@@ -1,0 +1,303 @@
+"""Command-line interface.
+
+The flow a parent with a box of DUPLO wants::
+
+    duplotrain solve --curve 12 --straight 4 -o out
+
+...and out come ranked pictures of every distinct loop those pieces can build.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import click
+from rich.console import Console
+from rich.table import Table
+
+from .catalog import default_catalog, load_catalog
+from .layout import layout_from_dict, layout_to_dict
+from .scoring import score_solution
+from .solver import SolverConfig, solve
+
+console = Console()
+
+
+def _catalog(paths: tuple[str, ...]):
+    return load_catalog(*paths) if paths else default_catalog()
+
+
+@click.group()
+@click.version_option(package_name="duplotrain")
+def main() -> None:
+    """Model DUPLO train track and find layouts that loop nicely."""
+
+
+@main.command()
+@click.option(
+    "--catalog",
+    "catalog_paths",
+    multiple=True,
+    type=click.Path(exists=True),
+    help="Extra piece-catalogue JSON, overriding built-ins by id.",
+)
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
+def pieces(catalog_paths: tuple[str, ...], as_json: bool) -> None:
+    """List the known track pieces."""
+    catalog = _catalog(catalog_paths)
+    if as_json:
+        payload = [
+            {
+                "id": p.id,
+                "name": p.name,
+                "category": p.category,
+                "ports": len(p.ports),
+                "part_numbers": list(p.part_numbers),
+                "provisional": p.provisional,
+                "notes": p.notes,
+            }
+            for p in catalog.values()
+        ]
+        click.echo(json.dumps(payload, indent=2))
+        return
+    table = Table(title="DUPLO track pieces")
+    table.add_column("id", style="bold")
+    table.add_column("name")
+    table.add_column("ports", justify="right")
+    table.add_column("parts")
+    table.add_column("notes", max_width=60)
+    for p in catalog.values():
+        name = p.name + (" [dim](provisional)[/dim]" if p.provisional else "")
+        table.add_row(p.id, name, str(len(p.ports)), ", ".join(p.part_numbers), p.notes)
+    console.print(table)
+
+
+def _inventory_options(fn):
+    for pid in reversed(list(default_catalog())):
+        fn = click.option(
+            f"--{pid.replace('_', '-')}",
+            pid,
+            type=int,
+            default=0,
+            help=f"Number of '{pid}' pieces you own.",
+        )(fn)
+    return fn
+
+
+@main.command()
+@_inventory_options
+@click.option(
+    "--inventory",
+    "inventory_path",
+    type=click.Path(exists=True),
+    help='JSON file {"curve": 12, "straight": 4, ...}; merged with the flags.',
+)
+@click.option(
+    "--catalog",
+    "catalog_paths",
+    multiple=True,
+    type=click.Path(exists=True),
+    help="Extra piece-catalogue JSON, overriding built-ins by id.",
+)
+@click.option(
+    "--slop",
+    type=float,
+    default=0.0,
+    show_default=True,
+    help="Total closing gap (mm) the joints may absorb; 0 = exact loops only.",
+)
+@click.option("--min-pieces", type=int, default=4, show_default=True)
+@click.option("--max-results", type=int, default=25, show_default=True)
+@click.option("--max-nodes", type=int, default=2_000_000, show_default=True)
+@click.option("--use-all", is_flag=True, help="Only layouts using every owned piece.")
+@click.option(
+    "-o",
+    "--out",
+    type=click.Path(file_okay=False),
+    default=None,
+    help="Directory for rendered images and layout JSON; omit for a text listing only.",
+)
+@click.option("--top", type=int, default=10, show_default=True, help="How many to save.")
+def solve_cmd(
+    inventory_path: str | None,
+    catalog_paths: tuple[str, ...],
+    slop: float,
+    min_pieces: int,
+    max_results: int,
+    max_nodes: int,
+    use_all: bool,
+    out: str | None,
+    top: int,
+    **flag_counts: int,
+) -> None:
+    """Find closed loops buildable from your pieces."""
+    catalog = _catalog(catalog_paths)
+
+    inventory: dict[str, int] = {k: v for k, v in flag_counts.items() if v > 0}
+    if inventory_path:
+        with open(inventory_path, encoding="utf-8") as fh:
+            for k, v in json.load(fh).items():
+                inventory[k] = inventory.get(k, 0) + int(v)
+    if not inventory:
+        raise click.UsageError(
+            "Tell me what you own, e.g.:  duplotrain solve --curve 12 --straight 4"
+        )
+
+    config = SolverConfig(
+        slop=slop,
+        min_pieces=min_pieces,
+        max_results=max_results,
+        max_nodes=max_nodes,
+        use_all_pieces=use_all,
+    )
+    with console.status("searching for loops..."):
+        result = solve(inventory, catalog, config)
+    stats = result.stats
+
+    scored = sorted(
+        (
+            (score_solution(sol, inventory).total, sol)
+            for sol in result.solutions
+        ),
+        key=lambda pair: -pair[0],
+    )
+
+    console.print(
+        f"[bold]{len(scored)}[/bold] distinct loop(s) found "
+        f"({stats.nodes:,} states searched in {stats.duration_s:.1f}s"
+        + (", [red]stopped at node limit[/red]" if stats.aborted else "")
+        + ")"
+    )
+    if not scored:
+        console.print(
+            "No closed loop fits. Try adding curves (12 make a circle), or allow "
+            "forced fits with [bold]--slop 5[/bold]."
+        )
+        return
+
+    table = Table(title="Loops, nicest first")
+    table.add_column("#", justify="right")
+    table.add_column("score", justify="right")
+    table.add_column("pieces")
+    table.add_column("size (cm)", justify="right")
+    table.add_column("closure")
+    table.add_column("stubs", justify="right")
+    for rank, (score, sol) in enumerate(scored[: max(top, 10)], start=1):
+        width, height = sol.layout.size()
+        counts = " ".join(
+            f"{n}x{pid}" for pid, n in sorted(sol.layout.piece_counts.items())
+        )
+        closure = "exact" if sol.exact else f"forced ({sol.gap:.1f} mm)"
+        table.add_row(
+            str(rank),
+            f"{score:.0f}",
+            counts,
+            f"{width / 10:.0f} x {height / 10:.0f}",
+            closure,
+            str(sol.open_stubs),
+        )
+    console.print(table)
+
+    if out:
+        out_dir = Path(out)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            from .render import render_layout
+        except ImportError:
+            console.print(
+                "[yellow]matplotlib not installed; writing layout JSON only "
+                "(pip install duplotrain[render])[/yellow]"
+            )
+            render_layout = None
+        for rank, (score, sol) in enumerate(scored[:top], start=1):
+            stem = out_dir / f"loop_{rank:02d}"
+            with open(f"{stem}.json", "w", encoding="utf-8") as fh:
+                json.dump(layout_to_dict(sol.layout), fh, indent=2)
+            if render_layout is not None:
+                closure = "exact" if sol.exact else f"forced {sol.gap:.1f} mm"
+                width, height = sol.layout.size()
+                render_layout(
+                    sol.layout,
+                    path=f"{stem}.png",
+                    title=(
+                        f"#{rank}  score {score:.0f}  |  {closure}  |  "
+                        f"{width / 10:.0f} x {height / 10:.0f} cm"
+                    ),
+                )
+        console.print(f"Saved the top {min(top, len(scored))} to [bold]{out_dir}[/bold]")
+
+
+main.add_command(solve_cmd, name="solve")
+
+
+@main.command()
+@click.argument("layout_file", type=click.Path(exists=True))
+@click.option(
+    "--catalog",
+    "catalog_paths",
+    multiple=True,
+    type=click.Path(exists=True),
+)
+@click.option("-o", "--out", type=click.Path(dir_okay=False), default=None)
+def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) -> None:
+    """Render a saved layout JSON to an image."""
+    from .render import render_layout
+
+    catalog = _catalog(catalog_paths)
+    with open(layout_file, encoding="utf-8") as fh:
+        layout = layout_from_dict(json.load(fh), catalog)
+    target = out or str(Path(layout_file).with_suffix(".png"))
+    render_layout(layout, path=target)
+    console.print(f"Wrote [bold]{target}[/bold]")
+
+
+@main.command()
+@click.argument("layout_file", type=click.Path(exists=True))
+@click.option(
+    "--catalog",
+    "catalog_paths",
+    multiple=True,
+    type=click.Path(exists=True),
+)
+def check(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
+    """Report whether a saved layout is closed, and where the gaps are."""
+    catalog = _catalog(catalog_paths)
+    with open(layout_file, encoding="utf-8") as fh:
+        layout = layout_from_dict(json.load(fh), catalog)
+    width, height = layout.size()
+    console.print(
+        f"{len(layout)} pieces, {layout.track_length() / 10:.0f} cm of track, "
+        f"{width / 10:.0f} x {height / 10:.0f} cm footprint"
+    )
+    if layout.is_closed:
+        console.print("[green]Fully closed: every connector is mated.[/green]")
+        return
+    open_ends = layout.open_ends()
+    console.print(f"[yellow]{len(open_ends)} open end(s).[/yellow]")
+    for a, b, gap in layout.gaps()[:5]:
+        console.print(f"  {a} <-> {b}: gap {gap:.1f} mm")
+
+
+@main.command()
+@click.option("-o", "--out", type=click.Path(dir_okay=False), default="oval.png")
+def demo(out: str) -> None:
+    """Build and render the classic starter oval (12 curves + 4 straights)."""
+    from .render import render_layout
+
+    catalog = default_catalog()
+    result = solve(
+        {"curve": 12, "straight": 4},
+        catalog,
+        SolverConfig(use_all_pieces=True, max_results=5),
+    )
+    best = result.solutions[0]
+    render_layout(best.layout, path=out, title="The classic DUPLO oval")
+    console.print(
+        f"The starter oval closes exactly; picture in [bold]{out}[/bold]. "
+        "Now try:  duplotrain solve --curve 12 --straight 4 --switch 2 -o out"
+    )
+
+
+if __name__ == "__main__":
+    main()
