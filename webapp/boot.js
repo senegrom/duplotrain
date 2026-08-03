@@ -1,20 +1,31 @@
-/* duplotrain web boot: run the Python engine in-browser via (self-hosted) Pyodide.
+/* duplotrain web boot: bridge the editor to the Python engine running in a
+ * Web Worker (see worker.js), so solving never freezes the page.
  *
  * Installs window.duplotrainApi + window.duplotrainBoot before the editor's own
- * script runs; the editor calls duplotrainBoot({refresh, status}) instead of its
- * first refresh, and every api() call is answered by the Python dispatcher. */
+ * script (app.js) runs; the editor calls duplotrainBoot({refresh, status})
+ * instead of its first refresh. */
 "use strict";
 
 (function () {
-  let dispatch = null; // Python callable once booted
+  let worker = null;
+  let seq = 0;
+  const pending = new Map();
 
-  window.duplotrainApi = async (path, body) => {
-    if (!dispatch) throw new Error("engine still loading");
-    const res = dispatch(path, body === undefined ? null : JSON.stringify(body));
-    const data = JSON.parse(res);
-    if (data.__error) throw new Error(data.__error);
-    return data;
-  };
+  window.duplotrainApi = (path, body) =>
+    new Promise((resolve, reject) => {
+      if (!worker) return reject(new Error("engine still loading"));
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      worker.postMessage({
+        id,
+        path,
+        body: body === undefined ? null : JSON.stringify(body),
+      });
+    }).then((res) => {
+      const data = JSON.parse(res);
+      if (data.__error) throw new Error(data.__error);
+      return data;
+    });
 
   window.duplotrainBoot = async ({ refresh, status }) => {
     const overlay = document.createElement("div");
@@ -28,31 +39,39 @@
       "<span style='color:#7a828a;font-size:13px'>(~12 MB once; cached for next time)</span></div>";
     document.body.append(overlay);
     const msg = overlay.querySelector("#bootmsg");
+    const fail = (detail) => {
+      msg.innerHTML = "Could not start the engine: <b>" +
+        String(detail).slice(0, 300) + "</b>";
+    };
 
     try {
-      msg.firstChild.textContent = "Loading Python runtime…";
-      const { loadPyodide } = await import("./pyodide/pyodide.mjs");
-      const pyodide = await loadPyodide({ indexURL: "./pyodide/" });
+      worker = new Worker("./worker.js");
+      worker.onerror = (e) => fail(e.message || "worker error");
+      const ready = new Promise((resolve, reject) => {
+        worker.addEventListener("message", function onMsg(event) {
+          if (event.data && event.data.ready) {
+            worker.removeEventListener("message", onMsg);
+            resolve();
+          } else if (event.data && event.data.bootError) {
+            reject(new Error(event.data.bootError));
+          }
+        });
+      });
+      worker.addEventListener("message", (event) => {
+        const { id, res, err } = event.data || {};
+        const call = pending.get(id);
+        if (!call) return;
+        pending.delete(id);
+        if (err) call.reject(new Error(err));
+        else call.resolve(res);
+      });
 
-      msg.firstChild.textContent = "Loading duplotrain…";
-      const zipBuf = await (await fetch("./duplotrain-src.zip")).arrayBuffer();
-      pyodide.FS.mkdirTree("/app");
-      pyodide.unpackArchive(zipBuf, "zip", { extractDir: "/app" });
-      pyodide.runPython("import sys; sys.path.insert(0, '/app')");
-
-      const adapterSrc = await (await fetch("./adapter.py")).text();
-      pyodide.FS.writeFile("/app/adapter.py", adapterSrc);
-      dispatch = pyodide.pyimport("adapter").dispatch;
-
+      await ready;
       overlay.remove();
       await refresh();
-      status(
-        "Engine ready — everything runs in your browser. " +
-        "Solving may pause the page for a few seconds."
-      );
+      status("Engine ready — runs in your browser.");
     } catch (err) {
-      msg.innerHTML =
-        "Could not start the engine: <b>" + String(err).slice(0, 300) + "</b>";
+      fail(err);
       console.error(err);
     }
   };

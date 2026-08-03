@@ -35,7 +35,8 @@
   button.primary:disabled { background: #b9c4bd; border-color: #b9c4bd; cursor: default; }
   button.ghost { border-style: dashed; color: var(--dim); }
   #actions { display: flex; flex-wrap: wrap; gap: 6px; }
-  #status { padding: 8px 10px; border-radius: 8px; background: #f0efe9; min-height: 38px; }
+  #status { padding: 8px 10px; border-radius: 8px; background: #f0efe9; min-height: 38px;
+            overflow-wrap: anywhere; }
   #status.closed { background: #e4f2e8; color: var(--good); font-weight: 600; }
   #status.err { background: #fbe9e7; color: var(--open); }
   .cand { border: 1px solid #e2e0da; border-radius: 8px; padding: 7px 10px; cursor: pointer; }
@@ -75,7 +76,7 @@
 </div>
 <div id="stage">
   <canvas id="canvas"></canvas>
-  <div id="hint">drag: pan · wheel: zoom · click red arrow: attach armed piece / pick ends</div>
+  <div id="hint">drag: pan · wheel: zoom · click red arrow: attach · right-click: remove piece/stone</div>
 </div>
 <script>
 "use strict";
@@ -173,6 +174,43 @@ function openEndScreenPos() {
     }
   });
   return out;
+}
+
+function stoneMarkPositions() {
+  // Screen positions of every drawn stone, mirroring the draw loop's layout.
+  const out = [];
+  if (!S) return out;
+  S.layout.placements.forEach((pl, i) => {
+    (pl.stone_marks || []).forEach((mark, k) => {
+      let wx = pl.mid[0], wy = pl.mid[1];
+      if (mark.at !== null && mark.at !== undefined && pl.ports[mark.at]) {
+        const port = pl.ports[mark.at];
+        wx = port.x * 0.82 + pl.mid[0] * 0.18;
+        wy = port.y * 0.82 + pl.mid[1] * 0.18;
+      }
+      const [sx, sy] = worldToScreen(wx, wy);
+      const r = Math.max(6, 14 * view.scale);
+      const oy = (k - ((pl.stone_marks.length - 1) / 2)) * r * 2.2;
+      out.push({ placement: i, id: mark.id, x: sx, y: sy + oy, r });
+    });
+  });
+  return out;
+}
+
+function placementAt(sx, sy) {
+  if (!S) return null;
+  let best = null;
+  S.layout.placements.forEach((pl, i) => {
+    const reach = Math.max(14, (pl.width / 2) * view.scale);
+    for (const line of pl.lines) {
+      for (const [x, y] of line) {
+        const [px, py] = worldToScreen(x, y);
+        const d = Math.hypot(px - sx, py - sy);
+        if (d < reach && (!best || d < best.d)) best = { placement: i, d };
+      }
+    }
+  });
+  return best ? best.placement : null;
 }
 
 function stoneMountAt(sx, sy) {
@@ -485,8 +523,12 @@ el("solve").addEventListener("click", async () => {
   await runSolve(null, null);
 });
 
+let solving = false;
 async function runSolve(grow, close) {
-  status("searching…");
+  if (solving) return;
+  solving = true;
+  el("solve").disabled = true;
+  status("searching… (hard gaps can take up to ~30 s)");
   try {
     S = await api("/api/solve", {
       grow, close,
@@ -503,6 +545,9 @@ async function runSolve(grow, close) {
   } catch (e) {
     pickMode = null;
     status(e.message, "err");
+  } finally {
+    solving = false;
+    el("solve").disabled = (S && S.open_ends.length < 2) || false;
   }
 }
 
@@ -554,6 +599,26 @@ canvas.addEventListener("mouseup", async (e) => {
       const m = S.matable.find(([a, b]) =>
         (a[0] === hit.end[0] && a[1] === hit.end[1]) || (b[0] === hit.end[0] && b[1] === hit.end[1]));
       if (m) { S = await api("/api/join", { a: m[0], b: m[1] }); redraw(); }
+    }
+  } catch (err) {
+    status(err.message, "err");
+  }
+});
+canvas.addEventListener("contextmenu", async (e) => {
+  e.preventDefault();
+  try {
+    // A stone under the cursor comes off first; otherwise the piece does.
+    const mark = stoneMarkPositions().find(
+      m => Math.hypot(m.x - e.offsetX, m.y - e.offsetY) < Math.max(12, m.r + 4));
+    if (mark) {
+      S = await api("/api/stone", { placement: mark.placement, id: mark.id });
+      redraw();
+      return;
+    }
+    const hit = placementAt(e.offsetX, e.offsetY);
+    if (hit !== null) {
+      S = await api("/api/remove", { placement: hit });
+      redraw();
     }
   } catch (err) {
     status(err.message, "err");

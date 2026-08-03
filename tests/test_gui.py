@@ -172,6 +172,45 @@ def test_sealed_buffer_end_is_not_clickable(server):
     assert "sealed" in err["error"]
 
 
+def test_buffer_is_placeable_from_the_palette(server):
+    status, state = server("/api/state")
+    buffer = next(p for p in state["palette"] if p["id"] == "buffer")
+    assert buffer["variants"], "route-less pieces still need a placement button"
+    variant = buffer["variants"][0]
+    assert variant["label"] == "cap the end"
+
+    _, state = server("/api/attach", {"piece": "straight", "entry": 0, "at": None})
+    status, state = server(
+        "/api/attach",
+        {"piece": "buffer", "entry": variant["entry"], "at": state["open_ends"][-1]},
+    )
+    assert status == 200
+    assert state["layout"]["placements"][1]["piece"] == "buffer"
+
+
+def test_remove_piece_reindexes(server):
+    _, state = server("/api/attach", {"piece": "straight", "entry": 0, "at": None})
+    _, state = server(
+        "/api/attach", {"piece": "curve", "entry": 0, "at": state["open_ends"][-1]}
+    )
+    _, state = server(
+        "/api/attach", {"piece": "curve", "entry": 0, "at": state["open_ends"][-1]}
+    )
+    _, state = server("/api/stone", {"placement": 0, "id": "stone_stop"})
+    assert len(state["layout"]["placements"]) == 3
+
+    # Remove the middle curve: the chain splits, the stone stays on the straight.
+    status, state = server("/api/remove", {"placement": 1})
+    assert status == 200
+    assert len(state["layout"]["placements"]) == 2
+    assert [p["piece"] for p in state["layout"]["placements"]] == ["straight", "curve"]
+    assert state["layout"]["placements"][0]["stones"] == ["stone_stop"]
+    assert len(state["open_ends"]) == 4  # two loose chains now
+
+    status, err = server("/api/remove", {"placement": 7})
+    assert status == 409
+
+
 def test_errors_are_json_not_500(server):
     status, err = server("/api/attach", {"piece": "warp_gate", "entry": 0, "at": None})
     assert status == 409

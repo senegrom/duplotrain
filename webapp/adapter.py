@@ -27,6 +27,8 @@ def dispatch(path: str, body_json: str | None) -> str:
             session.join(tuple(body["a"]), tuple(body["b"]))
         elif path == "/api/undo":
             session.undo()
+        elif path == "/api/remove":
+            session.remove_piece(int(body["placement"]))
         elif path == "/api/clear":
             session.clear()
         elif path == "/api/inventory":

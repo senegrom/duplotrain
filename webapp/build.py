@@ -144,6 +144,7 @@ def main() -> None:
 
     build_index()
     shutil.copy2(WEBAPP / "boot.js", DIST / "boot.js")
+    shutil.copy2(WEBAPP / "worker.js", DIST / "worker.js")
     shutil.copy2(WEBAPP / "adapter.py", DIST / "adapter.py")
     build_source_zip()
 

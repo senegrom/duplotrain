@@ -242,6 +242,31 @@ class Layout:
         links[(new_index, entry_port)] = at
         return Layout(placements, links, self.accessories), new_index
 
+    def remove(self, index: int) -> Layout:
+        """Take one placed piece off the floor.
+
+        Its joints open up, its stones come off with it, and later placements shift
+        down one index (links and accessories are remapped accordingly).
+        """
+        if not 0 <= index < len(self.placements):
+            raise ValueError(f"no placement {index}")
+        placements = self.placements[:index] + self.placements[index + 1 :]
+
+        def remap(i: int) -> int:
+            return i - 1 if i > index else i
+
+        links: dict[End, End] = {}
+        for (ai, ap), (bi, bp) in self.links.items():
+            if ai == index or bi == index:
+                continue
+            links[(remap(ai), ap)] = (remap(bi), bp)
+        accessories = tuple(
+            (remap(entry[0]), *entry[1:])
+            for entry in self.accessories
+            if entry[0] != index
+        )
+        return Layout(placements, links, accessories)
+
     def join(self, a: End, b: End, force: bool = False) -> Layout:
         """Record that two existing open ends mate -- the move that closes a loop.
 

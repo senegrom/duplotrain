@@ -161,6 +161,15 @@ class Session:
                 variants.append(
                     {"entry": move.entry, "exit": move.exit, "label": label, "turn": turn}
                 )
+            if not variants:
+                # No drivable route (a buffer stop): still placeable by hand through
+                # each real connector -- attaching only needs an entry port.
+                unsealed = [
+                    p for p in range(len(piece.ports)) if p not in piece.sealed
+                ]
+                for p in unsealed:
+                    label = "cap the end" if len(unsealed) == 1 else f"via {piece.ports[p].name}"
+                    variants.append({"entry": p, "exit": p, "label": label, "turn": 0})
             palette.append(
                 {
                     "id": pid,
@@ -244,6 +253,9 @@ class Session:
     def join(self, a: End, b: End) -> None:
         self._push(self.layout.join(a, b))
 
+    def remove_piece(self, placement: int) -> None:
+        self._push(self.layout.remove(placement))
+
     def undo(self) -> None:
         if len(self.history) > 1:
             self.history.pop()
@@ -312,7 +324,9 @@ class Session:
                 slop=slop,
                 min_pieces=1,
                 max_results=max_results,
-                max_nodes=400_000,
+                # Modest budget: the editor must feel interactive, and under the web
+                # build this runs in WebAssembly at a fraction of native speed.
+                max_nodes=150_000,
                 reversing_loops=reversing,
             ),
             base=self.layout,
@@ -386,6 +400,8 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 session.join(tuple(body["a"]), tuple(body["b"]))
             elif path == "/api/undo":
                 session.undo()
+            elif path == "/api/remove":
+                session.remove_piece(int(body["placement"]))
             elif path == "/api/clear":
                 session.clear()
             elif path == "/api/inventory":
