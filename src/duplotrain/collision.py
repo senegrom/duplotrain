@@ -12,7 +12,12 @@ future piece (or a user's brick-stacked bridge) rises high enough, crossing unde
 becomes legal automatically.
 
 Directly-linked placements are exempt from mutual checking: neighbouring pieces meet at
-their shared joint by construction, and that contact is not an overlap.
+their shared joint by construction, and that contact is not an overlap.  The one thing
+that exemption cannot judge is bodies extending *past* the joint (the level crossing's
+road plate overhangs its connectors by 16 mm) -- the disc model cannot tell a legal
+plate-over-plain-track join from an illegal plate-over-plate one.  That constraint is
+therefore enforced at link level instead: pieces declare an ``end_overhang`` and two
+overhanging ends refuse to mate (see ``PieceType.end_overhang`` and ``Layout.join``).
 """
 
 from __future__ import annotations
@@ -45,7 +50,9 @@ class CollisionField:
     """Incremental collision checker over a growing set of placements.
 
     Supports ``add`` / ``pop`` in LIFO order, matching depth-first search.  Points are
-    binned into a coarse grid so each query touches only nearby samples.
+    binned into a coarse grid; each query scans a neighbourhood wide enough for the
+    largest interaction radius actually stored, so wide pieces (the 160 mm level
+    crossing) are detected just as reliably as plain 64 mm track.
     """
 
     clearance: float = DEFAULT_CLEARANCE
@@ -54,10 +61,16 @@ class CollisionField:
     _grid: dict[tuple[int, int], list[tuple[float, float, float, float, int]]] = field(
         default_factory=dict
     )
+    _max_half_width: float = 0.0
 
-    def _cells_near(self, x: float, y: float) -> list[tuple[int, int]]:
+    def _cells_near(self, x: float, y: float, reach: float) -> list[tuple[int, int]]:
+        r = max(1, math.ceil(reach / self.cell))
         cx, cy = int(math.floor(x / self.cell)), int(math.floor(y / self.cell))
-        return [(cx + dx, cy + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+        return [
+            (cx + dx, cy + dy)
+            for dx in range(-r, r + 1)
+            for dy in range(-r, r + 1)
+        ]
 
     def clashes(
         self,
@@ -70,8 +83,9 @@ class CollisionField:
         *ignore* lists placement indices exempt from the check (the piece's direct
         neighbours in the layout graph).
         """
+        reach = half_width + self._max_half_width - TOUCH_MARGIN
         for x, y, z in points:
-            for cell in self._cells_near(x, y):
+            for cell in self._cells_near(x, y, reach):
                 for px, py, pz, phw, pidx in self._grid.get(cell, ()):
                     if pidx in ignore:
                         continue
@@ -87,6 +101,7 @@ class CollisionField:
     ) -> None:
         cloud = _Cloud(placement, half_width, points)
         self._clouds.append(cloud)
+        self._max_half_width = max(self._max_half_width, half_width)
         for x, y, z in points:
             key = (int(math.floor(x / self.cell)), int(math.floor(y / self.cell)))
             self._grid.setdefault(key, []).append((x, y, z, half_width, placement))
@@ -94,6 +109,10 @@ class CollisionField:
     def pop(self) -> None:
         """Remove the most recently added placement (backtracking)."""
         cloud = self._clouds.pop()
+        if cloud.half_width >= self._max_half_width:
+            self._max_half_width = max(
+                (c.half_width for c in self._clouds), default=0.0
+            )
         for x, y, _z in cloud.points:
             key = (int(math.floor(x / self.cell)), int(math.floor(y / self.cell)))
             bucket = self._grid[key]

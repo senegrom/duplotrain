@@ -13,12 +13,13 @@ for speed and only builds a ``Layout`` once a candidate is worth keeping.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from fractions import Fraction
 from typing import Any, Iterable, Iterator, Mapping
 
 from .exact import Alg
-from .geometry import HEADING_STEPS, Pose
+from .geometry import Pose
 from .pieces import PieceType
 
 __all__ = ["Placement", "End", "Layout", "layout_to_dict", "layout_from_dict"]
@@ -58,8 +59,6 @@ class Placement:
 
     def centrelines(self, spacing: float = 8.0) -> list[list[tuple[float, float, float]]]:
         """Every route through the piece, sampled in world coordinates."""
-        import math
-
         theta = math.radians(self.frame.degrees)
         cos_t, sin_t = math.cos(theta), math.sin(theta)
         ox, oy, oz = self.frame.xyz()
@@ -133,35 +132,46 @@ class Layout:
             counts[placement.piece.id] = counts.get(placement.piece.id, 0) + 1
         return counts
 
-    def total_turn_steps(self) -> int:
-        """Net heading change accumulated by walking the main route of every piece.
-
-        Only meaningful for a simple loop, where it should be ``+/- HEADING_STEPS``.
-        """
-        total = 0
-        for placement in self.placements:
-            route = placement.piece.routes[0]
-            a = placement.piece.ports[route.port_a].pose
-            b = placement.piece.ports[route.port_b].pose
-            total += (b.heading - (a.heading + HEADING_STEPS // 2)) % HEADING_STEPS
-        return total
-
     def bounds(self) -> tuple[float, float, float, float]:
         """Outer envelope ``(min_x, min_y, max_x, max_y)`` in mm.
 
-        Centreline samples grown by each piece's half-width -- the room the physical
-        track needs, up to a slight over-estimate at corners cut diagonally.
+        Centreline samples are grown by each piece's half-width *perpendicular to the
+        direction of travel* (plus any declared end overhang along it at the line
+        ends), so a straight run reports its true footprint rather than being inflated
+        lengthwise by its width.
         """
         min_x = min_y = float("inf")
         max_x = max_y = float("-inf")
+
+        def grow(x: float, y: float) -> None:
+            nonlocal min_x, min_y, max_x, max_y
+            min_x, max_x = min(min_x, x), max(max_x, x)
+            min_y, max_y = min(min_y, y), max(max_y, y)
+
         for placement in self.placements:
             hw = placement.piece.width / 2.0
+            overhang = placement.piece.end_overhang
             for line in placement.centrelines():
-                for x, y, _ in line:
-                    min_x = min(min_x, x - hw)
-                    min_y = min(min_y, y - hw)
-                    max_x = max(max_x, x + hw)
-                    max_y = max(max_y, y + hw)
+                if len(line) < 2:
+                    for x, y, _ in line:
+                        grow(x - hw, y - hw)
+                        grow(x + hw, y + hw)
+                    continue
+                n = len(line)
+                for i, (x, y, _z) in enumerate(line):
+                    ax, ay, _ = line[max(0, i - 1)]
+                    bx, by, _ = line[min(n - 1, i + 1)]
+                    dx, dy = bx - ax, by - ay
+                    norm = math.hypot(dx, dy) or 1.0
+                    nx, ny = -dy / norm, dx / norm
+                    grow(x + nx * hw, y + ny * hw)
+                    grow(x - nx * hw, y - ny * hw)
+                    if overhang and i in (0, n - 1):
+                        direction = -1.0 if i == 0 else 1.0
+                        ox = x + direction * dx / norm * overhang
+                        oy = y + direction * dy / norm * overhang
+                        grow(ox + nx * hw, oy + ny * hw)
+                        grow(ox - nx * hw, oy - ny * hw)
         if min_x > max_x:
             return (0.0, 0.0, 0.0, 0.0)
         return (min_x, min_y, max_x, max_y)
@@ -186,10 +196,17 @@ class Layout:
         """Plug *piece* into the open end *at*, entering through *entry_port*.
 
         Raises:
-            ValueError: if *at* is already occupied.
+            ValueError: if *at* is already occupied, or both mating ends carry a body
+                overhang (two level-crossing plates cannot share a joint).
         """
         if at in self.links:
             raise ValueError(f"end {at} is already connected to {self.links[at]}")
+        host = self.placements[at[0]].piece
+        if host.end_overhang > 0 and piece.end_overhang > 0:
+            raise ValueError(
+                f"{host.id} and {piece.id} both overhang their connectors; their "
+                "plates would overlap, so they cannot join directly"
+            )
         # pose_of() already points outward from the existing piece, which is exactly the
         # direction the layout continues in -- what frame_for() wants.
         frame = piece.frame_for(entry_port, self.pose_of(at))
@@ -214,6 +231,13 @@ class Layout:
         for end in (a, b):
             if end in self.links:
                 raise ValueError(f"end {end} is already connected")
+        piece_a = self.placements[a[0]].piece
+        piece_b = self.placements[b[0]].piece
+        if piece_a.end_overhang > 0 and piece_b.end_overhang > 0:
+            raise ValueError(
+                f"{piece_a.id} and {piece_b.id} both overhang their connectors; "
+                "their plates would overlap, so they cannot join directly"
+            )
         pose_a, pose_b = self.pose_of(a), self.pose_of(b)
         if not force and not pose_a.connects_to(pose_b):
             raise ValueError(

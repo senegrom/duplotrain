@@ -25,7 +25,10 @@ console = Console()
 
 
 def _catalog(paths: tuple[str, ...]):
-    return load_catalog(*paths) if paths else default_catalog()
+    try:
+        return load_catalog(*paths) if paths else default_catalog()
+    except (ValueError, OSError) as exc:  # JSONDecodeError is a ValueError
+        raise click.ClickException(f"bad catalogue file: {exc}") from exc
 
 
 @click.group()
@@ -91,7 +94,10 @@ def _inventory_options(fn):
     "--inventory",
     "inventory_path",
     type=click.Path(exists=True),
-    help='JSON file {"curve": 12, "straight": 4, ...}; merged with the flags.',
+    help=(
+        'JSON file {"curve": 12, "straight": 4, ...}; merged with the flags. '
+        "Pieces added via --catalog have no dedicated flag and are counted here."
+    ),
 )
 @click.option(
     "--catalog",
@@ -136,9 +142,12 @@ def solve_cmd(
 
     inventory: dict[str, int] = {k: v for k, v in flag_counts.items() if v > 0}
     if inventory_path:
-        with open(inventory_path, encoding="utf-8") as fh:
-            for k, v in json.load(fh).items():
-                inventory[k] = inventory.get(k, 0) + int(v)
+        try:
+            with open(inventory_path, encoding="utf-8") as fh:
+                for k, v in json.load(fh).items():
+                    inventory[k] = inventory.get(k, 0) + int(v)
+        except (ValueError, TypeError) as exc:
+            raise click.ClickException(f"bad inventory file: {exc}") from exc
     if not inventory:
         raise click.UsageError(
             "Tell me what you own, e.g.:  duplotrain solve --curve 12 --straight 4"
@@ -151,8 +160,11 @@ def solve_cmd(
         max_nodes=max_nodes,
         use_all_pieces=use_all,
     )
-    with console.status("searching for loops..."):
-        result = solve(inventory, catalog, config)
+    try:
+        with console.status("searching for loops..."):
+            result = solve(inventory, catalog, config)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
     stats = result.stats
 
     scored = sorted(
@@ -183,7 +195,7 @@ def solve_cmd(
     table.add_column("size (cm)", justify="right")
     table.add_column("closure")
     table.add_column("stubs", justify="right")
-    for rank, (score, sol) in enumerate(scored[: max(top, 10)], start=1):
+    for rank, (score, sol) in enumerate(scored, start=1):
         width, height = sol.layout.size()
         counts = " ".join(
             f"{n}x{pid}" for pid, n in sorted(sol.layout.piece_counts.items())
@@ -231,6 +243,14 @@ def solve_cmd(
 main.add_command(solve_cmd, name="solve")
 
 
+def _load_layout(layout_file: str, catalog):
+    try:
+        with open(layout_file, encoding="utf-8") as fh:
+            return layout_from_dict(json.load(fh), catalog)
+    except (ValueError, KeyError) as exc:
+        raise click.ClickException(f"bad layout file: {exc}") from exc
+
+
 @main.command()
 @click.argument("layout_file", type=click.Path(exists=True))
 @click.option(
@@ -245,8 +265,7 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
     from .render import render_layout
 
     catalog = _catalog(catalog_paths)
-    with open(layout_file, encoding="utf-8") as fh:
-        layout = layout_from_dict(json.load(fh), catalog)
+    layout = _load_layout(layout_file, catalog)
     target = out or str(Path(layout_file).with_suffix(".png"))
     render_layout(layout, path=target)
     console.print(f"Wrote [bold]{target}[/bold]")
@@ -263,8 +282,7 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
 def check(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
     """Report whether a saved layout is closed, and where the gaps are."""
     catalog = _catalog(catalog_paths)
-    with open(layout_file, encoding="utf-8") as fh:
-        layout = layout_from_dict(json.load(fh), catalog)
+    layout = _load_layout(layout_file, catalog)
     width, height = layout.size()
     console.print(
         f"{len(layout)} pieces, {layout.track_length() / 10:.0f} cm of track, "
@@ -277,6 +295,20 @@ def check(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
     console.print(f"[yellow]{len(open_ends)} open end(s).[/yellow]")
     for a, b, gap in layout.gaps()[:5]:
         console.print(f"  {a} <-> {b}: gap {gap:.1f} mm")
+
+
+@main.command()
+@click.option("--port", type=int, default=8137, show_default=True)
+@click.option("--no-browser", is_flag=True, help="Don't open a browser tab.")
+def gui(port: int, no_browser: bool) -> None:
+    """Open the interactive track designer in your browser.
+
+    Build track by clicking pieces onto open ends, then let the solver close the
+    loop with whatever is left in your box.
+    """
+    from .gui import run
+
+    run(port=port, open_browser=not no_browser)
 
 
 @main.command()

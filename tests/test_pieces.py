@@ -80,17 +80,29 @@ def test_crossing_has_two_independent_routes(catalog):
     # Straight through on each route; never a turn onto the other route.
     assert {exit_ for exit_, _ in crossing.transit(0)} == {1}
     assert {exit_ for exit_, _ in crossing.transit(2)} == {3}
+    # Each route is exactly one straight module (BlueBrick-measured, LDraw-calibrated).
     dx, dy, dz, dheading = crossing.exit_delta(0, 1)
-    assert (dx, dy, dheading) == (Alg(192), Alg(0), 0)
+    assert (dx, dy, dheading) == (Alg(128), Alg(0), 0)
+    # Route B's ports sit at (32, -32*sqrt3) and (96, 32*sqrt3), 60 deg to route A.
+    poses = {(p.pose.x, p.pose.y) for p in crossing.ports}
+    assert (Alg(32), Alg(0, 0, -32, 0)) in poses
+    assert (Alg(96), Alg(0, 0, 32, 0)) in poses
 
 
 def test_ramp_rises(catalog):
     ramp = catalog["ramp"]
     dx, dy, dz, dheading = ramp.exit_delta(0, 1)
-    assert (float(dx), float(dz)) == (320.0, pytest.approx(76.8))
+    # 3 DUPLO bricks over 320 mm; a 4-brick rise cannot fit the real part's height.
+    assert (float(dx), float(dz)) == (320.0, pytest.approx(57.6))
     # Entered downhill, it descends.
     dx2, _dy2, dz2, _ = ramp.exit_delta(1, 0)
-    assert float(dz2) == pytest.approx(-76.8)
+    assert float(dz2) == pytest.approx(-57.6)
+
+
+def test_span_keeps_rising_to_the_crest(catalog):
+    span = catalog["span"]
+    dx, _dy, dz, _ = span.exit_delta(0, 1)
+    assert (float(dx), float(dz)) == (192.0, pytest.approx(19.2))
 
 
 def test_duplicate_piece_ids_rejected():

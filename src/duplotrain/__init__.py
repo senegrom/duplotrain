@@ -10,6 +10,8 @@ Quick taste::
     render_layout(best.layout, "oval.png")
 """
 
+from typing import TYPE_CHECKING
+
 from .catalog import default_catalog, load_catalog
 from .exact import Alg
 from .geometry import ORIGIN, Pose
@@ -45,8 +47,12 @@ __all__ = [
 ]
 
 
-def render_layout(*args, **kwargs):
-    """Lazy proxy for :func:`duplotrain.render.render_layout` (needs matplotlib)."""
-    from .render import render_layout as _render
+if TYPE_CHECKING:  # give type checkers and IDEs the real signature
+    from .render import render_layout
+else:
 
-    return _render(*args, **kwargs)
+    def render_layout(*args, **kwargs):
+        """Lazy proxy for :func:`duplotrain.render.render_layout` (needs matplotlib)."""
+        from .render import render_layout as _render
+
+        return _render(*args, **kwargs)

@@ -101,6 +101,37 @@ def _moves_for(piece: PieceType) -> list[Move]:
     return moves
 
 
+def _mirror_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, int] | None]:
+    """Map each traversal to the traversal that produces its mirror image, if any.
+
+    Derived from geometry rather than a hand-kept handedness table: a traversal's
+    anchored placement is reflected across the axis of approach (y -> -y, heading
+    negated) and the traversal of the same piece landing on exactly that reflected
+    geometry is looked up.  This automatically pairs a curve's left and right
+    readings, a switch's two branches, and even a crossing's two routes; a genuinely
+    single-handed piece maps to ``None`` (its loops have no buildable mirror twin).
+    """
+    by_key: dict[tuple, tuple[int, int]] = {}
+    traversals: list[tuple[int, int]] = []
+    for entry in range(len(piece.ports)):
+        for exit_port, _route in piece.transit(entry):
+            key = _traversal_key(piece, entry, exit_port)
+            by_key.setdefault(key, (entry, exit_port))
+            traversals.append((entry, exit_port))
+
+    canon = _canonical_traversals(piece)
+    mirror: dict[tuple[int, int], tuple[int, int] | None] = {}
+    for entry, exit_port in traversals:
+        ports_key, exit_key = _traversal_key(piece, entry, exit_port)
+        mirrored_key = (
+            frozenset((x, -y, z, (-h) % HEADING_STEPS) for (x, y, z, h) in ports_key),
+            (exit_key[0], -exit_key[1], exit_key[2], (-exit_key[3]) % HEADING_STEPS),
+        )
+        partner = by_key.get(mirrored_key)
+        mirror[(entry, exit_port)] = canon[partner] if partner is not None else None
+    return mirror
+
+
 def _turn_capacity(piece: PieceType) -> int:
     """Largest |heading swing| any single traversal of this piece can contribute."""
     best = 0
@@ -144,49 +175,82 @@ class _Transit:
 def _canonical_signature(
     steps: Sequence[object],
     canon_for: Mapping[str, Mapping[tuple[int, int], tuple[int, int]]],
+    base_pids: Sequence[str] = (),
+    cyclic: bool = True,
+    mirror_for: Mapping[str, Mapping[tuple[int, int], tuple[int, int] | None]] | None = None,
 ) -> tuple:
-    """Loop signature invariant to starting piece and traversal direction.
+    """Loop signature invariant to starting piece, direction, and reflection.
 
-    Reversal also covers mirror images: reflecting a closed curve gives the same
-    signature as walking it the other way round.  Two normalisations make the
-    comparison sound:
+    Three normalisations make the comparison sound:
 
     * every (entry, exit) is mapped through the piece's canonical-traversal table, so
       a reversed straight -- mechanically ``(1, 0)`` -- matches the ``(0, 1)`` the
       forward search emits;
     * pieces visited more than once (a figure-eight's crossing) are identified by a
       per-candidate ordinal of *first appearance*, not by which visit the search
-      happened to place them on -- rotation and reversal both move that visit around.
+      happened to place them on -- rotation and reversal both move that visit around;
+    * the mirror image is generated explicitly via each piece's mirror-traversal
+      table.  (Walking a chiral loop backwards is NOT its mirror image -- reversal
+      alone only collapses reflection twins of loops that are themselves symmetric.)
+
+    Completion searches (growing between two fixed ends of an existing layout) pass
+    ``cyclic=False``: their step sequences are paths anchored to the base, so
+    rotation, reversal and mirroring would all conflate genuinely different
+    completions.  ``base_pids`` names the pre-existing placements so transits through
+    them resolve to a piece id.
     """
-    # (instance, pid, entry, exit): `instance` identifies the physical piece -- the
-    # placement ordinal for place steps and the referenced ordinal for transits.
+    # (instance, pid, entry, exit): `instance` identifies the physical piece.  Instance
+    # ids share one space: base placements keep their layout index; grown pieces get
+    # n_base + (placement ordinal); transits reference either kind directly.
+    n_base = len(base_pids)
     place_pids = [s.piece_id for s in steps if isinstance(s, _Place)]
+
+    def pid_of(instance: int) -> str:
+        return base_pids[instance] if instance < n_base else place_pids[instance - n_base]
+
     visits: list[tuple[int, str, int, int]] = []
     ordinal = 0
     for s in steps:
         if isinstance(s, _Place):
-            visits.append((ordinal, s.piece_id, s.entry, s.exit))
+            visits.append((n_base + ordinal, s.piece_id, s.entry, s.exit))
             ordinal += 1
         else:
-            visits.append((s.placement, place_pids[s.placement], s.entry, s.exit))
+            visits.append((s.placement, pid_of(s.placement), s.entry, s.exit))
 
-    reversed_visits = [(inst, pid, x, e) for (inst, pid, e, x) in reversed(visits)]
+    def normalise(seq: list[tuple[int, str, int, int]]) -> tuple:
+        fresh: dict[int, int] = {}
+        out = []
+        for inst, pid, entry, exit_ in seq:
+            if inst not in fresh:
+                fresh[inst] = len(fresh)
+            table = canon_for.get(pid)
+            if table is not None:
+                entry, exit_ = table.get((entry, exit_), (entry, exit_))
+            out.append((fresh[inst], pid, entry, exit_))
+        return tuple(out)
 
-    def normalised_rotations(seq: list[tuple[int, str, int, int]]):
-        n = len(seq)
-        for start in range(n):
-            rotated = seq[start:] + seq[:start]
-            fresh: dict[int, int] = {}
-            out = []
-            for inst, pid, entry, exit_ in rotated:
-                if inst not in fresh:
-                    fresh[inst] = len(fresh)
-                entry, exit_ = canon_for[pid].get((entry, exit_), (entry, exit_))
-                out.append((fresh[inst], pid, entry, exit_))
-            yield tuple(out)
+    if not cyclic:
+        return normalise(visits)
 
+    sequences = [visits, [(inst, pid, x, e) for (inst, pid, e, x) in reversed(visits)]]
+
+    if mirror_for is not None:
+        mirrored: list[tuple[int, str, int, int]] | None = []
+        for inst, pid, entry, exit_ in visits:
+            partner = mirror_for.get(pid, {}).get((entry, exit_))
+            if partner is None:
+                mirrored = None  # a single-handed piece: no buildable mirror twin
+                break
+            mirrored.append((inst, pid, partner[0], partner[1]))
+        if mirrored is not None:
+            sequences.append(mirrored)
+            sequences.append(
+                [(inst, pid, x, e) for (inst, pid, e, x) in reversed(mirrored)]
+            )
+
+    n = len(visits)
     return min(
-        min(normalised_rotations(visits)), min(normalised_rotations(reversed_visits))
+        normalise(seq[start:] + seq[:start]) for seq in sequences for start in range(n)
     )
 
 
@@ -194,18 +258,26 @@ def _replay(
     steps: Sequence[object],
     pieces: Mapping[str, PieceType],
     force_final_join: bool,
+    base: Layout | None = None,
+    grow_from: tuple[int, int] | None = None,
+    close_onto: tuple[int, int] | None = None,
 ) -> Layout:
-    """Rebuild a full Layout (placements + link graph) from a step trace."""
-    layout = Layout()
-    cursor: tuple[int, int] | None = None
-    first_entry: tuple[int, int] | None = None
+    """Rebuild a full Layout (placements + link graph) from a step trace.
+
+    Loop mode (no *base*): the first placed piece plugs onto a virtual face at the
+    origin and the trace must return there.  Completion mode: the trace grows from the
+    open end *grow_from* of *base* and finally joins onto *close_onto*.
+    """
+    layout = base if base is not None else Layout()
+    cursor = grow_from
+    target: tuple[int, int] | None = close_onto
     for step in steps:
         if isinstance(step, _Place):
             piece = pieces[step.piece_id]
             if cursor is None:
                 frame = piece.frame_for(step.entry, ORIGIN)
                 layout, index = layout.with_piece(piece, frame)
-                first_entry = (index, step.entry)
+                target = (index, step.entry)
             else:
                 layout, index = layout.attach(piece, step.entry, cursor)
             cursor = (index, step.exit)
@@ -213,8 +285,8 @@ def _replay(
             assert isinstance(step, _Transit) and cursor is not None
             layout = layout.join(cursor, (step.placement, step.entry), force=force_final_join)
             cursor = (step.placement, step.exit)
-    assert cursor is not None and first_entry is not None
-    return layout.join(cursor, first_entry, force=force_final_join)
+    assert cursor is not None and target is not None
+    return layout.join(cursor, target, force=force_final_join)
 
 
 # --------------------------------------------------------------------------------------
@@ -277,30 +349,73 @@ def solve(
     inventory: Mapping[str, int],
     pieces: Mapping[str, PieceType],
     config: SolverConfig | None = None,
+    *,
+    base: Layout | None = None,
+    grow_from: tuple[int, int] | None = None,
+    close_onto: tuple[int, int] | None = None,
 ) -> SolveResult:
     """Find closed loops buildable from *inventory*.
 
+    Loop mode (default): search fresh loops from scratch.
+
+    Completion mode (*base* given): keep every placed piece of *base* where it is and
+    search for ways to connect its open end *grow_from* to its open end *close_onto*
+    using the inventory -- the "I built this much by hand, close it for me" question.
+    When the two ends are omitted they default to the last and first open end of the
+    base layout.  Base pieces participate fully: they collide, and open branches of
+    base junctions may be transited through.
+
     Args:
-        inventory: piece id -> available count.
+        inventory: piece id -> available count (the *spare* pieces, in completion mode).
         pieces: the catalogue those ids refer to.
-        config: search options; the defaults suit a shoebox of track.
+        config: search options; the defaults suit a shoebox of track.  In completion
+            mode ``min_pieces`` counts only newly grown pieces, so callers closing a
+            small gap will want ``min_pieces=1``.
+        base: existing layout to complete.
+        grow_from: open end of *base* the new track grows out of.
+        close_onto: open end of *base* the new track must finally mate with.
 
     Returns:
-        Distinct solutions (deduplicated up to rotation, reflection and starting
-        point), each with a rebuilt :class:`~duplotrain.layout.Layout`, plus counters
-        describing how the search went.
+        Distinct solutions (loop mode: deduplicated up to rotation, reflection and
+        starting point), each with a rebuilt :class:`~duplotrain.layout.Layout`, plus
+        counters describing how the search went.
     """
     cfg = config or SolverConfig()
     for piece_id in inventory:
         if piece_id not in pieces:
             raise ValueError(f"inventory names unknown piece {piece_id!r}")
 
+    if base is None:
+        if grow_from is not None or close_onto is not None:
+            raise ValueError("grow_from/close_onto only make sense with a base layout")
+        base_pids: list[str] = []
+    else:
+        opens = base.open_ends()
+        if grow_from is None and close_onto is None and len(opens) >= 2:
+            grow_from, close_onto = opens[-1], opens[0]
+        if grow_from is None or close_onto is None or grow_from == close_onto:
+            raise ValueError("completion needs two distinct open ends of the base layout")
+        for end in (grow_from, close_onto):
+            if end in base.links:
+                raise ValueError(f"end {end} of the base layout is already connected")
+        if base.pose_of(grow_from).connects_to(base.pose_of(close_onto)):
+            raise ValueError(
+                "those ends already mate exactly; join them with Layout.join instead"
+            )
+        base_pids = [p.piece.id for p in base.placements]
+
     counts: dict[str, int] = {pid: n for pid, n in inventory.items() if n > 0}
     piece_ids = sorted(counts)
+    piece_obj: dict[str, PieceType] = {pid: pieces[pid] for pid in piece_ids}
+    if base is not None:
+        for placement in base.placements:
+            piece_obj.setdefault(placement.piece.id, placement.piece)
     moves_by_piece = {pid: _moves_for(pieces[pid]) for pid in piece_ids}
-    canon_for = {pid: _canonical_traversals(pieces[pid]) for pid in piece_ids}
-    span_of = {pid: _max_span(pieces[pid]) for pid in piece_ids}
-    turn_of = {pid: _turn_capacity(pieces[pid]) for pid in piece_ids}
+    canon_for = {pid: _canonical_traversals(p) for pid, p in piece_obj.items()}
+    mirror_for = {pid: _mirror_traversals(p) for pid, p in piece_obj.items()}
+    span_of = {pid: _max_span(p) for pid, p in piece_obj.items()}
+    turn_of = {pid: _turn_capacity(p) for pid, p in piece_obj.items()}
+    overhang_of = {pid: p.end_overhang for pid, p in piece_obj.items()}
     total_pieces = sum(counts.values())
 
     # Collision samples, precomputed per (piece, entry, lattice rotation): the world
@@ -328,13 +443,40 @@ def solve(
     solutions: dict[tuple, Solution] = {}
     started = time.perf_counter()
 
-    # The anchor: the loop's first connector face sits at the origin facing +x.  The
-    # walk is closed when the running end returns to exactly this pose.
-    anchor = ORIGIN
+    # The anchor is the pose the walk must reach to close.  Loop mode: the first
+    # connector face sits at the origin facing +x and the walk returns to it.
+    # Completion mode: the walk starts at the grow end's outward pose and closes when
+    # it faces the target end -- i.e. reaches that end's pose reversed.
+    if base is None:
+        anchor = ORIGIN
+        start_cursor = anchor
+        start_prev: int | None = None
+        anchor_index = 0  # the first placed piece
+    else:
+        anchor = base.pose_of(close_onto).reversed()
+        start_cursor = base.pose_of(grow_from)
+        start_prev = grow_from[0]
+        anchor_index = close_onto[0]
 
     steps: list[object] = []
-    stubs: list[tuple[int, int, Pose]] = []  # (placement ordinal, port, world pose)
+    stubs: list[tuple[int, int, Pose]] = []  # (placement index, port, world pose)
     placements: list[tuple[str, Pose]] = []  # (piece id, world frame), in order
+
+    if base is not None:
+        for index, placement in enumerate(base.placements):
+            placements.append((placement.piece.id, placement.frame))
+            pts = [
+                p
+                for line in placement.centrelines(cfg.collision_spacing)
+                for p in line
+            ]
+            field.add(index, pts, placement.piece.width / 2.0)
+            if placement.piece.is_junction:
+                for port in range(len(placement.piece.ports)):
+                    end = (index, port)
+                    if end in base.links or end in (grow_from, close_onto):
+                        continue
+                    stubs.append((index, port, placement.port_pose(port)))
 
     remaining_span = sum(span_of[pid] * n for pid, n in counts.items())
     remaining_turn = sum(turn_of[pid] * n for pid, n in counts.items())
@@ -344,10 +486,19 @@ def solve(
 
     def emit(gap: float) -> None:
         stats.closures_found += 1
-        signature = _canonical_signature(steps, canon_for)
+        signature = _canonical_signature(
+            steps, canon_for, base_pids, cyclic=base is None, mirror_for=mirror_for
+        )
         if signature in solutions and solutions[signature].gap <= gap:
             return
-        layout = _replay(steps, pieces, force_final_join=gap > 0.0)
+        layout = _replay(
+            steps,
+            pieces,
+            force_final_join=gap > 0.0,
+            base=base,
+            grow_from=grow_from,
+            close_onto=close_onto,
+        )
         solutions[signature] = Solution(
             layout=layout,
             steps=tuple(steps),
@@ -367,8 +518,13 @@ def solve(
         gap = pose.distance_to(target)
         return gap if gap <= budget + 1e-12 else None
 
-    def dfs(cursor: Pose, used: int, slack_used: float) -> bool:
-        """Depth-first over moves; returns False when global limits say stop."""
+    def dfs(cursor: Pose, used: int, slack_used: float, prev_index: int | None) -> bool:
+        """Depth-first over moves; returns False when global limits say stop.
+
+        *prev_index* is the placement owning the connector the walk currently stands
+        on -- the last piece placed, or the junction just transited -- which the next
+        placement legitimately butts against.
+        """
         nonlocal remaining_span, remaining_turn
         if len(solutions) >= cfg.max_results:
             return False
@@ -378,13 +534,23 @@ def solve(
             return False
 
         # -- closure ------------------------------------------------------------
+        def closing_link_legal() -> bool:
+            # The final join links the piece the cursor stands on to the anchor piece;
+            # two overhanging plates cannot share that joint.
+            if prev_index is None or not placements:
+                return True
+            return not (
+                overhang_of[placements[prev_index][0]] > 0
+                and overhang_of[placements[anchor_index][0]] > 0
+            )
+
         if used > 0 and cursor == anchor:
-            # The anchor face is occupied by the first piece; whether or not this
-            # counts as a result, nothing can continue through it.
-            if eligible(used):
+            # The anchor face is occupied; whether or not this counts as a result,
+            # nothing can continue through it.
+            if eligible(used) and closing_link_legal():
                 emit(slack_used)
             return True
-        if cfg.slop > 0.0 and eligible(used):
+        if cfg.slop > 0.0 and eligible(used) and closing_link_legal():
             gap = near(cursor, anchor.reversed(), cfg.slop - slack_used)
             if gap is not None and gap > 0.0:
                 emit(slack_used + gap)
@@ -400,7 +566,8 @@ def solve(
         if home > remaining_span + stub_reach + (cfg.slop - slack_used) + 1e-6:
             stats.pruned_reach += 1
             return True
-        need = min(cursor.heading, HEADING_STEPS - cursor.heading)
+        turn_gap = (cursor.heading - anchor.heading) % HEADING_STEPS
+        need = min(turn_gap, HEADING_STEPS - turn_gap)
         stub_turns = sum(turn_of[placements[s[0]][0]] for s in stubs)
         if need > remaining_turn + stub_turns:
             stats.pruned_turn += 1
@@ -410,6 +577,12 @@ def solve(
         if stubs:
             snapshot = list(stubs)
             for i, (pidx, port, pose) in enumerate(snapshot):
+                if (
+                    prev_index is not None
+                    and overhang_of[placements[prev_index][0]] > 0
+                    and overhang_of[placements[pidx][0]] > 0
+                ):
+                    continue  # two overhanging plates cannot share the joint
                 if cursor.connects_to(pose):
                     joint_gap = 0.0
                 else:
@@ -438,79 +611,107 @@ def solve(
                     out_pose = frame.then(local.x, local.y, local.z, local.heading)
                     stubs[:] = [s for k, s in enumerate(snapshot) if k not in (i, j)]
                     steps.append(_Transit(pidx, port, exit_port))
-                    keep_going = dfs(out_pose, used, slack_used + joint_gap)
+                    keep_going = dfs(out_pose, used, slack_used + joint_gap, pidx)
                     steps.pop()
                     stubs[:] = snapshot
                     if not keep_going:
                         return False
 
         # -- place a new piece -----------------------------------------------------
+        if used >= depth_limit:
+            return True
+        candidates: list[tuple[float, str, Move, Pose]] = []
+        cursor_overhangs = (
+            prev_index is not None and overhang_of[placements[prev_index][0]] > 0
+        )
         for pid in piece_ids:
             if counts[pid] == 0:
                 continue
-            piece = pieces[pid]
+            if cursor_overhangs and overhang_of[pid] > 0:
+                continue  # the joint would stack two overhanging plates
             for move in moves_by_piece[pid]:
-                next_cursor = cursor.then(move.dx, move.dy, move.dz, move.dheading)
+                child = cursor.then(move.dx, move.dy, move.dz, move.dheading)
+                gap_turn = (child.heading - anchor.heading) % HEADING_STEPS
+                heuristic = child.distance_to(anchor) + 64.0 * min(
+                    gap_turn, HEADING_STEPS - gap_turn
+                )
+                candidates.append((heuristic, pid, move, child))
+        # Try homeward moves first: irrelevant to completeness, decisive for how fast
+        # the obvious completion of a small gap is found.
+        candidates.sort(key=lambda c: (c[0], c[1]))
+        for _heuristic, pid, move, next_cursor in candidates:
+            piece = pieces[pid]
+            frame = piece.frame_for(move.entry, cursor)
+            pts = placement_samples(pid, move.entry, frame)
+            index = len(placements)
+            ignore = {prev_index} if prev_index is not None else set()
+            # A move that closes the loop legitimately butts against the anchor
+            # piece; exempt it from colliding with that piece only.  Likewise a
+            # move landing on an open stub butts against that stub's piece.
+            if placements and eligible(used + 1):
+                if next_cursor == anchor or (
+                    cfg.slop > 0.0
+                    and near(next_cursor, anchor.reversed(), cfg.slop - slack_used)
+                    is not None
+                ):
+                    ignore.add(anchor_index)
+            for stub_index, _stub_port, stub_pose in stubs:
+                if next_cursor.connects_to(stub_pose) or (
+                    cfg.slop > 0.0
+                    and near(next_cursor, stub_pose, cfg.slop - slack_used) is not None
+                ):
+                    ignore.add(stub_index)
+            if field.clashes(pts, piece.width / 2.0, ignore):
+                stats.pruned_collision += 1
+                continue
 
-                frame = piece.frame_for(move.entry, cursor)
-                pts = placement_samples(pid, move.entry, frame)
-                index = len(placements)
-                ignore = {index - 1} if placements else set()
-                # A move that closes the loop legitimately butts against the first
-                # piece; exempt it from colliding with that piece only.  Likewise a
-                # move landing on an open stub butts against that stub's piece.
-                if placements and eligible(used + 1):
-                    if next_cursor == anchor or (
-                        cfg.slop > 0.0
-                        and near(next_cursor, anchor.reversed(), cfg.slop - slack_used)
-                        is not None
-                    ):
-                        ignore.add(0)
-                for stub_index, stub_port, stub_pose in stubs:
-                    if next_cursor.connects_to(stub_pose) or (
-                        cfg.slop > 0.0
-                        and near(next_cursor, stub_pose, cfg.slop - slack_used) is not None
-                    ):
-                        ignore.add(stub_index)
-                if field.clashes(pts, piece.width / 2.0, ignore):
-                    stats.pruned_collision += 1
-                    continue
+            counts[pid] -= 1
+            remaining_span -= span_of[pid]
+            remaining_turn -= turn_of[pid]
+            placements.append((pid, frame))
+            field.add(index, pts, piece.width / 2.0)
+            new_stubs = 0
+            if piece.is_junction:
+                for port_index in range(len(piece.ports)):
+                    if port_index in (move.entry, move.exit):
+                        continue
+                    local = piece.ports[port_index].pose
+                    stub_pose = frame.then(local.x, local.y, local.z, local.heading)
+                    stubs.append((index, port_index, stub_pose))
+                    new_stubs += 1
+            steps.append(_Place(pid, move.entry, move.exit))
 
-                counts[pid] -= 1
-                remaining_span -= span_of[pid]
-                remaining_turn -= turn_of[pid]
-                placements.append((pid, frame))
-                field.add(index, pts, piece.width / 2.0)
-                new_stubs = 0
-                if piece.is_junction:
-                    for port_index in range(len(piece.ports)):
-                        if port_index in (move.entry, move.exit):
-                            continue
-                        local = piece.ports[port_index].pose
-                        stub_pose = frame.then(local.x, local.y, local.z, local.heading)
-                        stubs.append((index, port_index, stub_pose))
-                        new_stubs += 1
-                steps.append(_Place(pid, move.entry, move.exit))
+            keep_going = dfs(next_cursor, used + 1, slack_used, index)
 
-                keep_going = dfs(next_cursor, used + 1, slack_used)
-
-                steps.pop()
-                for _ in range(new_stubs):
-                    stubs.pop()
-                field.pop()
-                placements.pop()
-                counts[pid] += 1
-                remaining_span += span_of[pid]
-                remaining_turn += turn_of[pid]
-                if not keep_going:
-                    return False
+            steps.pop()
+            for _ in range(new_stubs):
+                stubs.pop()
+            field.pop()
+            placements.pop()
+            counts[pid] += 1
+            remaining_span += span_of[pid]
+            remaining_turn += turn_of[pid]
+            if not keep_going:
+                return False
         return True
 
-    dfs(anchor, 0, 0.0)
+    # One depth-first pass for both modes.  The greedy homeward move ordering is what
+    # makes completions arrive promptly: the walk beelines for the target end first,
+    # so a small gap is closed within a handful of nodes even from a huge box, and the
+    # remaining budget then broadens the enumeration.  (Iterative deepening was tried
+    # and reverted: proving "no k-piece completion exists" before looking at k+1 costs
+    # a full breadth-k tree, which dwarfs the guided search.)
+    depth_limit = total_pieces
+    dfs(start_cursor, 0, 0.0, start_prev)
     stats.duration_s = time.perf_counter() - started
 
     ordered = sorted(
         solutions.values(),
-        key=lambda s: (not s.exact, s.gap, s.open_stubs, -s.piece_count),
+        key=lambda s: (
+            not s.exact,
+            s.gap,
+            s.open_stubs,
+            s.piece_count if base is not None else -s.piece_count,
+        ),
     )
     return SolveResult(solutions=ordered, stats=stats)

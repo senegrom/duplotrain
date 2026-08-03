@@ -31,9 +31,15 @@ duplotrain = "duplotrain.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+duplotrain = ["static/*.html"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "slow: long-running full enumerations (deselect with -m 'not slow')",
+]
 
 [tool.ruff]
 line-length = 100

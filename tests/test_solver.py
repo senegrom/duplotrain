@@ -100,6 +100,80 @@ def test_dedup_no_mirror_twins(catalog):
     assert len(result.solutions) == 1
 
 
+def test_chiral_loops_dedup_mirror_twins(catalog):
+    """A circle with a switch is chiral; its mirror image must not double-count.
+
+    Regression for the reflection bug: reversal alone only collapses mirror twins of
+    layouts that are themselves mirror-symmetric, so this returned 2 before the
+    signature gained an explicit mirror normalisation.
+    """
+    result = solve({"curve": 11, "switch": 1}, catalog, SolverConfig(use_all_pieces=True))
+    assert len(result.solutions) == 1
+
+
+@pytest.mark.slow
+def test_chiral_enumeration_counts(catalog):
+    """12 curves + 6 straights: 18 distinct loops, 9 of them using every piece."""
+    result = solve({"curve": 12, "straight": 6}, catalog, SolverConfig(max_results=100))
+    assert len(result.solutions) == 18
+    result = solve(
+        {"curve": 12, "straight": 6},
+        catalog,
+        SolverConfig(use_all_pieces=True, max_results=100),
+    )
+    assert len(result.solutions) == 9
+
+
+def test_level_crossings_never_link_in_series(catalog):
+    """The 160 mm road plates overhang a 128 mm joint; two of them cannot mate."""
+    result = solve(
+        {"curve": 12, "level_crossing": 4},
+        catalog,
+        SolverConfig(use_all_pieces=True, max_results=50),
+    )
+    assert result.solutions
+    for sol in result.solutions:
+        for a, b in sol.layout.links.items():
+            pa = sol.layout.placements[a[0]].piece.id
+            pb = sol.layout.placements[b[0]].piece.id
+            assert not (pa == pb == "level_crossing")
+
+
+def test_slop_reports_engineered_gap(catalog):
+    """A 130 mm 'stretched straight' opposite a 128 mm one leaves exactly 2 mm.
+
+    No arrangement of those two plus 12 curves closes exactly (the straights' vector
+    sum has magnitude >= 2 mm), so with slop every solution must be a forced fit
+    reporting exactly that 2 mm gap -- never relabelled exact.
+    """
+    from duplotrain.catalog import DEFAULT_CATALOG_SPECS
+    from duplotrain.pieces import parse_pieces
+
+    specs = list(DEFAULT_CATALOG_SPECS) + [
+        {
+            "id": "stretched",
+            "name": "Stretched straight (test)",
+            "category": "track",
+            "width": 64,
+            "paths": [{"segments": [{"type": "straight", "run": 130}]}],
+        }
+    ]
+    pieces = parse_pieces(specs)
+    inventory = {"curve": 12, "straight": 1, "stretched": 1}
+
+    exact_only = solve(inventory, pieces, SolverConfig(use_all_pieces=True))
+    assert exact_only.solutions == []
+
+    forced = solve(
+        inventory, pieces, SolverConfig(use_all_pieces=True, slop=3.0, max_results=20)
+    )
+    assert forced.solutions
+    for sol in forced.solutions:
+        assert not sol.exact
+        assert sol.gap == pytest.approx(2.0, abs=1e-9)
+        assert sol.layout.is_closed
+
+
 def test_starter_box_has_exactly_four_shapes(catalog):
     """Using all of 12 curves + 4 straights, exactly four layouts exist.
 

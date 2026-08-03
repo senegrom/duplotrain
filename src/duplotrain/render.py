@@ -102,6 +102,9 @@ def render_layout(
 
     for mean_z, lines, half_width, elevated in sorted(features, key=lambda f: f[0]):
         shade = 1.0 - 0.25 * (mean_z / max_z if max_z > 0 else 0.0)
+        # One zorder band per piece: an elevated deck (ballast ~1.8) must paint over a
+        # ground piece's rails (~1.5), not thread between another piece's layers.
+        band = 1 + mean_z / 100.0
         for line in lines:
             face = BRIDGE if elevated else BALLAST
             poly = _band(line, half_width)
@@ -112,10 +115,10 @@ def render_layout(
                 edgecolor=BALLAST_EDGE,
                 linewidth=0.8,
                 alpha=min(1.0, 0.75 + 0.25 * shade),
-                zorder=1 + mean_z / 1000.0,
+                zorder=band,
             )
         for line in lines:
-            z = 2 + mean_z / 1000.0
+            z = band + 0.5
             # Sleepers.
             total = sum(
                 math.hypot(bx - ax_, by - ay) for (ax_, ay), (bx, by) in zip(line, line[1:])

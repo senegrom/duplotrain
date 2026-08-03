@@ -273,6 +273,11 @@ class PieceType:
     ports: tuple[Port, ...]
     routes: tuple[Route, ...]
     width: float = 40.0
+    #: Solid body extending past each connector plane, mm -- beyond the standard
+    #: interlock tab.  Two overhanging ends cannot legally mate (their bodies would
+    #: claim the same strip of floor), which is how the level crossing's road plate
+    #: forbids a second level crossing directly in series.
+    end_overhang: float = 0.0
     part_numbers: tuple[str, ...] = ()
     notes: str = ""
     provisional: bool = False
@@ -435,6 +440,7 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         ports=ports,
         routes=routes,
         width=float(spec.get("width", 40.0)),
+        end_overhang=float(spec.get("end_overhang", 0.0)),
         part_numbers=tuple(spec.get("part_numbers", ())),
         notes=spec.get("notes", ""),
         provisional=bool(spec.get("provisional", False)),

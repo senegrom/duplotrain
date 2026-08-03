@@ -88,16 +88,49 @@ def test_rrll_is_a_documented_near_miss(catalog):
     assert 3.5 * 128 - float(end.x) == pytest.approx(4.59, abs=0.01)
 
 
-def test_ramp_chain_returns_to_ground(catalog):
+def test_bridge_chain_returns_to_ground(catalog):
+    """Ramp up, arch up to the crest, arch down, ramp down: 1024 mm, back at z=0."""
     ramp, span = catalog["ramp"], catalog["span"]
     layout = build_chain(
-        [(ramp, 0, 1), (span, 0, 1), (span, 0, 1), (ramp, 1, 0)]
+        [(ramp, 0, 1), (span, 0, 1), (span, 1, 0), (ramp, 1, 0)]
     )
     end = chain_end(layout)
     assert end == ORIGIN.then(1024, 0, 0, 0)  # 8 straights of run, back at z=0
-    # Mid-bridge the track is elevated.
-    mid = layout.placements[1].port_pose(0)
-    assert float(mid.z) == pytest.approx(76.8)
+    # Ramp top sits at 3 bricks; the crest between the two arches at 4 bricks.
+    ramp_top = layout.placements[1].port_pose(0)
+    assert float(ramp_top.z) == pytest.approx(57.6)
+    crest = layout.placements[1].port_pose(1)
+    assert float(crest.z) == pytest.approx(76.8)
+
+
+def test_level_crossing_reports_its_plate_footprint(catalog):
+    """Bounds grow perpendicular to travel plus the declared end overhang: the level
+    crossing is a 160 x 160 plate, not 288 x 160."""
+    lc = build_chain([(catalog["level_crossing"], 0, 1)])
+    width, height = lc.size()
+    assert (round(width), round(height)) == (160, 160)
+
+
+def test_overhanging_plates_refuse_to_mate(catalog):
+    lc = catalog["level_crossing"]
+    layout = build_chain([(lc, 0, 1)])
+    with pytest.raises(ValueError, match="overlap"):
+        layout.attach(lc, 0, layout.open_ends()[-1])
+    # A plain straight on the same end is fine.
+    layout.attach(catalog["straight"], 0, layout.open_ends()[-1])
+
+
+def test_bridge_dimensions_are_exact(catalog):
+    from fractions import Fraction
+
+    from duplotrain.exact import Alg
+
+    ramp, span = catalog["ramp"], catalog["span"]
+    assert ramp.exit_delta(0, 1)[2] == Alg(Fraction(288, 5))  # 57.6 mm
+    assert span.exit_delta(0, 1)[2] == Alg(Fraction(96, 5))  # 19.2 mm
+    layout = build_chain([(ramp, 0, 1), (span, 0, 1), (span, 1, 0), (ramp, 1, 0)])
+    crest = layout.placements[1].port_pose(1)
+    assert crest.z == Alg(Fraction(384, 5))  # exactly 76.8 mm at the mid-bridge joint
 
 
 def test_attach_rejects_occupied_end(catalog):

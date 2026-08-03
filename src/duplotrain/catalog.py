@@ -19,9 +19,14 @@ truly close (ovals, S-bends, 90-degree lattice layouts) then test closed with no
 epsilon, and layouts that only *look* closed (the classic "Regel 3" builds, which are
 4.59 mm short) are honestly reported as forced fits.
 
-Pieces marked ``provisional`` carry a dimension nobody has published; the value used is
-derived and clearly noted.  Override any piece by loading a user catalogue on top --
-same JSON schema, matching ids replace the built-ins.
+No built-in piece is provisional any more: the crossing, switch and bridge numbers were
+settled by parsing the LDraw part files and BlueBrick's measured connection library
+(cross-calibrated against each other and against part weights and photographs).  The
+bridge's *vertical* split (57.6 mm ramp + 19.2 mm arch to a 76.8 mm crest) is derived
+from brick-integer constraints and part bounding heights rather than a published
+figure -- the most likely number to move if someone puts callipers on the real part.
+Override any piece by loading a user catalogue on top -- same JSON schema, matching ids
+replace the built-ins.
 """
 
 from __future__ import annotations
@@ -90,9 +95,10 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
         "port_names": ["stem", "left", "right"],
         "notes": (
             "A meld of a left and a right curve sharing the stem; there is no straight "
-            "route through a DUPLO switch, and the two exits sit 60 deg apart. Modelled "
-            "as two nominal 30 deg / R256 curves; Gilbert (onemetre.net) measured the "
-            "real branch nearer 29.7 deg, absorbed in practice by joint play."
+            "route through a DUPLO switch, and the two exits sit 60 deg apart. LDraw "
+            "51943.dat confirms each branch is EXACTLY a standard 30.000 deg / R=256 mm "
+            "curve (branch ends at (128, +/-34.2975) mm, max file deviation 1.2 um). "
+            "Gilbert's measured ~29.7 deg is real-part play, absorbed by --slop."
         ),
     },
     {
@@ -101,20 +107,20 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
         "category": "junction",
         "part_numbers": ["6376"],
         "width": WIDTH,
-        "provisional": True,
         "paths": [
-            # Two straight runs crossing at their midpoints, 60 degrees apart.
-            {"segments": [{"type": "straight", "run": 192}]},
+            # Two straight 128 mm runs crossing at their common midpoint, 60 deg apart.
+            {"segments": [{"type": "straight", "run": STRAIGHT}]},
             {
-                "start": {"x": 48, "y": {"alg": [0, 0, -48, 0]}, "heading_deg": 60},
-                "segments": [{"type": "straight", "run": 192}],
+                "start": {"x": 32, "y": {"alg": [0, 0, -32, 0]}, "heading_deg": 60},
+                "segments": [{"type": "straight", "run": STRAIGHT}],
             },
         ],
         "port_names": ["a", "b", "c", "d"],
         "notes": (
-            "Out of production since ~2008. Crossing angle 60 deg is documented; the "
-            "192 mm (12-stud) run length is inferred from BrickLink's 12 x 14 stud "
-            "bounding box and should be confirmed by measurement."
+            "Out of production since ~2008. Each route is exactly one straight module "
+            "(128 mm); geometry from BlueBrick's measured part library, calibrated "
+            "against LDraw 6377/6378 and cross-checked by part weight and imagery. "
+            "BrickLink's '12 x 14 studs' listing is wrong and was rejected."
         ),
     },
     {
@@ -123,48 +129,51 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
         "category": "track",
         "part_numbers": ["6391", "6207496"],
         "width": 160,
+        "end_overhang": 16.0,  # (160 mm plate - 128 mm pitch) / 2 per end
         "paths": [
             {"segments": [{"type": "straight", "run": STRAIGHT}]},
         ],
         "port_names": ["a", "b"],
         "notes": (
             "Rail run is one plain straight (128 mm); the road plate is 10 x 10 studs "
-            "(160 x 160 mm), which is why two of these cannot sit adjacent in reality."
+            "(160 x 160 mm), so each end overhangs the joint by 16 mm -- which is why "
+            "two of these cannot sit directly adjacent, and the model forbids it."
         ),
     },
     {
         "id": "ramp",
-        "name": "Bridge ramp (ascending half)",
+        "name": "Bridge ramp (lower part)",
         "category": "bridge",
         "part_numbers": ["6392", "35136", "6231963"],
         "width": WIDTH,
-        "provisional": True,
         "paths": [
-            {"segments": [{"type": "ramp", "run": 320, "rise": "384/5"}]},
+            {"segments": [{"type": "ramp", "run": 320, "rise": "288/5"}]},
         ],
         "port_names": ["low", "high"],
         "notes": (
-            "Inclined approach from set 10872. The full 4-piece bridge spans exactly 8 "
-            "straights = 1024 mm of run (duplo-schienen Regel 5), split here as ramp "
-            "320 mm + span 192 mm per half. The 76.8 mm rise (4 DUPLO brick heights) is "
-            "derived from part bounding boxes, not published -- measure before trusting."
+            "Inclined approach from sets 2738/10508/10872. Run 320 mm (confirmed: the "
+            "full 4-piece bridge spans exactly 8 straights = 1024 mm, duplo-schienen "
+            "Regel 5/6); rises 57.6 mm = 3 DUPLO bricks (a 76.8 mm rise is impossible "
+            "inside the part's ~88 mm overall height). Mean grade 18%."
         ),
     },
     {
         "id": "span",
-        "name": "Bridge span (level top)",
+        "name": "Bridge arch (upper part)",
         "category": "bridge",
         "part_numbers": ["6393", "35138", "6232170"],
         "width": WIDTH,
-        "provisional": True,
         "paths": [
-            {"segments": [{"type": "straight", "run": 192}]},
+            {"segments": [{"type": "ramp", "run": 192, "rise": "96/5"}]},
         ],
-        "port_names": ["a", "b"],
+        "port_names": ["low", "high"],
         "notes": (
-            "Raised level section from set 10872; two of them bridge between the tops "
-            "of two ramps. Run length 192 mm inferred from the 1024 mm total; modelled "
-            "level, with the ramps carrying all the rise."
+            "Half-arch middle section; the deck is NOT level -- it keeps rising 19.2 mm "
+            "(1 brick) over its 192 mm run and crests at 76.8 mm (4 bricks) where the "
+            "two arches meet mid-bridge. Modelled piecewise-linear. Physically its low "
+            "end is a special overlap joint onto the ramp needing 2-brick supports (no "
+            "normal pin/socket); modelled as a normal port since the solver has no "
+            "port-type machinery."
         ),
     },
 ]

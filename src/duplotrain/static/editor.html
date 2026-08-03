@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>duplotrain editor</title>
+<style>
+  :root {
+    --bg: #f4f2ee; --panel: #ffffff; --ink: #2b2f33; --dim: #7a828a;
+    --accent: #2f6fdb; --good: #2c8a4b; --warn: #c05621; --open: #d0342c;
+    --ballast: #b9bec4; --bridge: #c9b79b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, "Segoe UI", sans-serif; color: var(--ink);
+         display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
+  #side { background: var(--panel); border-right: 1px solid #e2e0da; padding: 14px;
+          overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  h1 { font-size: 17px; margin: 0; }
+  h1 small { color: var(--dim); font-weight: 400; font-size: 12px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+       color: var(--dim); margin: 4px 0 2px; }
+  #stage { position: relative; background: var(--bg); }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+  .piece { border: 1px solid #e2e0da; border-radius: 8px; padding: 8px 10px; }
+  .piece .row { display: flex; justify-content: space-between; align-items: baseline; }
+  .piece .name { font-weight: 600; }
+  .piece .count { color: var(--dim); font-variant-numeric: tabular-nums; }
+  .piece .count input { width: 44px; border: 1px solid #d8d5ce; border-radius: 5px;
+                        padding: 1px 4px; font: inherit; text-align: right; }
+  .variants { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  button { font: inherit; border: 1px solid #d8d5ce; background: #fbfaf7; color: var(--ink);
+           border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.armed { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary { background: var(--good); border-color: var(--good); color: #fff; font-weight: 600; }
+  button.primary:disabled { background: #b9c4bd; border-color: #b9c4bd; cursor: default; }
+  button.ghost { border-style: dashed; color: var(--dim); }
+  #actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  #status { padding: 8px 10px; border-radius: 8px; background: #f0efe9; min-height: 38px; }
+  #status.closed { background: #e4f2e8; color: var(--good); font-weight: 600; }
+  #status.err { background: #fbe9e7; color: var(--open); }
+  .cand { border: 1px solid #e2e0da; border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+  .cand:hover, .cand.hover { border-color: var(--accent); background: #eef4fd; }
+  .cand .gap { color: var(--warn); }
+  .cand .exact { color: var(--good); font-weight: 600; }
+  .solverow { display: flex; gap: 6px; align-items: center; }
+  .solverow input { width: 52px; border: 1px solid #d8d5ce; border-radius: 5px; padding: 3px 6px; font: inherit; }
+  #hint { position: absolute; left: 12px; bottom: 10px; color: var(--dim); font-size: 12px;
+          background: #ffffffcc; padding: 3px 8px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>duplotrain <small>track editor</small></h1>
+  <div id="status">loading…</div>
+  <div id="actions">
+    <button id="undo">↩ undo</button>
+    <button id="clear" class="ghost">clear</button>
+    <button id="export">⭳ export JSON</button>
+  </div>
+  <h2>Close the loop</h2>
+  <div class="solverow">
+    <label>slop <input id="slop" type="number" min="0" step="0.5" value="0"> mm</label>
+    <button id="solve" class="primary">Close the loop</button>
+  </div>
+  <div id="cands"></div>
+  <h2>Pieces <span style="font-weight:400">(arm one, then click a red arrow)</span></h2>
+  <div id="palette"></div>
+</div>
+<div id="stage">
+  <canvas id="canvas"></canvas>
+  <div id="hint">drag: pan · wheel: zoom · click red arrow: attach armed piece / pick ends</div>
+</div>
+<script>
+"use strict";
+const api = async (path, body) => {
+  const res = await fetch(path, body === undefined ? {} :
+    { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+};
+
+let S = null;                 // last /api/state payload
+let armed = null;             // {piece, entry, label}
+let preview = null;           // candidate layout ghost
+let pickMode = null;          // null | {stage: "grow"|"close", grow: [i,p]}
+let view = { x: 0, y: 0, scale: 0.9 };
+let fitted = false;
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = canvas.clientHeight * devicePixelRatio;
+  draw();
+}
+window.addEventListener("resize", resize);
+
+function worldToScreen(x, y) {
+  return [ (x - view.x) * view.scale + canvas.clientWidth / 2,
+           -(y - view.y) * view.scale + canvas.clientHeight / 2 ];
+}
+function screenToWorld(sx, sy) {
+  return [ (sx - canvas.clientWidth / 2) / view.scale + view.x,
+           -(sy - canvas.clientHeight / 2) / view.scale + view.y ];
+}
+
+function drawLayout(layout, ghost) {
+  for (const pl of layout.placements) {
+    const w = pl.width * view.scale;
+    for (const line of pl.lines) {
+      ctx.beginPath();
+      line.forEach(([x, y], i) => {
+        const [sx, sy] = worldToScreen(x, y);
+        i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy);
+      });
+      ctx.lineWidth = w;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = ghost ? "rgba(44,138,75,.35)"
+        : pl.category === "bridge" ? "var(--bridge)" : "#b9bec4";
+      if (ghost) ctx.strokeStyle = "rgba(44,138,75,.35)";
+      else ctx.strokeStyle = pl.category === "bridge" ? "#c9b79b" : "#b9bec4";
+      ctx.stroke();
+      if (!ghost) {                       // rails
+        ctx.lineWidth = Math.max(1, 1.5 * view.scale);
+        ctx.strokeStyle = "#6d7278";
+        for (const off of [24, -24]) {
+          ctx.beginPath();
+          offsetLine(line, off).forEach(([x, y], i) => {
+            const [sx, sy] = worldToScreen(x, y);
+            i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy);
+          });
+          ctx.stroke();
+        }
+      }
+    }
+  }
+}
+
+function offsetLine(line, d) {
+  const out = [];
+  for (let i = 0; i < line.length; i++) {
+    const a = line[Math.max(0, i - 1)], b = line[Math.min(line.length - 1, i + 1)];
+    let nx = -(b[1] - a[1]), ny = b[0] - a[0];
+    const len = Math.hypot(nx, ny) || 1;
+    out.push([line[i][0] + nx / len * d, line[i][1] + ny / len * d]);
+  }
+  return out;
+}
+
+function openEndScreenPos() {
+  const out = [];
+  if (!S) return out;
+  S.layout.placements.forEach((pl, i) => {
+    for (const p of pl.ports) {
+      if (!p.open) continue;
+      const [sx, sy] = worldToScreen(p.x, p.y);
+      out.push({ end: [i, p.port], x: sx, y: sy, deg: p.deg, name: p.name });
+    }
+  });
+  return out;
+}
+
+function draw() {
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  if (!S) return;
+  // faint 128mm grid
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "#e9e6df";
+  const step = 128 * view.scale;
+  if (step > 14) {
+    const [wx0, wy0] = screenToWorld(0, canvas.clientHeight);
+    const [wx1, wy1] = screenToWorld(canvas.clientWidth, 0);
+    for (let gx = Math.floor(wx0 / 128) * 128; gx <= wx1; gx += 128) {
+      const [sx] = worldToScreen(gx, 0);
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, canvas.clientHeight); ctx.stroke();
+    }
+    for (let gy = Math.floor(wy0 / 128) * 128; gy <= wy1; gy += 128) {
+      const [, sy] = worldToScreen(0, gy);
+      ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(canvas.clientWidth, sy); ctx.stroke();
+    }
+  }
+  drawLayout(S.layout, false);
+  if (preview) drawLayout(preview, true);
+
+  // joints + open-end arrows
+  S.layout.placements.forEach((pl, i) => {
+    for (const p of pl.ports) {
+      const [sx, sy] = worldToScreen(p.x, p.y);
+      if (!p.open) {
+        ctx.fillStyle = "#4d5359";
+        ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, 7); ctx.fill();
+      } else {
+        const picked = pickMode && pickMode.grow && pickMode.grow[0] === i && pickMode.grow[1] === p.port;
+        const rad = -p.deg * Math.PI / 180;
+        ctx.strokeStyle = picked ? "#2f6fdb" : "#d0342c";
+        ctx.fillStyle = picked ? "#2f6fdb" : "#d0342c";
+        ctx.lineWidth = 2.5;
+        const len = Math.max(16, 30 * view.scale);
+        const ex = sx + Math.cos(rad) * len, ey = sy + Math.sin(rad) * len;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(sx, sy, 5.5, 0, 7); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex + Math.cos(rad + 2.6) * 8, ey + Math.sin(rad + 2.6) * 8);
+        ctx.lineTo(ex + Math.cos(rad - 2.6) * 8, ey + Math.sin(rad - 2.6) * 8);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+  });
+  if (S.layout.placements.length === 0) {
+    ctx.fillStyle = "#7a828a";
+    ctx.font = "15px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("Arm a piece on the left, then click anywhere to place the first one.",
+                 canvas.clientWidth / 2, canvas.clientHeight / 2);
+  }
+}
+
+function fitView() {
+  if (!S || !S.layout.placements.length) { view = { x: 0, y: 0, scale: 0.9 }; return; }
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const pl of S.layout.placements)
+    for (const line of pl.lines)
+      for (const [x, y] of line) {
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+        y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      }
+  view.x = (x0 + x1) / 2; view.y = (y0 + y1) / 2;
+  const pad = 180;
+  view.scale = Math.min((canvas.clientWidth) / (x1 - x0 + pad),
+                        (canvas.clientHeight) / (y1 - y0 + pad), 1.6);
+}
+
+// ---------- UI wiring ----------
+const el = (id) => document.getElementById(id);
+
+function status(msg, cls) {
+  const s = el("status");
+  s.textContent = msg;
+  s.className = cls || "";
+}
+
+function refreshStatus() {
+  if (!S) return;
+  const n = S.layout.placements.length;
+  const opens = S.open_ends.length;
+  if (S.layout.closed && n) {
+    status(`Closed! ${n} pieces, ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`, "closed");
+  } else if (pickMode) {
+    status(pickMode.stage === "grow" ? "Pick the end to GROW from (click a red arrow)"
+                                     : "Now pick the end to CLOSE onto");
+  } else if (armed) {
+    status(`${armed.pieceName} — ${armed.label} armed. ` +
+           (n ? "Click a red arrow to attach." : "Click anywhere to place it."));
+  } else {
+    status(n ? `${n} pieces, ${opens} open end(s), ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`
+             : "Empty floor. Arm a piece to begin.");
+  }
+  el("solve").disabled = opens < 2;
+}
+
+function renderPalette() {
+  const pal = el("palette");
+  pal.innerHTML = "";
+  for (const piece of S.palette) {
+    const remaining = S.inventory.remaining[piece.id] ?? 0;
+    const owned = S.inventory.owned[piece.id] ?? 0;
+    const div = document.createElement("div");
+    div.className = "piece";
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `<span class="name">${piece.name}${piece.provisional ? " ⚠" : ""}</span>`;
+    const count = document.createElement("span");
+    count.className = "count";
+    const input = document.createElement("input");
+    input.type = "number"; input.min = 0; input.value = owned;
+    input.title = "how many you own";
+    input.addEventListener("change", async () => {
+      try { S = await api("/api/inventory", { counts: { [piece.id]: input.value } }); redraw(); }
+      catch (e) { status(e.message, "err"); }
+    });
+    count.append(`${remaining}/`); count.append(input);
+    row.append(count);
+    div.append(row);
+    const vs = document.createElement("div");
+    vs.className = "variants";
+    for (const v of piece.variants) {
+      const b = document.createElement("button");
+      b.textContent = v.label;
+      b.disabled = remaining <= 0;
+      if (armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit)
+        b.classList.add("armed");
+      b.addEventListener("click", () => {
+        armed = (armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit)
+          ? null
+          : { piece: piece.id, pieceName: piece.name, entry: v.entry, exit: v.exit, label: v.label };
+        pickMode = null;
+        renderPalette(); refreshStatus(); draw();
+      });
+      vs.append(b);
+    }
+    div.append(vs);
+    pal.append(div);
+  }
+}
+
+function renderCandidates() {
+  const box = el("cands");
+  box.innerHTML = "";
+  preview = null;
+  for (const c of (S.candidates || [])) {
+    const div = document.createElement("div");
+    div.className = "cand";
+    const added = Object.entries(c.added).map(([k, n]) => `${n}×${k}`).join(" ") || "nothing";
+    div.innerHTML = `<span class="${c.exact ? "exact" : "gap"}">` +
+      (c.exact ? "exact" : `forced ${c.gap} mm`) + `</span> — add ${added}` +
+      ` <span style="color:var(--dim)">(${c.size_cm[0]}×${c.size_cm[1]} cm` +
+      (c.open_stubs ? `, ${c.open_stubs} stub${c.open_stubs > 1 ? "s" : ""}` : "") + `)</span>`;
+    div.addEventListener("mouseenter", () => { preview = c.preview; draw(); });
+    div.addEventListener("mouseleave", () => { preview = null; draw(); });
+    div.addEventListener("click", async () => {
+      try { S = await api("/api/apply", { index: c.index }); fitted = false; redraw(); }
+      catch (e) { status(e.message, "err"); }
+    });
+    box.append(div);
+  }
+}
+
+function redraw() {
+  if (!fitted) { fitView(); fitted = true; }
+  renderPalette(); renderCandidates(); refreshStatus(); draw();
+}
+
+async function refresh() {
+  S = await api("/api/state");
+  redraw();
+}
+
+el("undo").addEventListener("click", async () => {
+  try { S = await api("/api/undo", {}); redraw(); } catch (e) { status(e.message, "err"); }
+});
+el("clear").addEventListener("click", async () => {
+  try { S = await api("/api/clear", {}); fitted = false; redraw(); } catch (e) { status(e.message, "err"); }
+});
+el("export").addEventListener("click", async () => {
+  const data = await api("/api/export");
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "layout.json";
+  a.click();
+});
+el("solve").addEventListener("click", async () => {
+  const opens = S.open_ends.length;
+  if (opens > 2) {
+    pickMode = { stage: "grow", grow: null };
+    armed = null;
+    renderPalette(); refreshStatus(); draw();
+    return;
+  }
+  await runSolve(null, null);
+});
+
+async function runSolve(grow, close) {
+  status("searching…");
+  try {
+    S = await api("/api/solve", {
+      grow, close,
+      slop: parseFloat(el("slop").value || "0"),
+      max_results: 8,
+    });
+    pickMode = null;
+    redraw();
+    if (!S.candidates.length)
+      status("No way to close with the remaining pieces — add inventory or slop.", "err");
+    else
+      status(`${S.candidates.length} way(s) to close — hover to preview, click to apply.`);
+  } catch (e) {
+    pickMode = null;
+    status(e.message, "err");
+  }
+}
+
+// canvas interactions
+let dragging = null;
+canvas.addEventListener("mousedown", (e) => {
+  dragging = { x: e.offsetX, y: e.offsetY, moved: false };
+});
+canvas.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  const dx = e.offsetX - dragging.x, dy = e.offsetY - dragging.y;
+  if (Math.abs(dx) + Math.abs(dy) > 3) dragging.moved = true;
+  if (dragging.moved) {
+    view.x -= dx / view.scale;
+    view.y += dy / view.scale;
+    dragging.x = e.offsetX; dragging.y = e.offsetY;
+    draw();
+  }
+});
+canvas.addEventListener("mouseup", async (e) => {
+  const wasDrag = dragging && dragging.moved;
+  dragging = null;
+  if (wasDrag) return;
+  const hit = openEndScreenPos().find(p => Math.hypot(p.x - e.offsetX, p.y - e.offsetY) < 16);
+  try {
+    if (pickMode) {
+      if (!hit) return;
+      if (pickMode.stage === "grow") {
+        pickMode = { stage: "close", grow: hit.end };
+        refreshStatus(); draw();
+      } else {
+        await runSolve(pickMode.grow, hit.end);
+      }
+    } else if (armed && S.layout.placements.length === 0) {
+      S = await api("/api/attach", { piece: armed.piece, entry: armed.entry, at: null });
+      fitted = false; redraw();
+    } else if (armed && hit) {
+      S = await api("/api/attach", { piece: armed.piece, entry: armed.entry, at: hit.end });
+      redraw();
+    } else if (hit && S.matable.length) {
+      const m = S.matable.find(([a, b]) =>
+        (a[0] === hit.end[0] && a[1] === hit.end[1]) || (b[0] === hit.end[0] && b[1] === hit.end[1]));
+      if (m) { S = await api("/api/join", { a: m[0], b: m[1] }); redraw(); }
+    }
+  } catch (err) {
+    status(err.message, "err");
+  }
+});
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  const [wx, wy] = screenToWorld(e.offsetX, e.offsetY);
+  view.scale = Math.min(4, Math.max(0.08, view.scale * factor));
+  const [nx, ny] = screenToWorld(e.offsetX, e.offsetY);
+  view.x += wx - nx; view.y += wy - ny;
+  draw();
+}, { passive: false });
+window.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "z") el("undo").click();
+  if (e.key === "Escape") { armed = null; pickMode = null; renderPalette(); refreshStatus(); draw(); }
+});
+
+resize();
+refresh().catch(e => status(e.message, "err"));
+</script>
+</body>
+</html>

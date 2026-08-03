@@ -151,6 +151,10 @@ class Alg:
         return (self.a, self.b, self.c, self.d) == (other.a, other.b, other.c, other.d)
 
     def __hash__(self) -> int:
+        # Rational values hash like their Fraction (hence like equal ints), keeping the
+        # hash/eq contract with the numbers __eq__ deliberately accepts.
+        if not (self.b or self.c or self.d):
+            return hash(self.a)
         return hash((self.a, self.b, self.c, self.d))
 
     def __bool__(self) -> bool:
@@ -159,16 +163,19 @@ class Alg:
     def __lt__(self, other: AlgLike) -> bool:
         # Exact sign comparison would need interval refinement; float is fine for
         # ordering (used only for sorting and bounding boxes, never for equality).
+        # All four operators derive from the same float comparison so that distinct
+        # values with identical float images compare as consistently unordered rather
+        # than each claiming to exceed the other.
         return float(self) < float(Alg.coerce(other))
 
     def __le__(self, other: AlgLike) -> bool:
         return self == other or self < other
 
     def __gt__(self, other: AlgLike) -> bool:
-        return not self <= other
+        return float(self) > float(Alg.coerce(other))
 
     def __ge__(self, other: AlgLike) -> bool:
-        return not self < other
+        return self == other or self > other
 
     # -- conversion ------------------------------------------------------------
 
