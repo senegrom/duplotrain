@@ -167,6 +167,68 @@ render_layout(best.layout, "loop.png")
 
 ![Oval with a switch worked in](docs/oval-with-switch.png)
 
+## Driving, and the looping ladder
+
+Geometry closing is necessary, not sufficient: switches have *state*. `duplotrain.drive`
+simulates a train with real points semantics — a **facing** move (in at the stem)
+follows the tongue; a **trailing** move (in through a branch) pushes through and
+**forces the tongue to the branch it came from**, like the real unsprung DUPLO points.
+Direction stones bounce the train once per pass; stop stones park it; buffers and open
+ends end the run. Every run is provably periodic (finite state), so
+`classify()` decides, by exhaustive simulation over every starting position, direction
+and initial tongue setting, where a layout sits on the ladder:
+
+| level | meaning |
+| --- | --- |
+| **locally looping** | some placement runs forever |
+| **looping** | every placement runs forever |
+| **completely looping** | …and every run covers the whole track |
+| **perfectly looping** | …sweeping every tile in both directions, infinitely often |
+
+(`duplotrain classify layout.json` prints the verdict and a counterexample start.)
+
+Findings the simulator proves about real DUPLO:
+
+- Any reachable open end or buffer admits a doomed start (bounce off the tip, or park
+  against the bumper), so everything from *looping* up requires a fully mated layout.
+  Teardrops are therefore *locally* looping only — wonderful, but keep the toddler
+  from placing the loco at the very tip.
+- A plain loop is *completely* but never *perfectly* looping: runs are one-way.
+  Clip one green direction stone anywhere on it and it becomes **perfect** — every
+  run ping-pongs, sweeping everything both ways.
+- Teardrops come in two flavours: **stem-tailed** (the classic — every pass trails
+  the points, the tongue alternates, the train alternates lobes) and **branch-tailed**
+  (a one-way trap that absorbs the train into its circuit). `is_stem_tailed()` tells
+  them apart; only the first composes further.
+- Join two stem-tailed teardrops through their tails and you get the **dogbone** —
+  perfectly looping with *no stones at all*: the lobes themselves reverse the train.
+
+![Dogbone](docs/dogbone.png)
+
+## Isomorphism and finding all perfect tracks
+
+Two layouts count as the same when their track centrelines are congruent curves in
+space (rotations, translations, reflections; `z` included, so bridges distinguish) —
+which straight carries the stone, or whether a level crossing stands in for a plain
+straight, doesn't change the curve. `congruence_key()` canonicalises the sampled
+centreline over the 24 lattice rotations × reflection, so non-isomorphic hunting is a
+set of keys:
+
+```python
+from duplotrain import default_catalog, find_perfect_loops, SolverConfig
+
+pieces = default_catalog()
+perfect = find_perfect_loops({"curve": 12, "straight": 4}, pieces,
+                             SolverConfig(use_all_pieces=True, max_results=100))
+# -> 4 non-isomorphic perfectly looping tracks (oval, two parallelograms,
+#    rounded square -- each with one direction stone clipped on)
+```
+
+With today's pieces, perfection has exactly two sources: a closed loop plus a
+direction stone, or reversing topology (dogbones — build them with
+`make_dogbone(pick_stem_tailed(solutions, pieces), pieces)`). Everything else tops out
+lower on the ladder, and `classify` will tell you why, with the exact doomed start.
+
 ## How the solver works
 
 Depth-first search that walks track outward from an anchored origin, over the

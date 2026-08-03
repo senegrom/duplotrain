@@ -357,6 +357,44 @@ def check(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
         console.print(f"  {a} <-> {b}: gap {gap:.1f} mm")
 
 
+@main.command(name="classify")
+@click.argument("layout_file", type=click.Path(exists=True))
+@click.option(
+    "--catalog",
+    "catalog_paths",
+    multiple=True,
+    type=click.Path(exists=True),
+)
+def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
+    """Where does a saved layout sit on the looping ladder?
+
+    Simulates a train from every placement, in both directions, under every initial
+    switch-tongue setting, with the layout's action stones in effect.
+    """
+    from .drive import classify
+
+    catalog = _catalog(catalog_paths)
+    layout = _load_layout(layout_file, catalog)
+    verdict = classify(layout)
+    ladder = [
+        ("locally looping", verdict.locally_looping, "some placement runs forever"),
+        ("looping", verdict.looping, "every placement runs forever"),
+        ("completely looping", verdict.completely_looping, "and every run covers all track"),
+        ("perfectly looping", verdict.perfectly_looping, "and sweeps every tile both ways"),
+    ]
+    for name, holds, meaning in ladder:
+        mark = "[green]yes[/green]" if holds else "[red]no[/red]"
+        console.print(f"  {name:20s} {mark}   [dim]{meaning}[/dim]")
+    console.print(f"[dim]{verdict.runs} simulated runs[/dim]")
+    if verdict.counterexample and not verdict.perfectly_looping:
+        start, tongues, outcome = verdict.counterexample
+        detail = f" with tongues {tongues}" if tongues else ""
+        console.print(
+            f"first failure: a train entering piece {start[0]} via port {start[1]}"
+            f"{detail} -> {outcome}"
+        )
+
+
 @main.command()
 @click.option("--port", type=int, default=8137, show_default=True)
 @click.option("--no-browser", is_flag=True, help="Don't open a browser tab.")

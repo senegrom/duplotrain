@@ -12,12 +12,15 @@ Quick taste::
 
 from typing import TYPE_CHECKING
 
-from .catalog import default_catalog, load_catalog
+from .catalog import ACCESSORIES, default_catalog, load_catalog
+from .drive import DriveReport, LoopClassification, classify, drive, endless_run
 from .exact import Alg
+from .explore import congruence_key, find_perfect_loops, make_dogbone
 from .geometry import ORIGIN, Pose
 from .layout import Layout, Placement, build_chain, layout_from_dict, layout_to_dict
 from .pieces import PieceType, parse_piece, parse_pieces
 from .scoring import ScoreWeights, score_solution
+from .sets import SETS, inventory_for_sets
 from .solver import Solution, SolveResult, SolverConfig, solve
 
 __version__ = "0.1.0"
@@ -31,6 +34,9 @@ __all__ = [
     "parse_pieces",
     "default_catalog",
     "load_catalog",
+    "ACCESSORIES",
+    "SETS",
+    "inventory_for_sets",
     "Layout",
     "Placement",
     "build_chain",
@@ -42,6 +48,14 @@ __all__ = [
     "Solution",
     "ScoreWeights",
     "score_solution",
+    "drive",
+    "endless_run",
+    "classify",
+    "DriveReport",
+    "LoopClassification",
+    "congruence_key",
+    "find_perfect_loops",
+    "make_dogbone",
     "render_layout",
     "__version__",
 ]
