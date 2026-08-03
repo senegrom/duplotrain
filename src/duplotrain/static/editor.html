@@ -176,9 +176,16 @@ function stoneMountAt(sx, sy) {
   let best = null;
   S.layout.placements.forEach((pl, i) => {
     if (!pl.stone_ok) return;
+    // Near a connector face: position the stone AT that face (it then only acts on
+    // trains running into it -- the reversing-terminator trick at a buffer).
+    pl.ports.forEach((p) => {
+      const [px, py] = worldToScreen(p.x, p.y);
+      const d = Math.hypot(px - sx, py - sy);
+      if (d < 20 && (!best || d < best.d)) best = { placement: i, at_port: p.port, d };
+    });
     const [mx, my] = worldToScreen(pl.mid[0], pl.mid[1]);
     const d = Math.hypot(mx - sx, my - sy);
-    if (d < 28 && (!best || d < best.d)) best = { placement: i, d };
+    if (d < 28 && (!best || d < best.d)) best = { placement: i, at_port: null, d };
   });
   return best;
 }
@@ -206,13 +213,19 @@ function draw() {
   drawLayout(S.layout, false);
   if (preview) drawLayout(preview, true);
 
-  // action stones
+  // action stones (mid-piece, or pulled toward the port face they guard)
   S.layout.placements.forEach((pl) => {
-    (pl.stones || []).forEach((sid, k) => {
-      const info = S.stones.catalog[sid] || {};
-      const [sx, sy] = worldToScreen(pl.mid[0], pl.mid[1]);
+    (pl.stone_marks || []).forEach((mark, k) => {
+      const info = S.stones.catalog[mark.id] || {};
+      let wx = pl.mid[0], wy = pl.mid[1];
+      if (mark.at !== null && mark.at !== undefined && pl.ports[mark.at]) {
+        const port = pl.ports[mark.at];
+        wx = port.x * 0.82 + pl.mid[0] * 0.18;
+        wy = port.y * 0.82 + pl.mid[1] * 0.18;
+      }
+      const [sx, sy] = worldToScreen(wx, wy);
       const r = Math.max(6, 14 * view.scale);
-      const oy = (k - ((pl.stones.length - 1) / 2)) * r * 2.2;
+      const oy = (k - ((pl.stone_marks.length - 1) / 2)) * r * 2.2;
       ctx.beginPath();
       ctx.arc(sx, sy + oy, r, 0, 7);
       ctx.fillStyle = info.color || "#888";
@@ -220,7 +233,7 @@ function draw() {
       ctx.lineWidth = 2;
       ctx.strokeStyle = "#ffffff";
       ctx.stroke();
-      if (sid === "stone_direction" && r > 7) {
+      if (mark.id === "stone_direction" && r > 7) {
         ctx.fillStyle = "#fff";
         ctx.font = `${r}px system-ui`;
         ctx.textAlign = "center";
@@ -514,7 +527,9 @@ canvas.addEventListener("mouseup", async (e) => {
     if (armedStone) {
       const mount = stoneMountAt(e.offsetX, e.offsetY);
       if (mount) {
-        S = await api("/api/stone", { placement: mount.placement, id: armedStone });
+        S = await api("/api/stone", {
+          placement: mount.placement, id: armedStone, at_port: mount.at_port,
+        });
         redraw();
       }
     } else if (pickMode) {

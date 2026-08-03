@@ -88,7 +88,9 @@ class Layout:
 
     placements: tuple[Placement, ...] = ()
     links: Mapping[End, End] = None  # type: ignore[assignment]
-    accessories: tuple[tuple[int, str], ...] = ()
+    #: (placement, stone id) for a mid-piece stone, (placement, stone id, port) for
+    #: one positioned at that connector's face.
+    accessories: tuple[tuple, ...] = ()
 
     def __post_init__(self) -> None:
         if self.links is None:
@@ -276,21 +278,38 @@ class Layout:
 
     # -- accessories -------------------------------------------------------------
 
-    def with_accessory(self, placement: int, accessory_id: str) -> Layout:
-        """Clip an action stone onto a placement."""
+    def with_accessory(
+        self, placement: int, accessory_id: str, at_port: int | None = None
+    ) -> Layout:
+        """Clip an action stone onto a placement.
+
+        ``at_port`` positions the stone at that connector's face instead of
+        mid-piece.  A face stone only acts on trains RUNNING INTO that face (a train
+        setting off away from it sits past the trigger already) -- which is exactly
+        what makes a direction stone at a buffer face a safe reversing terminator.
+        """
         if not 0 <= placement < len(self.placements):
             raise ValueError(f"no placement {placement}")
+        if at_port is not None and not (
+            0 <= at_port < len(self.placements[placement].piece.ports)
+        ):
+            raise ValueError(f"placement {placement} has no port {at_port}")
+        entry = (placement, accessory_id) if at_port is None else (
+            placement,
+            accessory_id,
+            at_port,
+        )
         return Layout(
             self.placements,
             dict(self.links),
-            self.accessories + ((placement, accessory_id),),
+            self.accessories + (entry,),
         )
 
     def without_accessory(self, placement: int, accessory_id: str) -> Layout:
-        """Remove one matching stone (the last one clipped on)."""
+        """Remove one matching stone (the last one clipped on), wherever it sits."""
         accessories = list(self.accessories)
         for i in range(len(accessories) - 1, -1, -1):
-            if accessories[i] == (placement, accessory_id):
+            if accessories[i][0] == placement and accessories[i][1] == accessory_id:
                 accessories.pop(i)
                 break
         else:
@@ -298,7 +317,15 @@ class Layout:
         return Layout(self.placements, dict(self.links), tuple(accessories))
 
     def stones_on(self, placement: int) -> list[str]:
-        return [sid for idx, sid in self.accessories if idx == placement]
+        return [entry[1] for entry in self.accessories if entry[0] == placement]
+
+    def stone_entries_on(self, placement: int) -> list[tuple[str, int | None]]:
+        """``(stone id, port position or None for mid-piece)`` for one placement."""
+        return [
+            (entry[1], entry[2] if len(entry) > 2 else None)
+            for entry in self.accessories
+            if entry[0] == placement
+        ]
 
     # -- traversal -------------------------------------------------------------
 
@@ -371,7 +398,7 @@ def layout_to_dict(layout: Layout) -> dict[str, Any]:
         "links": sorted(
             [list(a) + list(b) for a, b in layout.links.items() if a < b]
         ),
-        "accessories": [[idx, sid] for idx, sid in layout.accessories],
+        "accessories": [list(entry) for entry in layout.accessories],
     }
 
 
@@ -400,7 +427,10 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
         links[(ai, ap)] = (bi, bp)
         links[(bi, bp)] = (ai, ap)
     accessories = tuple(
-        (int(idx), str(sid)) for idx, sid in data.get("accessories", [])
+        (int(entry[0]), str(entry[1]))
+        if len(entry) < 3
+        else (int(entry[0]), str(entry[1]), int(entry[2]))
+        for entry in data.get("accessories", [])
     )
     return Layout(tuple(placements), links, accessories)
 

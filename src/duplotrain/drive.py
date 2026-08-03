@@ -31,7 +31,7 @@ from typing import Iterable, Mapping
 
 from .layout import End, Layout
 
-__all__ = ["DriveReport", "drive", "endless_run"]
+__all__ = ["DriveReport", "drive", "endless_run", "classify", "drivable_universe"]
 
 #: Stones that affect motion.
 STOP_STONE = "stone_stop"
@@ -66,8 +66,25 @@ class DriveReport:
         return len(self.steps) - self.cycle_start
 
     def covers(self, layout: Layout) -> bool:
-        """Did the run visit every placed piece?"""
-        return self.visited == frozenset(range(len(layout.placements)))
+        """Did the run visit every drivable piece?
+
+        Coverage ranges over track a train can actually traverse: a buffer stop's
+        only route runs into its sealed face, so it can terminate a run but never be
+        driven through, and it doesn't count against coverage.
+        """
+        return self.visited >= drivable_universe(layout)
+
+
+def drivable_universe(layout: Layout) -> frozenset[int]:
+    """Placements traversable between two real connectors -- the coverage universe."""
+    universe = set()
+    for index, placement in enumerate(layout.placements):
+        piece = placement.piece
+        for route in piece.routes:
+            if route.port_a not in piece.sealed and route.port_b not in piece.sealed:
+                universe.add(index)
+                break
+    return frozenset(universe)
 
 
 def _default_switch_states(layout: Layout) -> dict[int, int]:
@@ -111,9 +128,11 @@ def drive(
     if switch_states:
         states.update({int(k): int(v) for k, v in switch_states.items()})
 
-    stones_by_placement: dict[int, set[str]] = {}
-    for idx, sid in layout.accessories:
-        stones_by_placement.setdefault(idx, set()).add(sid)
+    stones_by_placement: dict[int, list[tuple[str, int | None]]] = {}
+    for index in range(len(layout.placements)):
+        entries = layout.stone_entries_on(index)
+        if entries:
+            stones_by_placement[index] = entries
 
     placement, entered = start
     steps: list[tuple[int, int, int]] = []
@@ -146,10 +165,14 @@ def drive(
                 final_switch_states=dict(states),
             )
 
-        if STOP_STONE in stones:
+        # Mid-piece stones trigger on every pass.  A stone positioned at a port face
+        # only acts on trains RUNNING INTO that face; a train setting off away from
+        # it starts past the trigger (DUPLO locos are longer than anything beyond),
+        # so entering *via* that port leaves it silent.
+        if any(sid == STOP_STONE and pos is None for sid, pos in stones):
             return finish("stopped")
 
-        if DIRECTION_STONE in stones:
+        if any(sid == DIRECTION_STONE and pos is None for sid, pos in stones):
             # One reversal per pass: in, trigger, back out the way it came.
             exit_port = entered
             reversals += 1
@@ -170,6 +193,15 @@ def drive(
                     # Trailing move: we are pushing through toward a facing port, so
                     # the tongue is forced to the branch we came from.
                     states[placement] = entered
+            # Face stones at the port the train is heading for.
+            if any(sid == STOP_STONE and pos == exit_port for sid, pos in stones):
+                return finish("stopped")
+            if any(
+                sid == DIRECTION_STONE and pos == exit_port and pos != entered
+                for sid, pos in stones
+            ):
+                exit_port = entered
+                reversals += 1
 
         steps.append((placement, entered, exit_port))
 
@@ -231,9 +263,16 @@ class LoopClassification:
 
 
 def _all_starts(layout: Layout) -> list[End]:
+    """Every placement of a train: a drivable tile plus a direction of entry.
+
+    Buffers are not start locations -- at 64 mm they cannot hold a locomotive, and
+    any real train "at the buffer" stands on the neighbouring piece.
+    """
+    universe = drivable_universe(layout)
     return [
         (index, port)
         for index, placement in enumerate(layout.placements)
+        if index in universe
         for port in range(len(placement.piece.ports))
         if port not in placement.piece.sealed
     ]
@@ -262,16 +301,19 @@ def _tongue_assignments(layout: Layout) -> list[dict[int, int]]:
 
 
 def _cycle_both_directions(report: DriveReport, layout: Layout) -> bool:
-    """Does the eventual cycle traverse every tile in both directions?"""
+    """Does the eventual cycle traverse every drivable tile in both directions?"""
     assert report.cycle_start is not None
     cycle = report.steps[report.cycle_start :]
     per_placement: dict[int, set[tuple[int, int]]] = {}
     for placement, entered, exited in cycle:
         per_placement.setdefault(placement, set()).add((entered, exited))
-    if set(per_placement) != set(range(len(layout.placements))):
+    universe = drivable_universe(layout)
+    if not universe <= set(per_placement):
         return False
     return all(
-        any((x, e) in moves for (e, x) in moves) for moves in per_placement.values()
+        any((x, e) in moves for (e, x) in moves)
+        for index, moves in per_placement.items()
+        if index in universe
     )
 
 
@@ -287,7 +329,7 @@ def classify(layout: Layout) -> LoopClassification:
 
     starts = _all_starts(layout)
     assignments = _tongue_assignments(layout)
-    everything = frozenset(range(len(layout.placements)))
+    everything = drivable_universe(layout)
 
     locally = False
     looping = True
@@ -305,7 +347,7 @@ def classify(layout: Layout) -> LoopClassification:
                 if not locally:
                     locally = True
                     witness = (start, dict(assignment))
-                if report.visited != everything and completely:
+                if not report.visited >= everything and completely:
                     completely = False
                     perfectly = False
                     counterexample = counterexample or (

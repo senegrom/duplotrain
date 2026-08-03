@@ -166,6 +166,61 @@ def test_branch_tailed_teardrop_is_a_one_way_trap(catalog, teardrops):
         make_dogbone(branch_tailed, catalog)
 
 
+def test_direction_stone_at_buffer_face_makes_a_safe_terminator(catalog, teardrop):
+    """The user's construction: teardrop + tail + [stone at the buffer face][buffer].
+
+    Every approach to the buffer reverses at the wall, the doomed tip start no longer
+    exists, and the buffer itself (never drivable through) is excluded from coverage
+    -- so the whole build becomes PERFECTLY looping.
+    """
+    tail = teardrop.layout.connectable_ends()[0]
+    layout, s1 = teardrop.layout.attach(catalog["straight"], 0, tail)
+    layout, b = layout.attach(catalog["buffer"], 0, (s1, 1))
+    layout = layout.with_accessory(s1, "stone_direction", at_port=1)  # at the buffer face
+    assert layout.is_closed  # buffer face sealed, everything else mated
+
+    verdict = classify(layout)
+    assert verdict.looping, verdict.counterexample
+    assert verdict.completely_looping
+    assert verdict.perfectly_looping
+
+    # A mid-piece stone in the same spot is NOT safe: a train setting off from the
+    # buffer side triggers it and shunts itself into the bumper.
+    unsafe = teardrop.layout
+    unsafe, s2 = unsafe.attach(catalog["straight"], 0, tail)
+    unsafe, _b2 = unsafe.attach(catalog["buffer"], 0, (s2, 1))
+    unsafe = unsafe.with_accessory(s2, "stone_direction")
+    bad = classify(unsafe)
+    assert bad.locally_looping
+    assert not bad.looping
+
+
+def test_shuttle_with_face_stones_is_perfectly_looping(catalog):
+    """[buffer][stone@face ... straights ... stone@face][buffer]: pure ping-pong."""
+    chain = build_chain([(catalog["straight"], 0, 1)] * 3)
+    layout, b1 = chain.attach(catalog["buffer"], 0, chain.open_ends()[0])
+    layout, b2 = layout.attach(catalog["buffer"], 0, (2, 1))
+    layout = layout.with_accessory(0, "stone_direction", at_port=0)  # at buffer 1's face
+    layout = layout.with_accessory(2, "stone_direction", at_port=1)  # at buffer 2's face
+    assert layout.is_closed
+
+    verdict = classify(layout)
+    assert verdict.perfectly_looping
+    report = drive(layout, start=(1, 0))
+    assert report.outcome == "endless"
+    assert report.reversals >= 2
+
+
+def test_positioned_stones_serialise(catalog):
+    from duplotrain.layout import layout_from_dict, layout_to_dict
+
+    layout = build_chain([(catalog["straight"], 0, 1)])
+    layout = layout.with_accessory(0, "stone_direction", at_port=1)
+    rebuilt = layout_from_dict(layout_to_dict(layout), catalog)
+    assert rebuilt == layout
+    assert rebuilt.stone_entries_on(0) == [("stone_direction", 1)]
+
+
 # -- isomorphism ---------------------------------------------------------------------
 
 

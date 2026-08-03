@@ -130,6 +130,10 @@ class Session:
                     "mid": [mid[0], mid[1]],
                     "stone_ok": placement.piece.id in STONE_MOUNTS,
                     "stones": layout.stones_on(index),
+                    "stone_marks": [
+                        {"id": sid, "at": pos}
+                        for sid, pos in layout.stone_entries_on(index)
+                    ],
                 }
             )
         width, height = layout.size()
@@ -266,8 +270,11 @@ class Session:
         for sid, n in stones.items():
             self.stones[sid] = self.stones.get(sid, 0) + n
 
-    def toggle_stone(self, placement: int, stone_id: str) -> None:
-        """Clip a stone onto a placement, or unclip it if already there."""
+    def toggle_stone(
+        self, placement: int, stone_id: str, at_port: int | None = None
+    ) -> None:
+        """Clip a stone onto a placement (mid-piece or at a connector face), or
+        unclip it if one of that kind is already there."""
         if stone_id not in ACCESSORIES:
             raise ValueError(f"unknown action stone {stone_id!r}")
         if not 0 <= placement < len(self.layout.placements):
@@ -280,7 +287,7 @@ class Session:
             raise ValueError(f"action stones clip onto straights, not {piece.id!r}")
         if self.stones_remaining().get(stone_id, 0) <= 0:
             raise ValueError(f"no {stone_id!r} left (edit the inventory)")
-        self._push(self.layout.with_accessory(placement, stone_id))
+        self._push(self.layout.with_accessory(placement, stone_id, at_port=at_port))
 
     def solve_gap(
         self,
@@ -386,7 +393,11 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             elif path == "/api/add_set":
                 session.add_set(str(body["code"]))
             elif path == "/api/stone":
-                session.toggle_stone(int(body["placement"]), str(body["id"]))
+                session.toggle_stone(
+                    int(body["placement"]),
+                    str(body["id"]),
+                    int(body["at_port"]) if body.get("at_port") is not None else None,
+                )
             elif path == "/api/solve":
                 found = session.solve_gap(
                     tuple(body["grow"]) if body.get("grow") else None,
