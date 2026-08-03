@@ -58,6 +58,11 @@
         });
       });
       worker.addEventListener("message", (event) => {
+        if (typeof event.data === "number") {
+          // Solve heartbeat: the search is alive, not hung.
+          status(`searching… ${event.data.toLocaleString()} states explored`);
+          return;
+        }
         const { id, res, err } = event.data || {};
         const call = pending.get(id);
         if (!call) return;

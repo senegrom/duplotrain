@@ -371,6 +371,9 @@ class SolverConfig:
     #: such a layout endlessly needs a direction-change action stone on that tail
     #: (and switches the train can trail through, which the modern ones are).
     reversing_loops: bool = False
+    #: Called with the node count every few thousand nodes -- a liveness heartbeat
+    #: for UIs sitting on a long search.  Exceptions from it are the caller's problem.
+    progress: object = None
 
 
 @dataclass
@@ -615,6 +618,8 @@ def solve(
         if stats.nodes > cfg.max_nodes:
             stats.aborted = True
             return False
+        if cfg.progress is not None and stats.nodes % 4096 == 0:
+            cfg.progress(stats.nodes)
 
         # -- closure ------------------------------------------------------------
         def closing_link_legal() -> bool:

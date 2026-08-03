@@ -11,6 +11,15 @@ from duplotrain.layout import layout_from_dict, layout_to_dict
 
 session = Session()
 
+try:  # inside the web worker: bare numbers posted back are progress heartbeats
+    from js import postMessage as _post
+
+    def _progress(nodes: int) -> None:
+        _post(nodes)
+
+except ImportError:  # plain CPython (tests, local server): no heartbeat channel
+    _progress = None
+
 
 def dispatch(path: str, body_json: str | None) -> str:
     """Handle one editor API call; returns the JSON the HTTP server would send."""
@@ -48,6 +57,7 @@ def dispatch(path: str, body_json: str | None) -> str:
                 float(body.get("slop", 0.0)),
                 int(body.get("max_results", 10)),
                 reversing=bool(body.get("reversing", False)),
+                progress=_progress,
             )
             return json.dumps({"found": found, **session.state()})
         elif path == "/api/apply":

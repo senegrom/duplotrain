@@ -308,6 +308,7 @@ class Session:
         slop: float,
         max_results: int,
         reversing: bool = False,
+        progress: object = None,
     ) -> int:
         opens = self.layout.connectable_ends()
         if grow is None or close is None:
@@ -325,9 +326,11 @@ class Session:
                 min_pieces=1,
                 max_results=max_results,
                 # Modest budget: the editor must feel interactive, and under the web
-                # build this runs in WebAssembly at a fraction of native speed.
-                max_nodes=150_000,
+                # build this runs in WebAssembly at a fraction of native speed
+                # (measured: ~1.8k nodes/s native today, so a few hundred in WASM).
+                max_nodes=60_000,
                 reversing_loops=reversing,
+                progress=progress,
             ),
             base=self.layout,
             grow_from=grow,
