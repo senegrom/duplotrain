@@ -79,7 +79,11 @@
 </div>
 <script>
 "use strict";
+// Transport: the local `duplotrain gui` server answers over HTTP; the static web
+// build (see webapp/) installs window.duplotrainApi to run the same Python engine
+// in-browser via Pyodide. Checked at call time so either host works unmodified.
 const api = async (path, body) => {
+  if (window.duplotrainApi) return window.duplotrainApi(path, body);
   const res = await fetch(path, body === undefined ? {} :
     { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) });
   const data = await res.json();
@@ -574,7 +578,11 @@ window.addEventListener("keydown", (e) => {
 el("reversing").addEventListener("change", (e) => { e.target.dataset.touched = "1"; });
 
 resize();
-refresh().catch(e => status(e.message, "err"));
+if (window.duplotrainBoot) {
+  window.duplotrainBoot({ refresh, status });
+} else {
+  refresh().catch(e => status(e.message, "err"));
+}
 </script>
 </body>
 </html>

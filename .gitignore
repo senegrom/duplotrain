@@ -27,3 +27,7 @@ out/
 *.png
 !docs/**/*.svg
 !docs/**/*.png
+
+# Web app build artifacts (deployed copy lives in the website repo)
+webapp/dist/
+webapp/vendor/

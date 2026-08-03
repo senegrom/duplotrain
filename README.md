@@ -126,6 +126,10 @@ finished, not dangling.
 
 ## The designer GUI
 
+**Hosted:** the editor runs fully client-side (the identical Python engine under
+Pyodide) at **https://carlgeorgheise.com/app/duplotrain/** — `webapp/build.py`
+produces the static bundle; nothing leaves the browser.
+
 `duplotrain gui` opens a local track editor in your browser (standard library server,
 nothing to install). Because DUPLO only ever connects on the exact lattice there is no
 freeform dragging: arm a piece variant in the palette, click a red open-end arrow and
