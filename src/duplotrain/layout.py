@@ -81,11 +81,14 @@ class Layout:
     """A set of connected placements.
 
     ``links`` maps each occupied end to the end it is plugged into.  It is symmetric:
-    if ``links[a] == b`` then ``links[b] == a``.
+    if ``links[a] == b`` then ``links[b] == a``.  ``accessories`` records action
+    stones clipped onto placements as ``(placement index, accessory id)`` pairs --
+    they carry no geometry, but they are part of the build.
     """
 
     placements: tuple[Placement, ...] = ()
     links: Mapping[End, End] = None  # type: ignore[assignment]
+    accessories: tuple[tuple[int, str], ...] = ()
 
     def __post_init__(self) -> None:
         if self.links is None:
@@ -94,7 +97,11 @@ class Layout:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Layout):
             return NotImplemented
-        return self.placements == other.placements and dict(self.links) == dict(other.links)
+        return (
+            self.placements == other.placements
+            and dict(self.links) == dict(other.links)
+            and sorted(self.accessories) == sorted(other.accessories)
+        )
 
     # -- inspection ------------------------------------------------------------
 
@@ -113,8 +120,16 @@ class Layout:
         ]
 
     def open_ends(self) -> list[End]:
-        """Connectors that nothing is plugged into."""
+        """Connectors that nothing is plugged into (including sealed dead faces)."""
         return [end for end in self.ends() if end not in self.links]
+
+    def is_sealed(self, end: End) -> bool:
+        """True when *end* is a dead face (a buffer's bumper) that can never mate."""
+        return end[1] in self.placements[end[0]].piece.sealed
+
+    def connectable_ends(self) -> list[End]:
+        """Open ends something could actually plug into."""
+        return [end for end in self.open_ends() if not self.is_sealed(end)]
 
     def pose_of(self, end: End) -> Pose:
         i, p = end
@@ -122,8 +137,12 @@ class Layout:
 
     @property
     def is_closed(self) -> bool:
-        """True when every connector is mated -- no loose ends anywhere."""
-        return bool(self.placements) and not self.open_ends()
+        """True when every real connector is mated -- no loose ends anywhere.
+
+        Sealed faces (buffer bumpers) are not connectors, so a siding properly
+        terminated by a buffer stop does not count as loose.
+        """
+        return bool(self.placements) and not self.connectable_ends()
 
     @property
     def piece_counts(self) -> dict[str, int]:
@@ -190,7 +209,7 @@ class Layout:
     def with_piece(self, piece: PieceType, frame: Pose) -> tuple[Layout, int]:
         """Add a free-standing piece; returns the new layout and its placement index."""
         placements = self.placements + (Placement(piece, frame),)
-        return Layout(placements, dict(self.links)), len(placements) - 1
+        return Layout(placements, dict(self.links), self.accessories), len(placements) - 1
 
     def attach(self, piece: PieceType, entry_port: int, at: End) -> tuple[Layout, int]:
         """Plug *piece* into the open end *at*, entering through *entry_port*.
@@ -201,6 +220,10 @@ class Layout:
         """
         if at in self.links:
             raise ValueError(f"end {at} is already connected to {self.links[at]}")
+        if self.is_sealed(at):
+            raise ValueError(f"end {at} is a sealed buffer face; nothing can mate there")
+        if entry_port in piece.sealed:
+            raise ValueError(f"port {entry_port} of {piece.id} is sealed and cannot mate")
         host = self.placements[at[0]].piece
         if host.end_overhang > 0 and piece.end_overhang > 0:
             raise ValueError(
@@ -215,7 +238,7 @@ class Layout:
         links = dict(self.links)
         links[at] = (new_index, entry_port)
         links[(new_index, entry_port)] = at
-        return Layout(placements, links), new_index
+        return Layout(placements, links, self.accessories), new_index
 
     def join(self, a: End, b: End, force: bool = False) -> Layout:
         """Record that two existing open ends mate -- the move that closes a loop.
@@ -231,6 +254,8 @@ class Layout:
         for end in (a, b):
             if end in self.links:
                 raise ValueError(f"end {end} is already connected")
+            if self.is_sealed(end):
+                raise ValueError(f"end {end} is a sealed buffer face; it cannot mate")
         piece_a = self.placements[a[0]].piece
         piece_b = self.placements[b[0]].piece
         if piece_a.end_overhang > 0 and piece_b.end_overhang > 0:
@@ -247,7 +272,33 @@ class Layout:
         links = dict(self.links)
         links[a] = b
         links[b] = a
-        return Layout(self.placements, links)
+        return Layout(self.placements, links, self.accessories)
+
+    # -- accessories -------------------------------------------------------------
+
+    def with_accessory(self, placement: int, accessory_id: str) -> Layout:
+        """Clip an action stone onto a placement."""
+        if not 0 <= placement < len(self.placements):
+            raise ValueError(f"no placement {placement}")
+        return Layout(
+            self.placements,
+            dict(self.links),
+            self.accessories + ((placement, accessory_id),),
+        )
+
+    def without_accessory(self, placement: int, accessory_id: str) -> Layout:
+        """Remove one matching stone (the last one clipped on)."""
+        accessories = list(self.accessories)
+        for i in range(len(accessories) - 1, -1, -1):
+            if accessories[i] == (placement, accessory_id):
+                accessories.pop(i)
+                break
+        else:
+            raise ValueError(f"no {accessory_id!r} on placement {placement}")
+        return Layout(self.placements, dict(self.links), tuple(accessories))
+
+    def stones_on(self, placement: int) -> list[str]:
+        return [sid for idx, sid in self.accessories if idx == placement]
 
     # -- traversal -------------------------------------------------------------
 
@@ -320,6 +371,7 @@ def layout_to_dict(layout: Layout) -> dict[str, Any]:
         "links": sorted(
             [list(a) + list(b) for a, b in layout.links.items() if a < b]
         ),
+        "accessories": [[idx, sid] for idx, sid in layout.accessories],
     }
 
 
@@ -347,7 +399,10 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
     for ai, ap, bi, bp in data.get("links", []):
         links[(ai, ap)] = (bi, bp)
         links[(bi, bp)] = (ai, ap)
-    return Layout(tuple(placements), links)
+    accessories = tuple(
+        (int(idx), str(sid)) for idx, sid in data.get("accessories", [])
+    )
+    return Layout(tuple(placements), links, accessories)
 
 
 def save_layout(layout: Layout, path: str) -> None:

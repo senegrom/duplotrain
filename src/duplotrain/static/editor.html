@@ -62,7 +62,14 @@
     <label>slop <input id="slop" type="number" min="0" step="0.5" value="0"> mm</label>
     <button id="solve" class="primary">Close the loop</button>
   </div>
+  <label class="solverow" style="font-size:12px" title="also propose teardrops that close into a switch branch — the train then needs a direction-change stone on the open tail">
+    <input id="reversing" type="checkbox"> allow reversing loops (uses the ↔ stone)
+  </label>
   <div id="cands"></div>
+  <h2>Your sets <span style="font-weight:400">(one click adds its pieces)</span></h2>
+  <div id="sets" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  <h2>Action stones <span style="font-weight:400">(arm one, click a straight)</span></h2>
+  <div id="stones" style="display:flex;flex-wrap:wrap;gap:6px"></div>
   <h2>Pieces <span style="font-weight:400">(arm one, then click a red arrow)</span></h2>
   <div id="palette"></div>
 </div>
@@ -82,6 +89,7 @@ const api = async (path, body) => {
 
 let S = null;                 // last /api/state payload
 let armed = null;             // {piece, entry, label}
+let armedStone = null;        // stone id
 let preview = null;           // candidate layout ghost
 let pickMode = null;          // null | {stage: "grow"|"close", grow: [i,p]}
 let view = { x: 0, y: 0, scale: 0.9 };
@@ -155,12 +163,24 @@ function openEndScreenPos() {
   if (!S) return out;
   S.layout.placements.forEach((pl, i) => {
     for (const p of pl.ports) {
-      if (!p.open) continue;
+      if (!p.open || p.sealed) continue;
       const [sx, sy] = worldToScreen(p.x, p.y);
       out.push({ end: [i, p.port], x: sx, y: sy, deg: p.deg, name: p.name });
     }
   });
   return out;
+}
+
+function stoneMountAt(sx, sy) {
+  if (!S) return null;
+  let best = null;
+  S.layout.placements.forEach((pl, i) => {
+    if (!pl.stone_ok) return;
+    const [mx, my] = worldToScreen(pl.mid[0], pl.mid[1]);
+    const d = Math.hypot(mx - sx, my - sy);
+    if (d < 28 && (!best || d < best.d)) best = { placement: i, d };
+  });
+  return best;
 }
 
 function draw() {
@@ -186,11 +206,45 @@ function draw() {
   drawLayout(S.layout, false);
   if (preview) drawLayout(preview, true);
 
-  // joints + open-end arrows
+  // action stones
+  S.layout.placements.forEach((pl) => {
+    (pl.stones || []).forEach((sid, k) => {
+      const info = S.stones.catalog[sid] || {};
+      const [sx, sy] = worldToScreen(pl.mid[0], pl.mid[1]);
+      const r = Math.max(6, 14 * view.scale);
+      const oy = (k - ((pl.stones.length - 1) / 2)) * r * 2.2;
+      ctx.beginPath();
+      ctx.arc(sx, sy + oy, r, 0, 7);
+      ctx.fillStyle = info.color || "#888";
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+      if (sid === "stone_direction" && r > 7) {
+        ctx.fillStyle = "#fff";
+        ctx.font = `${r}px system-ui`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("↔", sx, sy + oy + 1);
+      }
+    });
+  });
+
+  // joints + open-end arrows (+ sealed buffer faces)
   S.layout.placements.forEach((pl, i) => {
     for (const p of pl.ports) {
       const [sx, sy] = worldToScreen(p.x, p.y);
-      if (!p.open) {
+      if (p.sealed) {
+        const rad = -p.deg * Math.PI / 180;
+        const bx = Math.cos(rad + Math.PI / 2), by = Math.sin(rad + Math.PI / 2);
+        const w = Math.max(8, 26 * view.scale);
+        ctx.strokeStyle = "#8c1d18";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(sx - bx * w, sy - by * w);
+        ctx.lineTo(sx + bx * w, sy + by * w);
+        ctx.stroke();
+      } else if (!p.open) {
         ctx.fillStyle = "#4d5359";
         ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, 7); ctx.fill();
       } else {
@@ -254,6 +308,9 @@ function refreshStatus() {
   } else if (pickMode) {
     status(pickMode.stage === "grow" ? "Pick the end to GROW from (click a red arrow)"
                                      : "Now pick the end to CLOSE onto");
+  } else if (armedStone) {
+    const info = S.stones.catalog[armedStone];
+    status(`${info.name} armed — click a straight to clip it on (or off).`);
   } else if (armed) {
     status(`${armed.pieceName} — ${armed.label} armed. ` +
            (n ? "Click a red arrow to attach." : "Click anywhere to place it."));
@@ -299,13 +356,50 @@ function renderPalette() {
         armed = (armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit)
           ? null
           : { piece: piece.id, pieceName: piece.name, entry: v.entry, exit: v.exit, label: v.label };
+        armedStone = null;
         pickMode = null;
-        renderPalette(); refreshStatus(); draw();
+        renderPalette(); renderStones(); refreshStatus(); draw();
       });
       vs.append(b);
     }
     div.append(vs);
     pal.append(div);
+  }
+}
+
+function renderSets() {
+  const box = el("sets");
+  box.innerHTML = "";
+  for (const s of (S.sets || [])) {
+    const b = document.createElement("button");
+    b.textContent = `+ ${s.code}`;
+    b.title = `${s.name} (${s.year}): ` +
+      Object.entries(s.pieces).map(([k, n]) => `${n}×${k}`).join(", ");
+    b.addEventListener("click", async () => {
+      try { S = await api("/api/add_set", { code: s.code }); redraw(); }
+      catch (e) { status(e.message, "err"); }
+    });
+    box.append(b);
+  }
+}
+
+function renderStones() {
+  const box = el("stones");
+  box.innerHTML = "";
+  for (const [sid, info] of Object.entries(S.stones.catalog)) {
+    const remaining = S.stones.remaining[sid] ?? 0;
+    const b = document.createElement("button");
+    b.textContent = `${info.name.replace(" stone", "")} ×${remaining}`;
+    b.title = `${info.effect} — click a straight to clip on / off`;
+    b.style.borderLeft = `14px solid ${info.color}`;
+    if (armedStone === sid) b.classList.add("armed");
+    b.disabled = remaining <= 0 && armedStone !== sid;
+    b.addEventListener("click", () => {
+      armedStone = armedStone === sid ? null : sid;
+      armed = null; pickMode = null;
+      renderPalette(); renderStones(); refreshStatus(); draw();
+    });
+    box.append(b);
   }
 }
 
@@ -317,8 +411,11 @@ function renderCandidates() {
     const div = document.createElement("div");
     div.className = "cand";
     const added = Object.entries(c.added).map(([k, n]) => `${n}×${k}`).join(" ") || "nothing";
+    const kind = c.kind === "reversing"
+      ? ` <span style="color:#237841;font-weight:600">reversing (↔ stone on the tail)</span>`
+      : "";
     div.innerHTML = `<span class="${c.exact ? "exact" : "gap"}">` +
-      (c.exact ? "exact" : `forced ${c.gap} mm`) + `</span> — add ${added}` +
+      (c.exact ? "exact" : `forced ${c.gap} mm`) + `</span>${kind} — add ${added}` +
       ` <span style="color:var(--dim)">(${c.size_cm[0]}×${c.size_cm[1]} cm` +
       (c.open_stubs ? `, ${c.open_stubs} stub${c.open_stubs > 1 ? "s" : ""}` : "") + `)</span>`;
     div.addEventListener("mouseenter", () => { preview = c.preview; draw(); });
@@ -333,7 +430,12 @@ function renderCandidates() {
 
 function redraw() {
   if (!fitted) { fitView(); fitted = true; }
-  renderPalette(); renderCandidates(); refreshStatus(); draw();
+  renderPalette(); renderSets(); renderStones(); renderCandidates();
+  const rev = el("reversing");
+  if (!rev.dataset.touched) {
+    rev.checked = (S.stones.owned.stone_direction || 0) > 0;
+  }
+  refreshStatus(); draw();
 }
 
 async function refresh() {
@@ -373,6 +475,7 @@ async function runSolve(grow, close) {
       grow, close,
       slop: parseFloat(el("slop").value || "0"),
       max_results: 8,
+      reversing: el("reversing").checked,
     });
     pickMode = null;
     redraw();
@@ -408,7 +511,13 @@ canvas.addEventListener("mouseup", async (e) => {
   if (wasDrag) return;
   const hit = openEndScreenPos().find(p => Math.hypot(p.x - e.offsetX, p.y - e.offsetY) < 16);
   try {
-    if (pickMode) {
+    if (armedStone) {
+      const mount = stoneMountAt(e.offsetX, e.offsetY);
+      if (mount) {
+        S = await api("/api/stone", { placement: mount.placement, id: armedStone });
+        redraw();
+      }
+    } else if (pickMode) {
       if (!hit) return;
       if (pickMode.stage === "grow") {
         pickMode = { stage: "close", grow: hit.end };
@@ -442,8 +551,12 @@ canvas.addEventListener("wheel", (e) => {
 }, { passive: false });
 window.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "z") el("undo").click();
-  if (e.key === "Escape") { armed = null; pickMode = null; renderPalette(); refreshStatus(); draw(); }
+  if (e.key === "Escape") {
+    armed = null; armedStone = null; pickMode = null;
+    renderPalette(); renderStones(); refreshStatus(); draw();
+  }
 });
+el("reversing").addEventListener("change", (e) => { e.target.dataset.touched = "1"; });
 
 resize();
 refresh().catch(e => status(e.message, "err"));

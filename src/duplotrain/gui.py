@@ -24,10 +24,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from typing import Any, Mapping
 
-from .catalog import default_catalog
+from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
 from .geometry import steps_to_degrees
 from .layout import End, Layout, layout_from_dict, layout_to_dict
 from .pieces import PieceType
+from .sets import SETS, inventory_for_sets
 from .solver import Solution, SolverConfig, _moves_for, solve
 
 __all__ = ["Session", "make_server", "run"]
@@ -39,9 +40,13 @@ DEFAULT_INVENTORY = {
     "switch": 2,
     "crossing": 1,
     "level_crossing": 2,
+    "buffer": 2,
+    "slope": 2,
     "ramp": 2,
     "span": 2,
 }
+
+DEFAULT_STONES = {sid: 1 for sid in ACCESSORIES}
 
 
 def _signed_degrees(dheading: int) -> int:
@@ -55,6 +60,7 @@ class Session:
 
     catalog: dict[str, PieceType] = field(default_factory=default_catalog)
     inventory: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_INVENTORY))
+    stones: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_STONES))
     history: list[Layout] = field(default_factory=lambda: [Layout()])
     candidates: list[Solution] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
@@ -70,6 +76,15 @@ class Session:
         return {
             pid: max(0, self.inventory.get(pid, 0) - used.get(pid, 0))
             for pid in self.catalog
+        }
+
+    def stones_remaining(self) -> dict[str, int]:
+        placed: dict[str, int] = {}
+        for _idx, sid in self.layout.accessories:
+            placed[sid] = placed.get(sid, 0) + 1
+        return {
+            sid: max(0, self.stones.get(sid, 0) - placed.get(sid, 0))
+            for sid in ACCESSORIES
         }
 
     def _push(self, layout: Layout) -> None:
@@ -97,10 +112,13 @@ class Session:
                         "y": round(y, 2),
                         "deg": pose.degrees,
                         "open": (index, port) not in layout.links,
+                        "sealed": port in placement.piece.sealed,
                         "port": port,
                         "name": placement.piece.ports[port].name,
                     }
                 )
+            main_line = lines[0]
+            mid = main_line[len(main_line) // 2]
             placements.append(
                 {
                     "piece": placement.piece.id,
@@ -109,6 +127,9 @@ class Session:
                     "width": placement.piece.width,
                     "lines": lines,
                     "ports": ports,
+                    "mid": [mid[0], mid[1]],
+                    "stone_ok": placement.piece.id in STONE_MOUNTS,
+                    "stones": layout.stones_on(index),
                 }
             )
         width, height = layout.size()
@@ -146,19 +167,34 @@ class Session:
                 }
             )
         mates = []
-        opens = self.layout.open_ends()
+        opens = self.layout.connectable_ends()
         for i, a in enumerate(opens):
             for b in opens[i + 1 :]:
                 if self.layout.pose_of(a).connects_to(self.layout.pose_of(b)):
                     mates.append([list(a), list(b)])
         return {
             "layout": self._layout_json(self.layout),
-            "open_ends": [list(end) for end in self.layout.open_ends()],
+            "open_ends": [list(end) for end in self.layout.connectable_ends()],
             "matable": mates,
             "inventory": {
                 "owned": {pid: self.inventory.get(pid, 0) for pid in self.catalog},
                 "remaining": self.remaining(),
             },
+            "stones": {
+                "catalog": ACCESSORIES,
+                "owned": {sid: self.stones.get(sid, 0) for sid in ACCESSORIES},
+                "remaining": self.stones_remaining(),
+            },
+            "sets": [
+                {
+                    "code": s.code,
+                    "name": s.name,
+                    "year": s.year,
+                    "pieces": dict(s.pieces),
+                    "stones": dict(s.stones),
+                }
+                for s in SETS.values()
+            ],
             "palette": palette,
             "can_undo": len(self.history) > 1,
             "candidates": [self._candidate_json(i, s) for i, s in enumerate(self.candidates)],
@@ -175,6 +211,7 @@ class Session:
             "index": index,
             "exact": sol.exact,
             "gap": round(sol.gap, 2),
+            "kind": sol.kind,
             "added": added,
             "open_stubs": sol.open_stubs,
             "size_cm": [round(width / 10, 1), round(height / 10, 1)],
@@ -214,9 +251,36 @@ class Session:
 
     def set_inventory(self, counts: Mapping[str, Any]) -> None:
         for pid, n in counts.items():
-            if pid not in self.catalog:
+            if pid in self.catalog:
+                self.inventory[pid] = max(0, int(n))
+            elif pid in ACCESSORIES:
+                self.stones[pid] = max(0, int(n))
+            else:
                 raise ValueError(f"unknown piece {pid!r}")
-            self.inventory[pid] = max(0, int(n))
+
+    def add_set(self, code: str) -> None:
+        """Add one boxed set's pieces and stones to the owned inventory."""
+        pieces, stones = inventory_for_sets([code])
+        for pid, n in pieces.items():
+            self.inventory[pid] = self.inventory.get(pid, 0) + n
+        for sid, n in stones.items():
+            self.stones[sid] = self.stones.get(sid, 0) + n
+
+    def toggle_stone(self, placement: int, stone_id: str) -> None:
+        """Clip a stone onto a placement, or unclip it if already there."""
+        if stone_id not in ACCESSORIES:
+            raise ValueError(f"unknown action stone {stone_id!r}")
+        if not 0 <= placement < len(self.layout.placements):
+            raise ValueError(f"no placement {placement}")
+        if stone_id in self.layout.stones_on(placement):
+            self._push(self.layout.without_accessory(placement, stone_id))
+            return
+        piece = self.layout.placements[placement].piece
+        if piece.id not in STONE_MOUNTS:
+            raise ValueError(f"action stones clip onto straights, not {piece.id!r}")
+        if self.stones_remaining().get(stone_id, 0) <= 0:
+            raise ValueError(f"no {stone_id!r} left (edit the inventory)")
+        self._push(self.layout.with_accessory(placement, stone_id))
 
     def solve_gap(
         self,
@@ -224,8 +288,9 @@ class Session:
         close: End | None,
         slop: float,
         max_results: int,
+        reversing: bool = False,
     ) -> int:
-        opens = self.layout.open_ends()
+        opens = self.layout.connectable_ends()
         if grow is None or close is None:
             if len(opens) != 2:
                 raise ValueError(
@@ -241,6 +306,7 @@ class Session:
                 min_pieces=1,
                 max_results=max_results,
                 max_nodes=400_000,
+                reversing_loops=reversing,
             ),
             base=self.layout,
             grow_from=grow,
@@ -317,12 +383,17 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 session.clear()
             elif path == "/api/inventory":
                 session.set_inventory(body.get("counts", {}))
+            elif path == "/api/add_set":
+                session.add_set(str(body["code"]))
+            elif path == "/api/stone":
+                session.toggle_stone(int(body["placement"]), str(body["id"]))
             elif path == "/api/solve":
                 found = session.solve_gap(
                     tuple(body["grow"]) if body.get("grow") else None,
                     tuple(body["close"]) if body.get("close") else None,
                     float(body.get("slop", 0.0)),
                     int(body.get("max_results", 10)),
+                    reversing=bool(body.get("reversing", False)),
                 )
                 self._json(200, {"found": found, **session.state()})
                 return

@@ -91,14 +91,40 @@ def _canonical_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, 
 
 
 def _moves_for(piece: PieceType) -> list[Move]:
-    """All geometrically distinct traversals of *piece*, one Move per equivalence class."""
+    """All geometrically distinct traversals of *piece*, one Move per equivalence class.
+
+    Traversals through a sealed face are excluded: a buffer stop can terminate track
+    but can never be part of a route, so the loop search never places one.
+    """
     moves: list[Move] = []
     for (entry, exit_port), representative in _canonical_traversals(piece).items():
         if (entry, exit_port) != representative:
             continue
+        if entry in piece.sealed or exit_port in piece.sealed:
+            continue
         dx, dy, dz, dheading = piece.exit_delta(entry, exit_port)
         moves.append(Move(piece.id, entry, exit_port, dx, dy, dz, dheading))
     return moves
+
+
+def _mirror_ports(piece: PieceType) -> dict[int, int | None]:
+    """Map each port to the port its mirror image lands on, if any.
+
+    Local reflection across the piece's x axis; for the switch this pairs left/right
+    and fixes the stem.  ``None`` when the piece has no mirror-symmetric counterpart
+    for that port (the crossing's diagonal ports), in which case callers skip the
+    mirror candidate rather than mis-pair.
+    """
+    by_pose = {
+        (p.pose.x, p.pose.y, p.pose.z, p.pose.heading): i
+        for i, p in enumerate(piece.ports)
+    }
+    return {
+        i: by_pose.get(
+            (p.pose.x, -p.pose.y, p.pose.z, (-p.pose.heading) % HEADING_STEPS)
+        )
+        for i, p in enumerate(piece.ports)
+    }
 
 
 def _mirror_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, int] | None]:
@@ -178,6 +204,8 @@ def _canonical_signature(
     base_pids: Sequence[str] = (),
     cyclic: bool = True,
     mirror_for: Mapping[str, Mapping[tuple[int, int], tuple[int, int] | None]] | None = None,
+    closing_stub: tuple[int, int] | None = None,
+    port_mirror_for: Mapping[str, Mapping[int, int | None]] | None = None,
 ) -> tuple:
     """Loop signature invariant to starting piece, direction, and reflection.
 
@@ -229,24 +257,51 @@ def _canonical_signature(
             out.append((fresh[inst], pid, entry, exit_))
         return tuple(out)
 
+    def mirror_of(seq: list[tuple[int, str, int, int]]):
+        out: list[tuple[int, str, int, int]] = []
+        for inst, pid, entry, exit_ in seq:
+            partner = mirror_for.get(pid, {}).get((entry, exit_)) if mirror_for else None
+            if partner is None:
+                return None  # a single-handed piece: no buildable mirror twin
+            out.append((inst, pid, partner[0], partner[1]))
+        return out
+
+    if closing_stub is not None:
+        # A reversing loop is anchored at its open tail and closes into a junction
+        # stub: rotation and reversal are not symmetries, only reflection is.  The
+        # closing joint is part of the identity, appended as a final token.
+        stub_inst, stub_port = closing_stub
+
+        def with_join(seq, port: int) -> tuple:
+            fresh: dict[int, int] = {}
+            out = []
+            for inst, pid, entry, exit_ in seq:
+                if inst not in fresh:
+                    fresh[inst] = len(fresh)
+                table = canon_for.get(pid)
+                if table is not None:
+                    entry, exit_ = table.get((entry, exit_), (entry, exit_))
+                out.append((fresh[inst], pid, entry, exit_))
+            ordinal = fresh.setdefault(stub_inst, len(fresh))
+            return tuple(out) + (("J", ordinal, port),)
+
+        candidates = [with_join(visits, stub_port)]
+        mirrored = mirror_of(visits)
+        if mirrored is not None and port_mirror_for is not None:
+            stub_pid = pid_of(stub_inst)
+            mirrored_port = port_mirror_for.get(stub_pid, {}).get(stub_port)
+            if mirrored_port is not None:
+                candidates.append(with_join(mirrored, mirrored_port))
+        return min(candidates)
+
     if not cyclic:
         return normalise(visits)
 
     sequences = [visits, [(inst, pid, x, e) for (inst, pid, e, x) in reversed(visits)]]
-
-    if mirror_for is not None:
-        mirrored: list[tuple[int, str, int, int]] | None = []
-        for inst, pid, entry, exit_ in visits:
-            partner = mirror_for.get(pid, {}).get((entry, exit_))
-            if partner is None:
-                mirrored = None  # a single-handed piece: no buildable mirror twin
-                break
-            mirrored.append((inst, pid, partner[0], partner[1]))
-        if mirrored is not None:
-            sequences.append(mirrored)
-            sequences.append(
-                [(inst, pid, x, e) for (inst, pid, e, x) in reversed(mirrored)]
-            )
+    mirrored = mirror_of(visits)
+    if mirrored is not None:
+        sequences.append(mirrored)
+        sequences.append([(inst, pid, x, e) for (inst, pid, e, x) in reversed(mirrored)])
 
     n = len(visits)
     return min(
@@ -261,12 +316,15 @@ def _replay(
     base: Layout | None = None,
     grow_from: tuple[int, int] | None = None,
     close_onto: tuple[int, int] | None = None,
+    final_target: tuple[int, int] | None = None,
 ) -> Layout:
     """Rebuild a full Layout (placements + link graph) from a step trace.
 
     Loop mode (no *base*): the first placed piece plugs onto a virtual face at the
     origin and the trace must return there.  Completion mode: the trace grows from the
-    open end *grow_from* of *base* and finally joins onto *close_onto*.
+    open end *grow_from* of *base* and finally joins onto *close_onto*.  A reversing
+    loop overrides either with *final_target*: the walk's end joins that junction stub
+    instead, leaving the anchor face open as the tail.
     """
     layout = base if base is not None else Layout()
     cursor = grow_from
@@ -285,6 +343,8 @@ def _replay(
             assert isinstance(step, _Transit) and cursor is not None
             layout = layout.join(cursor, (step.placement, step.entry), force=force_final_join)
             cursor = (step.placement, step.exit)
+    if final_target is not None:
+        target = final_target
     assert cursor is not None and target is not None
     return layout.join(cursor, target, force=force_final_join)
 
@@ -305,6 +365,12 @@ class SolverConfig:
     use_all_pieces: bool = False
     clearance: float = DEFAULT_CLEARANCE
     collision_spacing: float = 8.0
+    #: Also accept layouts that close into an open junction stub instead of the
+    #: anchor -- a teardrop whose walk ends against its own switch's other branch.
+    #: The train then always exits through the stem toward the open tail, so running
+    #: such a layout endlessly needs a direction-change action stone on that tail
+    #: (and switches the train can trail through, which the modern ones are).
+    reversing_loops: bool = False
 
 
 @dataclass
@@ -328,6 +394,9 @@ class Solution:
     exact: bool
     open_stubs: int
     signature: tuple
+    #: "loop" -- an ordinary closed circuit; "reversing" -- closes into a junction
+    #: stub, drivable endlessly only with a direction-change stone on the open tail.
+    kind: str = "loop"
 
     @property
     def piece_count(self) -> int:
@@ -398,6 +467,9 @@ def solve(
         for end in (grow_from, close_onto):
             if end in base.links:
                 raise ValueError(f"end {end} of the base layout is already connected")
+        for end in (grow_from, close_onto):
+            if base.is_sealed(end):
+                raise ValueError(f"end {end} is a sealed buffer face; track cannot grow there")
         if base.pose_of(grow_from).connects_to(base.pose_of(close_onto)):
             raise ValueError(
                 "those ends already mate exactly; join them with Layout.join instead"
@@ -413,6 +485,7 @@ def solve(
     moves_by_piece = {pid: _moves_for(pieces[pid]) for pid in piece_ids}
     canon_for = {pid: _canonical_traversals(p) for pid, p in piece_obj.items()}
     mirror_for = {pid: _mirror_traversals(p) for pid, p in piece_obj.items()}
+    port_mirror_for = {pid: _mirror_ports(p) for pid, p in piece_obj.items()}
     span_of = {pid: _max_span(p) for pid, p in piece_obj.items()}
     turn_of = {pid: _turn_capacity(p) for pid, p in piece_obj.items()}
     overhang_of = {pid: p.end_overhang for pid, p in piece_obj.items()}
@@ -476,6 +549,8 @@ def solve(
                     end = (index, port)
                     if end in base.links or end in (grow_from, close_onto):
                         continue
+                    if port in placement.piece.sealed:
+                        continue
                     stubs.append((index, port, placement.port_pose(port)))
 
     remaining_span = sum(span_of[pid] * n for pid, n in counts.items())
@@ -484,10 +559,16 @@ def solve(
     def eligible(used: int) -> bool:
         return used >= cfg.min_pieces and (not cfg.use_all_pieces or used == total_pieces)
 
-    def emit(gap: float) -> None:
+    def emit(gap: float, reversing_target: tuple[int, int] | None = None) -> None:
         stats.closures_found += 1
         signature = _canonical_signature(
-            steps, canon_for, base_pids, cyclic=base is None, mirror_for=mirror_for
+            steps,
+            canon_for,
+            base_pids,
+            cyclic=base is None,
+            mirror_for=mirror_for,
+            closing_stub=reversing_target,
+            port_mirror_for=port_mirror_for,
         )
         if signature in solutions and solutions[signature].gap <= gap:
             return
@@ -498,14 +579,16 @@ def solve(
             base=base,
             grow_from=grow_from,
             close_onto=close_onto,
+            final_target=reversing_target,
         )
         solutions[signature] = Solution(
             layout=layout,
             steps=tuple(steps),
             gap=gap,
             exact=gap == 0.0,
-            open_stubs=len(layout.open_ends()),
+            open_stubs=len(layout.connectable_ends()),
             signature=signature,
+            kind="loop" if reversing_target is None else "reversing",
         )
 
     def near(pose: Pose, target: Pose, budget: float) -> float | None:
@@ -561,13 +644,23 @@ def solve(
             return True
 
         # -- pruning ------------------------------------------------------------
+        # The walk must eventually reach a closing target: the anchor, or -- in
+        # reversing mode -- any open junction stub.  Prune only when no target's
+        # position or heading is attainable with what remains.
         home = cursor.distance_to(anchor)
+        turn_gap = (cursor.heading - anchor.heading) % HEADING_STEPS
+        need = min(turn_gap, HEADING_STEPS - turn_gap)
+        if cfg.reversing_loops:
+            for _pidx, _port, stub_pose in stubs:
+                home = min(home, cursor.distance_to(stub_pose))
+                gap_steps = (
+                    cursor.heading - stub_pose.heading - HEADING_STEPS // 2
+                ) % HEADING_STEPS
+                need = min(need, gap_steps, HEADING_STEPS - gap_steps)
         stub_reach = sum(span_of[placements[s[0]][0]] for s in stubs)
         if home > remaining_span + stub_reach + (cfg.slop - slack_used) + 1e-6:
             stats.pruned_reach += 1
             return True
-        turn_gap = (cursor.heading - anchor.heading) % HEADING_STEPS
-        need = min(turn_gap, HEADING_STEPS - turn_gap)
         stub_turns = sum(turn_of[placements[s[0]][0]] for s in stubs)
         if need > remaining_turn + stub_turns:
             stats.pruned_turn += 1
@@ -594,6 +687,11 @@ def solve(
                     if gap is None:
                         continue
                     joint_gap = gap
+                if cfg.reversing_loops and used > 0 and eligible(used):
+                    # Closing INTO the stub (rather than driving through) makes a
+                    # reversing loop: the walk's end mates this branch, and the train
+                    # thereafter shuttles out through the junction's other route.
+                    emit(slack_used + joint_gap, reversing_target=(pidx, port))
                 piece = pieces[placements[pidx][0]]
                 frame = placements[pidx][1]
                 for exit_port, _route in piece.transit(port):
@@ -635,6 +733,16 @@ def solve(
                 heuristic = child.distance_to(anchor) + 64.0 * min(
                     gap_turn, HEADING_STEPS - gap_turn
                 )
+                if cfg.reversing_loops:
+                    for _pidx, _port, stub_pose in stubs:
+                        gap_steps = (
+                            child.heading - stub_pose.heading - HEADING_STEPS // 2
+                        ) % HEADING_STEPS
+                        heuristic = min(
+                            heuristic,
+                            child.distance_to(stub_pose)
+                            + 64.0 * min(gap_steps, HEADING_STEPS - gap_steps),
+                        )
                 candidates.append((heuristic, pid, move, child))
         # Try homeward moves first: irrelevant to completeness, decisive for how fast
         # the obvious completion of a small gap is found.
@@ -709,6 +817,7 @@ def solve(
         solutions.values(),
         key=lambda s: (
             not s.exact,
+            s.kind != "loop",
             s.gap,
             s.open_stubs,
             s.piece_count if base is not None else -s.piece_count,

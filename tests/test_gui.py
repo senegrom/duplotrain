@@ -126,6 +126,52 @@ def test_export_round_trips(server):
     assert len(state["layout"]["placements"]) == 1
 
 
+def test_add_set_bumps_inventory(server):
+    status, before = server("/api/state")
+    owned_before = before["inventory"]["owned"]["curve"]
+    status, state = server("/api/add_set", {"code": "10882"})
+    assert status == 200
+    assert state["inventory"]["owned"]["curve"] == owned_before + 10
+    assert state["inventory"]["owned"]["buffer"] >= 2
+    assert state["stones"]["owned"]["stone_stop"] >= 1
+    status, err = server("/api/add_set", {"code": "1234"})
+    assert status == 409
+    assert "unknown set" in err["error"]
+
+
+def test_stone_toggles_on_straights_only(server):
+    _, state = server("/api/attach", {"piece": "straight", "entry": 0, "at": None})
+    status, state = server("/api/stone", {"placement": 0, "id": "stone_direction"})
+    assert status == 200
+    assert state["layout"]["placements"][0]["stones"] == ["stone_direction"]
+    # Toggling again removes it.
+    status, state = server("/api/stone", {"placement": 0, "id": "stone_direction"})
+    assert state["layout"]["placements"][0]["stones"] == []
+
+    _, state = server(
+        "/api/attach", {"piece": "curve", "entry": 0, "at": state["open_ends"][-1]}
+    )
+    status, err = server("/api/stone", {"placement": 1, "id": "stone_stop"})
+    assert status == 409
+    assert "clip onto straights" in err["error"]
+
+
+def test_sealed_buffer_end_is_not_clickable(server):
+    _, state = server("/api/attach", {"piece": "straight", "entry": 0, "at": None})
+    _, state = server(
+        "/api/attach", {"piece": "buffer", "entry": 0, "at": state["open_ends"][-1]}
+    )
+    ports = state["layout"]["placements"][1]["ports"]
+    assert any(p["sealed"] for p in ports)
+    # The sealed face is not among the offered open ends.
+    assert [1, 1] not in state["open_ends"]
+    status, err = server(
+        "/api/attach", {"piece": "straight", "entry": 0, "at": [1, 1]}
+    )
+    assert status == 409
+    assert "sealed" in err["error"]
+
+
 def test_errors_are_json_not_500(server):
     status, err = server("/api/attach", {"piece": "warp_gate", "entry": 0, "at": None})
     assert status == 409

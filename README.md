@@ -47,6 +47,8 @@ and the LDraw part library:
 | `level_crossing` | 6391    | one straight under a 160 × 160 mm road plate (16 mm end overhang — two of them refuse to mate) |
 | `ramp`           | 6392    | 320 mm run rising 57.6 mm (3 bricks)                       |
 | `span`           | 6393    | 192 mm arch rising a further 19.2 mm to the 76.8 mm crest  |
+| `buffer`         | 35967   | 64 mm track-end bumper; its far face is sealed and can never mate |
+| `slope`          | 35966   | 256 mm "slight slope" from 10875 (rise ~5.6 mm, unverified) |
 
 Connectors are genderless (a jigsaw tab **and** socket at every end), so any end mates
 with any end and one physical curve serves as both the left and the right turn — the
@@ -87,6 +89,8 @@ CLI:
 
 ```
 duplotrain pieces                                     # the catalogue
+duplotrain sets                                       # known boxed sets
+duplotrain solve --set 10874 --set 10882 -o out       # "we own these boxes"
 duplotrain solve --curve 12 --straight 4 --switch 2 -o out
 duplotrain solve --inventory mybox.json --slop 5 -o out
 duplotrain check out/loop_01.json                     # closure report
@@ -94,6 +98,31 @@ duplotrain render out/loop_01.json -o picture.png
 duplotrain gui                                        # interactive designer
 duplotrain demo                                       # the classic oval
 ```
+
+`--set` knows the 2018 wave (10874 Steam Train, 10875 Cargo Train, 10872 Bridge &
+Tracks, 10882 Track pack) with verified per-set piece counts — repeat a flag to own a
+set twice. Sets also contribute their **action stones** (below).
+
+## Action stones and reversing loops
+
+The coloured inserts that clip onto a straight are modelled as accessories: red stop,
+yellow horn, blue refuel, white lights, and — the interesting one — **green
+direction-change**. A layout doesn't have to be a plain closed loop to run forever:
+
+![Reversing teardrop](docs/teardrop.png)
+
+With `reversing_loops` enabled (`--reversing`, on automatically when your `--set`s
+include the green stone, or the checkbox in the GUI) the solver also proposes
+**teardrops**: the walk closes into the switch's *other branch* instead of back on
+itself. The train always exits through the stem, bounces off the direction stone on
+the tail, comes back in and trails through the points — endless running from one
+switch and twelve curves, no full circle of spare track required. Exactly three
+distinct teardrop shapes exist for switch + 12 curves; the solver proves it.
+
+In the GUI, stones are armed from their own palette and clipped onto straights with a
+click; buffers cap open ends (their bumper face draws as a bar and is not clickable);
+layouts count as *closed* when every real connector is mated — a buffered siding is
+finished, not dangling.
 
 ## The designer GUI
 

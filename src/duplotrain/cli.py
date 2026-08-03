@@ -88,8 +88,35 @@ def _inventory_options(fn):
     return fn
 
 
+@main.command(name="sets")
+def sets_cmd() -> None:
+    """List the LEGO sets the inventory shortcut knows about."""
+    from .sets import SETS
+
+    table = Table(title="Known DUPLO train sets (use with: solve --set 10882)")
+    table.add_column("set", style="bold")
+    table.add_column("name")
+    table.add_column("track pieces")
+    table.add_column("action stones")
+    for s in SETS.values():
+        table.add_row(
+            s.code,
+            f"{s.name} ({s.year})",
+            ", ".join(f"{n}x {pid}" for pid, n in s.pieces.items()),
+            ", ".join(f"{n}x {sid.removeprefix('stone_')}" for sid, n in s.stones.items())
+            or "-",
+        )
+    console.print(table)
+
+
 @main.command()
 @_inventory_options
+@click.option(
+    "--set",
+    "set_codes",
+    multiple=True,
+    help="Add a whole boxed set's pieces (e.g. --set 10874 --set 10882); repeatable.",
+)
 @click.option(
     "--inventory",
     "inventory_path",
@@ -118,6 +145,15 @@ def _inventory_options(fn):
 @click.option("--max-nodes", type=int, default=2_000_000, show_default=True)
 @click.option("--use-all", is_flag=True, help="Only layouts using every owned piece.")
 @click.option(
+    "--reversing/--no-reversing",
+    default=None,
+    help=(
+        "Also propose reversing loops (teardrops closing into a switch branch); the "
+        "train needs a direction-change stone on the tail. Default: on when a --set "
+        "provides that stone."
+    ),
+)
+@click.option(
     "-o",
     "--out",
     type=click.Path(file_okay=False),
@@ -127,12 +163,14 @@ def _inventory_options(fn):
 @click.option("--top", type=int, default=10, show_default=True, help="How many to save.")
 def solve_cmd(
     inventory_path: str | None,
+    set_codes: tuple[str, ...],
     catalog_paths: tuple[str, ...],
     slop: float,
     min_pieces: int,
     max_results: int,
     max_nodes: int,
     use_all: bool,
+    reversing: bool | None,
     out: str | None,
     top: int,
     **flag_counts: int,
@@ -141,6 +179,16 @@ def solve_cmd(
     catalog = _catalog(catalog_paths)
 
     inventory: dict[str, int] = {k: v for k, v in flag_counts.items() if v > 0}
+    stones: dict[str, int] = {}
+    if set_codes:
+        from .sets import inventory_for_sets
+
+        try:
+            set_pieces, stones = inventory_for_sets(set_codes)
+        except ValueError as exc:
+            raise click.ClickException(str(exc)) from exc
+        for k, v in set_pieces.items():
+            inventory[k] = inventory.get(k, 0) + v
     if inventory_path:
         try:
             with open(inventory_path, encoding="utf-8") as fh:
@@ -150,8 +198,17 @@ def solve_cmd(
             raise click.ClickException(f"bad inventory file: {exc}") from exc
     if not inventory:
         raise click.UsageError(
-            "Tell me what you own, e.g.:  duplotrain solve --curve 12 --straight 4"
+            "Tell me what you own, e.g.:  duplotrain solve --curve 12 --straight 4 "
+            "or --set 10874 --set 10882"
         )
+
+    if reversing is None:
+        reversing = stones.get("stone_direction", 0) > 0
+        if reversing:
+            console.print(
+                "[dim]Your sets include a direction-change stone: reversing loops "
+                "enabled (--no-reversing to disable).[/dim]"
+            )
 
     config = SolverConfig(
         slop=slop,
@@ -159,6 +216,7 @@ def solve_cmd(
         max_results=max_results,
         max_nodes=max_nodes,
         use_all_pieces=use_all,
+        reversing_loops=reversing,
     )
     try:
         with console.status("searching for loops..."):
@@ -201,6 +259,8 @@ def solve_cmd(
             f"{n}x{pid}" for pid, n in sorted(sol.layout.piece_counts.items())
         )
         closure = "exact" if sol.exact else f"forced ({sol.gap:.1f} mm)"
+        if sol.kind == "reversing":
+            closure += " reversing"
         table.add_row(
             str(rank),
             f"{score:.0f}",

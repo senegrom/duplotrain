@@ -156,12 +156,42 @@ def render_layout(
                     zorder=z + 0.001,
                 )
 
+    # Action stones clipped onto pieces.
+    if layout.accessories:
+        from .catalog import ACCESSORIES
+
+        for k, (index, stone_id) in enumerate(layout.accessories):
+            info = ACCESSORIES.get(stone_id, {})
+            line = layout.placements[index].centrelines()[0]
+            mx, my, _ = line[len(line) // 2]
+            offset = 30.0 * sum(
+                1 for j, (idx2, _s) in enumerate(layout.accessories) if idx2 == index and j < k
+            )
+            ax.plot(
+                mx,
+                my + offset,
+                "o",
+                color=info.get("color", "#888888"),
+                markersize=11,
+                markeredgecolor="white",
+                markeredgewidth=1.6,
+                zorder=6.5,
+            )
+
     # Joints and open ends.
     for index, placement in enumerate(layout):
         for port in range(len(placement.piece.ports)):
             pose = placement.port_pose(port)
             x, y = pose.xy()
-            if (index, port) in layout.links:
+            if port in placement.piece.sealed:
+                # A buffer's dead face: draw the bumper bar, never an arrow.
+                rad = math.radians(pose.degrees + 90)
+                bx, by = math.cos(rad) * 26, math.sin(rad) * 26
+                ax.plot(
+                    [x - bx, x + bx], [y - by, y + by],
+                    color="#8c1d18", linewidth=4, zorder=6, solid_capstyle="butt",
+                )
+            elif (index, port) in layout.links:
                 ax.plot(x, y, "o", color=JOINT, markersize=3.5, zorder=6)
             else:
                 ax.plot(x, y, "o", color=OPEN_END, markersize=6, zorder=6)

@@ -278,6 +278,10 @@ class PieceType:
     #: claim the same strip of floor), which is how the level crossing's road plate
     #: forbids a second level crossing directly in series.
     end_overhang: float = 0.0
+    #: Port indices that are dead faces rather than connectors -- the far end of a
+    #: buffer stop.  Nothing may ever mate with a sealed port, and the solver never
+    #: routes through one, so a sealed piece can terminate track but not join it.
+    sealed: frozenset[int] = frozenset()
     part_numbers: tuple[str, ...] = ()
     notes: str = ""
     provisional: bool = False
@@ -441,6 +445,7 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         routes=routes,
         width=float(spec.get("width", 40.0)),
         end_overhang=float(spec.get("end_overhang", 0.0)),
+        sealed=frozenset(int(i) for i in spec.get("sealed_ports", ())),
         part_numbers=tuple(spec.get("part_numbers", ())),
         notes=spec.get("notes", ""),
         provisional=bool(spec.get("provisional", False)),

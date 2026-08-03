@@ -58,6 +58,24 @@ def test_solve_check_render_round_trip(runner, tmp_path):
     assert target.exists()
 
 
+def test_sets_command_lists_known_sets(runner):
+    result = runner.invoke(main, ["sets"])
+    assert result.exit_code == 0
+    for code in ("10874", "10875", "10872", "10882"):
+        assert code in result.output
+
+
+def test_solve_with_set_shortcut(runner):
+    # 10872 alone (straights + bridge) cannot loop; the CLI should say so politely.
+    result = runner.invoke(main, ["solve", "--set", "10872"])
+    assert result.exit_code == 0, result.output
+    assert "No closed loop fits" in result.output
+
+    result = runner.invoke(main, ["solve", "--set", "9999"])
+    assert result.exit_code != 0
+    assert "unknown set" in result.output
+
+
 def test_check_rejects_garbage_layout(runner, tmp_path):
     bad = tmp_path / "layout.json"
     bad.write_text(json.dumps({"format": "duplotrain-layout/1", "placements": [

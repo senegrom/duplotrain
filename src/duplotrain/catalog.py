@@ -141,6 +141,41 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
         ),
     },
     {
+        "id": "buffer",
+        "name": "Buffer stop (rail end)",
+        "category": "track",
+        "part_numbers": ["35967", "6219464"],
+        "width": WIDTH,
+        "paths": [
+            {"segments": [{"type": "straight", "run": 4 * STUD}]},
+        ],
+        "port_names": ["a", "end"],
+        "sealed_ports": [1],
+        "notes": (
+            "Red track-end bumper from set 10882 ('RAIL STOP, 4 MODULE'), 64 mm long. "
+            "Its far face is sealed: nothing can mate there and no loop can pass "
+            "through, so it terminates sidings and shuttle runs."
+        ),
+    },
+    {
+        "id": "slope",
+        "name": "Slight slope rail",
+        "category": "track",
+        "part_numbers": ["35966", "6207491"],
+        "width": WIDTH,
+        "provisional": True,
+        "paths": [
+            {"segments": [{"type": "ramp", "run": 16 * STUD, "rise": "28/5"}]},
+        ],
+        "port_names": ["low", "high"],
+        "notes": (
+            "'Train Track, Slight Slope' from set 10875 (two per set). Run 256 mm = 16 "
+            "modules (BrickOwl measures 28.1 cm incl. tab). The rise is derived: the "
+            "part stands 26 mm tall vs the 20.4 mm rail profile, giving ~5.6 mm -- a "
+            "play feature, not real elevation. Measure before trusting the rise."
+        ),
+    },
+    {
         "id": "ramp",
         "name": "Bridge ramp (lower part)",
         "category": "bridge",
@@ -177,6 +212,52 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
         ),
     },
 ]
+
+
+# --------------------------------------------------------------------------------------
+# Action stones (Funktionssteine): coloured inserts that clip onto a straight rail and
+# trigger a behaviour in the powered trains (10874/10875) as they drive over.  They are
+# accessories, not track -- no connectors, no geometry -- but they change what counts as
+# a playable layout: a green direction-change stone lets a train run a layout endlessly
+# without the track forming a plain closed loop (see the solver's reversing-loop mode).
+# --------------------------------------------------------------------------------------
+
+ACCESSORIES: dict[str, dict[str, str]] = {
+    "stone_stop": {
+        "name": "Stop stone",
+        "color": "#c4281c",
+        "design": "38507",
+        "effect": "stops the train",
+    },
+    "stone_direction": {
+        "name": "Direction-change stone",
+        "color": "#237841",
+        "design": "38506",
+        "effect": "reverses the train's direction of travel",
+    },
+    "stone_refuel": {
+        "name": "Refuel stone",
+        "color": "#0055bf",
+        "design": "38505",
+        "effect": "pauses with a refuelling sound, then continues",
+    },
+    "stone_lights": {
+        "name": "Lights stone",
+        "color": "#f4f4f4",
+        "design": "38508",
+        "effect": "toggles the headlights",
+    },
+    "stone_horn": {
+        "name": "Horn stone",
+        "color": "#f2cd37",
+        "design": "38509",
+        "effect": "sounds the horn",
+    },
+}
+
+#: Piece ids an action stone can clip onto (the flat sleeper area of a plain straight;
+#: LEGO's 35965 'rail with plate' is counted as a straight in the set data).
+STONE_MOUNTS = frozenset({"straight"})
 
 
 def default_catalog() -> dict[str, PieceType]:
