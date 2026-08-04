@@ -228,10 +228,32 @@ perfect = find_perfect_loops({"curve": 12, "straight": 4}, pieces,
 #    rounded square -- each with one direction stone clipped on)
 ```
 
-With today's pieces, perfection has exactly two sources: a closed loop plus a
-direction stone, or reversing topology (dogbones — build them with
+With today's pieces, perfection has exactly three known sources: a closed loop plus a
+direction stone; a **reversing terminator** (direction stone at a buffer face — every
+approach bounces off the wall) capping the ends of otherwise-open track (shuttles,
+capped teardrops); or reversing *topology* (dogbones — build them with
 `make_dogbone(pick_stem_tailed(solutions, pieces), pieces)`). Everything else tops out
 lower on the ladder, and `classify` will tell you why, with the exact doomed start.
+
+**Exhaustive network search.** `enumerate_networks()` goes beyond single driving
+loops: it enumerates every *closed network* — all connectors mated or sealed,
+passing-loop and multi-cap topologies included — by always extending the canonically
+smallest open end (attach, or join two ends that mate), with end-aware collision
+handling and congruence dedup. `find_perfect_networks()` then tries the sensible
+direction-stone placements (buffer faces are forced; one mid-loop stone otherwise)
+and classifies each, so for bounded sizes the question "what are ALL the perfectly
+looping networks from this box?" is answered by proof, not by taste. Costs are
+honest: exhaustion is practical to roughly a dozen pieces (a 14-piece hunt is a
+few minutes); beyond that, compose constructively and verify with `classify`.
+
+The switch dynamics yields a little theorem the machine confirms by exhaustion: a
+dead-end cap **reflects** a train back through the branch it came from, so a trailing
+pass re-aims the tongue at that same branch and a facing return retraces it — caps
+keep the tongue *sticky*. Only a lobe (branch-to-branch loop) *alternates* the
+tongue. Hence a 3-armed star of capped arms ping-pongs between two arms forever
+(looping, never completely), and **no perfect one-switch network exists without
+curves** — checked over all 27 closed candidates. Perfection needs rotation
+somewhere: a lobe, or a stone in a ring.
 
 ## How the solver works
 

@@ -449,10 +449,18 @@ def _compile_lattice(
             if local is None:
                 return None
             port_locals[(pid, port_index)] = as_delta(local)
+        # Frames for every unsealed entry: the network enumerator attaches pieces
+        # (a buffer, say) that contribute no traversal moves at all.
+        for entry in range(len(piece.ports)):
+            if entry in piece.sealed:
+                continue
+            f0 = _pose_to_lattice(piece.frame_for(entry, ORIGIN))
+            if f0 is None:
+                return None
+            frames0[(pid, entry)] = as_delta(f0)
 
     for pid, piece_moves in moves_by_piece.items():
         compiled = []
-        piece = pieces[pid]
         for m in piece_moves:
             if m.dheading % 2:
                 return None
@@ -463,11 +471,6 @@ def _compile_lattice(
             compiled.append(
                 (m.entry, m.exit, make_apply(rotations_of(delta), dz, m.dheading // 2))
             )
-            if (pid, m.entry) not in frames0:
-                f0 = _pose_to_lattice(piece.frame_for(m.entry, ORIGIN))
-                if f0 is None:
-                    return None
-                frames0[(pid, m.entry)] = as_delta(f0)
         moves[pid] = compiled
 
     return _LatticeEngine(anchor_l, start_l, moves, frames0, port_locals)

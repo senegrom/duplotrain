@@ -15,7 +15,13 @@ from typing import TYPE_CHECKING
 from .catalog import ACCESSORIES, default_catalog, load_catalog
 from .drive import DriveReport, LoopClassification, classify, drive, endless_run
 from .exact import Alg
-from .explore import congruence_key, find_perfect_loops, make_dogbone
+from .explore import (
+    congruence_key,
+    find_perfect_loops,
+    find_perfect_networks,
+    make_dogbone,
+)
+from .networks import NetworkConfig, enumerate_networks
 from .geometry import ORIGIN, Pose
 from .layout import Layout, Placement, build_chain, layout_from_dict, layout_to_dict
 from .pieces import PieceType, parse_piece, parse_pieces
@@ -55,6 +61,9 @@ __all__ = [
     "LoopClassification",
     "congruence_key",
     "find_perfect_loops",
+    "find_perfect_networks",
+    "enumerate_networks",
+    "NetworkConfig",
     "make_dogbone",
     "render_layout",
     "__version__",

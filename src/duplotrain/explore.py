@@ -24,7 +24,7 @@ families with today's pieces:
 
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Iterator, Mapping
 
 from .catalog import STONE_MOUNTS
 from .drive import LoopClassification, classify
@@ -36,6 +36,7 @@ from .solver import SolverConfig, Solution, solve
 __all__ = [
     "congruence_key",
     "find_perfect_loops",
+    "find_perfect_networks",
     "is_stem_tailed",
     "pick_stem_tailed",
     "make_dogbone",
@@ -159,6 +160,73 @@ def pick_stem_tailed(
         if sol.kind == "reversing" and is_stem_tailed(sol, pieces):
             return sol
     return None
+
+
+def _stone_variants(
+    layout: Layout, stones: Mapping[str, int]
+) -> Iterator[Layout]:
+    """Sensible direction-stone placements to try on a closed network.
+
+    Buffers make placement forced: every buffer face needs the stone on its
+    neighbour's mating face (the reversing-terminator idiom), or the network has a
+    doomed start and can never be perfect.  After those, the variants are "no extra
+    stone" and "one mid-piece stone on each straight" -- which is what turns a plain
+    loop perfect.
+    """
+    available = stones.get("stone_direction", 0)
+    base = layout
+    used = 0
+    for index, placement in enumerate(layout.placements):
+        if not placement.piece.sealed:
+            continue  # only buffers carry sealed faces today
+        connector = next(
+            p for p in range(len(placement.piece.ports)) if p not in placement.piece.sealed
+        )
+        link = layout.links.get((index, connector))
+        if link is None:
+            return  # not actually closed; nothing to try
+        neighbour, port = link
+        if layout.placements[neighbour].piece.id not in STONE_MOUNTS:
+            return  # cannot guard this buffer: never perfect
+        base = base.with_accessory(neighbour, "stone_direction", at_port=port)
+        used += 1
+    if used > available:
+        return
+    yield base
+    if available > used:
+        for index, placement in enumerate(layout.placements):
+            if placement.piece.id in STONE_MOUNTS:
+                yield base.with_accessory(index, "stone_direction")
+
+
+def find_perfect_networks(
+    inventory: Mapping[str, int],
+    pieces: Mapping[str, PieceType],
+    stones: Mapping[str, int],
+    config=None,
+) -> list[tuple[Layout, LoopClassification]]:
+    """Exhaustively find perfectly looping networks from an inventory.
+
+    Enumerates every closed network (:func:`duplotrain.networks.enumerate_networks`),
+    tries the sensible direction-stone placements on each, keeps those that classify
+    perfectly looping, and deduplicates by track-curve congruence.  Complete up to
+    the enumeration bounds in *config* -- for small inventories this genuinely
+    answers "these are ALL the perfect networks you can build".
+    """
+    from .networks import enumerate_networks
+
+    result = enumerate_networks(inventory, pieces, config)
+    found: dict[tuple, tuple[Layout, LoopClassification]] = {}
+    for layout in result.layouts:
+        key = congruence_key(layout)
+        if key in found:
+            continue
+        for variant in _stone_variants(layout, stones):
+            verdict = classify(variant)
+            if verdict.perfectly_looping:
+                found[key] = (variant, verdict)
+                break
+    return list(found.values())
 
 
 def make_dogbone(
