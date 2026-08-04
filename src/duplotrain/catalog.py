@@ -158,6 +158,25 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
         ),
     },
     {
+        "id": "offramp",
+        "name": "Off-ramp to the floor",
+        "category": "track",
+        "part_numbers": ["4785"],
+        "width": WIDTH,
+        "provisional": True,
+        "paths": [
+            {"segments": [{"type": "straight", "run": 6 * STUD}]},
+        ],
+        "port_names": ["a", "floor"],
+        "sealed_ports": [1],
+        "notes": (
+            "'RAIL RAMP, 6 MODULE' from set 10425 (2024): a 96 mm wedge that lets the "
+            "train drive off the rails onto the floor. Modelled like a buffer -- the "
+            "floor side is sealed and a run ending there stops (the train has left "
+            "the railway). Run length inferred from the 6-module name."
+        ),
+    },
+    {
         "id": "slope",
         "name": "Slight slope rail",
         "category": "track",

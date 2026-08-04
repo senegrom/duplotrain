@@ -233,6 +233,7 @@ def make_dogbone(
     teardrop: Solution,
     pieces: Mapping[str, PieceType],
     bar_straights: int = 2,
+    bar: "list[tuple[str, int, int]] | None" = None,
 ) -> Layout:
     """Grow a solver-found teardrop into a dogbone: the stone-free perfect layout.
 
@@ -258,9 +259,10 @@ def make_dogbone(
         raise ValueError("the teardrop should have exactly its tail open")
 
     cursor = opens[0]
-    for _ in range(bar_straights):
-        layout, index = layout.attach(pieces["straight"], 0, cursor)
-        cursor = (index, 1)
+    bar_sequence = bar if bar is not None else [("straight", 0, 1)] * bar_straights
+    for pid, entry, exit_port in bar_sequence:
+        layout, index = layout.attach(pieces[pid], entry, cursor)
+        cursor = (index, exit_port)
 
     # The teardrop's step trace is tail pieces, then the switch, then the lobe that
     # closes into the switch's other branch.  The lobe recipe -- switch onward -- is

@@ -156,16 +156,22 @@ def render_layout(
                     zorder=z + 0.001,
                 )
 
-    # Action stones clipped onto pieces.
+    # Action stones clipped onto pieces (mid-piece, or pulled toward a port face).
     if layout.accessories:
         from .catalog import ACCESSORIES
 
-        for k, (index, stone_id) in enumerate(layout.accessories):
+        for k, entry in enumerate(layout.accessories):
+            index, stone_id = entry[0], entry[1]
+            at_port = entry[2] if len(entry) > 2 else None
             info = ACCESSORIES.get(stone_id, {})
             line = layout.placements[index].centrelines()[0]
             mx, my, _ = line[len(line) // 2]
+            if at_port is not None:
+                px, py = layout.placements[index].port_pose(at_port).xy()
+                mx, my = 0.82 * px + 0.18 * mx, 0.82 * py + 0.18 * my
             offset = 30.0 * sum(
-                1 for j, (idx2, _s) in enumerate(layout.accessories) if idx2 == index and j < k
+                1 for j, other in enumerate(layout.accessories)
+                if other[0] == index and j < k
             )
             ax.plot(
                 mx,

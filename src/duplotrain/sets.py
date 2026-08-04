@@ -74,6 +74,30 @@ SETS: dict[str, TrainSet] = {
             notes="The four bridge pieces span exactly 8 straights (1024 mm) of run.",
         ),
         TrainSet(
+            code="10425",
+            name="Train Tunnel and Tracks",
+            year=2024,
+            pieces={"curve": 10, "switch": 1, "buffer": 1, "straight": 1, "offramp": 1},
+            notes=(
+                "The straight is the new rail-with-plates 5370; buffer 35967 in "
+                "reddish orange; plus the 96 mm off-ramp (4785) and a tunnel arch "
+                "(scenery, not track). Its white 'rail accessory no. 7' action stone "
+                "is a 2024-generation function brick not yet modelled."
+            ),
+        ),
+        TrainSet(
+            code="10426",
+            name="Train Bridge and Tracks Expansion Set",
+            year=2024,
+            pieces={"straight": 9, "ramp": 2, "span": 2},
+            notes=(
+                "8 plain straights + 1 rail-with-plates 5370. The redesigned bridge "
+                "moulds (5086 lower x2, 5087 upper x2) keep the classic 8-straight "
+                "1024 mm span and are mapped onto the 6392/6393 geometry; its 'rail "
+                "accessory no. 8' stone is not yet modelled."
+            ),
+        ),
+        TrainSet(
             code="10882",
             name="Train Tracks",
             year=2018,
