@@ -63,15 +63,6 @@ class CollisionField:
     )
     _max_half_width: float = 0.0
 
-    def _cells_near(self, x: float, y: float, reach: float) -> list[tuple[int, int]]:
-        r = max(1, math.ceil(reach / self.cell))
-        cx, cy = int(math.floor(x / self.cell)), int(math.floor(y / self.cell))
-        return [
-            (cx + dx, cy + dy)
-            for dx in range(-r, r + 1)
-            for dy in range(-r, r + 1)
-        ]
-
     def clashes(
         self,
         points: list[tuple[float, float, float]],
@@ -81,19 +72,35 @@ class CollisionField:
         """Would a piece with these sample points overlap anything already placed?
 
         *ignore* lists placement indices exempt from the check (the piece's direct
-        neighbours in the layout graph).
+        neighbours in the layout graph).  This is the solver's hottest non-arithmetic
+        loop, hence the inlined cell scan.
         """
+        if not self._grid:
+            return False
+        cell = self.cell
+        clearance = self.clearance
+        grid = self._grid
         reach = half_width + self._max_half_width - TOUCH_MARGIN
+        r = max(1, math.ceil(reach / cell))
         for x, y, z in points:
-            for cell in self._cells_near(x, y, reach):
-                for px, py, pz, phw, pidx in self._grid.get(cell, ()):
-                    if pidx in ignore:
+            cx = int(x // cell)
+            cy = int(y // cell)
+            for gx in range(cx - r, cx + r + 1):
+                for gy in range(cy - r, cy + r + 1):
+                    bucket = grid.get((gx, gy))
+                    if not bucket:
                         continue
-                    if abs(z - pz) >= self.clearance:
-                        continue
-                    limit = half_width + phw - TOUCH_MARGIN
-                    if (x - px) * (x - px) + (y - py) * (y - py) < limit * limit:
-                        return True
+                    for px, py, pz, phw, pidx in bucket:
+                        if pidx in ignore:
+                            continue
+                        dz = z - pz
+                        if dz >= clearance or dz <= -clearance:
+                            continue
+                        limit = half_width + phw - TOUCH_MARGIN
+                        dx = x - px
+                        dy = y - py
+                        if dx * dx + dy * dy < limit * limit:
+                            return True
         return False
 
     def add(
@@ -102,8 +109,9 @@ class CollisionField:
         cloud = _Cloud(placement, half_width, points)
         self._clouds.append(cloud)
         self._max_half_width = max(self._max_half_width, half_width)
+        cell = self.cell
         for x, y, z in points:
-            key = (int(math.floor(x / self.cell)), int(math.floor(y / self.cell)))
+            key = (int(x // cell), int(y // cell))
             self._grid.setdefault(key, []).append((x, y, z, half_width, placement))
 
     def pop(self) -> None:
@@ -113,8 +121,9 @@ class CollisionField:
             self._max_half_width = max(
                 (c.half_width for c in self._clouds), default=0.0
             )
+        cell = self.cell
         for x, y, _z in cloud.points:
-            key = (int(math.floor(x / self.cell)), int(math.floor(y / self.cell)))
+            key = (int(x // cell), int(y // cell))
             bucket = self._grid[key]
             for i in range(len(bucket) - 1, -1, -1):
                 if bucket[i][4] == cloud.placement:

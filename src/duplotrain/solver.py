@@ -36,6 +36,7 @@ from typing import Mapping, Sequence
 from .collision import DEFAULT_CLEARANCE, CollisionField
 from .exact import Alg
 from .geometry import HEADING_STEPS, ORIGIN, Pose, cos_sin
+from .lattice import ROT_COS_SIN, LatticePoint, LatticePose, from_alg_xy, z_from_alg
 from .layout import Layout
 from .pieces import PieceType
 
@@ -177,6 +178,279 @@ def _max_span(piece: PieceType) -> float:
         for b in piece.ports[i + 1 :]:
             best = max(best, a.pose.distance_to(b.pose))
     return best
+
+
+# --------------------------------------------------------------------------------------
+# Pose engines: the same search over two arithmetic backends
+#
+# The "field" engine is the general one: exact Q(sqrt2, sqrt3) coordinates, any
+# 15-degree heading.  The "lattice" engine handles what every real DUPLO piece
+# actually needs -- 30-degree turns, twentieth-millimetre lengths -- with pure
+# integer arithmetic (see duplotrain.lattice), roughly an order of magnitude faster.
+# solve() compiles the catalogue for the lattice engine and silently falls back to
+# the field when anything (a user piece, an odd heading) doesn't fit.
+# --------------------------------------------------------------------------------------
+
+
+def _pose_to_lattice(pose: Pose) -> LatticePose | None:
+    if pose.heading % 2:
+        return None
+    point = from_alg_xy(pose.x, pose.y)
+    z = z_from_alg(pose.z)
+    if point is None or z is None:
+        return None
+    return LatticePose(point, z, pose.heading // 2)
+
+
+class _FieldEngine:
+    """Pose operations over exact field arithmetic (the original implementation)."""
+
+    name = "field"
+
+    def __init__(
+        self,
+        anchor: Pose,
+        start_cursor: Pose,
+        pieces: Mapping[str, PieceType],
+        moves_by_piece: Mapping[str, list[Move]],
+    ) -> None:
+        self.anchor = anchor
+        self._mate = anchor.reversed()
+        self.start_cursor = start_cursor
+        self._pieces = pieces
+        self.moves = {
+            pid: [
+                (m.entry, m.exit, self._make_apply(m.dx, m.dy, m.dz, m.dheading))
+                for m in moves
+            ]
+            for pid, moves in moves_by_piece.items()
+        }
+        self._frames0 = {
+            (pid, entry): pieces[pid].frame_for(entry, ORIGIN)
+            for pid, moves in moves_by_piece.items()
+            for entry in {m.entry for m in moves}
+        }
+
+    @staticmethod
+    def _make_apply(dx: Alg, dy: Alg, dz: Alg, dheading: int):
+        def apply(cursor: Pose) -> Pose:
+            return cursor.then(dx, dy, dz, dheading)
+
+        return apply
+
+    def convert(self, pose: Pose) -> Pose:
+        return pose
+
+    def frame(self, pid: str, entry: int, cursor: Pose) -> Pose:
+        f0 = self._frames0.get((pid, entry))
+        if f0 is None:
+            f0 = self._pieces[pid].frame_for(entry, ORIGIN)
+            self._frames0[(pid, entry)] = f0
+        return cursor.then(f0.x, f0.y, f0.z, f0.heading)
+
+    def frame_floats(self, frame: Pose) -> tuple[int, float, float, float, float, float]:
+        c, s = cos_sin(frame.heading)
+        fx, fy, fz = frame.xyz()
+        return (frame.heading, fx, fy, fz, float(c), float(s))
+
+    def port_world(self, pid: str, port: int, frame: Pose) -> Pose:
+        local = self._pieces[pid].ports[port].pose
+        return frame.then(local.x, local.y, local.z, local.heading)
+
+    def closes(self, cursor: Pose) -> bool:
+        return cursor == self.anchor
+
+    def near_anchor(self, cursor: Pose, budget: float) -> float | None:
+        return self.near_pose(cursor, self._mate, budget)
+
+    def connects(self, cursor: Pose, pose: Pose) -> bool:
+        return cursor.connects_to(pose)
+
+    def near_pose(self, cursor: Pose, pose: Pose, budget: float) -> float | None:
+        if (
+            (cursor.heading - pose.heading) % HEADING_STEPS != HEADING_STEPS // 2
+            or cursor.z != pose.z
+        ):
+            return None
+        gap = cursor.distance_to(pose)
+        return gap if gap <= budget + 1e-12 else None
+
+    def dist(self, a: Pose, b: Pose) -> float:
+        return a.distance_to(b)
+
+    def dist_home(self, cursor: Pose) -> float:
+        return cursor.distance_to(self.anchor)
+
+    def need_turn24(self, cursor: Pose) -> int:
+        gap = (cursor.heading - self.anchor.heading) % HEADING_STEPS
+        return min(gap, HEADING_STEPS - gap)
+
+    def stub_need24(self, cursor: Pose, stub_pose: Pose) -> int:
+        gap = (cursor.heading - stub_pose.heading - HEADING_STEPS // 2) % HEADING_STEPS
+        return min(gap, HEADING_STEPS - gap)
+
+
+_SQRT3 = math.sqrt(3.0)
+
+
+def _flat(pose: LatticePose) -> tuple[int, int, int, int, int, int]:
+    """LatticePose as a plain int 6-tuple (a, b, c, d, z, heading12)."""
+    return (*pose.p.key(), pose.z, pose.heading)
+
+
+def _flat_xy(pose: tuple) -> tuple[float, float]:
+    a, b, c, d, _z, _h = pose
+    return (
+        (a + (b * _SQRT3 + c) / 2.0) / 20.0,
+        (d + (c * _SQRT3 + b) / 2.0) / 20.0,
+    )
+
+
+class _LatticeEngine:
+    """Pose operations over the integer 30-degree lattice.
+
+    Poses are plain int 6-tuples ``(a, b, c, d, z, heading12)`` and every move/frame/
+    port delta is precomputed for all 12 headings, so the hot path is tuple adds and
+    tuple compares -- no objects, no rotation loops.  Built by
+    :func:`_compile_lattice`, which returns None (-> field fallback) when the
+    catalogue or base layout doesn't fit the lattice.
+    """
+
+    name = "lattice"
+
+    def __init__(
+        self,
+        anchor: LatticePose,
+        start_cursor: LatticePose,
+        moves: Mapping[str, list[tuple]],
+        frames0: Mapping[tuple[str, int], tuple],
+        port_locals: Mapping[tuple[str, int], tuple],
+    ) -> None:
+        self.anchor = _flat(anchor)
+        self.start_cursor = _flat(start_cursor)
+        self.moves = moves
+        self._frames0 = frames0  # (pid, entry) -> (rotated deltas x12, dz, turn)
+        self._port_locals = port_locals
+
+    @staticmethod
+    def _advance(cursor: tuple, rotated: tuple, dz: int, turn: int) -> tuple:
+        a, b, c, d, z, h = cursor
+        da, db, dc, dd = rotated[h]
+        return (a + da, b + db, c + dc, d + dd, z + dz, (h + turn) % 12)
+
+    def frame(self, pid: str, entry: int, cursor: tuple) -> tuple:
+        rotated, dz, turn = self._frames0[(pid, entry)]
+        return self._advance(cursor, rotated, dz, turn)
+
+    def frame_floats(self, frame: tuple) -> tuple[int, float, float, float, float, float]:
+        fx, fy = _flat_xy(frame)
+        c, s = ROT_COS_SIN[frame[5]]
+        return (frame[5], fx, fy, frame[4] / 20.0, c, s)
+
+    def port_world(self, pid: str, port: int, frame: tuple) -> tuple:
+        rotated, dz, turn = self._port_locals[(pid, port)]
+        return self._advance(frame, rotated, dz, turn)
+
+    def closes(self, cursor: tuple) -> bool:
+        return cursor == self.anchor
+
+    def near_anchor(self, cursor: tuple, budget: float) -> float | None:
+        anchor = self.anchor
+        if cursor[5] != anchor[5] or cursor[4] != anchor[4]:
+            return None
+        gap = self.dist(cursor, anchor)
+        return gap if gap <= budget + 1e-12 else None
+
+    def connects(self, cursor: tuple, pose: tuple) -> bool:
+        return (
+            cursor[0] == pose[0]
+            and cursor[1] == pose[1]
+            and cursor[2] == pose[2]
+            and cursor[3] == pose[3]
+            and cursor[4] == pose[4]
+            and (cursor[5] - pose[5]) % 12 == 6
+        )
+
+    def near_pose(self, cursor: tuple, pose: tuple, budget: float) -> float | None:
+        if (cursor[5] - pose[5]) % 12 != 6 or cursor[4] != pose[4]:
+            return None
+        gap = self.dist(cursor, pose)
+        return gap if gap <= budget + 1e-12 else None
+
+    def dist(self, a: tuple, b: tuple) -> float:
+        ax, ay = _flat_xy(a)
+        bx, by = _flat_xy(b)
+        return math.hypot(ax - bx, ay - by)
+
+    def dist_home(self, cursor: tuple) -> float:
+        return self.dist(cursor, self.anchor)
+
+    def need_turn24(self, cursor: tuple) -> int:
+        gap = (cursor[5] - self.anchor[5]) % 12
+        return 2 * min(gap, 12 - gap)
+
+    def stub_need24(self, cursor: tuple, stub_pose: tuple) -> int:
+        gap = (cursor[5] - stub_pose[5] - 6) % 12
+        return 2 * min(gap, 12 - gap)
+
+
+def _compile_lattice(
+    anchor: Pose,
+    start_cursor: Pose,
+    pieces: Mapping[str, PieceType],
+    moves_by_piece: Mapping[str, list[Move]],
+) -> _LatticeEngine | None:
+    anchor_l = _pose_to_lattice(anchor)
+    start_l = _pose_to_lattice(start_cursor)
+    if anchor_l is None or start_l is None:
+        return None
+
+    moves: dict[str, list[tuple]] = {}
+    frames0: dict[tuple[str, int], tuple] = {}
+    port_locals: dict[tuple[str, int], tuple] = {}
+
+    def rotations_of(point: LatticePoint) -> tuple:
+        return tuple(point.rotated(h).key() for h in range(12))
+
+    def as_delta(pose: LatticePose) -> tuple:
+        return (rotations_of(pose.p), pose.z, pose.heading)
+
+    def make_apply(rot12: tuple, dz: int, turn: int):
+        def apply(cursor: tuple) -> tuple:
+            a, b, c, d, z, h = cursor
+            da, db, dc, dd = rot12[h]
+            return (a + da, b + db, c + dc, d + dd, z + dz, (h + turn) % 12)
+
+        return apply
+
+    for pid, piece in pieces.items():
+        for port_index, port in enumerate(piece.ports):
+            local = _pose_to_lattice(port.pose)
+            if local is None:
+                return None
+            port_locals[(pid, port_index)] = as_delta(local)
+
+    for pid, piece_moves in moves_by_piece.items():
+        compiled = []
+        piece = pieces[pid]
+        for m in piece_moves:
+            if m.dheading % 2:
+                return None
+            delta = from_alg_xy(m.dx, m.dy)
+            dz = z_from_alg(m.dz)
+            if delta is None or dz is None:
+                return None
+            compiled.append(
+                (m.entry, m.exit, make_apply(rotations_of(delta), dz, m.dheading // 2))
+            )
+            if (pid, m.entry) not in frames0:
+                f0 = _pose_to_lattice(piece.frame_for(m.entry, ORIGIN))
+                if f0 is None:
+                    return None
+                frames0[(pid, m.entry)] = as_delta(f0)
+        moves[pid] = compiled
+
+    return _LatticeEngine(anchor_l, start_l, moves, frames0, port_locals)
 
 
 # --------------------------------------------------------------------------------------
@@ -374,6 +648,10 @@ class SolverConfig:
     #: Called with the node count every few thousand nodes -- a liveness heartbeat
     #: for UIs sitting on a long search.  Exceptions from it are the caller's problem.
     progress: object = None
+    #: Arithmetic backend: "auto" uses the integer lattice engine whenever the whole
+    #: problem fits the 30-degree grid (every built-in piece does) and falls back to
+    #: the general field otherwise; "lattice"/"field" force one, for tests.
+    engine: str = "auto"
 
 
 @dataclass
@@ -385,6 +663,7 @@ class SolveStats:
     pruned_collision: int = 0
     duration_s: float = 0.0
     aborted: bool = False  # stopped by max_nodes
+    engine: str = ""  # which arithmetic backend ran
 
 
 @dataclass
@@ -494,25 +773,33 @@ def solve(
     overhang_of = {pid: p.end_overhang for pid, p in piece_obj.items()}
     total_pieces = sum(counts.values())
 
-    # Collision samples, precomputed per (piece, entry, lattice rotation): the world
-    # frame of a placement only ever differs by one of 24 rotations plus a translation,
-    # so the trig happens once here and the hot loop just adds offsets.
+    # Collision samples, precomputed per (piece, entry, frame rotation): the world
+    # frame of a placement only ever differs by one of finitely many rotations plus a
+    # translation, so the trig happens once here and the hot loop just adds offsets.
     sample_cache: dict[tuple[str, int, int], list[tuple[float, float, float]]] = {}
 
-    def placement_samples(pid: str, entry: int, frame: Pose) -> list[tuple[float, float, float]]:
-        key = (pid, entry, frame.heading)
-        base = sample_cache.get(key)
-        if base is None:
+    def placement_samples(
+        pid: str,
+        entry: int,
+        hkey: int,
+        cos_t: float,
+        sin_t: float,
+        fx: float,
+        fy: float,
+        fz: float,
+    ) -> list[tuple[float, float, float]]:
+        key = (pid, entry, hkey)
+        base_pts = sample_cache.get(key)
+        if base_pts is None:
             piece = pieces[pid]
-            c, s = cos_sin(frame.heading)
-            cos_t, sin_t = float(c), float(s)
-            base = []
+            base_pts = []
             for line in piece.all_centrelines(cfg.collision_spacing):
                 for lx, ly, lz in line:
-                    base.append((cos_t * lx - sin_t * ly, sin_t * lx + cos_t * ly, lz))
-            sample_cache[key] = base
-        fx, fy, fz = frame.xyz()
-        return [(fx + x, fy + y, fz + z) for x, y, z in base]
+                    base_pts.append(
+                        (cos_t * lx - sin_t * ly, sin_t * lx + cos_t * ly, lz)
+                    )
+            sample_cache[key] = base_pts
+        return [(fx + x, fy + y, fz + z) for x, y, z in base_pts]
 
     stats = SolveStats()
     field = CollisionField(clearance=cfg.clearance)
@@ -534,13 +821,47 @@ def solve(
         start_prev = grow_from[0]
         anchor_index = close_onto[0]
 
+    # Pick the arithmetic backend: integer lattice when everything fits, else field.
+    if cfg.engine not in ("auto", "lattice", "field"):
+        raise ValueError(f"unknown engine {cfg.engine!r}")
+    base_stub_poses: dict[tuple[int, int], object] = {}
+    eng = None
+    if cfg.engine in ("auto", "lattice"):
+        eng = _compile_lattice(anchor, start_cursor, piece_obj, moves_by_piece)
+        if eng is not None and base is not None:
+            # Base stub poses and nothing else still need converting; do it eagerly
+            # so a single off-lattice base placement demotes cleanly to the field.
+            for index, placement in enumerate(base.placements):
+                if not placement.piece.is_junction:
+                    continue
+                for port in range(len(placement.piece.ports)):
+                    converted = _pose_to_lattice(placement.port_pose(port))
+                    if converted is None:
+                        eng = None
+                        break
+                    base_stub_poses[(index, port)] = _flat(converted)
+                if eng is None:
+                    break
+    if eng is None:
+        if cfg.engine == "lattice":
+            raise ValueError("problem does not fit the integer lattice engine")
+        eng = _FieldEngine(anchor, start_cursor, piece_obj, moves_by_piece)
+        if base is not None:
+            base_stub_poses = {
+                (index, port): placement.port_pose(port)
+                for index, placement in enumerate(base.placements)
+                if placement.piece.is_junction
+                for port in range(len(placement.piece.ports))
+            }
+    stats.engine = eng.name
+
     steps: list[object] = []
-    stubs: list[tuple[int, int, Pose]] = []  # (placement index, port, world pose)
-    placements: list[tuple[str, Pose]] = []  # (piece id, world frame), in order
+    stubs: list[tuple[int, int, object]] = []  # (placement index, port, engine pose)
+    placements: list[tuple[str, object]] = []  # (piece id, engine frame), in order
 
     if base is not None:
         for index, placement in enumerate(base.placements):
-            placements.append((placement.piece.id, placement.frame))
+            placements.append((placement.piece.id, None))  # base frames never re-used
             pts = [
                 p
                 for line in placement.centrelines(cfg.collision_spacing)
@@ -554,7 +875,7 @@ def solve(
                         continue
                     if port in placement.piece.sealed:
                         continue
-                    stubs.append((index, port, placement.port_pose(port)))
+                    stubs.append((index, port, base_stub_poses[(index, port)]))
 
     remaining_span = sum(span_of[pid] * n for pid, n in counts.items())
     remaining_turn = sum(turn_of[pid] * n for pid, n in counts.items())
@@ -594,17 +915,7 @@ def solve(
             kind="loop" if reversing_target is None else "reversing",
         )
 
-    def near(pose: Pose, target: Pose, budget: float) -> float | None:
-        """Gap between *pose* and mating *target*, if a joint could absorb it."""
-        if (
-            (pose.heading - target.heading) % HEADING_STEPS != HEADING_STEPS // 2
-            or pose.z != target.z
-        ):
-            return None
-        gap = pose.distance_to(target)
-        return gap if gap <= budget + 1e-12 else None
-
-    def dfs(cursor: Pose, used: int, slack_used: float, prev_index: int | None) -> bool:
+    def dfs(cursor, used: int, slack_used: float, prev_index: int | None) -> bool:
         """Depth-first over moves; returns False when global limits say stop.
 
         *prev_index* is the placement owning the connector the walk currently stands
@@ -632,14 +943,14 @@ def solve(
                 and overhang_of[placements[anchor_index][0]] > 0
             )
 
-        if used > 0 and cursor == anchor:
+        if used > 0 and eng.closes(cursor):
             # The anchor face is occupied; whether or not this counts as a result,
             # nothing can continue through it.
             if eligible(used) and closing_link_legal():
                 emit(slack_used)
             return True
         if cfg.slop > 0.0 and eligible(used) and closing_link_legal():
-            gap = near(cursor, anchor.reversed(), cfg.slop - slack_used)
+            gap = eng.near_anchor(cursor, cfg.slop - slack_used)
             if gap is not None and gap > 0.0:
                 emit(slack_used + gap)
                 # A forced fit does not occupy the anchor; deeper search may still
@@ -652,16 +963,12 @@ def solve(
         # The walk must eventually reach a closing target: the anchor, or -- in
         # reversing mode -- any open junction stub.  Prune only when no target's
         # position or heading is attainable with what remains.
-        home = cursor.distance_to(anchor)
-        turn_gap = (cursor.heading - anchor.heading) % HEADING_STEPS
-        need = min(turn_gap, HEADING_STEPS - turn_gap)
+        home = eng.dist_home(cursor)
+        need = eng.need_turn24(cursor)
         if cfg.reversing_loops:
             for _pidx, _port, stub_pose in stubs:
-                home = min(home, cursor.distance_to(stub_pose))
-                gap_steps = (
-                    cursor.heading - stub_pose.heading - HEADING_STEPS // 2
-                ) % HEADING_STEPS
-                need = min(need, gap_steps, HEADING_STEPS - gap_steps)
+                home = min(home, eng.dist(cursor, stub_pose))
+                need = min(need, eng.stub_need24(cursor, stub_pose))
         stub_reach = sum(span_of[placements[s[0]][0]] for s in stubs)
         if home > remaining_span + stub_reach + (cfg.slop - slack_used) + 1e-6:
             stats.pruned_reach += 1
@@ -681,11 +988,11 @@ def solve(
                     and overhang_of[placements[pidx][0]] > 0
                 ):
                     continue  # two overhanging plates cannot share the joint
-                if cursor.connects_to(pose):
+                if eng.connects(cursor, pose):
                     joint_gap = 0.0
                 else:
                     gap = (
-                        near(cursor, pose, cfg.slop - slack_used)
+                        eng.near_pose(cursor, pose, cfg.slop - slack_used)
                         if cfg.slop > 0.0
                         else None
                     )
@@ -697,7 +1004,8 @@ def solve(
                     # reversing loop: the walk's end mates this branch, and the train
                     # thereafter shuttles out through the junction's other route.
                     emit(slack_used + joint_gap, reversing_target=(pidx, port))
-                piece = pieces[placements[pidx][0]]
+                stub_pid = placements[pidx][0]
+                piece = pieces[stub_pid]
                 frame = placements[pidx][1]
                 for exit_port, _route in piece.transit(port):
                     j = next(
@@ -710,8 +1018,10 @@ def solve(
                     )
                     if j is None:  # that exit is not open
                         continue
-                    local = piece.ports[exit_port].pose
-                    out_pose = frame.then(local.x, local.y, local.z, local.heading)
+                    if frame is None:  # a base placement: its poses were precomputed
+                        out_pose = base_stub_poses[(pidx, exit_port)]
+                    else:
+                        out_pose = eng.port_world(stub_pid, exit_port, frame)
                     stubs[:] = [s for k, s in enumerate(snapshot) if k not in (i, j)]
                     steps.append(_Transit(pidx, port, exit_port))
                     keep_going = dfs(out_pose, used, slack_used + joint_gap, pidx)
@@ -723,7 +1033,7 @@ def solve(
         # -- place a new piece -----------------------------------------------------
         if used >= depth_limit:
             return True
-        candidates: list[tuple[float, str, Move, Pose]] = []
+        candidates: list[tuple[float, str, int, int, object]] = []
         cursor_overhangs = (
             prev_index is not None and overhang_of[placements[prev_index][0]] > 0
         )
@@ -732,46 +1042,41 @@ def solve(
                 continue
             if cursor_overhangs and overhang_of[pid] > 0:
                 continue  # the joint would stack two overhanging plates
-            for move in moves_by_piece[pid]:
-                child = cursor.then(move.dx, move.dy, move.dz, move.dheading)
-                gap_turn = (child.heading - anchor.heading) % HEADING_STEPS
-                heuristic = child.distance_to(anchor) + 64.0 * min(
-                    gap_turn, HEADING_STEPS - gap_turn
-                )
+            for entry, exit_port, apply_move in eng.moves[pid]:
+                child = apply_move(cursor)
+                heuristic = eng.dist_home(child) + 64.0 * eng.need_turn24(child)
                 if cfg.reversing_loops:
                     for _pidx, _port, stub_pose in stubs:
-                        gap_steps = (
-                            child.heading - stub_pose.heading - HEADING_STEPS // 2
-                        ) % HEADING_STEPS
                         heuristic = min(
                             heuristic,
-                            child.distance_to(stub_pose)
-                            + 64.0 * min(gap_steps, HEADING_STEPS - gap_steps),
+                            eng.dist(child, stub_pose)
+                            + 64.0 * eng.stub_need24(child, stub_pose),
                         )
-                candidates.append((heuristic, pid, move, child))
+                candidates.append((heuristic, pid, entry, exit_port, child))
         # Try homeward moves first: irrelevant to completeness, decisive for how fast
         # the obvious completion of a small gap is found.
-        candidates.sort(key=lambda c: (c[0], c[1]))
-        for _heuristic, pid, move, next_cursor in candidates:
+        candidates.sort(key=lambda c: (c[0], c[1], c[2], c[3]))
+        for _heuristic, pid, entry, exit_port, next_cursor in candidates:
             piece = pieces[pid]
-            frame = piece.frame_for(move.entry, cursor)
-            pts = placement_samples(pid, move.entry, frame)
+            frame = eng.frame(pid, entry, cursor)
+            hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
+            pts = placement_samples(pid, entry, hkey, cos_t, sin_t, fx, fy, fz)
             index = len(placements)
             ignore = {prev_index} if prev_index is not None else set()
             # A move that closes the loop legitimately butts against the anchor
             # piece; exempt it from colliding with that piece only.  Likewise a
             # move landing on an open stub butts against that stub's piece.
             if placements and eligible(used + 1):
-                if next_cursor == anchor or (
+                if eng.closes(next_cursor) or (
                     cfg.slop > 0.0
-                    and near(next_cursor, anchor.reversed(), cfg.slop - slack_used)
-                    is not None
+                    and eng.near_anchor(next_cursor, cfg.slop - slack_used) is not None
                 ):
                     ignore.add(anchor_index)
             for stub_index, _stub_port, stub_pose in stubs:
-                if next_cursor.connects_to(stub_pose) or (
+                if eng.connects(next_cursor, stub_pose) or (
                     cfg.slop > 0.0
-                    and near(next_cursor, stub_pose, cfg.slop - slack_used) is not None
+                    and eng.near_pose(next_cursor, stub_pose, cfg.slop - slack_used)
+                    is not None
                 ):
                     ignore.add(stub_index)
             if field.clashes(pts, piece.width / 2.0, ignore):
@@ -786,13 +1091,11 @@ def solve(
             new_stubs = 0
             if piece.is_junction:
                 for port_index in range(len(piece.ports)):
-                    if port_index in (move.entry, move.exit):
+                    if port_index in (entry, exit_port):
                         continue
-                    local = piece.ports[port_index].pose
-                    stub_pose = frame.then(local.x, local.y, local.z, local.heading)
-                    stubs.append((index, port_index, stub_pose))
+                    stubs.append((index, port_index, eng.port_world(pid, port_index, frame)))
                     new_stubs += 1
-            steps.append(_Place(pid, move.entry, move.exit))
+            steps.append(_Place(pid, entry, exit_port))
 
             keep_going = dfs(next_cursor, used + 1, slack_used, index)
 
@@ -815,7 +1118,7 @@ def solve(
     # and reverted: proving "no k-piece completion exists" before looking at k+1 costs
     # a full breadth-k tree, which dwarfs the guided search.)
     depth_limit = total_pieces
-    dfs(start_cursor, 0, 0.0, start_prev)
+    dfs(eng.start_cursor, 0, 0.0, start_prev)
     stats.duration_s = time.perf_counter() - started
 
     ordered = sorted(

@@ -252,6 +252,16 @@ Elevation is modelled (ramps carry `z`; closure requires returning to ground), a
 collision clearance defaults to 120 mm — a DUPLO loco is ~100 mm tall, and the stock
 bridge crests at 76.8 mm, which is why the real one only passes toy cars underneath.
 
+**Arithmetic engines.** Exactness doesn't require Fractions: every real piece turns in
+30° steps and measures in twentieths of a millimetre, so positions live in the scaled
+cyclotomic ring (1/20)·ℤ[e^{iπ/6}], where rotation is an *integer* 4×4 map. The solver
+compiles the problem for this integer lattice engine automatically (~6× faster:
+1.8k → 10k nodes/s natively; it's what makes the browser build usable) and falls back
+to the general ℚ(√2,√3) field for anything off-grid — a user piece on the 45° lattice,
+say. Conformance tests run every solver mode on both engines and require identical
+solutions. If far bigger searches ever matter (v2 multi-cycle at scale), the same seam
+is where a Rust core would slot in.
+
 **Current limits worth knowing:**
 
 - The solver finds *driving loops* — one closed train circuit. A passing loop (both
