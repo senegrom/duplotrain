@@ -538,10 +538,15 @@ async function runSolve(grow, close) {
     });
     pickMode = null;
     redraw();
-    if (!S.candidates.length)
-      status("No way to close with the remaining pieces — add inventory or slop.", "err");
-    else
+    if (!S.candidates.length) {
+      if (S.aborted)
+        status(`Searched ${(S.searched || 0).toLocaleString()} states without luck — ` +
+               "a closure may still exist. Try more slop, or simplify the gap.", "err");
+      else
+        status("No way to close with the remaining pieces — add inventory or slop.", "err");
+    } else {
       status(`${S.candidates.length} way(s) to close — hover to preview, click to apply.`);
+    }
   } catch (e) {
     pickMode = null;
     status(e.message, "err");

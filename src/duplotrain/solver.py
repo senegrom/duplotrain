@@ -218,6 +218,11 @@ class _FieldEngine:
         self._mate = anchor.reversed()
         self.start_cursor = start_cursor
         self._pieces = pieces
+        ax, ay = anchor.xy()
+        theta = math.radians(anchor.degrees)
+        # The walk must ARRIVE at the anchor going its way; aim the search heuristic
+        # one straight behind it so candidates line up from the approachable side.
+        self._approach = (ax - 128.0 * math.cos(theta), ay - 128.0 * math.sin(theta))
         self.moves = {
             pid: [
                 (m.entry, m.exit, self._make_apply(m.dx, m.dy, m.dz, m.dheading))
@@ -281,6 +286,13 @@ class _FieldEngine:
     def dist_home(self, cursor: Pose) -> float:
         return cursor.distance_to(self.anchor)
 
+    def heur_dist(self, cursor: Pose) -> float:
+        x, y = cursor.xy()
+        ax, ay = self._approach
+        return math.hypot(x - ax, y - ay) + 2.5 * abs(
+            float(cursor.z) - float(self.anchor.z)
+        )
+
     def need_turn24(self, cursor: Pose) -> int:
         gap = (cursor.heading - self.anchor.heading) % HEADING_STEPS
         return min(gap, HEADING_STEPS - gap)
@@ -331,6 +343,9 @@ class _LatticeEngine:
         self.moves = moves
         self._frames0 = frames0  # (pid, entry) -> (rotated deltas x12, dz, turn)
         self._port_locals = port_locals
+        ax, ay = _flat_xy(self.anchor)
+        theta = math.radians(self.anchor[5] * 30)
+        self._approach = (ax - 128.0 * math.cos(theta), ay - 128.0 * math.sin(theta))
 
     @staticmethod
     def _advance(cursor: tuple, rotated: tuple, dz: int, turn: int) -> tuple:
@@ -384,6 +399,11 @@ class _LatticeEngine:
 
     def dist_home(self, cursor: tuple) -> float:
         return self.dist(cursor, self.anchor)
+
+    def heur_dist(self, cursor: tuple) -> float:
+        x, y = _flat_xy(cursor)
+        ax, ay = self._approach
+        return math.hypot(x - ax, y - ay) + 0.125 * abs(cursor[4] - self.anchor[4])
 
     def need_turn24(self, cursor: tuple) -> int:
         gap = (cursor[5] - self.anchor[5]) % 12
@@ -634,6 +654,10 @@ class SolverConfig:
 
     slop: float = 0.0  # total closing gap allowed, mm; 0 = exact closures only
     min_pieces: int = 4
+    #: Upper bound on pieces placed (loop length / grown completion length).  With a
+    #: huge inventory an unbounded depth-first dive is the enemy: a 300 mm gap needs
+    #: a dozen pieces, not two hundred.  None = no bound.
+    max_pieces: int | None = None
     max_results: int = 100
     max_nodes: int = 2_000_000
     use_all_pieces: bool = False
@@ -765,6 +789,22 @@ def solve(
         for placement in base.placements:
             piece_obj.setdefault(placement.piece.id, placement.piece)
     moves_by_piece = {pid: _moves_for(pieces[pid]) for pid in piece_ids}
+    # Tie-break rank for move ordering: with a broad inventory many moves share a
+    # heuristic score (a level crossing "ahead" lands exactly where a straight does);
+    # plain running track must win those ties or the search drowns in exotic-piece
+    # subtrees.  0 = plain flat track, 1 = flat with quirks (overhang), 2 = junctions
+    # and anything that changes elevation.
+    def _rank(pid: str) -> int:
+        piece = pieces[pid]
+        if piece.is_junction:
+            return 2
+        if any(m.dz for m in moves_by_piece[pid]):
+            return 2
+        if piece.end_overhang > 0:
+            return 1
+        return 0
+
+    piece_rank = {pid: _rank(pid) for pid in piece_ids}
     canon_for = {pid: _canonical_traversals(p) for pid, p in piece_obj.items()}
     mirror_for = {pid: _mirror_traversals(p) for pid, p in piece_obj.items()}
     port_mirror_for = {pid: _mirror_ports(p) for pid, p in piece_obj.items()}
@@ -880,6 +920,12 @@ def solve(
     remaining_span = sum(span_of[pid] * n for pid, n in counts.items())
     remaining_turn = sum(turn_of[pid] * n for pid, n in counts.items())
 
+    # Admissible per-piece bounds for the completion-mode IDA* contour: one piece
+    # advances at most max_span_any millimetres and swings at most max_turn_any
+    # heading steps, so pieces-needed >= max(dist/span, need/turn).
+    max_span_any = max(span_of.values(), default=1.0) or 1.0
+    max_turn_any = max(turn_of.values(), default=0)
+
     def eligible(used: int) -> bool:
         return used >= cfg.min_pieces and (not cfg.use_all_pieces or used == total_pieces)
 
@@ -977,6 +1023,19 @@ def solve(
         if need > remaining_turn + stub_turns:
             stats.pruned_turn += 1
             return True
+        # IDA* contour (completion mode): at least this many more pieces are needed.
+        slack_left = max(0.0, cfg.slop - slack_used)
+        h_dist = int((max(0.0, home - slack_left) + max_span_any - 1e-6) // max_span_any)
+        if need > 0:
+            if max_turn_any == 0:
+                stats.pruned_turn += 1
+                return True
+            h_turn = -(-need // max_turn_any)
+        else:
+            h_turn = 0
+        if used + max(h_dist, h_turn) > f_limit:
+            stats.pruned_reach += 1
+            return True
 
         # -- transit an open stub the walk meets (exactly, or within the slop) ----
         if stubs:
@@ -1044,7 +1103,7 @@ def solve(
                 continue  # the joint would stack two overhanging plates
             for entry, exit_port, apply_move in eng.moves[pid]:
                 child = apply_move(cursor)
-                heuristic = eng.dist_home(child) + 64.0 * eng.need_turn24(child)
+                heuristic = eng.heur_dist(child) + 64.0 * eng.need_turn24(child)
                 if cfg.reversing_loops:
                     for _pidx, _port, stub_pose in stubs:
                         heuristic = min(
@@ -1052,11 +1111,11 @@ def solve(
                             eng.dist(child, stub_pose)
                             + 64.0 * eng.stub_need24(child, stub_pose),
                         )
-                candidates.append((heuristic, pid, entry, exit_port, child))
+                candidates.append((heuristic, piece_rank[pid], pid, entry, exit_port, child))
         # Try homeward moves first: irrelevant to completeness, decisive for how fast
         # the obvious completion of a small gap is found.
-        candidates.sort(key=lambda c: (c[0], c[1], c[2], c[3]))
-        for _heuristic, pid, entry, exit_port, next_cursor in candidates:
+        candidates.sort(key=lambda c: (c[0], c[1], c[2], c[3], c[4]))
+        for _heuristic, _rank_, pid, entry, exit_port, next_cursor in candidates:
             piece = pieces[pid]
             frame = eng.frame(pid, entry, cursor)
             hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
@@ -1111,14 +1170,25 @@ def solve(
                 return False
         return True
 
-    # One depth-first pass for both modes.  The greedy homeward move ordering is what
-    # makes completions arrive promptly: the walk beelines for the target end first,
-    # so a small gap is closed within a handful of nodes even from a huge box, and the
-    # remaining budget then broadens the enumeration.  (Iterative deepening was tried
-    # and reverted: proving "no k-piece completion exists" before looking at k+1 costs
-    # a full breadth-k tree, which dwarfs the guided search.)
     depth_limit = total_pieces
-    dfs(eng.start_cursor, 0, 0.0, start_prev)
+    if cfg.max_pieces is not None:
+        depth_limit = min(depth_limit, cfg.max_pieces)
+    if base is None:
+        # Loop mode enumerates everything reachable; one full-depth pass.
+        f_limit = depth_limit
+        dfs(eng.start_cursor, 0, 0.0, start_prev)
+    else:
+        # Completion mode runs IDA*: grow the pieces-needed contour until closures
+        # appear.  Uninformed depth-first dies here whenever the inventory is broad
+        # (it exhausts gigantic fruitless subtrees before ever backtracking), while
+        # each admissible contour stays small and finds the SHORTEST completions
+        # first.  Plain iterative deepening without the heuristic was tried and is
+        # equally hopeless -- the contour bound is what tames the tree.
+        for f_limit in range(1, depth_limit + 1):
+            if not dfs(eng.start_cursor, 0, 0.0, start_prev):
+                break
+            if len(solutions) >= cfg.max_results or stats.aborted:
+                break
     stats.duration_s = time.perf_counter() - started
 
     ordered = sorted(

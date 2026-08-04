@@ -309,7 +309,14 @@ class Session:
         max_results: int,
         reversing: bool = False,
         progress: object = None,
-    ) -> int:
+    ) -> dict:
+        """Search for completions; returns {found, aborted, searched}.
+
+        Staged: plain running track (curves + straights) first -- that closes almost
+        every real gap within a few thousand nodes -- then the whole box only if
+        needed.  A depth-first search over a BROAD inventory otherwise drowns
+        exploring exotic-piece subtrees before finding the obvious answer.
+        """
         opens = self.layout.connectable_ends()
         if grow is None or close is None:
             if len(opens) != 2:
@@ -318,26 +325,47 @@ class Session:
                     f"{len(opens)} open ends)"
                 )
             grow, close = opens[1], opens[0]
-        result = solve(
-            self.remaining(),
-            self.catalog,
-            SolverConfig(
-                slop=slop,
-                min_pieces=1,
-                max_results=max_results,
-                # Modest budget: the editor must feel interactive, and under the web
-                # build this runs in WebAssembly at a fraction of native speed
-                # (measured: ~1.8k nodes/s native today, so a few hundred in WASM).
-                max_nodes=60_000,
-                reversing_loops=reversing,
-                progress=progress,
-            ),
-            base=self.layout,
-            grow_from=grow,
-            close_onto=close,
-        )
-        self.candidates = result.solutions[:max_results]
-        return len(self.candidates)
+
+        remaining = self.remaining()
+        plain = {
+            pid: n
+            for pid, n in remaining.items()
+            if pid in ("curve", "straight") and n > 0
+        }
+        full = {pid: n for pid, n in remaining.items() if n > 0}
+        stages = [plain, full] if plain and plain != full else [full]
+
+        searched = 0
+        aborted = False
+        self.candidates = []
+        for stage_index, inventory in enumerate(stages):
+            budget = 25_000 if stage_index == 0 and len(stages) > 1 else 60_000
+            result = solve(
+                inventory,
+                self.catalog,
+                SolverConfig(
+                    slop=slop,
+                    min_pieces=1,
+                    max_pieces=26,
+                    max_results=max_results,
+                    max_nodes=budget,
+                    reversing_loops=reversing,
+                    progress=progress,
+                ),
+                base=self.layout,
+                grow_from=grow,
+                close_onto=close,
+            )
+            searched += result.stats.nodes
+            aborted = result.stats.aborted
+            if result.solutions:
+                self.candidates = result.solutions[:max_results]
+                break
+        return {
+            "found": len(self.candidates),
+            "aborted": aborted and not self.candidates,
+            "searched": searched,
+        }
 
     def apply_candidate(self, index: int) -> None:
         if not 0 <= index < len(self.candidates):
@@ -418,14 +446,14 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                     int(body["at_port"]) if body.get("at_port") is not None else None,
                 )
             elif path == "/api/solve":
-                found = session.solve_gap(
+                outcome = session.solve_gap(
                     tuple(body["grow"]) if body.get("grow") else None,
                     tuple(body["close"]) if body.get("close") else None,
                     float(body.get("slop", 0.0)),
                     int(body.get("max_results", 10)),
                     reversing=bool(body.get("reversing", False)),
                 )
-                self._json(200, {"found": found, **session.state()})
+                self._json(200, {**outcome, **session.state()})
                 return
             elif path == "/api/apply":
                 session.apply_candidate(int(body["index"]))

@@ -51,7 +51,7 @@ def dispatch(path: str, body_json: str | None) -> str:
                 int(body["at_port"]) if body.get("at_port") is not None else None,
             )
         elif path == "/api/solve":
-            found = session.solve_gap(
+            outcome = session.solve_gap(
                 tuple(body["grow"]) if body.get("grow") else None,
                 tuple(body["close"]) if body.get("close") else None,
                 float(body.get("slop", 0.0)),
@@ -59,7 +59,7 @@ def dispatch(path: str, body_json: str | None) -> str:
                 reversing=bool(body.get("reversing", False)),
                 progress=_progress,
             )
-            return json.dumps({"found": found, **session.state()})
+            return json.dumps({**outcome, **session.state()})
         elif path == "/api/apply":
             session.apply_candidate(int(body["index"]))
         elif path == "/api/import":
