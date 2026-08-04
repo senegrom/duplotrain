@@ -145,8 +145,16 @@ def is_stem_tailed(teardrop: Solution, pieces: Mapping[str, PieceType]) -> bool:
     *Branch-tailed*: the lobe connects the stem to the other branch, forming an
     ordinary one-way circuit; a train entering from the tail is absorbed and never
     comes back.  Only the stem-tailed kind composes into a perfect dogbone.
+
+    Non-reversing solutions (plain loops, junction-free traces) are simply not
+    teardrops: False, not an error.
     """
-    lobe = _lobe_recipe(teardrop, pieces)
+    if teardrop.kind != "reversing":
+        return False
+    try:
+        lobe = _lobe_recipe(teardrop, pieces)
+    except ValueError:
+        return False
     piece = pieces[lobe[0].piece_id]
     options = [exit_port for exit_port, _ in piece.transit(lobe[0].entry)]
     return len(options) > 1
