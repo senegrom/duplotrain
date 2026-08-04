@@ -3,13 +3,16 @@
  * Messages out: {ready: true} once booted, then {id, res} / {id, err} per call. */
 "use strict";
 
-importScripts("./pyodide/pyodide.js");
+/* __PYODIDE_DIR__ and __ENGINE_ZIP__ are stamped by webapp/build.py: versioned
+ * URLs so browsers can cache the big runtime forever yet always pick up a new
+ * engine (the old flat names were served immutable and pinned stale engines). */
+importScripts("__PYODIDE_DIR__/pyodide.js");
 
 let dispatch = null;
 
 const booted = (async () => {
-  const pyodide = await loadPyodide({ indexURL: "./pyodide/" });
-  const zipBuf = await (await fetch("./duplotrain-src.zip")).arrayBuffer();
+  const pyodide = await loadPyodide({ indexURL: "__PYODIDE_DIR__/" });
+  const zipBuf = await (await fetch("__ENGINE_ZIP__")).arrayBuffer();
   pyodide.FS.mkdirTree("/app");
   pyodide.unpackArchive(zipBuf, "zip", { extractDir: "/app" });
   pyodide.runPython("import sys; sys.path.insert(0, '/app')");

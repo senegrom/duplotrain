@@ -74,7 +74,7 @@
       await ready;
       overlay.remove();
       await refresh();
-      status("Engine ready — runs in your browser.");
+      status("Engine ready — runs in your browser · build __BUILD__");
     } catch (err) {
       fail(err);
       console.error(err);

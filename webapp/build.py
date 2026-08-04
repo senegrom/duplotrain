@@ -3,11 +3,17 @@
 Output layout (everything self-hosted, no third-party requests at runtime):
 
     dist/
-      index.html          the editor, with boot.js injected
-      boot.js             Pyodide bootstrap + in-process API bridge
-      adapter.py          the dispatch shim around duplotrain.gui.Session
-      duplotrain-src.zip  the Python package, plain source
-      pyodide/            Pyodide core (downloaded once into webapp/vendor/)
+      index.html                    the editor, with boot.js injected
+      boot.js / app.js / worker.js  bridge + editor + engine worker
+      adapter.py                    the dispatch shim around duplotrain.gui.Session
+      duplotrain-src-<stamp>.zip    the Python package, content-stamped
+      pyodide-<version>/            Pyodide core (downloaded once into vendor/)
+
+Caching contract: mutable names (html/js/py) are served ``no-cache`` so every
+visit revalidates them (cheap 304s), while the content-stamped zip and the
+versioned Pyodide directory are immutable-cached forever.  The engine zip MUST
+carry the stamp in its filename: it was once served under a flat name with an
+immutable header, which pinned stale engines in returning visitors' browsers.
 
 Usage:  python webapp/build.py [--pyodide-version 0.27.7]
 """
@@ -15,6 +21,7 @@ Usage:  python webapp/build.py [--pyodide-version 0.27.7]
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import shutil
 import sys
@@ -66,16 +73,22 @@ def fetch_pyodide(version: str) -> Path:
     return target
 
 
-def build_source_zip() -> None:
-    """Zip src/duplotrain (source only) for unpackArchive."""
-    out = DIST / "duplotrain-src.zip"
+def build_source_zip() -> bytes:
+    """Zip src/duplotrain (source only) for unpackArchive; returns the bytes.
+
+    Zip entries carry a fixed timestamp so the stamp depends on content alone.
+    """
     src = ROOT / "src" / "duplotrain"
-    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(src.rglob("*")):
             if "__pycache__" in path.parts or not path.is_file():
                 continue
-            zf.write(path, Path("duplotrain") / path.relative_to(src))
-    print(f"wrote {out} ({out.stat().st_size / 1e3:.0f} kB)")
+            arcname = str(Path("duplotrain") / path.relative_to(src))
+            info = zipfile.ZipInfo(arcname, date_time=(2020, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            zf.writestr(info, path.read_bytes())
+    return buffer.getvalue()
 
 
 #: The site serves apps under a strict CSP; this scoped override only adds what
@@ -85,14 +98,27 @@ HTACCESS = """\
 # All scripts stay external and same-origin (no 'unsafe-inline' for scripts).
 <IfModule mod_headers.c>
   Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests"
-</IfModule>
 
-# The Pyodide runtime files are big and effectively immutable; cache hard.
-# (Bump the pyodide/ directory name if the runtime is ever upgraded.)
-<IfModule mod_headers.c>
-  <FilesMatch "\\.(wasm|zip|whl)$">
+  # Mutable names (the page, scripts, adapter) revalidate on every visit so
+  # engine fixes actually reach returning visitors; 304s make this cheap.
+  # NEVER serve a flat-named artifact as immutable -- a stale engine pinned
+  # in browser caches is exactly the bug this policy replaced.
+  Header set Cache-Control "no-cache"
+
+  # Content-stamped artifacts may cache forever: a new build gets a new name.
+  <FilesMatch "^duplotrain-src-[0-9a-f]{8}\\.zip$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
+</IfModule>
+
+AddType application/wasm .wasm
+"""
+
+#: Dropped into the versioned pyodide-<version>/ directory: its URL changes on
+#: upgrade, so its contents may cache forever.
+HTACCESS_PYODIDE = """\
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=31536000, immutable"
 </IfModule>
 
 AddType application/wasm .wasm
@@ -132,6 +158,15 @@ def build_index() -> None:
     print(f"wrote {DIST / 'index.html'}, app.js and .htaccess")
 
 
+def _stamp_file(source: Path, dest: Path, replacements: dict[str, str]) -> None:
+    text = source.read_text(encoding="utf-8")
+    for marker, value in replacements.items():
+        if marker not in text:
+            raise SystemExit(f"{source.name} lost its {marker} marker; fix webapp/")
+        text = text.replace(marker, value)
+    dest.write_text(text, encoding="utf-8", newline="\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pyodide-version", default="0.27.7")
@@ -143,18 +178,40 @@ def main() -> None:
     shutil.rmtree(DIST / "__pycache__", ignore_errors=True)
 
     build_index()
-    shutil.copy2(WEBAPP / "boot.js", DIST / "boot.js")
-    shutil.copy2(WEBAPP / "worker.js", DIST / "worker.js")
+
+    zip_bytes = build_source_zip()
+    adapter = (WEBAPP / "adapter.py").read_bytes()
+    stamp_src = zip_bytes + adapter + (DIST / "app.js").read_bytes()
+    for name in ("boot.js", "worker.js"):
+        stamp_src += (WEBAPP / name).read_bytes()
+    stamp = hashlib.sha256(stamp_src).hexdigest()[:8]
+
+    for stale in DIST.glob("duplotrain-src*.zip"):
+        stale.unlink()
+    zip_name = f"duplotrain-src-{stamp}.zip"
+    (DIST / zip_name).write_bytes(zip_bytes)
+    print(f"wrote {DIST / zip_name} ({len(zip_bytes) / 1e3:.0f} kB)")
+
+    pyodide_dirname = f"pyodide-{args.pyodide_version}"
+    _stamp_file(WEBAPP / "boot.js", DIST / "boot.js", {"__BUILD__": stamp})
+    _stamp_file(
+        WEBAPP / "worker.js",
+        DIST / "worker.js",
+        {"__PYODIDE_DIR__": f"./{pyodide_dirname}", "__ENGINE_ZIP__": f"./{zip_name}"},
+    )
     shutil.copy2(WEBAPP / "adapter.py", DIST / "adapter.py")
-    build_source_zip()
 
     pyodide_dir = fetch_pyodide(args.pyodide_version)
-    dest = DIST / "pyodide"
+    dest = DIST / pyodide_dirname
     dest.mkdir(exist_ok=True)
     for name in PYODIDE_FILES:
         shutil.copy2(pyodide_dir / name, dest / name)
+    (dest / ".htaccess").write_text(HTACCESS_PYODIDE, encoding="utf-8", newline="\n")
+    # The pre-stamp flat layout, if present from an older build.
+    shutil.rmtree(DIST / "pyodide", ignore_errors=True)
+
     total = sum(f.stat().st_size for f in DIST.rglob("*") if f.is_file())
-    print(f"dist ready: {total / 1e6:.1f} MB total")
+    print(f"dist ready: build {stamp}, {total / 1e6:.1f} MB total")
 
 
 if __name__ == "__main__":

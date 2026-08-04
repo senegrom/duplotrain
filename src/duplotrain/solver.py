@@ -646,6 +646,33 @@ def _replay(
     return layout.join(cursor, target, force=force_final_join)
 
 
+def _solution_overlaps(
+    layout: Layout, n_base: int, clearance: float, spacing: float
+) -> bool:
+    """Independent overlap audit of a finished solution.
+
+    The search prunes colliding placements as it goes, but its exemption
+    bookkeeping is intricate (anchors, stubs, transits, forced fits).  This
+    checks the replayed layout against its real link graph: a solution is
+    rejected if any piece the search added (index >= *n_base*) overlaps a
+    placement it is not directly joined to.  Contact already present inside the
+    base layout is the caller's business and stays exempt.
+    """
+    neighbours: dict[int, set[int]] = {}
+    for (ai, _ap), (bi, _bp) in layout.links.items():
+        neighbours.setdefault(ai, set()).add(bi)
+    check = CollisionField(clearance=clearance)
+    for index, placement in enumerate(layout.placements):
+        pts = [p for line in placement.centrelines(spacing) for p in line]
+        half = placement.piece.width / 2.0
+        if index >= n_base and check.clashes(
+            pts, half, neighbours.get(index, set())
+        ):
+            return True
+        check.add(index, pts, half)
+    return False
+
+
 # --------------------------------------------------------------------------------------
 # Configuration and results
 # --------------------------------------------------------------------------------------
@@ -691,6 +718,9 @@ class SolveStats:
     duration_s: float = 0.0
     aborted: bool = False  # stopped by max_nodes
     engine: str = ""  # which arithmetic backend ran
+    #: Solutions rejected by the final independent overlap audit.  Always 0 unless
+    #: a search-time exemption let an overlap slip through -- a bug worth reporting.
+    dropped_overlap: int = 0
 
 
 @dataclass
@@ -954,6 +984,11 @@ def solve(
             close_onto=close_onto,
             final_target=reversing_target,
         )
+        if _solution_overlaps(
+            layout, len(base_pids), cfg.clearance, cfg.collision_spacing
+        ):
+            stats.dropped_overlap += 1
+            return
         solutions[signature] = Solution(
             layout=layout,
             steps=tuple(steps),
