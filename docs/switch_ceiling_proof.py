@@ -171,22 +171,61 @@ def classify_wiring(n, edges, caps):
     return n_edges > 0
 
 
-for n in (1, 2, 3, 4):
-    total = 0
-    connected = 0
-    perfect = []
-    for edges, caps in all_wirings(n):
-        total += 1
-        if not edges or not is_connected(n, edges, caps):
-            continue
-        connected += 1
-        if classify_wiring(n, edges, caps):
-            perfect.append((edges, caps))
-    print(f"n={n}: {total} wirings, {connected} connected, "
-          f"{len(perfect)} PERFECT")
-    for edges, caps in perfect[:8]:
-        e_str = ", ".join(f"{a[0]}{a[1]}-{b[0]}{b[1]}" for a, b in edges)
-        c_str = ", ".join(f"{p[0]}{p[1]}*" for p in caps) or "none"
-        print(f"    edges: {e_str}   guarded stubs: {c_str}")
-    if len(perfect) > 8:
-        print(f"    ... and {len(perfect) - 8} more")
+def core_wirings(n):
+    """Lobe-free cores: branches pair only with OTHER switches' ports; stems
+    may pair (other switch) or take a guarded cap.
+
+    Reduction (proved by hand): every teardrop-lobe switch is behaviourally a
+    reflector and contracts to a guarded cap; balloons (branch to own stem) and
+    capped branches are instantly imperfect.  So any perfect wiring is a
+    lobe-free core decorated with reflector-lobes -- and if no core with up to
+    N switches is perfect, every perfect layout with at most N non-lobe
+    switches has all-lobe switches, of which a 1-D structure (a path) carries
+    at most two.  Machine result: 0 perfect cores for n = 2..6 (24,140,800
+    wirings at n=6 alone).
+    """
+    ports = [(k, a) for k in range(n) for a in (S, L, R)]
+
+    def rec(remaining, edges, caps):
+        if not remaining:
+            yield tuple(edges), tuple(caps)
+            return
+        p = remaining[0]
+        rest = remaining[1:]
+        if p[1] == S:  # stems may cap
+            yield from rec(rest, edges, caps + [p])
+        for i, q in enumerate(rest):
+            if q[0] == p[0]:
+                continue  # no same-switch pairs: no lobes, no balloons
+            yield from rec(rest[:i] + rest[i + 1 :], edges + [(p, q)], caps)
+
+    yield from rec(ports, [], [])
+
+
+if __name__ == "__main__":
+    for n in (1, 2, 3, 4):
+        total = 0
+        connected = 0
+        perfect = []
+        for edges, caps in all_wirings(n):
+            total += 1
+            if not edges or not is_connected(n, edges, caps):
+                continue
+            connected += 1
+            if classify_wiring(n, edges, caps):
+                perfect.append((edges, caps))
+        print(f"n={n}: {total} wirings, {connected} connected, "
+              f"{len(perfect)} PERFECT")
+        for edges, caps in perfect[:8]:
+            e_str = ", ".join(f"{a[0]}{a[1]}-{b[0]}{b[1]}" for a, b in edges)
+            c_str = ", ".join(f"{p[0]}{p[1]}*" for p in caps) or "none"
+            print(f"    edges: {e_str}   guarded stubs: {c_str}")
+        if len(perfect) > 8:
+            print(f"    ... and {len(perfect) - 8} more")
+    for n in (2, 3, 4, 5):
+        total = sum(
+            1
+            for edges, caps in core_wirings(n)
+            if edges and is_connected(n, edges, caps) and classify_wiring(n, edges, caps)
+        )
+        print(f"cores n={n}: {total} PERFECT")

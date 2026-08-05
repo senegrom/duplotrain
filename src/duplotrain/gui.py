@@ -16,6 +16,7 @@ static HTML file shipped as package data.
 
 from __future__ import annotations
 
+import itertools
 import json
 import threading
 import webbrowser
@@ -320,12 +321,15 @@ class Session:
     def _arc_closures(self, grow: End, close: End, max_results: int) -> list[Solution]:
         """Instant oracle for ring-shaped closures the DFS chronically misses.
 
-        Tries every ``j straights + k same-sign curves + m straights`` chain
-        (j, m <= 8, k <= 13).  A closure that must wind AWAY from the target
-        before returning -- ten curves looping around to a neighbouring fork
-        tip, say -- starves in the search's toward-target move ordering, yet is
-        exactly what a human expects "close the loop" to find.  A few thousand
-        exact pose checks cover the whole family.
+        Tries every ``leveler + j straights + k same-sign curves + m straights +
+        leveler`` chain (j, m <= 8, k <= 13), where a leveler is a short run of
+        climbing pieces: any one-directional ramp/span sequence of up to four
+        pieces, or the full up-and-over bridge.  This closes winding rings the
+        search's toward-target ordering starves on -- ten curves looping to a
+        neighbouring fork tip -- and their versions through bridges: finish the
+        descent from a half-built climb, or a ring that carries a whole bridge.
+        Heading and height prefilters keep it to a few thousand exact pose
+        checks.
         """
         from .solver import _solution_overlaps
 
@@ -333,12 +337,61 @@ class Session:
         base = self.layout
         n_base = len(base)
         curve, straight = self.catalog["curve"], self.catalog["straight"]
+        ramp, span = self.catalog["ramp"], self.catalog["span"]
         target = base.pose_of(close)
         s_delta = straight.exit_delta(0, 1)
         c_delta = {entry: curve.exit_delta(entry, 1 - entry) for entry in (0, 1)}
 
-        def build(j, k, entry, m):
+        # Leveling units: (sequence of (piece, entry), float dz).  Monotone
+        # ramp/span runs of length <= 4 both ways, the empty unit, and the full
+        # bridge (which levels out at zero but spans 1024 mm of run).
+        units: list[tuple[tuple, float]] = [((), 0.0)]
+        for length in (1, 2, 3, 4):
+            for combo in itertools.product(("ramp", "span"), repeat=length):
+                for entry_side, sign in ((0, 1.0), (1, -1.0)):
+                    seq = tuple((pid, entry_side) for pid in combo)
+                    dz = sign * sum(57.6 if pid == "ramp" else 19.2 for pid in combo)
+                    units.append((seq, dz))
+        units.append(
+            ((("ramp", 0), ("span", 0), ("span", 1), ("ramp", 1)), 0.0)
+        )
+
+        def unit_cost(seq):
+            need: dict[str, int] = {}
+            for pid, _e in seq:
+                need[pid] = need.get(pid, 0) + 1
+            return need
+
+        def unit_ok(*seqs):
+            need: dict[str, int] = {}
+            for seq in seqs:
+                for pid, _e in seq:
+                    need[pid] = need.get(pid, 0) + 1
+            return all(remaining.get(pid, 0) >= n for pid, n in need.items())
+
+        target_dz = float(target.z) - float(base.pose_of(grow).z)
+        pairs = [
+            (pre, post)
+            for pre, dz_pre in units
+            for post, dz_post in units
+            if abs(dz_pre + dz_post - target_dz) < 1e-6 and unit_ok(pre, post)
+        ]
+        pairs.sort(key=lambda pp: len(pp[0]) + len(pp[1]))
+        pairs = pairs[:60]
+
+        piece_of = {"ramp": ramp, "span": span}
+
+        def apply_unit(pose, seq):
+            for pid, entry_side in seq:
+                d = piece_of[pid].exit_delta(entry_side, 1 - entry_side)
+                pose = pose.then(*d)
+            return pose
+
+        def build(pre, j, k, entry, m, post):
             work, cursor = base, grow
+            for pid, entry_side in pre:
+                work, idx = work.attach(piece_of[pid], entry_side, cursor)
+                cursor = (idx, 1 - entry_side)
             for _ in range(j):
                 work, idx = work.attach(straight, 0, cursor)
                 cursor = (idx, 1)
@@ -348,47 +401,59 @@ class Session:
             for _ in range(m):
                 work, idx = work.attach(straight, 0, cursor)
                 cursor = (idx, 1)
+            for pid, entry_side in post:
+                work, idx = work.attach(piece_of[pid], entry_side, cursor)
+                cursor = (idx, 1 - entry_side)
             return work.join(cursor, close)
 
-        found: list[Solution] = []
         start = base.pose_of(grow)
-        for entry in (0, 1):  # left arc, right arc
-            dx, dy, dz, dh = c_delta[entry]
-            for j in range(0, 9):
-                pose_j = start
-                for _ in range(j):
-                    pose_j = pose_j.then(*s_delta)
-                pose_jk = pose_j
-                for k in range(1, 14):
-                    pose_jk = pose_jk.then(dx, dy, dz, dh)
+        want_heading = (target.heading + 12) % 24
+        found: list[Solution] = []
+        seen_pre = {}
+        for pre, post in pairs:
+            if pre not in seen_pre:
+                seen_pre[pre] = apply_unit(start, pre)
+            start_pre = seen_pre[pre]
+            for entry, turn in ((0, 2), (1, -2)):
+                for k in range(0 if (pre or post) else 1, 14):
+                    if (start_pre.heading + turn * k) % 24 != want_heading:
+                        continue
                     if k > remaining.get("curve", 0):
                         break
-                    pose = pose_jk
-                    for m in range(0, 9):
-                        if m:
+                    for j in range(0, 9):
+                        pose = start_pre
+                        for _ in range(j):
                             pose = pose.then(*s_delta)
-                        if j + m > remaining.get("straight", 0):
-                            continue
-                        if not pose.connects_to(target):
-                            continue
-                        try:
-                            closed = build(j, k, entry, m)
-                        except ValueError:
-                            continue
-                        if _solution_overlaps(closed, n_base, 120.0, 8.0):
-                            continue
-                        found.append(
-                            Solution(
-                                layout=closed,
-                                steps=(),
-                                gap=0.0,
-                                exact=True,
-                                open_stubs=len(closed.connectable_ends()),
-                                signature=("arc", j, k, entry, m),
+                        for _ in range(k):
+                            pose = pose.then(*c_delta[entry])
+                        for m in range(0, 9):
+                            if m:
+                                pose = pose.then(*s_delta)
+                            if j + m > remaining.get("straight", 0):
+                                continue
+                            if not pre and not post and not k:
+                                continue
+                            end_pose = apply_unit(pose, post) if post else pose
+                            if not end_pose.connects_to(target):
+                                continue
+                            try:
+                                closed = build(pre, j, k, entry, m, post)
+                            except ValueError:
+                                continue
+                            if _solution_overlaps(closed, n_base, 120.0, 8.0):
+                                continue
+                            found.append(
+                                Solution(
+                                    layout=closed,
+                                    steps=(),
+                                    gap=0.0,
+                                    exact=True,
+                                    open_stubs=len(closed.connectable_ends()),
+                                    signature=("arc", pre, j, k, entry, m, post),
+                                )
                             )
-                        )
-                        if len(found) >= max_results:
-                            return found
+                            if len(found) >= max_results:
+                                return found
         return found
 
     def solve_gap(

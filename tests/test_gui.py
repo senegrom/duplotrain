@@ -278,3 +278,26 @@ def test_height_impossibility_is_reported_with_a_reason():
     assert outcome["found"] == 0
     assert "height" in outcome["reason"]
     assert "154" in outcome["reason"]
+
+
+def test_arc_oracle_levels_through_ramps():
+    """One end atop a half-built climb, the other at ground: no flat chain can
+    close this -- the oracle must descend through a ramp, then ring around."""
+    from duplotrain.gui import Session
+
+    session = Session()
+    session.set_inventory({"curve": 12, "ramp": 2, "straight": 8})
+    session.attach("curve", 0, None)
+    for _ in range(5):
+        session.attach("curve", 0, (len(session.layout) - 1, 1))
+    high_end = session.layout.connectable_ends()[-1]
+    session.attach("ramp", 0, high_end)
+    tips = session.layout.connectable_ends()
+    grow = next(t for t in tips if float(session.layout.pose_of(t).z) > 1)
+    close = next(t for t in tips if float(session.layout.pose_of(t).z) <= 1)
+    outcome = session.solve_gap(grow, close, slop=0.0, max_results=5)
+    assert outcome["found"] > 0
+    assert outcome["searched"] == 0
+    counts = dict(session.candidates[0].layout.piece_counts)
+    assert counts["ramp"] == 2  # the descending ramp was added
+    assert counts["curve"] == 12

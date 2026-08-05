@@ -33,6 +33,37 @@ OPEN_END = "#d0342c"
 #: Estimated rail gauge (mm, centre to centre).  Cosmetic only.
 GAUGE = 48.0
 
+#: Elevation colour scale: ground ballast grey warming through amber (level 1,
+#: up to one bridge crest at 76.8 mm), brick red (level 2) and purple (level 3).
+#: Climbing pieces show the gradient along their run, so up-ramps visibly darken
+#: toward their high end and a stack of climbs reads as a hotter colour band.
+ELEVATION_STOPS = [
+    (0.0, (185, 190, 196)),   # ballast grey
+    (76.8, (214, 164, 76)),   # amber: one crest up
+    (153.6, (196, 94, 69)),   # brick red: two crests
+    (230.4, (142, 79, 150)),  # purple: three crests
+]
+
+
+def elevation_color(z: float) -> str:
+    """Hex colour for elevation *z* (mm), interpolated over ELEVATION_STOPS."""
+    stops = ELEVATION_STOPS
+    if z <= stops[0][0]:
+        r, g, b = stops[0][1]
+    elif z >= stops[-1][0]:
+        r, g, b = stops[-1][1]
+    else:
+        for (z0, c0), (z1, c1) in zip(stops, stops[1:]):
+            if z <= z1:
+                t = (z - z0) / (z1 - z0)
+                r, g, b = (
+                    c0[0] + t * (c1[0] - c0[0]),
+                    c0[1] + t * (c1[1] - c0[1]),
+                    c0[2] + t * (c1[2] - c0[2]),
+                )
+                break
+    return f"#{int(r):02x}{int(g):02x}{int(b):02x}"
+
 
 def _offset(
     line: Sequence[tuple[float, float]], distance: float
@@ -90,33 +121,58 @@ def render_layout(
                 max_z = max(max_z, z)
 
     # Ballast bands first, then rails and sleepers on top, so overlaps look right.
-    features: list[tuple[float, list[list[tuple[float, float]]], float, bool]] = []
+    features: list[tuple[float, list[list[tuple[float, float, float]]], float]] = []
     for placement in layout:
-        elevated = placement.piece.category == "bridge"
         lines3d = placement.centrelines(spacing=6.0)
-        lines = [[(x, y) for x, y, _ in line] for line in lines3d]
         mean_z = sum(z for line in lines3d for _x, _y, z in line) / max(
             1, sum(len(line) for line in lines3d)
         )
-        features.append((mean_z, lines, placement.piece.width / 2.0, elevated))
+        features.append((mean_z, lines3d, placement.piece.width / 2.0))
 
-    for mean_z, lines, half_width, elevated in sorted(features, key=lambda f: f[0]):
-        shade = 1.0 - 0.25 * (mean_z / max_z if max_z > 0 else 0.0)
+    for mean_z, lines3d, half_width in sorted(features, key=lambda f: f[0]):
+        lines = [[(x, y) for x, y, _ in line] for line in lines3d]
         # One zorder band per piece: an elevated deck (ballast ~1.8) must paint over a
         # ground piece's rails (~1.5), not thread between another piece's layers.
         band = 1 + mean_z / 100.0
-        for line in lines:
-            face = BRIDGE if elevated else BALLAST
-            poly = _band(line, half_width)
-            ax.fill(
-                [p[0] for p in poly],
-                [p[1] for p in poly],
-                facecolor=face,
-                edgecolor=BALLAST_EDGE,
-                linewidth=0.8,
-                alpha=min(1.0, 0.75 + 0.25 * shade),
-                zorder=band,
-            )
+        for line3d, line in zip(lines3d, lines):
+            climbs = max(z for _x, _y, z in line3d) - min(z for _x, _y, z in line3d)
+            if climbs > 1.0 or line3d[0][2] > 1.0:
+                # Elevation gradient: short chunks, each tinted by its own height.
+                step = 3
+                for s in range(0, len(line) - 1, step):
+                    chunk = line[s : s + step + 1]
+                    if len(chunk) < 2:
+                        continue
+                    chunk_z = sum(p[2] for p in line3d[s : s + step + 1]) / len(
+                        line3d[s : s + step + 1]
+                    )
+                    poly = _band(chunk, half_width)
+                    ax.fill(
+                        [p[0] for p in poly],
+                        [p[1] for p in poly],
+                        facecolor=elevation_color(chunk_z),
+                        edgecolor="none",
+                        zorder=band,
+                    )
+                outline = _band(line, half_width)
+                ax.fill(
+                    [p[0] for p in outline],
+                    [p[1] for p in outline],
+                    facecolor="none",
+                    edgecolor=BALLAST_EDGE,
+                    linewidth=0.8,
+                    zorder=band + 0.01,
+                )
+            else:
+                poly = _band(line, half_width)
+                ax.fill(
+                    [p[0] for p in poly],
+                    [p[1] for p in poly],
+                    facecolor=BALLAST,
+                    edgecolor=BALLAST_EDGE,
+                    linewidth=0.8,
+                    zorder=band,
+                )
         for line in lines:
             z = band + 0.5
             # Sleepers.

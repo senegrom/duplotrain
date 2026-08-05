@@ -57,3 +57,13 @@ def test_two_switches_dogbone_is_the_only_perfect_wiring(proof):
 
 def test_three_switches_never_perfect(proof):
     assert perfect_wirings(proof, 3) == []
+
+
+def test_lobe_free_cores_never_perfect(proof):
+    """The reduction lemma turns the any-size classification into: no lobe-free
+    core is perfect.  Exhausted to n=6 offline (24.1M wirings); n<=4 pinned."""
+    for n in (2, 3, 4):
+        for edges, caps in proof.core_wirings(n):
+            if not edges or not proof.is_connected(n, edges, caps):
+                continue
+            assert not proof.classify_wiring(n, edges, caps), (edges, caps)
