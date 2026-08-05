@@ -231,7 +231,16 @@ class Session:
                 entry_name = piece.ports[move.entry].name
                 exit_name = piece.ports[move.exit].name
                 turn = _signed_degrees(move.dheading)
-                if len(piece.ports) == 2 and turn == 0:
+                rise = float(move.dz)
+                if len(piece.ports) == 2 and turn == 0 and abs(rise) > 0.5:
+                    # Climbing pieces MUST distinguish direction: two identical
+                    # "ahead" buttons once left a user's bridge hanging mid-air.
+                    label = (
+                        f"↑ climb {rise:.0f}mm"
+                        if rise > 0
+                        else f"↓ descend {-rise:.0f}mm"
+                    )
+                elif len(piece.ports) == 2 and turn == 0:
                     label = "ahead"
                 elif len(piece.ports) == 2:
                     label = "turn left" if turn > 0 else "turn right"
