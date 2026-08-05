@@ -38,12 +38,17 @@ TOUCH_MARGIN = 2.0
 #: admit track beneath them.
 DEFAULT_CLEARANCE = 120.0
 
-#: An ``underpass`` piece (the open bridge arch) admits track beneath any deck point
-#: standing at least this much higher.  With the provisional bridge profile (span
-#: deck 57.6->76.8 mm) this opens roughly +/-90 mm of run around the mid-bridge
-#: crest for a crossing at 30 degrees or steeper -- and excludes the ramps (<=57.6)
-#: and the spans' low halves.  Refine when the real bridge is measured.
-UNDERPASS_MIN = 64.0
+#: An ``underpass`` piece (the bridge arch, and the ramps near their high ends)
+#: admits track beneath any deck point standing at least this much higher.  Set
+#: from the user's observations on the real 10872 bridge: a train passes under
+#: the mid-arch, and grazing the ramp's highest portion is fine too.  The value
+#: allows for the pairwise disc model: a crossing interacts with deck points up
+#: to ~60 mm to the side, which on the 18% ramp sit 10.8 mm lower than the point
+#: directly overhead -- 42 here means "about 53 mm of deck straight above".
+#: With the provisional profile (ramp 0->57.6, span 57.6->76.8 mm) crossings
+#: clear the full spans plus roughly the last 30 mm of each ramp, and the lower
+#: ramp stays solid.  Refine when the real bridge is measured.
+UNDERPASS_MIN = 42.0
 
 
 @dataclass

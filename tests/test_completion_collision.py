@@ -6,6 +6,7 @@ import math
 import pytest
 
 from duplotrain.catalog import default_catalog
+from duplotrain.collision import UNDERPASS_MIN
 from duplotrain.geometry import ORIGIN, Pose
 from duplotrain.gui import Session
 from duplotrain.layout import Layout
@@ -39,9 +40,9 @@ def strict_overlap_pairs(layout, spacing=8.0):
                 for px, py, pz in pb:
                     if abs(z - pz) >= 120.0:
                         continue
-                    if ua and z - pz >= 64.0:
+                    if ua and z - pz >= UNDERPASS_MIN:
                         continue
-                    if ub and pz - z >= 64.0:
+                    if ub and pz - z >= UNDERPASS_MIN:
                         continue
                     if (x - px) ** 2 + (y - py) ** 2 < limit * limit:
                         bad.append((i, j, math.hypot(x - px, y - py)))
@@ -125,18 +126,21 @@ def bridge_with_ground_track(catalog, cross_x):
     return layout
 
 
-def test_ground_track_passes_under_the_mid_arch(catalog):
-    """The user's observation: a train fits beneath the bridge at the crest."""
-    crest = bridge_with_ground_track(catalog, cross_x=512.0)  # the two-span joint
-    assert strict_overlap_pairs(crest) == []
+def test_ground_track_passes_under_the_high_bridge(catalog):
+    """The user's observations: a train fits beneath the mid-arch, beneath the
+    spans generally, and grazing under the ramp's highest portion is fine."""
     from duplotrain.solver import _solution_overlaps
 
-    assert not _solution_overlaps(crest, 0, 120.0, 8.0)
+    for cross_x in (512.0, 384.0, 304.0):  # crest, span low half, ramp top
+        layout = bridge_with_ground_track(catalog, cross_x=cross_x)
+        assert strict_overlap_pairs(layout) == [], cross_x
+        assert not _solution_overlaps(layout, 0, 120.0, 8.0), cross_x
 
 
-def test_ground_track_never_passes_under_a_ramp(catalog):
-    ramp_zone = bridge_with_ground_track(catalog, cross_x=160.0)  # mid-ramp
-    assert strict_overlap_pairs(ramp_zone) != []
+def test_ground_track_never_passes_under_the_lower_ramp(catalog):
     from duplotrain.solver import _solution_overlaps
 
-    assert _solution_overlaps(ramp_zone, 0, 120.0, 8.0)
+    for cross_x in (60.0, 160.0):  # ramp foot and mid-ramp stay solid
+        layout = bridge_with_ground_track(catalog, cross_x=cross_x)
+        assert strict_overlap_pairs(layout) != [], cross_x
+        assert _solution_overlaps(layout, 0, 120.0, 8.0), cross_x

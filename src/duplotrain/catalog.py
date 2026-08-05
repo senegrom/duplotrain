@@ -200,6 +200,11 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
         "category": "bridge",
         "part_numbers": ["6392", "35136", "6231963"],
         "width": WIDTH,
+        "provisional": True,
+        # Underpass near the top only (user ruling 2026-08-04: touching under the
+        # ramp's highest part is fine): the flag admits track beneath deck points
+        # at least UNDERPASS_MIN higher, which the lower ramp never reaches.
+        "underpass": True,
         "paths": [
             {"segments": [{"type": "ramp", "run": 320, "rise": "288/5"}]},
         ],
