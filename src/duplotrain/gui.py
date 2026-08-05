@@ -54,6 +54,69 @@ DEFAULT_STONES = {sid: 1 for sid in ACCESSORIES}
 UNLIMITED_COUNT = 999
 
 
+def check_layout_json(data: object) -> None:
+    """Sanity-bound an imported layout dict BEFORE parsing it.
+
+    ``layout_from_dict`` is exact-arithmetic: a hostile file could otherwise
+    smuggle mile-long coefficient strings (giant integers burn CPU) or a
+    million placements (memory).  In the web build everything runs inside the
+    visitor's own browser sandbox, so this is self-protection, not server
+    protection -- the static host executes nothing; the local server binds
+    127.0.0.1 only.  Raises ValueError with a clean message on anything out
+    of bounds; structural errors beyond these checks still surface as the
+    usual 409s from the parser itself.
+    """
+
+    def fail(msg: str) -> None:
+        raise ValueError(f"import refused: {msg}")
+
+    if not isinstance(data, dict):
+        fail("layout must be a JSON object")
+    if len(str(data.get("format", ""))) > 64:
+        fail("format tag too long")
+    placements = data.get("placements", [])
+    if not isinstance(placements, list) or len(placements) > 1500:
+        fail("too many placements (limit 1500)")
+    for entry in placements:
+        if not isinstance(entry, dict):
+            fail("placement entries must be objects")
+        if len(str(entry.get("piece", ""))) > 40:
+            fail("piece id too long")
+        frame = entry.get("frame")
+        if not isinstance(frame, dict):
+            fail("placement frame missing")
+        for axis in ("x", "y", "z"):
+            coeffs = frame.get(axis, [])
+            if not isinstance(coeffs, list) or len(coeffs) > 4:
+                fail(f"frame {axis} must be up to 4 coefficients")
+            for c in coeffs:
+                if not isinstance(c, (str, int)) or len(str(c)) > 48:
+                    fail(f"frame {axis} coefficient out of bounds")
+        heading = frame.get("heading", 0)
+        if not isinstance(heading, int) or abs(heading) > 10**6:
+            fail("frame heading out of bounds")
+    links = data.get("links", [])
+    if not isinstance(links, list) or len(links) > 6000:
+        fail("too many links")
+    for entry in links:
+        if (
+            not isinstance(entry, list)
+            or len(entry) != 4
+            or any(not isinstance(v, int) or abs(v) > 10**6 for v in entry)
+        ):
+            fail("links must be [i, port, j, port] integer rows")
+    accessories = data.get("accessories", [])
+    if not isinstance(accessories, list) or len(accessories) > 200:
+        fail("too many accessories")
+    for entry in accessories:
+        if not isinstance(entry, list) or not 2 <= len(entry) <= 3:
+            fail("accessory rows must be [index, stone] or [index, stone, port]")
+        if not isinstance(entry[0], int) or len(str(entry[1])) > 40:
+            fail("accessory row out of bounds")
+        if len(entry) == 3 and (not isinstance(entry[2], int) or abs(entry[2]) > 64):
+            fail("accessory port out of bounds")
+
+
 def _signed_degrees(dheading: int) -> int:
     degrees = steps_to_degrees(dheading)
     return degrees - 360 if degrees >= 180 else degrees
@@ -645,6 +708,7 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             elif path == "/api/apply":
                 session.apply_candidate(int(body["index"]))
             elif path == "/api/import":
+                check_layout_json(body.get("data"))
                 layout = layout_from_dict(body["data"], session.catalog)
                 session._push(layout)
             else:

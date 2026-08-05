@@ -6,7 +6,7 @@ browser front end calls :func:`dispatch` (via ``webapp/boot.js``) instead of fet
 
 import json
 
-from duplotrain.gui import Session
+from duplotrain.gui import Session, check_layout_json
 from duplotrain.layout import layout_from_dict, layout_to_dict
 
 session = Session()
@@ -65,6 +65,7 @@ def dispatch(path: str, body_json: str | None) -> str:
         elif path == "/api/apply":
             session.apply_candidate(int(body["index"]))
         elif path == "/api/import":
+            check_layout_json(body.get("data"))
             session._push(layout_from_dict(body["data"], session.catalog))
         else:
             return json.dumps({"__error": f"no route {path}"})

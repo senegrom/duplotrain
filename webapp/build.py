@@ -142,7 +142,8 @@ def build_index() -> None:
 
     html = (
         head
-        + '<script src="./boot.js"></script>\n<script src="./app.js"></script>\n</body>'
+        + '<script src="./boot.js?v=__V__"></script>\n'
+        + '<script src="./app.js?v=__V__"></script>\n</body>'
         + tail
     )
     html = html.replace(
@@ -191,6 +192,11 @@ def main() -> None:
     zip_name = f"duplotrain-src-{stamp}.zip"
     (DIST / zip_name).write_bytes(zip_bytes)
     print(f"wrote {DIST / zip_name} ({len(zip_bytes) / 1e3:.0f} kB)")
+
+    index = (DIST / "index.html").read_text(encoding="utf-8")
+    (DIST / "index.html").write_text(
+        index.replace("__V__", stamp), encoding="utf-8", newline="\n"
+    )
 
     pyodide_dirname = f"pyodide-{args.pyodide_version}"
     _stamp_file(WEBAPP / "boot.js", DIST / "boot.js", {"__BUILD__": stamp})

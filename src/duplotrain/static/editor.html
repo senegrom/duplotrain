@@ -57,6 +57,8 @@
     <button id="undo">↩ undo</button>
     <button id="clear" class="ghost">clear</button>
     <button id="export">⭳ export JSON</button>
+    <button id="import">⭱ import JSON</button>
+    <input id="importfile" type="file" accept=".json,application/json" style="display:none">
   </div>
   <h2>Close the loop</h2>
   <div class="solverow">
@@ -561,6 +563,31 @@ el("export").addEventListener("click", async () => {
   a.href = URL.createObjectURL(blob);
   a.download = "layout.json";
   a.click();
+});
+el("import").addEventListener("click", () => el("importfile").click());
+el("importfile").addEventListener("change", async (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    status("import refused: file larger than 2 MB", "err");
+    return;
+  }
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch (err) {
+    status("import refused: not valid JSON", "err");
+    return;
+  }
+  try {
+    S = await api("/api/import", { data });
+    fitted = false;
+    redraw();
+    status(`imported ${S.layout.placements.length} pieces.`);
+  } catch (err) {
+    status(`import refused: ${err.message}`, "err");
+  }
 });
 el("solve").addEventListener("click", async () => {
   const opens = S.open_ends.length;
