@@ -5,11 +5,13 @@ when any two of their sample points come closer than the sum of their half-width
 (minus a small margin so that exactly-touching parallel tracks stay legal -- sidings
 laid side by side are a feature, not a collision).
 
-Height is respected: points whose elevations differ by at least ``clearance`` pass over
-each other freely.  The default clearance is deliberately larger than the 10872 bridge
-deck height, because a DUPLO train genuinely does not fit under that bridge -- if a
-future piece (or a user's brick-stacked bridge) rises high enough, crossing under it
-becomes legal automatically.
+Height is respected two ways.  Points whose elevations differ by at least
+``clearance`` pass over each other freely -- a blanket rule no current piece can
+reach.  Separately, pieces flagged ``underpass`` (the bridge arch span: an open
+arch, unlike the solid ramps) let track run beneath wherever their deck stands at
+least ``UNDERPASS_MIN`` higher: with the current bridge profile that opens a window
+around the mid-bridge crest only, matching the user's observation that a train
+passes under the arch there but never under the ramps.
 
 Directly-linked placements are exempt from mutual checking: neighbouring pieces meet at
 their shared joint by construction, and that contact is not an overlap.  The one thing
@@ -25,15 +27,23 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-__all__ = ["CollisionField", "TOUCH_MARGIN", "DEFAULT_CLEARANCE"]
+__all__ = ["CollisionField", "TOUCH_MARGIN", "DEFAULT_CLEARANCE", "UNDERPASS_MIN"]
 
 #: Two tracks may come this close (mm) before it counts as an overlap.  Set just under
 #: the 64 mm piece width so flush parallel tracks are allowed.
 TOUCH_MARGIN = 2.0
 
-#: Vertical separation (mm) at which one track clears another.  A DUPLO locomotive is
-#: taller than the 10872 bridge deck (~77 mm), so by default nothing passes under it.
+#: Vertical separation (mm) at which one track clears another regardless of piece
+#: type.  No in-system elevation reaches it; solid pieces (ramps) therefore never
+#: admit track beneath them.
 DEFAULT_CLEARANCE = 120.0
+
+#: An ``underpass`` piece (the open bridge arch) admits track beneath any deck point
+#: standing at least this much higher.  With the provisional bridge profile (span
+#: deck 57.6->76.8 mm) this opens roughly +/-90 mm of run around the mid-bridge
+#: crest for a crossing at 30 degrees or steeper -- and excludes the ramps (<=57.6)
+#: and the spans' low halves.  Refine when the real bridge is measured.
+UNDERPASS_MIN = 64.0
 
 
 @dataclass
@@ -43,6 +53,7 @@ class _Cloud:
     placement: int
     half_width: float
     points: list[tuple[float, float, float]]
+    underpass: bool = False
 
 
 @dataclass
@@ -68,12 +79,14 @@ class CollisionField:
         points: list[tuple[float, float, float]],
         half_width: float,
         ignore: set[int],
+        underpass: bool = False,
     ) -> bool:
         """Would a piece with these sample points overlap anything already placed?
 
         *ignore* lists placement indices exempt from the check (the piece's direct
-        neighbours in the layout graph).  This is the solver's hottest non-arithmetic
-        loop, hence the inlined cell scan.
+        neighbours in the layout graph); *underpass* marks the querying piece as an
+        open arch that admits track beneath its deck.  This is the solver's hottest
+        non-arithmetic loop, hence the inlined cell scan.
         """
         if not self._grid:
             return False
@@ -90,12 +103,16 @@ class CollisionField:
                     bucket = grid.get((gx, gy))
                     if not bucket:
                         continue
-                    for px, py, pz, phw, pidx in bucket:
+                    for px, py, pz, phw, pidx, pu in bucket:
                         if pidx in ignore:
                             continue
                         dz = z - pz
                         if dz >= clearance or dz <= -clearance:
                             continue
+                        if pu and dz <= -UNDERPASS_MIN:
+                            continue  # running under the stored piece's open arch
+                        if underpass and dz >= UNDERPASS_MIN:
+                            continue  # the stored track runs under this open arch
                         limit = half_width + phw - TOUCH_MARGIN
                         dx = x - px
                         dy = y - py
@@ -104,15 +121,21 @@ class CollisionField:
         return False
 
     def add(
-        self, placement: int, points: list[tuple[float, float, float]], half_width: float
+        self,
+        placement: int,
+        points: list[tuple[float, float, float]],
+        half_width: float,
+        underpass: bool = False,
     ) -> None:
-        cloud = _Cloud(placement, half_width, points)
+        cloud = _Cloud(placement, half_width, points, underpass)
         self._clouds.append(cloud)
         self._max_half_width = max(self._max_half_width, half_width)
         cell = self.cell
         for x, y, z in points:
             key = (int(x // cell), int(y // cell))
-            self._grid.setdefault(key, []).append((x, y, z, half_width, placement))
+            self._grid.setdefault(key, []).append(
+                (x, y, z, half_width, placement, underpass)
+            )
 
     def pop(self) -> None:
         """Remove the most recently added placement (backtracking)."""

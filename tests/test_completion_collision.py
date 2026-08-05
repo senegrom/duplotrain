@@ -19,27 +19,31 @@ def catalog():
 
 def strict_overlap_pairs(layout, spacing=8.0):
     """Independent all-pairs audit: linked neighbours exempt, everything else must
-    keep centreline clearance (same rule the engine's CollisionField enforces)."""
+    keep centreline clearance (same rules the engine's CollisionField enforces,
+    including the arch-underpass exemption)."""
     clouds = []
     for placement in layout:
         pts = [p for line in placement.centrelines(spacing) for p in line]
-        clouds.append((pts, placement.piece.width / 2.0))
+        clouds.append((pts, placement.piece.width / 2.0, placement.piece.underpass))
     linked = {tuple(sorted((a[0], b[0]))) for a, b in layout.links.items()}
     bad = []
     for i in range(len(clouds)):
-        pa, ha = clouds[i]
+        pa, ha, ua = clouds[i]
         for j in range(i + 1, len(clouds)):
             if (i, j) in linked:
                 continue
-            pb, hb = clouds[j]
+            pb, hb, ub = clouds[j]
             limit = ha + hb - 2.0
             for x, y, z in pa:
                 hit = False
                 for px, py, pz in pb:
-                    if (
-                        abs(z - pz) < 120.0
-                        and (x - px) ** 2 + (y - py) ** 2 < limit * limit
-                    ):
+                    if abs(z - pz) >= 120.0:
+                        continue
+                    if ua and z - pz >= 64.0:
+                        continue
+                    if ub and pz - z >= 64.0:
+                        continue
+                    if (x - px) ** 2 + (y - py) ** 2 < limit * limit:
                         bad.append((i, j, math.hypot(x - px, y - py)))
                         hit = True
                         break
@@ -104,3 +108,35 @@ def test_gui_completions_never_overlap_the_base():
             if (hit[0], hit[1]) not in pre
         ]
         assert fresh == [], f"candidate overlaps the base: {fresh}"
+
+
+def bridge_with_ground_track(catalog, cross_x):
+    """The 4-piece bridge along +x from the origin, plus a floating ground-level
+    straight crossing beneath it at ``cross_x``, heading 90 degrees."""
+    layout = Layout()
+    ramp, span, straight = catalog["ramp"], catalog["span"], catalog["straight"]
+    layout, idx = layout.with_piece(ramp, ramp.frame_for(0, ORIGIN))
+    cursor = (idx, 1)
+    for piece, entry in ((span, 0), (span, 1), (ramp, 1)):
+        layout, idx = layout.attach(piece, entry, cursor)
+        cursor = (idx, 1 - entry)
+    under = Pose.make(cross_x, -64, 0, 6)
+    layout, _b = layout.with_piece(straight, straight.frame_for(0, under))
+    return layout
+
+
+def test_ground_track_passes_under_the_mid_arch(catalog):
+    """The user's observation: a train fits beneath the bridge at the crest."""
+    crest = bridge_with_ground_track(catalog, cross_x=512.0)  # the two-span joint
+    assert strict_overlap_pairs(crest) == []
+    from duplotrain.solver import _solution_overlaps
+
+    assert not _solution_overlaps(crest, 0, 120.0, 8.0)
+
+
+def test_ground_track_never_passes_under_a_ramp(catalog):
+    ramp_zone = bridge_with_ground_track(catalog, cross_x=160.0)  # mid-ramp
+    assert strict_overlap_pairs(ramp_zone) != []
+    from duplotrain.solver import _solution_overlaps
+
+    assert _solution_overlaps(ramp_zone, 0, 120.0, 8.0)

@@ -217,6 +217,8 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
         "category": "bridge",
         "part_numbers": ["6393", "35138", "6232170"],
         "width": WIDTH,
+        "provisional": True,
+        "underpass": True,
         "paths": [
             {"segments": [{"type": "ramp", "run": 192, "rise": "96/5"}]},
         ],
@@ -227,7 +229,9 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
             "two arches meet mid-bridge. Modelled piecewise-linear. Physically its low "
             "end is a special overlap joint onto the ramp needing 2-brick supports (no "
             "normal pin/socket); modelled as a normal port since the solver has no "
-            "port-type machinery."
+            "port-type machinery. UNDERPASS (user-verified 2026-08-04): a train passes "
+            "beneath the arch near the crest -- provisional pending real measurements "
+            "of deck height, ramp rise and under-arch clearance."
         ),
     },
 ]

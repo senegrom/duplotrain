@@ -665,11 +665,12 @@ def _solution_overlaps(
     for index, placement in enumerate(layout.placements):
         pts = [p for line in placement.centrelines(spacing) for p in line]
         half = placement.piece.width / 2.0
+        arch = placement.piece.underpass
         if index >= n_base and check.clashes(
-            pts, half, neighbours.get(index, set())
+            pts, half, neighbours.get(index, set()), underpass=arch
         ):
             return True
-        check.add(index, pts, half)
+        check.add(index, pts, half, underpass=arch)
     return False
 
 
@@ -940,7 +941,12 @@ def solve(
                 for line in placement.centrelines(cfg.collision_spacing)
                 for p in line
             ]
-            field.add(index, pts, placement.piece.width / 2.0)
+            field.add(
+                index,
+                pts,
+                placement.piece.width / 2.0,
+                underpass=placement.piece.underpass,
+            )
             if placement.piece.is_junction:
                 for port in range(len(placement.piece.ports)):
                     end = (index, port)
@@ -1176,7 +1182,7 @@ def solve(
                     is not None
                 ):
                     ignore.add(stub_index)
-            if field.clashes(pts, piece.width / 2.0, ignore):
+            if field.clashes(pts, piece.width / 2.0, ignore, underpass=piece.underpass):
                 stats.pruned_collision += 1
                 continue
 
@@ -1184,7 +1190,7 @@ def solve(
             remaining_span -= span_of[pid]
             remaining_turn -= turn_of[pid]
             placements.append((pid, frame))
-            field.add(index, pts, piece.width / 2.0)
+            field.add(index, pts, piece.width / 2.0, underpass=piece.underpass)
             new_stubs = 0
             if piece.is_junction:
                 for port_index in range(len(piece.ports)):

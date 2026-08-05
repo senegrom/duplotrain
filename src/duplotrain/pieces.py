@@ -282,6 +282,10 @@ class PieceType:
     #: buffer stop.  Nothing may ever mate with a sealed port, and the solver never
     #: routes through one, so a sealed piece can terminate track but not join it.
     sealed: frozenset[int] = frozenset()
+    #: True for open-arch pieces (the bridge span): other track may run beneath
+    #: this piece's deck where the deck stands high enough (user-verified: a train
+    #: passes under the 10872 mid-arch).  Solid pieces (ramps) stay impassable.
+    underpass: bool = False
     part_numbers: tuple[str, ...] = ()
     notes: str = ""
     provisional: bool = False
@@ -446,6 +450,7 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         width=float(spec.get("width", 40.0)),
         end_overhang=float(spec.get("end_overhang", 0.0)),
         sealed=frozenset(int(i) for i in spec.get("sealed_ports", ())),
+        underpass=bool(spec.get("underpass", False)),
         part_numbers=tuple(spec.get("part_numbers", ())),
         notes=spec.get("notes", ""),
         provisional=bool(spec.get("provisional", False)),
