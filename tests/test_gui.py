@@ -243,3 +243,38 @@ def test_unlimited_sandbox_mode(server):
     assert status == 200
     assert state["inventory"]["unlimited"] is False
     assert state["inventory"]["remaining"]["crossing"] == 0
+
+
+def test_arc_oracle_finds_winding_ring_closures():
+    """A gap whose only closure winds AWAY from the target (10 same-sign curves
+    looping around) starves the DFS -- the arc oracle must find it instantly."""
+    from duplotrain.gui import Session
+
+    session = Session()
+    session.set_inventory({"curve": 24, "straight": 8})
+    session.attach("curve", 0, None)
+    session.attach("curve", 0, (0, 1))
+    opens = session.layout.connectable_ends()
+    outcome = session.solve_gap(opens[1], opens[0], slop=0.0, max_results=5)
+    assert outcome["found"] > 0
+    assert outcome["searched"] == 0  # the oracle, not the search
+    added = session.candidates[0].layout.piece_counts["curve"] - 2
+    assert added == 10  # completes the 12-curve circle
+
+
+def test_height_impossibility_is_reported_with_a_reason():
+    """Both ramps and spans climbing in series leave a sky-high end no search
+    can ever bring down -- solve_gap must say so instead of searching."""
+    from duplotrain.gui import Session
+
+    session = Session()
+    session.set_inventory({"ramp": 2, "span": 2, "curve": 12, "straight": 8})
+    session.attach("ramp", 0, None)
+    session.attach("span", 0, (0, 1))
+    session.attach("span", 0, (1, 1))
+    session.attach("ramp", 0, (2, 1))
+    opens = session.layout.connectable_ends()
+    outcome = session.solve_gap(opens[1], opens[0], slop=0.0, max_results=5)
+    assert outcome["found"] == 0
+    assert "height" in outcome["reason"]
+    assert "154" in outcome["reason"]

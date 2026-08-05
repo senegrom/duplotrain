@@ -317,6 +317,80 @@ class Session:
             raise ValueError(f"no {stone_id!r} left (edit the inventory)")
         self._push(self.layout.with_accessory(placement, stone_id, at_port=at_port))
 
+    def _arc_closures(self, grow: End, close: End, max_results: int) -> list[Solution]:
+        """Instant oracle for ring-shaped closures the DFS chronically misses.
+
+        Tries every ``j straights + k same-sign curves + m straights`` chain
+        (j, m <= 8, k <= 13).  A closure that must wind AWAY from the target
+        before returning -- ten curves looping around to a neighbouring fork
+        tip, say -- starves in the search's toward-target move ordering, yet is
+        exactly what a human expects "close the loop" to find.  A few thousand
+        exact pose checks cover the whole family.
+        """
+        from .solver import _solution_overlaps
+
+        remaining = self.remaining()
+        base = self.layout
+        n_base = len(base)
+        curve, straight = self.catalog["curve"], self.catalog["straight"]
+        target = base.pose_of(close)
+        s_delta = straight.exit_delta(0, 1)
+        c_delta = {entry: curve.exit_delta(entry, 1 - entry) for entry in (0, 1)}
+
+        def build(j, k, entry, m):
+            work, cursor = base, grow
+            for _ in range(j):
+                work, idx = work.attach(straight, 0, cursor)
+                cursor = (idx, 1)
+            for _ in range(k):
+                work, idx = work.attach(curve, entry, cursor)
+                cursor = (idx, 1 - entry)
+            for _ in range(m):
+                work, idx = work.attach(straight, 0, cursor)
+                cursor = (idx, 1)
+            return work.join(cursor, close)
+
+        found: list[Solution] = []
+        start = base.pose_of(grow)
+        for entry in (0, 1):  # left arc, right arc
+            dx, dy, dz, dh = c_delta[entry]
+            for j in range(0, 9):
+                pose_j = start
+                for _ in range(j):
+                    pose_j = pose_j.then(*s_delta)
+                pose_jk = pose_j
+                for k in range(1, 14):
+                    pose_jk = pose_jk.then(dx, dy, dz, dh)
+                    if k > remaining.get("curve", 0):
+                        break
+                    pose = pose_jk
+                    for m in range(0, 9):
+                        if m:
+                            pose = pose.then(*s_delta)
+                        if j + m > remaining.get("straight", 0):
+                            continue
+                        if not pose.connects_to(target):
+                            continue
+                        try:
+                            closed = build(j, k, entry, m)
+                        except ValueError:
+                            continue
+                        if _solution_overlaps(closed, n_base, 120.0, 8.0):
+                            continue
+                        found.append(
+                            Solution(
+                                layout=closed,
+                                steps=(),
+                                gap=0.0,
+                                exact=True,
+                                open_stubs=len(closed.connectable_ends()),
+                                signature=("arc", j, k, entry, m),
+                            )
+                        )
+                        if len(found) >= max_results:
+                            return found
+        return found
+
     def solve_gap(
         self,
         grow: End | None,
@@ -326,12 +400,14 @@ class Session:
         reversing: bool = False,
         progress: object = None,
     ) -> dict:
-        """Search for completions; returns {found, aborted, searched}.
+        """Search for completions; returns {found, aborted, searched[, reason]}.
 
-        Staged: plain running track (curves + straights) first -- that closes almost
-        every real gap within a few thousand nodes -- then the whole box only if
-        needed.  A depth-first search over a BROAD inventory otherwise drowns
-        exploring exotic-piece subtrees before finding the obvious answer.
+        An instant arc oracle runs first (ring closures the DFS misses), then
+        the staged search: plain running track (curves + straights) first --
+        that closes almost every real gap within a few thousand nodes -- then
+        the whole box only if needed.  A depth-first search over a BROAD
+        inventory otherwise drowns exploring exotic-piece subtrees before
+        finding the obvious answer.
         """
         opens = self.layout.connectable_ends()
         if grow is None or close is None:
@@ -343,6 +419,34 @@ class Session:
             grow, close = opens[1], opens[0]
 
         remaining = self.remaining()
+
+        # Height sanity: if the two ends differ in elevation by more than every
+        # climbing piece left in the box can supply, no search can help.
+        dz = abs(float(self.layout.pose_of(grow).z) - float(self.layout.pose_of(close).z))
+        if dz > 1e-9:
+            lift = (
+                57.6 * remaining.get("ramp", 0)
+                + 19.2 * remaining.get("span", 0)
+                + 5.6 * remaining.get("slope", 0)
+            )
+            if dz > lift + 1e-6:
+                self.candidates = []
+                return {
+                    "found": 0,
+                    "aborted": False,
+                    "searched": 0,
+                    "reason": (
+                        f"impossible: those ends differ by {dz:.0f} mm in height "
+                        f"and the remaining pieces can climb at most {lift:.0f} mm "
+                        "— the track up there can never come back down"
+                    ),
+                }
+
+        if not reversing:
+            arcs = self._arc_closures(grow, close, max_results)
+            if arcs:
+                self.candidates = arcs
+                return {"found": len(arcs), "aborted": False, "searched": 0}
         plain = {
             pid: n
             for pid, n in remaining.items()

@@ -546,7 +546,9 @@ async function runSolve(grow, close) {
     pickMode = null;
     redraw();
     if (!S.candidates.length) {
-      if (S.aborted)
+      if (S.reason)
+        status(S.reason, "err");
+      else if (S.aborted)
         status(`Searched ${(S.searched || 0).toLocaleString()} states without luck — ` +
                "a closure may still exist. Try more slop, or simplify the gap.", "err");
       else
