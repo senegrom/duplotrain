@@ -33,15 +33,19 @@ OPEN_END = "#d0342c"
 #: Estimated rail gauge (mm, centre to centre).  Cosmetic only.
 GAUGE = 48.0
 
-#: Elevation colour scale: ground ballast grey warming through amber (level 1,
-#: up to one bridge crest at 76.8 mm), brick red (level 2) and purple (level 3).
-#: Climbing pieces show the gradient along their run, so up-ramps visibly darken
-#: toward their high end and a stack of climbs reads as a hotter colour band.
+#: Elevation colour scale, one hue band per bridge-crest level (76.8 mm each):
+#: ballast grey at ground, then amber, brick red, purple, indigo, glacier blue
+#: and finally snow at level six -- a mountain's worth of climbing.  Pieces show
+#: the gradient along their run, so up-ramps visibly change toward their high
+#: end and every extra stacked climb shifts into the next band.
 ELEVATION_STOPS = [
-    (0.0, (185, 190, 196)),   # ballast grey
-    (76.8, (214, 164, 76)),   # amber: one crest up
-    (153.6, (196, 94, 69)),   # brick red: two crests
-    (230.4, (142, 79, 150)),  # purple: three crests
+    (0.0, (185, 190, 196)),    # ballast grey
+    (76.8, (214, 164, 76)),    # amber: one crest up
+    (153.6, (196, 94, 69)),    # brick red: two crests
+    (230.4, (142, 79, 150)),   # purple: three
+    (307.2, (86, 96, 178)),    # indigo: four
+    (384.0, (70, 150, 180)),   # glacier blue: five
+    (460.8, (225, 230, 238)),  # snow: six crests up
 ]
 
 

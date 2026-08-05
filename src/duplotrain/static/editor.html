@@ -122,14 +122,18 @@ function screenToWorld(sx, sy) {
            -(sy - canvas.clientHeight / 2) / view.scale + view.y ];
 }
 
-// Elevation colour scale: ground grey warming through amber (one crest, 76.8mm),
-// brick red (two crests) and purple (three).  Climbing pieces get the gradient
-// along their run, so up- vs down-ramps and stacked climbs read at a glance.
+// Elevation colour scale, one hue band per bridge-crest level (76.8mm each):
+// grey, amber, brick red, purple, indigo, glacier blue, snow at level six.
+// Climbing pieces get the gradient along their run, so up- vs down-ramps and
+// stacked climbs read at a glance.
 const ELEV_STOPS = [
   [0.0, [185, 190, 196]],
   [76.8, [214, 164, 76]],
   [153.6, [196, 94, 69]],
   [230.4, [142, 79, 150]],
+  [307.2, [86, 96, 178]],
+  [384.0, [70, 150, 180]],
+  [460.8, [225, 230, 238]],
 ];
 function elevColor(z) {
   const s = ELEV_STOPS;
