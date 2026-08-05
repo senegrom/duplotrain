@@ -69,6 +69,9 @@
   <div id="cands"></div>
   <h2>Your sets <span style="font-weight:400">(one click adds its pieces)</span></h2>
   <div id="sets" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  <label class="solverow" style="font-size:12px" title="sandbox: ignore inventory limits — place anything, and the solver may draw from a bottomless box">
+    <input id="unlimited" type="checkbox"> infinite pieces (sandbox)
+  </label>
   <h2>Action stones <span style="font-weight:400">(arm one, click a straight)</span></h2>
   <div id="stones" style="display:flex;flex-wrap:wrap;gap:6px"></div>
   <h2>Pieces <span style="font-weight:400">(arm one, then click a red arrow)</span></h2>
@@ -379,6 +382,8 @@ function refreshStatus() {
 function renderPalette() {
   const pal = el("palette");
   pal.innerHTML = "";
+  const unlimited = !!S.inventory.unlimited;
+  el("unlimited").checked = unlimited;
   for (const piece of S.palette) {
     const remaining = S.inventory.remaining[piece.id] ?? 0;
     const owned = S.inventory.owned[piece.id] ?? 0;
@@ -396,7 +401,8 @@ function renderPalette() {
       try { S = await api("/api/inventory", { counts: { [piece.id]: input.value } }); redraw(); }
       catch (e) { status(e.message, "err"); }
     });
-    count.append(`${remaining}/`); count.append(input);
+    if (unlimited) count.append("∞");
+    else { count.append(`${remaining}/`); count.append(input); }
     row.append(count);
     div.append(row);
     const vs = document.createElement("div");
@@ -404,7 +410,7 @@ function renderPalette() {
     for (const v of piece.variants) {
       const b = document.createElement("button");
       b.textContent = v.label;
-      b.disabled = remaining <= 0;
+      b.disabled = !unlimited && remaining <= 0;
       if (armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit)
         b.classList.add("armed");
       b.addEventListener("click", () => {
@@ -441,14 +447,15 @@ function renderSets() {
 function renderStones() {
   const box = el("stones");
   box.innerHTML = "";
+  const unlimited = !!S.inventory.unlimited;
   for (const [sid, info] of Object.entries(S.stones.catalog)) {
     const remaining = S.stones.remaining[sid] ?? 0;
     const b = document.createElement("button");
-    b.textContent = `${info.name.replace(" stone", "")} ×${remaining}`;
+    b.textContent = `${info.name.replace(" stone", "")} ×${unlimited ? "∞" : remaining}`;
     b.title = `${info.effect} — click a straight to clip on / off`;
     b.style.borderLeft = `14px solid ${info.color}`;
     if (armedStone === sid) b.classList.add("armed");
-    b.disabled = remaining <= 0 && armedStone !== sid;
+    b.disabled = !unlimited && remaining <= 0 && armedStone !== sid;
     b.addEventListener("click", () => {
       armedStone = armedStone === sid ? null : sid;
       armed = null; pickMode = null;
@@ -646,6 +653,10 @@ window.addEventListener("keydown", (e) => {
   }
 });
 el("reversing").addEventListener("change", (e) => { e.target.dataset.touched = "1"; });
+el("unlimited").addEventListener("change", async (e) => {
+  try { S = await api("/api/unlimited", { on: e.target.checked }); redraw(); }
+  catch (err) { status(err.message, "err"); e.target.checked = !e.target.checked; }
+});
 
 resize();
 if (window.duplotrainBoot) {

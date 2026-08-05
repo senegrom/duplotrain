@@ -42,6 +42,8 @@ def dispatch(path: str, body_json: str | None) -> str:
             session.clear()
         elif path == "/api/inventory":
             session.set_inventory(body.get("counts", {}))
+        elif path == "/api/unlimited":
+            session.set_unlimited(bool(body.get("on")))
         elif path == "/api/add_set":
             session.add_set(str(body["code"]))
         elif path == "/api/stone":

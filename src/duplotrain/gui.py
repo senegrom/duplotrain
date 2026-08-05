@@ -48,6 +48,10 @@ DEFAULT_INVENTORY = {
 
 DEFAULT_STONES = {sid: 1 for sid in ACCESSORIES}
 
+#: Per-piece count reported while the sandbox "infinite pieces" mode is on: big
+#: enough to never run out in practice, small enough to keep every sum finite.
+UNLIMITED_COUNT = 999
+
 
 def _signed_degrees(dheading: int) -> int:
     degrees = steps_to_degrees(dheading)
@@ -61,6 +65,10 @@ class Session:
     catalog: dict[str, PieceType] = field(default_factory=default_catalog)
     inventory: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_INVENTORY))
     stones: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_STONES))
+    #: Sandbox mode: ignore inventory limits entirely -- place anything, and let
+    #: the completion solver draw from a bottomless box.  The owned counts are
+    #: kept untouched underneath so switching back restores them.
+    unlimited: bool = False
     history: list[Layout] = field(default_factory=lambda: [Layout()])
     candidates: list[Solution] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
@@ -72,6 +80,8 @@ class Session:
         return self.history[-1]
 
     def remaining(self) -> dict[str, int]:
+        if self.unlimited:
+            return {pid: UNLIMITED_COUNT for pid in self.catalog}
         used = self.layout.piece_counts
         return {
             pid: max(0, self.inventory.get(pid, 0) - used.get(pid, 0))
@@ -79,6 +89,8 @@ class Session:
         }
 
     def stones_remaining(self) -> dict[str, int]:
+        if self.unlimited:
+            return {sid: UNLIMITED_COUNT for sid in ACCESSORIES}
         placed: dict[str, int] = {}
         for _idx, sid in self.layout.accessories:
             placed[sid] = placed.get(sid, 0) + 1
@@ -86,6 +98,9 @@ class Session:
             sid: max(0, self.stones.get(sid, 0) - placed.get(sid, 0))
             for sid in ACCESSORIES
         }
+
+    def set_unlimited(self, on: bool) -> None:
+        self.unlimited = bool(on)
 
     def _push(self, layout: Layout) -> None:
         self.history.append(layout)
@@ -192,6 +207,7 @@ class Session:
             "inventory": {
                 "owned": {pid: self.inventory.get(pid, 0) for pid in self.catalog},
                 "remaining": self.remaining(),
+                "unlimited": self.unlimited,
             },
             "stones": {
                 "catalog": ACCESSORIES,
@@ -437,6 +453,8 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 session.clear()
             elif path == "/api/inventory":
                 session.set_inventory(body.get("counts", {}))
+            elif path == "/api/unlimited":
+                session.set_unlimited(bool(body.get("on")))
             elif path == "/api/add_set":
                 session.add_set(str(body["code"]))
             elif path == "/api/stone":

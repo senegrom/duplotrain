@@ -217,3 +217,29 @@ def test_errors_are_json_not_500(server):
     assert "unknown piece" in err["error"]
     status, err = server("/api/apply", {"index": 3})
     assert status == 409
+
+def test_unlimited_sandbox_mode(server):
+    # Exhaust a scarce piece under normal rules: only 1 crossing in the default box.
+    status, state = server("/api/attach", {"piece": "crossing", "entry": 0, "at": None})
+    assert status == 200
+    status, err = server(
+        "/api/attach", {"piece": "crossing", "entry": 0, "at": [0, 1]}
+    )
+    assert status == 409  # none left in the box
+
+    status, state = server("/api/unlimited", {"on": True})
+    assert status == 200
+    assert state["inventory"]["unlimited"] is True
+    assert state["inventory"]["remaining"]["crossing"] > 1
+
+    status, state = server(
+        "/api/attach", {"piece": "crossing", "entry": 0, "at": [0, 1]}
+    )
+    assert status == 200
+    assert len(state["layout"]["placements"]) == 2
+
+    # Switching back restores the real counts (now over-budget, clamped to 0).
+    status, state = server("/api/unlimited", {"on": False})
+    assert status == 200
+    assert state["inventory"]["unlimited"] is False
+    assert state["inventory"]["remaining"]["crossing"] == 0
