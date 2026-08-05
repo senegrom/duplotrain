@@ -45,7 +45,9 @@
     };
 
     try {
-      worker = new Worker("./worker.js");
+      /* Build-stamped worker URL: a stale cached page can never pair with a
+       * mismatched engine again -- each build fetches its own worker afresh. */
+      worker = new Worker("./worker.js?v=__BUILD__");
       worker.onerror = (e) => fail(e.message || "worker error");
       const ready = new Promise((resolve, reject) => {
         worker.addEventListener("message", function onMsg(event) {

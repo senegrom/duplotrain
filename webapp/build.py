@@ -197,7 +197,11 @@ def main() -> None:
     _stamp_file(
         WEBAPP / "worker.js",
         DIST / "worker.js",
-        {"__PYODIDE_DIR__": f"./{pyodide_dirname}", "__ENGINE_ZIP__": f"./{zip_name}"},
+        {
+            "__PYODIDE_DIR__": f"./{pyodide_dirname}",
+            "__ENGINE_ZIP__": f"./{zip_name}",
+            "__ADAPTER__": f"./adapter.py?v={stamp}",
+        },
     )
     shutil.copy2(WEBAPP / "adapter.py", DIST / "adapter.py")
 

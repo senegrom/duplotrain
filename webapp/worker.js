@@ -16,7 +16,7 @@ const booted = (async () => {
   pyodide.FS.mkdirTree("/app");
   pyodide.unpackArchive(zipBuf, "zip", { extractDir: "/app" });
   pyodide.runPython("import sys; sys.path.insert(0, '/app')");
-  const adapterSrc = await (await fetch("./adapter.py")).text();
+  const adapterSrc = await (await fetch("__ADAPTER__")).text();
   pyodide.FS.writeFile("/app/adapter.py", adapterSrc);
   dispatch = pyodide.pyimport("adapter").dispatch;
   postMessage({ ready: true });
