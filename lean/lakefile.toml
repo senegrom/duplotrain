@@ -1,5 +1,8 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs"]
+defaultTargets = ["DuplotrainProofs", "GeneralN"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
+
+[[lean_lib]]
+name = "GeneralN"
