@@ -1,0 +1,5 @@
+name = "duplotrain-proofs"
+defaultTargets = ["DuplotrainProofs"]
+
+[[lean_lib]]
+name = "DuplotrainProofs"
