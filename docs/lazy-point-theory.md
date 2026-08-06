@@ -17,9 +17,12 @@ an active switch flips both ways. Distinct tongue vectors on a cycle with
 > hence at most 4 distinct tongue vectors.
 
 is reduced to bounding actives. Status: proved below for all N in every case
-except one precisely isolated configuration (C\*), which is verified
-exhaustively for N ≤ 4 (140,152 wirings, also in Lean) and unbeaten by
-dedicated cycle-objective search through N = 7.
+except one precisely isolated core, which T9 compiles — geometry and all —
+into two lemmas (**B**, **C**) about a ten-line register machine.  Both are
+verified exhaustively on the wiring side for N ≤ 4 (140,152 wirings, also
+in Lean), unbeaten by cycle-objective search through N = 7, and verified
+across every small machine exhausted so far (`docs/echo_machine.py`).
+Modulo B + C the total state count obeys **f(N) ≤ N + O(1)**.
 
 ---
 
@@ -147,29 +150,111 @@ cluster's traffic all exits through one identified mouth.  The cycle
 decomposes as: system-runs (each depositing the train at its own mouth),
 joined by forced facing-chains through connector arcs.
 
-## The remaining core (C\*), reduced again
+## T9 (The forest compilation and the echo machine — formalised in
+## `lean/EchoMachine.lean`)
 
-> **(C\*)** On any eventual cycle, each active system's *dynamics* is a
-> reflector: the walk re-entering the system returns through its mouth
-> after a bounded excursion, with an involutive state map.
+The trailing structure of *any* wiring compiles into a forest, and the
+whole cycle dynamics into a ten-line register machine.
 
-The static half (one mouth, mouth-identifiability) is now proved (T8); the
-open half is return-through-the-mouth plus involutivity.  Given C\*, T4
-rules out flip-free faced stems, T8 gives the mouths, and
-`reflector_period` caps every cycle at the Gray square — at most 2 active
-switches and 4 tongue vectors, for all N.  C\* holds in every exhaustively
-checked wiring (all 143k with N ≤ 4, in Lean; N = 5 exhaustion of the
-cycle wall in progress) and survived dedicated cycle-objective search
-through N = 7 (max cycle vectors 4, max actives 2, always).
+**The forest.** Each switch has one stem edge; call what it attaches to
+the switch's *parent*.  A branch port of another switch → tree edge (the
+switch is that branch's child).  A stem port of another switch → both are
+**roots**, and the S–S edge **mouth-pairs their trees** (this is T8's
+landing injectivity: a landing stem determines the landing tree).  A cap
+or nothing → dead root.  So the switches partition into trees; used
+cascades are exactly **ascents** (enter a tree at a free branch port,
+trail up to the root, exit by the mouth, face the partner tree's root),
+and the facing chains between cascades are **descents** of a tree from
+its root, steered by the tongues.
+
+**Three structural facts** (each proved on the concrete model):
+
+1. tongues of a tree are written *only* during its own ascents
+   (pins happen at trailed switches, which lie in the ascended tree);
+2. an ascent from entry slot `e` points the whole ascent path back down
+   at `e` (T1: each trailed switch is pinned toward where the train came
+   from);
+3. hence — the retrace theorem T3, generalised by last-writer-wins — **a
+   descent from a root exits the tree at the slot of that tree's most
+   recent ascent**, whatever older ascents did.
+
+**The echo machine.**  Free branch ports (**slots**) are paired
+involutively by the branch–branch track edges (**jump edges**); trees are
+paired involutively by the mouth edges.  By facts 1–3 the eventual-cycle
+dynamics is *exactly*: one register per tree — the slot of its last
+ascent — and the step, from ascent entry `e`:
+
+    write  reg[tree e] := e          (ascend the tree of e)
+    read   f := reg[star (tree e)]   (descend the mouth partner)
+    jump   next entry := bar f       (cross the jump edge)
+
+Geometry is gone; falls and caps only truncate transients.  On a cycle,
+**actives = Σ_T (σ_T − 1)** where σ_T is the number of distinct slots
+from which T is ascended per period: a tree's σ ascent paths pairwise
+diverge at exactly σ−1 branch nodes, each of which flips, and every
+other tongue in the tree is eventually constant.
+
+**Machine-checked, general N** (`lean/EchoMachine.lean`, no sorry, no
+exhaustion): `reg_last_write` (registers hold the last ascent);
+`return_jump` (the step re-enters through the slot by which the partner
+tree was last entered); **`echo`** (an entry produced by two nested
+returns *literally repeats an earlier entry* — the LIFO seed);
+`succ_repeat` / `entry_change_read_change` (alternation propagation: two
+ascents of the same tree produce the same successor unless the feeder's
+partner register changed in between); **`bounce_orbit`** (a
+partner-alternating orbit obeys `e(k+2) = bar(e k)` and visits at most
+**four** distinct entries — the Gray square, for all N: the dogbone
+pattern is closed, at any size).
+
+## The remaining core, now two machine lemmas
+
+The full theorems reduce to two statements *about the echo machine
+alone*:
+
+> **(B — the cycle lemma, = C\*.)**  Every eventual cycle of the echo
+> machine has Σ_T (σ_T − 1) ≤ 2: at most two divergence nodes flip.
+>
+> **(C — the transient lemma.)**  A run of the echo machine makes O(1)
+> **alternations** (ascents of a tree from a slot different from that
+> tree's previous ascent) before entering its cycle.  Observed: never
+> more than **one**.
+
+Machine exhaustion (`docs/echo_machine.py`): all machines with 2 cells
+(≤ 6 slots) and 4 cells (≤ 8 slots), all initial registers and starts —
+183k configurations — plus 6-cell exhaustion over two-2-slot layouts and
+300k random machines each at 8 and 10 cells: **max actives 2, max
+transient alternations 1, throughout**.  Cycles can carry up to 12
+distinct *entries*, but the surplus always lives in one-slot trees,
+which pin nothing.  On the wiring side the same caps are exhaustive for
+all 143k wirings with N ≤ 4 (in Lean) and unbeaten by cycle-objective
+search through N = 7.
+
+## f(N) ≤ N + O(1): the accounting
+
+The no-op lemma (facts 1–2 + last-writer): re-ascending a tree from its
+previous slot changes no tongue.  So every change of the tongue vector
+is a **first ascent** of some tree (≤ #trees ≤ N of these) or an
+**alternation**.  Hence, over any entire run,
+
+    distinct tongue vectors ≤ 1 + N + (transient alternations)
+                              + (distinct vectors on the cycle),
+
+and given **B** (cycle ≤ 2 actives ⇒ ≤ 4 vectors) and **C** (O(1)
+transient alternations — observed ≤ 1):
+
+    f(N) ≤ N + O(1),
+
+matching the observed law f(N) = min(2^N, N + 4) up to the additive
+constant.  Both open lemmas are now finite-flavoured statements about a
+ten-line machine with no geometry in it.
 
 ## Consequences
 
-* **Cycle vectors ≤ 4 (= the dogbone Gray square) for all N**, modulo C\*.
-* The state-count law f(N) = min(2^N, N + 4): the cycle contributes ≤ 4;
-  the transient's contribution of at most one productive flip per switch is
-  observed exactly (winners decompose as N transient vectors + the Gray
-  square for every N measured) but its general-N proof remains open — the
-  second open item besides C\*.
+* **Cycle vectors ≤ 4 (= the dogbone Gray square) for all N**, modulo B;
+  **f(N) ≤ N + O(1)** modulo B + C.
+* The machine is exactly as strong as the wiring dynamics on cycles, so
+  B and C can be attacked — and exhausted — without ever enumerating
+  wirings again.
 * Everything is invariant under geometry: bridges, crossings and curvature
   never enter the argument, so cases (a)/(b)/(c) of the original question
   coincide, as observed.

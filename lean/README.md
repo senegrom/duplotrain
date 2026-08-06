@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Two libraries, both self-contained (no Mathlib):
+Three libraries, all self-contained (no Mathlib):
 
 **`GeneralN.lean` — general-N theorems, no exhaustion.** Every result holds
 for an arbitrary number of switches and arbitrary wirings, proved by
@@ -19,10 +19,30 @@ structural induction (no `native_decide`, no `sorry`):
 
 `dogbone_period` and `reflector_period` cover infinite families of wirings
 (any cascade length, any gadget size, any N) — the mechanism that caps every
-observed cycle at 4 vectors, formalised. The single remaining unproved core
-of the full cycle theorem is interface claim C\* (see
-docs/lazy-point-theory.md): every maximal active cluster on a cycle is a
-reflector.
+observed cycle at 4 vectors, formalised.
+
+**`EchoMachine.lean` — the abstracted cycle dynamics** (T9 in
+docs/lazy-point-theory.md): any wiring's trailing structure compiles to a
+forest of trees; the cycle dynamics reduces to a register machine (one
+register per tree = slot of its last ascent; step = write own register,
+read mouth-partner's, jump through its bar-involution).  General-N
+theorems, no `native_decide`, no `sorry`:
+
+| theorem | statement |
+|---|---|
+| `reg_write` / `reg_skip` / `reg_stable` / `reg_last_write` | a register holds exactly the slot of its cell's most recent ascent |
+| `return_jump` | the step identity: the next entry is `bar` of the partner cell's last ascent entry |
+| `echo` | the repetition identity: an entry produced by two nested returns **literally repeats an earlier entry** (the LIFO seed) |
+| `succ_repeat` / `entry_change_read_change` | alternation propagation: same-cell ascents produce the same successor unless the partner register changed in between |
+| `bounce_step` / `bounce_orbit` | a partner-alternating orbit obeys `e(k+2) = bar(e k)` and visits **at most 4 distinct entries** — the Gray square, for all N |
+
+The remaining unproved core of the full cycle theorem is now two lemmas
+about this machine (see docs/lazy-point-theory.md): **B** (every machine
+cycle has Σ(σ−1) ≤ 2 — this is C\*) and **C** (O(1) transient
+alternations).  Modulo B + C, the total state count obeys
+f(N) ≤ N + O(1).  Both are exhaustively verified across all small
+machines by `docs/echo_machine.py` (max actives 2, max transient
+alternations 1, everywhere).
 
 **`DuplotrainProofs.lean` — exhaustive small-N theorems** (`native_decide`):
 the wiring enumerator, the perfection automaton (reflecting caps) and the
