@@ -276,6 +276,89 @@ theorem descent_rebase {w : Wiring} {t : Tongues} {p s : Nat}
     obtain ⟨t₃, hd⟩ := ih (pin t₂ _)
     exact ⟨t₃, Descent.cons hp hlink hp' hd⟩
 
+/-! ## Merge and landing uniqueness (T2 sharpened: systems have one mouth) -/
+
+/-- Any branch on a descent's path carries its own sub-descent to the same
+landing. -/
+theorem descent_mem_suffix {w : Wiring} {t : Tongues} {p s : Nat}
+    {ps : List Nat} {t' : Tongues}
+    (h : Descent w t p ps s t') {q : Nat} (hq : q ∈ p :: ps) :
+    ∃ t₂ qs t₃, Descent w t₂ q qs s t₃ := by
+  induction h with
+  | @last t p s hp hlink hs =>
+    have hqp : q = p := by simpa using hq
+    subst hqp
+    exact ⟨t, [], _, Descent.last hp hlink hs⟩
+  | @cons t p p' s ps t' hp hlink hp' hrest ih =>
+    rcases List.mem_cons.mp hq with hqp | hqtail
+    · subst hqp
+      exact ⟨t, p' :: ps, t', Descent.cons hp hlink hp' hrest⟩
+    · exact ih hqtail
+
+/-- Two descents entering the SAME SWITCH (by either branch) land at the
+same stem: both exit that switch's stem, whose single edge fixes all the
+rest of the journey. -/
+theorem descent_land_unique {w : Wiring} {t₁ : Tongues}
+    {q₁ s₁ : Nat} {qs₁ : List Nat} {t₁' : Tongues}
+    (h₁ : Descent w t₁ q₁ qs₁ s₁ t₁') :
+    ∀ {t₂ : Tongues} {q₂ s₂ : Nat} {qs₂ : List Nat} {t₂' : Tongues},
+      q₁ / 3 = q₂ / 3 → Descent w t₂ q₂ qs₂ s₂ t₂' → s₁ = s₂ := by
+  induction h₁ with
+  | @last t p s hp hlink hs =>
+    intro t₂ q₂ s₂ qs₂ t₂' hsw h₂
+    rw [hsw] at hlink
+    cases h₂ with
+    | last hp₂ hlink₂ hs₂ =>
+      rw [hlink] at hlink₂
+      injection hlink₂
+    | cons hp₂ hlink₂ hp₂' hrest₂ =>
+      rw [hlink] at hlink₂
+      injection hlink₂ with heq
+      subst heq
+      exact absurd hs hp₂'
+  | @cons t p p' s ps t' hp hlink hp' hrest ih =>
+    intro t₂ q₂ s₂ qs₂ t₂' hsw h₂
+    rw [hsw] at hlink
+    cases h₂ with
+    | last hp₂ hlink₂ hs₂ =>
+      rw [hlink] at hlink₂
+      injection hlink₂ with heq
+      subst heq
+      exact absurd hs₂ hp'
+    | cons hp₂ hlink₂ hp₂' hrest₂ =>
+      rw [hlink] at hlink₂
+      injection hlink₂ with heq
+      subst heq
+      exact ih rfl hrest₂
+
+/-- **Merge-landing (T2, general N).**  Two cascades whose paths share a
+switch land at the same stem.  Hence cascade-connected components -- the
+SYSTEMS -- each have a unique landing stem. -/
+theorem merge_land {w : Wiring} {ta tb : Tongues} {pa pb sa sb : Nat}
+    {psa psb : List Nat} {ta' tb' : Tongues}
+    (ha : Descent w ta pa psa sa ta')
+    (hb : Descent w tb pb psb sb tb')
+    {qa qb : Nat} (hqa : qa ∈ pa :: psa) (hqb : qb ∈ pb :: psb)
+    (hsw : qa / 3 = qb / 3) :
+    sa = sb := by
+  obtain ⟨t₂, qs, t₃, hsub_a⟩ := descent_mem_suffix ha hqa
+  obtain ⟨t₄, qs', t₅, hsub_b⟩ := descent_mem_suffix hb hqb
+  exact descent_land_unique hsub_a hsw hsub_b
+
+/-- **Landing injectivity.**  Every cascade landing at stem `s` ends at the
+same last switch -- the one wired to `s`'s stem edge.  So distinct systems
+have distinct landing stems: facing `s` identifies the system that just
+ran. -/
+theorem land_last_unique {w : Wiring} {t₁ t₂ : Tongues}
+    {p₁ p₂ s : Nat} {ps₁ ps₂ : List Nat} {t₁' t₂' : Tongues}
+    (h₁ : Descent w t₁ p₁ ps₁ s t₁')
+    (h₂ : Descent w t₂ p₂ ps₂ s t₂') :
+    3 * (lastOf p₁ ps₁ / 3) = 3 * (lastOf p₂ ps₂ / 3) := by
+  have b₁ := w.symm _ _ (descent_last_link h₁)
+  have b₂ := w.symm _ _ (descent_last_link h₂)
+  rw [b₁] at b₂
+  injection b₂
+
 /-- **Lobe hop.**  Facing a lobed switch crosses the lobe, flips the tongue,
 and leaves by the stem edge -- two steps, both tongue values alike. -/
 theorem lobe_hop (w : Wiring) (a p : Nat) (u : Tongues)

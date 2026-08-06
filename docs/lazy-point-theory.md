@@ -125,20 +125,42 @@ involutive, commuting `τ` (disjoint gadget supports) two half-periods
 restore the tongues exactly, and the cycle's tongue states are the orbit
 `{u, τA u, τB (τA u), τB u}` — at most **4**, the Gray square.
 
-## The remaining core (C\*), sharpened
+## T8 (Systems and the one-mouth theorem — formalised)
 
-With T7 the open claim is no longer about walks but about interfaces:
+Three further general-N results, machine-checked in `lean/GeneralN.lean`:
 
-> **(C\*)** On any eventual cycle, every maximal active cluster implements
-> a reflector interface, with involutive state map.
+* **Simplicity** (paper): a cascade that revisits a switch trail-loops
+  forever and never lands; used cascades are simple paths.
+* **Merge-landing** (`merge_land`, Lean): two cascades whose paths share
+  ANY switch land at the same stem.  Define two used cascades equivalent
+  when their paths intersect; the equivalence classes — the **systems** —
+  each have a unique landing stem, and all flips of a switch happen inside
+  its system.
+* **Landing injectivity** (`land_last_unique`, Lean): every cascade landing
+  at a stem `s` ends at the same last switch (the one wired to `s`'s stem
+  edge).  Hence **distinct systems have distinct landing stems**, and
+  facing `s` identifies the system that just ran: each active cluster has
+  exactly ONE mouth, and the mouth names the cluster.
 
-Everything else is proved: given C\*, a cycle's actives sit inside two
-reflectors bouncing over a cascade (T4 rules out cycles without flipping
-faced stems; T2's merge gives each cluster a single tail and landing, i.e.
-a single mouth), and `reflector_period` caps the cycle at the Gray square.
-C\* holds in every exhaustively checked wiring (all 143k with N ≤ 4, in
-Lean) and survived dedicated cycle-objective search through N = 7 (max
-cycle vectors 4, max actives 2, always).
+This machine-checks the *static* half of the reflector interface: an active
+cluster's traffic all exits through one identified mouth.  The cycle
+decomposes as: system-runs (each depositing the train at its own mouth),
+joined by forced facing-chains through connector arcs.
+
+## The remaining core (C\*), reduced again
+
+> **(C\*)** On any eventual cycle, each active system's *dynamics* is a
+> reflector: the walk re-entering the system returns through its mouth
+> after a bounded excursion, with an involutive state map.
+
+The static half (one mouth, mouth-identifiability) is now proved (T8); the
+open half is return-through-the-mouth plus involutivity.  Given C\*, T4
+rules out flip-free faced stems, T8 gives the mouths, and
+`reflector_period` caps every cycle at the Gray square — at most 2 active
+switches and 4 tongue vectors, for all N.  C\* holds in every exhaustively
+checked wiring (all 143k with N ≤ 4, in Lean; N = 5 exhaustion of the
+cycle wall in progress) and survived dedicated cycle-objective search
+through N = 7 (max cycle vectors 4, max actives 2, always).
 
 ## Consequences
 
