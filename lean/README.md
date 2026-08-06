@@ -14,10 +14,15 @@ structural induction (no `native_decide`, no `sorry`):
 | `lobe_hop` | facing a lobed switch crosses the lobe, flips it, exits the stem (2 steps, both tongue values) |
 | `dogbone_halfPeriod` | **the bounce**: lobed `a`, arbitrary trailing cascade, lobed `b` — `2·|ps|+6` steps flip exactly `a`,`b` and return to `a`'s stem |
 | `dogbone_period` | two half-periods restore the tongues exactly: the orbit is a genuine cycle whose tongue states are the Gray square |
+| `IsReflector` / `lobe_isReflector` | the one-port gadget interface; lobes are its smallest instances |
+| `reflector_halfPeriod` / `reflector_period` | **any two reflectors joined by any cascade** bounce forever; for involutive commuting state maps the cycle's tongue states are exactly the Gray orbit — at most 4 |
 
-`dogbone_period` covers an infinite family of wirings (any interior cascade
-length, any N) — the mechanism that caps every observed cycle at 4 vectors,
-formalised.
+`dogbone_period` and `reflector_period` cover infinite families of wirings
+(any cascade length, any gadget size, any N) — the mechanism that caps every
+observed cycle at 4 vectors, formalised. The single remaining unproved core
+of the full cycle theorem is interface claim C\* (see
+docs/lazy-point-theory.md): every maximal active cluster on a cycle is a
+reflector.
 
 **`DuplotrainProofs.lean` — exhaustive small-N theorems** (`native_decide`):
 the wiring enumerator, the perfection automaton (reflecting caps) and the

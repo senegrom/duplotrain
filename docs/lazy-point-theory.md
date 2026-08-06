@@ -107,24 +107,38 @@ constants' arcs recur inside the single fixed inter-a chain, whose
 stem-route from any repeated constant is identical each period, pinning
 identically — no second active. With zero actives, T4. ∎
 
-## The isolated remaining case (C\*)
+## T7 (Reflector gadgets — formalised in `lean/GeneralN.lean`)
 
-Active switches need not be lobed: a compound rotator can flip a switch via
-two arcs arriving from another switch's traffic (the exhaustive N = 4
-maximiser contains exactly such a pair — switches 2 and 3 jointly forming a
-rotator). For these, step (i) of T6 still holds at the flip level (T5), but
-the inter-flip route passes faced actives whose tongue varies with phase,
-and the symmetry argument needs the retrace to hold through them. The
-precise remaining claim:
+Abstract the rotator: a **reflector** is a one-port gadget with mouth stem
+`g`: a train facing `g` wanders inside and emerges, a fixed number of steps
+later, over `g`'s own edge, with the tongues transformed by a fixed map `τ`
+on an invariant state class. A lobed switch is the smallest reflector
+(`lobe_isReflector`, `τ = flip`); the compound rotators in the exhaustive
+winners (e.g. switches 2–3 of the N = 4 maximiser) are two-switch
+reflectors with involutive `τ`.
 
-> **(C\*)** After a flip of active m, the walk reaches its next flip at a
-> switch depending only on m, and this next-flip relation is an involution.
+**Theorem (`reflector_period`, Lean, general N).** Any two reflectors
+joined by any trailing cascade trap the train in a genuine cycle: one
+half-period applies `τA` then `τB` and returns to A's mouth
+(`reflector_halfPeriod`, via the cascade no-op and the retrace); for
+involutive, commuting `τ` (disjoint gadget supports) two half-periods
+restore the tongues exactly, and the cycle's tongue states are the orbit
+`{u, τA u, τB (τA u), τB u}` — at most **4**, the Gray square.
 
-C\* holds in every exhaustively checked wiring (all 143k wirings with
-N ≤ 4, every start and tongue setting — also certified in Lean), and no
-counterexample surfaced in cycle-objective hill-climbing through N = 7
-(max cycle vectors 4, max actives 2, everywhere). Under C\*, the Cycle
-theorem holds for all N by the argument of T6(iii).
+## The remaining core (C\*), sharpened
+
+With T7 the open claim is no longer about walks but about interfaces:
+
+> **(C\*)** On any eventual cycle, every maximal active cluster implements
+> a reflector interface, with involutive state map.
+
+Everything else is proved: given C\*, a cycle's actives sit inside two
+reflectors bouncing over a cascade (T4 rules out cycles without flipping
+faced stems; T2's merge gives each cluster a single tail and landing, i.e.
+a single mouth), and `reflector_period` caps the cycle at the Gray square.
+C\* holds in every exhaustively checked wiring (all 143k with N ≤ 4, in
+Lean) and survived dedicated cycle-objective search through N = 7 (max
+cycle vectors 4, max actives 2, always).
 
 ## Consequences
 

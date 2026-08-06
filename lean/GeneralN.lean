@@ -388,4 +388,103 @@ theorem dogbone_period
   show stepN w (2 * ps.length + 6) (3 * a, flipAt (flipAt u a) b) = _
   rw [h2, hflip]
 
+/-! ## Reflector gadgets: the bounce beyond lobes
+
+A *reflector* is a one-port gadget: a train facing its mouth stem wanders
+inside and, a fixed number of steps later, emerges over the mouth's own
+edge, with the tongues transformed by a fixed map `τ` on an invariant state
+class.  A lobed switch is the smallest reflector (`lobe_isReflector`, with
+`τ = flipAt a`); the compound rotators observed in the exhaustive winners
+are two-switch reflectors.  The bounce theorem below shows that ANY two
+reflectors joined by ANY trailing cascade trap the train forever in a
+four-phase cycle whose tongue states are the orbit of the group generated
+by `τA, τB` -- for involutions with disjoint support, the Gray square.
+This reduces the general cycle theorem to the single remaining claim that
+every maximal active cluster implements a reflector interface (C* of
+docs/lazy-point-theory.md). -/
+
+/-- A reflector with mouth `g`, exit port `e` (the far end of `g`'s own
+edge), period `k`, invariant state class `S` and state map `τ`. -/
+def IsReflector (w : Wiring) (g e k : Nat)
+    (S : Tongues → Prop) (τ : Tongues → Tongues) : Prop :=
+  ∀ u, S u → stepN w k (g, u) = some (e, τ u) ∧ S (τ u)
+
+/-- A lobed switch is a reflector on all states. -/
+theorem lobe_isReflector (w : Wiring) (a p : Nat)
+    (hlobe : w.link (3 * a + 1) = some (3 * a + 2))
+    (hstem : w.link (3 * a) = some p) :
+    IsReflector w (3 * a) p 2 (fun _ => True) (flipAt · a) := by
+  intro u _
+  exact ⟨lobe_hop w a p u hlobe hstem, trivial⟩
+
+/-- **The reflector bounce, half period.**  Reflector A's exit feeds a
+trailing cascade landing on reflector B's mouth; B's exit is the cascade's
+last stem, so the retrace carries the train straight back to A's mouth.
+One half-period applies `τA` then `τB`. -/
+theorem reflector_halfPeriod
+    (w : Wiring) {gA kA gB kB p : Nat} {ps : List Nat}
+    {SA SB : Tongues → Prop} {τA τB : Tongues → Tongues}
+    {t₀ t₁ : Tongues}
+    (hA : IsReflector w gA p kA SA τA)
+    (hB : IsReflector w gB (3 * (lastOf p ps / 3)) kB SB τB)
+    (hD : Descent w t₀ p ps gB t₁)
+    (hga : w.link gA = some p)
+    (hAa : ∀ u, Agrees u (p :: ps) → Agrees (τA u) (p :: ps))
+    (hBa : ∀ u, Agrees u (p :: ps) → Agrees (τB u) (p :: ps))
+    (u : Tongues) (hSA : SA u) (hSB : SB (τA u))
+    (hagree : Agrees u (p :: ps)) :
+    stepN w (kA + (ps.length + 1) + kB + (p :: ps).length) (gA, u)
+      = some (gA, τB (τA u)) := by
+  obtain ⟨hopA, _⟩ := hA u hSA
+  have hagree1 : Agrees (τA u) (p :: ps) := hAa u hagree
+  obtain ⟨t₂, hD1⟩ := descent_rebase hD (τA u)
+  have ride := descent_sound_noop hD1 hagree1
+  obtain ⟨hopB, _⟩ := hB (τA u) hSB
+  have back := retrace hD gA hga (τB (τA u)) (hBa _ hagree1)
+  rw [stepN_add, stepN_add, stepN_add, hopA]
+  show ((stepN w (ps.length + 1) (p, τA u)).bind (stepN w kB)).bind
+    (stepN w (p :: ps).length) = _
+  rw [ride]
+  show (stepN w kB (gB, τA u)).bind (stepN w (p :: ps).length) = _
+  rw [hopB]
+  exact back
+
+/-- **The reflector bounce, full period.**  For involutive, commuting state
+maps (disjoint gadget supports), two half-periods restore the tongues
+exactly: any reflector pair joined by any cascade is trapped in a genuine
+cycle whose tongue states are the Gray orbit `{u, τA u, τB (τA u), τB u}`. -/
+theorem reflector_period
+    (w : Wiring) {gA kA gB kB p : Nat} {ps : List Nat}
+    {SA SB : Tongues → Prop} {τA τB : Tongues → Tongues}
+    {t₀ t₁ : Tongues}
+    (hA : IsReflector w gA p kA SA τA)
+    (hB : IsReflector w gB (3 * (lastOf p ps / 3)) kB SB τB)
+    (hD : Descent w t₀ p ps gB t₁)
+    (hga : w.link gA = some p)
+    (hAa : ∀ u, Agrees u (p :: ps) → Agrees (τA u) (p :: ps))
+    (hBa : ∀ u, Agrees u (p :: ps) → Agrees (τB u) (p :: ps))
+    (hSAB : ∀ u, SA u → SA (τB (τA u)))
+    (hSBB : ∀ u, SB u → SB (τA (τB u)))
+    (hcomm : ∀ u, τA (τB u) = τB (τA u))
+    (hinvA : ∀ u, τA (τA u) = u)
+    (hinvB : ∀ u, τB (τB u) = u)
+    (u : Tongues) (hSA : SA u) (hSB : SB (τA u))
+    (hagree : Agrees u (p :: ps)) :
+    stepN w (2 * (kA + (ps.length + 1) + kB + (p :: ps).length)) (gA, u)
+      = some (gA, u) := by
+  have h1 := reflector_halfPeriod w hA hB hD hga hAa hBa u hSA hSB hagree
+  have hagree2 : Agrees (τB (τA u)) (p :: ps) := hBa _ (hAa _ hagree)
+  have hSA2 : SA (τB (τA u)) := hSAB u hSA
+  have hSB2 : SB (τA (τB (τA u))) := hSBB (τA u) hSB
+  have h2 := reflector_halfPeriod w hA hB hD hga hAa hBa
+    (τB (τA u)) hSA2 hSB2 hagree2
+  have hflip : τB (τA (τB (τA u))) = u := by
+    rw [hcomm (τA u), hinvA, hinvB]
+  have hlen : 2 * (kA + (ps.length + 1) + kB + (p :: ps).length)
+      = (kA + (ps.length + 1) + kB + (p :: ps).length)
+        + (kA + (ps.length + 1) + kB + (p :: ps).length) := by omega
+  rw [hlen, stepN_add, h1]
+  show stepN w _ (gA, τB (τA u)) = _
+  rw [h2, hflip]
+
 end GeneralN
