@@ -436,26 +436,16 @@ theorem productive_first_or_alternation (k : Nat)
     intro j hjk hc
     exact hex ⟨j, hjk, hc⟩
 
-/-! ## The final theorem
+/-! ## The counting scaffold around the open core
 
-The ultimate wiring-level target of the whole program (GeneralN model;
-descends from `state_law` below once the T9 forest compilation is
-formalised):
-
-    theorem lazy_point_state_law (w : Wiring) (N : Nat)
-        (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-        (c : Nat × Tongues) (ks : List Nat)
-        (hnd : (ks.map fun k =>
-            VectorCount.restrict N ((stepN w k c).getD c).2).Nodup) :
-        ks.length ≤ N + 6
-
-At machine level the unconditional target is `state_law` below WITHOUT
-the hypotheses `htail` (lemma B: eventually the register snapshot lies
-in a fixed 4-element set — the Gray tail) and `halts`/`hcover`
-(lemma C: at most one alternation before the tail).  This section
-proves the complete assembly from exactly those two hypotheses:
-snapshot stability, first-write counting and the injection are all
-machine-checked, so B and C are the only remaining gap. -/
+The actual target theorem — in the language of tracks and switches —
+is `GeneralN.StateLaw` in `StateLaw.lean`, and **it is open**.  This
+section proves only the counting that surrounds the open core: IF a
+run's snapshots eventually stay in a ≤4-element set (the Gray tail —
+open) and at most one alternation precedes that tail (open), THEN at
+most `#cells + 6` distinct snapshots occur.  The two IFs are the hard
+part of the problem, not side conditions; nothing here discharges
+them. -/
 
 /-- The register snapshot at time `k` on a finite list of cells. -/
 def snap (cells : List Nat) (k : Nat) : List Nat :=
@@ -696,16 +686,15 @@ private theorem nodup_map_filter {f : Nat → List Nat} {p : Nat → Bool} :
           exact ih h.2
 
 open Classical in
-/-- **THE FINAL THEOREM, assembled.**  Along any run, any list of times
-with pairwise-distinct register snapshots has length at most
-`#cells + 6` — that is, **f(N) ≤ N + O(1)** — given exactly the two
-open lemmas as hypotheses: `htail` (**lemma B**: from some time `K`
-on, the snapshot lies in a fixed ≤4-element set — the Gray tail) and
-`halts`/`hcover` (**lemma C**: before `K`, every productive step is a
-first write except for at most one alternation).  Everything else —
-snapshot stability, last-write extraction, first-write injectivity,
-the coding — is machine-checked here.  Discharging B and C for actual
-runs is the sole remaining content of the state law. -/
+/-- **Conditional counting scaffold — NOT the state law.**  IF a run
+has a Gray tail (`htail`: from some `K` on the snapshot lies in a
+fixed ≤4-element set) and at most one alternation before it
+(`hcover`/`halts`), THEN at most `#cells + 6` distinct snapshots
+occur.  Those two hypotheses are **the open core of the problem — the
+hard part**, unproved for general runs; what this theorem contributes
+is only the counting around them: snapshot stability, last-write
+extraction, first-write injectivity, the coding.  The actual target
+statement lives in `StateLaw.lean` (`GeneralN.StateLaw`) and is open. -/
 theorem state_law (_hrun : IsRun m e r0)
     (cells : List Nat) (hcells : ∀ k, m.cellOf (e k) ∈ cells)
     (K : Nat) (S : List (List Nat)) (hS : S.length ≤ 4)

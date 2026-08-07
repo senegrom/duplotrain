@@ -16,13 +16,18 @@ an active switch flips both ways. Distinct tongue vectors on a cycle with
 > **Cycle theorem.** Every eventual cycle has at most 2 active switches,
 > hence at most 4 distinct tongue vectors.
 
-is reduced to bounding actives. Status: proved below for all N in every case
-except one precisely isolated core, which T9 compiles — geometry and all —
-into two lemmas (**B**, **C**) about a ten-line register machine.  Both are
-verified exhaustively on the wiring side for N ≤ 4 (140,152 wirings, also
-in Lean), unbeaten by cycle-objective search through N = 7, and verified
-across every small machine exhausted so far (`docs/echo_machine.py`).
-Modulo B + C the total state count obeys **f(N) ≤ N + O(1)**.
+is reduced to bounding actives. Status: **the state law is OPEN** — its
+precise statement, in the raw language of tracks and switches, is
+`GeneralN.StateLaw` in `lean/StateLaw.lean`, and nothing proves it.  What
+is proved: the same statement with 2^N in place of N + 6
+(`state_law_two_pow`); T1–T3/T5–T8 below; and a counting scaffold
+(`Echo.state_law`) showing the law would follow from two properties of
+runs — the Gray tail (**B**) and the one-alternation transient (**C**).
+B and C are *the core of the problem*, not side lemmas; T9's compilation
+of wirings into the register machine is itself paper-only.  Evidence:
+exhaustive for N ≤ 4 on wirings (140,152, in Lean), unbeaten by
+cycle-objective search through N = 7, and exhaustive across all small
+machines (`docs/echo_machine.py`).
 
 ---
 

@@ -41,7 +41,17 @@ theorems, no `native_decide`, no `sorry`:
 | `reg_cell` / `witness` | registers stay in their own cells, and **every entry names its delivery**: `cell (bar (e (k+1))) = star (cell (e k))` with the partner register equal to `bar (e (k+1))` — the predecessor structure is forced (seed of the T10 nesting argument) |
 | `succ_of_reg_eq` | merge at the mouth, direct form: same cell + equal partner registers ⇒ identical successors — variation cannot steer itself |
 | `snap_stall` / `snap_between` | register snapshots move only at productive steps and are constant across productive-free stretches |
-| **`state_law`** | **THE FINAL THEOREM, assembled**: any list of times with pairwise-distinct register snapshots has length ≤ `#cells + 6` — i.e. **f(N) ≤ N + O(1)** — proved from exactly two hypotheses: `htail` (lemma B: a ≤4-element Gray tail) and `hcover`/`halts` (lemma C: ≤1 alternation before the tail). Snapshot stability, last-write extraction, first-write injectivity and the coding are all machine-checked; **B and C are the only remaining gap** |
+| `state_law` | conditional counting scaffold — **not the state law**: IF a run has a ≤4-element Gray tail and ≤1 alternation before it (both **open** — the hard core of the problem), THEN ≤ `#cells + 6` distinct snapshots. Contributes only the counting around the open core |
+
+**`StateLaw.lean` — the target theorem, in the language of tracks and
+switches.**  `GeneralN.StateLaw` states the actual claim — a single
+train on any `N`-switch lazy-point layout ever sees at most `N + 6`
+distinct tongue vectors — directly over `Wiring`/`stepN`, decodable
+piece by piece as track, switches and the lazy-point rule.  **It is
+OPEN: nothing in this repository proves it.**  Proved alongside it:
+`state_law_two_pow`, the identical statement with `2 ^ N` in place of
+`N + 6` — the pigeonhole ceiling.  The open problem is exactly closing
+`2 ^ N` down to `N + O(1)`.
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real
 pigeonhole proof (induction on N, splitting on the first coordinate),
