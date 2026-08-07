@@ -29,16 +29,13 @@ private theorem filter_split_bool (p : Nat → Bool) :
       | true => simp [hp]; omega
       | false => simp [hp]; omega
 
-/-- Filtering a list once more cannot make it longer than filtering only by
-its second predicate. -/
 private theorem filter_filter_length_le (p q : Nat → Bool) (l : List Nat) :
     ((l.filter p).filter q).length ≤ (l.filter q).length := by
   have hcomm : (l.filter p).filter q = (l.filter q).filter p := by
     simp only [List.filter_filter, Bool.and_comm]
   rw [hcomm]
-  exact List.length_filter_le
+  exact List.length_filter_le p (l.filter q)
 
-/-- Generic finite-alphabet counting with bounded fibre multiplicity. -/
 private theorem bounded_multiplicity_length (f : Nat → List Nat) (r : Nat) :
     ∀ (S : List (List Nat)) (ks : List Nat),
       (∀ tag, (ks.filter (fun k => decide (f k = tag))).length ≤ r) →
@@ -96,8 +93,6 @@ private theorem pairUniverse_length_local (xs : List Nat) :
     (pairUniverse xs).length = xs.length * xs.length := by
   exact pairRect_length xs xs
 
-/-- Bounded pair multiplicity gives a polynomial bound in the exact future
-alphabet. -/
 theorem future_pair_multiplicity_bound
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (cells slots : List Nat)
@@ -124,8 +119,6 @@ theorem future_pair_multiplicity_bound
   rw [pairUniverse_length_local] at hle
   exact hle
 
-/-- With at most one token per cell, multiplicity `r` gives the explicit
-polynomial bound `r * (2C+1)^2`. -/
 theorem future_pair_multiplicity_le_cells_sq
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (cells slots : List Nat)
@@ -150,8 +143,6 @@ theorem future_pair_multiplicity_le_cells_sq
     Nat.mul_le_mul hA hA
   exact Nat.le_trans hp (Nat.mul_le_mul (Nat.le_refl r) hsquare)
 
-/-- The empirically indicated three-occurrence ceiling would give a concrete
-quadratic bound immediately. -/
 theorem future_pair_three_bound
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (cells slots : List Nat)
