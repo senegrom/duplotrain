@@ -6,7 +6,7 @@ import GeneralN
 The state-count question asks how many distinct tongue vectors a single
 train can visit on an N-switch wiring.  The conjectured law is
 f(N) = min(2^N, N+4); the N+4 half currently rests on the two echo-machine
-lemmas (docs/lazy-point-theory.md).  This file closes the other half
+lemmas (../lazy-point-theory.md).  This file closes the other half
 unconditionally: **no run of any wiring, of any length, ever visits more
 than 2^N distinct tongue vectors** — a genuine pigeonhole proof (no
 `native_decide`, no Mathlib), not an appeal to "obviously the state space

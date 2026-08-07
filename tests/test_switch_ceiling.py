@@ -1,6 +1,6 @@
 """The switch ceiling: no perfect layout has 3+ switches (abstract exhaustion).
 
-Runs the wiring enumerator from docs/switch_ceiling_proof.py over all abstract
+Runs the wiring enumerator from theory/switch_ceiling_proof.py over all abstract
 networks of n switches (ports joined by paths or capped with guarded-buffer
 reflectors -- which also subsumes every mid-path direction stone, since a stone
 splits its path into two reflector stubs) and simulates the exact tongue
@@ -16,7 +16,7 @@ import pathlib
 
 import pytest
 
-_PROOF = pathlib.Path(__file__).resolve().parent.parent / "docs" / "switch_ceiling_proof.py"
+_PROOF = pathlib.Path(__file__).resolve().parent.parent / "theory" / "switch_ceiling_proof.py"
 
 
 @pytest.fixture(scope="module")

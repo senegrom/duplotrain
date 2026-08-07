@@ -757,4 +757,231 @@ theorem state_law (_hrun : IsRun m e r0)
     omega
   omega
 
+/-! ## The heat structure (unconditional)
+
+A slot is **confirmed** when its own cell's register points at it; each
+cell confirms exactly one slot.  Every step's read value is confirmed
+(`head_confirmed`), so the walk always traverses an edge out of a
+confirmed slot; the step is productive exactly when the *arrival* end
+is unconfirmed with confirmed partner — a **token** (`arrival_token`).
+A productive step consumes its token and can create at most one new
+one, at the evicted slot of the same cell (`token_step`).  Hence the
+total number of tokens — the machine's capacity for future
+alternations — **never increases** (`tokens_nonincreasing`) and is at
+most one per cell at every moment (`tokens_le_cells`).  These are
+theorems about arbitrary runs, no hypotheses beyond well-formed
+initial registers.  What they do NOT give: a bound on the number of
+alternation *events* (a token can be consumed and re-emitted forever —
+that is exactly the Gray flip), so the open core stands. -/
+
+/-- Slot `s` is confirmed at time `k`: its cell's register points at it. -/
+def Confirmed (k s : Nat) : Prop :=
+  reg m e r0 k (m.cellOf s) = s
+
+/-- The confirmation dynamics: after step `k`, a slot is confirmed iff
+it is the arrival, or it kept a confirmation outside the written cell. -/
+theorem confirmed_step (k s : Nat) :
+    Confirmed m e r0 (k+1) s ↔
+      (s = e (k+1) ∨
+       (m.cellOf s ≠ m.cellOf (e (k+1)) ∧ Confirmed m e r0 k s)) := by
+  unfold Confirmed
+  by_cases hc : m.cellOf s = m.cellOf (e (k+1))
+  · rw [hc, reg_write m e r0 rfl]
+    constructor
+    · intro h; exact Or.inl h.symm
+    · rintro (h | ⟨hne, _⟩)
+      · exact h.symm
+      · exact absurd rfl hne
+  · rw [reg_skip m e r0 (fun h => hc h.symm)]
+    constructor
+    · intro h; exact Or.inr ⟨hc, h⟩
+    · rintro (rfl | ⟨_, h⟩)
+      · exact absurd rfl hc
+      · exact h
+
+/-- Every step reads a confirmed slot: the traversed edge's head is
+always confirmed. -/
+theorem head_confirmed (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) (k : Nat) :
+    Confirmed m e r0 k (m.bar (e (k+1))) := by
+  have hw := witness m e r0 hrun hr0 k
+  unfold Confirmed
+  rw [hw.1]
+  exact hw.2
+
+/-- A **token**: an unconfirmed slot whose jump partner is confirmed —
+a hot edge end, the only kind of place a productive step can land. -/
+def TokenEnd (k s : Nat) : Prop :=
+  ¬ Confirmed m e r0 k s ∧ Confirmed m e r0 k (m.bar s)
+
+instance (k s : Nat) : Decidable (TokenEnd m e r0 k s) := by
+  unfold TokenEnd Confirmed
+  infer_instance
+
+/-- A productive step lands exactly on a token. -/
+theorem arrival_token (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) (k : Nat)
+    (hp : ProductiveStep m e r0 k) :
+    TokenEnd m e r0 k (e (k+1)) := by
+  constructor
+  · intro h
+    exact hp h.symm
+  · exact head_confirmed m e r0 hrun hr0 k
+
+/-- A slot that loses confirmation at step `k` is the written cell's
+evicted register. -/
+theorem lost_confirmation {k s : Nat} (hk : Confirmed m e r0 k s)
+    (hk1 : ¬ Confirmed m e r0 (k+1) s) :
+    s = reg m e r0 k (m.cellOf (e (k+1))) := by
+  have h1 : ¬(s = e (k+1) ∨
+      (m.cellOf s ≠ m.cellOf (e (k+1)) ∧ Confirmed m e r0 k s)) :=
+    fun h => hk1 ((confirmed_step m e r0 k s).mpr h)
+  have hcs : m.cellOf s = m.cellOf (e (k+1)) := by
+    by_cases hc : m.cellOf s = m.cellOf (e (k+1))
+    · exact hc
+    · exact absurd (Or.inr ⟨hc, hk⟩) h1
+  unfold Confirmed at hk
+  rw [hcs] at hk
+  exact hk.symm
+
+/-- **Token bookkeeping.**  Any token present after step `k` is either
+the freshly evicted register of the written cell, or was already a
+token before the step (and is not the arrival). -/
+theorem token_step (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) (k s : Nat)
+    (ht : TokenEnd m e r0 (k+1) s) :
+    s = reg m e r0 k (m.cellOf (e (k+1))) ∨
+    (TokenEnd m e r0 k s ∧ s ≠ e (k+1)) := by
+  obtain ⟨hu, hb⟩ := ht
+  have hse : s ≠ e (k+1) := by
+    intro h
+    exact hu ((confirmed_step m e r0 k s).mpr (Or.inl h))
+  rcases (confirmed_step m e r0 k (m.bar s)).mp hb with hbe | ⟨_, hbk⟩
+  · have hs : s = m.bar (e (k+1)) := by rw [← hbe, m.bar_invol]
+    have hck : Confirmed m e r0 k s :=
+      hs ▸ head_confirmed m e r0 hrun hr0 k
+    exact Or.inl (lost_confirmation m e r0 hck hu)
+  · by_cases hcs : Confirmed m e r0 k s
+    · exact Or.inl (lost_confirmation m e r0 hcs hu)
+    · exact Or.inr ⟨⟨hcs, hbk⟩, hse⟩
+
+/-- The tokens present at time `k`, listed over a slot universe. -/
+def tokenEnds (slots : List Nat) (k : Nat) : List Nat :=
+  slots.filter (fun s => decide (TokenEnd m e r0 k s))
+
+private theorem nodup_filter (p : Nat → Bool) :
+    ∀ {l : List Nat}, l.Nodup → (l.filter p).Nodup := by
+  intro l
+  induction l with
+  | nil => intro _; simp
+  | cons x t ih =>
+      intro h
+      rw [List.nodup_cons] at h
+      cases hp : p x with
+      | true =>
+          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
+          exact ⟨fun hmem => h.1 ((List.mem_filter.mp hmem).1), ih h.2⟩
+      | false =>
+          simp only [List.filter_cons, hp]
+          exact ih h.2
+
+private theorem nodup_map_on {f : Nat → Nat} :
+    ∀ {l : List Nat}, (∀ x ∈ l, ∀ y ∈ l, f x = f y → x = y) →
+      l.Nodup → (l.map f).Nodup := by
+  intro l
+  induction l with
+  | nil => intro _ _; simp
+  | cons x t ih =>
+      intro hinj hnd
+      rw [List.nodup_cons] at hnd
+      simp only [List.map_cons, List.nodup_cons]
+      refine ⟨?_, ih (fun a ha b hb =>
+        hinj a (List.mem_cons_of_mem _ ha) b (List.mem_cons_of_mem _ hb))
+        hnd.2⟩
+      intro hmem
+      obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hmem
+      exact hnd.1 (hinj y (List.mem_cons_of_mem _ hy) x
+        List.mem_cons_self hfy ▸ hy)
+
+/-- **Heat never grows.**  The number of tokens is non-increasing along
+the run: a productive step consumes its token and creates at most one
+(at the evicted slot); an unproductive step moves nothing. -/
+theorem tokens_nonincreasing (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hnd : slots.Nodup)
+    (hslots : ∀ j, e j ∈ slots) (k : Nat) :
+    (tokenEnds m e r0 slots (k+1)).length
+      ≤ (tokenEnds m e r0 slots k).length := by
+  by_cases hp : ProductiveStep m e r0 k
+  · have harr : e (k+1) ∈ tokenEnds m e r0 slots k := by
+      rw [tokenEnds, List.mem_filter]
+      exact ⟨hslots (k+1),
+        decide_eq_true (arrival_token m e r0 hrun hr0 k hp)⟩
+    have hsub : ∀ s ∈ tokenEnds m e r0 slots (k+1),
+        s ∈ reg m e r0 k (m.cellOf (e (k+1))) ::
+          (tokenEnds m e r0 slots k).erase (e (k+1)) := by
+      intro s hs
+      rw [tokenEnds, List.mem_filter] at hs
+      have hT : TokenEnd m e r0 (k+1) s := of_decide_eq_true hs.2
+      rcases token_step m e r0 hrun hr0 k s hT with hv | ⟨hTk, hne⟩
+      · rw [hv]; exact List.mem_cons_self
+      · refine List.mem_cons_of_mem _ ?_
+        rw [List.mem_erase_of_ne hne, tokenEnds, List.mem_filter]
+        exact ⟨hs.1, decide_eq_true hTk⟩
+    have hnd1 : (tokenEnds m e r0 slots (k+1)).Nodup :=
+      nodup_filter _ hnd
+    have hlen := nodup_subset_length hnd1 hsub
+    rw [List.length_cons, List.length_erase_of_mem harr] at hlen
+    have hpos : 0 < (tokenEnds m e r0 slots k).length := by
+      cases htk : tokenEnds m e r0 slots k with
+      | nil => rw [htk] at harr; cases harr
+      | cons a t => simp
+    omega
+  · have heq : e (k+1) = reg m e r0 k (m.cellOf (e (k+1))) := by
+      by_cases hq : e (k+1) = reg m e r0 k (m.cellOf (e (k+1)))
+      · exact hq
+      · exact absurd hq hp
+    have hstall := unproductive_stall m e r0 k heq
+    have hEq : tokenEnds m e r0 slots (k+1)
+        = tokenEnds m e r0 slots k := by
+      unfold tokenEnds
+      apply List.filter_congr
+      intro s _
+      have h1 : Confirmed m e r0 (k+1) s ↔ Confirmed m e r0 k s := by
+        unfold Confirmed; rw [hstall]
+      have h2 : Confirmed m e r0 (k+1) (m.bar s) ↔
+          Confirmed m e r0 k (m.bar s) := by
+        unfold Confirmed; rw [hstall]
+      exact decide_eq_decide.mpr (by unfold TokenEnd; rw [h1, h2])
+    rw [hEq]
+    exact Nat.le_refl _
+
+/-- **At most one token per cell, at every moment**: `bar` maps tokens
+injectively to confirmed slots, and each cell confirms exactly one
+slot.  So the machine's alternation capacity is bounded by the number
+of cells, for all time. -/
+theorem tokens_le_cells (slots : List Nat) (hnd : slots.Nodup)
+    (cells : List Nat) (hcells : ∀ s, m.cellOf s ∈ cells) (k : Nat) :
+    (tokenEnds m e r0 slots k).length ≤ cells.length := by
+  have hinj : ∀ x ∈ tokenEnds m e r0 slots k,
+      ∀ y ∈ tokenEnds m e r0 slots k,
+      m.cellOf (m.bar x) = m.cellOf (m.bar y) → x = y := by
+    intro x hx y hy hc
+    rw [tokenEnds, List.mem_filter] at hx hy
+    have hxT := (of_decide_eq_true hx.2).2
+    have hyT := (of_decide_eq_true hy.2).2
+    unfold Confirmed at hxT hyT
+    rw [hc] at hxT
+    have hbar : m.bar x = m.bar y := by rw [hxT] at hyT; exact hyT
+    have := congrArg m.bar hbar
+    rwa [m.bar_invol, m.bar_invol] at this
+  have hndm := nodup_map_on hinj (nodup_filter _ hnd)
+  have hmem : ∀ v ∈ (tokenEnds m e r0 slots k).map
+      (fun s => m.cellOf (m.bar s)), v ∈ cells := by
+    intro v hv
+    obtain ⟨s, _, rfl⟩ := List.mem_map.mp hv
+    exact hcells _
+  have hle := nodup_subset_length hndm hmem
+  rwa [List.length_map] at hle
+
 end Echo

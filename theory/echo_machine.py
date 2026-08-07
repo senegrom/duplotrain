@@ -1,6 +1,6 @@
 """The echo machine: abstract cycle dynamics of lazy-point wirings.
 
-T9 (docs/lazy-point-theory.md) compiles any wiring's trailing structure
+T9 (lazy-point-theory.md) compiles any wiring's trailing structure
 into a forest of trees whose eventual-cycle dynamics is this register
 machine:
 

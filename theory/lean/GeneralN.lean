@@ -17,7 +17,7 @@ Results (all general-N, no `native_decide`, no `sorry`):
 
 * `trailing_route` / `trailing_route_independent` -- a trailing pass's exit
   route never reads the tongues: cascades are wiring-determined (T1/T2 of
-  docs/lazy-point-theory.md).
+  ../lazy-point-theory.md).
 * `descent_sound` -- a `Descent` (a trailing cascade carrying its wiring
   facts) is executed faithfully by the dynamics.
 * `descent_pins` / `descent_noop` / `descent_sound_noop` -- a cascade's
@@ -484,7 +484,7 @@ four-phase cycle whose tongue states are the orbit of the group generated
 by `τA, τB` -- for involutions with disjoint support, the Gray square.
 This reduces the general cycle theorem to the single remaining claim that
 every maximal active cluster implements a reflector interface (C* of
-docs/lazy-point-theory.md). -/
+../lazy-point-theory.md). -/
 
 /-- A reflector with mouth `g`, exit port `e` (the far end of `g`'s own
 edge), period `k`, invariant state class `S` and state map `τ`. -/

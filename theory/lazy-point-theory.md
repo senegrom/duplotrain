@@ -27,7 +27,7 @@ B and C are *the core of the problem*, not side lemmas; T9's compilation
 of wirings into the register machine is itself paper-only.  Evidence:
 exhaustive for N ≤ 4 on wirings (140,152, in Lean), unbeaten by
 cycle-objective search through N = 7, and exhaustive across all small
-machines (`docs/echo_machine.py`).
+machines (`echo_machine.py`).
 
 ---
 
@@ -224,7 +224,7 @@ alone*:
 > tree's previous ascent) before entering its cycle.  Observed: never
 > more than **one**.
 
-Machine exhaustion (`docs/echo_machine.py` + the structured hunt): all
+Machine exhaustion (`echo_machine.py` + the structured hunt): all
 machines with 2 cells (≤ 6 slots) and 4 cells (≤ 8 slots), **all
 machines with 6 cells and up to 10 slots (10.4 million runs — every
 composition, every jump matching, every initial register, every

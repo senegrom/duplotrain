@@ -22,7 +22,7 @@ structural induction (no `native_decide`, no `sorry`):
 observed cycle at 4 vectors, formalised.
 
 **`EchoMachine.lean` — the abstracted cycle dynamics** (T9 in
-docs/lazy-point-theory.md): any wiring's trailing structure compiles to a
+../lazy-point-theory.md): any wiring's trailing structure compiles to a
 forest of trees; the cycle dynamics reduces to a register machine (one
 register per tree = slot of its last ascent; step = write own register,
 read mouth-partner's, jump through its bar-involution).  General-N
@@ -42,6 +42,9 @@ theorems, no `native_decide`, no `sorry`:
 | `succ_of_reg_eq` | merge at the mouth, direct form: same cell + equal partner registers ⇒ identical successors — variation cannot steer itself |
 | `snap_stall` / `snap_between` | register snapshots move only at productive steps and are constant across productive-free stretches |
 | `state_law` | conditional counting scaffold — **not the state law**: IF a run has a ≤4-element Gray tail and ≤1 alternation before it (both **open** — the hard core of the problem), THEN ≤ `#cells + 6` distinct snapshots. Contributes only the counting around the open core |
+| `confirmed_step` / `head_confirmed` | the confirmation dynamics: each cell confirms exactly its register slot, and every step's read value is confirmed — the walk always leaves a confirmed slot |
+| `arrival_token` / `token_step` | a productive step lands exactly on a **token** (unconfirmed slot, confirmed partner) and can create at most one new token, at the evicted slot of the same cell |
+| `tokens_nonincreasing` / `tokens_le_cells` | **heat never grows**: the number of tokens — the machine's capacity for future alternations — is non-increasing along any run and at most one per cell at every moment. (Does NOT bound alternation *events*: a token can be consumed and re-emitted forever — the Gray flip — so the open core stands) |
 
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single
@@ -63,7 +66,7 @@ no `native_decide`:
 | `vector_count_le` / `trajectory_count_le` | **no run of any N-switch wiring, of any length, visits more than 2^N distinct tongue vectors** |
 
 The remaining unproved core of the full cycle theorem is two lemmas
-about the echo machine (see docs/lazy-point-theory.md): **B** (every
+about the echo machine (see ../lazy-point-theory.md): **B** (every
 machine cycle has Σ(σ−1) ≤ 2 — this is C\*) and **C** (O(1) transient
 alternations).  Modulo B + C, the accounting theorem closes the state
 count to f(N) ≤ N + O(1); unconditionally, f(N) ≤ min(2^N, N + 1 + A)
