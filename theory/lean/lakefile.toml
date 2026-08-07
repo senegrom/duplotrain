@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts"]
+defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -27,3 +27,6 @@ name = "SlotBound"
 
 [[lean_lib]]
 name = "ReplayFacts"
+
+[[lean_lib]]
+name = "PairBound"
