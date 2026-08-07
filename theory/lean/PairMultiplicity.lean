@@ -3,18 +3,11 @@ import FutureEntryBound
 /-!
 # Bounded multiplicity of consecutive pairs
 
-`FutureEntryBound` collapses every future entry to a fixed alphabet of at most
-`2 * #cells + 1` elements.  This file removes the unnecessarily strong
-pair-`Nodup` hypothesis from the quadratic counting step.
-
-If every ordered consecutive entry pair occurs at most `r` times in a phase,
-then the phase has length at most
-
-    r * (2 * #cells + 1)^2.
-
-Thus the experimentally observed multiplicity ceiling `r = 3` would already
-give an unconditional quadratic echo-machine bound.  All counting below is
-proved; the remaining dynamical statement is exactly the multiplicity bound.
+After a base time the entry alphabet has at most `2 * #cells + 1` elements.
+If every consecutive pair occurs at most `r` times in a phase, the phase has
+length at most `r * (2 * #cells + 1)^2`.  Thus any uniform polynomial bound
+on pair multiplicity is enough for a polynomial, hence subexponential, state
+bound.
 -/
 
 namespace Echo
@@ -36,21 +29,14 @@ private theorem filter_split_bool (p : Nat → Bool) :
       | true => simp [hp]; omega
       | false => simp [hp]; omega
 
-private theorem filter_filter_length_le (p q : Nat → Bool) :
-    ∀ l : List Nat, ((l.filter p).filter q).length ≤ (l.filter q).length := by
-  intro l
-  induction l with
-  | nil => simp
-  | cons x t ih =>
-      cases hp : p x <;> cases hq : q x
-      · simpa only [List.filter_cons, hp, hq, if_false] using ih
-      · have hle := Nat.le_succ_of_le ih
-        simpa only [List.filter_cons, hp, hq, if_false, if_true,
-          List.length_cons] using hle
-      · simpa only [List.filter_cons, hp, hq, if_false, if_true] using ih
-      · have hle := Nat.succ_le_succ ih
-        simpa only [List.filter_cons, hp, hq, if_false, if_true,
-          List.length_cons] using hle
+/-- Filtering a list once more cannot make it longer than filtering only by
+its second predicate. -/
+private theorem filter_filter_length_le (p q : Nat → Bool) (l : List Nat) :
+    ((l.filter p).filter q).length ≤ (l.filter q).length := by
+  have hcomm : (l.filter p).filter q = (l.filter q).filter p := by
+    simp only [List.filter_filter, Bool.and_comm]
+  rw [hcomm]
+  exact List.length_filter_le
 
 /-- Generic finite-alphabet counting with bounded fibre multiplicity. -/
 private theorem bounded_multiplicity_length (f : Nat → List Nat) (r : Nat) :
@@ -111,7 +97,7 @@ private theorem pairUniverse_length_local (xs : List Nat) :
   exact pairRect_length xs xs
 
 /-- Bounded pair multiplicity gives a polynomial bound in the exact future
-alphabet, without assuming pairwise distinct pairs. -/
+alphabet. -/
 theorem future_pair_multiplicity_bound
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (cells slots : List Nat)
@@ -164,8 +150,8 @@ theorem future_pair_multiplicity_le_cells_sq
     Nat.mul_le_mul hA hA
   exact Nat.le_trans hp (Nat.mul_le_mul (Nat.le_refl r) hsquare)
 
-/-- The observed three-occurrence ceiling would give a concrete quadratic
-bound immediately. -/
+/-- The empirically indicated three-occurrence ceiling would give a concrete
+quadratic bound immediately. -/
 theorem future_pair_three_bound
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (cells slots : List Nat)
