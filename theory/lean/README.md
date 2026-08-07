@@ -1,8 +1,14 @@
 # Formal proofs (Lean 4)
 
-Thirteen libraries, all self-contained (no Mathlib).  Core five below;
+Fourteen libraries, all self-contained (no Mathlib).  Core five below;
 plus the accounting/monovariant satellites (all sorry-free, honestly
 conditional where marked):
+
+* `FutureEntryBound.lean` — **the linear future entry alphabet**:
+  every entry from any base time on lies in a fixed alphabet (the base
+  entry, bars of base registers, bars of live tokens) of size
+  ≤ `2·#cells + 1`; pair-duplicate-free phases are quadratically
+  bounded.  Built on `future_register_le`.
 
 * `LinearBound.lean` — **snapshots ≤ #cells + #alts + 1**, for any
   alternation list covering the prefix: the unconditional accounting
@@ -76,6 +82,8 @@ theorems, no `native_decide`, no `sorry`:
 | `change_has_productive`(`_le`) | registers move only through productive writes of their own cell |
 | `variation_needs_variation` | **the steering seed (T10 brick 1)**: two different deliveries with a common witness cell force a productive write of that witness cell strictly between them — a cell's variation must be steered by somebody's variation |
 | `trajectory_merge` | **trajectory determinism**: two moments at the same cell whose subsequent reads all agree produce identical entry sequences — the walk branches only where a read differs |
+| `token_shape_tail` / `gray_tail` | **the Gray tail from the token shape**: under the shape every exhaustion exhibits — ≤1 token in each of two cells, none anywhere else — every later snapshot is one of **four explicit candidates**, so at most 4 distinct snapshots occur, ever: the quantitative half of lemma B |
+| `state_law_of_token_shape` | the conditional scaffold re-based: token shape at `K` + ≤1 alternation before `K` ⇒ ≤ `#cells + 6` snapshots.  The open core is now exactly *reaching* the token shape within one alternation |
 
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single
