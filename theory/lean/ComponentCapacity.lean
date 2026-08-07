@@ -64,8 +64,12 @@ theorem tree_marker_square {v : Nat} (hv : 2 ≤ v) :
               have h := square_four_plus d
               have hp : 2^(4+d) ≤ 2^(5+d) :=
                 Nat.pow_le_pow_right (by omega) (by omega)
-              change (4+d)*(4+d) ≤ 2^(5+d)
-              exact Nat.le_trans h hp
+              have hbound : (4+d)*(4+d) ≤ 2^(5+d) :=
+                Nat.le_trans h hp
+              have hleft : 2 + (d+1+1+1) - 1 = 4+d := by omega
+              have hright : 2 + (d+1+1+1) = 5+d := by omega
+              rw [hleft, hright]
+              exact hbound
 
 /-- The two possible orientations of a loop-free cycle component obey the
 same square-capacity bound. -/
