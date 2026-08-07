@@ -1116,6 +1116,276 @@ theorem singleton_lock_reg (hrun : IsRun m e r0)
   obtain ⟨d, rfl⟩ : ∃ d, j = k + d := ⟨j - k, by omega⟩
   exact (singleton_lock m e r0 hrun hr0 slots hslots h1 d).1
 
+/-! ### The pedigree theorems: the machine can never invent values
+
+Where can a register value come from?  `token_pedigree`: every live
+token traces back — it was already a token at any chosen base time, or
+its slot has held its own cell's register somewhere in between (tokens
+are re-emitted only at evicted registers, and dead edges never
+revive).  `future_register`: consequently every value a cell's
+register will EVER hold is either its value now or the slot of a token
+alive now.  The token profile at any moment spans the machine's entire
+future state space, and as tokens die the reachable space only
+collapses.  Counted: σ(C) ≤ 1 + #tokens(C) per cell
+(`repertoire_count`), and fresh values — values some cell has not held
+at base time — are paid for one-for-one by base-time tokens
+(`fresh_values_le_tokens`), hence by `tokens_le_cells` at most
+`#cells` of them ever appear, in total, across all cells and all
+future time. -/
+
+/-- **Token pedigree.**  A token alive at `K+d` was already a token at
+`K`, or its slot has held its own cell's register at some time in
+`[K, K+d]`. -/
+theorem token_pedigree (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) {K : Nat} :
+    ∀ d s, TokenEnd m e r0 (K+d) s →
+      TokenEnd m e r0 K s ∨
+      ∃ t, K ≤ t ∧ t ≤ K + d ∧ reg m e r0 t (m.cellOf s) = s := by
+  intro d
+  induction d with
+  | zero => intro s hs; exact Or.inl hs
+  | succ n ih =>
+      intro s hs
+      have hs' : TokenEnd m e r0 (K+n+1) s := hs
+      rcases token_step m e r0 hrun hr0 (K+n) s hs' with hv | ⟨hTk, _⟩
+      · refine Or.inr ⟨K+n, Nat.le_add_right _ _, by omega, ?_⟩
+        have hc : m.cellOf s = m.cellOf (e (K+n+1)) := by
+          rw [hv]
+          exact reg_cell m e r0 hr0 (K+n) _
+        rw [hc]
+        exact hv.symm
+      · rcases ih s hTk with h | ⟨t, h1, h2, h3⟩
+        · exact Or.inl h
+        · exact Or.inr ⟨t, h1, by omega, h3⟩
+
+/-- **The repertoire collapse.**  Every value a cell's register will
+ever hold is either its value now or the slot of a token alive now:
+the machine can never invent values.  Unconditional, for every cell
+and every base time. -/
+theorem future_register (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) {K C : Nat} :
+    ∀ d, reg m e r0 (K+d) C = reg m e r0 K C ∨
+      TokenEnd m e r0 K (reg m e r0 (K+d) C) := by
+  have aux : ∀ d d', d' ≤ d →
+      reg m e r0 (K+d') C = reg m e r0 K C ∨
+      TokenEnd m e r0 K (reg m e r0 (K+d') C) := by
+    intro d
+    induction d with
+    | zero =>
+        intro d' hd'
+        have hz : d' = 0 := by omega
+        subst hz
+        exact Or.inl rfl
+    | succ n ih =>
+        intro d' hd'
+        by_cases hn : d' ≤ n
+        · exact ih d' hn
+        · have hs : d' = n + 1 := by omega
+          subst hs
+          show reg m e r0 (K+n+1) C = reg m e r0 K C ∨
+            TokenEnd m e r0 K (reg m e r0 (K+n+1) C)
+          by_cases hC : m.cellOf (e (K+n+1)) = C
+          · have hwrite : reg m e r0 (K+n+1) C = e (K+n+1) :=
+              reg_write m e r0 hC
+            by_cases hp : ProductiveStep m e r0 (K+n)
+            · have harr := arrival_token m e r0 hrun hr0 (K+n) hp
+              rcases token_pedigree m e r0 hrun hr0 n (e (K+n+1)) harr
+                with h | ⟨t, h1, h2, h3⟩
+              · rw [hwrite]
+                exact Or.inr h
+              · rw [hC] at h3
+                obtain ⟨d'', rfl⟩ : ∃ d'', t = K + d'' := ⟨t - K, by omega⟩
+                have hd'' : d'' ≤ n := by omega
+                have hIH := ih d'' hd''
+                rw [h3] at hIH
+                rw [hwrite]
+                exact hIH
+            · have heq : e (K+n+1)
+                  = reg m e r0 (K+n) (m.cellOf (e (K+n+1))) := by
+                by_cases hq : e (K+n+1)
+                    = reg m e r0 (K+n) (m.cellOf (e (K+n+1)))
+                · exact hq
+                · exact absurd hq hp
+              rw [unproductive_stall m e r0 (K+n) heq C]
+              exact ih n (Nat.le_refl _)
+          · rw [reg_skip m e r0 hC]
+            exact ih n (Nat.le_refl _)
+  intro d
+  exact aux d d (Nat.le_refl _)
+
+/-- Arbitrary-time form of the collapse: for any `j ≥ K`, cell `C`'s
+register at `j` is its `K`-value or the slot of a `K`-token. -/
+theorem future_register_le (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) {K C j : Nat} (hj : K ≤ j) :
+    reg m e r0 j C = reg m e r0 K C ∨
+      TokenEnd m e r0 K (reg m e r0 j C) := by
+  obtain ⟨d, rfl⟩ : ∃ d, j = K + d := ⟨j - K, by omega⟩
+  exact future_register m e r0 hrun hr0 d
+
+/-- **The register repertoire, counted**: any duplicate-free list of
+values that cell `C`'s register takes at or after time `K` has length
+at most `#tokens of C at K` + 1 — σ(C) ≤ 1 + tokens(C).  With zero
+tokens this is freeze-out; with one it is the singleton lock. -/
+theorem repertoire_count (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) {K C : Nat}
+    (hCslots : ∀ v, m.cellOf v = C → v ∈ slots)
+    (vs : List Nat) (hnd : vs.Nodup)
+    (hvs : ∀ v ∈ vs, ∃ j, K ≤ j ∧ reg m e r0 j C = v) :
+    vs.length ≤ (cellTokens m e r0 slots C K).length + 1 := by
+  have hsub : ∀ v ∈ vs,
+      v ∈ reg m e r0 K C :: cellTokens m e r0 slots C K := by
+    intro v hv
+    obtain ⟨j, hj, hval⟩ := hvs v hv
+    rcases future_register_le m e r0 hrun hr0 (C := C) hj with h | h
+    · rw [hval] at h
+      rw [h]
+      exact List.mem_cons_self
+    · rw [hval] at h
+      refine List.mem_cons_of_mem _ ?_
+      rw [cellTokens, List.mem_filter]
+      have hcell : m.cellOf v = C := by
+        rw [← hval]
+        exact reg_cell m e r0 hr0 j C
+      exact ⟨hCslots v hcell, decide_eq_true ⟨h, hcell⟩⟩
+  have hle := nodup_subset_length hnd hsub
+  rw [List.length_cons] at hle
+  exact hle
+
+/-- **The fresh-value budget.**  Values that some cell's register takes
+at or after `K`, other than that cell's own `K`-value, are paid for
+one-for-one by tokens alive at `K`: any duplicate-free list of them
+has length at most the `K`-token count — so with `tokens_le_cells`,
+the whole run exhibits at most `#cells` fresh values, in total, across
+all cells and all future time.  Σ(σ − 1) ≤ #cells, unconditional. -/
+theorem fresh_values_le_tokens (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat)
+    (hregslots : ∀ j c, reg m e r0 j c ∈ slots)
+    {K : Nat} (vs : List Nat) (hnd : vs.Nodup)
+    (hvs : ∀ v ∈ vs, ∃ j C, K ≤ j ∧ reg m e r0 j C = v ∧
+      reg m e r0 K C ≠ v) :
+    vs.length ≤ (tokenEnds m e r0 slots K).length := by
+  have hsub : ∀ v ∈ vs, v ∈ tokenEnds m e r0 slots K := by
+    intro v hv
+    obtain ⟨j, C, hj, hval, hne⟩ := hvs v hv
+    rcases future_register_le m e r0 hrun hr0 (C := C) hj with h | h
+    · rw [hval] at h
+      exact absurd h.symm hne
+    · rw [hval] at h
+      rw [tokenEnds, List.mem_filter]
+      refine ⟨?_, decide_eq_true h⟩
+      rw [← hval]
+      exact hregslots j C
+  exact nodup_subset_length hnd hsub
+
+/-! ### Conservation on cycles: recurrences cannot annihilate tokens
+
+Token count is non-increasing (`tokens_nonincreasing`), so across any
+register recurrence — the walk's eventual cycle — it is exactly
+conserved.  A productive step that fails to re-emit (its evicted slot
+does not become a token) strictly cools the machine
+(`no_emission_drop`); hence inside a recurrence every productive step
+DOES re-emit (`recurrence_emission`): the cycle's tokens form a
+conserved population, handed from evicted slot to evicted slot.  With
+`future_register`, the cycle's entire value repertoire is spanned by
+that fixed population — lemma B is exactly the claim that its
+effective size is at most 2. -/
+
+/-- Token count is antitone: heat only ever decreases. -/
+theorem tokens_antitone (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hnd : slots.Nodup)
+    (hslots : ∀ j, e j ∈ slots) (i : Nat) :
+    ∀ d, (tokenEnds m e r0 slots (i+d)).length
+      ≤ (tokenEnds m e r0 slots i).length := by
+  intro d
+  induction d with
+  | zero => exact Nat.le_refl _
+  | succ n ih =>
+      exact Nat.le_trans
+        (tokens_nonincreasing m e r0 hrun hr0 slots hnd hslots (i+n)) ih
+
+/-- Arbitrary-time form: `i ≤ j` gives `#tokens j ≤ #tokens i`. -/
+theorem tokens_le_of_le (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hnd : slots.Nodup)
+    (hslots : ∀ j, e j ∈ slots) {i j : Nat} (hij : i ≤ j) :
+    (tokenEnds m e r0 slots j).length
+      ≤ (tokenEnds m e r0 slots i).length := by
+  obtain ⟨d, rfl⟩ : ∃ d, j = i + d := ⟨j - i, by omega⟩
+  exact tokens_antitone m e r0 hrun hr0 slots hnd hslots i d
+
+/-- **Failing to re-emit cools the machine.**  A productive step whose
+evicted slot does not come out a token strictly decreases the token
+count: the arrival's token is consumed and nothing replaces it. -/
+theorem no_emission_drop (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hnd : slots.Nodup)
+    (hslots : ∀ j, e j ∈ slots) (k : Nat)
+    (hp : ProductiveStep m e r0 k)
+    (hno : ¬ TokenEnd m e r0 (k+1) (reg m e r0 k (m.cellOf (e (k+1))))) :
+    (tokenEnds m e r0 slots (k+1)).length + 1
+      ≤ (tokenEnds m e r0 slots k).length := by
+  have harr : e (k+1) ∈ tokenEnds m e r0 slots k := by
+    rw [tokenEnds, List.mem_filter]
+    exact ⟨hslots (k+1),
+      decide_eq_true (arrival_token m e r0 hrun hr0 k hp)⟩
+  have hsub : ∀ s ∈ tokenEnds m e r0 slots (k+1),
+      s ∈ (tokenEnds m e r0 slots k).erase (e (k+1)) := by
+    intro s hs
+    rw [tokenEnds, List.mem_filter] at hs
+    have hT : TokenEnd m e r0 (k+1) s := of_decide_eq_true hs.2
+    rcases token_step m e r0 hrun hr0 k s hT with hv | ⟨hTk, hne⟩
+    · rw [hv] at hT
+      exact absurd hT hno
+    · rw [List.mem_erase_of_ne hne, tokenEnds, List.mem_filter]
+      exact ⟨hs.1, decide_eq_true hTk⟩
+  have hnd1 : (tokenEnds m e r0 slots (k+1)).Nodup :=
+    nodup_filter _ hnd
+  have hle := nodup_subset_length hnd1 hsub
+  rw [List.length_erase_of_mem harr] at hle
+  have hpos : 0 < (tokenEnds m e r0 slots k).length := by
+    cases htk : tokenEnds m e r0 slots k with
+    | nil => rw [htk] at harr; cases harr
+    | cons a t => simp
+  omega
+
+/-- **Conservation on cycles.**  If the register map recurs
+(`reg k1 = reg k2`), every productive step strictly inside the
+recurrence re-emits: its evicted slot comes out a token.  The eventual
+cycle's tokens are a conserved population, only handed around — never
+destroyed, never created. -/
+theorem recurrence_emission (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hnd : slots.Nodup)
+    (hslots : ∀ j, e j ∈ slots) {k1 k2 j : Nat}
+    (hrec : ∀ c, reg m e r0 k1 c = reg m e r0 k2 c)
+    (hj1 : k1 ≤ j) (hj2 : j < k2)
+    (hp : ProductiveStep m e r0 j) :
+    TokenEnd m e r0 (j+1) (reg m e r0 j (m.cellOf (e (j+1)))) := by
+  by_cases hno : TokenEnd m e r0 (j+1) (reg m e r0 j (m.cellOf (e (j+1))))
+  · exact hno
+  exfalso
+  have hdrop := no_emission_drop m e r0 hrun hr0 slots hnd hslots j hp hno
+  have h1 : (tokenEnds m e r0 slots k2).length
+      ≤ (tokenEnds m e r0 slots (j+1)).length :=
+    tokens_le_of_le m e r0 hrun hr0 slots hnd hslots (by omega)
+  have h2 : (tokenEnds m e r0 slots j).length
+      ≤ (tokenEnds m e r0 slots k1).length :=
+    tokens_le_of_le m e r0 hrun hr0 slots hnd hslots hj1
+  have heq : (tokenEnds m e r0 slots k1).length
+      = (tokenEnds m e r0 slots k2).length := by
+    unfold tokenEnds
+    have hcong : ∀ s ∈ slots,
+        decide (TokenEnd m e r0 k1 s) = decide (TokenEnd m e r0 k2 s) := by
+      intro s _
+      apply decide_eq_decide.mpr
+      unfold TokenEnd Confirmed
+      rw [hrec (m.cellOf s), hrec (m.cellOf (m.bar s))]
+    rw [List.filter_congr hcong]
+  omega
+
 /-- **At most one token per cell, at every moment**: `bar` maps tokens
 injectively to confirmed slots, and each cell confirms exactly one
 slot.  So the machine's alternation capacity is bounded by the number

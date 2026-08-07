@@ -330,6 +330,47 @@ Two upper bounds hold with **no** open lemma behind them:
   This is the exact skeleton of N + O(1): the sole missing ingredient
   is a bound on alternations.
 
+## Heat: the token calculus (machine-checked, general N)
+
+Call a slot **confirmed** when its cell's register points at it, and
+call an unconfirmed slot whose jump partner is confirmed a **token** —
+a hot edge end.  All of the following are Lean theorems
+(`lean/EchoMachine.lean`), unconditional, for every machine and every
+run:
+
+* **Productive steps land exactly on tokens** (`arrival_token`), and a
+  step can create at most one token, at the written cell's evicted
+  register (`token_step`).  So the token count never increases
+  (`tokens_nonincreasing`, `tokens_antitone`), and it is at most one
+  per cell at every moment (`tokens_le_cells`, via the bar-involution).
+* **Freeze-out and the singleton lock** (`freezeout`,
+  `singleton_lock`): a cell with no tokens never changes its register
+  again; a cell whose tokens sit in `{t}` keeps its register in
+  `{current, t}` forever — σ ≤ 2 for singleton-token cells.
+* **The repertoire collapse** (`token_pedigree`, `future_register`):
+  the machine can never invent values.  Every token alive at time
+  `K + d` was already a token at `K` or sits at a slot that has held
+  its own cell's register in between; consequently **every value a
+  cell's register will ever hold is either its current value or the
+  slot of a currently live token**.  The token profile at any moment
+  spans the machine's entire future state space, and the space only
+  collapses as tokens die.  Counted (`repertoire_count`,
+  `fresh_values_le_tokens`): σ(C) ≤ 1 + #tokens(C) for every cell, and
+  the whole run exhibits **at most `#cells` fresh values in total** —
+  Σ(σ − 1) ≤ #tokens ≤ #cells, across all cells and all time.
+* **Conservation on cycles** (`no_emission_drop`,
+  `recurrence_emission`): a productive step whose evicted slot does
+  not come out a token *strictly* cools the machine — so inside any
+  register recurrence every productive step re-emits.  The eventual
+  cycle's tokens are a **conserved population, handed from evicted
+  slot to evicted slot, never destroyed**, and by the collapse the
+  cycle's whole value repertoire is spanned by that fixed population.
+
+Together these turn lemma B into a single sharp question: **can three
+or more tokens of the cycle's conserved population actually be
+consumed on the cycle?**  Every exhaustion says no — the population's
+effective size is 0 (functional collapse) or 2 (the Gray pair).
+
 ## f(N) ≤ N + O(1): what remains
 
 Given **B** (cycle ≤ 2 actives ⇒ ≤ 4 cycle vectors) and **C** (O(1)

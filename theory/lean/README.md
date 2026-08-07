@@ -68,6 +68,10 @@ theorems, no `native_decide`, no `sorry`:
 | `tokens_nonincreasing` / `tokens_le_cells` | **heat never grows**: the number of tokens — the machine's capacity for future alternations — is non-increasing along any run and at most one per cell at every moment. (Does NOT bound alternation *events*: a token can be consumed and re-emitted forever — the Gray flip — so the open core stands) |
 | `freezeout` | **freeze-out**: a cell with no tokens never changes its register again — productive arrivals need a token of the written cell, and fresh tokens appear only at the written cell's own evicted slot |
 | `singleton_lock` / `singleton_lock_reg` | **the singleton lock**: a cell whose tokens are contained in `{t}` keeps its register in `{current register, t}` **forever** — single-token cells alternate between at most two slots: the σ ≤ 2 half of lemma B for singleton cells, unconditional |
+| `token_pedigree` / `future_register` | **the repertoire collapse — the machine can never invent values**: every token traces back to a base-time token or to an evicted register, so every value a cell's register will *ever* hold is either its value now or the slot of a token alive now.  The current token profile spans the entire future state space, and it only shrinks |
+| `repertoire_count` / `fresh_values_le_tokens` | the collapse, counted: σ(C) ≤ 1 + #tokens(C) for every cell, and **at most `#cells` fresh values ever appear in the whole run** — Σ(σ−1) ≤ #tokens ≤ #cells across all cells and all future time, unconditional |
+| `tokens_antitone` / `no_emission_drop` | heat decreases over arbitrary intervals; a productive step whose evicted slot does not come out a token **strictly** cools the machine |
+| `recurrence_emission` | **conservation on cycles**: inside any register recurrence every productive step re-emits — the eventual cycle's tokens are a conserved population, handed from evicted slot to evicted slot, never destroyed.  With the collapse, the cycle's whole value repertoire is spanned by that fixed population |
 
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single
@@ -94,7 +98,11 @@ machine cycle has Σ(σ−1) ≤ 2 — this is C\*) and **C** (O(1) transient
 alternations).  Modulo B + C, the accounting theorem closes the state
 count to f(N) ≤ N + O(1); unconditionally, f(N) ≤ min(2^N, N + 1 + A)
 with A the run's alternation count.  The lobed case of B is proved
-outright (`absorb`).  B and C are exhaustively verified across all
+outright (`absorb`).  The pedigree/conservation theorems reduce B to a
+single sharp question: the cycle's conserved, repertoire-spanning
+token population (`recurrence_emission` + `future_register`) — can
+**three or more** of its tokens actually be consumed on the cycle?
+Every exhaustion says no (profiles `()` and `(2,2)` only).  B and C are exhaustively verified across all
 machines with ≤ 6 cells and ≤ 10 slots — 10.4M runs — plus climbs at
 8–12 cells (max actives 2, max transient alternations 1, everywhere;
 every cycle's σ-profile is `()` or `(2,2)` — functional collapse or the
