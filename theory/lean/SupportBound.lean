@@ -22,8 +22,9 @@ variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 def Occupied (k s : Nat) : Prop :=
   Confirmed m e r0 k s ∨ Confirmed m e r0 k (m.bar s)
 
-instance (k s : Nat) : Decidable (Occupied m e r0 k s) := by
-  unfold Occupied
+noncomputable instance (k s : Nat) : Decidable (Occupied m e r0 k s) := by
+  classical
+  unfold Occupied Confirmed
   infer_instance
 
 /-- Occupancy is independent of which endpoint represents the jump edge. -/
@@ -71,7 +72,8 @@ theorem empty_forever
   induction d with
   | zero => simpa using hempty
   | succ n ih =>
-      have hstep := empty_stays_empty m e r0 hrun hr0 (k+n) s ih
+      have ih' : ¬ Occupied m e r0 (k+n) s := ih (by omega)
+      have hstep := empty_stays_empty m e r0 hrun hr0 (k+n) s ih'
       simpa [Nat.add_assoc] using hstep
 
 end Echo
