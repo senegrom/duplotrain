@@ -53,7 +53,7 @@ private theorem pairRect_length (xs ys : List Nat) :
   induction xs with
   | nil => simp
   | cons a t ih =>
-      simp [ih, Nat.add_mul]
+      simp [ih, Nat.add_mul, Nat.add_comm]
 
 private theorem pairUniverse_length (slots : List Nat) :
     (pairUniverse slots).length = slots.length * slots.length := by
