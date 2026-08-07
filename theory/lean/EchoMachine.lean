@@ -1386,6 +1386,126 @@ theorem recurrence_emission (hrun : IsRun m e r0)
     rw [List.filter_congr hcong]
   omega
 
+/-- **The cycle dichotomy.**  Inside a register recurrence, every
+productive step either flips its own edge — the evicted slot is the
+arrival's jump partner: the Gray move — or hands off through a foreign
+edge that was already fully confirmed before the step. -/
+theorem recurrence_dichotomy (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hnd : slots.Nodup)
+    (hslots : ∀ j, e j ∈ slots) {k1 k2 j : Nat}
+    (hrec : ∀ c, reg m e r0 k1 c = reg m e r0 k2 c)
+    (hj1 : k1 ≤ j) (hj2 : j < k2)
+    (hp : ProductiveStep m e r0 j) :
+    reg m e r0 j (m.cellOf (e (j+1))) = m.bar (e (j+1)) ∨
+      (m.cellOf (m.bar (reg m e r0 j (m.cellOf (e (j+1)))))
+          ≠ m.cellOf (e (j+1)) ∧
+       Confirmed m e r0 j (m.bar (reg m e r0 j (m.cellOf (e (j+1)))))) := by
+  obtain ⟨_, hbo⟩ := recurrence_emission m e r0 hrun hr0 slots hnd hslots
+    hrec hj1 hj2 hp
+  rcases (confirmed_step m e r0 j
+      (m.bar (reg m e r0 j (m.cellOf (e (j+1)))))).mp hbo with hbe | ⟨hcne, hcj⟩
+  · left
+    have hb := congrArg m.bar hbe
+    rw [m.bar_invol] at hb
+    exact hb
+  · exact Or.inr ⟨hcne, hcj⟩
+
+/-! ### The steering seed: variation needs variation
+
+Registers move only through productive writes of their own cell
+(`change_has_productive`).  Combined with the witness identity this
+yields the first formal brick of the T10 delivery-chain argument:
+two different deliveries with a common witness cell force a productive
+write of that witness cell strictly between them.  A cell's variation
+must be steered by somebody's variation — the recursion whose LIFO
+closure is the nesting argument. -/
+
+/-- Registers move only through productive writes of their own cell. -/
+theorem change_has_productive {c i : Nat} :
+    ∀ d, reg m e r0 (i+d) c ≠ reg m e r0 i c →
+      ∃ t, i ≤ t ∧ t < i + d ∧ ProductiveStep m e r0 t ∧
+        m.cellOf (e (t+1)) = c := by
+  intro d
+  induction d with
+  | zero => intro h; exact absurd rfl h
+  | succ n ih =>
+      intro h
+      have h' : reg m e r0 (i+n+1) c ≠ reg m e r0 i c := h
+      by_cases hc : m.cellOf (e (i+n+1)) = c
+      · by_cases hp : ProductiveStep m e r0 (i+n)
+        · exact ⟨i+n, Nat.le_add_right _ _, by omega, hp, hc⟩
+        · have heq : e (i+n+1)
+              = reg m e r0 (i+n) (m.cellOf (e (i+n+1))) := by
+            by_cases hq : e (i+n+1)
+                = reg m e r0 (i+n) (m.cellOf (e (i+n+1)))
+            · exact hq
+            · exact absurd hq hp
+          rw [unproductive_stall m e r0 (i+n) heq c] at h'
+          obtain ⟨t, h1, h2, h3, h4⟩ := ih h'
+          exact ⟨t, h1, by omega, h3, h4⟩
+      · rw [reg_skip m e r0 hc] at h'
+        obtain ⟨t, h1, h2, h3, h4⟩ := ih h'
+        exact ⟨t, h1, by omega, h3, h4⟩
+
+/-- Arbitrary-time form: a register that differs at `i ≤ j` was moved
+by a productive write of its own cell strictly inside `[i, j)`. -/
+theorem change_has_productive_le {c i j : Nat} (hij : i ≤ j)
+    (h : reg m e r0 j c ≠ reg m e r0 i c) :
+    ∃ t, i ≤ t ∧ t < j ∧ ProductiveStep m e r0 t ∧
+      m.cellOf (e (t+1)) = c := by
+  obtain ⟨d, rfl⟩ : ∃ d, j = i + d := ⟨j - i, by omega⟩
+  exact change_has_productive m e r0 d h
+
+/-- **Variation needs variation.**  Two different deliveries whose
+witness cells coincide force a productive write of that witness cell
+strictly between them: reading the same cell twice can only hand out
+different slots if somebody productively rewrote it in the meantime.
+The steering recursion of T10, as a theorem. -/
+theorem variation_needs_variation (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) {j1 j2 : Nat}
+    (h12 : j1 < j2)
+    (hQ : m.cellOf (m.bar (e (j1+1))) = m.cellOf (m.bar (e (j2+1))))
+    (hne : e (j1+1) ≠ e (j2+1)) :
+    ∃ t, j1 ≤ t ∧ t < j2 ∧ ProductiveStep m e r0 t ∧
+      m.cellOf (e (t+1)) = m.cellOf (m.bar (e (j1+1))) := by
+  have h1 : reg m e r0 j1 (m.cellOf (m.bar (e (j1+1))))
+      = m.bar (e (j1+1)) := head_confirmed m e r0 hrun hr0 j1
+  have h2 : reg m e r0 j2 (m.cellOf (m.bar (e (j2+1))))
+      = m.bar (e (j2+1)) := head_confirmed m e r0 hrun hr0 j2
+  rw [← hQ] at h2
+  have hbar : m.bar (e (j1+1)) ≠ m.bar (e (j2+1)) := by
+    intro hb
+    have := congrArg m.bar hb
+    rw [m.bar_invol, m.bar_invol] at this
+    exact hne this
+  have hchange : reg m e r0 j2 (m.cellOf (m.bar (e (j1+1))))
+      ≠ reg m e r0 j1 (m.cellOf (m.bar (e (j1+1)))) := by
+    rw [h1, h2]
+    exact fun hh => hbar hh.symm
+  exact change_has_productive_le m e r0 (Nat.le_of_lt h12) hchange
+
+/-- **Trajectory determinism.**  Two moments at the same cell whose
+subsequent reads all agree produce identical entry sequences: the walk
+can only branch where some read differs — variation in the route must
+be fed by variation in a register somewhere along it. -/
+theorem trajectory_merge (hrun : IsRun m e r0) {i j : Nat}
+    (hcell : m.cellOf (e i) = m.cellOf (e j)) :
+    ∀ d, (∀ l, l ≤ d → reg m e r0 (i+l) (m.star (m.cellOf (e (i+l))))
+        = reg m e r0 (j+l) (m.star (m.cellOf (e (j+l))))) →
+      e (i+d+1) = e (j+d+1) := by
+  intro d
+  induction d with
+  | zero =>
+      intro h
+      exact succ_of_reg_eq m e r0 hrun hcell (h 0 (Nat.le_refl _))
+  | succ n ih =>
+      intro h
+      have hprev := ih (fun l hl => h l (by omega))
+      have hcell' : m.cellOf (e (i+n+1)) = m.cellOf (e (j+n+1)) :=
+        congrArg m.cellOf hprev
+      exact succ_of_reg_eq m e r0 hrun hcell' (h (n+1) (Nat.le_refl _))
+
 /-- **At most one token per cell, at every moment**: `bar` maps tokens
 injectively to confirmed slots, and each cell confirms exactly one
 slot.  So the machine's alternation capacity is bounded by the number

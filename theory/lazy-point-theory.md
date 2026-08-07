@@ -365,6 +365,19 @@ run:
   cycle's tokens are a **conserved population, handed from evicted
   slot to evicted slot, never destroyed**, and by the collapse the
   cycle's whole value repertoire is spanned by that fixed population.
+* **The cycle dichotomy** (`recurrence_dichotomy`): inside a
+  recurrence, every productive step either **flips its own edge** (the
+  evicted slot is the arrival's jump partner — the Gray move) or
+  **hands off through a foreign edge that was fully confirmed before
+  the step**.  Cycles move a hole through full edges, or flip lobes.
+* **The steering seed** (`change_has_productive`,
+  `variation_needs_variation`, `trajectory_merge`): registers move
+  only through productive writes of their own cell; two different
+  deliveries with a common witness cell force a productive write of
+  that witness cell strictly between them; and the walk's route can
+  only branch where a read differs.  These are the first formal bricks
+  of the T10 delivery-chain recursion: variation is never free — it
+  must be fed by variation upstream.
 
 Together these turn lemma B into a single sharp question: **can three
 or more tokens of the cycle's conserved population actually be

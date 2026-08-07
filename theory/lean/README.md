@@ -72,6 +72,10 @@ theorems, no `native_decide`, no `sorry`:
 | `repertoire_count` / `fresh_values_le_tokens` | the collapse, counted: σ(C) ≤ 1 + #tokens(C) for every cell, and **at most `#cells` fresh values ever appear in the whole run** — Σ(σ−1) ≤ #tokens ≤ #cells across all cells and all future time, unconditional |
 | `tokens_antitone` / `no_emission_drop` | heat decreases over arbitrary intervals; a productive step whose evicted slot does not come out a token **strictly** cools the machine |
 | `recurrence_emission` | **conservation on cycles**: inside any register recurrence every productive step re-emits — the eventual cycle's tokens are a conserved population, handed from evicted slot to evicted slot, never destroyed.  With the collapse, the cycle's whole value repertoire is spanned by that fixed population |
+| `recurrence_dichotomy` | **the cycle dichotomy**: inside a recurrence every productive step either flips its own edge (evicted = bar of arrival — the Gray move) or hands off through a foreign edge that was fully confirmed before the step |
+| `change_has_productive`(`_le`) | registers move only through productive writes of their own cell |
+| `variation_needs_variation` | **the steering seed (T10 brick 1)**: two different deliveries with a common witness cell force a productive write of that witness cell strictly between them — a cell's variation must be steered by somebody's variation |
+| `trajectory_merge` | **trajectory determinism**: two moments at the same cell whose subsequent reads all agree produce identical entry sequences — the walk branches only where a read differs |
 
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single
