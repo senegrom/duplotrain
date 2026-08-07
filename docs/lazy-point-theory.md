@@ -250,6 +250,58 @@ bound holds outright for every run that falls into a lobed Gray
 square, which is the pattern every exhausted machine's active cycle
 actually exhibits.
 
+## T10 (The delivery chains: why a lone alternator is impossible)
+
+Two further machine facts are Lean-checked
+(`reg_cell`, `witness`, `succ_of_reg_eq`):
+
+* **Witness identity.**  Every entry names its own delivery:
+  `cell (bar (e (k+1))) = star (cell (e k))`, and the partner's
+  register at read time *is* `bar (e (k+1))`.  So the walk's
+  predecessor structure is forced: the cell ascended before an entry
+  `x` is always `star (cell (bar x))`, and the witness cell
+  `cell (bar x)` must hold register `bar x` at that moment.
+* **Merge at the mouth.**  Two ascents of the same cell with equal
+  partner registers have identical successors: a cell's variation
+  cannot steer itself.
+
+**The nesting argument** (paper, the emerging proof of B).  Suppose a
+cycle has exactly one alternating cell C.  Every varying read is of C,
+so C's varying entries must themselves be `bar (s C)` — delivered by
+reading C — which by the witness identity makes C's own slots
+bar-paired inside C (a lobe) and makes C\* the predecessor of every
+C-ascent.  C\* is constant, entered always at some slot `w`, so its
+witness cell `H = cell (bar w)` must hold `bar w` and be read by H\*;
+H\*'s constant entry needs its own witness K read by K\*, and so on:
+**each delivery pushes a fresh frame, and the walk realises the frames
+as nested Z … Z\* excursions — a LIFO structure**.  Finitely many
+cells force the innermost frame to close directly: Z reads Z\* (value
+`q`) and jumps to `bar q` *inside* Z\* — so `q, bar q ∈ Z*`, i.e. the
+innermost frame is a **lobed alternator**: a second member of M.
+Contradiction — so m = 0 or m ≥ 2, and the observed saturation (each
+alternator's variation is fully consumed steering the other) is what
+caps m at exactly 2.  The two open steps to a full proof of B: (a)
+rigorise the finiteness/nesting step, (b) show a third alternator has
+no steering source left.
+
+**The (2,2) attractor shapes** (exhaustive classification, C = 4 and
+C = 6 complete, 10.6M runs): writing L for an alternator whose two
+slots are bar-paired to each other (a lobe) and E for one steered
+through external constant cells,
+
+| signature | mouth relation | example |
+|---|---|---|
+| (L, L) | partners | the dogbone (covered by `absorb`) |
+| (L, L) | non-partners | lobed pair steering at a distance |
+| (E, L) | partners and non-partners | one lobe, one external steer |
+| (E, E) | partners | all steering through constant cells |
+
+A **direct cross** (alternators bar-paired into each other without
+lobes) never occurs.  Non-partner pairs confirm that steering is
+routed through constant chains, exactly as the nesting argument
+predicts; generalising `absorb` to the E-signatures is the remaining
+formal step of the lobed→general trap programme.
+
 ## The unconditional bounds (machine-checked, general N)
 
 Two upper bounds hold with **no** open lemma behind them:

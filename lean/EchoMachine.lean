@@ -162,6 +162,52 @@ theorem entry_change_read_change (hrun : IsRun m e r0) {i j : Nat}
   have hj := hrun j
   rw [hj, heq, ← hi]
 
+/-- Registers are well-formed: if the initial registers hold slots of
+their own cells, they do so forever (writes only store own-cell
+entries). -/
+theorem reg_cell (hr0 : ∀ c, m.cellOf (r0 c) = c) :
+    ∀ k c, m.cellOf (reg m e r0 k c) = c := by
+  intro k
+  induction k with
+  | zero =>
+      intro c
+      by_cases h : m.cellOf (e 0) = c
+      · rw [reg_write m e r0 h]; exact h
+      · show m.cellOf (if m.cellOf (e 0) = c then e 0 else r0 c) = c
+        rw [if_neg h]; exact hr0 c
+  | succ n ih =>
+      intro c
+      by_cases h : m.cellOf (e (n+1)) = c
+      · rw [reg_write m e r0 h]; exact h
+      · rw [reg_skip m e r0 h]; exact ih c
+
+/-- **The witness identity.**  Every entry names its own delivery: the
+cell of `bar (e (k+1))` is exactly the mouth partner of the previous
+cell, and that partner's register at read time is exactly
+`bar (e (k+1))`.  This pins the walk's predecessor structure — the
+formal seed of the delivery-chain (nesting) analysis of lemma B. -/
+theorem witness (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (k : Nat) :
+    m.cellOf (m.bar (e (k+1))) = m.star (m.cellOf (e k)) ∧
+    reg m e r0 k (m.star (m.cellOf (e k))) = m.bar (e (k+1)) := by
+  have h := hrun k
+  have hv : m.bar (e (k+1)) = reg m e r0 k (m.star (m.cellOf (e k))) := by
+    rw [h, m.bar_invol]
+  constructor
+  · rw [hv]; exact reg_cell m e r0 hr0 k _
+  · exact hv.symm
+
+/-- **Merge at the mouth, direct form.**  Two ascents of the same cell
+whose partner registers agree at read time have identical successors:
+an alternating cell cannot steer its own variation. -/
+theorem succ_of_reg_eq (hrun : IsRun m e r0) {i j : Nat}
+    (hcell : m.cellOf (e i) = m.cellOf (e j))
+    (hreg : reg m e r0 i (m.star (m.cellOf (e i)))
+          = reg m e r0 j (m.star (m.cellOf (e j)))) :
+    e (i+1) = e (j+1) := by
+  rw [hrun i, hrun j, hcell] at *
+  exact congrArg m.bar hreg
+
 /-- The dogbone pattern: consecutive ascents are of partner cells. -/
 def Alternating : Prop :=
   ∀ k, m.cellOf (e (k+1)) = m.star (m.cellOf (e k))

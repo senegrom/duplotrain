@@ -38,6 +38,8 @@ theorems, no `native_decide`, no `sorry`:
 | `unproductive_stall` | a write that re-stores the current value changes **no** register: states move only through productive writes |
 | `productive_first_or_alternation` | **the accounting theorem**: every productive write is the *first* write of its cell (≤ N over a run) or an *alternation* — the unconditional skeleton of f(N) ≤ N + O(1) |
 | `absorb` / `absorb_entries` | **absorption**: a doubly-lobed mouth pair entered compatibly traps the walk forever — every later entry lies in `{a, bar a, b, bar b}`, so all subsequent alternations are confined to the two cells (the lobed case of lemma B, as an attractor) |
+| `reg_cell` / `witness` | registers stay in their own cells, and **every entry names its delivery**: `cell (bar (e (k+1))) = star (cell (e k))` with the partner register equal to `bar (e (k+1))` — the predecessor structure is forced (seed of the T10 nesting argument) |
+| `succ_of_reg_eq` | merge at the mouth, direct form: same cell + equal partner registers ⇒ identical successors — variation cannot steer itself |
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real
 pigeonhole proof (induction on N, splitting on the first coordinate),
