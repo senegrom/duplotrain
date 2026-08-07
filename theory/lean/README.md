@@ -1,6 +1,27 @@
 # Formal proofs (Lean 4)
 
-Four libraries, all self-contained (no Mathlib):
+Thirteen libraries, all self-contained (no Mathlib).  Core five below;
+plus the accounting/monovariant satellites (all sorry-free, honestly
+conditional where marked):
+
+* `LinearBound.lean` — **snapshots ≤ #cells + #alts + 1**, for any
+  alternation list covering the prefix: the unconditional accounting
+  with an arbitrary alternation budget (no Gray tail needed).
+* `SlotBound.lean` — **snapshots ≤ #slots + 1 under one hypothesis**,
+  `ProductiveSlotReplay` (two productive arrivals at the same slot give
+  the same snapshot): the cleanest known single-lemma reduction of the
+  O(N) state law.
+* `ReplayFacts.lean` — first steps toward proving that hypothesis:
+  equal delivered entries force equal registers at the destination and
+  source cells.
+* `AlternationBound.lean` — forced-predecessor lemmas and a
+  conditional two-alternations-per-cell bound.
+* `SupportBound.lean` / `SupportMove.lean` — the edge-occupancy
+  monovariant: an empty jump edge (neither end confirmed) stays empty
+  forever; transfer laws for fully-confirmed edges.
+* `EdgeReversal.lean` — the cell-level walk arrow reverses after
+  traversal (the LIFO seed at cell level).
+* `PairBound.lean` — distinct consecutive-entry pairs number ≤ #slots².
 
 **`GeneralN.lean` — general-N theorems, no exhaustion.** Every result holds
 for an arbitrary number of switches and arbitrary wirings, proved by
