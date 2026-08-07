@@ -1506,6 +1506,118 @@ theorem trajectory_merge (hrun : IsRun m e r0) {i j : Nat}
         congrArg m.cellOf hprev
       exact succ_of_reg_eq m e r0 hrun hcell' (h (n+1) (Nat.le_refl _))
 
+/-! ### The Gray tail from the token shape
+
+The shape every exhaustion exhibits — at most one token in each of two
+cells, none anywhere else — forces the Gray square: every later
+snapshot is one of four explicit lists (`token_shape_tail`), so at
+most 4 distinct snapshots occur from that moment on (`gray_tail`), and
+the conditional scaffold re-bases onto the token shape
+(`state_law_of_token_shape`).  This is the quantitative half of lemma
+B as a theorem; what stays open is exactly that every run *reaches*
+the (≤1, ≤1, 0, …) token shape within O(1) alternations. -/
+
+/-- Under the (≤1, ≤1, 0, …) token shape at `K`, every snapshot from
+`K` on is one of four explicit candidates: frozen cells keep their
+`K`-registers and the two steering cells each hold their `K`-register
+or their single token. -/
+theorem token_shape_tail (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hslots : ∀ j, e j ∈ slots)
+    {K C1 C2 t1 t2 : Nat}
+    (h1 : ∀ s ∈ cellTokens m e r0 slots C1 K, s = t1)
+    (h2 : ∀ s ∈ cellTokens m e r0 slots C2 K, s = t2)
+    (h0 : ∀ C, C ≠ C1 → C ≠ C2 → ∀ s, s ∉ cellTokens m e r0 slots C K)
+    (cells : List Nat) :
+    ∀ j, K ≤ j → snap m e r0 cells j ∈
+      [cells.map (fun c => if c = C1 then reg m e r0 K C1
+          else if c = C2 then reg m e r0 K C2 else reg m e r0 K c),
+       cells.map (fun c => if c = C1 then reg m e r0 K C1
+          else if c = C2 then t2 else reg m e r0 K c),
+       cells.map (fun c => if c = C1 then t1
+          else if c = C2 then reg m e r0 K C2 else reg m e r0 K c),
+       cells.map (fun c => if c = C1 then t1
+          else if c = C2 then t2 else reg m e r0 K c)] := by
+  intro j hj
+  have hfrozen : ∀ c, c ≠ C1 → c ≠ C2 →
+      reg m e r0 j c = reg m e r0 K c := by
+    intro c hc1 hc2
+    obtain ⟨d, hd⟩ : ∃ d, j = K + d := ⟨j - K, by omega⟩
+    rw [hd]
+    exact (freezeout m e r0 hrun hr0 slots hslots (h0 c hc1 hc2) d).2
+  have hcand : snap m e r0 cells j
+      = cells.map (fun c => if c = C1 then reg m e r0 j C1
+          else if c = C2 then reg m e r0 j C2
+          else reg m e r0 K c) := by
+    unfold snap
+    apply map_congr'
+    intro c _
+    by_cases hc1 : c = C1
+    · rw [if_pos hc1, hc1]
+    · rw [if_neg hc1]
+      by_cases hc2 : c = C2
+      · rw [if_pos hc2, hc2]
+      · rw [if_neg hc2]
+        exact hfrozen c hc1 hc2
+  rw [hcand]
+  have hL1 := singleton_lock_reg m e r0 hrun hr0 slots hslots h1 hj
+  have hL2 := singleton_lock_reg m e r0 hrun hr0 slots hslots h2 hj
+  rcases hL1 with ha | ha <;> rcases hL2 with hb | hb <;> rw [ha, hb]
+  · exact List.mem_cons_self
+  · exact List.mem_cons_of_mem _ List.mem_cons_self
+  · exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _
+      List.mem_cons_self)
+  · exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _
+      (List.mem_cons_of_mem _ List.mem_cons_self))
+
+/-- **The Gray tail.**  From any moment at which the token population
+has the observed shape — at most one token in each of two cells, none
+anywhere else — the machine visits at most **4** distinct register
+snapshots, ever, on any cell support. -/
+theorem gray_tail (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hslots : ∀ j, e j ∈ slots)
+    {K C1 C2 t1 t2 : Nat}
+    (h1 : ∀ s ∈ cellTokens m e r0 slots C1 K, s = t1)
+    (h2 : ∀ s ∈ cellTokens m e r0 slots C2 K, s = t2)
+    (h0 : ∀ C, C ≠ C1 → C ≠ C2 → ∀ s, s ∉ cellTokens m e r0 slots C K)
+    (cells ks : List Nat)
+    (hks : ∀ j ∈ ks, K ≤ j)
+    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
+    ks.length ≤ 4 := by
+  have hle := nodup_subset_length hnd
+    (fun v hv => by
+      obtain ⟨j, hjks, rfl⟩ := List.mem_map.mp hv
+      exact token_shape_tail m e r0 hrun hr0 slots hslots h1 h2 h0
+        cells j (hks j hjks))
+  rw [List.length_map] at hle
+  exact hle
+
+/-- The conditional scaffold, re-based onto the token shape: IF from
+some `K` the token population has the observed shape AND at most one
+alternation occurs before `K`, THEN at most `#cells + 6` distinct
+snapshots occur, ever.  The open core is now exactly: every run
+reaches the (≤1, ≤1, 0, …) token shape within one alternation. -/
+theorem state_law_of_token_shape (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hslots : ∀ j, e j ∈ slots)
+    (cells : List Nat) (hcells : ∀ k, m.cellOf (e k) ∈ cells)
+    {K C1 C2 t1 t2 : Nat}
+    (h1 : ∀ s ∈ cellTokens m e r0 slots C1 K, s = t1)
+    (h2 : ∀ s ∈ cellTokens m e r0 slots C2 K, s = t2)
+    (h0 : ∀ C, C ≠ C1 → C ≠ C2 → ∀ s, s ∉ cellTokens m e r0 slots C K)
+    (alts : List Nat) (halts : alts.length ≤ 1)
+    (hcover : ∀ i, i < K → ProductiveStep m e r0 i →
+      FirstStep m e i ∨ i ∈ alts)
+    (ks : List Nat)
+    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
+    ks.length ≤ cells.length + 6 := by
+  refine state_law m e r0 hrun cells hcells K _ ?_
+    (fun j hj => token_shape_tail m e r0 hrun hr0 slots hslots
+      h1 h2 h0 cells j hj)
+    alts halts hcover ks hnd
+  exact Nat.le_refl 4
+
 /-- **At most one token per cell, at every moment**: `bar` maps tokens
 injectively to confirmed slots, and each cell confirms exactly one
 slot.  So the machine's alternation capacity is bounded by the number
