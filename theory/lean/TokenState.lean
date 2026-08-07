@@ -28,8 +28,9 @@ theorem confirmed_iff_occupied_not_token (k s : Nat) :
   · rintro ⟨ho, hnt⟩
     rcases ho with hc | hb
     · exact hc
-    · by_contra hnc
-      exact hnt ⟨hnc, hb⟩
+    · by_cases hc : Confirmed m e r0 k s
+      · exact hc
+      · exact absurd ⟨hc, hb⟩ hnt
 
 /-- Pointwise equality of occupied support and token ends forces equality of
 one register. -/
