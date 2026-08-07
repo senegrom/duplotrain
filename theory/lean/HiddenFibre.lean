@@ -124,8 +124,6 @@ theorem productive_reversal_or_parallel
     intro hnone
     apply hs
     intro c
-    by_contra hne
-    apply hnone
-    exact ⟨c, hne⟩
+    exact Classical.byContradiction (fun hne => hnone ⟨c, hne⟩)
 
 end Echo
