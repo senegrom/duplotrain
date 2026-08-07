@@ -3,15 +3,9 @@ import TokenState
 /-!
 # Per-cell heat is non-increasing
 
-The global token count is known to be non-increasing.  More strongly, tokens
-cannot migrate between cells: a productive arrival consumes a token in the
-cell it writes and can only re-emit the previous register of that same cell.
-Consequently each cell's token count is individually non-increasing.
-
-Thus over a whole run there are at most as many strict local heat losses as
-there are initial tokens.  Between losses every productive step is a
-conservative token hand-off, the pointer-reversal regime relevant to the
-pair-return theorem.
+Tokens cannot migrate between cells: a productive arrival consumes a token in
+the cell it writes and can only re-emit the previous register of that same
+cell.  Consequently each cell's token count is individually non-increasing.
 -/
 
 namespace Echo
@@ -57,8 +51,7 @@ private theorem nodup_subset_length_local {l S : List Nat}
       simp only [List.length_cons]
       omega
 
-/-- **Local heat never grows.**  The number of token ends belonging to any
-fixed cell is non-increasing at every machine step. -/
+/-- **Local heat never grows.** -/
 theorem cellTokens_nonincreasing
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (slots : List Nat) (hnd : slots.Nodup)
@@ -125,9 +118,9 @@ theorem cellTokens_antitone
   obtain ⟨d, rfl⟩ : ∃ d, j = i + d := ⟨j-i, by omega⟩
   induction d with
   | zero => exact Nat.le_refl _
-  | succ n =>
-      exact Nat.le_trans
-        (cellTokens_nonincreasing m e r0 hrun hr0 slots hnd hslots C (i+n))
-        (by simpa [Nat.add_assoc] using n)
+  | succ n ih =>
+      have hstep := cellTokens_nonincreasing m e r0 hrun hr0 slots hnd
+        hslots C (i+n)
+      exact Nat.le_trans (by simpa [Nat.add_assoc] using hstep) ih
 
 end Echo
