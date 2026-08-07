@@ -83,8 +83,9 @@ theorem nextCell_changed_source
     {k c : Nat}
     (hchg : nextCell m e r0 (k+1) c ≠ nextCell m e r0 k c) :
     c = m.star (m.cellOf (e (k+1))) := by
-  by_contra hne
-  exact hchg (nextCell_skip m e r0 hne)
+  by_cases h : c = m.star (m.cellOf (e (k+1)))
+  · exact h
+  · exact absurd (nextCell_skip m e r0 h) hchg
 
 /-- If the mirror arrow already points backwards, the step makes no change at
 all to the cell-level arrow function.  Such a step may still change a slot
