@@ -84,6 +84,10 @@ theorems, no `native_decide`, no `sorry`:
 | `trajectory_merge` | **trajectory determinism**: two moments at the same cell whose subsequent reads all agree produce identical entry sequences — the walk branches only where a read differs |
 | `token_shape_tail` / `gray_tail` | **the Gray tail from the token shape**: under the shape every exhaustion exhibits — ≤1 token in each of two cells, none anywhere else — every later snapshot is one of **four explicit candidates**, so at most 4 distinct snapshots occur, ever: the quantitative half of lemma B |
 | `state_law_of_token_shape` | the conditional scaffold re-based: token shape at `K` + ≤1 alternation before `K` ⇒ ≤ `#cells + 6` snapshots.  The open core is now exactly *reaching* the token shape within one alternation |
+| `divergence_names_steer` | **the steering locator**: a recurring entry that later diverges names a moment where the entries still agree and a productive write of `star(cellOf ·)` lands strictly between the visits — steering is never anonymous |
+| `mouth_entry_productive` / `mouth_delivery_lobe` | mouth crossings are always productive; deliveries across a mouth hand out the entered cell's own lobe slots (witness + involution) |
+| `quiet_mouth_unreachable` | **the quiet mouth is unreachable**: no productive-free stretch can lead from a cell to its mouth partner — the quiet path is forced to be its own `bar`-reflection (the machine-level retrace), whose middle is a `star` fixed point or an unproductive mouth crossing, both impossible |
+| `read_back_productive` / `lone_write_no_mouth` | **a lone alternating cell cannot steer itself**: reading a cell's variation back costs a productive step in between, and a walk whose every productive write lands in its start cell can *never* reach that cell's mouth partner — for every machine, every run, every `N` |
 
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single

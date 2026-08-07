@@ -371,13 +371,32 @@ run:
   **hands off through a foreign edge that was fully confirmed before
   the step**.  Cycles move a hole through full edges, or flip lobes.
 * **The steering seed** (`change_has_productive`,
-  `variation_needs_variation`, `trajectory_merge`): registers move
-  only through productive writes of their own cell; two different
-  deliveries with a common witness cell force a productive write of
-  that witness cell strictly between them; and the walk's route can
-  only branch where a read differs.  These are the first formal bricks
-  of the T10 delivery-chain recursion: variation is never free — it
-  must be fed by variation upstream.
+  `variation_needs_variation`, `trajectory_merge`,
+  `divergence_names_steer`): registers move only through productive
+  writes of their own cell; two different deliveries with a common
+  witness cell force a productive write of that witness cell strictly
+  between them; the walk's route can only branch where a read differs
+  — and a recurring entry that later diverges *names* the steering
+  cell (star of a visited cell) and the productive write that steered.
+  Variation is never free: it must be fed by variation upstream.
+* **The quiet mouth is unreachable** (`quiet_mouth_unreachable`,
+  `read_back_productive`, `lone_write_no_mouth`, with
+  `mouth_entry_productive` / `mouth_delivery_lobe`): a walk can
+  **never** travel from a cell to that cell's mouth partner through
+  unproductive steps alone.  The productive-free path is forced to be
+  its own `bar`-reflection — entry `j` steps from the end is `bar` of
+  entry `j+1` steps from the start, the machine-level *retrace* — so
+  its middle would be a `star` fixed point (impossible) or an
+  unproductive mouth crossing (impossible: mouth entries are always
+  productive).  Hence **every read-back of a cell's variation costs a
+  productive write strictly in between**, and a walk whose every
+  productive write lands in its start cell can never reach that
+  cell's mouth partner at all: **a lone alternating cell cannot steer
+  itself** — the self-steering half of "no `(2)`-alone profile",
+  machine-checked for all N.  (The full m ≠ 1 on cycles additionally
+  needs the frozen-witness routing case, which reduces to
+  `divergence_names_steer` naming `star C` as a visited cell; the
+  assembly over eventual periodicity is the remaining step.)
 
 Together these turn lemma B into a single sharp question: **can three
 or more tokens of the cycle's conserved population actually be

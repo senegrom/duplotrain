@@ -1506,6 +1506,223 @@ theorem trajectory_merge (hrun : IsRun m e r0) {i j : Nat}
         congrArg m.cellOf hprev
       exact succ_of_reg_eq m e r0 hrun hcell' (h (n+1) (Nat.le_refl _))
 
+/-- **The steering locator.**  If an entry recurs but the trajectories
+afterwards diverge, some visited cell's mouth partner was productively
+rewritten strictly between the two visits — and the theorem names it:
+divergence within `n` steps locates a moment `l < n` where the entries
+still agree and a productive write of `star (cellOf (e (i+l)))` lands
+in `[i+l, j+l)`.  Steering is never anonymous: every branch of the
+walk is paid for by a named productive write of a read cell. -/
+theorem divergence_names_steer (hrun : IsRun m e r0) {i j : Nat}
+    (hij : i ≤ j) :
+    ∀ n, e i = e j → e (i+n) ≠ e (j+n) →
+      ∃ l, l < n ∧ e (i+l) = e (j+l) ∧
+        ∃ t, i + l ≤ t ∧ t < j + l ∧ ProductiveStep m e r0 t ∧
+          m.cellOf (e (t+1)) = m.star (m.cellOf (e (i+l))) := by
+  intro n
+  induction n with
+  | zero =>
+      intro h0 hne
+      exact absurd h0 hne
+  | succ n ih =>
+      intro h0 hne
+      by_cases hn : e (i+n) = e (j+n)
+      · have hne1 : e (i+n+1) ≠ e (j+n+1) := hne
+        have hcell : m.cellOf (e (i+n)) = m.cellOf (e (j+n)) :=
+          congrArg m.cellOf hn
+        have hread := entry_change_read_change m e r0 hrun hcell
+          (fun hh => hne1 hh.symm)
+        rw [← hcell] at hread
+        have hprod := change_has_productive_le m e r0
+          (Nat.add_le_add_right hij n) hread
+        exact ⟨n, Nat.lt_succ_self n, hn, hprod⟩
+      · obtain ⟨l, hl, hel, ht⟩ := ih h0 hn
+        exact ⟨l, Nat.lt_succ_of_lt hl, hel, ht⟩
+
+/-- **Mouth entries are hot.**  Whenever the walk steps into the mouth
+partner of its current cell, the step is productive (provided the read
+register is not a `bar`-fixed point, which no physical wiring has): an
+unproductive mouth crossing would need `bar r = r`.  Consequently a
+productive-free stretch can never cross a mouth — frozen interludes
+move only along non-mouth jumps. -/
+theorem mouth_entry_productive (hrun : IsRun m e r0) {t : Nat}
+    (hfix : m.bar (reg m e r0 t (m.star (m.cellOf (e t))))
+      ≠ reg m e r0 t (m.star (m.cellOf (e t))))
+    (hmouth : m.cellOf (e (t+1)) = m.star (m.cellOf (e t))) :
+    ProductiveStep m e r0 t := by
+  intro hun
+  apply hfix
+  rw [← hrun t, hun, hmouth]
+
+/-- **Mouth deliveries are lobe deliveries.**  A delivery whose
+predecessor sits at the entered cell's mouth partner has its
+`bar`-partner inside the entered cell itself: reading a cell from its
+own mouth can only hand out that cell's lobe slots.  (The witness
+identity plus the `star` involution — the "forced lobe" step of the
+nesting argument.) -/
+theorem mouth_delivery_lobe (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) {k C : Nat}
+    (hpred : m.cellOf (e k) = m.star C)
+    (_harr : m.cellOf (e (k+1)) = C) :
+    m.cellOf (m.bar (e (k+1))) = C := by
+  have hw := (witness m e r0 hrun hr0 k).1
+  rw [hw, hpred, m.star_invol]
+
+/-- Registers are constant across a productive-free stretch. -/
+theorem quiet_reg {i : Nat} :
+    ∀ d, (∀ t, i ≤ t → t < i + d → ¬ ProductiveStep m e r0 t) →
+      ∀ c, reg m e r0 (i + d) c = reg m e r0 i c := by
+  intro d
+  induction d with
+  | zero => intro _ c; rfl
+  | succ n ih =>
+      intro hq c
+      have hun : e (i+n+1) = reg m e r0 (i+n) (m.cellOf (e (i+n+1))) := by
+        by_cases hq2 : e (i+n+1) = reg m e r0 (i+n) (m.cellOf (e (i+n+1)))
+        · exact hq2
+        · exact absurd hq2 (hq (i+n) (Nat.le_add_right _ _) (by omega))
+      calc reg m e r0 (i + (n+1)) c
+          = reg m e r0 (i+n) c := unproductive_stall m e r0 (i+n) hun c
+        _ = reg m e r0 i c := ih (fun t h1 h2 => hq t h1 (by omega)) c
+
+/-- **The quiet mouth is unreachable.**  A walk can never travel from
+a cell to that cell's mouth partner through unproductive steps alone.
+The productive-free path is forced to be the `bar`-reflection of
+itself — the machine-level retrace: entry `j` steps from the end is
+`bar` of entry `j+1` steps from the start — so its middle would be
+either a `star` fixed point or an unproductive mouth crossing, both
+impossible.  Consequence: **reading a cell's own variation back costs
+a productive write strictly between the ascent and the read** — the
+walk cannot quietly turn around and look at what it just wrote.  This
+is the engine behind "a lone alternating cell cannot steer itself". -/
+theorem quiet_mouth_unreachable (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (hbar : ∀ s, m.bar s ≠ s) {i p : Nat}
+    (hquiet : ∀ t, i ≤ t → t < i + p → ¬ ProductiveStep m e r0 t)
+    (hmouth : m.cellOf (e (i + p)) = m.star (m.cellOf (e i))) :
+    False := by
+  have hpair : ∀ j, j ≤ p →
+      m.cellOf (e (i + (p - j))) = m.star (m.cellOf (e (i + j))) := by
+    intro j
+    induction j with
+    | zero => intro _; exact hmouth
+    | succ n ih =>
+        intro hn1
+        have IH := ih (by omega)
+        have ht : i + (p - n) = (i + (p - (n+1))) + 1 := by omega
+        have hq1 : ¬ ProductiveStep m e r0 (i + (p - (n+1))) :=
+          hquiet _ (Nat.le_add_right _ _) (by omega)
+        have hun : e ((i + (p - (n+1))) + 1)
+            = reg m e r0 (i + (p - (n+1)))
+                (m.cellOf (e ((i + (p - (n+1))) + 1))) := by
+          by_cases hq2 : e ((i + (p - (n+1))) + 1)
+              = reg m e r0 (i + (p - (n+1)))
+                  (m.cellOf (e ((i + (p - (n+1))) + 1)))
+          · exact hq2
+          · exact absurd hq2 hq1
+        rw [← ht] at hun
+        have hreg1 : ∀ c, reg m e r0 (i + (p - (n+1))) c
+            = reg m e r0 i c :=
+          quiet_reg m e r0 (p - (n+1))
+            (fun t h1 h2 => hquiet t h1 (by omega))
+        have hreg2 : ∀ c, reg m e r0 (i + n) c = reg m e r0 i c :=
+          quiet_reg m e r0 n (fun t h1 h2 => hquiet t h1 (by omega))
+        have hval : e (i + (p - n))
+            = reg m e r0 i (m.star (m.cellOf (e (i + n)))) := by
+          rw [hun, hreg1, IH]
+        have hfwd : e (i + n + 1)
+            = m.bar (reg m e r0 i (m.star (m.cellOf (e (i + n))))) := by
+          rw [hrun (i + n), hreg2]
+        have hpal : m.bar (e (i + (p - n))) = e (i + n + 1) := by
+          rw [hval, hfwd]
+        have hw := (witness m e r0 hrun hr0 (i + (p - (n+1)))).1
+        rw [← ht] at hw
+        rw [hpal] at hw
+        have hst := congrArg m.star hw
+        rw [m.star_invol] at hst
+        exact hst.symm
+  have hsplit : p = 2 * (p / 2) ∨ p = 2 * (p / 2) + 1 := by omega
+  rcases hsplit with hq | hq
+  · have h := hpair (p / 2) (by omega)
+    have hsub : p - p / 2 = p / 2 := by omega
+    rw [hsub] at h
+    exact m.star_ne _ h.symm
+  · have h := hpair (p / 2) (by omega)
+    have hsub : p - p / 2 = p / 2 + 1 := by omega
+    rw [hsub] at h
+    have hq1 : ¬ ProductiveStep m e r0 (i + p / 2) :=
+      hquiet _ (Nat.le_add_right _ _) (by omega)
+    have hun : e (i + p / 2 + 1)
+        = reg m e r0 (i + p / 2) (m.cellOf (e (i + p / 2 + 1))) := by
+      by_cases hq2 : e (i + p / 2 + 1)
+          = reg m e r0 (i + p / 2) (m.cellOf (e (i + p / 2 + 1)))
+      · exact hq2
+      · exact absurd hq2 hq1
+    have hcell : m.cellOf (e (i + p / 2 + 1))
+        = m.star (m.cellOf (e (i + p / 2))) := h
+    rw [hcell] at hun
+    have hstep := hrun (i + p / 2)
+    rw [hun] at hstep
+    exact hbar _ hstep.symm
+
+/-- **Every read-back is paid for.**  If the walk stands in a cell's
+mouth partner `p` steps after standing in the cell, some step in
+between was productive: variation cannot be observed for free. -/
+theorem read_back_productive (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) (hbar : ∀ s, m.bar s ≠ s)
+    {i p : Nat}
+    (hmouth : m.cellOf (e (i + p)) = m.star (m.cellOf (e i))) :
+    ∃ t, i ≤ t ∧ t < i + p ∧ ProductiveStep m e r0 t := by
+  by_cases h : ∃ t, i ≤ t ∧ t < i + p ∧ ProductiveStep m e r0 t
+  · exact h
+  · exact (quiet_mouth_unreachable m e r0 hrun hr0 hbar
+      (fun t h1 h2 hp => h ⟨t, h1, h2, hp⟩) hmouth).elim
+
+/-- **The lone alternator cannot reach its own mouth.**  A walk whose
+every productive write (throughout the stretch) lands in the cell it
+started from can never arrive at that cell's mouth partner: each
+attempted approach needs an interior productive step, which by
+hypothesis is another visit to the start cell — and the remaining,
+strictly shorter approach fails by induction.  So a cell that is the
+only cell being written can never have its register read back:
+**a lone alternating cell cannot steer itself**, for every machine,
+every run, every `N`. -/
+theorem lone_write_no_mouth (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) (hbar : ∀ s, m.bar s ≠ s) :
+    ∀ p i, (∀ t, i ≤ t → t < i + p → ProductiveStep m e r0 t →
+        m.cellOf (e (t+1)) = m.cellOf (e i)) →
+      m.cellOf (e (i + p)) ≠ m.star (m.cellOf (e i)) := by
+  have main : ∀ P p, p ≤ P → ∀ i,
+      (∀ t, i ≤ t → t < i + p → ProductiveStep m e r0 t →
+        m.cellOf (e (t+1)) = m.cellOf (e i)) →
+      m.cellOf (e (i + p)) ≠ m.star (m.cellOf (e i)) := by
+    intro P
+    induction P with
+    | zero =>
+        intro p hp i _ hmouth
+        have hp0 : p = 0 := by omega
+        subst hp0
+        exact m.star_ne _ hmouth.symm
+    | succ Q IH =>
+        intro p hp i hlone hmouth
+        obtain ⟨t, h1, h2, hprod⟩ :=
+          read_back_productive m e r0 hrun hr0 hbar hmouth
+        have hC := hlone t h1 h2 hprod
+        have hlone' : ∀ t', t+1 ≤ t' → t' < (t+1) + (i + p - (t+1)) →
+            ProductiveStep m e r0 t' →
+            m.cellOf (e (t'+1)) = m.cellOf (e (t+1)) := by
+          intro t' ht1 ht2 hp'
+          rw [hC]
+          exact hlone t' (by omega) (by omega) hp'
+        have hmouth' : m.cellOf (e ((t+1) + (i + p - (t+1))))
+            = m.star (m.cellOf (e (t+1))) := by
+          have harith : (t+1) + (i + p - (t+1)) = i + p := by omega
+          rw [harith, hC]
+          exact hmouth
+        exact IH (i + p - (t+1)) (by omega) (t+1) hlone' hmouth'
+  intro p i
+  exact main p p (Nat.le_refl _) i
+
 /-! ### The Gray tail from the token shape
 
 The shape every exhaustion exhibits — at most one token in each of two
