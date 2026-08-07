@@ -29,7 +29,7 @@ private theorem square_four_plus : ∀ d : Nat,
       have hlin : 2*n + 1 ≤ n*n := by
         have h1 : 2*n + 1 ≤ 3*n := by omega
         have h2 : 3*n ≤ n*n := Nat.mul_le_mul_right n hn
-        exact h1.trans h2
+        exact Nat.le_trans h1 h2
       have hexpand : (n+1)*(n+1) = n*n + (2*n+1) := by
         simp [Nat.add_mul, Nat.mul_add, Nat.two_mul]
         omega
@@ -44,7 +44,7 @@ private theorem square_four_plus : ∀ d : Nat,
         exact Nat.mul_comm _ _
       have hnext : (n+1)*(n+1) ≤ 2^(n+1) := by
         rw [← hp]
-        exact hsquare.trans hdouble
+        exact Nat.le_trans hsquare hdouble
       simpa [n, Nat.add_assoc] using hnext
 
 /-- A tree component with `v ≥ 2` cells has `v-1` possible full-edge markers,
@@ -64,7 +64,7 @@ theorem tree_marker_square {v : Nat} (hv : 2 ≤ v) :
               have h := square_four_plus d
               have hp : 2^(4+d) ≤ 2^(5+d) :=
                 Nat.pow_le_pow_right (by omega) (by omega)
-              simpa [Nat.add_assoc] using h.trans hp
+              simpa [Nat.add_assoc] using Nat.le_trans h hp
 
 /-- The two possible orientations of a loop-free cycle component obey the
 same square-capacity bound. -/
