@@ -165,7 +165,6 @@ theorem descending_chain_bound (N : Nat) (vs : List (List Bool))
 /-- Support vector on a chosen list of jump-edge representatives.  It is safe
 if the list contains both endpoints too; that only duplicates coordinates and
 weakens the numerical bound. -/
-open Classical in
 noncomputable def supportSnap (edges : List Nat) (k : Nat) : List Bool :=
   edges.map (fun s => decide (Occupied m e r0 k s))
 
