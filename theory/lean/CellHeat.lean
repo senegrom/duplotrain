@@ -106,6 +106,7 @@ theorem cellTokens_nonincreasing
       · exact hq
       · exact absurd hq hp
     rw [cellTokens_stall m e r0 heq slots C]
+    exact Nat.le_refl _
 
 /-- Local token counts are antitone over arbitrary time intervals. -/
 theorem cellTokens_antitone
@@ -116,6 +117,7 @@ theorem cellTokens_antitone
     (cellTokens m e r0 slots C j).length
       ≤ (cellTokens m e r0 slots C i).length := by
   obtain ⟨d, rfl⟩ : ∃ d, j = i + d := ⟨j-i, by omega⟩
+  clear hij
   induction d with
   | zero => exact Nat.le_refl _
   | succ n ih =>
