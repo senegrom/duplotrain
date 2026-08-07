@@ -237,6 +237,132 @@ private theorem exists_last {P : Nat → Prop} :
         · exact hie ▸ hn
         · exact h3 i hi1 (by omega)
 
+/-- **Absorption step.**  If the current entry is one of the lobe slots
+`{a, bar a}` of cell A and the partner cell B's register holds one of
+its lobe slots `{b, bar b}`, the same holds two steps later — with the
+intermediate entry in `{b, bar b}`. -/
+private theorem absorb_step (hrun : IsRun m e r0) {a b k : Nat}
+    (ha : m.cellOf (m.bar a) = m.cellOf a)
+    (hb : m.cellOf (m.bar b) = m.cellOf b)
+    (hAB : m.star (m.cellOf a) = m.cellOf b)
+    (hek : e k = a ∨ e k = m.bar a)
+    (hrB : reg m e r0 k (m.cellOf b) = b ∨
+           reg m e r0 k (m.cellOf b) = m.bar b) :
+    (e (k+2) = a ∨ e (k+2) = m.bar a) ∧
+    (reg m e r0 (k+2) (m.cellOf b) = b ∨
+     reg m e r0 (k+2) (m.cellOf b) = m.bar b) := by
+  have hne : m.cellOf b ≠ m.cellOf a := by
+    rw [← hAB]
+    exact m.star_ne _
+  have hBA : m.star (m.cellOf b) = m.cellOf a := by
+    have h := congrArg m.star hAB
+    rw [m.star_invol] at h
+    exact h.symm
+  have hcellk : m.cellOf (e k) = m.cellOf a := by
+    rcases hek with h | h
+    · rw [h]
+    · rw [h]; exact ha
+  have h1 : e (k+1) = m.bar (reg m e r0 k (m.cellOf b)) := by
+    have h := hrun k
+    rw [hcellk, hAB] at h
+    exact h
+  have hek1 : e (k+1) = m.bar b ∨ e (k+1) = b := by
+    rcases hrB with hr | hr
+    · exact Or.inl (by rw [h1, hr])
+    · exact Or.inr (by rw [h1, hr, m.bar_invol])
+  have hcellk1 : m.cellOf (e (k+1)) = m.cellOf b := by
+    rcases hek1 with h | h
+    · rw [h]; exact hb
+    · rw [h]
+  have hrB1 : reg m e r0 (k+1) (m.cellOf b) = e (k+1) :=
+    reg_write m e r0 hcellk1
+  have hrA : reg m e r0 (k+1) (m.cellOf a) = e k := by
+    rw [reg_skip m e r0 (by rw [hcellk1]; exact hne)]
+    exact reg_write m e r0 hcellk
+  have h2 : e (k+1+1) = m.bar (e k) := by
+    have h := hrun (k+1)
+    rw [hcellk1, hBA, hrA] at h
+    exact h
+  have hek2 : e (k+1+1) = a ∨ e (k+1+1) = m.bar a := by
+    rcases hek with h | h
+    · exact Or.inr (by rw [h2, h])
+    · exact Or.inl (by rw [h2, h, m.bar_invol])
+  have hcellk2 : m.cellOf (e (k+1+1)) = m.cellOf a := by
+    rcases hek2 with h | h
+    · rw [h]
+    · rw [h]; exact ha
+  have hregB2 : reg m e r0 (k+1+1) (m.cellOf b) = e (k+1) := by
+    rw [reg_skip m e r0 (by rw [hcellk2]; exact hne.symm)]
+    exact hrB1
+  refine ⟨hek2, ?_⟩
+  rcases hek1 with h | h
+  · exact Or.inr (hregB2.trans h)
+  · exact Or.inl (hregB2.trans h)
+
+/-- **Absorption: the lobed Gray square is a trap.**  Suppose slots `a`
+and `bar a` share a cell A, slots `b` and `bar b` share the partner
+cell B = star A.  If the walk ever enters `a` while B's register holds
+`b` or `bar b`, then **forever after** the even-step entries stay in
+`{a, bar a}` and B's register stays in `{b, bar b}`. -/
+theorem absorb (hrun : IsRun m e r0) {a b k0 : Nat}
+    (ha : m.cellOf (m.bar a) = m.cellOf a)
+    (hb : m.cellOf (m.bar b) = m.cellOf b)
+    (hAB : m.star (m.cellOf a) = m.cellOf b)
+    (hstart : e k0 = a)
+    (hreg : reg m e r0 k0 (m.cellOf b) = b ∨
+            reg m e r0 k0 (m.cellOf b) = m.bar b) :
+    ∀ t, (e (k0 + 2*t) = a ∨ e (k0 + 2*t) = m.bar a) ∧
+         (reg m e r0 (k0 + 2*t) (m.cellOf b) = b ∨
+          reg m e r0 (k0 + 2*t) (m.cellOf b) = m.bar b) := by
+  intro t
+  induction t with
+  | zero => exact ⟨Or.inl hstart, hreg⟩
+  | succ n ih =>
+      exact absorb_step m e r0 hrun ha hb hAB ih.1 ih.2
+
+/-- **The absorbed alternation bound.**  After absorption every entry —
+even and odd steps alike — lies in the four-element set
+`{a, bar a, b, bar b}`: the run is captured by the dogbone pattern, so
+every later write (productive or not) happens in the two cells A, B,
+and the eventual cycle carries at most four distinct entries.  This is
+the machine form of the lobed case of the cycle theorem. -/
+theorem absorb_entries (hrun : IsRun m e r0) {a b k0 : Nat}
+    (ha : m.cellOf (m.bar a) = m.cellOf a)
+    (hb : m.cellOf (m.bar b) = m.cellOf b)
+    (hAB : m.star (m.cellOf a) = m.cellOf b)
+    (hstart : e k0 = a)
+    (hreg : reg m e r0 k0 (m.cellOf b) = b ∨
+            reg m e r0 k0 (m.cellOf b) = m.bar b) :
+    ∀ j, k0 ≤ j →
+      e j = a ∨ e j = m.bar a ∨ e j = b ∨ e j = m.bar b := by
+  intro j hj
+  obtain ⟨d, rfl⟩ : ∃ d, j = k0 + d := ⟨j - k0, by omega⟩
+  have habs := absorb m e r0 hrun ha hb hAB hstart hreg
+  have hsplit : d = 2 * (d / 2) ∨ d = 2 * (d / 2) + 1 := by omega
+  rcases hsplit with h | h
+  · rcases (habs (d / 2)).1 with he | he
+    · rw [h]; exact Or.inl he
+    · rw [h]; exact Or.inr (Or.inl he)
+  · have hek := (habs (d / 2)).1
+    have hcellk : m.cellOf (e (k0 + 2 * (d / 2))) = m.cellOf a := by
+      rcases hek with he | he
+      · rw [he]
+      · rw [he]; exact ha
+    have h1 : e (k0 + 2 * (d / 2) + 1)
+        = m.bar (reg m e r0 (k0 + 2 * (d / 2)) (m.cellOf b)) := by
+      have hh := hrun (k0 + 2 * (d / 2))
+      rw [hcellk, hAB] at hh
+      exact hh
+    have hodd : e (k0 + 2 * (d / 2) + 1) = m.bar b ∨
+        e (k0 + 2 * (d / 2) + 1) = b := by
+      rcases (habs (d / 2)).2 with hr | hr
+      · exact Or.inl (by rw [h1, hr])
+      · exact Or.inr (by rw [h1, hr, m.bar_invol])
+    rw [h]
+    rcases hodd with he | he
+    · exact Or.inr (Or.inr (Or.inr he))
+    · exact Or.inr (Or.inr (Or.inl he))
+
 /-- **The accounting theorem** (unconditional, general N).  A productive
 write is either the **first** write of its cell — at most one per cell,
 i.e. at most N over the whole run — or an **alternation**: it differs

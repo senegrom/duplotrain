@@ -219,20 +219,36 @@ alone*:
 > tree's previous ascent) before entering its cycle.  Observed: never
 > more than **one**.
 
-Machine exhaustion (`docs/echo_machine.py`): all machines with 2 cells
-(≤ 6 slots) and 4 cells (≤ 8 slots), all initial registers and starts —
-183k configurations — plus 6-cell exhaustion over two-2-slot layouts and
-300k random machines each at 8 and 10 cells: **max actives 2, max
-transient alternations 1, throughout**.  Cycles can carry up to 12
-distinct *entries*, but the surplus always lives in one-slot trees,
-which pin nothing.  Sharper still, the per-tree σ-profile of every cycle
-observed (C = 4 exhaustive, C = 8 random) is **either `()` — no tree
-alternates, the functional collapse — or exactly `(2, 2)`** — two trees
-of two slots each, the dogbone pattern.  No `(2)` alone (a lone
-alternating tree cannot sustain itself in fall mode), no `(3)`, nothing
-larger.  On the wiring side the same caps are exhaustive for all 143k
-wirings with N ≤ 4 (in Lean) and unbeaten by cycle-objective search
-through N = 7.
+Machine exhaustion (`docs/echo_machine.py` + the structured hunt): all
+machines with 2 cells (≤ 6 slots) and 4 cells (≤ 8 slots), **all
+machines with 6 cells and up to 10 slots (10.4 million runs — every
+composition, every jump matching, every initial register, every
+start)**, plus hill-climbing with actives as the objective at 8, 10 and
+12 cells: **max actives 2, max transient alternations 1, throughout**.
+Cycles can carry up to 12 distinct *entries*, but the surplus always
+lives in one-slot trees, which pin nothing.  Sharper still, the
+per-tree σ-profile of every cycle ever observed is **either `()` — no
+tree alternates, the functional collapse — or exactly `(2, 2)`** — two
+trees of two slots each, the dogbone pattern.  No `(2)` alone, no
+`(3)`, nothing larger.  The mechanism behind "never `(2)` alone": an
+alternating tree's two branches merge immediately after its mouth, so
+some *second* register must remember which branch to take next — the
+variation cannot steer itself.  Alternating trees come in mutually
+steering **pairs**, and lemma B says a single trajectory sustains at
+most one pair.  On the wiring side the same caps are exhaustive for all
+143k wirings with N ≤ 4 (in Lean) and unbeaten by cycle-objective
+search through N = 7.
+
+**Absorption (machine-checked).**  The lobed instance of B is now a
+theorem for all N (`EchoMachine.lean`: `absorb`, `absorb_entries`): if
+slots `a, bar a` share a cell, slots `b, bar b` share its mouth
+partner, and the walk ever enters `a` while the partner's register
+holds `b` or `bar b`, then **every subsequent entry lies in
+`{a, bar a, b, bar b}`** — the doubly-lobed pair is a trap.  After
+absorption all writes are confined to the two cells: the alternation
+bound holds outright for every run that falls into a lobed Gray
+square, which is the pattern every exhausted machine's active cycle
+actually exhibits.
 
 ## The unconditional bounds (machine-checked, general N)
 

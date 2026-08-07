@@ -37,6 +37,7 @@ theorems, no `native_decide`, no `sorry`:
 | `bounce_step` / `bounce_orbit` | a partner-alternating orbit obeys `e(k+2) = bar(e k)` and visits **at most 4 distinct entries** — the Gray square, for all N |
 | `unproductive_stall` | a write that re-stores the current value changes **no** register: states move only through productive writes |
 | `productive_first_or_alternation` | **the accounting theorem**: every productive write is the *first* write of its cell (≤ N over a run) or an *alternation* — the unconditional skeleton of f(N) ≤ N + O(1) |
+| `absorb` / `absorb_entries` | **absorption**: a doubly-lobed mouth pair entered compatibly traps the walk forever — every later entry lies in `{a, bar a, b, bar b}`, so all subsequent alternations are confined to the two cells (the lobed case of lemma B, as an attractor) |
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real
 pigeonhole proof (induction on N, splitting on the first coordinate),
@@ -52,10 +53,12 @@ about the echo machine (see docs/lazy-point-theory.md): **B** (every
 machine cycle has Σ(σ−1) ≤ 2 — this is C\*) and **C** (O(1) transient
 alternations).  Modulo B + C, the accounting theorem closes the state
 count to f(N) ≤ N + O(1); unconditionally, f(N) ≤ min(2^N, N + 1 + A)
-with A the run's alternation count.  B and C are exhaustively verified
-across all small machines by `docs/echo_machine.py` (max actives 2, max
-transient alternations 1, everywhere; every cycle's σ-profile is `()`
-or `(2,2)` — functional collapse or the dogbone Gray square).
+with A the run's alternation count.  The lobed case of B is proved
+outright (`absorb`).  B and C are exhaustively verified across all
+machines with ≤ 6 cells and ≤ 10 slots — 10.4M runs — plus climbs at
+8–12 cells (max actives 2, max transient alternations 1, everywhere;
+every cycle's σ-profile is `()` or `(2,2)` — functional collapse or the
+dogbone Gray square, never a lone alternating tree, never three).
 
 **`DuplotrainProofs.lean` — exhaustive small-N theorems** (`native_decide`):
 the wiring enumerator, the perfection automaton (reflecting caps) and the
