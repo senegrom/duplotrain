@@ -13,9 +13,8 @@ star-reversed arrow at the next time:
 
     nextCell (k+1) (star c_{k+1}) = star c_k.
 
-Thus every traversed cell-level arrow is immediately reversed, with `star`
-applied to both endpoints.  This is the graph-theoretic core of the echo
-machine and is independent of slot labels.
+All other cell-level arrows are unchanged.  Thus a step is literally a
+single-arrow reversal, with `star` applied to both endpoints.
 -/
 
 namespace Echo
@@ -47,6 +46,35 @@ theorem reversed_arrow
     reg_write m e r0 rfl
   rw [hw]
   exact (witness m e r0 hrun hr0 k).1
+
+/-- A step changes no arrow except the one whose source is
+`star (cellOf (e (k+1)))`. -/
+theorem nextCell_skip {k c : Nat}
+    (hne : c ≠ m.star (m.cellOf (e (k+1)))) :
+    nextCell m e r0 (k+1) c = nextCell m e r0 k c := by
+  unfold nextCell
+  have hne' : m.cellOf (e (k+1)) ≠ m.star c := by
+    intro h
+    apply hne
+    have hs := congrArg m.star h
+    rw [m.star_invol] at hs
+    exact hs.symm
+  rw [reg_skip m e r0 hne']
+
+/-- Exact update rule: the arrival's star-cell is redirected backwards and
+all other sources retain their old arrows. -/
+theorem nextCell_update
+    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (k c : Nat) :
+    nextCell m e r0 (k+1) c =
+      if c = m.star (m.cellOf (e (k+1)))
+      then m.star (m.cellOf (e k))
+      else nextCell m e r0 k c := by
+  by_cases h : c = m.star (m.cellOf (e (k+1)))
+  · rw [if_pos h, h]
+    exact reversed_arrow m e r0 hrun hr0 k
+  · rw [if_neg h]
+    exact nextCell_skip m e r0 h
 
 /-- Slot-level form of the same reversal: after step `k`, the register of the
 arrival cell is precisely the arrival slot. -/
