@@ -120,7 +120,12 @@ theorem productive_reversal_or_parallel
   · exact Or.inr ⟨(cell_projection_stall_iff_parallel m e r0 hrun hr0 k).mp hs,
         productive_parallel_ne m e r0 hp⟩
   · apply Or.inl
-    push_neg at hs
-    exact hs
+    apply Classical.byContradiction
+    intro hnone
+    apply hs
+    intro c
+    by_contra hne
+    apply hnone
+    exact ⟨c, hne⟩
 
 end Echo
