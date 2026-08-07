@@ -42,11 +42,19 @@ private theorem filter_filter_length_le (p q : Nat → Bool) :
   induction l with
   | nil => simp
   | cons x t ih =>
-      cases hp : p x <;> cases hq : q x <;> simp [hp, hq, ih]
+      cases hp : p x <;> cases hq : q x
+      · simpa only [List.filter_cons, hp, hq, if_false] using ih
+      · have hle := Nat.le_succ_of_le ih
+        simpa only [List.filter_cons, hp, hq, if_false, if_true,
+          List.length_cons] using hle
+      · simpa only [List.filter_cons, hp, hq, if_false, if_true] using ih
+      · have hle := Nat.succ_le_succ ih
+        simpa only [List.filter_cons, hp, hq, if_false, if_true,
+          List.length_cons] using hle
 
 /-- Generic finite-alphabet counting with bounded fibre multiplicity. -/
 private theorem bounded_multiplicity_length (f : Nat → List Nat) (r : Nat) :
-    ∀ (S ks : List (List Nat)),
+    ∀ (S : List (List Nat)) (ks : List Nat),
       (∀ tag, (ks.filter (fun k => decide (f k = tag))).length ≤ r) →
       (∀ k ∈ ks, f k ∈ S) →
       ks.length ≤ r * S.length := by
@@ -63,14 +71,16 @@ private theorem bounded_multiplicity_length (f : Nat → List Nat) (r : Nat) :
       intro ks hmult hmem
       let yes := ks.filter (fun k => decide (f k = a))
       let no := ks.filter (fun k => !(decide (f k = a)))
-      have hyes : yes.length ≤ r := hmult a
+      have hyes : yes.length ≤ r := by
+        simpa [yes] using hmult a
       have hmultNo : ∀ tag,
           (no.filter (fun k => decide (f k = tag))).length ≤ r := by
         intro tag
         have hle := filter_filter_length_le
           (fun k => !(decide (f k = a)))
           (fun k => decide (f k = tag)) ks
-        exact Nat.le_trans hle (hmult tag)
+        have hle' := Nat.le_trans hle (hmult tag)
+        simpa [no] using hle'
       have hmemNo : ∀ k ∈ no, f k ∈ S := by
         intro k hk
         have hkf := List.mem_filter.mp hk
@@ -82,8 +92,9 @@ private theorem bounded_multiplicity_length (f : Nat → List Nat) (r : Nat) :
         · exact absurd ha hne
         · exact hS
       have hno : no.length ≤ r * S.length := ih no hmultNo hmemNo
-      have hsplit : yes.length + no.length = ks.length :=
-        filter_split_bool (fun k => decide (f k = a)) ks
+      have hsplit : yes.length + no.length = ks.length := by
+        simpa [yes, no] using
+          filter_split_bool (fun k => decide (f k = a)) ks
       simp only [List.length_cons, Nat.mul_add, Nat.mul_one]
       omega
 
