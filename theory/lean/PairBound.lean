@@ -47,14 +47,17 @@ private theorem nodup_subset_length_pair {l S : List (List Nat)}
       simp only [List.length_cons]
       omega
 
-private theorem pairUniverse_length (slots : List Nat) :
-    (pairUniverse slots).length = slots.length * slots.length := by
-  unfold pairUniverse
-  induction slots with
+private theorem pairRect_length (xs ys : List Nat) :
+    (xs.flatMap (fun a => ys.map (fun b => [a,b]))).length
+      = xs.length * ys.length := by
+  induction xs with
   | nil => simp
   | cons a t ih =>
-      simp [ih]
-      omega
+      simp [ih, Nat.add_mul]
+
+private theorem pairUniverse_length (slots : List Nat) :
+    (pairUniverse slots).length = slots.length * slots.length := by
+  exact pairRect_length slots slots
 
 /-- **Quadratic pair bound.** Any list of transition times with pairwise
  distinct consecutive entry pairs has length at most `#slots^2`, provided all
