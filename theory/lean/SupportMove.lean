@@ -11,8 +11,8 @@ A confirmed endpoint is a cell's selected register slot.  A jump edge is
 old register by an arrival on a genuinely different jump edge, and the old
 edge remains occupied afterwards, then the old edge was Full before the step
 and the arrival edge is Full afterwards.  In other words, inside a fixed
-support epoch a productive non-lobe move transfers the unique redundancy from
-one edge to an adjacent edge.
+support epoch a productive non-lobe move transfers the redundancy from one
+edge to an adjacent edge.
 -/
 
 namespace Echo
@@ -39,26 +39,28 @@ theorem sameEdge_bar (s : Nat) : SameEdge m s (m.bar s) := Or.inr rfl
 
 /-- If two confirmed slots belong to one cell, they are equal. -/
 theorem confirmed_same_cell_eq
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
     {k s t : Nat}
     (hs : Confirmed m e r0 k s) (ht : Confirmed m e r0 k t)
     (hc : m.cellOf s = m.cellOf t) : s = t := by
   unfold Confirmed at hs ht
-  have hcs := reg_cell m e r0 hr0 k (m.cellOf s)
-  rw [hs] at hcs
-  have hct := reg_cell m e r0 hr0 k (m.cellOf t)
-  rw [ht] at hct
   rw [hc] at hs
   exact hs.symm.trans ht
 
+/-- The old register value is confirmed before it is overwritten. -/
+theorem old_register_confirmed
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) (k c : Nat) :
+    Confirmed m e r0 k (reg m e r0 k c) := by
+  unfold Confirmed
+  have hc := reg_cell m e r0 hr0 k c
+  rw [hc]
+
 /-- Let `new = e(k+1)` and let `old` be the destination cell's previous
-register.  If the step is productive, the old jump edge is still occupied
-afterwards, and old/new are genuinely different jump edges, then the old edge
-was Full before the write. -/
+register.  If the old jump edge remains occupied afterwards and old/new are
+genuinely different jump edges, then the old edge was Full before the write. -/
 theorem old_edge_full_of_preserved
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (k : Nat)
-    (hp : ProductiveStep m e r0 k)
+    (_hp : ProductiveStep m e r0 k)
     (hpres : Occupied m e r0 (k+1)
       (reg m e r0 k (m.cellOf (e (k+1)))))
     (hdiff : ¬ SameEdge m
@@ -67,59 +69,57 @@ theorem old_edge_full_of_preserved
   let old := reg m e r0 k (m.cellOf (e (k+1)))
   let new := e (k+1)
   have hold : Confirmed m e r0 k old := by
-    unfold Confirmed old
-    have hc := reg_cell m e r0 hr0 k (m.cellOf new)
-    exact hc.symm
+    exact old_register_confirmed m e r0 hr0 k (m.cellOf new)
+  have hcold : m.cellOf old = m.cellOf new := by
+    simpa [old] using reg_cell m e r0 hr0 k (m.cellOf new)
   have hnew : Confirmed m e r0 (k+1) new := by
     unfold Confirmed new
     exact reg_write m e r0 rfl
   rcases hpres with hstill | hbarstill
-  · have heq : old = new := by
-      apply confirmed_same_cell_eq m e r0 hr0 hstill hnew
-      have hcold := reg_cell m e r0 hr0 k (m.cellOf new)
-      simpa [old, new] using hcold
+  · have heq : old = new :=
+      confirmed_same_cell_eq m e r0 hstill hnew hcold
     exact absurd (Or.inl heq.symm) hdiff
-  · exact ⟨hold, by
-      have hcb : m.cellOf (m.bar old) ≠ m.cellOf new := by
-        intro hc
-        have hnewbar : m.bar old = new :=
-          confirmed_same_cell_eq m e r0 hr0 hbarstill hnew hc
-        exact hdiff (Or.inr hnewbar.symm)
-      have hskip := reg_skip m e r0 (k := k) (c := m.cellOf (m.bar old))
-        (by simpa [new] using hcb.symm)
-      unfold Confirmed at hbarstill ⊢
-      rw [hskip] at hbarstill
-      exact hbarstill⟩
+  · refine ⟨hold, ?_⟩
+    have hcb : m.cellOf new ≠ m.cellOf (m.bar old) := by
+      intro hc
+      have hnewbar : new = m.bar old :=
+        confirmed_same_cell_eq m e r0 hnew hbarstill hc
+      exact hdiff (Or.inr hnewbar)
+    have hskip := reg_skip m e r0 (k := k) (c := m.cellOf (m.bar old)) hcb
+    unfold Confirmed at hbarstill ⊢
+    rw [hskip] at hbarstill
+    exact hbarstill
 
-/-- Under the same hypotheses, the arrival edge is Full after the write. -/
+/-- Under the same different-edge hypothesis, the arrival edge is Full after
+its write: its opposite endpoint was the confirmed value read by the step and
+cannot be overwritten by this different-edge arrival. -/
 theorem new_edge_full_of_preserved
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (k : Nat)
-    (hp : ProductiveStep m e r0 k)
+    (_hp : ProductiveStep m e r0 k)
     (hdiff : ¬ SameEdge m
       (reg m e r0 k (m.cellOf (e (k+1)))) (e (k+1))) :
     Full m e r0 (k+1) (e (k+1)) := by
   let new := e (k+1)
+  let old := reg m e r0 k (m.cellOf new)
   have hnew : Confirmed m e r0 (k+1) new := by
     unfold Confirmed new
     exact reg_write m e r0 rfl
   have hbarold : Confirmed m e r0 k (m.bar new) :=
     head_confirmed m e r0 hrun hr0 k
+  have hold : Confirmed m e r0 k old := by
+    exact old_register_confirmed m e r0 hr0 k (m.cellOf new)
+  have hcold : m.cellOf old = m.cellOf new := by
+    simpa [old] using reg_cell m e r0 hr0 k (m.cellOf new)
   have hcellne : m.cellOf new ≠ m.cellOf (m.bar new) := by
     intro hc
-    have hold : Confirmed m e r0 k
-        (reg m e r0 k (m.cellOf new)) := by
-      unfold Confirmed
-      have hrc := reg_cell m e r0 hr0 k (m.cellOf new)
-      exact hrc.symm
-    have heq : reg m e r0 k (m.cellOf new) = m.bar new := by
-      apply confirmed_same_cell_eq m e r0 hr0 hold hbarold
-      have hrc := reg_cell m e r0 hr0 k (m.cellOf new)
-      rw [hc]
-      exact hrc
+    have heq : old = m.bar new :=
+      confirmed_same_cell_eq m e r0 hold hbarold (hcold.trans hc)
     apply hdiff
     right
-    exact heq
+    have hb := congrArg m.bar heq
+    rw [m.bar_invol] at hb
+    exact hb.symm
   have hskip := reg_skip m e r0 (k := k) (c := m.cellOf (m.bar new)) hcellne
   refine ⟨hnew, ?_⟩
   unfold Confirmed at hbarold ⊢
