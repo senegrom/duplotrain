@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy"]
+defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -54,3 +54,6 @@ name = "HiddenAbsorb"
 
 [[lean_lib]]
 name = "HiddenDichotomy"
+
+[[lean_lib]]
+name = "ThreeQuarterArithmetic"
