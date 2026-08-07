@@ -32,7 +32,7 @@ theorem parallel_preserved_sameEdge
   · have hf := old_edge_full_of_preserved m e r0 hrun hr0 k hp hpres hs
     have hn := head_confirmed m e r0 hrun hr0 k
     have hbar : m.bar (oldSlot m e r0 k) = m.bar (e (k+1)) :=
-      confirmed_same_cell_eq m e r0 hr0 hf.2 hn hpar.2
+      confirmed_same_cell_eq m e r0 hf.2 hn hpar.2
     have heq : oldSlot m e r0 k = e (k+1) := by
       have h := congrArg m.bar hbar
       rwa [m.bar_invol, m.bar_invol] at h
