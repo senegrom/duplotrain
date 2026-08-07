@@ -82,7 +82,7 @@ private theorem pairRect_length (xs ys : List Nat) :
   induction xs with
   | nil => simp
   | cons _ t ih =>
-      simp [ih, Nat.add_mul]
+      simp [ih, Nat.add_mul, Nat.add_comm]
 
 private theorem pairUniverse_length_local (xs : List Nat) :
     (pairUniverse xs).length = xs.length * xs.length := by
@@ -94,7 +94,6 @@ theorem futureEntryAlphabet_length (cells slots : List Nat) (K : Nat) :
       cells.length + (tokenEnds m e r0 slots K).length + 1 := by
   unfold futureEntryAlphabet
   simp only [List.length_cons, List.length_append, List.length_map]
-  omega
 
 /-- Every arrival after the base time belongs to the fixed future alphabet. -/
 theorem future_arrival_mem
