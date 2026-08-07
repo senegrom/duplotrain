@@ -18,4 +18,4 @@ jobs:
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build LinearBound AlternationBound SlotBound ReplayFacts PairBound SupportBound SupportMove EdgeReversal ReversalFacts MonotoneSupport HiddenFibre HiddenAbsorb HiddenDichotomy ThreeQuarterArithmetic ComponentCapacity ProfileCodeBound SupportSize LobeAbsorption EpochAggregation TreeReplay
+          lake build LinearBound AlternationBound SlotBound ReplayFacts PairBound SupportBound SupportMove EdgeReversal ReversalFacts MonotoneSupport HiddenFibre HiddenAbsorb HiddenDichotomy ThreeQuarterArithmetic ComponentCapacity ProfileCodeBound SupportSize LobeAbsorption EpochAggregation TreeReplay TreeEpochCode
