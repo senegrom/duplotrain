@@ -436,4 +436,336 @@ theorem productive_first_or_alternation (k : Nat)
     intro j hjk hc
     exact hex ⟨j, hjk, hc⟩
 
+/-! ## The final theorem
+
+The ultimate wiring-level target of the whole program (GeneralN model;
+descends from `state_law` below once the T9 forest compilation is
+formalised):
+
+    theorem lazy_point_state_law (w : Wiring) (N : Nat)
+        (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
+        (c : Nat × Tongues) (ks : List Nat)
+        (hnd : (ks.map fun k =>
+            VectorCount.restrict N ((stepN w k c).getD c).2).Nodup) :
+        ks.length ≤ N + 6
+
+At machine level the unconditional target is `state_law` below WITHOUT
+the hypotheses `htail` (lemma B: eventually the register snapshot lies
+in a fixed 4-element set — the Gray tail) and `halts`/`hcover`
+(lemma C: at most one alternation before the tail).  This section
+proves the complete assembly from exactly those two hypotheses:
+snapshot stability, first-write counting and the injection are all
+machine-checked, so B and C are the only remaining gap. -/
+
+/-- The register snapshot at time `k` on a finite list of cells. -/
+def snap (cells : List Nat) (k : Nat) : List Nat :=
+  cells.map (reg m e r0 k)
+
+/-- Step `k → k+1` changes the written cell's register. -/
+def ProductiveStep (k : Nat) : Prop :=
+  e (k+1) ≠ reg m e r0 k (m.cellOf (e (k+1)))
+
+/-- Step `k → k+1` performs the first write of its cell. -/
+def FirstStep (k : Nat) : Prop :=
+  ∀ j, j ≤ k → m.cellOf (e j) ≠ m.cellOf (e (k+1))
+
+private theorem map_congr' {f g : Nat → Nat} :
+    ∀ l : List Nat, (∀ x ∈ l, f x = g x) → l.map f = l.map g := by
+  intro l
+  induction l with
+  | nil => intro _; rfl
+  | cons x t ih =>
+      intro h
+      simp only [List.map_cons]
+      rw [h x List.mem_cons_self,
+        ih (fun y hy => h y (List.mem_cons_of_mem _ hy))]
+
+/-- Unproductive steps do not move the snapshot. -/
+theorem snap_stall (cells : List Nat) {k : Nat}
+    (h : ¬ ProductiveStep m e r0 k) :
+    snap m e r0 cells (k+1) = snap m e r0 cells k := by
+  have heq : e (k+1) = reg m e r0 k (m.cellOf (e (k+1))) := by
+    by_cases hq : e (k+1) = reg m e r0 k (m.cellOf (e (k+1)))
+    · exact hq
+    · exact absurd hq h
+  exact map_congr' _ (fun c _ => unproductive_stall m e r0 k heq c)
+
+/-- Snapshots are constant across productive-free stretches. -/
+theorem snap_between (cells : List Nat) (a : Nat) :
+    ∀ d, (∀ i, a ≤ i → i < a + d → ¬ ProductiveStep m e r0 i) →
+      snap m e r0 cells (a + d) = snap m e r0 cells a := by
+  intro d
+  induction d with
+  | zero => intro _; rfl
+  | succ n ih =>
+      intro h
+      calc snap m e r0 cells (a + (n+1))
+          = snap m e r0 cells (a + n) :=
+            snap_stall m e r0 cells (h (a+n) (by omega) (by omega))
+        _ = snap m e r0 cells a :=
+            ih (fun i h1 h2 => h i h1 (by omega))
+
+private theorem exists_last_lt {P : Nat → Prop} :
+    ∀ k, (∃ j, j < k ∧ P j) →
+      ∃ j, j < k ∧ P j ∧ ∀ i, j < i → i < k → ¬ P i := by
+  intro k
+  induction k with
+  | zero =>
+      intro h
+      obtain ⟨j, hj, _⟩ := h
+      exact absurd hj (by omega)
+  | succ n ih =>
+      intro h
+      by_cases hn : P n
+      · exact ⟨n, by omega, hn, fun i h1 h2 _ => by omega⟩
+      · obtain ⟨j, hj, hp⟩ := h
+        have hj' : j < n := by
+          by_cases hje : j = n
+          · exact absurd (hje ▸ hp) hn
+          · omega
+        obtain ⟨j', h1, h2, h3⟩ := ih ⟨j, hj', hp⟩
+        refine ⟨j', by omega, h2, ?_⟩
+        intro i hi1 hi2
+        by_cases hie : i = n
+        · exact hie ▸ hn
+        · exact h3 i hi1 (by omega)
+
+open Classical in
+/-- The tag of time `k`: 0 if no productive step precedes `k`; else,
+for the last productive step `j` before `k`, the written cell's code
+(first write) or 1 (alternation). -/
+private noncomputable def codeOf (k : Nat) : Nat :=
+  if h : ∃ j, j < k ∧ ProductiveStep m e r0 j then
+    if FirstStep m e (exists_last_lt k h).choose
+    then m.cellOf (e ((exists_last_lt k h).choose + 1)) + 2
+    else 1
+  else 0
+
+private theorem codeOf_spec (cells : List Nat) (k : Nat) :
+    (codeOf m e r0 k = 0 ∧
+      snap m e r0 cells k = snap m e r0 cells 0) ∨
+    (∃ j, j < k ∧ ProductiveStep m e r0 j ∧
+      snap m e r0 cells k = snap m e r0 cells (j+1) ∧
+      ((FirstStep m e j ∧ codeOf m e r0 k = m.cellOf (e (j+1)) + 2) ∨
+       (¬ FirstStep m e j ∧ codeOf m e r0 k = 1))) := by
+  by_cases h : ∃ j, j < k ∧ ProductiveStep m e r0 j
+  · right
+    obtain ⟨hj, hp, hno⟩ := (exists_last_lt k h).choose_spec
+    refine ⟨(exists_last_lt k h).choose, hj, hp, ?_, ?_⟩
+    · have hd : (exists_last_lt k h).choose + 1 +
+          (k - ((exists_last_lt k h).choose + 1)) = k := by omega
+      have hsb := snap_between m e r0 cells
+        ((exists_last_lt k h).choose + 1)
+        (k - ((exists_last_lt k h).choose + 1))
+        (fun i h1 h2 => hno i (by omega) (by omega))
+      rw [hd] at hsb
+      exact hsb
+    · by_cases hf : FirstStep m e (exists_last_lt k h).choose
+      · exact Or.inl ⟨hf, by unfold codeOf; rw [dif_pos h, if_pos hf]⟩
+      · exact Or.inr ⟨hf, by unfold codeOf; rw [dif_pos h, if_neg hf]⟩
+  · left
+    constructor
+    · unfold codeOf; rw [dif_neg h]
+    · have hsb := snap_between m e r0 cells 0 k
+        (fun i _ h2 => fun hp => h ⟨i, by omega, hp⟩)
+      rw [Nat.zero_add] at hsb
+      exact hsb
+
+private theorem mem_len_one {l : List Nat} (h : l.length ≤ 1) :
+    ∀ {a b : Nat}, a ∈ l → b ∈ l → a = b := by
+  intro a b ha hb
+  cases l with
+  | nil => cases ha
+  | cons x t =>
+      cases t with
+      | nil =>
+          have ha' : a = x := by simpa using ha
+          have hb' : b = x := by simpa using hb
+          rw [ha', hb']
+      | cons y t2 => simp only [List.length_cons] at h; omega
+
+/-- Equal codes force equal snapshots (before the tail). -/
+private theorem code_eq_snap_eq (cells : List Nat) (K : Nat)
+    (alts : List Nat) (halts : alts.length ≤ 1)
+    (hcover : ∀ i, i < K → ProductiveStep m e r0 i →
+      FirstStep m e i ∨ i ∈ alts)
+    {k1 k2 : Nat} (h1 : k1 < K) (h2 : k2 < K)
+    (hc : codeOf m e r0 k1 = codeOf m e r0 k2) :
+    snap m e r0 cells k1 = snap m e r0 cells k2 := by
+  rcases codeOf_spec m e r0 cells k1 with ⟨c1, s1⟩ | ⟨j1, hj1, hp1, hs1, hcase1⟩
+  · rcases codeOf_spec m e r0 cells k2 with ⟨c2, s2⟩ | ⟨j2, hj2, hp2, hs2, hcase2⟩
+    · rw [s1, s2]
+    · rcases hcase2 with ⟨_, hcode⟩ | ⟨_, hcode⟩ <;>
+        (rw [c1, hcode] at hc; omega)
+  · rcases codeOf_spec m e r0 cells k2 with ⟨c2, s2⟩ | ⟨j2, hj2, hp2, hs2, hcase2⟩
+    · rcases hcase1 with ⟨_, hcode⟩ | ⟨_, hcode⟩ <;>
+        (rw [c2, hcode] at hc; omega)
+    · rcases hcase1 with ⟨hf1, hcode1⟩ | ⟨hnf1, hcode1⟩ <;>
+        rcases hcase2 with ⟨hf2, hcode2⟩ | ⟨hnf2, hcode2⟩
+      · have hcell : m.cellOf (e (j1+1)) = m.cellOf (e (j2+1)) := by
+          rw [hcode1, hcode2] at hc; omega
+        have hj : j1 = j2 := by
+          rcases Nat.lt_trichotomy j1 j2 with h | h | h
+          · exact absurd hcell (hf2 (j1+1) (by omega))
+          · exact h
+          · exact absurd hcell.symm (hf1 (j2+1) (by omega))
+        rw [hs1, hs2, hj]
+      · rw [hcode1, hcode2] at hc; omega
+      · rw [hcode1, hcode2] at hc; omega
+      · have m1 : j1 ∈ alts :=
+          (hcover j1 (by omega) hp1).resolve_left hnf1
+        have m2 : j2 ∈ alts :=
+          (hcover j2 (by omega) hp2).resolve_left hnf2
+        have hj : j1 = j2 := mem_len_one halts m1 m2
+        rw [hs1, hs2, hj]
+
+private theorem nodup_transfer {f : Nat → List Nat} {c : Nat → Nat} :
+    ∀ l : List Nat, (∀ x ∈ l, ∀ y ∈ l, c x = c y → f x = f y) →
+      (l.map f).Nodup → (l.map c).Nodup := by
+  intro l
+  induction l with
+  | nil => intro _ _; simp
+  | cons x t ih =>
+      intro hinj hnd
+      simp only [List.map_cons, List.nodup_cons] at hnd ⊢
+      refine ⟨?_, ih (fun a ha b hb =>
+        hinj a (List.mem_cons_of_mem _ ha) b (List.mem_cons_of_mem _ hb))
+        hnd.2⟩
+      intro hmem
+      obtain ⟨y, hy, hcy⟩ := List.mem_map.mp hmem
+      have hfy : f x = f y :=
+        hinj x List.mem_cons_self y (List.mem_cons_of_mem _ hy) hcy.symm
+      exact hnd.1 (List.mem_map.mpr ⟨y, hy, hfy.symm⟩)
+
+private theorem nodup_subset_length {α : Type} [BEq α] [LawfulBEq α] :
+    ∀ {l S : List α},
+    l.Nodup → (∀ x ∈ l, x ∈ S) → l.length ≤ S.length := by
+  intro l
+  induction l with
+  | nil => intro S _ _; exact Nat.zero_le _
+  | cons x t ih =>
+      intro S hnd hsub
+      rw [List.nodup_cons] at hnd
+      have hx : x ∈ S := hsub x List.mem_cons_self
+      have hsub' : ∀ y ∈ t, y ∈ S.erase x := by
+        intro y hy
+        have hyS : y ∈ S := hsub y (List.mem_cons_of_mem _ hy)
+        have hyx : y ≠ x := fun hxy => hnd.1 (hxy ▸ hy)
+        exact (List.mem_erase_of_ne hyx).mpr hyS
+      have hih := ih hnd.2 hsub'
+      have hlen : (S.erase x).length = S.length - 1 :=
+        List.length_erase_of_mem hx
+      have hpos : 0 < S.length := by
+        cases S with
+        | nil => cases hx
+        | cons a t2 => simp
+      simp only [List.length_cons]
+      omega
+
+private theorem filter_split (p : Nat → Bool) :
+    ∀ l : List Nat,
+      (l.filter p).length + (l.filter (fun x => !(p x))).length
+        = l.length := by
+  intro l
+  induction l with
+  | nil => rfl
+  | cons x t ih =>
+      cases hp : p x with
+      | true => simp [hp]; omega
+      | false => simp [hp]; omega
+
+private theorem nodup_map_filter {f : Nat → List Nat} {p : Nat → Bool} :
+    ∀ {l : List Nat}, (l.map f).Nodup → ((l.filter p).map f).Nodup := by
+  intro l
+  induction l with
+  | nil => intro _; simp
+  | cons x t ih =>
+      intro h
+      simp only [List.map_cons, List.nodup_cons] at h
+      cases hp : p x with
+      | true =>
+          simp only [List.filter_cons, hp, if_true, List.map_cons,
+            List.nodup_cons]
+          refine ⟨?_, ih h.2⟩
+          intro hmem
+          obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hmem
+          exact h.1 (List.mem_map.mpr
+            ⟨y, (List.mem_filter.mp hy).1, hfy⟩)
+      | false =>
+          simp only [List.filter_cons, hp]
+          exact ih h.2
+
+open Classical in
+/-- **THE FINAL THEOREM, assembled.**  Along any run, any list of times
+with pairwise-distinct register snapshots has length at most
+`#cells + 6` — that is, **f(N) ≤ N + O(1)** — given exactly the two
+open lemmas as hypotheses: `htail` (**lemma B**: from some time `K`
+on, the snapshot lies in a fixed ≤4-element set — the Gray tail) and
+`halts`/`hcover` (**lemma C**: before `K`, every productive step is a
+first write except for at most one alternation).  Everything else —
+snapshot stability, last-write extraction, first-write injectivity,
+the coding — is machine-checked here.  Discharging B and C for actual
+runs is the sole remaining content of the state law. -/
+theorem state_law (_hrun : IsRun m e r0)
+    (cells : List Nat) (hcells : ∀ k, m.cellOf (e k) ∈ cells)
+    (K : Nat) (S : List (List Nat)) (hS : S.length ≤ 4)
+    (htail : ∀ j, K ≤ j → snap m e r0 cells j ∈ S)
+    (alts : List Nat) (halts : alts.length ≤ 1)
+    (hcover : ∀ i, i < K → ProductiveStep m e r0 i →
+      FirstStep m e i ∨ i ∈ alts)
+    (ks : List Nat)
+    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
+    ks.length ≤ cells.length + 6 := by
+  have hsplit := filter_split (fun k => decide (k < K)) ks
+  -- tail: distinct snapshots inside S
+  have htailpart :
+      (ks.filter (fun k => !(decide (k < K)))).length ≤ 4 := by
+    have hnd2 := nodup_map_filter
+      (p := fun k => !(decide (k < K))) hnd
+    have hmem : ∀ v ∈ (ks.filter (fun k => !(decide (k < K)))).map
+        (snap m e r0 cells), v ∈ S := by
+      intro v hv
+      obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hv
+      have hk2 := (List.mem_filter.mp hk).2
+      have hK : K ≤ k := by
+        simp only [Bool.not_eq_true', decide_eq_false_iff_not] at hk2
+        omega
+      exact htail k hK
+    have hle := nodup_subset_length hnd2 hmem
+    rw [List.length_map] at hle
+    omega
+  -- transient: inject into 0 :: 1 :: cells.map (· + 2)
+  have htrans :
+      (ks.filter (fun k => decide (k < K))).length
+        ≤ cells.length + 2 := by
+    have hltK : ∀ k ∈ ks.filter (fun k => decide (k < K)), k < K := by
+      intro k hk
+      have := (List.mem_filter.mp hk).2
+      simpa using this
+    have hndl := nodup_map_filter (p := fun k => decide (k < K)) hnd
+    have hcodes : ((ks.filter (fun k => decide (k < K))).map
+        (codeOf m e r0)).Nodup :=
+      nodup_transfer _
+        (fun x hx y hy hc => code_eq_snap_eq m e r0 cells K alts halts
+          hcover (hltK x hx) (hltK y hy) hc)
+        hndl
+    have hmemcodes : ∀ v ∈ (ks.filter (fun k => decide (k < K))).map
+        (codeOf m e r0), v ∈ 0 :: 1 :: cells.map (· + 2) := by
+      intro v hv
+      obtain ⟨k, _, rfl⟩ := List.mem_map.mp hv
+      rcases codeOf_spec m e r0 cells k with ⟨hc0, _⟩ |
+        ⟨j, _, _, _, hcase⟩
+      · rw [hc0]; exact List.mem_cons_self
+      · rcases hcase with ⟨_, hcode⟩ | ⟨_, hcode⟩
+        · rw [hcode]
+          exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _
+            (List.mem_map.mpr ⟨_, hcells (j+1), rfl⟩))
+        · rw [hcode]
+          exact List.mem_cons_of_mem _ List.mem_cons_self
+    have hle := nodup_subset_length hcodes hmemcodes
+    rw [List.length_map] at hle
+    simp only [List.length_cons, List.length_map] at hle
+    omega
+  omega
+
 end Echo

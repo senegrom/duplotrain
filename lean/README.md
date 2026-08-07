@@ -40,6 +40,8 @@ theorems, no `native_decide`, no `sorry`:
 | `absorb` / `absorb_entries` | **absorption**: a doubly-lobed mouth pair entered compatibly traps the walk forever — every later entry lies in `{a, bar a, b, bar b}`, so all subsequent alternations are confined to the two cells (the lobed case of lemma B, as an attractor) |
 | `reg_cell` / `witness` | registers stay in their own cells, and **every entry names its delivery**: `cell (bar (e (k+1))) = star (cell (e k))` with the partner register equal to `bar (e (k+1))` — the predecessor structure is forced (seed of the T10 nesting argument) |
 | `succ_of_reg_eq` | merge at the mouth, direct form: same cell + equal partner registers ⇒ identical successors — variation cannot steer itself |
+| `snap_stall` / `snap_between` | register snapshots move only at productive steps and are constant across productive-free stretches |
+| **`state_law`** | **THE FINAL THEOREM, assembled**: any list of times with pairwise-distinct register snapshots has length ≤ `#cells + 6` — i.e. **f(N) ≤ N + O(1)** — proved from exactly two hypotheses: `htail` (lemma B: a ≤4-element Gray tail) and `hcover`/`halts` (lemma C: ≤1 alternation before the tail). Snapshot stability, last-write extraction, first-write injectivity and the coding are all machine-checked; **B and C are the only remaining gap** |
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real
 pigeonhole proof (induction on N, splitting on the first coordinate),
