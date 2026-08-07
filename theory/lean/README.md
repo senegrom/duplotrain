@@ -66,6 +66,8 @@ theorems, no `native_decide`, no `sorry`:
 | `confirmed_step` / `head_confirmed` | the confirmation dynamics: each cell confirms exactly its register slot, and every step's read value is confirmed — the walk always leaves a confirmed slot |
 | `arrival_token` / `token_step` | a productive step lands exactly on a **token** (unconfirmed slot, confirmed partner) and can create at most one new token, at the evicted slot of the same cell |
 | `tokens_nonincreasing` / `tokens_le_cells` | **heat never grows**: the number of tokens — the machine's capacity for future alternations — is non-increasing along any run and at most one per cell at every moment. (Does NOT bound alternation *events*: a token can be consumed and re-emitted forever — the Gray flip — so the open core stands) |
+| `freezeout` | **freeze-out**: a cell with no tokens never changes its register again — productive arrivals need a token of the written cell, and fresh tokens appear only at the written cell's own evicted slot |
+| `singleton_lock` / `singleton_lock_reg` | **the singleton lock**: a cell whose tokens are contained in `{t}` keeps its register in `{current register, t}` **forever** — single-token cells alternate between at most two slots: the σ ≤ 2 half of lemma B for singleton cells, unconditional |
 
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single

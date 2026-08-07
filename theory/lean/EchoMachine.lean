@@ -956,6 +956,166 @@ theorem tokens_nonincreasing (hrun : IsRun m e r0)
     rw [hEq]
     exact Nat.le_refl _
 
+/-- The tokens of cell `C` at time `k`. -/
+def cellTokens (slots : List Nat) (C k : Nat) : List Nat :=
+  slots.filter (fun s => decide (TokenEnd m e r0 k s ∧ m.cellOf s = C))
+
+/-- Unproductive steps do not move any cell's token set. -/
+theorem cellTokens_stall {k : Nat}
+    (heq : e (k+1) = reg m e r0 k (m.cellOf (e (k+1))))
+    (slots : List Nat) (C : Nat) :
+    cellTokens m e r0 slots C (k+1) = cellTokens m e r0 slots C k := by
+  unfold cellTokens
+  apply List.filter_congr
+  intro s _
+  have hstall := unproductive_stall m e r0 k heq
+  have h1 : Confirmed m e r0 (k+1) s ↔ Confirmed m e r0 k s := by
+    unfold Confirmed; rw [hstall]
+  have h2 : Confirmed m e r0 (k+1) (m.bar s) ↔
+      Confirmed m e r0 k (m.bar s) := by
+    unfold Confirmed; rw [hstall]
+  exact decide_eq_decide.mpr (by unfold TokenEnd; rw [h1, h2])
+
+/-- **Freeze-out.**  A cell with no tokens never changes its register
+again: a productive arrival needs a token of the cell it writes, and
+no step can hand a tokenless cell a new one (fresh tokens appear only
+at the evicted slot of the written cell itself).  Unconditional. -/
+theorem freezeout (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hslots : ∀ j, e j ∈ slots)
+    {C k : Nat} (h0 : ∀ s, s ∉ cellTokens m e r0 slots C k) :
+    ∀ d, (∀ s, s ∉ cellTokens m e r0 slots C (k+d)) ∧
+      reg m e r0 (k+d) C = reg m e r0 k C := by
+  intro d
+  induction d with
+  | zero => exact ⟨h0, rfl⟩
+  | succ n ih =>
+      obtain ⟨htok, hreg⟩ := ih
+      by_cases hp : ProductiveStep m e r0 (k+n)
+      · have hD : m.cellOf (e (k+n+1)) ≠ C := by
+          intro hDC
+          have ht := arrival_token m e r0 hrun hr0 (k+n) hp
+          have hmem : e (k+n+1) ∈ cellTokens m e r0 slots C (k+n) := by
+            rw [cellTokens, List.mem_filter]
+            exact ⟨hslots (k+n+1), decide_eq_true ⟨ht, hDC⟩⟩
+          exact htok _ hmem
+        constructor
+        · show ∀ s, s ∉ cellTokens m e r0 slots C (k+n+1)
+          intro s hs
+          rw [cellTokens, List.mem_filter] at hs
+          obtain ⟨hT, hC⟩ := of_decide_eq_true hs.2
+          rcases token_step m e r0 hrun hr0 (k+n) s hT with hv | ⟨hTk, _⟩
+          · have hcs : m.cellOf s = m.cellOf (e (k+n+1)) := by
+              rw [hv]; exact reg_cell m e r0 hr0 (k+n) _
+            exact hD (hcs.symm.trans hC)
+          · exact htok s (by
+              rw [cellTokens, List.mem_filter]
+              exact ⟨hs.1, decide_eq_true ⟨hTk, hC⟩⟩)
+        · show reg m e r0 (k+n+1) C = reg m e r0 k C
+          rw [reg_skip m e r0 hD]
+          exact hreg
+      · have heq : e (k+n+1) = reg m e r0 (k+n) (m.cellOf (e (k+n+1))) := by
+          by_cases hq : e (k+n+1) = reg m e r0 (k+n) (m.cellOf (e (k+n+1)))
+          · exact hq
+          · exact absurd hq hp
+        constructor
+        · show ∀ s, s ∉ cellTokens m e r0 slots C (k+n+1)
+          rw [cellTokens_stall m e r0 heq slots C]
+          exact htok
+        · show reg m e r0 (k+n+1) C = reg m e r0 k C
+          rw [unproductive_stall m e r0 (k+n) heq C]
+          exact hreg
+
+/-- **The singleton lock.**  A cell whose tokens all equal one slot `t`
+keeps its register in the two-element set `{current register, t}`
+**forever**: its productive arrivals can only consume `t` or its own
+re-emissions, so the register bounces between at most two values.
+This is the σ ≤ 2 half of lemma B for singleton-token cells,
+unconditional. -/
+theorem singleton_lock (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hslots : ∀ j, e j ∈ slots)
+    {C k t : Nat}
+    (h1 : ∀ s ∈ cellTokens m e r0 slots C k, s = t) :
+    ∀ d, (reg m e r0 (k+d) C = reg m e r0 k C ∨
+          reg m e r0 (k+d) C = t) ∧
+      (∀ s ∈ cellTokens m e r0 slots C (k+d),
+        s = reg m e r0 k C ∨ s = t) := by
+  intro d
+  induction d with
+  | zero => exact ⟨Or.inl rfl, fun s hs => Or.inr (h1 s hs)⟩
+  | succ n ih =>
+      obtain ⟨hregmem, htokmem⟩ := ih
+      by_cases hp : ProductiveStep m e r0 (k+n)
+      · by_cases hD : m.cellOf (e (k+n+1)) = C
+        · have harr : e (k+n+1) ∈ cellTokens m e r0 slots C (k+n) := by
+            rw [cellTokens, List.mem_filter]
+            exact ⟨hslots _, decide_eq_true
+              ⟨arrival_token m e r0 hrun hr0 (k+n) hp, hD⟩⟩
+          have harrmem := htokmem _ harr
+          have hregnew : reg m e r0 (k+n+1) C = e (k+n+1) := by
+            rw [← hD]
+            exact reg_write m e r0 rfl
+          constructor
+          · show reg m e r0 (k+n+1) C = reg m e r0 k C ∨
+                reg m e r0 (k+n+1) C = t
+            rw [hregnew]
+            exact harrmem
+          · show ∀ s ∈ cellTokens m e r0 slots C (k+n+1),
+                s = reg m e r0 k C ∨ s = t
+            intro s hs
+            rw [cellTokens, List.mem_filter] at hs
+            obtain ⟨hT, hC⟩ := of_decide_eq_true hs.2
+            rcases token_step m e r0 hrun hr0 (k+n) s hT with hv | ⟨hTk, _⟩
+            · rw [hv, hD]
+              exact hregmem
+            · exact htokmem s (by
+                rw [cellTokens, List.mem_filter]
+                exact ⟨hs.1, decide_eq_true ⟨hTk, hC⟩⟩)
+        · constructor
+          · show reg m e r0 (k+n+1) C = reg m e r0 k C ∨
+                reg m e r0 (k+n+1) C = t
+            rw [reg_skip m e r0 hD]
+            exact hregmem
+          · show ∀ s ∈ cellTokens m e r0 slots C (k+n+1),
+                s = reg m e r0 k C ∨ s = t
+            intro s hs
+            rw [cellTokens, List.mem_filter] at hs
+            obtain ⟨hT, hC⟩ := of_decide_eq_true hs.2
+            rcases token_step m e r0 hrun hr0 (k+n) s hT with hv | ⟨hTk, _⟩
+            · have hcs : m.cellOf s = m.cellOf (e (k+n+1)) := by
+                rw [hv]; exact reg_cell m e r0 hr0 (k+n) _
+              exact absurd (hcs.symm.trans hC) hD
+            · exact htokmem s (by
+                rw [cellTokens, List.mem_filter]
+                exact ⟨hs.1, decide_eq_true ⟨hTk, hC⟩⟩)
+      · have heq : e (k+n+1) = reg m e r0 (k+n) (m.cellOf (e (k+n+1))) := by
+          by_cases hq : e (k+n+1) = reg m e r0 (k+n) (m.cellOf (e (k+n+1)))
+          · exact hq
+          · exact absurd hq hp
+        constructor
+        · show reg m e r0 (k+n+1) C = reg m e r0 k C ∨
+              reg m e r0 (k+n+1) C = t
+          rw [unproductive_stall m e r0 (k+n) heq C]
+          exact hregmem
+        · show ∀ s ∈ cellTokens m e r0 slots C (k+n+1),
+              s = reg m e r0 k C ∨ s = t
+          rw [cellTokens_stall m e r0 heq slots C]
+          exact htokmem
+
+/-- Register form of the singleton lock: from the moment a cell's
+tokens are contained in `{t}`, its register takes at most two values,
+ever. -/
+theorem singleton_lock_reg (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (slots : List Nat) (hslots : ∀ j, e j ∈ slots)
+    {C k t : Nat}
+    (h1 : ∀ s ∈ cellTokens m e r0 slots C k, s = t)
+    {j : Nat} (hj : k ≤ j) :
+    reg m e r0 j C = reg m e r0 k C ∨ reg m e r0 j C = t := by
+  obtain ⟨d, rfl⟩ : ∃ d, j = k + d := ⟨j - k, by omega⟩
+  exact (singleton_lock m e r0 hrun hr0 slots hslots h1 d).1
+
 /-- **At most one token per cell, at every moment**: `bar` maps tokens
 injectively to confirmed slots, and each cell confirms exactly one
 slot.  So the machine's alternation capacity is bounded by the number
