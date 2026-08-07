@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Three libraries, all self-contained (no Mathlib):
+Four libraries, all self-contained (no Mathlib):
 
 **`GeneralN.lean` — general-N theorems, no exhaustion.** Every result holds
 for an arbitrary number of switches and arbitrary wirings, proved by
@@ -35,14 +35,27 @@ theorems, no `native_decide`, no `sorry`:
 | `echo` | the repetition identity: an entry produced by two nested returns **literally repeats an earlier entry** (the LIFO seed) |
 | `succ_repeat` / `entry_change_read_change` | alternation propagation: same-cell ascents produce the same successor unless the partner register changed in between |
 | `bounce_step` / `bounce_orbit` | a partner-alternating orbit obeys `e(k+2) = bar(e k)` and visits **at most 4 distinct entries** — the Gray square, for all N |
+| `unproductive_stall` | a write that re-stores the current value changes **no** register: states move only through productive writes |
+| `productive_first_or_alternation` | **the accounting theorem**: every productive write is the *first* write of its cell (≤ N over a run) or an *alternation* — the unconditional skeleton of f(N) ≤ N + O(1) |
 
-The remaining unproved core of the full cycle theorem is now two lemmas
-about this machine (see docs/lazy-point-theory.md): **B** (every machine
-cycle has Σ(σ−1) ≤ 2 — this is C\*) and **C** (O(1) transient
-alternations).  Modulo B + C, the total state count obeys
-f(N) ≤ N + O(1).  Both are exhaustively verified across all small
-machines by `docs/echo_machine.py` (max actives 2, max transient
-alternations 1, everywhere).
+**`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real
+pigeonhole proof (induction on N, splitting on the first coordinate),
+no `native_decide`:
+
+| theorem | statement |
+|---|---|
+| `pigeonhole` | a duplicate-free list of length-N boolean vectors has at most 2^N elements |
+| `vector_count_le` / `trajectory_count_le` | **no run of any N-switch wiring, of any length, visits more than 2^N distinct tongue vectors** |
+
+The remaining unproved core of the full cycle theorem is two lemmas
+about the echo machine (see docs/lazy-point-theory.md): **B** (every
+machine cycle has Σ(σ−1) ≤ 2 — this is C\*) and **C** (O(1) transient
+alternations).  Modulo B + C, the accounting theorem closes the state
+count to f(N) ≤ N + O(1); unconditionally, f(N) ≤ min(2^N, N + 1 + A)
+with A the run's alternation count.  B and C are exhaustively verified
+across all small machines by `docs/echo_machine.py` (max actives 2, max
+transient alternations 1, everywhere; every cycle's σ-profile is `()`
+or `(2,2)` — functional collapse or the dogbone Gray square).
 
 **`DuplotrainProofs.lean` — exhaustive small-N theorems** (`native_decide`):
 the wiring enumerator, the perfection automaton (reflecting caps) and the

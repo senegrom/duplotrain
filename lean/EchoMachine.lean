@@ -199,4 +199,69 @@ theorem bounce_orbit (hrun : IsRun m e r0) (halt : Alternating m e) :
   · rw [hb, h]; exact Or.inr (Or.inr (Or.inr rfl))
   · rw [hb, h, m.bar_invol]; exact Or.inr (Or.inr (Or.inl rfl))
 
+/-- An unproductive write — one that rewrites the value already stored —
+changes **no** register at all: the machine state can only move through
+productive writes. -/
+theorem unproductive_stall (k : Nat)
+    (h : e (k+1) = reg m e r0 k (m.cellOf (e (k+1)))) :
+    ∀ c, reg m e r0 (k+1) c = reg m e r0 k c := by
+  intro c
+  by_cases hc : m.cellOf (e (k+1)) = c
+  · rw [reg_write m e r0 hc, h, hc]
+  · exact reg_skip m e r0 hc
+
+private theorem exists_last {P : Nat → Prop} :
+    ∀ k, (∃ j, j ≤ k ∧ P j) →
+      ∃ j, j ≤ k ∧ P j ∧ ∀ i, j < i → i ≤ k → ¬ P i := by
+  intro k
+  induction k with
+  | zero =>
+      intro h
+      obtain ⟨j, hj, hp⟩ := h
+      have hj0 : j = 0 := Nat.le_zero.mp hj
+      subst hj0
+      exact ⟨0, Nat.le_refl 0, hp, fun i h1 h2 _ => by omega⟩
+  | succ n ih =>
+      intro h
+      obtain ⟨j, hj, hp⟩ := h
+      by_cases hn : P (n+1)
+      · exact ⟨n+1, Nat.le_refl _, hn, fun i h1 h2 _ => by omega⟩
+      · have hj' : j ≤ n := by
+          by_cases hje : j = n+1
+          · exact absurd (hje ▸ hp) hn
+          · omega
+        obtain ⟨j', h1, h2, h3⟩ := ih ⟨j, hj', hp⟩
+        refine ⟨j', Nat.le_trans h1 (Nat.le_succ n), h2, ?_⟩
+        intro i hi1 hi2
+        by_cases hie : i = n+1
+        · exact hie ▸ hn
+        · exact h3 i hi1 (by omega)
+
+/-- **The accounting theorem** (unconditional, general N).  A productive
+write is either the **first** write of its cell — at most one per cell,
+i.e. at most N over the whole run — or an **alternation**: it differs
+from that cell's most recent previous write.  Together with
+`unproductive_stall` this is the skeleton of f(N) ≤ N + O(1): every
+change of the machine state is a first ascent or an alternation, so the
+state count is 1 + #first-ascents + #alternations, and the two open
+lemmas B and C only have to bound the alternations. -/
+theorem productive_first_or_alternation (k : Nat)
+    (hprod : e (k+1) ≠ reg m e r0 k (m.cellOf (e (k+1)))) :
+    (∀ j, j ≤ k → m.cellOf (e j) ≠ m.cellOf (e (k+1))) ∨
+    (∃ j, j ≤ k ∧ m.cellOf (e j) = m.cellOf (e (k+1)) ∧
+      (∀ i, j < i → i ≤ k → m.cellOf (e i) ≠ m.cellOf (e (k+1))) ∧
+      e (k+1) ≠ e j) := by
+  by_cases hex : ∃ j, j ≤ k ∧ m.cellOf (e j) = m.cellOf (e (k+1))
+  · right
+    obtain ⟨j, hjk, hjc, hlast⟩ :=
+      exists_last (P := fun j => m.cellOf (e j) = m.cellOf (e (k+1))) k hex
+    refine ⟨j, hjk, hjc, hlast, ?_⟩
+    have hreg : reg m e r0 k (m.cellOf (e (k+1))) = e j :=
+      reg_last_write m e r0 hjc hjk hlast
+    intro heq
+    exact hprod (heq.trans hreg.symm)
+  · left
+    intro j hjk hc
+    exact hex ⟨j, hjk, hc⟩
+
 end Echo

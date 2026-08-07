@@ -30,7 +30,11 @@ Results (this file's sweep plus larger ones, 2026-08-06):
   C=8 random 300k                           max actives 2, transient alt 1
   C=10 random 300k                          max actives 2, transient alt 1
 Cycles carry up to 12 distinct entries, but the surplus always lives in
-one-slot cells, which pin nothing: actives never exceed 2.
+one-slot cells, which pin nothing: actives never exceed 2.  Sharper: the
+per-cell sigma profile of every observed cycle (C=4 exhaustive, C=8
+random 300k) is either () — no cell alternates — or exactly (2, 2): two
+cells of two slots each, the dogbone Gray square.  Never (2) alone,
+never (3).
 """
 
 import itertools

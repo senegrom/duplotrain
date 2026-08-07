@@ -225,28 +225,50 @@ Machine exhaustion (`docs/echo_machine.py`): all machines with 2 cells
 300k random machines each at 8 and 10 cells: **max actives 2, max
 transient alternations 1, throughout**.  Cycles can carry up to 12
 distinct *entries*, but the surplus always lives in one-slot trees,
-which pin nothing.  On the wiring side the same caps are exhaustive for
-all 143k wirings with N ≤ 4 (in Lean) and unbeaten by cycle-objective
-search through N = 7.
+which pin nothing.  Sharper still, the per-tree σ-profile of every cycle
+observed (C = 4 exhaustive, C = 8 random) is **either `()` — no tree
+alternates, the functional collapse — or exactly `(2, 2)`** — two trees
+of two slots each, the dogbone pattern.  No `(2)` alone (a lone
+alternating tree cannot sustain itself in fall mode), no `(3)`, nothing
+larger.  On the wiring side the same caps are exhaustive for all 143k
+wirings with N ≤ 4 (in Lean) and unbeaten by cycle-objective search
+through N = 7.
 
-## f(N) ≤ N + O(1): the accounting
+## The unconditional bounds (machine-checked, general N)
 
-The no-op lemma (facts 1–2 + last-writer): re-ascending a tree from its
-previous slot changes no tongue.  So every change of the tongue vector
-is a **first ascent** of some tree (≤ #trees ≤ N of these) or an
-**alternation**.  Hence, over any entire run,
+Two upper bounds hold with **no** open lemma behind them:
 
-    distinct tongue vectors ≤ 1 + N + (transient alternations)
-                              + (distinct vectors on the cycle),
+* **f(N) ≤ 2^N** (`lean/VectorCount.lean`, `vector_count_le` /
+  `trajectory_count_le`): no run of any N-switch wiring, of any length,
+  visits more than 2^N distinct tongue vectors.  Proved by a genuine
+  pigeonhole induction (`pigeonhole`: a duplicate-free list of length-N
+  boolean vectors has ≤ 2^N elements), not by assertion.
 
-and given **B** (cycle ≤ 2 actives ⇒ ≤ 4 vectors) and **C** (O(1)
-transient alternations — observed ≤ 1):
+* **The accounting theorem** (`lean/EchoMachine.lean`,
+  `unproductive_stall` + `productive_first_or_alternation`): a write
+  that re-stores a register's current value changes *nothing*, and a
+  write that changes a register is either the **first write of its
+  cell** or an **alternation** (it differs from that cell's most recent
+  previous write — proved via `reg_last_write`).  Hence, along any run,
+
+      distinct machine states ≤ 1 + #first-ascents + #alternations
+                              ≤ 1 + N + #alternations.
+
+  This is the exact skeleton of N + O(1): the sole missing ingredient
+  is a bound on alternations.
+
+## f(N) ≤ N + O(1): what remains
+
+Given **B** (cycle ≤ 2 actives ⇒ ≤ 4 cycle vectors) and **C** (O(1)
+transient alternations — observed ≤ 1), the accounting closes to
 
     f(N) ≤ N + O(1),
 
 matching the observed law f(N) = min(2^N, N + 4) up to the additive
-constant.  Both open lemmas are now finite-flavoured statements about a
-ten-line machine with no geometry in it.
+constant.  Both open lemmas are finite-flavoured statements about a
+ten-line machine with no geometry in it, and the observed σ-profiles
+(`()` or `(2, 2)` only) say the eventual answer is exactly the dogbone
+Gray square, every time.
 
 ## Consequences
 
