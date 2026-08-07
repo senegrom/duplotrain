@@ -60,8 +60,8 @@ theorem repeated_entry_source_equal
       simpa [src, s] using hi0
     have hj : reg m e r0 j src = m.bar s := by
       simpa [src, s, heq'] using hj0
-    have hskip_i := reg_skip m e r0 (k := i) (c := src) hsrc_i
-    have hskip_j := reg_skip m e r0 (k := j) (c := src) hsrc_j
+    have hskip_i := reg_skip m e r0 (k := i) (c := src) hsrc_i.symm
+    have hskip_j := reg_skip m e r0 (k := j) (c := src) hsrc_j.symm
     rw [hskip_i, hskip_j, hi, hj]
 
 /-- For a snapshot whose listed cells are all boundary cells of a repeated
