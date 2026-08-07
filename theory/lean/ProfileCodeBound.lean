@@ -73,7 +73,7 @@ private theorem codeRect_length (ps : List Nat) (A : Nat) :
   induction ps with
   | nil => simp
   | cons p rest ih =>
-      simp [ih, Nat.add_mul]
+      simp [ih, Nat.add_mul, Nat.add_comm]
 
 /-- The code universe has exactly `P * 2^A` elements. -/
 theorem profileCodeUniverse_length (P A : Nat) :
