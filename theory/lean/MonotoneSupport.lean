@@ -36,14 +36,15 @@ theorem boolBelow_length {lo hi : List Bool}
   | nil =>
       cases hi with
       | nil => rfl
-      | cons b bs => cases h
+      | cons _ _ => cases h
   | cons a as ih =>
       cases hi with
       | nil => cases h
       | cons b bs =>
-          simp only [BoolBelow] at h
+          have ht : BoolBelow as bs := (show
+            (a = true → b = true) ∧ BoolBelow as bs from h).2
           simp only [List.length_cons]
-          exact congrArg Nat.succ (ih h.2)
+          exact congrArg Nat.succ (ih ht)
 
 theorem trueCount_le_of_below {lo hi : List Bool}
     (h : BoolBelow lo hi) : trueCount lo ≤ trueCount hi := by
@@ -51,19 +52,23 @@ theorem trueCount_le_of_below {lo hi : List Bool}
   | nil =>
       cases hi with
       | nil => exact Nat.le_refl _
-      | cons b bs => cases h
+      | cons _ _ => cases h
   | cons a as ih =>
       cases hi with
       | nil => cases h
       | cons b bs =>
-          simp only [BoolBelow] at h
-          cases a <;> cases b <;>
-            simp only [trueCount, Bool.false_eq_true, Bool.true_eq_true,
-              if_false, if_true] at h ⊢
-          · exact ih h.2
-          · exact Nat.le_trans (ih h.2) (Nat.le_add_left _ _)
-          · exact absurd rfl (h.1)
-          · exact Nat.add_le_add_left (ih h.2) 1
+          have hab : a = true → b = true := (show
+            (a = true → b = true) ∧ BoolBelow as bs from h).1
+          have htail : BoolBelow as bs := (show
+            (a = true → b = true) ∧ BoolBelow as bs from h).2
+          have ht := ih htail
+          cases a <;> cases b
+          · simpa [trueCount] using ht
+          · simp [trueCount] at ⊢
+            omega
+          · have hf : (false : Bool) = true := hab rfl
+            cases hf
+          · simpa [trueCount] using Nat.add_le_add_left ht 1
 
 theorem eq_of_below_trueCount_eq {lo hi : List Bool}
     (h : BoolBelow lo hi)
@@ -72,21 +77,29 @@ theorem eq_of_below_trueCount_eq {lo hi : List Bool}
   | nil =>
       cases hi with
       | nil => rfl
-      | cons b bs => cases h
+      | cons _ _ => cases h
   | cons a as ih =>
       cases hi with
       | nil => cases h
       | cons b bs =>
-          simp only [BoolBelow] at h
+          have hab : a = true → b = true := (show
+            (a = true → b = true) ∧ BoolBelow as bs from h).1
+          have htail : BoolBelow as bs := (show
+            (a = true → b = true) ∧ BoolBelow as bs from h).2
           cases a <;> cases b
-          · simp only [trueCount, if_false, Nat.zero_add] at hc
-            rw [ih h.2 hc]
-          · have hle := trueCount_le_of_below h.2
-            simp only [trueCount, if_false, if_true, Nat.zero_add] at hc
+          · have htc : trueCount as = trueCount bs := by
+              simpa [trueCount] using hc
+            have he := ih htail htc
+            simp [he]
+          · have hle := trueCount_le_of_below htail
+            simp [trueCount] at hc
             omega
-          · exact absurd rfl h.1
-          · simp only [trueCount, if_true, Nat.add_left_cancel_iff] at hc
-            rw [ih h.2 hc]
+          · have hf : (false : Bool) = true := hab rfl
+            cases hf
+          · have htc : trueCount as = trueCount bs := by
+              simpa [trueCount] using hc
+            have he := ih htail htc
+            simp [he]
 
 theorem trueCount_lt_of_below_ne {lo hi : List Bool}
     (h : BoolBelow lo hi) (hne : lo ≠ hi) :
@@ -97,6 +110,14 @@ theorem trueCount_lt_of_below_ne {lo hi : List Bool}
     exact hne (eq_of_below_trueCount_eq h heq)
   omega
 
+theorem trueCount_le_length : ∀ xs : List Bool,
+    trueCount xs ≤ xs.length := by
+  intro xs
+  induction xs with
+  | nil => exact Nat.le_refl _
+  | cons b bs ih =>
+      cases b <;> simp [trueCount] <;> omega
+
 /-- Consecutive vectors form a descending support chain. -/
 def Descending : List (List Bool) → Prop
   | [] => True
@@ -104,21 +125,27 @@ def Descending : List (List Bool) → Prop
   | x :: y :: rest => BoolBelow y x ∧ Descending (y :: rest)
 
 private theorem descending_length_le_head :
-    ∀ {vs : List (List Bool)}, vs.Nodup → Descending vs →
-      ∀ {x rest}, vs = x :: rest → vs.length ≤ trueCount x + 1 := by
-  intro vs hnd hdesc x rest heq
-  subst vs
+    ∀ (x : List Bool) (rest : List (List Bool)),
+      (x :: rest).Nodup → Descending (x :: rest) →
+      (x :: rest).length ≤ trueCount x + 1 := by
+  intro x rest
   induction rest generalizing x with
-  | nil => simp
+  | nil =>
+      intro _ _
+      simp
   | cons y ys ih =>
-      simp only [List.nodup_cons] at hnd
-      simp only [Descending] at hdesc
-      have hxy : x ≠ y := by
+      intro hnd hdesc
+      have hndx := List.nodup_cons.mp hnd
+      have hd : BoolBelow y x ∧ Descending (y :: ys) := by
+        simpa only [Descending] using hdesc
+      have hyx : y ≠ x := by
         intro h
-        exact hnd.1 (h ▸ List.mem_cons_self)
-      have hlt := trueCount_lt_of_below_ne hdesc.1 (fun h => hxy h.symm)
-      have htail := ih hnd.2 hdesc.2
-      simp only [List.length_cons]
+        apply hndx.1
+        rw [← h]
+        exact List.mem_cons_self
+      have hlt := trueCount_lt_of_below_ne hd.1 hyx
+      have htail := ih y hndx.2 hd.2
+      simp only [List.length_cons] at htail ⊢
       omega
 
 /-- A duplicate-free descending chain of length-`N` Boolean vectors has at
@@ -130,19 +157,16 @@ theorem descending_chain_bound (N : Nat) (vs : List (List Bool))
   cases vs with
   | nil => exact Nat.zero_le _
   | cons x rest =>
-      have hhead := descending_length_le_head hnd hdesc rfl
-      have hcount : trueCount x ≤ x.length := by
-        induction x with
-        | nil => exact Nat.le_refl _
-        | cons b bs ih =>
-            cases b <;> simp [trueCount] <;> omega
+      have hhead := descending_length_le_head x rest hnd hdesc
+      have hcount := trueCount_le_length x
       have hxlen := hlen x List.mem_cons_self
       omega
 
 /-- Support vector on a chosen list of jump-edge representatives.  It is safe
 if the list contains both endpoints too; that only duplicates coordinates and
 weakens the numerical bound. -/
-def supportSnap (edges : List Nat) (k : Nat) : List Bool :=
+open Classical in
+noncomputable def supportSnap (edges : List Nat) (k : Nat) : List Bool :=
   edges.map (fun s => decide (Occupied m e r0 k s))
 
 theorem supportSnap_length (edges : List Nat) (k : Nat) :
@@ -154,7 +178,7 @@ private theorem below_map {α : Type} (xs : List α)
     (h : ∀ x ∈ xs, p x = true → q x = true) :
     BoolBelow (xs.map p) (xs.map q) := by
   induction xs with
-  | nil => trivial
+  | nil => exact True.intro
   | cons x rest ih =>
       simp only [List.map_cons, BoolBelow]
       exact ⟨h x List.mem_cons_self,
@@ -193,18 +217,23 @@ private theorem support_descending
     (edges : List Nat) :
     ∀ ks, Increasing ks →
       Descending (ks.map (supportSnap m e r0 edges)) := by
-  intro ks hinc
-  cases ks with
-  | nil => trivial
-  | cons i rest =>
+  intro ks
+  induction ks with
+  | nil =>
+      intro _
+      exact True.intro
+  | cons i rest ih =>
       cases rest with
-      | nil => trivial
+      | nil =>
+          intro _
+          exact True.intro
       | cons j tail =>
-          simp only [Increasing] at hinc
+          intro hinc
+          have hp : i < j ∧ Increasing (j :: tail) := by
+            simpa only [Increasing] using hinc
           simp only [List.map_cons, Descending]
           exact ⟨support_later_below m e r0 hrun hr0 edges
-              (Nat.le_of_lt hinc.1),
-            support_descending m e r0 hrun hr0 edges (j :: tail) hinc.2⟩
+              (Nat.le_of_lt hp.1), ih hp.2⟩
 
 /-- **Linear number of support epochs.**  Along increasing times, if the
 support vectors are pairwise distinct, there are at most `#edges + 1` of
@@ -215,12 +244,13 @@ theorem support_epoch_bound
     (hinc : Increasing ks)
     (hnd : (ks.map (supportSnap m e r0 edges)).Nodup) :
     ks.length ≤ edges.length + 1 := by
+  have hdesc := support_descending m e r0 hrun hr0 edges ks hinc
   have h := descending_chain_bound edges.length
     (ks.map (supportSnap m e r0 edges))
     (fun v hv => by
       obtain ⟨k, _, rfl⟩ := List.mem_map.mp hv
       exact supportSnap_length m e r0 edges k)
-    hnd (support_descending m e r0 hrun hr0 edges ks hinc)
+    hnd hdesc
   simpa only [List.length_map] using h
 
 end Echo
