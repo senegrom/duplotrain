@@ -1,7 +1,7 @@
-name: Linear current Lean check
+name: Subexponential bound Lean check
 on:
   push:
-    branches: [agent/linear-bound-current]
+    branches: [agent/subexponential-bound]
   workflow_dispatch:
 jobs:
   lean:
@@ -18,4 +18,4 @@ jobs:
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build LinearBound AlternationBound SlotBound ReplayFacts PairBound SupportBound SupportMove EdgeReversal
+          lake build LinearBound AlternationBound SlotBound ReplayFacts PairBound SupportBound SupportMove EdgeReversal SkewWalk
