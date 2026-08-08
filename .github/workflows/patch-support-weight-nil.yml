@@ -1,0 +1,45 @@
+name: Patch support-weight nil case
+on:
+  push:
+    branches: [agent/linear-bound-current]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Replace the final fibre base case
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("theory/lean/SupportWeightFibres.lean")
+          text = path.read_text()
+          old = """  | nil =>
+              intro _
+              simp [supportFibreSizes, supportFibreSize]
+          """
+          new = """  | nil =>
+              intro _
+              unfold supportFibreSizes
+              induction K with
+              | zero => rfl
+              | succ K ih =>
+                  rw [List.range_succ, List.map_append, List.sum_append]
+                  simp [supportFibreSize, ih]
+          """
+          if old in text:
+              path.write_text(text.replace(old, new, 1))
+          elif new not in text:
+              raise SystemExit("support-weight nil branch did not match")
+          PY
+      - name: Commit repair
+        run: |
+          if ! git diff --quiet -- theory/lean/SupportWeightFibres.lean; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add theory/lean/SupportWeightFibres.lean
+            git commit -m "prove the support-fibre empty-list base case"
+            git push origin HEAD:agent/linear-bound-current
+          fi
