@@ -24,6 +24,7 @@ jobs:
           export PATH="$HOME/.elan/bin:$PATH"
           lake build StateLaw FiniteFrameSwitchCorollary
           lake env lean ConcreteEchoBridge.lean
+          lake env lean ConcreteCascadeFacts.lean
       - name: Build automatic component chain
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
