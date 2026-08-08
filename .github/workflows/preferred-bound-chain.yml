@@ -36,3 +36,16 @@ jobs:
           lake env lean PairedPointwiseReplayCore.lean
           lake env lean PairedBlockEpochStrictBound.lean
           lake env lean BlockEpochAggregation.lean
+          lake env lean BlockGlobalArithmetic.lean
+      - name: Check automatic component chain
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake env lean SupportTreeFull.lean
+          lake env lean AutomaticTreeBlock.lean
+          lake env lean AutomaticCycleFixed.lean
+          lake env lean AutomaticEpochBound.lean
+          lake env lean BoundaryReplay.lean
+          lake env lean LobeForestBlock.lean
+          lake env lean LobeForestActive.lean
+          lake env lean MixedEpochBound.lean
+          lake env lean LobeForestPartition.lean
