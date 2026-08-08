@@ -22,11 +22,14 @@ def EdgeRepresentatives (edges : List Nat) : Prop :=
   ∀ s, s ∈ edges → ∀ t, t ∈ edges → SameEdge m s t → s = t
 
 /-- Pick a confirmed endpoint when the edge is occupied. -/
-noncomputable def chosenEndpoint (k s : Nat) : Nat :=
-  if Confirmed m e r0 k s then s else m.bar s
+noncomputable def chosenEndpoint
+    (m : Machine) (e r0 : Nat → Nat) (k s : Nat) : Nat := by
+  classical
+  exact if Confirmed m e r0 k s then s else m.bar s
 
 theorem chosenEndpoint_sameEdge (k s : Nat) :
     SameEdge m s (chosenEndpoint m e r0 k s) := by
+  classical
   unfold chosenEndpoint
   split
   · exact Or.inl rfl
@@ -35,6 +38,7 @@ theorem chosenEndpoint_sameEdge (k s : Nat) :
 theorem chosenEndpoint_confirmed {k s : Nat}
     (hocc : Occupied m e r0 k s) :
     Confirmed m e r0 k (chosenEndpoint m e r0 k s) := by
+  classical
   unfold chosenEndpoint
   split <;> rename_i h
   · exact h
@@ -118,6 +122,7 @@ theorem occupied_edges_le_cells
     (hcells : ∀ s ∈ edges,
       m.cellOf s ∈ cells ∧ m.cellOf (m.bar s) ∈ cells) :
     edges.length ≤ cells.length := by
+  classical
   have hnd := nodup_map_selected m e r0 edges k hreps hocc
   have hsub : ∀ c ∈ edges.map
       (fun s => m.cellOf (chosenEndpoint m e r0 k s)), c ∈ cells := by
