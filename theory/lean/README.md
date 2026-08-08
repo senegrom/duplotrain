@@ -209,20 +209,31 @@ of Chalcraft--Greene and Aaronson directly over `Wiring`:
   absorbing cycle, exact reverse retrace, one-step return to the start port,
   or one-step exit past the start.
 
-`TrackGlobalRepair.lean` now closes the whole-route self-healing half of the
-global theta case.  `repair_forward_damage_or_facing` says a switch-simple
-reference route in an arbitrary tongue state either exposes a concrete broken
-passage approached through its stem, or repairs every groove in one traversal.
+`TrackGlobalRepair.lean` now carries the whole-route repair with the other
+reflector's support as an invariant.  `repair_forward_damage_or_facing` says a
+switch-simple reference route in an arbitrary tongue state either exposes a
+concrete broken passage approached through its stem, or repairs every groove
+in one traversal.  Its stronger successor
+`repair_preserving_paths_until_conflict` advances one physical passage at a
+time and stops at the first facing diversion or the first state-changing
+contact with a protected groove family; every earlier passage is proved to
+preserve that whole family.
 `support_grooves_of_orientedRoute` and
 `oriented_data_eq_of_route_grooved` prove that the repaired route restores the
 entire manufactured-reflector support and still selects the same far endpoint.
 `current_route_reference` aligns only the reflector's private action tongue,
-whose reusable support is disjoint, so `repair_current_route_or_facing`
-replays the route the train actually selects rather than freezing an obsolete
-choice.  `current_facing_has_support_witness` removes the resulting false
-action-mouth case, and `current_facing_change_location` proves that every
-remaining outward obstruction is literally a backward theta contact: its
-unique changing exploration passage exits through the old route's stem.
+whose reusable support is disjoint, so
+`repair_current_route_preserving_until_conflict` replays the route the train
+actually selects rather than freezing an obsolete choice.  The local
+classifiers `protected_changed_contact_periodic_or_forward` and
+`protected_facing_contact_periodic_or_forward` close every backward contact as
+an exact grooved cycle.  `return_change_facing_eventuallyPeriodic` closes the
+former final-mouth exception by an explicit two-capture period.  Finally,
+`completed_route_with_pair_support_periodic` invokes the already proved
+complete two-reflector theorem once repair has installed both supports.
+Consequently `manufactured_pair_protected_repair_outcomes` eliminates the
+old unspecified facing residual: only two concrete **forward merges** remain,
+one with no tongue change and one with the old passage self-repaired.
 The capstone `repair_or_facing_diversion` therefore completes a damaged
 reflector all the way to the opposite boundary unless that one explicit
 facing-first diversion occurs.  The endpoint-strengthened
@@ -230,8 +241,9 @@ facing-first diversion occurs.  The endpoint-strengthened
 unmatched tail between the old-route and fresh-exploration endpoints, rather
 than only their prefix-comparability.  The global capstone lifts the repaired
 journey back to the original train start while retaining the forward-fault
-certificate.  This is unconditional and general-`N`; the facing-first theta
-diversion remains the open global case.
+certificate.  All new reductions are unconditional and general-`N`; the open
+global track case is now the well-founded collapse of the two retained forward
+merges, not the former facing-first diversion.
 
 * `first_revisit_of_long_run`: every live `N+1`-passage run has a first
   revisited switch after a switch-simple prefix of length at most `N`.
