@@ -181,6 +181,17 @@ of Chalcraft--Greene and Aaronson directly over `Wiring`:
   `physical_edge_repeats_of_long_run`: an `N`-switch live run repeats a
   physical edge by step `3*N`; this is a kernel-checked linear cutoff, not a
   finiteness assumption.
+* `first_edge_revisit_split_from`, `passageEdgeRep_eq_iff`: the first repeated
+  edge is recovered as an actual passage split with its exact same/reverse
+  orientation—not merely as a duplicate key.
+* `same_oriented_first_edge_settles` and
+  `reverse_oriented_first_edge_retraces`: **Observation 2 and the lollipop
+  retrace**.  An internal same-oriented repeat is an absorbing simple cycle;
+  an internal reverse repeat closes a simple candy and retraces the whole
+  earlier runway without further tongue changes.
+* `first_edge_outcome_of_long_run`: the complete linear-prefix case split:
+  absorbing cycle, exact reverse retrace, one-step return to the start port,
+  or one-step exit past the start.
 
 * `first_revisit_of_long_run`: every live `N+1`-passage run has a first
   revisited switch after a switch-simple prefix of length at most `N`.
@@ -198,13 +209,13 @@ of Chalcraft--Greene and Aaronson directly over `Wiring`:
   local actions avoid one another's supports have a genuine period, by the
   four-corner Gray composition.
 
-The raw `StateLaw` remains **OPEN**.  The new edge cutoff and Observation 1
-close the combinatorial front end of the classical proof.  What remains is
-to formalise its orientation case split after the first repeated edge
-(same-direction simple cycle; reverse-direction line/lollipop/dumbbell; the
-degree-three theta collapse), and then count the linear transient plus the
-at-most-four-state attractor.  The older first-repeated-switch route still
-has an equivalent forward-theta residual; neither residual is being called
+The raw `StateLaw` remains **OPEN**.  The new edge cutoff and the complete
+four-way first-edge outcome close the local front end of the classical
+proof.  What remains is the global composition of its return/retrace cases
+into the line/lollipop/dumbbell attractors (including the degree-three theta
+collapse), followed by counting the linear transient plus the at-most-four
+attractor states.  The older first-repeated-switch route still has an
+equivalent forward-theta residual; neither global residual is being called
 proved.
 
 **`EchoMachine.lean` — the abstracted cycle dynamics** (T9 in

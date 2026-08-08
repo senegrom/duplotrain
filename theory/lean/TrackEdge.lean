@@ -36,6 +36,50 @@ def EdgeSimpleFrom (w : Wiring) (entryEdge : Nat)
     (passages : List Passage) : Prop :=
   (wireEdgeRep w entryEdge :: passages.map (passageEdgeRep w)).Nodup
 
+/-- Add the incoming edge as a distinguished event before all passage edges.
+Using `Option` keeps enough information to turn a first-repeat split back into
+a split of the original passage list. -/
+def edgeEvents (passages : List Passage) : List (Option Passage) :=
+  none :: passages.map some
+
+def edgeEventRep (w : Wiring) (entryEdge : Nat) :
+    Option Passage → Nat
+  | none => wireEdgeRep w entryEdge
+  | some passage => passageEdgeRep w passage
+
+private theorem map_some_injective {α : Type} :
+    Function.Injective (List.map (fun x : α => some x)) := by
+  intro xs ys h
+  induction xs generalizing ys with
+  | nil =>
+      cases ys with
+      | nil => rfl
+      | cons y ys => cases h
+  | cons x xs ih =>
+      cases ys with
+      | nil => cases h
+      | cons y ys =>
+          simp only [List.map_cons] at h
+          injection h with hxy htail
+          have hhead : x = y := Option.some.inj hxy
+          subst y
+          rw [ih htail]
+
+private theorem exists_map_some_of_all_some {α : Type}
+    (events : List (Option α))
+    (h : ∀ event ∈ events, ∃ x, event = some x) :
+    ∃ (xs : List α), events = xs.map (fun x => some x) := by
+  induction events with
+  | nil => exact ⟨[], rfl⟩
+  | cons event events ih =>
+      obtain ⟨x, hx⟩ := h event List.mem_cons_self
+      obtain ⟨xs, hxs⟩ := ih (by
+        intro later hlater
+        exact h later (List.mem_cons_of_mem _ hlater))
+      subst event
+      subst events
+      exact ⟨x :: xs, rfl⟩
+
 /-- Equality of canonical names means equality of undirected wiring edges.
 The second endpoint is either the same oriented exit or its wire partner. -/
 theorem wireEdgeRep_eq_iff (w : Wiring) (p q : Nat) :
@@ -378,6 +422,371 @@ theorem first_edge_revisit_split {w : Wiring} {passages : List Passage}
       hsimple | hrepeat
   · exact absurd hsimple hnsimple
   · exact hrepeat
+
+/-- Boundary-aware first-repeat decomposition.  `repeated` is the first
+passage whose outgoing physical edge was already crossed: either it repeats
+the incoming edge, or it repeats one of `before`'s outgoing edges. -/
+theorem first_edge_revisit_split_from
+    {w : Wiring} {entryEdge : Nat} {passages : List Passage}
+    (hnsimple : ¬ EdgeSimpleFrom w entryEdge passages) :
+    ∃ before repeated after,
+      passages = before ++ repeated :: after ∧
+      EdgeSimpleFrom w entryEdge before ∧
+      (passageEdgeRep w repeated = wireEdgeRep w entryEdge ∨
+        passageEdgeRep w repeated ∈
+          before.map (passageEdgeRep w)) := by
+  have hnot : ¬ ((edgeEvents passages).map
+      (edgeEventRep w entryEdge)).Nodup := by
+    simpa [EdgeSimpleFrom, edgeEvents, edgeEventRep, List.map_map,
+      Function.comp_def]
+      using hnsimple
+  rcases first_repeat_by (edgeEventRep w entryEdge)
+      (edgeEvents passages) with hsimple | hrepeat
+  · exact absurd hsimple hnot
+  · obtain ⟨eventsBefore, repeatedEvent, eventsAfter,
+        hEq, hbefore, hmem⟩ := hrepeat
+    cases eventsBefore with
+    | nil =>
+        simp at hmem
+    | cons first priorEvents =>
+        unfold edgeEvents at hEq
+        simp only [List.cons_append] at hEq
+        injection hEq with hfirst htail
+        subst first
+        have hrepeatedMem :
+            repeatedEvent ∈ passages.map (fun passage => some passage) := by
+          rw [htail]
+          exact List.mem_append_right _ List.mem_cons_self
+        obtain ⟨repeated, _hrepeated, hrepeatedEq⟩ :=
+          List.mem_map.mp hrepeatedMem
+        have hrepeatedEq' : repeatedEvent = some repeated :=
+          hrepeatedEq.symm
+        subst repeatedEvent
+        have hpriorAll : ∀ event ∈ priorEvents,
+            ∃ passage, event = some passage := by
+          intro event hevent
+          have heventFull :
+              event ∈ passages.map (fun passage => some passage) := by
+            rw [htail]
+            exact List.mem_append_left _ hevent
+          obtain ⟨passage, _hpassage, hp⟩ :=
+            List.mem_map.mp heventFull
+          exact ⟨passage, hp.symm⟩
+        obtain ⟨before, hprior⟩ :=
+          exists_map_some_of_all_some priorEvents hpriorAll
+        have hafterAll : ∀ event ∈ eventsAfter,
+            ∃ passage, event = some passage := by
+          intro event hevent
+          have heventFull :
+              event ∈ passages.map (fun passage => some passage) := by
+            rw [htail]
+            exact List.mem_append_right _
+              (List.mem_cons_of_mem _ hevent)
+          obtain ⟨passage, _hpassage, hp⟩ :=
+            List.mem_map.mp heventFull
+          exact ⟨passage, hp.symm⟩
+        obtain ⟨after, hafter⟩ :=
+          exists_map_some_of_all_some eventsAfter hafterAll
+        subst priorEvents
+        subst eventsAfter
+        have hpassages : passages = before ++ repeated :: after := by
+          apply map_some_injective
+          simpa only [List.map_append, List.map_cons] using htail
+        have hbefore' : EdgeSimpleFrom w entryEdge before := by
+          unfold EdgeSimpleFrom
+          simpa [edgeEventRep, List.map_map, Function.comp_def]
+            using hbefore
+        have hmem' :
+            passageEdgeRep w repeated ∈
+              wireEdgeRep w entryEdge ::
+                before.map (passageEdgeRep w) := by
+          simpa [edgeEventRep, List.map_map, Function.comp_def]
+            using hmem
+        exact ⟨before, repeated, after, hpassages, hbefore',
+          List.mem_cons.mp hmem'⟩
+
+/-- Equality of passage-edge names has exactly the two expected orientations:
+the repeated passage exits through the old exit, or through its wire partner. -/
+theorem passageEdgeRep_eq_iff (w : Wiring) (old repeated : Passage) :
+    passageEdgeRep w old = passageEdgeRep w repeated ↔
+      repeated.2 = old.2 ∨ repeated.2 = wireBar w old.2 := by
+  exact wireEdgeRep_eq_iff w old.2 repeated.2
+
+/-- Orientation split when the repeated edge is the incoming boundary edge. -/
+theorem passageEdgeRep_eq_entry_iff
+    (w : Wiring) (entryEdge : Nat) (repeated : Passage) :
+    passageEdgeRep w repeated = wireEdgeRep w entryEdge ↔
+      repeated.2 = entryEdge ∨
+        repeated.2 = wireBar w entryEdge := by
+  rw [eq_comm]
+  exact wireEdgeRep_eq_iff w entryEdge repeated.2
+
+/-- **First repeated physical edge, fully split.**  A live `3*N`-step run
+from a known incoming edge reaches, after an edge-simple prefix, the first
+passage whose outgoing edge is either the incoming edge or an earlier
+passage edge. -/
+theorem first_edge_revisit_from_long_run
+    {w : Wiring} {N entryEdge : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start finish : Nat × Tongues}
+    (hentry : w.link entryEdge = some start.1)
+    (hlive : stepN w (3 * N) start = some finish) :
+    ∃ (before : List Passage) (repeated : Passage)
+        (after : List Passage) (middle : Nat × Tongues),
+      PhysicalTrace w start before middle ∧
+      PhysicalTrace w middle (repeated :: after) finish ∧
+      EdgeSimpleFrom w entryEdge before ∧
+      (passageEdgeRep w repeated = wireEdgeRep w entryEdge ∨
+        passageEdgeRep w repeated ∈
+          before.map (passageEdgeRep w)) := by
+  obtain ⟨passages, _hlen, htrace, hrepeat⟩ :=
+    physical_edge_repeats_of_long_run hN hentry hlive
+  obtain ⟨before, repeated, after, hEq, hbefore, hkey⟩ :=
+    first_edge_revisit_split_from hrepeat
+  subst passages
+  obtain ⟨middle, hprefix, hsuffix⟩ := htrace.split_append
+  exact ⟨before, repeated, after, middle,
+    hprefix, hsuffix, hbefore, hkey⟩
+
+/-- **Observation 2 / Case 1.**  If the first repeated passage edge is crossed
+in the same orientation as its earlier occurrence, the train is already
+entering an absorbing tongue-stable simple cycle. -/
+theorem same_oriented_first_edge_settles
+    {w : Wiring} {entryEdge : Nat}
+    {start middle finish : Nat × Tongues}
+    {before after : List Passage} {old repeated : Passage}
+    (hentry : w.link entryEdge = some start.1)
+    (hbefore : PhysicalTrace w start before middle)
+    (hsuffix : PhysicalTrace w middle (repeated :: after) finish)
+    (hedges : EdgeSimpleFrom w entryEdge before)
+    (hold : old ∈ before)
+    (hsame : repeated.2 = old.2) :
+    SettlesOnSimpleCycle w middle := by
+  obtain ⟨runway, loop, hsplit⟩ := List.append_of_mem hold
+  rcases old with ⟨p, x⟩
+  rcases repeated with ⟨q, y⟩
+  have hsame' : y = x := by simpa using hsame
+  subst y
+  subst before
+  obtain ⟨atOld, hrunway, hexcursion⟩ := hbefore.split_append
+  have hatOldPort : atOld.1 = p := hexcursion.head_arrive.1
+  rcases atOld with ⟨atOldPort, oldTongues⟩
+  simp only at hatOldPort
+  subst atOldPort
+  have hmiddlePort : middle.1 = q := hsuffix.head_arrive.1
+  rcases middle with ⟨middlePort, middleTongues⟩
+  simp only at hmiddlePort
+  subst middlePort
+  obtain ⟨nextTongues, hnext⟩ := hsuffix.head_arrive.2
+  have hsimpleBefore :
+      SwitchSimple (runway ++ (p, x) :: loop) :=
+    hbefore.switchSimple_of_edgeSimpleFrom hentry hedges
+  have hsimpleExcursion : SwitchSimple ((p, x) :: loop) := by
+    unfold SwitchSimple at hsimpleBefore ⊢
+    simp only [List.map_append] at hsimpleBefore
+    exact (List.nodup_append.mp hsimpleBefore).2.1
+  have hcycle := hexcursion.simple_same_exit_enters_period
+    hsimpleExcursion hnext
+  exact ⟨((q, x) :: loop).length, nextTongues,
+    by simp, hcycle.1, hcycle.2⟩
+
+/-- **Reverse-oriented first-edge case.**  When the first repeated passage
+edge is crossed backwards, the part after its old occurrence is a simple
+lollipop candy.  Closing that candy sends the train back over the entire
+earlier runway, with no further tongue change. -/
+theorem reverse_oriented_first_edge_retraces
+    {w : Wiring} {entryEdge : Nat}
+    {start middle finish : Nat × Tongues}
+    {before after : List Passage} {old repeated : Passage}
+    (hentry : w.link entryEdge = some start.1)
+    (hbefore : PhysicalTrace w start before middle)
+    (hsuffix : PhysicalTrace w middle (repeated :: after) finish)
+    (hedges : EdgeSimpleFrom w entryEdge before)
+    (hold : old ∈ before)
+    (hreverse : repeated.2 = wireBar w old.2) :
+    ∃ backSteps settled,
+      backSteps ≤ before.length + 1 ∧
+      stepN w backSteps middle =
+        (w.link start.1).map (fun ell => (ell, settled)) := by
+  obtain ⟨runway, loop, hsplit⟩ := List.append_of_mem hold
+  rcases old with ⟨p, x⟩
+  rcases repeated with ⟨q, y⟩
+  subst before
+  obtain ⟨atOld, hrunway, hexcursion⟩ := hbefore.split_append
+  have hatOldPort : atOld.1 = p := hexcursion.head_arrive.1
+  rcases atOld with ⟨atOldPort, oldTongues⟩
+  simp only at hatOldPort
+  subst atOldPort
+  have hmiddlePort : middle.1 = q := hsuffix.head_arrive.1
+  rcases middle with ⟨middlePort, middleTongues⟩
+  simp only at hmiddlePort
+  subst middlePort
+  obtain ⟨nextTongues, hnext⟩ := hsuffix.head_arrive.2
+  have hsimpleBefore :
+      SwitchSimple (runway ++ (p, x) :: loop) :=
+    hbefore.switchSimple_of_edgeSimpleFrom hentry hedges
+  cases loop with
+  | nil =>
+      have hlast : w.link x = some q := by
+        simpa [lastPassageExit] using hexcursion.last_link
+      have hbar : wireBar w x = q := wireBar_of_link hlast
+      have hy : y = q := hreverse.trans hbar
+      have hne := arrive_exit_ne middleTongues q
+      rw [hnext] at hne
+      exact (hne hy).elim
+  | cons passage rest =>
+      rcases passage with ⟨r, z⟩
+      cases hexcursion with
+      | @cons _ _ next _ afterOld _ _ harriveOld hlinkOld hloopTrace =>
+          have hnextPort : next = r := hloopTrace.head_arrive.1
+          subst next
+          have hbar : wireBar w x = r :=
+            wireBar_of_link hlinkOld
+          have hyr : y = r := hreverse.trans hbar
+          subst y
+          have hsingle :
+              PhysicalTrace w (p, oldTongues) [(p, x)]
+                (r, afterOld) :=
+            PhysicalTrace.cons harriveOld hlinkOld
+              (PhysicalTrace.nil (r, afterOld))
+          have hprefix :
+              PhysicalTrace w start (runway ++ [(p, x)])
+                (r, afterOld) :=
+            hrunway.append hsingle
+          have hsimple :
+              SwitchSimple
+                ((runway ++ [(p, x)]) ++ (r, z) :: rest) := by
+            simpa only [List.append_assoc, List.singleton_append]
+              using hsimpleBefore
+          have hback := hprefix.simple_cross_exit_retraces_prefix
+            hloopTrace hsimple hnext
+          refine ⟨(runway ++ [(p, x)]).length + 1,
+            nextTongues, ?_, hback⟩
+          simp
+
+/-- Complete outcome when the first repeated edge is one of the prefix's
+passage edges: same orientation is an absorbing cycle; reverse orientation
+is an exact retrace to the far side of the starting edge. -/
+theorem internal_first_edge_outcome
+    {w : Wiring} {entryEdge : Nat}
+    {start middle finish : Nat × Tongues}
+    {before after : List Passage} {repeated : Passage}
+    (hentry : w.link entryEdge = some start.1)
+    (hbefore : PhysicalTrace w start before middle)
+    (hsuffix : PhysicalTrace w middle (repeated :: after) finish)
+    (hedges : EdgeSimpleFrom w entryEdge before)
+    (hkey : passageEdgeRep w repeated ∈
+      before.map (passageEdgeRep w)) :
+    SettlesOnSimpleCycle w middle ∨
+      ∃ backSteps settled,
+        backSteps ≤ before.length + 1 ∧
+        stepN w backSteps middle =
+          (w.link start.1).map (fun ell => (ell, settled)) := by
+  obtain ⟨old, hold, hedge⟩ := List.mem_map.mp hkey
+  rcases (passageEdgeRep_eq_iff w old repeated).1 hedge with
+      hsame | hreverse
+  · exact Or.inl (same_oriented_first_edge_settles
+      hentry hbefore hsuffix hedges hold hsame)
+  · exact Or.inr (reverse_oriented_first_edge_retraces
+      hentry hbefore hsuffix hedges hold hreverse)
+
+/-- Repeating the incoming edge in its original orientation returns to the
+original start port in one raw step. -/
+theorem boundary_same_orientation_returns
+    {w : Wiring} {entryEdge : Nat}
+    {start middle finish : Nat × Tongues}
+    {repeated : Passage} {after : List Passage}
+    (hentry : w.link entryEdge = some start.1)
+    (hsuffix : PhysicalTrace w middle (repeated :: after) finish)
+    (hsame : repeated.2 = entryEdge) :
+    ∃ settled,
+      stepN w 1 middle = some (start.1, settled) := by
+  rcases repeated with ⟨q, y⟩
+  have hmiddlePort : middle.1 = q := hsuffix.head_arrive.1
+  rcases middle with ⟨middlePort, middleTongues⟩
+  simp only at hmiddlePort
+  subst middlePort
+  obtain ⟨settled, harrive⟩ := hsuffix.head_arrive.2
+  have hy : y = entryEdge := by simpa using hsame
+  subst y
+  refine ⟨settled, ?_⟩
+  simp [stepN, step, harrive, hentry]
+
+/-- Repeating the incoming edge in reverse leaves through the far side of
+the start in one raw step. -/
+theorem boundary_reverse_orientation_exits
+    {w : Wiring} {entryEdge : Nat}
+    {start middle finish : Nat × Tongues}
+    {repeated : Passage} {after : List Passage}
+    (hentry : w.link entryEdge = some start.1)
+    (hsuffix : PhysicalTrace w middle (repeated :: after) finish)
+    (hreverse : repeated.2 = wireBar w entryEdge) :
+    ∃ settled,
+      stepN w 1 middle =
+        (w.link start.1).map (fun ell => (ell, settled)) := by
+  rcases repeated with ⟨q, y⟩
+  have hmiddlePort : middle.1 = q := hsuffix.head_arrive.1
+  rcases middle with ⟨middlePort, middleTongues⟩
+  simp only at hmiddlePort
+  subst middlePort
+  obtain ⟨settled, harrive⟩ := hsuffix.head_arrive.2
+  have hbar : wireBar w entryEdge = start.1 :=
+    wireBar_of_link hentry
+  have hreverse' : y = wireBar w entryEdge := by
+    simpa using hreverse
+  have hy : y = start.1 := hreverse'.trans hbar
+  subst y
+  refine ⟨settled, ?_⟩
+  simp [stepN, step, harrive, hbar]
+
+/-- **Complete first-edge outcome theorem.**  Within a linear prefix, the
+first repeated physical edge has one of four exact raw-track outcomes:
+
+* an absorbing simple cycle;
+* a reverse closure that retraces to the far side of the start;
+* a same-oriented repeat of the boundary edge, returning to the start port;
+* a reverse repeat of the boundary edge, exiting past the start.
+
+No topology, compiler, or finite-state enumeration is assumed. -/
+theorem first_edge_outcome_of_long_run
+    {w : Wiring} {N entryEdge : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start finish : Nat × Tongues}
+    (hentry : w.link entryEdge = some start.1)
+    (hlive : stepN w (3 * N) start = some finish) :
+    ∃ (before : List Passage) (repeated : Passage)
+        (after : List Passage) (middle : Nat × Tongues),
+      PhysicalTrace w start before middle ∧
+      PhysicalTrace w middle (repeated :: after) finish ∧
+      before.length < 3 * N ∧
+      (SettlesOnSimpleCycle w middle ∨
+        (∃ backSteps settled,
+          backSteps ≤ before.length + 1 ∧
+          stepN w backSteps middle =
+            (w.link start.1).map (fun ell => (ell, settled))) ∨
+        (∃ settled,
+          stepN w 1 middle = some (start.1, settled)) ∨
+        (∃ settled,
+          stepN w 1 middle =
+            (w.link start.1).map (fun ell => (ell, settled)))) := by
+  obtain ⟨before, repeated, after, middle,
+      hbefore, hsuffix, hedges, hkey⟩ :=
+    first_edge_revisit_from_long_run hN hentry hlive
+  have hlength :=
+    hbefore.edgeSimpleFrom_length_lt hN hentry hedges
+  refine ⟨before, repeated, after, middle,
+    hbefore, hsuffix, hlength, ?_⟩
+  rcases hkey with hboundary | hinternal
+  · rcases (passageEdgeRep_eq_entry_iff
+      w entryEdge repeated).1 hboundary with hsame | hreverse
+    · exact Or.inr (Or.inr (Or.inl
+        (boundary_same_orientation_returns hentry hsuffix hsame)))
+    · exact Or.inr (Or.inr (Or.inr
+        (boundary_reverse_orientation_exits hentry hsuffix hreverse)))
+  · rcases internal_first_edge_outcome
+      hentry hbefore hsuffix hedges hinternal with hcycle | hretrace
+    · exact Or.inl hcycle
+    · exact Or.inr (Or.inl hretrace)
 
 /-- **First repeated-track theorem.**  Any live `3*N+1`-step run in an
 `N`-switch wiring contains a first repeated undirected physical edge.  The
