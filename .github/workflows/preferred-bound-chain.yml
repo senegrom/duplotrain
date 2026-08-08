@@ -23,6 +23,7 @@ jobs:
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build FiniteFrameSwitchCorollary
+          lake env lean ConcreteEchoBridge.lean
       - name: Build automatic component chain
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
