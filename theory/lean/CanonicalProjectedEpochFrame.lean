@@ -106,7 +106,11 @@ private theorem filter_partition_length
   induction xs with
   | nil => rfl
   | cons x rest ih =>
-      by_cases hx : p x <;> simp [hx, ih]
+      by_cases hx : p x
+      · simp [hx]
+        omega
+      · simp [hx]
+        omega
 
 private theorem active_filter_length
     {cells active : List Nat}
