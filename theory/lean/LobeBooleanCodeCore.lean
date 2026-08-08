@@ -17,10 +17,10 @@ def coreLobeCells (lobes : List Nat) : List Nat :=
   lobes.map m.cellOf
 
 /-- One Boolean per lobe representative. -/
-open Classical in
 noncomputable def coreLobeBits
-    (lobes : List Nat) (k : Nat) : List Bool :=
-  lobes.map (fun a =>
+    (lobes : List Nat) (k : Nat) : List Bool := by
+  classical
+  exact lobes.map (fun a =>
     decide (reg m e r0 k (m.cellOf a) = m.bar a))
 
 theorem coreLobeBits_length (lobes : List Nat) (k : Nat) :
@@ -75,11 +75,11 @@ theorem core_lobe_reg_eq_of_bit_eq
       hj | hj
   · exact hi.trans hj.symm
   · by_cases hab : a = m.bar a
-    · exact hi.trans hab.trans hj.symm
+    · exact hi.trans (hab.trans hj.symm)
     · exfalso
       simp [hi, hj, hab] at hbit
   · by_cases hab : a = m.bar a
-    · exact hi.trans hab.symm.trans hj.symm
+    · exact hi.trans (hab.symm.trans hj.symm)
     · have hba : m.bar a ≠ a := by
         intro h
         exact hab h.symm
