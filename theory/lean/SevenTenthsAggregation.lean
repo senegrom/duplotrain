@@ -81,7 +81,6 @@ theorem sevenTenths_global_piece_bound
 
 /-- Multiplying by the current-entry and physical prefix factors changes only
 the polynomial prefactor. -/
-set_option maxHeartbeats 800000 in
 theorem sevenTenths_physical_polynomial_bound
     (N physical abstract : Nat)
     (hphysical : physical ≤
@@ -92,11 +91,19 @@ theorem sevenTenths_physical_polynomial_bound
       treeTenth (2 * (N+1)) *
         (treeTenth (2*N) *
           (treeTenth (N+2) * 2^(7*N+20))) := by
-  have hmono := treeTenth_mono hphysical
-  rw [treeTenth_mul_aggregation,
-    treeTenth_mul_aggregation] at hmono
-  exact Nat.le_trans hmono
-    (Nat.mul_le_mul_left (treeTenth (2 * (N+1)))
-      (Nat.mul_le_mul_left (treeTenth (2*N)) habstract))
+  calc
+    treeTenth physical ≤
+        treeTenth ((2 * (N+1)) * ((2*N) * abstract)) :=
+          treeTenth_mono hphysical
+    _ = treeTenth (2 * (N+1)) *
+          (treeTenth (2*N) * treeTenth abstract) := by
+            rw [treeTenth_mul_aggregation
+                (2 * (N+1)) ((2*N) * abstract),
+              treeTenth_mul_aggregation (2*N) abstract]
+    _ ≤ treeTenth (2 * (N+1)) *
+          (treeTenth (2*N) *
+            (treeTenth (N+2) * 2^(7*N+20))) :=
+          Nat.mul_le_mul_left (treeTenth (2 * (N+1)))
+            (Nat.mul_le_mul_left (treeTenth (2*N)) habstract)
 
 end Echo
