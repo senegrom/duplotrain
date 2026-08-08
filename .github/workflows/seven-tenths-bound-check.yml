@@ -4,6 +4,7 @@ on:
     branches: [agent/linear-bound-current]
     paths:
       - theory/lean/TreeCapacitySevenTenths.lean
+      - theory/lean/SevenTenthsAggregation.lean
       - theory/lean/MixedEpochBound.lean
       - theory/lean/TreeEpochCode.lean
       - theory/lean/ComponentCapacity.lean
@@ -22,14 +23,16 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-      - name: Register theorem target
+      - name: Register theorem targets
         run: |
           cat >> lakefile.toml <<'EOF'
 
           [[lean_lib]]
           name = "TreeCapacitySevenTenths"
+          [[lean_lib]]
+          name = "SevenTenthsAggregation"
           EOF
-      - name: Build seven-tenths theorem
+      - name: Build seven-tenths theorems
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TreeCapacitySevenTenths
+          lake build TreeCapacitySevenTenths SevenTenthsAggregation
