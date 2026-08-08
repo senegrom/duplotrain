@@ -34,16 +34,18 @@ def endpointTrueCount : List Bool → Nat
   | b :: rest => (if b then 1 else 0) + endpointTrueCount rest
 
 /-- Full-edge indicator. -/
-open Classical in
 noncomputable def endpointFullBits
-    (edges : List Nat) (k : Nat) : List Bool :=
-  edges.map (fun s => decide (Full m e r0 k s))
+    (m : Machine) (e r0 : Nat → Nat)
+    (edges : List Nat) (k : Nat) : List Bool := by
+  classical
+  exact edges.map (fun s => decide (Full m e r0 k s))
 
 /-- Confirmed represented endpoints. -/
-open Classical in
 noncomputable def standaloneConfirmed
-    (edges : List Nat) (k : Nat) : List Nat :=
-  (standaloneEdgeEnds m edges).filter
+    (m : Machine) (e r0 : Nat → Nat)
+    (edges : List Nat) (k : Nat) : List Nat := by
+  classical
+  exact (standaloneEdgeEnds m edges).filter
     (fun s => Confirmed m e r0 k s)
 
 theorem standaloneSelected_length (cells : List Nat) (k : Nat) :
@@ -134,12 +136,15 @@ theorem standaloneConfirmed_length
       by_cases hs : Confirmed m e r0 k s
       · by_cases hb : Confirmed m e r0 k (m.bar s)
         · simp [standaloneConfirmed, standaloneEdgeEnds,
-            endpointFullBits, endpointTrueCount, Full, hs, hb, hi]
+            endpointFullBits, endpointTrueCount, Full, hs, hb] at hi ⊢
+          omega
         · simp [standaloneConfirmed, standaloneEdgeEnds,
-            endpointFullBits, endpointTrueCount, Full, hs, hb, hi]
+            endpointFullBits, endpointTrueCount, Full, hs, hb] at hi ⊢
+          omega
       · by_cases hb : Confirmed m e r0 k (m.bar s)
         · simp [standaloneConfirmed, standaloneEdgeEnds,
-            endpointFullBits, endpointTrueCount, Full, hs, hb, hi]
+            endpointFullBits, endpointTrueCount, Full, hs, hb] at hi ⊢
+          omega
         · exfalso
           rcases hsocc with h | h
           · exact hs h
