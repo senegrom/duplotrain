@@ -209,6 +209,23 @@ of Chalcraft--Greene and Aaronson directly over `Wiring`:
   absorbing cycle, exact reverse retrace, one-step return to the start port,
   or one-step exit past the start.
 
+`TrackGlobalRepair.lean` now closes the whole-route self-healing half of the
+global theta case.  `repair_forward_damage_or_facing` says a switch-simple
+reference route in an arbitrary tongue state either exposes a concrete broken
+passage approached through its stem, or repairs every groove in one traversal.
+`support_grooves_of_orientedRoute` and
+`oriented_data_eq_of_route_grooved` prove that the repaired route restores the
+entire manufactured-reflector support and still selects the same far endpoint.
+The capstone `repair_or_facing_diversion` therefore completes a damaged
+reflector all the way to the opposite boundary unless that one explicit
+facing-first diversion occurs.  The endpoint-strengthened
+`tails_endpoint_dichotomy` also retains an actual `PhysicalTrace` along the
+unmatched tail between the old-route and fresh-exploration endpoints, rather
+than only their prefix-comparability.  The global capstone lifts the repaired
+journey back to the original train start while retaining the forward-fault
+certificate.  This is unconditional and general-`N`; the facing-first theta
+diversion remains the open global case.
+
 * `first_revisit_of_long_run`: every live `N+1`-passage run has a first
   revisited switch after a switch-simple prefix of length at most `N`.
 * `first_revisit_fork`: the first repeated edge has the complete raw-track
