@@ -3,6 +3,8 @@ on:
   push:
     branches: [agent/linear-bound-current]
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   lean:
     runs-on: ubuntu-latest
@@ -11,6 +13,68 @@ jobs:
         working-directory: theory/lean
     steps:
       - uses: actions/checkout@v4
+      - name: Normalize the projected-cell Boolean complement
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("CanonicalProjectedEpochFrame.lean")
+          text = path.read_text()
+
+          old_def = """  exact cells.filter fun c =>
+              c ∉ standaloneActiveLobeCells m
+                (canonicalActiveLobes m e r0 lo hi slots k0)
+          """
+          new_def = """  exact cells.filter fun c =>
+              ! decide (c ∈ standaloneActiveLobeCells m
+                (canonicalActiveLobes m e r0 lo hi slots k0))
+          """
+          if old_def in text:
+              text = text.replace(old_def, new_def, 1)
+          elif new_def not in text:
+              raise SystemExit("canonicalProjectedCells definition did not match")
+
+          old_split = """  have hsplit :
+              (cells.filter (fun c => c ∈ active)).length +
+                (cells.filter (fun c => c ∉ active)).length = cells.length := by
+            simpa using filter_partition_length
+              (fun c => decide (c ∈ active)) cells
+          """
+          new_split = """  have hsplit :
+              (cells.filter (fun c => decide (c ∈ active))).length +
+                (cells.filter (fun c => ! decide (c ∈ active))).length =
+                cells.length :=
+            filter_partition_length (fun c => decide (c ∈ active)) cells
+          """
+          if old_split in text:
+              text = text.replace(old_split, new_split, 1)
+          elif new_split not in text:
+              raise SystemExit("projected partition block did not match")
+
+          old_goal = """  change cells.length =
+              (canonicalActiveLobes m e r0 lo hi slots k0).length +
+                (cells.filter (fun c => c ∉ active)).length
+          """
+          new_goal = """  change cells.length =
+              (canonicalActiveLobes m e r0 lo hi slots k0).length +
+                (cells.filter (fun c => ! decide (c ∈ active))).length
+          """
+          if old_goal in text:
+              text = text.replace(old_goal, new_goal, 1)
+          elif new_goal not in text:
+              raise SystemExit("projected partition goal did not match")
+
+          path.write_text(text)
+          PY
+      - name: Commit the proof-source repair
+        run: |
+          if ! git diff --quiet -- CanonicalProjectedEpochFrame.lean; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add CanonicalProjectedEpochFrame.lean
+            git commit -m "align projected cells with Boolean partition"
+            git push origin HEAD:agent/linear-bound-current
+          fi
       - name: Install Lean
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
