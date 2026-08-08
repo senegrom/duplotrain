@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank", "StarIndependent", "ActiveLobes", "FixedSupportBound", "GrayTailCount", "GrayTailAggregation", "LobeBits", "CertifiedEpochBound", "RecencyRank", "RecencyTreeBlock", "NoFullFixed", "SupportTreeFull", "AutomaticTreeBlock", "AutomaticCycleFixed", "AutomaticEpochBound", "BoundaryReplay", "LobeForestBlock", "LobeForestActive", "MixedEpochBound", "LobeForestPartition", "CanonicalProjectedEpochFrame", "CanonicalPreTailGlobalBound", "CanonicalGlobalAbsorbedBound", "CertifiedLobeAbsorption", "SupportRelativeCertifiedEpochBound", "CanonicalCertifiedEpochBound", "CanonicalNoCertifiedGlobalBound", "CanonicalUnconditionalGlobalBound", "FiniteFrameSwitchCorollary"]
+defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank", "StarIndependent", "ActiveLobes", "FixedSupportBound", "GrayTailCount", "GrayTailAggregation", "LobeBits", "CertifiedEpochBound", "RecencyRank", "RecencyTreeBlock", "NoFullFixed", "SupportTreeFull", "AutomaticTreeBlock", "AutomaticCycleFixed", "AutomaticEpochBound", "BoundaryReplay", "LobeForestBlock", "LobeForestActive", "MixedEpochBound", "LobeForestPartition", "CanonicalProjectedEpochFrame", "CanonicalPreTailGlobalBound", "CanonicalGlobalAbsorbedBound", "CertifiedLobeAbsorption", "SupportRelativeCertifiedEpochBound", "CanonicalCertifiedEpochBound", "CanonicalNoCertifiedGlobalBound", "CanonicalUnconditionalGlobalBound", "FiniteFrameSwitchCorollary", "BlockSparseBoundCore", "BlockSparseFixedCountCore", "EndpointAccountingStandalone", "BlockAbstractEpochBoundCore", "LobeBooleanCodeCore", "StarPairCountingCore", "PersistentLobeSeparationStandalone", "NoFullFreezeCore", "PairedReachReplay", "FullReachPersistencePaired", "PairedNoFullReachFreeze", "PairedPointwiseReplayCore", "PairedBlockEpochStrictBound", "SupportRelativeNoLobe", "SupportRelativePointwiseReplay", "SupportRelativeEpochStrictBound", "CanonicalEdgeRepsCore", "CanonicalSupportFrame", "ActiveLobeCoverCore", "CanonicalActiveLobeFrame", "SupportWeightFibres", "BlockEpochAggregation", "BlockGlobalArithmetic"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -165,3 +165,72 @@ name = "CanonicalUnconditionalGlobalBound"
 
 [[lean_lib]]
 name = "FiniteFrameSwitchCorollary"
+
+[[lean_lib]]
+name = "BlockSparseBoundCore"
+
+[[lean_lib]]
+name = "BlockSparseFixedCountCore"
+
+[[lean_lib]]
+name = "EndpointAccountingStandalone"
+
+[[lean_lib]]
+name = "BlockAbstractEpochBoundCore"
+
+[[lean_lib]]
+name = "LobeBooleanCodeCore"
+
+[[lean_lib]]
+name = "StarPairCountingCore"
+
+[[lean_lib]]
+name = "PersistentLobeSeparationStandalone"
+
+[[lean_lib]]
+name = "NoFullFreezeCore"
+
+[[lean_lib]]
+name = "PairedReachReplay"
+
+[[lean_lib]]
+name = "FullReachPersistencePaired"
+
+[[lean_lib]]
+name = "PairedNoFullReachFreeze"
+
+[[lean_lib]]
+name = "PairedPointwiseReplayCore"
+
+[[lean_lib]]
+name = "PairedBlockEpochStrictBound"
+
+[[lean_lib]]
+name = "SupportRelativeNoLobe"
+
+[[lean_lib]]
+name = "SupportRelativePointwiseReplay"
+
+[[lean_lib]]
+name = "SupportRelativeEpochStrictBound"
+
+[[lean_lib]]
+name = "CanonicalEdgeRepsCore"
+
+[[lean_lib]]
+name = "CanonicalSupportFrame"
+
+[[lean_lib]]
+name = "ActiveLobeCoverCore"
+
+[[lean_lib]]
+name = "CanonicalActiveLobeFrame"
+
+[[lean_lib]]
+name = "SupportWeightFibres"
+
+[[lean_lib]]
+name = "BlockEpochAggregation"
+
+[[lean_lib]]
+name = "BlockGlobalArithmetic"
