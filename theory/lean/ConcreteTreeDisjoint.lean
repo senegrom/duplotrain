@@ -140,26 +140,4 @@ theorem runEntryActions_preserves_agrees
         exact hroots r (List.mem_cons_of_mem _ hr)
       · exact hfirst
 
-/-- A canonical action leaves its own pins in agreement. -/
-theorem entryAction_self_agrees
-    {w : Wiring} {p : Nat}
-    (hp : IsDescentEntry w p) (t : Tongues) :
-    Agrees (pinList (entryAction w p) t) (entryAction w p) := by
-  intro b hb
-  have happly := pinList_apply
-    (entryAction w p) t (b / 3)
-  rw [happly]
-  rcases hp with ⟨u, ps, s, u', hd⟩
-  have haction := entryAction_eq_of_descent hd
-  rw [haction] at hb ⊢
-  induction hd with
-  | @last u p s hpBranch hlink hs =>
-      simp only [finalPinValue]
-      rcases List.mem_cons.mp hb with hbp | hb
-      · subst b
-        simp [pinValue, bval]
-      · cases hb
-  | @cons u p p' s ps u' hpBranch hlink hp' hrest ih =>
-      sorry
-
 end GeneralN
