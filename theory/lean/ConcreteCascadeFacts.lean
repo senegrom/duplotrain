@@ -1,4 +1,4 @@
-import ConcreteEchoBridge
+import GeneralN
 
 /-!
 # Concrete cascade mouths and the wiring involution
