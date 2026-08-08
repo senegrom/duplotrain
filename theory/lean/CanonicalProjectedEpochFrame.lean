@@ -41,18 +41,20 @@ theorem completeFrame_confirmed_slot
   exact hs
 
 /-- Cells not represented by a canonical active lobe. -/
-open Classical in
 noncomputable def canonicalProjectedCells
-    (lo hi : Nat) (cells slots : List Nat) (k0 : Nat) : List Nat :=
-  cells.filter fun c =>
+    (m : Machine) (e r0 : Nat → Nat)
+    (lo hi : Nat) (cells slots : List Nat) (k0 : Nat) : List Nat := by
+  classical
+  exact cells.filter fun c =>
     c ∉ standaloneActiveLobeCells m
       (canonicalActiveLobes m e r0 lo hi slots k0)
 
 /-- Common support edges other than the canonical active lobes. -/
-open Classical in
 noncomputable def canonicalProjectedEdges
-    (lo hi : Nat) (slots : List Nat) (k0 : Nat) : List Nat :=
-  (canonicalSupportEdges m e r0 slots k0).filter fun s =>
+    (m : Machine) (e r0 : Nat → Nat)
+    (lo hi : Nat) (slots : List Nat) (k0 : Nat) : List Nat := by
+  classical
+  exact (canonicalSupportEdges m e r0 slots k0).filter fun s =>
     s ∉ canonicalActiveLobes m e r0 lo hi slots k0
 
 theorem mem_canonicalProjectedCells_iff
@@ -119,11 +121,11 @@ private theorem active_filter_length
   have hto : ∀ c ∈ active,
       c ∈ cells.filter (fun c => c ∈ active) := by
     intro c hc
-    exact List.mem_filter.mpr ⟨hsub c hc, hc⟩
+    exact List.mem_filter.mpr ⟨hsub c hc, decide_eq_true hc⟩
   have hfrom : ∀ c ∈ cells.filter (fun c => c ∈ active),
       c ∈ active := by
     intro c hc
-    exact (List.mem_filter.mp hc).2
+    exact of_decide_eq_true (List.mem_filter.mp hc).2
   have hle1 := nodup_subset_length_projected hactive hto
   have hle2 := nodup_subset_length_projected hfilterNodup hfrom
   omega
@@ -214,7 +216,7 @@ theorem canonicalProjected_allFull_represented
   have hgOcc0 : Occupied m e r0 k0 g := hs.mpr hgOccK
   have hgSupport : g ∈ canonicalSupportEdges m e r0 slots k0 := by
     classical
-    exact List.mem_filter.mpr ⟨hg, hgOcc0⟩
+    exact List.mem_filter.mpr ⟨hg, decide_eq_true hgOcc0⟩
   have hgNotActive :
       g ∉ canonicalActiveLobes m e r0 lo hi slots k0 := by
     intro hga
@@ -259,7 +261,7 @@ theorem canonicalProjected_selected
   have hgOcc0 : Occupied m e r0 k0 g := hsupport.mpr hgOccK
   have hgSupport : g ∈ canonicalSupportEdges m e r0 slots k0 := by
     classical
-    exact List.mem_filter.mpr ⟨hg, hgOcc0⟩
+    exact List.mem_filter.mpr ⟨hg, decide_eq_true hgOcc0⟩
   have hgNotActive :
       g ∉ canonicalActiveLobes m e r0 lo hi slots k0 := by
     intro hga
@@ -279,13 +281,11 @@ theorem canonicalProjected_selected
       ⟨hgSupport, hgNotActive⟩
   have hends := core_rep_endpoints_mem m hgProjected
   rcases hsg with hsg | hsg
-  · rw [hsg]
-    exact hends.1
+  · simpa [s, hsg] using hends.1
   · have hb := congrArg m.bar hsg
     have hbar : m.bar g = s := by
       simpa only [m.bar_invol] using hb
-    rw [← hbar]
-    exact hends.2
+    simpa [s, hbar] using hends.2
 
 /-- Same-edge is transitive, locally for the endpoint argument below. -/
 theorem sameEdge_trans_projected
