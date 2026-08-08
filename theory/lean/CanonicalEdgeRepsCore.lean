@@ -34,13 +34,13 @@ theorem core_mem_edgeEnds_cases
       ∃ s, s ∈ edges ∧ (x = s ∨ x = m.bar s) := by
   induction edges with
   | nil => simp [standaloneEdgeEnds]
-  | cons s rest ih =>
+  | cons a rest ih =>
       intro hx
       simp only [standaloneEdgeEnds, List.mem_cons] at hx
-      rcases hx with rfl | hx
-      · exact ⟨s, List.mem_cons_self, Or.inl rfl⟩
-      · rcases hx with rfl | hx
-        · exact ⟨s, List.mem_cons_self, Or.inr rfl⟩
+      rcases hx with hxa | hx
+      · exact ⟨a, List.mem_cons_self, Or.inl hxa⟩
+      · rcases hx with hxbar | hx
+        · exact ⟨a, List.mem_cons_self, Or.inr hxbar⟩
         · rcases ih hx with ⟨t, ht, hxt⟩
           exact ⟨t, List.mem_cons_of_mem _ ht, hxt⟩
 
