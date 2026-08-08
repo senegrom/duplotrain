@@ -96,8 +96,13 @@ theorem supportFibreSizes_sum {α : Type}
   intro xs
   induction xs with
   | nil =>
-      intro _
-      simp [supportFibreSizes, supportFibreSize]
+    intro _
+    unfold supportFibreSizes
+    induction K with
+    | zero => rfl
+    | succ K ih =>
+        rw [List.range_succ, List.map_append, List.sum_append]
+        simp [supportFibreSize, ih]
   | cons x rest ih =>
       intro hbound
       have hx : f x < K := hbound x List.mem_cons_self
