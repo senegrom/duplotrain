@@ -19,47 +19,11 @@ jobs:
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build ThreeQuarterArithmetic SupportMove HiddenAbsorb GrayTailCount
-      - name: Check preferred strict-bound chain
+      - name: Build unconditional strict-bound endpoint
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake env lean BlockSparseBoundCore.lean
-          lake env lean BlockSparseFixedCountCore.lean
-          lake env lean EndpointAccountingStandalone.lean
-          lake env lean BlockAbstractEpochBoundCore.lean
-          lake env lean LobeBooleanCodeCore.lean
-          lake env lean StarPairCountingCore.lean
-          lake env lean PersistentLobeSeparationStandalone.lean
-          lake env lean NoFullFreezeCore.lean
-          lake env lean PairedReachReplay.lean
-          lake env lean FullReachPersistencePaired.lean
-          lake env lean PairedNoFullReachFreeze.lean
-          lake env lean PairedPointwiseReplayCore.lean
-          lake env lean PairedBlockEpochStrictBound.lean
-          lake env lean SupportRelativeNoLobe.lean
-          lake env lean SupportRelativePointwiseReplay.lean
-          lake env lean SupportRelativeEpochStrictBound.lean
-          lake env lean CanonicalActiveLobeFrame.lean
-          lake env lean CanonicalProjectedEpochFrame.lean
-          lake env lean SupportWeightFibres.lean
-          lake env lean CanonicalPreTailGlobalBound.lean
-          lake env lean CanonicalGlobalAbsorbedBound.lean
-          lake env lean CertifiedLobeAbsorption.lean
-          lake env lean SupportRelativeCertifiedEpochBound.lean
-          lake env lean CanonicalCertifiedEpochBound.lean
-          lake env lean CanonicalNoCertifiedGlobalBound.lean
-          lake env lean CanonicalUnconditionalGlobalBound.lean
-          lake env lean FiniteFrameSwitchCorollary.lean
-          lake env lean BlockEpochAggregation.lean
-          lake env lean BlockGlobalArithmetic.lean
-      - name: Check automatic component chain
+          lake build FiniteFrameSwitchCorollary
+      - name: Build automatic component chain
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake env lean SupportTreeFull.lean
-          lake env lean AutomaticTreeBlock.lean
-          lake env lean AutomaticCycleFixed.lean
-          lake env lean AutomaticEpochBound.lean
-          lake env lean BoundaryReplay.lean
-          lake env lean LobeForestBlock.lean
-          lake env lean LobeForestActive.lean
-          lake env lean MixedEpochBound.lean
-          lake env lean LobeForestPartition.lean
+          lake build LobeForestPartition
