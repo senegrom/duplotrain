@@ -1,4 +1,5 @@
 import TreeCapacitySevenTenths
+import BlockEpochAggregation
 
 /-!
 # Aggregating the seven-tenths component bound
