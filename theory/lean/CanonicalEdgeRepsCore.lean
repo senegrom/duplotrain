@@ -57,9 +57,11 @@ theorem core_rep_endpoints_mem
       rcases hs with rfl | hs
       · simp [standaloneEdgeEnds]
       · have ht := ih hs
-        constructor <;>
-          simp only [standaloneEdgeEnds, List.mem_cons] <;>
-          exact Or.inr (Or.inr (by assumption))
+        constructor
+        · exact List.mem_cons_of_mem _
+            (List.mem_cons_of_mem _ ht.1)
+        · exact List.mem_cons_of_mem _
+            (List.mem_cons_of_mem _ ht.2)
 
 /-- Ordered duplicate-free representatives have duplicate-free endpoints. -/
 theorem orderedEdgeEndsCore_nodup :
@@ -88,35 +90,41 @@ theorem orderedEdgeEndsCore_nodup :
         · omega
         · rcases core_mem_edgeEnds_cases m hm with
             ⟨t, ht, hst | hst⟩
-          · exact hnd.1 (hst ▸ ht)
+          · apply hnd.1
+            simpa [hst] using ht
           · have htlt := hrestOrd t ht
             have hbars : m.bar s = t := by
               calc
-                m.bar s = m.bar (m.bar t) := by rw [hst]
+                m.bar s = m.bar (m.bar t) :=
+                  congrArg m.bar hst
                 _ = t := m.bar_invol t
             have hstlt : s < t := by
-              rw [← hbars]
-              exact hslt
+              calc
+                s < m.bar s := hslt
+                _ = t := hbars
             have hts : t < s := by
-              rw [hst] at htlt
-              exact htlt
+              calc
+                t < m.bar t := htlt
+                _ = s := hst.symm
             omega
       · intro hm
         rcases core_mem_edgeEnds_cases m hm with
           ⟨t, ht, hst | hst⟩
         · have htlt := hrestOrd t ht
+          have hbt : m.bar t = s := by
+            have hb := congrArg m.bar hst
+            simpa [m.bar_invol] using hb.symm
           have hts : m.bar s < s := by
             calc
               m.bar s = t := hst
               _ < m.bar t := htlt
-              _ = s := by
-                have hb := congrArg m.bar hst
-                simpa [m.bar_invol] using hb.symm
+              _ = s := hbt
           omega
         · have heq : s = t := by
             have hb := congrArg m.bar hst
             simpa [m.bar_invol] using hb
-          exact hnd.1 (heq ▸ ht)
+          apply hnd.1
+          simpa [heq] using ht
 
 /-- Canonical endpoint expansion is duplicate-free. -/
 theorem canonicalEdgeEndsCore_nodup {slots : List Nat}
@@ -126,7 +134,9 @@ theorem canonicalEdgeEndsCore_nodup {slots : List Nat}
     (canonicalEdgesCore m slots)
     (canonicalEdgesCore_nodup m hnd)
   intro s hs
-  exact (mem_canonicalEdgesCore_iff.mp hs).2
+  have hs' : s ∈ slots ∧ s < m.bar s := by
+    simpa [canonicalEdgesCore] using hs
+  exact hs'.2
 
 /-- Every original slot has a canonical same-edge representative. -/
 theorem slot_has_canonicalEdgeCore
@@ -136,8 +146,8 @@ theorem slot_has_canonicalEdgeCore
     {s : Nat} (hs : s ∈ slots) :
     ∃ g, g ∈ canonicalEdgesCore m slots ∧ SameEdge m s g := by
   by_cases hlt : s < m.bar s
-  · exact ⟨s, mem_canonicalEdgesCore_iff.mpr ⟨hs, hlt⟩,
-      Or.inl rfl⟩
+  · refine ⟨s, ?_, Or.inl rfl⟩
+    simpa [canonicalEdgesCore, hs, hlt]
   · have hbarMem := hclosed s hs
     have hbarLt : m.bar s < s := by
       have hle : m.bar s ≤ s := Nat.le_of_not_gt hlt
@@ -145,9 +155,8 @@ theorem slot_has_canonicalEdgeCore
       omega
     have hbarOrdered : m.bar s < m.bar (m.bar s) := by
       simpa [m.bar_invol] using hbarLt
-    exact ⟨m.bar s,
-      mem_canonicalEdgesCore_iff.mpr ⟨hbarMem, hbarOrdered⟩,
-      Or.inr rfl⟩
+    refine ⟨m.bar s, ?_, Or.inr rfl⟩
+    simpa [canonicalEdgesCore, hbarMem, hbarOrdered]
 
 /-- Every original slot occurs in the endpoint expansion. -/
 theorem slot_mem_canonicalEdgeEndsCore
@@ -159,10 +168,10 @@ theorem slot_mem_canonicalEdgeEndsCore
   rcases slot_has_canonicalEdgeCore m hclosed hfixed hs with
     ⟨g, hg, hsg⟩
   have hends := core_rep_endpoints_mem m hg
-  rcases hsg with rfl | hsg
-  · exact hends.1
-  · rw [hsg]
-    exact hends.2
+  rcases hsg with hsg | hsg
+  · simpa [hsg] using hends.1
+  · have hb := hends.2
+    simpa [hsg, m.bar_invol] using hb
 
 /-- Every canonical endpoint lies in the original bar-closed list. -/
 theorem canonicalEdgeEndsCore_mem_slots
@@ -173,7 +182,11 @@ theorem canonicalEdgeEndsCore_mem_slots
     x ∈ slots := by
   rcases core_mem_edgeEnds_cases m hx with
     ⟨s, hs, rfl | rfl⟩
-  · exact (mem_canonicalEdgesCore_iff.mp hs).1
-  · exact hclosed s (mem_canonicalEdgesCore_iff.mp hs).1
+  · have hs' : s ∈ slots ∧ s < m.bar s := by
+      simpa [canonicalEdgesCore] using hs
+    exact hs'.1
+  · have hs' : s ∈ slots ∧ s < m.bar s := by
+      simpa [canonicalEdgesCore] using hs
+    exact hclosed s hs'.1
 
 end Echo
