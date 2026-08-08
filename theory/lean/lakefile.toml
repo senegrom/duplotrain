@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "SkewWalk", "FutureEntryBound", "PairMultiplicity", "TokenState", "CellHeat", "Periodicity", "LoneWriter", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank"]
+defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "SkewWalk", "FutureEntryBound", "PairMultiplicity", "TokenState", "CellHeat", "Periodicity", "LoneWriter", "SteeringLaw", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -60,6 +60,9 @@ name = "Periodicity"
 
 [[lean_lib]]
 name = "LoneWriter"
+
+[[lean_lib]]
+name = "SteeringLaw"
 
 [[lean_lib]]
 name = "ReversalFacts"

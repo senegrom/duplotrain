@@ -417,13 +417,34 @@ run:
   half of the one-mouth theorem, machine-checked for all N.  The
   lone-alternating-tree case of lemma B is dead outright.
 
+* **The steering law: active cycles stand at active mouths**
+  (`SteeringLaw.lean`).  For an *arbitrary* writer set `S` — no
+  palindrome, no `bar`-freeness needed: if the walk never stands at
+  `star C` for any writer `C`, every read on the tail is a frozen
+  foreign register (a cell is only read from its mouth partner), so
+  same-cell visits merge, periodicity equalizes all deliveries, and
+  every register freezes: **a stand-free tail is silent**
+  (`no_stand_quiet`).  Hence every eventual cycle is quiet or stands
+  at the mouth partner of an active cell
+  (`active_tail_stands_at_mouth`, `rho_steering`).  The anatomy of a
+  stand: it fetches exactly `bar (reg C)` (`stand_delivery`) — the
+  only mechanism by which a writer's variation is ever read — and if
+  `star C` is not itself a writer, all stands at `star C` carry one
+  fixed frozen entry (`stand_entry_frozen`): the cycle is frozen
+  rails between look-alike stands, with all variation concentrated
+  in the fetched deliveries.  This is the machine-level skeleton of
+  the reflector interface: the two-mouth (m = 2) cycle must
+  physically execute mouth crossings at `star C1` / `star C2`,
+  exactly as the dogbone bounce does.
+
 Together these turn lemma B into a single sharp question: **can three
 or more tokens of the cycle's conserved population actually be
 consumed on the cycle?**  Every exhaustion says no — the population's
 effective size is 0 (functional collapse) or 2 (the Gray pair).  With
 m ≠ 1 proved, the open profiles are exactly: m = 0 (quiet — done,
-snapshots frozen), m = 2 (show it is the Gray pair, ≤ 4 vectors), and
-m ≥ 3 (show it cannot happen).
+snapshots frozen), m = 2 (show it is the Gray pair, ≤ 4 vectors —
+the steering law pins its walk to rails-and-stands; what remains is
+classifying the delivery orbit), and m ≥ 3 (show it cannot happen).
 
 ## f(N) ≤ N + O(1): what remains
 

@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Thirty-four libraries, all self-contained (no Mathlib).  Core five
+Thirty-five libraries, all self-contained (no Mathlib).  Core five
 below; plus the accounting/monovariant satellites (all sorry-free,
 honestly conditional where marked):
 
@@ -19,6 +19,25 @@ honestly conditional where marked):
   quiet or steered from at least two distinct cells**, for every
   machine, every run, every `N`.  The dynamic half of the one-mouth
   theorem, and the death of the lone-alternating-tree case of lemma B.
+
+* `SteeringLaw.lean` — **active cycles stand at active mouths.**
+  The generalization of the lone-writer engine to an *arbitrary*
+  writer set `S`, needing neither the palindrome nor `bar`-freeness:
+  a cell is only ever read from its mouth partner, so if the walk
+  never stands at `star C` for any writer `C`, every read is frozen,
+  same-cell visits merge (`no_stand_merge`), periodicity equalizes
+  all deliveries (`no_stand_arrivals_agree`), every register freezes
+  (`no_stand_freeze`) and nothing is productive (`no_stand_quiet`).
+  Headline `active_tail_stands_at_mouth` / `rho_steering`: **every
+  eventual cycle is completely quiet, or the walk physically stands
+  at the mouth partner of one of its active cells** — for
+  `S = [C1, C2]`, the two-mouth cycle must visit `star C1` or
+  `star C2`, the dogbone's mouth crossings.  Plus the stand anatomy:
+  `stand_delivery` (a stand fetches exactly `bar (reg C)` — the only
+  way a writer's variation is ever read) and `stand_entry_frozen`
+  (if `star C` is not itself a writer, all stands at `star C` carry
+  one fixed entry: the cycle is frozen rails between look-alike
+  stands, and only the fetched delivery varies).
 
 * `Periodicity.lean` — **every run is a rho**: the state (current
   entry + registers of the listed cells) evolves autonomously and
