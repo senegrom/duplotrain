@@ -37,7 +37,12 @@ honestly conditional where marked):
   way a writer's variation is ever read) and `stand_entry_frozen`
   (if `star C` is not itself a writer, all stands at `star C` carry
   one fixed entry: the cycle is frozen rails between look-alike
-  stands, and only the fetched delivery varies).
+  stands, and only the fetched delivery varies).  `stand_flip`: a
+  delivery landing back in its writer cell is the Gray move
+  (register := its bar); `flip_lock`: **a cell whose every arrival
+  is the self-flip keeps its register in the two-element orbit
+  `{v₀, bar v₀}` forever** — σ ≤ 2, the two-value half of lemma B
+  for pure flipper cells, unconditional.
 
 * `Periodicity.lean` — **every run is a rho**: the state (current
   entry + registers of the listed cells) evolves autonomously and

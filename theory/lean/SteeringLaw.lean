@@ -241,6 +241,53 @@ theorem stand_entry_frozen {S : List Nat} {K : Nat}
   rw [hunprod, hstand]
   exact writers_frozen_foreign m e r0 hS hCS u hK
 
+/-- **The stand flip.**  If the delivery fetched at a stand lands back
+in the writer cell — the register is a lobe slot — the arrival is the
+Gray move: `C`'s register flips to its bar. -/
+theorem stand_flip (hrun : IsRun m e r0) {C v : Nat}
+    (hstand : m.cellOf (e v) = m.star C)
+    (hback : m.cellOf (m.bar (reg m e r0 v C)) = C) :
+    reg m e r0 (v+1) C = m.bar (reg m e r0 v C) := by
+  have hdel := stand_delivery m e r0 hrun hstand
+  have hcell : m.cellOf (e (v+1)) = C := by
+    rw [hdel]
+    exact hback
+  rw [reg_write m e r0 hcell, hdel]
+
+/-- **The Gray lock.**  If every arrival into `C` on the tail delivers
+the bar of `C`'s current register — the self-flip — then `C`'s register
+stays in the two-element orbit `{v₀, bar v₀}` forever: `σ(C) ≤ 2`,
+the two-value half of lemma B for pure flipper cells. -/
+theorem flip_lock {C K : Nat}
+    (hflip : ∀ t, K ≤ t → m.cellOf (e (t+1)) = C →
+      e (t+1) = m.bar (reg m e r0 t C)) :
+    ∀ d, reg m e r0 (K + d) C = reg m e r0 K C ∨
+      reg m e r0 (K + d) C = m.bar (reg m e r0 K C) := by
+  intro d
+  induction d with
+  | zero => exact Or.inl rfl
+  | succ n ih =>
+      by_cases hc : m.cellOf (e (K + n + 1)) = C
+      · have harr := hflip (K + n) (Nat.le_add_right _ _) hc
+        have hw : reg m e r0 (K + n + 1) C = e (K + n + 1) :=
+          reg_write m e r0 hc
+        rcases ih with h | h
+        · right
+          show reg m e r0 ((K + n) + 1) C = m.bar (reg m e r0 K C)
+          rw [hw, harr, h]
+        · left
+          show reg m e r0 ((K + n) + 1) C = reg m e r0 K C
+          rw [hw, harr, h, m.bar_invol]
+      · rcases ih with h | h
+        · left
+          show reg m e r0 ((K + n) + 1) C = reg m e r0 K C
+          rw [reg_skip m e r0 hc]
+          exact h
+        · right
+          show reg m e r0 ((K + n) + 1) C = m.bar (reg m e r0 K C)
+          rw [reg_skip m e r0 hc]
+          exact h
+
 /-- **The rho steering law.**  Every run whose productive steps write
 into cells of `S` reaches an eventual cycle that is either completely
 quiet or stands at the mouth partner of an active cell.  For

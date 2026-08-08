@@ -435,7 +435,13 @@ run:
   in the fetched deliveries.  This is the machine-level skeleton of
   the reflector interface: the two-mouth (m = 2) cycle must
   physically execute mouth crossings at `star C1` / `star C2`,
-  exactly as the dogbone bounce does.
+  exactly as the dogbone bounce does.  And the flip anatomy: a
+  delivery landing back in its writer cell is the Gray move
+  (`stand_flip`), and a cell whose every arrival is the self-flip is
+  locked in the two-element orbit `{v₀, bar v₀}` forever
+  (`flip_lock`) — σ ≤ 2 for pure flippers, unconditional.  The m = 2
+  Gray-pair question is now exactly: why must both writers of an
+  active two-mouth cycle be pure flippers (or frozen)?
 
 Together these turn lemma B into a single sharp question: **can three
 or more tokens of the cycle's conserved population actually be
