@@ -44,7 +44,8 @@ theorem reg_step_eq_of_coreNoFull_coreNoLobe
     · rw [hwrite, ← heq]
     · have hp : ProductiveStep m e r0 k := by
         unfold ProductiveStep
-        simpa [old, new] using heq
+        intro h
+        exact heq h.symm
       have holdConf : Confirmed m e r0 k old :=
         old_register_confirmed m e r0 hr0 k (m.cellOf new)
       have holdAfter : Occupied m e r0 (k+1) old :=
