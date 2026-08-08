@@ -22,7 +22,7 @@ jobs:
       - name: Build unconditional strict-bound endpoint
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build FiniteFrameSwitchCorollary
+          lake build StateLaw FiniteFrameSwitchCorollary
           lake env lean ConcreteEchoBridge.lean
       - name: Build automatic component chain
         run: |
