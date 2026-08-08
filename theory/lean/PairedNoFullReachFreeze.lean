@@ -26,7 +26,10 @@ theorem pairedSupportFixed_between_of_le
   | succ d ih =>
       have hkLo : lo ≤ i+d := by omega
       have hkLt : i+d < hi := by omega
-      exact ih.trans (hfixed (i+d) hkLo hkLt s)
+      have hprev : Occupied m e r0 i s ↔
+          Occupied m e r0 (i+d) s :=
+        ih (by omega) (by omega)
+      exact Iff.trans hprev (hfixed (i+d) hkLo hkLt s)
 
 /-- Symmetric arbitrary-time support equality. -/
 theorem pairedSupportFixed_between
@@ -81,9 +84,11 @@ theorem pairedNoFullReach_reg_prefix
         (lo+d) c hs hprev.1
       refine ⟨?_, ?_⟩
       · simpa [Nat.add_assoc] using hnext
-      · calc
+      · have hidx : lo + (d+1) = lo+d+1 := by omega
+        calc
           reg m e r0 (lo+(d+1)) c
-              = reg m e r0 (lo+d+1) c := by omega
+              = reg m e r0 (lo+d+1) c :=
+                congrArg (fun n => reg m e r0 n c) hidx
           _ = reg m e r0 (lo+d) c := hreg
           _ = reg m e r0 lo c := hprev.2
 
