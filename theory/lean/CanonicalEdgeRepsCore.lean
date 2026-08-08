@@ -46,16 +46,18 @@ theorem core_mem_edgeEnds_cases
 
 /-- An edge representative and its opposite endpoint occur in the endpoint
 expansion. -/
-theorem core_rep_endpoints_mem
-    {edges : List Nat} {s : Nat} (hs : s ∈ edges) :
-    s ∈ standaloneEdgeEnds m edges ∧
-      m.bar s ∈ standaloneEdgeEnds m edges := by
-  induction edges with
+theorem core_rep_endpoints_mem :
+    ∀ {edges : List Nat} {s : Nat}, s ∈ edges →
+      s ∈ standaloneEdgeEnds m edges ∧
+        m.bar s ∈ standaloneEdgeEnds m edges := by
+  intro edges s hs
+  induction edges generalizing s with
   | nil => cases hs
   | cons x rest ih =>
       simp only [List.mem_cons] at hs
-      rcases hs with rfl | hs
-      · simp [standaloneEdgeEnds]
+      rcases hs with hxs | hs
+      · subst s
+        simp [standaloneEdgeEnds]
       · have ht := ih hs
         constructor
         · exact List.mem_cons_of_mem _
@@ -180,13 +182,13 @@ theorem canonicalEdgeEndsCore_mem_slots
     {x : Nat}
     (hx : x ∈ standaloneEdgeEnds m (canonicalEdgesCore m slots)) :
     x ∈ slots := by
-  rcases core_mem_edgeEnds_cases m hx with
-    ⟨s, hs, rfl | rfl⟩
-  · have hs' : s ∈ slots ∧ s < m.bar s := by
-      simpa [canonicalEdgesCore] using hs
+  rcases core_mem_edgeEnds_cases m hx with ⟨s, hs, hcase⟩
+  have hs' : s ∈ slots ∧ s < m.bar s := by
+    simpa [canonicalEdgesCore] using hs
+  rcases hcase with hxs | hxs
+  · rw [hxs]
     exact hs'.1
-  · have hs' : s ∈ slots ∧ s < m.bar s := by
-      simpa [canonicalEdgesCore] using hs
+  · rw [hxs]
     exact hclosed s hs'.1
 
 end Echo
