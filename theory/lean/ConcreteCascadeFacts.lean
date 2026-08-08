@@ -123,7 +123,8 @@ theorem descent_same_root_same_landing
       3 * descentRoot p₂ ps₂ := congrArg (fun c => 3 * c) hroot
   unfold descentRoot at hstem
   rw [hstem, hlink₂] at hlink₁
-  injection hlink₁
+  injection hlink₁ with h
+  exact h.symm
 
 /-- Two descents landing at the same stem have the same concrete root. -/
 theorem descent_same_landing_same_root
