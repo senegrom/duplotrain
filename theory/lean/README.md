@@ -1,8 +1,27 @@
 # Formal proofs (Lean 4)
 
-One hundred and three libraries, all self-contained (no Mathlib), all
+One hundred and four libraries, all self-contained (no Mathlib), all
 sorry-free, honestly conditional where marked.  Core five below, then
 the satellites:
+
+* `LobeDichotomy.lean` — **every cycle cell is a Gray flipper or
+  foreign-valued.**  A slot can only be delivered by reading its
+  bar-partner out of that partner's cell (`partner_held`), so:
+  foreign-partnered registers are *irreversible* — a cell that holds
+  a slot whose partner lies outside can never again hold an
+  inside-partnered slot (`cross_stays_cross`) — and while a cell is
+  lobe-valued, **every arrival is the Gray flip** `reg := bar reg`
+  (the delivered slot's inside partner must equal the current
+  register), so the register never leaves `{v₀, bar v₀}`
+  (`lobe_gray_lock`): σ ≤ 2 with no writer-set, productivity, or
+  `bar`-freeness hypotheses.  Periodicity turns irreversibility into
+  a dichotomy (`lobe_or_cross`), and composed with the rho theorem
+  (`rho_gray_or_cross`): on every run's eventual cycle, **every cell
+  either keeps its register in a two-element bar-orbit — the Gray
+  pair — or is foreign-valued at every moment**, where each arrival
+  reads a cell other than the written one
+  (`cross_delivery_reads_foreign`).  Lemma B's remaining work is
+  confined to the foreign-valued cells.
 
 * `LoneWriter.lean` — **m ≠ 1 on cycles: the lone writer freezes.**
   If every productive step of a periodic tail writes into a single
