@@ -68,7 +68,7 @@ theorem epochTotal_le_count_mul_max {α : Type} :
                 (Nat.mul_le_mul_left rest.length hr)
         _ = (rest.length + 1) *
               max xs.length (epochMax rest) := by
-              simp [Nat.add_mul, Nat.mul_comm, Nat.add_comm]
+              simp [Nat.mul_add, Nat.mul_comm, Nat.add_comm]
 
 private theorem epochMax_is_zero_or_member {α : Type} :
     ∀ epochs : List (List α),
