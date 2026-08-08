@@ -87,6 +87,13 @@ private theorem sum_map_add_nat {α : Type}
       rw [ih]
       omega
 
+private theorem sum_map_zero_nat {α : Type}
+    (xs : List α) :
+    (xs.map (fun _ => 0)).sum = 0 := by
+  induction xs with
+  | nil => rfl
+  | cons _ rest ih => simp [ih]
+
 /-- Integer fibres below `K` partition the list exactly. -/
 theorem supportFibreSizes_sum {α : Type}
     (K : Nat) (f : α → Nat) :
@@ -98,11 +105,8 @@ theorem supportFibreSizes_sum {α : Type}
   | nil =>
     intro _
     unfold supportFibreSizes
-    induction K with
-    | zero => rfl
-    | succ K ih =>
-        rw [List.range_succ, List.map_append, List.sum_append]
-        simp [supportFibreSize, ih]
+    simpa [supportFibreSize] using
+      (sum_map_zero_nat (List.range K))
   | cons x rest ih =>
       intro hbound
       have hx : f x < K := hbound x List.mem_cons_self
