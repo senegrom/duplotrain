@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "TrackTrace", "TrackLobe", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "SkewWalk", "FutureEntryBound", "PairMultiplicity", "TokenState", "CellHeat", "Periodicity", "LoneWriter", "SteeringLaw", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank"]
+defaultTargets = ["DuplotrainProofs", "GeneralN", "TrackTrace", "TrackLobe", "TrackNormalForm", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "SkewWalk", "FutureEntryBound", "PairMultiplicity", "TokenState", "CellHeat", "Periodicity", "LoneWriter", "SteeringLaw", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -12,6 +12,9 @@ name = "TrackTrace"
 
 [[lean_lib]]
 name = "TrackLobe"
+
+[[lean_lib]]
+name = "TrackNormalForm"
 
 [[lean_lib]]
 name = "EchoMachine"

@@ -1,4 +1,4 @@
-import GeneralN
+import TrackNormalForm
 import VectorCount
 
 /-!
@@ -10,6 +10,12 @@ What is proved is the same statement with `2 ^ N` in place of `N + 6`
 (`state_law_two_pow` below), and a conditional machine-level assembly
 (`Echo.state_law`) whose two hypotheses — the Gray tail and the
 one-alternation transient — are the unproved core of the problem.
+
+There is now also a direct physical-track route in `TrackTrace`, `TrackLobe`,
+and `TrackNormalForm`: the first-repeated-edge fork and both reflector cases
+are proved.  Its remaining gap is the theta-intersection lemma described in
+`theory/lean/README.md`; `StateLaw` stays explicitly open until that lemma and
+the final count are kernel-checked.
 
 ## How to read the statement
 

@@ -133,6 +133,32 @@ structural induction (no `native_decide`, no `sorry`):
 (any cascade length, any gadget size, any N) — the mechanism that caps every
 observed cycle at 4 vectors, formalised.
 
+**Direct physical-track route (`TrackTrace.lean`, `TrackLobe.lean`,
+`TrackNormalForm.lean`).**  This is the current shortest route to the raw
+state law and does not pass through an assumed echo compiler:
+
+* `first_revisit_of_long_run`: every live `N+1`-passage run has a first
+  revisited switch after a switch-simple prefix of length at most `N`.
+* `first_revisit_fork`: the first repeated edge has the complete raw-track
+  dichotomy — same-direction closure is an absorbing simple cycle; crossed
+  closure retraces the whole runway exactly (or falls off at its far edge).
+* `stem_lobe_isReflector`, `crossed_revisit_full_reflector`, and
+  `same_exit_revisit_full_reflector`: every crossed closure, including the
+  self-edge corner case allowed by abstract `Wiring`, is a universal
+  identity/one-switch-flip reflector behind its arbitrary simple runway.
+* `first_revisit_cycle_or_supported_reflector`: every first revisit is now
+  packaged as either a simple cycle or a reflector carrying its exact grooved
+  support paths.
+* `SupportedReflector.paired_period`: two opposite supported reflectors whose
+  local actions avoid one another's supports have a genuine period, by the
+  four-corner Gray composition.
+
+The raw `StateLaw` remains **OPEN**.  The remaining direct-route theorem is
+the theta-intersection lemma: when the second simple exploration first meets
+the first reflector's support, it settles on a simple cycle; otherwise its
+new reflector support is disjoint, so `paired_period` applies.  No other
+dynamical or counting hypothesis remains on this route.
+
 **`EchoMachine.lean` — the abstracted cycle dynamics** (T9 in
 ../lazy-point-theory.md): any wiring's trailing structure compiles to a
 forest of trees; the cycle dynamics reduces to a register machine (one
