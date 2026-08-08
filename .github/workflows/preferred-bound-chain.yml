@@ -23,8 +23,12 @@ jobs:
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build StateLaw FiniteFrameSwitchCorollary
-          lake env lean ConcreteEchoBridge.lean
-          lake env lean ConcreteCascadeFacts.lean
+          mkdir -p .lake/build/lib/lean
+          lake env lean ConcreteEchoBridge.lean \
+            -o .lake/build/lib/lean/ConcreteEchoBridge.olean
+          lake env lean ConcreteCascadeFacts.lean \
+            -o .lake/build/lib/lean/ConcreteCascadeFacts.olean
+          lake env lean ConcreteFiniteBounds.lean
       - name: Build automatic component chain
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
