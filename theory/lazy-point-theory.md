@@ -443,14 +443,54 @@ run:
   Gray-pair question is now exactly: why must both writers of an
   active two-mouth cycle be pure flippers (or frozen)?
 
+* **The lobe dichotomy** (`LobeDichotomy.lean`).  A slot can only be
+  delivered by reading its bar-partner out of the partner's own cell
+  (`partner_held`).  Hence foreign-partnered registers are
+  *irreversible* (`cross_stays_cross`: delivering a lobe slot would
+  need the cell itself to hold its other end), and while a cell is
+  lobe-valued **every arrival is the Gray flip** — the register
+  never leaves `{v₀, bar v₀}` (`lobe_gray_lock`; no writer-set, no
+  productivity, no `bar`-freeness hypotheses).  With periodicity:
+  every cell of every eventual cycle **is a Gray flipper (σ ≤ 2) or
+  foreign-valued at every moment** (`rho_gray_or_cross`), and a
+  foreign-valued cell's every delivery reads a *different* cell
+  (`cross_delivery_reads_foreign`).  The dogbone's lobe pair is now
+  a theorem-level attractor class; what remains of lemma B is the
+  foreign-valued (cross-coupled) cells — for m = 2: writes into a
+  cross cell read only the other writer or frozen rails, and the
+  sync argument (a cross delivery sets `reg C1 := bar (reg C2)`,
+  after which the pair reads back unproductively) is the target.
+
 Together these turn lemma B into a single sharp question: **can three
 or more tokens of the cycle's conserved population actually be
 consumed on the cycle?**  Every exhaustion says no — the population's
 effective size is 0 (functional collapse) or 2 (the Gray pair).  With
 m ≠ 1 proved, the open profiles are exactly: m = 0 (quiet — done,
 snapshots frozen), m = 2 (show it is the Gray pair, ≤ 4 vectors —
-the steering law pins its walk to rails-and-stands; what remains is
-classifying the delivery orbit), and m ≥ 3 (show it cannot happen).
+the steering law pins its walk to rails-and-stands, and the lobe
+dichotomy makes each writer a Gray flipper or cross-coupled), and
+m ≥ 3 (show it cannot happen).
+
+## The strict-base ceiling: below 2^N unconditionally
+
+Independently of the N + O(1) program, the support-epoch campaign
+(merged from a parallel agent, repaired and verified) now proves a
+**register-snapshot ceiling with exponential base strictly below 2**,
+machine-checked and unconditional over any complete finite echo frame
+(`CanonicalUnconditionalGlobalBound.lean`):
+
+    T^8 ≤ (4N+2)^8 · 2^(7N+18),   i.e.   T ≤ poly(N) · 2^(0.875·N).
+
+The engine: linearly many support epochs (support only shrinks);
+inside a fixed support, no-full components freeze and tree components
+replay from a single full-edge choice, so states inject into a sparse
+code of capacity² ≤ 2^#cells; the first certified lobe-pair absorption
+starts a ≤ 4-snapshot Gray tail.  The **overwrite lasso** (pin words
+are idempotent, so a recurrent echo configuration carries at most two
+tongue vectors per cascade prefix) transfers this to concrete tongue
+vectors at cascade boundaries — conditional on the T9 compilation
+interface (every wiring's `stepN` as configuration-driven pin words),
+which is the open step of this route.
 
 ## f(N) ≤ N + O(1): what remains
 

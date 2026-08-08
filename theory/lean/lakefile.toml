@@ -1,11 +1,11 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "TrackTrace", "TrackLobe", "TrackNormalForm", "TrackTheta", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "SkewWalk", "FutureEntryBound", "PairMultiplicity", "TokenState", "CellHeat", "Periodicity", "LoneWriter", "SteeringLaw", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank"]
+defaultTargets = ["ActiveLobeCoverCore", "ActiveLobes", "AlternationBound", "AutomaticCycleFixed", "AutomaticEpochBound", "AutomaticTreeBlock", "BlockAbstractEpochBoundCore", "BlockEpochAggregation", "BlockGlobalArithmetic", "BlockSparseBoundCore", "BlockSparseFixedCountCore", "BoundaryReplay", "CanonicalActiveLobeFrame", "CanonicalCertifiedEpochBound", "CanonicalConfigurationRepresentatives", "CanonicalEdgeRepsCore", "CanonicalGlobalAbsorbedBound", "CanonicalNoCertifiedGlobalBound", "CanonicalPreTailGlobalBound", "CanonicalProjectedEpochFrame", "CanonicalSupportFrame", "CanonicalUnconditionalGlobalBound", "CellHeat", "CertifiedEpochBound", "CertifiedLobeAbsorption", "ComponentCapacity", "ConcreteCascadeFacts", "ConcreteEchoBridge", "ConcreteFiniteBounds", "ConcreteMachine", "ConcreteOverwriteBridge", "DeterministicOverwriteReturn", "DuplotrainProofs", "EchoConfigCount", "EchoConfiguration", "EchoMachine", "EchoOverwriteFibre", "EdgeReversal", "EndpointAccountingStandalone", "EpochAggregation", "FiniteFrameSwitchCorollary", "FixedSupportBound", "FullReachPersistencePaired", "FutureEntryBound", "GeneralN", "GrayTailAggregation", "GrayTailCount", "HiddenAbsorb", "HiddenDichotomy", "HiddenFibre", "LinearBound", "LobeAbsorption", "LobeDichotomy", "LobeBits", "LobeBooleanCodeCore", "LobeForestActive", "LobeForestBlock", "LobeForestPartition", "LoneWriter", "MixedEpochBound", "MonotoneSupport", "NoFullFixed", "NoFullFreezeCore", "ObservedConfigurationFibre", "OverwriteDynamics", "OverwriteLasso", "PairBound", "PairMultiplicity", "PairedBlockEpochStrictBound", "PairedNoFullReachFreeze", "PairedPointwiseReplayCore", "PairedReachReplay", "Periodicity", "PersistentLobeSeparationStandalone", "PhysicalPrefixCount", "PhysicalPrefixFibre", "ProfileCodeBound", "RecencyRank", "RecencyTreeBlock", "ReplayFacts", "ReversalFacts", "RootRank", "SkewWalk", "SlotBound", "StarIndependent", "StarPairCountingCore", "StateLaw", "SteeringLaw", "SupportBound", "SupportMove", "SupportRelativeCertifiedEpochBound", "SupportRelativeEpochStrictBound", "SupportRelativeNoLobe", "SupportRelativePointwiseReplay", "SupportSize", "SupportTreeFull", "SupportWeightFibres", "ThreeQuarterArithmetic", "TokenState", "TrackLobe", "TrackNormalForm", "TrackTheta", "TrackTrace", "TreeEpochCode", "TreeReplay", "TwoStateConfigurationFibre", "TwoToOneConfigurationCount", "VectorCount"]
 
 [[lean_lib]]
-name = "DuplotrainProofs"
+name = "ActiveLobeCoverCore"
 
 [[lean_lib]]
-name = "GeneralN"
+name = "ActiveLobes"
 
 [[lean_lib]]
 name = "TrackTrace"
@@ -20,70 +20,139 @@ name = "TrackNormalForm"
 name = "TrackTheta"
 
 [[lean_lib]]
-name = "EchoMachine"
-
-[[lean_lib]]
-name = "VectorCount"
-
-[[lean_lib]]
-name = "StateLaw"
-
-[[lean_lib]]
-name = "LinearBound"
-
-[[lean_lib]]
 name = "AlternationBound"
 
 [[lean_lib]]
-name = "SlotBound"
+name = "AutomaticCycleFixed"
 
 [[lean_lib]]
-name = "ReplayFacts"
+name = "AutomaticEpochBound"
 
 [[lean_lib]]
-name = "PairBound"
+name = "AutomaticTreeBlock"
 
 [[lean_lib]]
-name = "SupportBound"
+name = "BlockAbstractEpochBoundCore"
 
 [[lean_lib]]
-name = "SupportMove"
+name = "BlockEpochAggregation"
 
 [[lean_lib]]
-name = "EdgeReversal"
+name = "BlockGlobalArithmetic"
 
 [[lean_lib]]
-name = "SkewWalk"
+name = "BlockSparseBoundCore"
 
 [[lean_lib]]
-name = "FutureEntryBound"
+name = "BlockSparseFixedCountCore"
 
 [[lean_lib]]
-name = "PairMultiplicity"
+name = "BoundaryReplay"
 
 [[lean_lib]]
-name = "TokenState"
+name = "CanonicalActiveLobeFrame"
+
+[[lean_lib]]
+name = "CanonicalCertifiedEpochBound"
+
+[[lean_lib]]
+name = "CanonicalConfigurationRepresentatives"
+
+[[lean_lib]]
+name = "CanonicalEdgeRepsCore"
+
+[[lean_lib]]
+name = "CanonicalGlobalAbsorbedBound"
+
+[[lean_lib]]
+name = "CanonicalNoCertifiedGlobalBound"
+
+[[lean_lib]]
+name = "CanonicalPreTailGlobalBound"
+
+[[lean_lib]]
+name = "CanonicalProjectedEpochFrame"
+
+[[lean_lib]]
+name = "CanonicalSupportFrame"
+
+[[lean_lib]]
+name = "CanonicalUnconditionalGlobalBound"
 
 [[lean_lib]]
 name = "CellHeat"
 
 [[lean_lib]]
-name = "Periodicity"
+name = "CertifiedEpochBound"
 
 [[lean_lib]]
-name = "LoneWriter"
+name = "CertifiedLobeAbsorption"
 
 [[lean_lib]]
-name = "SteeringLaw"
+name = "ComponentCapacity"
 
 [[lean_lib]]
-name = "ReversalFacts"
+name = "ConcreteCascadeFacts"
 
 [[lean_lib]]
-name = "MonotoneSupport"
+name = "ConcreteEchoBridge"
 
 [[lean_lib]]
-name = "HiddenFibre"
+name = "ConcreteFiniteBounds"
+
+[[lean_lib]]
+name = "ConcreteMachine"
+
+[[lean_lib]]
+name = "ConcreteOverwriteBridge"
+
+[[lean_lib]]
+name = "DeterministicOverwriteReturn"
+
+[[lean_lib]]
+name = "DuplotrainProofs"
+
+[[lean_lib]]
+name = "EchoConfigCount"
+
+[[lean_lib]]
+name = "EchoConfiguration"
+
+[[lean_lib]]
+name = "EchoMachine"
+
+[[lean_lib]]
+name = "EchoOverwriteFibre"
+
+[[lean_lib]]
+name = "EdgeReversal"
+
+[[lean_lib]]
+name = "EndpointAccountingStandalone"
+
+[[lean_lib]]
+name = "EpochAggregation"
+
+[[lean_lib]]
+name = "FiniteFrameSwitchCorollary"
+
+[[lean_lib]]
+name = "FixedSupportBound"
+
+[[lean_lib]]
+name = "FullReachPersistencePaired"
+
+[[lean_lib]]
+name = "FutureEntryBound"
+
+[[lean_lib]]
+name = "GeneralN"
+
+[[lean_lib]]
+name = "GrayTailAggregation"
+
+[[lean_lib]]
+name = "GrayTailCount"
 
 [[lean_lib]]
 name = "HiddenAbsorb"
@@ -92,28 +161,166 @@ name = "HiddenAbsorb"
 name = "HiddenDichotomy"
 
 [[lean_lib]]
-name = "ThreeQuarterArithmetic"
+name = "HiddenFibre"
 
 [[lean_lib]]
-name = "ComponentCapacity"
+name = "LinearBound"
 
 [[lean_lib]]
-name = "ProfileCodeBound"
-
-[[lean_lib]]
-name = "SupportSize"
+name = "LobeDichotomy"
 
 [[lean_lib]]
 name = "LobeAbsorption"
 
 [[lean_lib]]
-name = "EpochAggregation"
+name = "LobeBits"
 
 [[lean_lib]]
-name = "TreeReplay"
+name = "LobeBooleanCodeCore"
+
+[[lean_lib]]
+name = "LobeForestActive"
+
+[[lean_lib]]
+name = "LobeForestBlock"
+
+[[lean_lib]]
+name = "LobeForestPartition"
+
+[[lean_lib]]
+name = "LoneWriter"
+
+[[lean_lib]]
+name = "MixedEpochBound"
+
+[[lean_lib]]
+name = "MonotoneSupport"
+
+[[lean_lib]]
+name = "NoFullFixed"
+
+[[lean_lib]]
+name = "NoFullFreezeCore"
+
+[[lean_lib]]
+name = "ObservedConfigurationFibre"
+
+[[lean_lib]]
+name = "OverwriteDynamics"
+
+[[lean_lib]]
+name = "OverwriteLasso"
+
+[[lean_lib]]
+name = "PairBound"
+
+[[lean_lib]]
+name = "PairMultiplicity"
+
+[[lean_lib]]
+name = "PairedBlockEpochStrictBound"
+
+[[lean_lib]]
+name = "PairedNoFullReachFreeze"
+
+[[lean_lib]]
+name = "PairedPointwiseReplayCore"
+
+[[lean_lib]]
+name = "PairedReachReplay"
+
+[[lean_lib]]
+name = "Periodicity"
+
+[[lean_lib]]
+name = "PersistentLobeSeparationStandalone"
+
+[[lean_lib]]
+name = "PhysicalPrefixCount"
+
+[[lean_lib]]
+name = "PhysicalPrefixFibre"
+
+[[lean_lib]]
+name = "ProfileCodeBound"
+
+[[lean_lib]]
+name = "RecencyRank"
+
+[[lean_lib]]
+name = "RecencyTreeBlock"
+
+[[lean_lib]]
+name = "ReplayFacts"
+
+[[lean_lib]]
+name = "ReversalFacts"
+
+[[lean_lib]]
+name = "RootRank"
+
+[[lean_lib]]
+name = "SkewWalk"
+
+[[lean_lib]]
+name = "SlotBound"
+
+[[lean_lib]]
+name = "StarIndependent"
+
+[[lean_lib]]
+name = "StarPairCountingCore"
+
+[[lean_lib]]
+name = "StateLaw"
+
+[[lean_lib]]
+name = "SteeringLaw"
+
+[[lean_lib]]
+name = "SupportBound"
+
+[[lean_lib]]
+name = "SupportMove"
+
+[[lean_lib]]
+name = "SupportRelativeCertifiedEpochBound"
+
+[[lean_lib]]
+name = "SupportRelativeEpochStrictBound"
+
+[[lean_lib]]
+name = "SupportRelativeNoLobe"
+
+[[lean_lib]]
+name = "SupportRelativePointwiseReplay"
+
+[[lean_lib]]
+name = "SupportSize"
+
+[[lean_lib]]
+name = "SupportTreeFull"
+
+[[lean_lib]]
+name = "SupportWeightFibres"
+
+[[lean_lib]]
+name = "ThreeQuarterArithmetic"
+
+[[lean_lib]]
+name = "TokenState"
 
 [[lean_lib]]
 name = "TreeEpochCode"
 
 [[lean_lib]]
-name = "RootRank"
+name = "TreeReplay"
+
+[[lean_lib]]
+name = "TwoStateConfigurationFibre"
+
+[[lean_lib]]
+name = "TwoToOneConfigurationCount"
+
+[[lean_lib]]
+name = "VectorCount"

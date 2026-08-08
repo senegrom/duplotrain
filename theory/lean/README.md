@@ -1,8 +1,27 @@
 # Formal proofs (Lean 4)
 
-Thirty-five libraries, all self-contained (no Mathlib).  Core five
-below; plus the accounting/monovariant satellites (all sorry-free,
-honestly conditional where marked):
+One hundred and four libraries, all self-contained (no Mathlib), all
+sorry-free, honestly conditional where marked.  Core five below, then
+the satellites:
+
+* `LobeDichotomy.lean` — **every cycle cell is a Gray flipper or
+  foreign-valued.**  A slot can only be delivered by reading its
+  bar-partner out of that partner's cell (`partner_held`), so:
+  foreign-partnered registers are *irreversible* — a cell that holds
+  a slot whose partner lies outside can never again hold an
+  inside-partnered slot (`cross_stays_cross`) — and while a cell is
+  lobe-valued, **every arrival is the Gray flip** `reg := bar reg`
+  (the delivered slot's inside partner must equal the current
+  register), so the register never leaves `{v₀, bar v₀}`
+  (`lobe_gray_lock`): σ ≤ 2 with no writer-set, productivity, or
+  `bar`-freeness hypotheses.  Periodicity turns irreversibility into
+  a dichotomy (`lobe_or_cross`), and composed with the rho theorem
+  (`rho_gray_or_cross`): on every run's eventual cycle, **every cell
+  either keeps its register in a two-element bar-orbit — the Gray
+  pair — or is foreign-valued at every moment**, where each arrival
+  reads a cell other than the written one
+  (`cross_delivery_reads_foreign`).  Lemma B's remaining work is
+  confined to the foreign-valued cells.
 
 * `LoneWriter.lean` — **m ≠ 1 on cycles: the lone writer freezes.**
   If every productive step of a periodic tail writes into a single
@@ -74,26 +93,41 @@ honestly conditional where marked):
   ≤ `r·(2·#cells+1)²`: any uniform pair-multiplicity bound gives a
   polynomial state bound.
 
-* The **support-epoch campaign** (`ReversalFacts`, `MonotoneSupport`,
-  `SupportSize`, `HiddenFibre` / `HiddenAbsorb` / `HiddenDichotomy`,
-  `LobeAbsorption`, `TreeReplay` / `TreeEpochCode` / `RootRank`,
-  `ComponentCapacity` / `ProfileCodeBound` /
-  `ThreeQuarterArithmetic` / `EpochAggregation`) — toward a
-  subexponential ceiling `f ≤ poly · 2^(3N/4)`.  Proved outright:
-  occupied support only ever shrinks, so along any run there are at
-  most `#edges + 1` distinct support vectors (`support_epoch_bound`),
-  and occupied edges inject into cells (`occupied_edges_le_cells`);
-  a productive step whose cell-projection stalls is a parallel-edge
-  move that is either a lobe Gray-flip (two in a row absorb —
-  `two_hidden_preserved_absorb`) or permanently empties its old edge
-  (`hidden_drop_forever`); within one support epoch, tree components
-  with a decreasing-rank certificate replay their whole snapshot from
-  the choice of one full edge (`tree_epoch_count`), with capacity²
-  ≤ `2^#cells` (`treeCapacity_square`).  The capstone aggregation
-  (`encoded_three_quarter_bound`, `aggregate_three_quarter_epochs`)
-  is **conditional**: it still assumes states inject into the
-  projected code plus active-lobe bits — that injection is the open
-  step of this route.
+* The **strict-base campaign** (~70 libraries, from `ReversalFacts` /
+  `MonotoneSupport` through `SupportWeightFibres` /
+  `CanonicalProjectedEpochFrame` to
+  `CanonicalUnconditionalGlobalBound` and the physical bridge) —
+  **a snapshot ceiling with exponential base strictly below 2**.
+  The engine, proved outright: occupied support only shrinks, so a
+  run has ≤ `#edges + 1` support epochs (`support_epoch_bound`) and
+  occupied edges inject into cells (`occupied_edges_le_cells`);
+  within one fixed support, no-full components freeze, tree
+  components replay their whole snapshot from one full-edge choice
+  (rooted-rank certificates), active lobes are star-separated before
+  any absorption, and the resulting sparse code has capacity²
+  ≤ `2^#cells`; the first certified lobe-pair absorption starts a
+  ≤ 4-snapshot Gray tail (`absorbed_snapshot_count`).  Headline —
+  **unconditional over any complete finite echo frame**
+  (`canonical_unconditional_global_bound`,
+  `finiteFrame_atMost_N_strict_bound`): any duplicate-free list of
+  register snapshots in a window satisfies
+  `T^8 ≤ (4N+2)^8 · 2^(7N+18)` — that is,
+  `T ≤ (4N+2) · 2^(0.875·N + 2.25)`, strictly below the `2^N`
+  pigeonhole for large `N`.  The **physical transfer**
+  (`OverwriteDynamics` / `OverwriteLasso` /
+  `DeterministicOverwriteReturn` / `EchoConfigCount` /
+  `PhysicalPrefixCount` / `ConcreteOverwriteBridge`) rides the
+  overwrite lasso — pin words are idempotent, so each recurrent
+  echo configuration carries at most two tongue vectors per cascade
+  prefix — giving `T^8 ≤ 2^8 (2N)^8 (4N+2)^8 · 2^(7N+18)` for
+  concrete tongue vectors at cascade boundaries
+  (`strict_boundary_bound_of_overwriteCompilation`).  This last step
+  is **conditional on the compilation interface**
+  (`OverwriteEchoCompilation`): constructing, for every wiring, an
+  echo machine whose configuration-driven pin words reproduce
+  `stepN`'s tongue states (the T9 compilation, partially built in
+  `ConcreteMachine` / `ConcreteCascadeFacts` / `ConcreteFiniteBounds`)
+  is the open step of this route.
 
 * `LinearBound.lean` — **snapshots ≤ #cells + #alts + 1**, for any
   alternation list covering the prefix: the unconditional accounting
