@@ -35,6 +35,11 @@ jobs:
           lake env lean PairedNoFullReachFreeze.lean
           lake env lean PairedPointwiseReplayCore.lean
           lake env lean PairedBlockEpochStrictBound.lean
+          lake env lean SupportRelativeNoLobe.lean
+          lake env lean SupportRelativePointwiseReplay.lean
+          lake env lean SupportRelativeEpochStrictBound.lean
+          lake env lean CanonicalActiveLobeFrame.lean
+          lake env lean CanonicalProjectedEpochFrame.lean
           lake env lean BlockEpochAggregation.lean
           lake env lean BlockGlobalArithmetic.lean
       - name: Check automatic component chain
