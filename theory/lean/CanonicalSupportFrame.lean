@@ -115,13 +115,11 @@ theorem frame_selected_in_support_ends
     exact List.mem_filter.mpr ⟨hg, decide_eq_true hgOcc0⟩
   have hends := core_rep_endpoints_mem m hgSupport
   rcases hsg with hsg | hsg
-  · rw [hsg]
-    exact hends.1
+  · simpa [s, hsg] using hends.1
   · have hb := congrArg m.bar hsg
     have hbar : m.bar g = s := by
       simpa [m.bar_invol] using hb
-    rw [← hbar]
-    exact hends.2
+    simpa [s, hbar] using hends.2
 
 /-- Every full edge has a common support representative. -/
 theorem frame_allFull_represented
@@ -140,8 +138,9 @@ theorem frame_allFull_represented
   have hfSlots : f ∈ slots := by
     have hs := frame.selected k hk.1 hk.2
       (m.cellOf f) hfCell
-    unfold Confirmed at hfull
-    rw [hfull.1] at hs
+    have hfConf : Confirmed m e r0 k f := hfull.1
+    unfold Confirmed at hfConf
+    rw [hfConf] at hs
     exact hs
   rcases slot_has_canonicalEdgeCore m frame.bar_closed frame.bar_ne
       hfSlots with ⟨g, hg, hfg⟩
