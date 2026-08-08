@@ -301,6 +301,65 @@ theorem PhysicalTrace.head_arrive {w : Wiring}
   | @cons _ _ q _ v _ _ harrive hlink tail =>
       exact ⟨rfl, v, harrive⟩
 
+/-- The switch owning the final exit of a nonempty trace occurs in the
+trace's passage-switch list. -/
+theorem PhysicalTrace.last_exit_switch_mem {w : Wiring}
+    {p x : Nat} {start finish : Nat × Tongues}
+    {rest : List Passage}
+    (h : PhysicalTrace w start ((p, x) :: rest) finish) :
+    lastPassageExit x rest / 3 ∈
+      (((p, x) :: rest).map passageSwitch) := by
+  induction rest generalizing p x start finish with
+  | nil =>
+      have ha := h.head_arrive
+      obtain ⟨v, harrive⟩ := ha.2
+      have hs := arrive_exit_switch start.2 p
+      rw [harrive] at hs
+      simp [lastPassageExit, passageSwitch, hs]
+  | cons passage rest ih =>
+      rcases passage with ⟨q, y⟩
+      cases h with
+      | @cons _ _ r _ v _ _ harrive hlink tail =>
+          cases tail with
+          | cons harrive' hlink' restTrace =>
+              have htail := ih
+                (PhysicalTrace.cons harrive' hlink' restTrace)
+              exact List.mem_cons_of_mem _ (by
+                simpa [lastPassageExit] using htail)
+
+/-- A switch-simple nonempty trace cannot have its final exit port equal its
+first entry port. -/
+theorem PhysicalTrace.simple_last_exit_ne_first_entry {w : Wiring}
+    {p x : Nat} {start finish : Nat × Tongues}
+    {rest : List Passage}
+    (h : PhysicalTrace w start ((p, x) :: rest) finish)
+    (hsimple : SwitchSimple ((p, x) :: rest)) :
+    lastPassageExit x rest ≠ p := by
+  cases rest with
+  | nil =>
+      intro hEq
+      have hxne := arrive_exit_ne start.2 p
+      obtain ⟨v, harrive⟩ := h.head_arrive.2
+      rw [harrive] at hxne
+      exact hxne (by simpa [lastPassageExit] using hEq)
+  | cons passage rest =>
+      rcases passage with ⟨q, y⟩
+      intro hEq
+      unfold SwitchSimple at hsimple
+      simp only [List.map_cons, List.nodup_cons] at hsimple
+      apply hsimple.1
+      cases h with
+      | @cons _ _ r _ v _ _ harrive hlink tail =>
+          cases tail with
+          | cons harrive' hlink' restTrace =>
+              have htailMem := (PhysicalTrace.cons harrive' hlink'
+                restTrace).last_exit_switch_mem
+              have hkey : passageSwitch (p, x) =
+                  lastPassageExit y rest / 3 := by
+                simp [passageSwitch, ← hEq, lastPassageExit]
+              rw [hkey]
+              exact htailMem
+
 /-- Every successful finite raw run has a physical passage trace. -/
 theorem physicalTrace_of_stepN (w : Wiring) :
     ∀ {n : Nat} {start finish : Nat × Tongues},
