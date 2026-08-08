@@ -34,7 +34,8 @@ private theorem supportFibreSize_cons {α : Type}
     (f : α → Nat) (q : Nat) (x : α) (xs : List α) :
     supportFibreSize f q (x :: xs) =
       (if f x = q then 1 else 0) + supportFibreSize f q xs := by
-  by_cases h : f x = q <;> simp [supportFibreSize, h]
+  by_cases h : f x = q <;>
+    simp [supportFibreSize, h, Nat.add_comm]
 
 private theorem range_indicator_zero : ∀ K n : Nat,
     K ≤ n →
@@ -96,7 +97,7 @@ theorem supportFibreSizes_sum {α : Type}
   induction xs with
   | nil =>
       intro _
-      simp [supportFibreSizes]
+      simp [supportFibreSizes, supportFibreSize]
   | cons x rest ih =>
       intro hbound
       have hx : f x < K := hbound x List.mem_cons_self
@@ -112,9 +113,12 @@ theorem supportFibreSizes_sum {α : Type}
         apply List.map_congr_left
         intro q _
         exact supportFibreSize_cons f q x rest
-      rw [hpoint, sum_map_add_nat]
-      rw [range_indicator_one K (f x) hx, ih hrest]
-      simp
+      rw [hpoint, sum_map_add_nat,
+        range_indicator_one K (f x) hx]
+      change 1 + (supportFibreSizes K f rest).sum =
+        (x :: rest).length
+      rw [ih hrest]
+      simp [Nat.add_comm]
 
 /-- A canonical minimum of one distinguished element and a tail. -/
 def fibreMinFrom : Nat → List Nat → Nat
@@ -133,13 +137,15 @@ theorem fibreMinFrom_mem : ∀ x xs,
   | nil =>
       simp [fibreMinFrom]
   | cons y ys ih =>
-      unfold fibreMinFrom
+      change x.min (fibreMinFrom y ys) ∈ x :: y :: ys
       by_cases h : x ≤ fibreMinFrom y ys
-      · rw [Nat.min_eq_left h]
-        exact List.mem_cons_self
+      · have hmin : x.min (fibreMinFrom y ys) = x :=
+          Nat.min_eq_left h
+        exact hmin.symm ▸ List.mem_cons_self
       · have hle : fibreMinFrom y ys ≤ x := by omega
-        rw [Nat.min_eq_right hle]
-        exact List.mem_cons_of_mem _ (ih y)
+        have hmin : x.min (fibreMinFrom y ys) =
+            fibreMinFrom y ys := Nat.min_eq_right hle
+        exact hmin.symm ▸ List.mem_cons_of_mem _ (ih y)
 
 theorem fibreMaxFrom_mem : ∀ x xs,
     fibreMaxFrom x xs ∈ x :: xs := by
@@ -148,13 +154,15 @@ theorem fibreMaxFrom_mem : ∀ x xs,
   | nil =>
       simp [fibreMaxFrom]
   | cons y ys ih =>
-      unfold fibreMaxFrom
+      change x.max (fibreMaxFrom y ys) ∈ x :: y :: ys
       by_cases h : x ≤ fibreMaxFrom y ys
-      · rw [Nat.max_eq_right h]
-        exact List.mem_cons_of_mem _ (ih y)
+      · have hmax : x.max (fibreMaxFrom y ys) =
+            fibreMaxFrom y ys := Nat.max_eq_right h
+        exact hmax.symm ▸ List.mem_cons_of_mem _ (ih y)
       · have hle : fibreMaxFrom y ys ≤ x := by omega
-        rw [Nat.max_eq_left hle]
-        exact List.mem_cons_self
+        have hmax : x.max (fibreMaxFrom y ys) = x :=
+          Nat.max_eq_left hle
+        exact hmax.symm ▸ List.mem_cons_self
 
 theorem fibreMinFrom_le_mem : ∀ x xs y,
     y ∈ x :: xs → fibreMinFrom x xs ≤ y := by
@@ -162,17 +170,17 @@ theorem fibreMinFrom_le_mem : ∀ x xs y,
   induction xs generalizing x with
   | nil =>
       intro y hy
-      simp only [List.mem_cons] at hy
-      rcases hy with rfl | hy
+      rcases List.mem_cons.mp hy with rfl | hy
       · exact Nat.le_refl _
       · cases hy
   | cons z zs ih =>
       intro y hy
-      unfold fibreMinFrom
-      simp only [List.mem_cons] at hy
-      rcases hy with rfl | hy
-      · exact Nat.min_le_left _ _
-      · exact Nat.le_trans (Nat.min_le_right _ _) (ih z y hy)
+      change x.min (fibreMinFrom z zs) ≤ y
+      rcases List.mem_cons.mp hy with hxy | hyTail
+      · subst y
+        exact Nat.min_le_left _ _
+      · exact Nat.le_trans (Nat.min_le_right _ _)
+          (ih z y hyTail)
 
 theorem mem_le_fibreMaxFrom : ∀ x xs y,
     y ∈ x :: xs → y ≤ fibreMaxFrom x xs := by
@@ -180,17 +188,17 @@ theorem mem_le_fibreMaxFrom : ∀ x xs y,
   induction xs generalizing x with
   | nil =>
       intro y hy
-      simp only [List.mem_cons] at hy
-      rcases hy with rfl | hy
+      rcases List.mem_cons.mp hy with rfl | hy
       · exact Nat.le_refl _
       · cases hy
   | cons z zs ih =>
       intro y hy
-      unfold fibreMaxFrom
-      simp only [List.mem_cons] at hy
-      rcases hy with rfl | hy
-      · exact Nat.le_max_left _ _
-      · exact Nat.le_trans (ih z y hy) (Nat.le_max_right _ _)
+      change y ≤ x.max (fibreMaxFrom z zs)
+      rcases List.mem_cons.mp hy with hxy | hyTail
+      · subst y
+        exact Nat.le_max_left _ _
+      · exact Nat.le_trans (ih z y hyTail)
+          (Nat.le_max_right _ _)
 
 theorem fibreMinFrom_le_fibreMaxFrom (x : Nat) (xs : List Nat) :
     fibreMinFrom x xs ≤ fibreMaxFrom x xs := by
@@ -208,18 +216,24 @@ theorem map_filter_nodup {α β : Type}
   induction xs with
   | nil => simp
   | cons x rest ih =>
-      simp only [List.map_cons, List.nodup_cons] at hnd
+      have hnd' := List.nodup_cons.mp hnd
       by_cases hx : p x
-      · simp only [List.filter_cons_of_pos hx, List.map_cons,
-          List.nodup_cons]
+      · have hfilter :
+            (x :: rest).filter p = x :: rest.filter p := by
+          simp [hx]
+        rw [hfilter, List.map_cons, List.nodup_cons]
         constructor
         · intro hm
           obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-          apply hnd.1
+          apply hnd'.1
           exact List.mem_map.mpr
             ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-        · exact ih hnd.2
-      · simpa [List.filter_cons_of_neg hx] using ih hnd.2
+        · exact ih hnd'.2
+      · have hfilter :
+            (x :: rest).filter p = rest.filter p := by
+          simp [hx]
+        rw [hfilter]
+        exact ih hnd'.2
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
