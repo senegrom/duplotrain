@@ -1,4 +1,4 @@
-import TrackNormalForm
+import TrackTheta
 import VectorCount
 
 /-!
@@ -12,10 +12,10 @@ What is proved is the same statement with `2 ^ N` in place of `N + 6`
 one-alternation transient — are the unproved core of the problem.
 
 There is now also a direct physical-track route in `TrackTrace`, `TrackLobe`,
-and `TrackNormalForm`: the first-repeated-edge fork and both reflector cases
-are proved.  Its remaining gap is the theta-intersection lemma described in
-`theory/lean/README.md`; `StateLaw` stays explicitly open until that lemma and
-the final count are kernel-checked.
+`TrackNormalForm`, and `TrackTheta`: the first-repeated-edge fork, both
+reflector cases, and every theta-intersection orientation are proved.  Its
+remaining gap is the global two-component assembly and the final tongue-vector
+count; `StateLaw` stays explicitly open until both are kernel-checked.
 
 ## How to read the statement
 
