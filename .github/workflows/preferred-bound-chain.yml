@@ -18,7 +18,7 @@ jobs:
       - name: Build established support base
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build ThreeQuarterArithmetic SupportMove HiddenAbsorb
+          lake build ThreeQuarterArithmetic SupportMove HiddenAbsorb GrayTailCount
       - name: Check preferred strict-bound chain
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
@@ -40,6 +40,15 @@ jobs:
           lake env lean SupportRelativeEpochStrictBound.lean
           lake env lean CanonicalActiveLobeFrame.lean
           lake env lean CanonicalProjectedEpochFrame.lean
+          lake env lean SupportWeightFibres.lean
+          lake env lean CanonicalPreTailGlobalBound.lean
+          lake env lean CanonicalGlobalAbsorbedBound.lean
+          lake env lean CertifiedLobeAbsorption.lean
+          lake env lean SupportRelativeCertifiedEpochBound.lean
+          lake env lean CanonicalCertifiedEpochBound.lean
+          lake env lean CanonicalNoCertifiedGlobalBound.lean
+          lake env lean CanonicalUnconditionalGlobalBound.lean
+          lake env lean FiniteFrameSwitchCorollary.lean
           lake env lean BlockEpochAggregation.lean
           lake env lean BlockGlobalArithmetic.lean
       - name: Check automatic component chain
