@@ -98,19 +98,15 @@ private theorem nodup_subset_length_projected
       omega
 
 private theorem filter_partition_length
-    (p : Nat → Prop) [DecidablePred p] :
+    (p : Nat → Bool) :
     ∀ xs : List Nat,
       (xs.filter p).length +
-        (xs.filter (fun x => ¬ p x)).length = xs.length := by
+        (xs.filter (fun x => ! p x)).length = xs.length := by
   intro xs
   induction xs with
   | nil => rfl
   | cons x rest ih =>
-      by_cases hx : p x
-      · simp [hx]
-        omega
-      · simp [hx]
-        omega
+      cases hpx : p x <;> simp [hpx] <;> omega
 
 private theorem active_filter_length
     {cells active : List Nat}
@@ -160,8 +156,11 @@ theorem canonicalProjectedCells_length
     exact canonicalActiveLobeCells_subset m e r0 frame
   have hpositive := active_filter_length frame.cells_nodup
     hactiveNodup hactiveSub
-  have hsplit := filter_partition_length
-    (fun c => c ∈ active) cells
+  have hsplit :
+    (cells.filter (fun c => c ∈ active)).length +
+      (cells.filter (fun c => c ∉ active)).length = cells.length := by
+  simpa using filter_partition_length
+    (fun c => decide (c ∈ active)) cells
   have hactiveLen : active.length =
       (canonicalActiveLobes m e r0 lo hi slots k0).length := by
     simp [active, standaloneActiveLobeCells]
