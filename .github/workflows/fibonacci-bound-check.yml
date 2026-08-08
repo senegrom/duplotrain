@@ -1,4 +1,4 @@
-name: Fibonacci strict-bound Lean chain
+name: Fibonacci and component strict-bound Lean chain
 on:
   push:
     branches: [agent/linear-bound-current]
@@ -99,8 +99,10 @@ jobs:
           name = "RelevantEdgeFibonacciPhysicalBound"
           [[lean_lib]]
           name = "FullComponentRootUniqueness"
+          [[lean_lib]]
+          name = "TreeCapacitySevenTenths"
           EOF
-      - name: Build improved bound endpoint
+      - name: Build improved bound endpoints
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build RelevantEdgeFibonacciPhysicalBound FullComponentRootUniqueness
+          lake build RelevantEdgeFibonacciPhysicalBound FullComponentRootUniqueness TreeCapacitySevenTenths
