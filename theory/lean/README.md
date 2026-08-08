@@ -1,14 +1,38 @@
 # Formal proofs (Lean 4)
 
-Fourteen libraries, all self-contained (no Mathlib).  Core five below;
+Nineteen libraries, all self-contained (no Mathlib).  Core five below;
 plus the accounting/monovariant satellites (all sorry-free, honestly
 conditional where marked):
+
+* `Periodicity.lean` — **every run is a rho**: the state (current
+  entry + registers of the listed cells) evolves autonomously and
+  ranges over a finite space, so some state recurs within
+  `|slots|^(|cells|+1) + 1` steps (`state_repeat`) and determinism
+  replays the stretch forever (`run_eventually_periodic`): explicit
+  pre-period and period bounds, machine-checked.  `run_rho` adds the
+  payoff: on the tail all registers are periodic too, and — via
+  `recurrence_emission` — **every productive step on the tail
+  re-emits a token**: the eventual cycle's token population is
+  conserved, unconditionally.  The cycle-classification theorems
+  (`lone_write_no_mouth`, `divergence_names_steer`) now have a
+  machine-checked cycle to run on.
 
 * `FutureEntryBound.lean` — **the linear future entry alphabet**:
   every entry from any base time on lies in a fixed alphabet (the base
   entry, bars of base registers, bars of live tokens) of size
   ≤ `2·#cells + 1`; pair-duplicate-free phases are quadratically
   bounded.  Built on `future_register_le`.
+* `CellHeat.lean` — **local heat never grows**: each cell's token
+  count is individually non-increasing (tokens cannot migrate between
+  cells) — so every condition of the Gray-tail token shape
+  (tokenless cells, ≤1-token cells) is monotone once reached.
+* `TokenState.lean` — occupancy and token-ends *determine* every
+  register (`confirmed ↔ occupied ∧ ¬token`): state recurrence is
+  finite token motion on the monotone occupied support.
+* `PairMultiplicity.lean` — if every consecutive entry pair occurs
+  ≤ `r` times in a phase, the phase has length
+  ≤ `r·(2·#cells+1)²`: any uniform pair-multiplicity bound gives a
+  polynomial state bound.
 
 * `LinearBound.lean` — **snapshots ≤ #cells + #alts + 1**, for any
   alternation list covering the prefix: the unconditional accounting
@@ -114,7 +138,10 @@ machine cycle has Σ(σ−1) ≤ 2 — this is C\*) and **C** (O(1) transient
 alternations).  Modulo B + C, the accounting theorem closes the state
 count to f(N) ≤ N + O(1); unconditionally, f(N) ≤ min(2^N, N + 1 + A)
 with A the run's alternation count.  The lobed case of B is proved
-outright (`absorb`).  The pedigree/conservation theorems reduce B to a
+outright (`absorb`).  The eventual cycle itself is no longer
+hypothetical: `Periodicity.run_rho` proves every run enters one, with
+explicit bounds, periodic registers, and conserved tokens on the tail.
+The pedigree/conservation theorems reduce B to a
 single sharp question: the cycle's conserved, repertoire-spanning
 token population (`recurrence_emission` + `future_register`) — can
 **three or more** of its tokens actually be consumed on the cycle?
