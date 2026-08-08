@@ -9,8 +9,8 @@ A state in one fixed-support epoch will be encoded by
 2. `A` Boolean lobe bits.
 
 This file proves that a duplicate-free list of such codes has at most
-`P * 2^A` elements, and combines that count with
-`three_quarter_fourth_bound`.
+`P * 2^A` elements, and combines that count with the three-quarter exponent
+estimates.
 -/
 
 namespace Echo
@@ -151,5 +151,26 @@ theorem encoded_three_quarter_bound
     simpa [Nat.mul_comm] using hcount
   exact Nat.le_trans hfourth
     (three_quarter_fourth_bound C L M A P hC hAL hAM hcap)
+
+/-- Encoded three-quarter bound using only star-pair independence of the
+active lobe coordinates.  The hypothesis `2*A ≤ C` is supplied by
+`star_independent_length` once the active-cell list is shown to contain at
+most one endpoint from each mouth-partner pair. -/
+theorem encoded_three_quarter_star_pair_bound
+    (C L M A P : Nat)
+    (codes : List (Nat × List Bool))
+    (hnd : codes.Nodup)
+    (hcodeP : ∀ z ∈ codes, z.1 < P)
+    (hcodeA : ∀ z ∈ codes, z.2.length = A)
+    (hC : C = L + M)
+    (hAL : A ≤ L) (hhalf : 2*A ≤ C)
+    (hcap : P*P ≤ 2^M) :
+    fourth codes.length ≤ 2^(3*C) := by
+  have hcount := profile_code_count P A codes hnd hcodeP hcodeA
+  have hfourth : fourth codes.length ≤ fourth (2^A * P) := by
+    apply fourth_mono
+    simpa [Nat.mul_comm] using hcount
+  exact Nat.le_trans hfourth
+    (three_quarter_star_pair_bound C L M A P hC hAL hhalf hcap)
 
 end Echo
