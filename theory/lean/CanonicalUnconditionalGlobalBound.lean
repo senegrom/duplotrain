@@ -25,9 +25,11 @@ private theorem canonical_filter_lt_ge_length (cut : Nat) :
   | cons x rest ih =>
       by_cases h : x < cut
       · have hn : ¬ cut ≤ x := by omega
-        simp [h, hn, ih]
+        simp [h, hn]
+        omega
       · have hge : cut ≤ x := by omega
-        simp [h, hge, ih]
+        simp [h, hge]
+        omega
 
 /-- Four snapshots fit inside the universal strict exponential factor. -/
 theorem canonical_four_snapshots_eighth_le (N : Nat) :
@@ -62,7 +64,8 @@ theorem canonical_unconditional_global_bound
     have hwCand : w ∈ candidates := by
       dsimp [candidates]
       exact List.mem_filter.mpr
-        ⟨List.mem_range.mpr (by omega), hwLo, hwCert⟩
+        ⟨List.mem_range.mpr (by omega),
+          decide_eq_true ⟨hwLo, hwCert⟩⟩
     cases hcandidates : candidates with
     | nil =>
         rw [hcandidates] at hwCand
@@ -72,15 +75,22 @@ theorem canonical_unconditional_global_bound
         have hk0Cand : k0 ∈ candidates := by
           rw [hcandidates]
           exact fibreMinFrom_mem x rest
-        have hk0Data := List.mem_filter.mp (by
-          simpa [candidates] using hk0Cand)
-        have hk0Lo : globalLo ≤ k0 := hk0Data.2.1
+        have hk0InFilter :
+            k0 ∈ (List.range (globalHi + 1)).filter
+              (fun k => globalLo ≤ k ∧
+                CertifiedLobeAbsorptionAt m e r0 k) := by
+          simpa only [candidates] using hk0Cand
+        have hk0Filter := List.mem_filter.mp hk0InFilter
+        have hk0Cond :
+            globalLo ≤ k0 ∧ CertifiedLobeAbsorptionAt m e r0 k0 :=
+          of_decide_eq_true hk0Filter.2
+        have hk0Lo : globalLo ≤ k0 := hk0Cond.1
         have hk0Hi : k0 ≤ globalHi := by
           have hrange : k0 < globalHi + 1 :=
-            List.mem_range.mp hk0Data.1
+            List.mem_range.mp hk0Filter.1
           omega
         have hk0Cert : CertifiedLobeAbsorptionAt m e r0 k0 :=
-          hk0Data.2.2
+          hk0Cond.2
         let pre := ks.filter (fun k => k < k0)
         let tail := ks.filter (fun k => k0 ≤ k)
         have hsplit : pre.length + tail.length = ks.length := by
@@ -96,8 +106,11 @@ theorem canonical_unconditional_global_bound
             (fun k => k0 ≤ k) hnd
         have htailTimes : ∀ k ∈ tail, k0 ≤ k := by
           intro k hk
-          exact (List.mem_filter.mp (by
-            simpa [tail] using hk)).2
+          have hkInFilter :
+              k ∈ ks.filter (fun k => k0 ≤ k) := by
+            simpa only [tail] using hk
+          exact of_decide_eq_true
+            (List.mem_filter.mp hkInFilter).2
         have htailCount : tail.length ≤ 4 :=
           certifiedLobeAbsorption_snapshot_count m e r0
             hrun hk0Cert cells tail htailTimes hndTail
@@ -119,9 +132,13 @@ theorem canonical_unconditional_global_bound
           have hpreTimes : ∀ k ∈ pre,
               globalLo ≤ k ∧ k ≤ preHi := by
             intro k hk
-            have hkData := List.mem_filter.mp (by
-              simpa [pre] using hk)
-            have hkGlobal := hks k hkData.1
+            have hkInFilter :
+                k ∈ ks.filter (fun k => k < k0) := by
+              simpa only [pre] using hk
+            have hkFilter := List.mem_filter.mp hkInFilter
+            have hkLt : k < k0 :=
+              of_decide_eq_true hkFilter.2
+            have hkGlobal := hks k hkFilter.1
             constructor
             · exact hkGlobal.1
             · dsimp [preHi]
@@ -135,7 +152,8 @@ theorem canonical_unconditional_global_bound
                 omega)
             have hkCandidates : k ∈ candidates := by
               dsimp [candidates]
-              exact List.mem_filter.mpr ⟨hkRange, hkLo, hcert⟩
+              exact List.mem_filter.mpr
+                ⟨hkRange, decide_eq_true ⟨hkLo, hcert⟩⟩
             have hkList : k ∈ x :: rest := by
               rw [← hcandidates]
               exact hkCandidates
@@ -163,10 +181,13 @@ theorem canonical_unconditional_global_bound
             [pre.length, tail.length]
             (blockCoreEighth (slots.length + 1) * X) (by
               intro s hs
-              simp only [List.mem_cons, List.mem_singleton] at hs
-              rcases hs with rfl | rfl
-              · exact hpreEight
-              · exact htailLarge)
+              rcases List.mem_cons.mp hs with hsp | hsTail
+              · subst s
+                exact hpreEight
+              · have hst : s = tail.length := by
+                  simpa using hsTail
+                subst s
+                exact htailLarge)
           have hsum : [pre.length, tail.length].sum = ks.length := by
             simpa using hsplit
           rw [hsum] at hagg
