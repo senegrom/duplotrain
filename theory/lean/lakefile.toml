@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "SkewWalk", "FutureEntryBound", "PairMultiplicity", "TokenState", "CellHeat", "Periodicity", "LoneWriter"]
+defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "SkewWalk", "FutureEntryBound", "PairMultiplicity", "TokenState", "CellHeat", "Periodicity", "LoneWriter", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -60,3 +60,45 @@ name = "Periodicity"
 
 [[lean_lib]]
 name = "LoneWriter"
+
+[[lean_lib]]
+name = "ReversalFacts"
+
+[[lean_lib]]
+name = "MonotoneSupport"
+
+[[lean_lib]]
+name = "HiddenFibre"
+
+[[lean_lib]]
+name = "HiddenAbsorb"
+
+[[lean_lib]]
+name = "HiddenDichotomy"
+
+[[lean_lib]]
+name = "ThreeQuarterArithmetic"
+
+[[lean_lib]]
+name = "ComponentCapacity"
+
+[[lean_lib]]
+name = "ProfileCodeBound"
+
+[[lean_lib]]
+name = "SupportSize"
+
+[[lean_lib]]
+name = "LobeAbsorption"
+
+[[lean_lib]]
+name = "EpochAggregation"
+
+[[lean_lib]]
+name = "TreeReplay"
+
+[[lean_lib]]
+name = "TreeEpochCode"
+
+[[lean_lib]]
+name = "RootRank"
