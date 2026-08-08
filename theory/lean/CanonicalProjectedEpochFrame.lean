@@ -46,8 +46,8 @@ noncomputable def canonicalProjectedCells
     (lo hi : Nat) (cells slots : List Nat) (k0 : Nat) : List Nat := by
   classical
   exact cells.filter fun c =>
-    c ∉ standaloneActiveLobeCells m
-      (canonicalActiveLobes m e r0 lo hi slots k0)
+    ! decide (c ∈ standaloneActiveLobeCells m
+      (canonicalActiveLobes m e r0 lo hi slots k0))
 
 /-- Common support edges other than the canonical active lobes. -/
 noncomputable def canonicalProjectedEdges
@@ -157,17 +157,17 @@ theorem canonicalProjectedCells_length
   have hpositive := active_filter_length frame.cells_nodup
     hactiveNodup hactiveSub
   have hsplit :
-    (cells.filter (fun c => c ∈ active)).length +
-      (cells.filter (fun c => c ∉ active)).length = cells.length := by
-  simpa using filter_partition_length
-    (fun c => decide (c ∈ active)) cells
+    (cells.filter (fun c => decide (c ∈ active))).length +
+      (cells.filter (fun c => ! decide (c ∈ active))).length =
+      cells.length :=
+  filter_partition_length (fun c => decide (c ∈ active)) cells
   have hactiveLen : active.length =
       (canonicalActiveLobes m e r0 lo hi slots k0).length := by
     simp [active, standaloneActiveLobeCells]
   dsimp [canonicalProjectedCells]
   change cells.length =
     (canonicalActiveLobes m e r0 lo hi slots k0).length +
-      (cells.filter (fun c => c ∉ active)).length
+      (cells.filter (fun c => ! decide (c ∈ active))).length
   omega
 
 /-- Projected edge representatives remain ordered and duplicate-free. -/
