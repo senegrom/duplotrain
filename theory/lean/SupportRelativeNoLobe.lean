@@ -60,7 +60,8 @@ theorem reg_step_eq_of_coreNoFull_coreNoOccupiedLobe
     · rw [hwrite, ← heq]
     · have hp : ProductiveStep m e r0 k := by
         unfold ProductiveStep
-        simpa [old, new] using heq
+        intro h
+        exact heq h.symm
       have holdConf : Confirmed m e r0 k old :=
         old_register_confirmed m e r0 hr0 k (m.cellOf new)
       have holdOcc : Occupied m e r0 k old := Or.inl holdConf
@@ -112,9 +113,11 @@ theorem pairedNoFullReach_reg_prefix_supportRelative
         (lo+d) c hs hprev.1
       refine ⟨?_, ?_⟩
       · simpa [Nat.add_assoc] using hnext
-      · calc
+      · have hidx : lo + (d+1) = lo+d+1 := by omega
+        calc
           reg m e r0 (lo+(d+1)) c
-              = reg m e r0 (lo+d+1) c := by omega
+              = reg m e r0 (lo+d+1) c :=
+                congrArg (fun n => reg m e r0 n c) hidx
           _ = reg m e r0 (lo+d) c := hreg
           _ = reg m e r0 lo c := hprev.2
 
