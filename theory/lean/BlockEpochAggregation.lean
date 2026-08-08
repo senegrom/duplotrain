@@ -35,7 +35,7 @@ theorem block_sum_le_length_mul_max : ∀ xs : List Nat,
     xs.sum ≤ xs.length * blockEpochMax xs := by
   intro xs
   induction xs with
-  | nil => rfl
+  | nil => exact Nat.le_refl 0
   | cons x rest ih =>
       have hx : x ≤ blockEpochMax (x :: rest) :=
         Nat.le_max_left _ _
@@ -45,7 +45,12 @@ theorem block_sum_le_length_mul_max : ∀ xs : List Nat,
           rest.length * blockEpochMax (x :: rest) :=
         Nat.le_trans ih (Nat.mul_le_mul_left rest.length hmax)
       simp only [List.sum_cons, List.length_cons]
-      omega
+      calc
+        x + rest.sum ≤ blockEpochMax (x :: rest) +
+            rest.length * blockEpochMax (x :: rest) :=
+          Nat.add_le_add hx htail
+        _ = (rest.length + 1) * blockEpochMax (x :: rest) := by
+          simp [Nat.add_mul, Nat.add_comm]
 
 /-- Eighth-power monotonicity. -/
 theorem blockCoreEighth_mono {x y : Nat} (h : x ≤ y) :
@@ -77,11 +82,9 @@ theorem blockEpochMax_eighth_le
         exact h y (List.mem_cons_of_mem _ hy)
       have hi := ih hr
       by_cases hxr : x ≤ blockEpochMax rest
-      · rw [blockEpochMax, Nat.max_eq_right hxr]
-        exact hi
+      · simpa [blockEpochMax, Nat.max_eq_right hxr] using hi
       · have hrx : blockEpochMax rest ≤ x := by omega
-        rw [blockEpochMax, Nat.max_eq_left hrx]
-        exact hx
+        simpa [blockEpochMax, Nat.max_eq_left hrx] using hx
 
 /-- **Aggregate a uniform epoch bound.** -/
 theorem block_aggregate_eighth_bound
