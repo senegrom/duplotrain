@@ -42,13 +42,14 @@ to be non-full. -/
 theorem selected_not_full_away_root
     (hr0 : ∀ c, m.cellOf (r0 c) = c)
     {k f c : Nat}
-    (hunique : ∀ s, Full m e r0 k s → SameEdge m f s)
+    (hunique : Full m e r0 k (reg m e r0 k c) →
+      SameEdge m f (reg m e r0 k c))
     (hl : c ≠ m.cellOf f)
     (hr : c ≠ m.cellOf (m.bar f)) :
     ¬ Full m e r0 k (reg m e r0 k c) := by
   intro hfull
   rcases selected_sameEdge_root m e r0 hr0
-      (hunique (reg m e r0 k c) hfull) with h | h
+      (hunique hfull) with h | h
   · exact hl h
   · exact hr h
 
@@ -62,8 +63,9 @@ noncomputable def recencyTreeBlock
     (fullAt : Nat → Nat)
     (hmem : ∀ k, times k → fullAt k ∈ edges)
     (hfull : ∀ k, times k → Full m e r0 k (fullAt k))
-    (hunique : ∀ k, times k → ∀ s,
-      Full m e r0 k s → SameEdge m (fullAt k) s)
+    (hunique : ∀ k, times k → ∀ c ∈ cells,
+      Full m e r0 k (reg m e r0 k c) →
+        SameEdge m (fullAt k) (reg m e r0 k c))
     (hvisit : ∀ k, times k → ∀ c ∈ cells,
       ∃ j, 0 < j ∧ j ≤ k ∧ m.cellOf (e j) = c)
     (htarget : ∀ k, times k → ∀ c ∈ cells,
@@ -86,6 +88,6 @@ noncomputable def recencyTreeBlock
       cells lw (htarget k hk) (hnlobe k hk)
       (fun c hc hl hr =>
         selected_not_full_away_root m e r0 hr0
-          (hunique k hk) hl hr)
+          (hunique k hk c hc) hl hr)
 
 end Echo
