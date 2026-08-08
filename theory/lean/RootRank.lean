@@ -5,8 +5,8 @@ import TreeEpochCode
 
 A rooted tree orientation admits a simple numerical certificate: the two
 endpoints of the full edge are roots, while every other selected edge moves to
-a strictly smaller rank.  Strong induction on that rank constructs the
-`RootedAt` proof required by `TreeReplay`.
+a strictly smaller rank.  Induction on an upper bound for that rank constructs
+the `RootedAt` proof required by `TreeReplay`.
 
 This replaces arbitrary path objects by a compact, checkable rank function.
 -/
@@ -31,11 +31,19 @@ theorem rootedCells_of_rank
     (htoward : ∀ c ∈ cells, RankedToward m e r0 k f cells rank c) :
     RootedCells m e r0 k f cells := by
   intro c hc
-  have hmain : ∀ n c, rank c = n → c ∈ cells →
+  have hmain : ∀ n c, rank c ≤ n → c ∈ cells →
       RootedAt m e r0 k f c := by
     intro n
-    induction n using Nat.strong_induction_on with
-    | h n ih =>
+    induction n with
+    | zero =>
+        intro c hrank hc
+        rcases htoward c hc with hleft | hright | ⟨hnfull, hmem, hlt⟩
+        · rw [hleft]
+          exact RootedAt.left
+        · rw [hright]
+          exact RootedAt.right
+        · omega
+    | succ n ih =>
         intro c hrank hc
         rcases htoward c hc with hleft | hright | ⟨hnfull, hmem, hlt⟩
         · rw [hleft]
@@ -43,11 +51,10 @@ theorem rootedCells_of_rank
         · rw [hright]
           exact RootedAt.right
         · apply RootedAt.step c hnfull
-          apply ih (rank (m.cellOf (m.bar (reg m e r0 k c))))
-            (by simpa [hrank] using hlt)
-          · rfl
+          apply ih
+          · omega
           · exact hmem
-  exact hmain (rank c) c rfl hc
+  exact hmain (rank c) c (Nat.le_refl _) hc
 
 /-- A rank certificate varying with time constructs a `TreeBlockCert`. -/
 def treeBlockOfRank
