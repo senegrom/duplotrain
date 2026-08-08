@@ -15,18 +15,24 @@ namespace Echo
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
 /-- One endpoint of the lobe is visited during the interval. -/
-def StandaloneLobeVisited (lo hi a : Nat) : Prop :=
+def StandaloneLobeVisited
+    (m : Machine) (e r0 : Nat → Nat)
+    (lo hi a : Nat) : Prop :=
   ∃ k, lo ≤ k ∧ k ≤ hi ∧
     (e k = a ∨ e k = m.bar a)
 
 /-- A four-slot tail begins at `k`. -/
-def StandaloneFourTailFrom (k : Nat) : Prop :=
+def StandaloneFourTailFrom
+    (m : Machine) (e r0 : Nat → Nat)
+    (k : Nat) : Prop :=
   ∃ a b, ∀ j, k ≤ j →
     e j = a ∨ e j = m.bar a ∨
     e j = b ∨ e j = m.bar b
 
 /-- No four-slot tail begins within `[lo,hi]`. -/
-def StandaloneNoFourTailIn (lo hi : Nat) : Prop :=
+def StandaloneNoFourTailIn
+    (m : Machine) (e r0 : Nat → Nat)
+    (lo hi : Nat) : Prop :=
   ∀ k, lo ≤ k → k ≤ hi →
     ¬ StandaloneFourTailFrom m e r0 k
 
