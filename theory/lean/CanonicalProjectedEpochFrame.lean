@@ -95,11 +95,11 @@ private theorem nodup_subset_length_projected
       simp only [List.length_cons]
       omega
 
-private theorem filter_partition_length (p : Nat → Prop) :
+private theorem filter_partition_length
+    (p : Nat → Prop) [DecidablePred p] :
     ∀ xs : List Nat,
       (xs.filter p).length +
         (xs.filter (fun x => ¬ p x)).length = xs.length := by
-  classical
   intro xs
   induction xs with
   | nil => rfl
@@ -143,6 +143,7 @@ theorem canonicalProjectedCells_length
     cells.length =
       (canonicalActiveLobes m e r0 lo hi slots k0).length +
       (canonicalProjectedCells m e r0 lo hi cells slots k0).length := by
+  classical
   let active := standaloneActiveLobeCells m
     (canonicalActiveLobes m e r0 lo hi slots k0)
   have hactiveNodup : active.Nodup := by
@@ -348,11 +349,8 @@ theorem canonicalProjected_confirmed_cell
       have hxb : x = m.bar a :=
         confirmed_same_cell_eq m e r0 hconf hbarConf hcellBar
       have hxaEdge : SameEdge m x a := by
-        have hsym : SameEdge m (m.bar a) a := by
-          left
-          exact (m.bar_invol a).symm
         rw [hxb]
-        exact hsym
+        exact sameEdge_symm m (sameEdge_bar m a)
       exact sameEdge_trans_projected m hgx hxaEdge
   have hgaEq := canonicalSupport_sameEdge_eq m e r0
     hgData.1 haData.1 hga
