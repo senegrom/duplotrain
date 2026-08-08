@@ -81,6 +81,7 @@ theorem sevenTenths_global_piece_bound
 
 /-- Multiplying by the current-entry and physical prefix factors changes only
 the polynomial prefactor. -/
+set_option maxHeartbeats 800000 in
 theorem sevenTenths_physical_polynomial_bound
     (N physical abstract : Nat)
     (hphysical : physical ≤
