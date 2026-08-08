@@ -31,14 +31,17 @@ theorem mem_starPairExpansion_cases {active : List Nat} {x : Nat} :
       intro hx
       simp only [starPairExpansion, List.mem_cons] at hx
       rcases hx with h | h | h
-      · exact Or.inl (Or.inl h)
-      · right
+      · apply Or.inl
+        rw [h]
+        exact List.mem_cons_self
+      · apply Or.inr
         have hs : m.star x = c := by
           rw [h, m.star_invol]
-        exact Or.inl hs
+        rw [hs]
+        exact List.mem_cons_self
       · rcases ih h with hm | hm
-        · exact Or.inl (Or.inr hm)
-        · exact Or.inr (Or.inr hm)
+        · exact Or.inl (List.mem_cons_of_mem _ hm)
+        · exact Or.inr (List.mem_cons_of_mem _ hm)
 
 /-- Expansion doubles the length. -/
 theorem starPairExpansion_length : ∀ active : List Nat,
