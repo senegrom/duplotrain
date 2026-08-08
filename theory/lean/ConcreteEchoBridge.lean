@@ -120,14 +120,14 @@ def EveryFiniteRunCompiles : Prop :=
     ∀ (c0 : Nat × Tongues) (sample : List Nat),
       (∀ k ∈ sample, (stepN w k c0).isSome) →
       ∃ globalLo globalHi,
-        EchoCompilation w N c0 sample globalLo globalHi
+        Nonempty (EchoCompilation w N c0 sample globalLo globalHi)
 
 /-- Once the concrete forest compilation is supplied, the strict-base state
 law follows with no further dynamical hypothesis. -/
 theorem strictBaseStateLaw_of_compilation
     (hcompile : EveryFiniteRunCompiles) : StrictBaseStateLaw := by
   intro w N hN c0 sample hlive hnd
-  obtain ⟨globalLo, globalHi, comp⟩ :=
+  obtain ⟨globalLo, globalHi, ⟨comp⟩⟩ :=
     hcompile w N hN c0 sample hlive
   exact strict_bound_of_echoCompilation comp hnd
 
