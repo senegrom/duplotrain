@@ -1,5 +1,6 @@
 import CanonicalConfigurationRepresentatives
 import PhysicalPrefixFibre
+import FiniteListBounds
 
 /-!
 # Strict-base bound for all physical cascade-prefix states
@@ -130,15 +131,17 @@ theorem finite_echo_physical_prefix_bound
         (fun x hx => hobserve x (hsampleOf x hx))
         hndPrefixFibre
       simpa [finiteFibreSize, prefixFibre] using htwo
-    have hprefixBound := sum_le_length_mul_bound
-      prefixSizes 2 hprefixEach
+    have hprefixBound :=
+      FiniteListBounds.sum_le_length_mul_bound
+        prefixSizes 2 hprefixEach
     rw [hprefixSum] at hprefixBound
     have hprefixLen : prefixSizes.length = N + 1 := by
       simp [prefixSizes, finiteFibreSizes]
     rw [hprefixLen] at hprefixBound
     simpa [Nat.mul_comm] using hprefixBound
-  have hsampleBound := sum_le_length_mul_bound
-    configSizes (2 * (N + 1)) hconfigEach
+  have hsampleBound :=
+    FiniteListBounds.sum_le_length_mul_bound
+      configSizes (2 * (N + 1)) hconfigEach
   rw [hconfigSum] at hsampleBound
   have hconfigLen : configSizes.length = configs.length := by
     simp [configSizes, finiteFibreSizes]
