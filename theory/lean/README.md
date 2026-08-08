@@ -216,6 +216,13 @@ passage approached through its stem, or repairs every groove in one traversal.
 `support_grooves_of_orientedRoute` and
 `oriented_data_eq_of_route_grooved` prove that the repaired route restores the
 entire manufactured-reflector support and still selects the same far endpoint.
+`current_route_reference` aligns only the reflector's private action tongue,
+whose reusable support is disjoint, so `repair_current_route_or_facing`
+replays the route the train actually selects rather than freezing an obsolete
+choice.  `current_facing_has_support_witness` removes the resulting false
+action-mouth case, and `current_facing_change_location` proves that every
+remaining outward obstruction is literally a backward theta contact: its
+unique changing exploration passage exits through the old route's stem.
 The capstone `repair_or_facing_diversion` therefore completes a damaged
 reflector all the way to the opposite boundary unless that one explicit
 facing-first diversion occurs.  The endpoint-strengthened

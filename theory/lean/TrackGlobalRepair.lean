@@ -151,6 +151,57 @@ theorem forward_merge_tails_endpoint_dichotomy
           exact physicalTrace_prefix_comparable_with_endpoints
             oldRest' freshRest
 
+/-- Converse membership for the explicitly reversed passage list. -/
+theorem source_of_mem_reversePassages
+    {passage : Passage} {passages : List Passage}
+    (hmem : passage ∈ reversePassages passages) :
+    ∃ old ∈ passages, passage = (old.2, old.1) := by
+  induction passages with
+  | nil => cases hmem
+  | cons head rest ih =>
+      simp only [reversePassages] at hmem
+      rcases List.mem_append.mp hmem with hrest | hhead
+      · obtain ⟨old, hold, hEq⟩ := ih hrest
+        exact ⟨old, List.mem_cons_of_mem _ hold, hEq⟩
+      · simp only [List.mem_singleton] at hhead
+        exact ⟨head, List.mem_cons_self, hhead⟩
+
+/-- The first candy arm is grooved whenever the action tongue selects it. -/
+theorem ManufacturedFlipReflector.firstArm_groove_of_selected
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedFlipReflector w g e)
+    (state : Tongues)
+    (hselected : state A.actionSwitch = bval A.firstArm) :
+    arrive state A.firstArm = (A.mouth, state) := by
+  have hagree : state (A.firstArm / 3) = bval A.firstArm := by
+    rw [A.firstArm_switch]
+    exact hselected
+  have hpin : pin state A.firstArm = state := pin_of_agrees hagree
+  have hstem : 3 * (A.firstArm / 3) = A.mouth := by
+    have hm := A.mouth_is_stem
+    have hs := A.firstArm_switch
+    unfold ManufacturedFlipReflector.actionSwitch at hs
+    omega
+  simp [arrive, A.firstArm_branch, hstem, hpin]
+
+/-- The second candy arm is grooved whenever the action tongue selects it. -/
+theorem ManufacturedFlipReflector.secondArm_groove_of_selected
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedFlipReflector w g e)
+    (state : Tongues)
+    (hselected : state A.actionSwitch = bval A.secondArm) :
+    arrive state A.secondArm = (A.mouth, state) := by
+  have hagree : state (A.secondArm / 3) = bval A.secondArm := by
+    rw [A.secondArm_switch]
+    exact hselected
+  have hpin : pin state A.secondArm = state := pin_of_agrees hagree
+  have hstem : 3 * (A.secondArm / 3) = A.mouth := by
+    have hm := A.mouth_is_stem
+    have hs := A.secondArm_switch
+    unfold ManufacturedFlipReflector.actionSwitch at hs
+    omega
+  simp [arrive, A.secondArm_branch, hstem, hpin]
+
 /-- A forward theta fault with the endpoint information retained.  At the
 merge, the fresh exploration suffix and old selected-route suffix share one
 deterministic continuation.  Whichever suffix is longer, its unmatched tail
@@ -275,6 +326,82 @@ theorem ManufacturedReflector.support_grooves_of_orientedRoute
                 (List.mem_cons_of_mem _ (reversePassage_mem hp)))
           exact groove_forward hreverse
 
+/-- Align only the reflector's private action tongue with an arbitrary current
+state.  Its reusable support avoids that tongue, so the aligned reference
+still grooves every support path and statically realizes exactly the route
+that the current state selects. -/
+theorem ManufacturedReflector.current_route_reference
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (base state : Tongues)
+    (hpaths : PathGrooves A.toSupported.paths base) :
+    ∃ reference,
+      PathGrooves A.toSupported.paths reference ∧
+      A.orientedRoute reference = A.orientedRoute state ∧
+      A.orientedFinish reference = A.orientedFinish state ∧
+      PassagesGrooved reference (A.orientedRoute state) := by
+  cases A with
+  | stay R =>
+      have htrace :=
+        (ManufacturedReflector.stay R).orientedRoute_trace base hpaths
+      have hgrooved := htrace.grooved_of_switchSimple
+        ((ManufacturedReflector.stay R).orientedRoute_simple base)
+      exact ⟨base, hpaths, rfl, rfl, hgrooved⟩
+  | flip R =>
+      by_cases hsame :
+          state R.actionSwitch = base R.actionSwitch
+      · have hroute :
+            (ManufacturedReflector.flip R).orientedRoute base =
+              (ManufacturedReflector.flip R).orientedRoute state := by
+          simp only [ManufacturedReflector.orientedRoute]
+          rw [hsame]
+        have hfinish :
+            (ManufacturedReflector.flip R).orientedFinish base =
+              (ManufacturedReflector.flip R).orientedFinish state := by
+          simp only [ManufacturedReflector.orientedFinish]
+          rw [hsame]
+        have htrace :=
+          (ManufacturedReflector.flip R).orientedRoute_trace base hpaths
+        have hgrooved := htrace.grooved_of_switchSimple
+          ((ManufacturedReflector.flip R).orientedRoute_simple base)
+        rw [hroute] at hgrooved
+        exact ⟨base, hpaths, hroute, hfinish, hgrooved⟩
+      · let reference := flipAt base R.actionSwitch
+        have hrefAction :
+            reference R.actionSwitch = state R.actionSwitch := by
+          dsimp [reference]
+          simp only [flipAt, if_pos]
+          cases hb : base R.actionSwitch <;>
+            cases hs : state R.actionSwitch <;> simp_all
+        have hreferencePaths :
+            PathGrooves
+              (ManufacturedReflector.flip R).toSupported.paths
+              reference := by
+          change PathGrooves [R.runway, R.candy]
+            (flipAt base R.actionSwitch)
+          change PathGrooves [R.runway, R.candy] base at hpaths
+          have havoid : (LocalAction.flip R.actionSwitch).Avoids
+              [R.runway, R.candy] := R.support_foreign
+          exact hpaths.after_avoiding_action havoid
+        have hroute :
+            (ManufacturedReflector.flip R).orientedRoute reference =
+              (ManufacturedReflector.flip R).orientedRoute state := by
+          simp only [ManufacturedReflector.orientedRoute]
+          rw [hrefAction]
+        have hfinish :
+            (ManufacturedReflector.flip R).orientedFinish reference =
+              (ManufacturedReflector.flip R).orientedFinish state := by
+          simp only [ManufacturedReflector.orientedFinish]
+          rw [hrefAction]
+        have htrace :=
+          (ManufacturedReflector.flip R).orientedRoute_trace
+            reference hreferencePaths
+        have hgrooved := htrace.grooved_of_switchSimple
+          ((ManufacturedReflector.flip R).orientedRoute_simple reference)
+        rw [hroute] at hgrooved
+        exact ⟨reference, hreferencePaths,
+          hroute, hfinish, hgrooved⟩
+
 /-- If the route selected by `selector` is grooved both in `selector` and in
 `state`, then the action-switch tongue agrees.  Consequently both vectors
 select exactly the same outward route and the same far endpoint. -/
@@ -389,6 +516,139 @@ def ManufacturedReflector.FacingDiversion
     arrive state passage.2 ≠ (passage.1, state) ∧
     passage.1 % 3 = 0
 
+/-- A facing obstruction on the route selected by the current state is never
+the flip reflector's private action mouth: that arm is selected and therefore
+already grooved.  Every such obstruction is an oriented occurrence of a
+genuine reusable support passage. -/
+theorem ManufacturedReflector.current_facing_has_support_witness
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (state : Tongues)
+    (hfacing : A.FacingDiversion state state) :
+    ∃ oriented ∈ A.orientedRoute state,
+      arrive state oriented.2 ≠ (oriented.1, state) ∧
+      oriented.1 % 3 = 0 ∧
+      ∃ path ∈ A.toSupported.paths, ∃ old ∈ path,
+        oriented = old ∨ oriented = (old.2, old.1) := by
+  obtain ⟨oriented, horiented, hbroken, hstem⟩ := hfacing
+  refine ⟨oriented, horiented, hbroken, hstem, ?_⟩
+  cases A with
+  | stay R =>
+      change oriented ∈ R.runway ++ [(R.mouth, R.arm)] at horiented
+      change ∃ path ∈ [R.runway, [(R.mouth, R.arm)]],
+        ∃ old ∈ path,
+          oriented = old ∨ oriented = (old.2, old.1)
+      rcases List.mem_append.mp horiented with hrunway | hcore
+      · exact ⟨R.runway, by simp, oriented, hrunway, Or.inl rfl⟩
+      · simp only [List.mem_singleton] at hcore
+        subst oriented
+        exact ⟨[(R.mouth, R.arm)], by simp,
+          (R.mouth, R.arm), List.mem_cons_self, Or.inl rfl⟩
+  | flip R =>
+      change ∃ path ∈ [R.runway, R.candy], ∃ old ∈ path,
+        oriented = old ∨ oriented = (old.2, old.1)
+      by_cases hselected :
+          state R.actionSwitch = bval R.firstArm
+      · simp only [ManufacturedReflector.orientedRoute, hselected,
+          if_pos] at horiented
+        rcases List.mem_append.mp horiented with hrunway | hcore
+        · exact ⟨R.runway, by simp, oriented, hrunway, Or.inl rfl⟩
+        · rcases List.mem_cons.mp hcore with hhead | hcandy
+          · subst oriented
+            exact (hbroken
+              (R.firstArm_groove_of_selected state hselected)).elim
+          · exact ⟨R.candy, by simp, oriented, hcandy, Or.inl rfl⟩
+      · have hsecond :
+            state R.actionSwitch = bval R.secondArm := by
+          rcases R.selected_arm state with hfirst | hsecond
+          · exact absurd hfirst hselected
+          · exact hsecond
+        simp only [ManufacturedReflector.orientedRoute, hselected,
+          if_false] at horiented
+        rcases List.mem_append.mp horiented with hrunway | hcore
+        · exact ⟨R.runway, by simp, oriented, hrunway, Or.inl rfl⟩
+        · rcases List.mem_cons.mp hcore with hhead | hreverse
+          · subst oriented
+            exact (hbroken
+              (R.secondArm_groove_of_selected state hsecond)).elim
+          · obtain ⟨old, hold, hEq⟩ :=
+              source_of_mem_reversePassages hreverse
+            exact ⟨R.candy, by simp, old, hold, Or.inr hEq⟩
+
+/-- Provenance of a current-route facing obstruction.  It is a support groove
+that changed between the second reflector's base and activated states.  The
+unique responsible event is therefore either the final repeated-mouth event,
+or one outward exploration passage.  In the outward case the changing lazy
+passage must exit through the facing passage's stem, so the contact is
+literally backward relative to that old oriented route. -/
+theorem ManufacturedReflector.current_facing_change_location
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (base state : Tongues)
+    (hbase : B.baseState = base)
+    (hactivated : state = B.activatedState)
+    (hpaths : PathGrooves A.toSupported.paths base)
+    (hfacing : A.FacingDiversion state state) :
+    ∃ oriented ∈ A.orientedRoute state,
+      arrive state oriented.2 ≠ (oriented.1, state) ∧
+      oriented.1 % 3 = 0 ∧
+      ∃ path ∈ A.toSupported.paths, ∃ old ∈ path,
+        (oriented = old ∨ oriented = (old.2, old.1)) ∧
+        (passageSwitch oriented = B.preReturn.1 / 3 ∨
+          ∃ approach p suffix u v,
+            B.exploration =
+              approach ++ (p, oriented.1) :: suffix ∧
+            passageSwitch (p, oriented.1) =
+              passageSwitch oriented ∧
+            PhysicalTrace w (e, B.baseState) approach (p, u) ∧
+            arrive u p = (oriented.1, v) ∧
+            v (p / 3) ≠ u (p / 3)) := by
+  obtain ⟨oriented, horiented, hbroken, hstem,
+      path, hpath, old, hold, horient⟩ :=
+    A.current_facing_has_support_witness state hfacing
+  have holdBase := hpaths path hpath old hold
+  have horientedBase :
+      arrive base oriented.2 = (oriented.1, base) := by
+    rcases horient with hsame | hreverse
+    · simpa [hsame] using holdBase
+    · simpa [hreverse] using groove_forward holdBase
+  have hchange :=
+    broken_groove_changes_switch horientedBase hbroken
+  have hchangeB :
+      B.activatedState (passageSwitch oriented) ≠
+        B.baseState (passageSwitch oriented) := by
+    intro hEq
+    apply hchange
+    calc
+      state (passageSwitch oriented) =
+          B.activatedState (passageSwitch oriented) :=
+        congrFun hactivated (passageSwitch oriented)
+      _ = B.baseState (passageSwitch oriented) := hEq
+      _ = base (passageSwitch oriented) :=
+        congrFun hbase (passageSwitch oriented)
+  refine ⟨oriented, horiented, hbroken, hstem,
+    path, hpath, old, hold, horient, ?_⟩
+  rcases B.activated_change_location hchangeB with
+      hreturn | houtward
+  · exact Or.inl hreturn
+  · obtain ⟨approach, p, x, suffix, u, v,
+      hsplit, hswitch, htrace, harrive,
+      _hbefore, _hafter, hchanged⟩ := houtward
+    have hpSwitch : p / 3 = passageSwitch oriented := by
+      simpa [passageSwitch] using hswitch
+    have hchangedP : v (p / 3) ≠ u (p / 3) := by
+      rw [hpSwitch]
+      exact hchanged
+    obtain ⟨_hpBranch, hx, _hv, _hback⟩ :=
+      changed_arrival_is_trailing harrive hchangedP
+    have hxStem : x = oriented.1 := by
+      simp only [passageSwitch] at hpSwitch
+      omega
+    rw [hxStem] at hsplit hswitch harrive
+    exact Or.inr ⟨approach, p, suffix, u, v,
+      hsplit, hswitch, htrace, harrive, hchangedP⟩
+
 /-- Named form of `repair_or_facing_diversion`. -/
 theorem ManufacturedReflector.repair_or_facing_diversion_named
     {w : Wiring} {g e : Nat}
@@ -402,6 +662,67 @@ theorem ManufacturedReflector.repair_or_facing_diversion_named
       PathGrooves A.toSupported.paths finalState := by
   simpa [ManufacturedReflector.FacingDiversion] using
     A.repair_or_facing_diversion selector state hpaths
+
+/-- **Current-route repair.**  Unlike the selector-frozen form above, this
+replays the route chosen by the train's current action tongue.  The aligned
+reference supplied by `current_route_reference` removes the private action
+switch as a spurious obstruction.  Hence either a genuinely broken passage
+on the current route is reached facing-first, or the reflector repairs and
+completes to the opposite boundary. -/
+theorem ManufacturedReflector.repair_current_route_or_facing
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (base state : Tongues)
+    (hpaths : PathGrooves A.toSupported.paths base) :
+    A.FacingDiversion state state ∨
+    ∃ travel finalState,
+      stepN w travel (g, state) =
+        some (e, A.toSupported.action.apply finalState) ∧
+      PathGrooves A.toSupported.paths finalState := by
+  obtain ⟨reference, hreferencePaths, hroute, hfinish,
+      hreferenceRouteGrooved⟩ :=
+    A.current_route_reference base state hpaths
+  have hreferenceTrace :=
+    A.orientedRoute_trace reference hreferencePaths
+  rw [hroute, hfinish] at hreferenceTrace
+  have hsimple := A.orientedRoute_simple state
+  rcases hreferenceTrace.repair_forward_damage_or_facing
+      hsimple hreferenceRouteGrooved state with hfacing | hrepaired
+  · exact Or.inl (by
+      simpa [ManufacturedReflector.FacingDiversion] using hfacing)
+  · right
+    obtain ⟨finalState, hrepairTrace, hfinalRouteGrooved⟩ := hrepaired
+    have hfinalPaths : PathGrooves A.toSupported.paths finalState :=
+      A.support_grooves_of_orientedRoute state finalState
+        hfinalRouteGrooved
+    have hreferenceRouteGrooved' :
+        PassagesGrooved reference (A.orientedRoute reference) := by
+      rw [hroute]
+      exact hreferenceRouteGrooved
+    have hfinalReferenceRouteGrooved :
+        PassagesGrooved finalState (A.orientedRoute reference) := by
+      rw [hroute]
+      exact hfinalRouteGrooved
+    have horiented := A.oriented_data_eq_of_route_grooved
+      reference finalState hreferenceRouteGrooved'
+        hfinalReferenceRouteGrooved
+    have hrouteFinal := A.orientedRoute_trace finalState hfinalPaths
+    have hrouteFinal' : PhysicalTrace w (g, finalState)
+        (A.orientedRoute state)
+        (A.orientedFinish state, finalState) := by
+      rw [horiented.1, horiented.2, hroute, hfinish] at hrouteFinal
+      exact hrouteFinal
+    have hsplit : A.orientedRoute finalState =
+        A.orientedRoute state ++ [] := by
+      rw [horiented.1, hroute]
+      simp
+    obtain ⟨tailSteps, _hlen, htail⟩ :=
+      A.complete_after_oriented_prefix finalState hfinalPaths
+        hsplit hrouteFinal'
+    refine ⟨(A.orientedRoute state).length + tailSteps,
+      finalState, ?_, hfinalPaths⟩
+    rw [stepN_add, hrepairTrace.sound]
+    exact htail
 
 /-- **Global repair residual.**  Lift the damaged-reflector macro dichotomy
 all the way back to the original train start.  After the two manufactured
@@ -428,7 +749,7 @@ theorem long_run_eventually_periodic_or_facing_diversion_or_repaired
         stepN w secondTravel (e, stateA) = some (start.1, stateB) ∧
         PathGrooves B.toSupported.paths stateB ∧
         A.ForwardOrientedFault B ∧
-        (A.FacingDiversion stateA stateB ∨
+        (A.FacingDiversion stateB stateB ∨
           ∃ repairTravel repaired,
             stepN w (firstTravel + secondTravel + repairTravel) start =
               some (e, A.toSupported.action.apply repaired) ∧
@@ -443,7 +764,7 @@ theorem long_run_eventually_periodic_or_facing_diversion_or_repaired
     refine ⟨A, B, stateA, stateB, firstTravel, secondTravel,
       hbaseA, hactivatedA, hreachA, hgroovesA,
       hbaseB, hactivatedB, hreachB, hgroovesB, hforward, ?_⟩
-    rcases A.repair_or_facing_diversion_named
+    rcases A.repair_current_route_or_facing
         stateA stateB hgroovesA with hfacing | hrepaired
     · exact Or.inl hfacing
     · right
