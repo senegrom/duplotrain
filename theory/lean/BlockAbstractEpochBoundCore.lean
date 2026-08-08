@@ -75,8 +75,8 @@ theorem blockCoreTrueCount_eq_endpoint : ∀ bits : List Bool,
         simp [blockCoreTrueCount, endpointTrueCount, ih]
 
 /-- Full-edge plus auxiliary-bit code. -/
-open Classical in
 noncomputable def blockCoreAbstractCode
+    (m : Machine) (e r0 : Nat → Nat)
     (edges : List Nat) (aux : Nat → List Bool) (k : Nat) :
     List Bool × List Bool :=
   (blockCoreSeparate (endpointFullBits m e r0 edges k), aux k)
