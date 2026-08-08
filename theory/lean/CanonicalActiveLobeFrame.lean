@@ -33,10 +33,11 @@ structure FiniteEpochFrame
     reg m e r0 k c ∈ slots
 
 /-- Canonical occupied lobe representatives whose cells are written. -/
-open Classical in
 noncomputable def canonicalActiveLobes
-    (lo hi : Nat) (slots : List Nat) (k0 : Nat) : List Nat :=
-  (canonicalSupportEdges m e r0 slots k0).filter fun a =>
+    (m : Machine) (e r0 : Nat → Nat)
+    (lo hi : Nat) (slots : List Nat) (k0 : Nat) : List Nat := by
+  classical
+  exact (canonicalSupportEdges m e r0 slots k0).filter fun a =>
     m.cellOf (m.bar a) = m.cellOf a ∧
       CellWrittenIn m e r0 lo hi (m.cellOf a)
 
@@ -89,7 +90,7 @@ theorem canonicalSupportEdge_mem_slots
   classical
   have hc : s ∈ canonicalEdgesCore m slots :=
     (List.mem_filter.mp hs).1
-  exact (mem_canonicalEdgesCore_iff.mp hc).1
+  exact ((mem_canonicalEdgesCore_iff (m := m)).mp hc).1
 
 /-- Occupancy of a lobe places at least one endpoint in the cell's register. -/
 theorem occupied_lobes_same_cell_sameEdge
@@ -281,7 +282,7 @@ theorem exists_canonicalActiveLobe
     (occupied_sameEdge_iff m e r0 hag).mp haOcc
   have hgSupport : g ∈ canonicalSupportEdges m e r0 slots k0 := by
     classical
-    exact List.mem_filter.mpr ⟨hg, hgOcc⟩
+    exact List.mem_filter.mpr ⟨hg, decide_eq_true hgOcc⟩
   have haLobe : m.cellOf (m.bar a) = m.cellOf a := by
     rw [haCell]
     exact haLoop
