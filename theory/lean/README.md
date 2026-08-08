@@ -1,8 +1,8 @@
 # Formal proofs (Lean 4)
 
-One hundred and four libraries, all self-contained (no Mathlib), all
-sorry-free, honestly conditional where marked.  Core five below, then
-the satellites:
+One hundred and thirty-nine libraries, all self-contained (no
+Mathlib), all sorry-free, honestly conditional where marked.  Core
+five below, then the satellites:
 
 * `LobeDichotomy.lean` — **every cycle cell is a Gray flipper or
   foreign-valued.**  A slot can only be delivered by reading its
@@ -127,7 +127,23 @@ the satellites:
   echo machine whose configuration-driven pin words reproduce
   `stepN`'s tongue states (the T9 compilation, partially built in
   `ConcreteMachine` / `ConcreteCascadeFacts` / `ConcreteFiniteBounds`)
-  is the open step of this route.
+  is the open step of this route.  Two sharpenings landed since:
+  the **Fibonacci capacity** chain (`FibonacciSparseBound` /
+  `TreeCapacitySevenTenths` / `RelevantFibonacciNBound` /
+  `RelevantFibonacciPhysicalBound`) lowers the per-epoch code to
+  no-adjacent sparse words, giving
+  `T ≤ (2N+1)·fibBalancedCapacity N + 4` for snapshots and
+  `T = O(N³·(√(2φ))^N)` for physical tongue vectors — exponential
+  base ≈ **1.79891** — under the same compilation interface; and the
+  **concrete compiler chain** (`DescentSimplicity` — landed cascades
+  never revisit a switch; `DescentRouteCatalogue` — canonical routes;
+  `ConcreteTreeCodes` / `ConcreteTreeRetrace` / `ConcreteAscentTrace`
+  / `ConcreteTraceRegisters` / `ConcreteEchoRun` /
+  `ConcreteCertifiedEchoRun` — **`certifiedConcreteEcho_isRun`: every
+  certified segmented concrete run IS a run of the canonical echo
+  machine**, the central compiler theorem) now builds the T9
+  instance; what remains is producing the `CertifiedConcreteEchoRun`
+  certificate from raw `stepN` dynamics.
 
 * `LinearBound.lean` — **snapshots ≤ #cells + #alts + 1**, for any
   alternation list covering the prefix: the unconditional accounting
