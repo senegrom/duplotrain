@@ -1,8 +1,8 @@
 # Formal proofs (Lean 4)
 
-Twenty libraries, all self-contained (no Mathlib).  Core five below;
-plus the accounting/monovariant satellites (all sorry-free, honestly
-conditional where marked):
+Thirty-four libraries, all self-contained (no Mathlib).  Core five
+below; plus the accounting/monovariant satellites (all sorry-free,
+honestly conditional where marked):
 
 * `LoneWriter.lean` — **m ≠ 1 on cycles: the lone writer freezes.**
   If every productive step of a periodic tail writes into a single
@@ -49,6 +49,27 @@ conditional where marked):
   ≤ `r` times in a phase, the phase has length
   ≤ `r·(2·#cells+1)²`: any uniform pair-multiplicity bound gives a
   polynomial state bound.
+
+* The **support-epoch campaign** (`ReversalFacts`, `MonotoneSupport`,
+  `SupportSize`, `HiddenFibre` / `HiddenAbsorb` / `HiddenDichotomy`,
+  `LobeAbsorption`, `TreeReplay` / `TreeEpochCode` / `RootRank`,
+  `ComponentCapacity` / `ProfileCodeBound` /
+  `ThreeQuarterArithmetic` / `EpochAggregation`) — toward a
+  subexponential ceiling `f ≤ poly · 2^(3N/4)`.  Proved outright:
+  occupied support only ever shrinks, so along any run there are at
+  most `#edges + 1` distinct support vectors (`support_epoch_bound`),
+  and occupied edges inject into cells (`occupied_edges_le_cells`);
+  a productive step whose cell-projection stalls is a parallel-edge
+  move that is either a lobe Gray-flip (two in a row absorb —
+  `two_hidden_preserved_absorb`) or permanently empties its old edge
+  (`hidden_drop_forever`); within one support epoch, tree components
+  with a decreasing-rank certificate replay their whole snapshot from
+  the choice of one full edge (`tree_epoch_count`), with capacity²
+  ≤ `2^#cells` (`treeCapacity_square`).  The capstone aggregation
+  (`encoded_three_quarter_bound`, `aggregate_three_quarter_epochs`)
+  is **conditional**: it still assumes states inject into the
+  projected code plus active-lobe bits — that injection is the open
+  step of this route.
 
 * `LinearBound.lean` — **snapshots ≤ #cells + #alts + 1**, for any
   alternation list covering the prefix: the unconditional accounting

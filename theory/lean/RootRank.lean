@@ -31,23 +31,31 @@ theorem rootedCells_of_rank
     (htoward : ∀ c ∈ cells, RankedToward m e r0 k f cells rank c) :
     RootedCells m e r0 k f cells := by
   intro c hc
-  have hmain : ∀ n c, rank c = n → c ∈ cells →
+  have hmain : ∀ N n c, n ≤ N → rank c = n → c ∈ cells →
       RootedAt m e r0 k f c := by
-    intro n
-    induction n using Nat.strong_induction_on with
-    | h n ih =>
-        intro c hrank hc
+    intro N
+    induction N with
+    | zero =>
+        intro n c hn hrank hc
+        rcases htoward c hc with hleft | hright | ⟨hnfull, hmem, hlt⟩
+        · rw [hleft]
+          exact RootedAt.left
+        · rw [hright]
+          exact RootedAt.right
+        · rw [hrank] at hlt
+          omega
+    | succ N ihN =>
+        intro n c hn hrank hc
         rcases htoward c hc with hleft | hright | ⟨hnfull, hmem, hlt⟩
         · rw [hleft]
           exact RootedAt.left
         · rw [hright]
           exact RootedAt.right
         · apply RootedAt.step c hnfull
-          apply ih (rank (m.cellOf (m.bar (reg m e r0 k c))))
-            (by simpa [hrank] using hlt)
-          · rfl
-          · exact hmem
-  exact hmain (rank c) c rfl hc
+          exact ihN (rank (m.cellOf (m.bar (reg m e r0 k c))))
+            (m.cellOf (m.bar (reg m e r0 k c)))
+            (by rw [hrank] at hlt; omega) rfl hmem
+  exact hmain (rank c) (rank c) c (Nat.le_refl _) rfl hc
 
 /-- A rank certificate varying with time constructs a `TreeBlockCert`. -/
 def treeBlockOfRank
