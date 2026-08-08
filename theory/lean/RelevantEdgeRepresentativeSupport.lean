@@ -35,6 +35,10 @@ private theorem edgeRep_nodup_subset_length
         exact (List.mem_erase_of_ne hzx).mpr hzy
       have hle := ih hnd.2 hsub'
       rw [List.length_erase_of_mem hx] at hle
+      have hpos : 0 < ys.length := by
+        cases ys with
+        | nil => cases hx
+        | cons _ _ => simp
       simp only [List.length_cons]
       omega
 

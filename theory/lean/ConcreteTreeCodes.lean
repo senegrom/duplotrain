@@ -56,7 +56,7 @@ theorem rootCode_right_of_mouth
     rootCode w a = 2 * b + 1 := by
   unfold rootCode
   rw [mouthPartner_eq_of_paired h]
-  simp [hba]
+  rw [if_neg (by omega : ¬ a < b)]
 
 /-- The root code intertwines the physical mouth pairing and `mateNat`. -/
 theorem rootCode_mouth_partner
@@ -86,7 +86,9 @@ theorem properMouthRoot_partner
   rw [hpartner]
   constructor
   · exact ⟨r, mouthPaired_symm hrs, hrsne.symm⟩
-  · exact mouthPartner_invol_of_paired hrs
+  · have h := mouthPartner_invol_of_paired hrs
+    rw [hpartner] at h
+    exact h
 
 /-- Root coding is injective on proper mouth roots. -/
 theorem rootCode_injective_on_proper
@@ -135,7 +137,7 @@ theorem rootCode_injective_on_proper
         rw [hpb] at hi
         exact hi
       rw [hs, hsbBack] at hsaBack
-      exact hsaBack
+      exact hsaBack.symm
 
 /-- Every branch in one realised cascade has the same canonical root. -/
 theorem entryRoot_eq_of_mem_entryAction

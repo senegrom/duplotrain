@@ -102,7 +102,7 @@ theorem other_entryAction_preserves_agrees
   exact hagree b hb
 
 /-- Execute a finite sequence of canonical entry actions. -/
-def runEntryActions (w : Wiring) : List Nat → Tongues → Tongues
+noncomputable def runEntryActions (w : Wiring) : List Nat → Tongues → Tongues
   | [], t => t
   | q :: qs, t =>
       runEntryActions w qs (pinList (entryAction w q) t)

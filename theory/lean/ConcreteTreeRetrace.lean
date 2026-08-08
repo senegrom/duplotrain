@@ -33,7 +33,7 @@ theorem pinList_agrees_of_switch_nodup
         have havoid : ∀ c ∈ rest, c / 3 ≠ a / 3 := by
           intro c hc hca
           apply hnd'.1
-          exact List.mem_map.mpr ⟨c, hc, hca.symm⟩
+          exact List.mem_map.mpr ⟨c, hc, hca⟩
         unfold pinList
         rw [pinList_apply_of_avoids_switch
           rest (pin t a) (a / 3) havoid]
@@ -122,5 +122,6 @@ theorem retrace_after_other_roots_tongues
         (fun c => c.2) =
       some (runEntryActions w entries t') := by
   rw [retrace_after_other_roots hd hentry entries hentries hroots]
+  rfl
 
 end GeneralN

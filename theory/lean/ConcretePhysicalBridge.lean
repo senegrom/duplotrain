@@ -6,15 +6,15 @@ import FiniteListBounds
 # Correct full physical-run bridge
 
 Every physical tongue vector in a live run is either a cascade-boundary vector
-or a prefix of the fixed overwrite word of the current cascade.  A concrete
+or a prefixAt of the fixed overwrite word of the current cascade.  A concrete
 compilation therefore supplies, for each sampled physical time:
 
 * its owning abstract echo step;
-* its prefix length inside that step's cascade word; and
-* equality of the actual tongue vector with that prefix overwrite.
+* its prefixAt length inside that step's cascade word; and
+* equality of the actual tongue vector with that prefixAt overwrite.
 
 The abstract strict bound, deterministic replay, overwrite idempotence and the
-`N+1` prefix positions then give a strict-base bound for all physical tongue
+`N+1` prefixAt positions then give a strict-base bound for all physical tongue
 vectors, not merely the cascade boundaries.
 -/
 
@@ -33,7 +33,7 @@ structure PhysicalOverwriteCompilation
   actionOf : Nat × List Nat → List Nat
   initialTongues : Tongues
   owner : Nat → Nat
-  prefix : Nat → Nat
+  prefixAt : Nat → Nat
   run : Echo.IsRun machine echoEntry initialRegister
   initialRegister_wellFormed :
     ∀ c, machine.cellOf (initialRegister c) = c
@@ -49,14 +49,14 @@ structure PhysicalOverwriteCompilation
     globalLo ≤ owner x ∧ owner x ≤ globalHi
   partner_cover : ∀ k,
     machine.star (machine.cellOf (echoEntry k)) ∈ cells
-  prefix_length : ∀ x ∈ sample, prefix x ≤ N
+  prefix_length : ∀ x ∈ sample, prefixAt x ≤ N
   concrete_live : ∀ x ∈ sample, (stepN w x c0).isSome
   physical_tongues : ∀ x ∈ sample,
     tonguesAt w c0 x =
       pinList
         ((actionOf
           (Echo.configSnap machine echoEntry initialRegister
-            cells (owner x))).take (prefix x))
+            cells (owner x))).take (prefixAt x))
         (pinTrajectory
           (fun n => actionOf
             (Echo.configSnap machine echoEntry initialRegister cells n))
@@ -88,7 +88,7 @@ theorem strict_physical_bound_of_overwriteCompilation
     comp.entries sample comp.frame
     comp.cells_length comp.slots_length
     comp.entries_nodup comp.entries_length
-    comp.owner comp.prefix comp.owner_entry comp.owner_range
+    comp.owner comp.prefixAt comp.owner_entry comp.owner_range
     comp.partner_cover comp.actionOf comp.initialTongues
     observed comp.prefix_length comp.physical_tongues hndObserved
 

@@ -87,7 +87,7 @@ theorem descent_suffix
           Descent.cons hp hlink hp' hrest, Nat.le_refl _⟩
       · obtain ⟨u, qs, hsuffix, hlen⟩ := ih hb
         refine ⟨u, qs, hsuffix, ?_⟩
-        simp only [List.length_cons]
+        simp only [List.length_cons] at hlen ⊢
         omega
 
 /-- **Simplicity.**  The switch indices visited by a landed cascade are
@@ -104,7 +104,10 @@ theorem descent_switch_path_nodup
       simp only [List.map_cons, List.nodup_cons]
       constructor
       · intro hmem
-        obtain ⟨b, hb, hswitch⟩ := List.mem_map.mp hmem
+        have hmem' : p / 3 ∈ (p' :: ps).map (fun b => b / 3) := by
+          rw [List.map_cons]
+          exact hmem
+        obtain ⟨b, hb, hswitch⟩ := List.mem_map.mp hmem'
         obtain ⟨u, qs, hsuffix, hsuffixLen⟩ :=
           descent_suffix hrest hb
         have hfull : Descent w t p (p' :: ps) s t' :=
@@ -113,7 +116,9 @@ theorem descent_switch_path_nodup
           hfull hsuffix hswitch.symm
         simp only [List.length_cons] at hsameLen hsuffixLen
         omega
-      · exact ih
+      · have ih' := ih
+        simp only [List.map_cons, List.nodup_cons] at ih'
+        exact ih'
 
 /-- Every switch on a bounded landed cascade belongs to the first `N`
 switches. -/

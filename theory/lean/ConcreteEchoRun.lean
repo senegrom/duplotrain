@@ -1,4 +1,5 @@
 import ConcreteEchoStep
+import EchoConfiguration
 
 /-!
 # From the physical last-writer register to an echo run
@@ -16,11 +17,11 @@ is exactly `Echo.IsRun` for `canonicalEchoMachine`.
 namespace GeneralN
 
 /-- Physical root-cell assignment used by the canonical machine. -/
-def physicalCell (w : Wiring) (p : Nat) : Nat :=
+noncomputable def physicalCell (w : Wiring) (p : Nat) : Nat :=
   rootCode w (entryRoot w p)
 
 /-- Last physical ascent entry of a cell after entries `0,…,k`. -/
-def physicalReg (w : Wiring)
+noncomputable def physicalReg (w : Wiring)
     (entry : Nat → Nat) (initial : Nat → Nat) :
     Nat → Nat → Nat
   | 0, c => if physicalCell w (entry 0) = c then entry 0 else initial c
@@ -55,10 +56,12 @@ theorem encoded_reg_eq
       intro c
       simp [Echo.reg, physicalReg, encodedEntries, encodedInitial,
         physicalCell, canonicalPhysicalCellOf]
+      split <;> rfl
   | succ n ih =>
       intro c
       simp [Echo.reg, physicalReg, encodedEntries, encodedInitial,
         physicalCell, canonicalPhysicalCellOf, ih]
+      split <;> rfl
 
 /-- Physical initial registers are well-formed exactly when their entries
 belong to their indexed root cells. -/
@@ -70,6 +73,7 @@ theorem encodedInitial_wellFormed
   intro c
   simp [encodedInitial, physicalCell, canonicalPhysicalCellOf,
     hinitial c]
+  exact hinitial c
 
 /-- The physical last-writer recurrence. -/
 def IsPhysicalEchoRun (w : Wiring)
@@ -92,7 +96,8 @@ theorem canonicalEcho_isRun
   simp only [encodedEntries]
   rw [encoded_reg_eq]
   simpa [canonicalEchoMachine, encodedMachine, physicalCell,
-    canonicalPhysicalCellOf] using hencoded
+    canonicalPhysicalCellOf, encodedBar_encodeSlot,
+    encodedCellOf_encodeSlot] using hencoded
 
 /-- A physical register holding a realised entry is encoded as that same
 canonical echo slot. -/

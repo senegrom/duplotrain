@@ -1,5 +1,6 @@
 import RelevantEdgeRepresentativeSupport
 import RelevantFibonacciGlobalBound
+import FibonacciCapacityMonotone
 
 /-!
 # Global Fibonacci bound using one support coordinate per physical edge

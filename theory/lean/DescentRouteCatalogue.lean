@@ -76,6 +76,7 @@ noncomputable def chosenDescentWitness
     DescentWitness w p :=
   Classical.choice (descentWitness_nonempty h)
 
+open Classical in
 /-- Canonical finite branch-pin word of a realised entry; unrealised ports
 receive the empty word. -/
 noncomputable def entryAction (w : Wiring) (p : Nat) : List Nat :=
@@ -83,12 +84,14 @@ noncomputable def entryAction (w : Wiring) (p : Nat) : List Nat :=
     p :: (chosenDescentWitness w p h).tail
   else []
 
+open Classical in
 /-- Canonical root switch of a realised entry. -/
 noncomputable def entryRoot (w : Wiring) (p : Nat) : Nat :=
   if h : IsDescentEntry w p then
     descentRoot p (chosenDescentWitness w p h).tail
   else 0
 
+open Classical in
 /-- Canonical landing stem of a realised entry. -/
 noncomputable def entryLanding (w : Wiring) (p : Nat) : Nat :=
   if h : IsDescentEntry w p then

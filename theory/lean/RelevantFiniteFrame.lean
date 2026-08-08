@@ -1,4 +1,5 @@
 import MonotoneSupport
+import PairedNoFullReachFreeze
 
 /-!
 # Constructible finite relevant frames

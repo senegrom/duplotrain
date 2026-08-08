@@ -19,11 +19,11 @@ cascades and that each partner descent reads the most recent entry register.
 namespace GeneralN
 
 /-- Canonical physical branch-port-to-cell assignment. -/
-def canonicalPhysicalCellOf (w : Wiring) (p : Nat) : Nat :=
+noncomputable def canonicalPhysicalCellOf (w : Wiring) (p : Nat) : Nat :=
   rootCode w (entryRoot w p)
 
 /-- Total canonical echo machine associated to the concrete wiring. -/
-def canonicalEchoMachine (w : Wiring) : Echo.Machine :=
+noncomputable def canonicalEchoMachine (w : Wiring) : Echo.Machine :=
   encodedMachine w (canonicalPhysicalCellOf w)
 
 /-- Canonical overwrite word emitted by one finite echo configuration. -/
@@ -112,7 +112,7 @@ theorem canonicalEchoMachine_star_entry
     mouthPaired_right_unique hmouth hcanonical
   subst partner
   simp only [canonicalEchoMachine_cell, canonicalEchoMachine,
-    encodedMachine]
+    encodedMachine, encodedCellOf_encodeSlot, canonicalPhysicalCellOf]
   exact rootCode_mouth_partner hcanonical hne
 
 /-- Full local mouth compatibility with another realised slot in the partner

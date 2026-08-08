@@ -5,7 +5,7 @@ import RelevantEdgeFibonacciConfigBound
 # Best current full physical tongue-vector bound
 
 Using one support coordinate per physical jump edge improves the finite
-configuration count inside the existing overwrite-prefix bridge.  The direct
+configuration count inside the existing overwrite-prefixAt bridge.  The direct
 physical bound is
 
     T ≤ 2*(N+1)*(2*N)*((N+1)*fibBalancedCapacity N + 4).
@@ -36,7 +36,7 @@ private theorem edgeFibPhysical_sum_le
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-/-- **Best current all-prefix bound over a relevant finite echo trace.** -/
+/-- **Best current all-prefixAt bound over a relevant finite echo trace.** -/
 theorem relevant_echo_physical_prefix_edge_fibonacci_bound
     (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c)
@@ -48,7 +48,7 @@ theorem relevant_echo_physical_prefix_edge_fibonacci_bound
     (hslots : slots.length ≤ 2 * N)
     (hentriesNodup : entries.Nodup)
     (hentriesLength : entries.length ≤ 2 * N)
-    (owner prefix : Nat → Nat)
+    (owner prefixAt : Nat → Nat)
     (hownerEntry : ∀ x ∈ sample, e (owner x) ∈ entries)
     (hownerRange : ∀ x ∈ sample,
       globalLo ≤ owner x ∧ owner x ≤ globalHi)
@@ -57,12 +57,12 @@ theorem relevant_echo_physical_prefix_edge_fibonacci_bound
     (actionOf : Nat × List Nat → List Nat)
     (t0 : GeneralN.Tongues)
     (observed : Nat → GeneralN.Tongues)
-    (hprefix : ∀ x ∈ sample, prefix x ≤ N)
+    (hprefix : ∀ x ∈ sample, prefixAt x ≤ N)
     (hobserve : ∀ x ∈ sample,
       observed x =
         GeneralN.pinList
           ((actionOf (configSnap m e r0 cells (owner x))).take
-            (prefix x))
+            (prefixAt x))
           (GeneralN.pinTrajectory
             (fun n => actionOf (configSnap m e r0 cells n))
             t0 (owner x)))
@@ -91,7 +91,7 @@ theorem relevant_echo_physical_prefix_edge_fibonacci_bound
     obtain ⟨q, hq, rfl⟩ := List.mem_map.mp hs
     let configFibre := sample.filter (fun x => cfg (owner x) = q)
     have hconfigFibrePrefix : ∀ x ∈ configFibre,
-        prefix x ∈ List.range (N + 1) := by
+        prefixAt x ∈ List.range (N + 1) := by
       intro x hx
       have hxFilter : x ∈ sample.filter
           (fun y => cfg (owner y) = q) := by
@@ -101,16 +101,16 @@ theorem relevant_echo_physical_prefix_edge_fibonacci_bound
         have hp := hprefix x hxSample
         omega)
     let prefixSizes := finiteFibreSizes (List.range (N + 1))
-      prefix configFibre
+      prefixAt configFibre
     have hprefixSum : prefixSizes.sum = configFibre.length := by
       dsimp [prefixSizes]
       exact finiteFibreSizes_sum (List.range (N + 1))
-        prefix configFibre List.nodup_range hconfigFibrePrefix
+        prefixAt configFibre List.nodup_range hconfigFibrePrefix
     have hprefixEach : ∀ z ∈ prefixSizes, z ≤ 2 := by
       intro z hz
       dsimp [prefixSizes, finiteFibreSizes] at hz
       obtain ⟨r, hr, rfl⟩ := List.mem_map.mp hz
-      let prefixFibre := configFibre.filter (fun x => prefix x = r)
+      let prefixFibre := configFibre.filter (fun x => prefixAt x = r)
       have hsame : ∀ x ∈ prefixFibre,
           configSnap m e r0 cells (owner x) = q := by
         intro x hx
@@ -119,7 +119,7 @@ theorem relevant_echo_physical_prefix_edge_fibonacci_bound
             (fun y => cfg (owner y) = q) := by
           simpa only [configFibre] using hxOuter
         exact of_decide_eq_true (List.mem_filter.mp hxConfig).2
-      have hpref : ∀ x ∈ prefixFibre, prefix x = r := by
+      have hpref : ∀ x ∈ prefixFibre, prefixAt x = r := by
         intro x hx
         exact of_decide_eq_true (List.mem_filter.mp hx).2
       have hsampleOf : ∀ x ∈ prefixFibre, x ∈ sample := by
@@ -136,10 +136,10 @@ theorem relevant_echo_physical_prefix_edge_fibonacci_bound
       have hndPrefixFibre : (prefixFibre.map observed).Nodup := by
         dsimp [prefixFibre]
         exact map_filter_nodup observed
-          (fun x => prefix x = r) hndConfigFibre
+          (fun x => prefixAt x = r) hndConfigFibre
       have htwo := physical_prefix_fibre_length_le_two
         m e r0 hrun cells hpartnerCover actionOf t0
-        owner prefix observed q r prefixFibre hsame hpref
+        owner prefixAt observed q r prefixFibre hsame hpref
         (fun x hx => hobserve x (hsampleOf x hx))
         hndPrefixFibre
       simpa [finiteFibreSize, prefixFibre] using htwo
@@ -148,7 +148,9 @@ theorem relevant_echo_physical_prefix_edge_fibonacci_bound
     have hprefixLen : prefixSizes.length = N + 1 := by
       simp [prefixSizes, finiteFibreSizes]
     rw [hprefixLen] at hprefixBound
-    simpa [Nat.mul_comm] using hprefixBound
+    show configFibre.length ≤ 2 * (N + 1)
+    rw [Nat.mul_comm]
+    exact hprefixBound
   have hsampleBound := edgeFibPhysical_sum_le
     configSizes (2 * (N + 1)) hconfigEach
   rw [hconfigSum] at hsampleBound
@@ -176,7 +178,9 @@ theorem relevant_echo_physical_prefix_edge_fibonacci_bound
     have h := congrArg List.length hrepsConfig
     simpa using h
   have hsampleReps : sample.length ≤ (2 * (N + 1)) * reps.length := by
-    rwa [hlenReps] at hsampleBound
+    rw [← hlenReps] at hsampleBound
+    rw [Nat.mul_comm]
+    exact hsampleBound
   exact Nat.le_trans hsampleReps
     (Nat.mul_le_mul_left (2 * (N + 1)) hconfigBound)
 
@@ -198,7 +202,7 @@ theorem physical_edge_fibonacci_bound_of_compilation
         ((2*N) * ((N + 1) * Echo.fibBalancedCapacity N + 4)) := by
   let observed := fun k => tonguesAt w c0 k
   have hndObserved : (sample.map observed).Nodup := by
-    apply nodup_map_of_fibre sample observed
+    apply FiniteListBounds.nodup_map_of_fibre sample observed
       (fun k => VectorCount.restrict N (tonguesAt w c0 k))
     · intro i hi j hj heq
       exact congrArg (VectorCount.restrict N) heq
@@ -210,7 +214,7 @@ theorem physical_edge_fibonacci_bound_of_compilation
     comp.frame comp.full_edges_relevant
     comp.cells_length comp.slots_length
     comp.entries_nodup comp.entries_length
-    comp.owner comp.prefix comp.owner_entry comp.owner_range
+    comp.owner comp.prefixAt comp.owner_entry comp.owner_range
     comp.partner_cover comp.actionOf comp.initialTongues
     observed comp.prefix_length comp.physical_tongues hndObserved
 

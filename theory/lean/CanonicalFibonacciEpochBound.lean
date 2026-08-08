@@ -86,7 +86,8 @@ theorem relevant_canonical_preAbsorption_fibonacci_bound
     (hks : ∀ k ∈ ks, lo ≤ k ∧ k ≤ hi)
     (hnd : (ks.map (snap m e r0 cells)).Nodup) :
     ks.length ≤ fibBalancedCapacity cells.length := by
-  let finiteFrame := frame.toFiniteEpochFrame lo hi
+  let finiteFrame :=
+    ProperRelevantFiniteFrame.toFiniteEpochFrame m e r0 frame lo hi
   let lobes := canonicalActiveLobes m e r0 lo hi slots k0
   let projected := canonicalProjectedCells m e r0
     lo hi cells slots k0

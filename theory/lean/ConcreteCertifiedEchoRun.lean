@@ -19,7 +19,7 @@ so its endpoint must be the jump partner of the selected register.  This proves
 namespace GeneralN
 
 /-- Partner root-cell read after the ascent at time `k`. -/
-def tracePartnerCell {w : Wiring}
+noncomputable def tracePartnerCell {w : Wiring}
     (trace : ConcreteAscentTrace w) (k : Nat) : Nat :=
   mateNat (physicalCell w (trace.entry k))
 
@@ -60,8 +60,9 @@ theorem tracePartnerCell_eq_landingCode
   have hstar := canonicalEchoMachine_star_entry
     hp (trace.properRoot k)
   have hlanding := entryLanding_eq_of_descent (trace.descent k)
-  simpa [tracePartnerCell, physicalCell,
-    canonicalEchoMachine, canonicalPhysicalCellOf, hlanding] using hstar
+  simpa [tracePartnerCell, physicalCell, canonicalEchoMachine,
+    encodedMachine, encodedCellOf_encodeSlot, canonicalPhysicalCellOf,
+    hlanding] using hstar
 
 /-- The landing root of a proper current cascade is itself a proper mouth
 root. -/
@@ -127,7 +128,8 @@ theorem no_later_partner_cell_no_later_root
   intro i hiLo hiHi hroot
   apply hno i hiLo hiHi
   unfold physicalCell
-  rw [← hroot, hcell]
+  rw [← hroot]
+  exact hcell
 
 /-- Retrace an untouched physical initial register at the current partner
 root. -/
@@ -151,7 +153,8 @@ theorem initial_writer_retrace
     intro i hi hEq
     apply hno i hi
     unfold physicalCell
-    rw [← hEq, hfCell]
+    rw [← hEq]
+    exact hfCell
   have hagree := trace_initial_writer_agrees
     trace f hf k hnoRoot hinitial
   let witness := chosenDescentWitness w f hf
@@ -166,9 +169,8 @@ theorem initial_writer_retrace
     have hstem := stem_eq_three_mul_div hlandingStem
     rw [← hroot] at hstem
     omega
-  rw [entryAction_eq_of_descent hd,
-    entryRoot_eq_of_descent hd,
-    hlanding]
+  rw [entryAction_eq_of_descent hd, hlanding,
+    entryRoot_eq_of_descent hd]
   exact hret
 
 /-- **Central compiler theorem.**  Every certified segmented concrete run is
@@ -201,7 +203,8 @@ theorem certifiedConcreteEcho_isRun
       intro i hiLo hiHi hEq
       apply hjLast i hiLo hiHi
       unfold physicalCell
-      rw [← hEq, hjCell]
+      rw [← hEq]
+      exact hjCell
     let count := k - j
     have hjcount : j + count = k := by
       dsimp [count]
@@ -211,7 +214,7 @@ theorem certifiedConcreteEcho_isRun
         intro i hiLo hiHi
         apply hnoRoot i hiLo
         rwa [hjcount] at hiHi)
-      (by rwa [hjcount])
+      (by rw [hjcount]; exact hjRoot.symm)
     have hface := run.facing k (trace.entry j) (by
       simpa [trace, partner] using hreg)
     rw [hjcount] at hret
@@ -219,10 +222,24 @@ theorem certifiedConcreteEcho_isRun
     have hnext : trace.entry (k + 1) =
         wireBar w (trace.entry j) := by
       injection hface with h
-      exact h.symm
-    rw [hreg]
-    simpa [encodedEntries, trace, partner] using
-      congrArg encodeSlot hnext
+      exact (congrArg Prod.fst h).symm
+    have hstarcell : (canonicalEchoMachine w).star
+        ((canonicalEchoMachine w).cellOf (encodedEntries run.entry k)) =
+        partner := by
+      simp [encodedEntries, canonicalEchoMachine, encodedMachine,
+        encodedCellOf_encodeSlot, partner, trace, tracePartnerCell,
+        physicalCell, canonicalPhysicalCellOf]
+    rw [hstarcell]
+    have hreg' : Echo.reg (canonicalEchoMachine w)
+        (encodedEntries run.entry) run.initialRegister k partner =
+        encodeSlot (trace.entry j) := hreg
+    rw [hreg']
+    have hbar : (canonicalEchoMachine w).bar
+        (encodeSlot (trace.entry j)) =
+        encodeSlot (wireBar w (trace.entry j)) := by
+      simp [canonicalEchoMachine, encodedMachine, encodedBar_encodeSlot]
+    rw [hbar]
+    exact congrArg encodeSlot hnext
   · have hno : ∀ i, i ≤ k →
         physicalCell w (trace.entry i) ≠ partner := by
       intro i hi hEq
@@ -251,9 +268,22 @@ theorem certifiedConcreteEcho_isRun
     rw [hret] at hface
     have hnext : trace.entry (k + 1) = wireBar w f := by
       injection hface with h
-      exact h.symm
-    rw [hreg]
-    simpa [encodedEntries, trace, partner] using
-      congrArg encodeSlot hnext
+      exact (congrArg Prod.fst h).symm
+    have hstarcell : (canonicalEchoMachine w).star
+        ((canonicalEchoMachine w).cellOf (encodedEntries run.entry k)) =
+        partner := by
+      simp [encodedEntries, canonicalEchoMachine, encodedMachine,
+        encodedCellOf_encodeSlot, partner, trace, tracePartnerCell,
+        physicalCell, canonicalPhysicalCellOf]
+    rw [hstarcell]
+    have hreg' : Echo.reg (canonicalEchoMachine w)
+        (encodedEntries run.entry) run.initialRegister k partner =
+        encodeSlot f := hreg
+    rw [hreg']
+    have hbar : (canonicalEchoMachine w).bar (encodeSlot f) =
+        encodeSlot (wireBar w f) := by
+      simp [canonicalEchoMachine, encodedMachine, encodedBar_encodeSlot]
+    rw [hbar]
+    exact congrArg encodeSlot hnext
 
 end GeneralN

@@ -81,10 +81,10 @@ theorem canonical_reg_last_entry
     Echo.reg (canonicalEchoMachine w)
       (encodedEntries entry) r0 k c = encodeSlot (entry j) := by
   apply Echo.reg_last_write
-  · simpa [encodedEntries] using hc
+  · simpa [encodedEntries, physicalCell] using hc
   · exact hjk
   · intro i hij hik
-    simpa [encodedEntries] using hno i hij hik
+    simpa [encodedEntries, physicalCell] using hno i hij hik
 
 /-- If no physical ascent wrote cell `c`, its canonical echo register equals
 its arbitrary initial encoded slot. -/
@@ -96,7 +96,7 @@ theorem canonical_reg_initial
       (encodedEntries entry) r0 k c = r0 c := by
   apply reg_eq_initial_of_no_write
   intro i hi
-  simpa [encodedEntries] using hno i hi
+  simpa [encodedEntries, physicalCell] using hno i hi
 
 /-- All ascent entries from time zero through `k`. -/
 def entriesThrough (entry : Nat → Nat) (k : Nat) : List Nat :=

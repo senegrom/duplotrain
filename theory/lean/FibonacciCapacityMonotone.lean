@@ -11,6 +11,7 @@ theorem fibSparseCount_mono {a b : Nat} (hab : a ≤ b) :
     fibSparseCount a ≤ fibSparseCount b := by
   obtain ⟨d, rfl⟩ : ∃ d, b = a + d :=
     ⟨b - a, by omega⟩
+  clear hab
   induction d with
   | zero => exact Nat.le_refl _
   | succ d ih =>
@@ -34,6 +35,7 @@ theorem fibBalancedCapacity_mono {a b : Nat} (hab : a ≤ b) :
     fibBalancedCapacity a ≤ fibBalancedCapacity b := by
   obtain ⟨d, rfl⟩ : ∃ d, b = a + d :=
     ⟨b - a, by omega⟩
+  clear hab
   induction d with
   | zero => exact Nat.le_refl _
   | succ d ih =>

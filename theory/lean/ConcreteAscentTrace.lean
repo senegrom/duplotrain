@@ -109,7 +109,13 @@ theorem trace_boundary_after
           (start + n + 1) + 1 := by omega
       rw [hindex, hstep]
       rw [ih]
-      unfold entriesAfter
+      show pinList (entryAction w (trace.entry (start + n + 1)))
+          (runEntryActions w (entriesAfter trace.entry start n)
+            (trace.boundary (start + 1))) =
+        runEntryActions w
+          (entriesAfter trace.entry start n ++
+            [trace.entry (start + n + 1)])
+          (trace.boundary (start + 1))
       rw [runEntryActions_append_singleton]
 
 /-- If the interval contains no ascent of `start`'s root, it preserves all
@@ -137,7 +143,7 @@ theorem trace_last_writer_agrees
   apply runEntryActions_preserves_agrees hp
     (entriesAfter trace.entry start count) hentries hroots
   have hself := entryAction_self_agrees hp (trace.boundary start)
-  rw [← trace_boundary_succ trace start]
+  rw [trace_boundary_succ trace start]
   exact hself
 
 /-- **Trace-level last-writer retrace.**  If ascent `current = start+count`
@@ -169,12 +175,14 @@ theorem trace_last_writer_retrace
       3 * (lastOf f (trace.tail start) / 3) =
         3 * entryRoot w f := by
     rw [entryRoot_eq_of_descent hd]
+    rfl
   have hlandingStem := descent_landing_stem
     (trace.descent (start + count))
   have hlandingEq : trace.landing (start + count) =
       3 * entryRoot w f := by
     have hstem := stem_eq_three_mul_div hlandingStem
     rw [hlands] at hstem
+    dsimp [f]
     omega
   rw [entryAction_eq_of_descent hd,
     hlandingEq, ← hstartRoot]

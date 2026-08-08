@@ -109,6 +109,10 @@ private theorem fibSparse_nodup_subset_length
         exact (List.mem_erase_of_ne hzx).mpr hzy
       have hle := ih hnd.2 hsub'
       rw [List.length_erase_of_mem hx] at hle
+      have hpos : 0 < ys.length := by
+        cases ys with
+        | nil => cases hx
+        | cons _ _ => simp
       simp only [List.length_cons]
       omega
 
@@ -168,6 +172,8 @@ theorem fibSparse_capacity_balance : ∀ (A d : Nat),
                   Nat.add_left_comm] using hgrow
           _ = 2^(A+1) * fibSparseCount ((A+1)+d) := by
                 rw [Nat.pow_succ]
+                have hidx : A + 1 + d = A + d + 1 := by omega
+                rw [hidx]
                 simp [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm]
       have ih := fibSparse_capacity_balance (A+1) d
       have hexp : (A+1) + d/2 = A + (d+2)/2 := by omega
@@ -291,6 +297,10 @@ private theorem fibBlockCoreAbstract_nodup_subset_length
         exact (List.mem_erase_of_ne hzx).mpr hzy
       have hle := ih hnd.2 hsub'
       rw [List.length_erase_of_mem hx] at hle
+      have hpos : 0 < ys.length := by
+        cases ys with
+        | nil => cases hx
+        | cons _ _ => simp
       simp only [List.length_cons]
       omega
 

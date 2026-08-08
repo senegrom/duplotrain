@@ -182,9 +182,9 @@ theorem relevant_canonicalProjected_confirmed_cell
     m e r0 hgData.1
   have hxSlot : x ∈ slots := by
     rcases hxg with hxg | hxg
-    · rw [← hxg]
+    · rw [hxg]
       exact hgSlot
-    · rw [← hxg]
+    · rw [hxg]
       exact frame.bar_closed g hgSlot
   have hxCell : m.cellOf x ∈ cells := frame.slot_cell x hxSlot
   apply (mem_canonicalProjectedCells_iff m e r0).mpr
@@ -196,8 +196,8 @@ theorem relevant_canonicalProjected_confirmed_cell
     hfixed hk0 k hkLo hkHi a ha
   have hgx : SameEdge m g x := by
     rcases hxg with hxg | hxg
-    · exact Or.inl hxg.symm
-    · exact Or.inr hxg.symm
+    · exact Or.inl hxg
+    · exact Or.inr hxg
   have hga : SameEdge m g a := by
     rcases haOcc with haConf | hbarConf
     · have hxa : x = a :=
@@ -247,7 +247,8 @@ theorem relevant_canonical_preAbsorption_epoch_bound
     (hks : ∀ k ∈ ks, lo ≤ k ∧ k ≤ hi)
     (hnd : (ks.map (snap m e r0 cells)).Nodup) :
     blockCoreEighth ks.length ≤ 2^(7*cells.length+18) := by
-  let finiteFrame := frame.toFiniteEpochFrame lo hi
+  let finiteFrame :=
+    ProperRelevantFiniteFrame.toFiniteEpochFrame m e r0 frame lo hi
   let lobes := canonicalActiveLobes m e r0 lo hi slots k0
   let projected := canonicalProjectedCells m e r0
     lo hi cells slots k0
