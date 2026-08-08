@@ -452,6 +452,27 @@ snapshots frozen), m = 2 (show it is the Gray pair, ≤ 4 vectors —
 the steering law pins its walk to rails-and-stands; what remains is
 classifying the delivery orbit), and m ≥ 3 (show it cannot happen).
 
+## The strict-base ceiling: below 2^N unconditionally
+
+Independently of the N + O(1) program, the support-epoch campaign
+(merged from a parallel agent, repaired and verified) now proves a
+**register-snapshot ceiling with exponential base strictly below 2**,
+machine-checked and unconditional over any complete finite echo frame
+(`CanonicalUnconditionalGlobalBound.lean`):
+
+    T^8 ≤ (4N+2)^8 · 2^(7N+18),   i.e.   T ≤ poly(N) · 2^(0.875·N).
+
+The engine: linearly many support epochs (support only shrinks);
+inside a fixed support, no-full components freeze and tree components
+replay from a single full-edge choice, so states inject into a sparse
+code of capacity² ≤ 2^#cells; the first certified lobe-pair absorption
+starts a ≤ 4-snapshot Gray tail.  The **overwrite lasso** (pin words
+are idempotent, so a recurrent echo configuration carries at most two
+tongue vectors per cascade prefix) transfers this to concrete tongue
+vectors at cascade boundaries — conditional on the T9 compilation
+interface (every wiring's `stepN` as configuration-driven pin words),
+which is the open step of this route.
+
 ## f(N) ≤ N + O(1): what remains
 
 Given **B** (cycle ≤ 2 actives ⇒ ≤ 4 cycle vectors) and **C** (O(1)
