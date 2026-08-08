@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank", "StarIndependent", "ActiveLobes", "FixedSupportBound", "GrayTailCount"]
+defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank", "StarIndependent", "ActiveLobes", "FixedSupportBound", "GrayTailCount", "GrayTailAggregation"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -93,3 +93,6 @@ name = "FixedSupportBound"
 
 [[lean_lib]]
 name = "GrayTailCount"
+
+[[lean_lib]]
+name = "GrayTailAggregation"
