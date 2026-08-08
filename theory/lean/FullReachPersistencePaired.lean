@@ -110,7 +110,8 @@ theorem full_arrival_predecessor_paired
         (hsupport old).mp (Or.inl holdConf)
       have hp : ProductiveStep m e r0 k := by
         unfold ProductiveStep
-        simpa [old, new] using heq
+        intro h
+        exact heq h.symm
       have hfullOld : Full m e r0 k old :=
         old_edge_full_of_preserved m e r0
           hrun hr0 k hp holdAfterOcc hsame
