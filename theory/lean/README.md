@@ -241,10 +241,20 @@ trailing self-repair).  Thus
 `manufactured_pair_eventuallyPeriodic_or_changed_forward_merge` leaves only
 the state-changing, old-passage-self-repairing forward splice.
 `ChangedForwardMerge.spliced_lobe_reflector` now proves that this last splice
-always manufactures a concrete flip lobe at the merge switch and retains an
-exact suffix from the lobe's outside edge to the original boundary, applying
-the old reflector action.  This is a structural reduction, not yet a proof of
-periodicity: the new lobe action can touch the retained old support.
+always manufactures a concrete flip lobe at the merge switch, exposes the
+actual reached post-contact state, and retains an exact suffix from the
+lobe's outside edge to the original boundary, applying the old reflector
+action.  `single_flipped_trailing_repairs` proves that flipping one grooved
+trailing passage on a selected reflector route repairs itself and completes
+the unchanged suffix.  `suffix_after_runway_passage` packages every strict
+runway suffix of an identity reflector as a smaller opposite-facing identity
+reflector, with support foreign to the discarded switch.  Consequently
+`ChangedForwardMerge.eventuallyPeriodic_of_stay` closes the complete old
+identity-reflector branch: a runway splice is a paired-reflector Gray period,
+while a splice at the self-linked core closes after two lobe traversals.
+This is still not the full periodicity theorem: the protected old **flip**
+reflector branch remains open because the new lobe action can touch either
+its runway or candy support.
 The capstone `repair_or_facing_diversion` therefore completes a damaged
 reflector all the way to the opposite boundary unless that one explicit
 facing-first diversion occurs.  The endpoint-strengthened
@@ -253,8 +263,8 @@ unmatched tail between the old-route and fresh-exploration endpoints, rather
 than only their prefix-comparability.  The global capstone lifts the repaired
 journey back to the original train start while retaining the forward-fault
 certificate.  All new reductions are unconditional and general-`N`; the open
-global track case is now the well-founded collapse of the two retained forward
-merges, not the former facing-first diversion.
+global track case is now the state-changing forward splice into an old flip
+reflector, not the former facing-first diversion or identity-reflector case.
 
 * `first_revisit_of_long_run`: every live `N+1`-passage run has a first
   revisited switch after a switch-simple prefix of length at most `N`.

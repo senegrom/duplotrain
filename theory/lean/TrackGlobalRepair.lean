@@ -2019,11 +2019,20 @@ theorem ManufacturedReflector.ChangedForwardMerge.spliced_lobe_reflector
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
     (hmerge : A.ChangedForwardMerge B) :
-    ∃ (mouth outside : Nat) (candy : List Passage)
-        (state : Tongues) (tailSteps : Nat),
+    ∃ (entry mouth outside : Nat) (candy : List Passage)
+        (state : Tongues) (leadSteps tailSteps : Nat),
+      (entry, mouth) ∈ B.orientedRoute state ∧
+      entry % 3 ≠ 0 ∧ mouth % 3 = 0 ∧
+      w.link mouth = some outside ∧
+      PathGrooves B.toSupported.paths state ∧
+      PassagesGrooved state candy ∧
+      (∀ passage ∈ candy,
+        passageSwitch passage ≠ mouth / 3) ∧
       IsReflector w mouth outside (candy.length + 2)
         (fun state => PassagesGrooved state candy)
         (fun state => flipAt state (mouth / 3)) ∧
+      stepN w leadSteps (g, B.activatedState) =
+        some (outside, flipAt state (mouth / 3)) ∧
       stepN w tailSteps (outside, state) =
         some (g, B.toSupported.action.apply state) := by
   obtain ⟨approach, p, x, suffix, u, v, _path, _old,
@@ -2156,10 +2165,327 @@ theorem ManufacturedReflector.ChangedForwardMerge.spliced_lobe_reflector
         simp [List.append_assoc]
       obtain ⟨tailSteps, _hlen, hcomplete⟩ :=
         B.complete_after_oriented_prefix u hpaths hleadSplit hlead
-      refine ⟨s, outside, candy, u, tailSteps, ?_, hcomplete⟩
+      have hflip : v = flipAt u (s / 3) := by
+        have hv := changed_arrival_eq_flipAt harrive hchanged
+        simpa [hsp] using hv
+      have hone : stepN w 1 (p, u) = some (outside, v) := by
+        simp [stepN, step, harrive, hmouth]
+      have hreach : stepN w (approach.length + 1)
+          (g, B.activatedState) =
+          some (outside, flipAt u (s / 3)) := by
+        rw [stepN_add, happroach.sound]
+        simp only [Option.bind_some]
+        rw [hone, hflip]
+      refine ⟨a, s, outside, candy, u, approach.length + 1,
+        tailSteps, horiented, haBranch, hsStem, hmouth,
+        hpaths, hCandyGrooved, hCandyForeign, ?_, hreach,
+        hcomplete⟩
       exact stem_lobe_isReflector_foreign w candy
         hsStem haBranch hpBranch hsa hsp hap hCandyForeign
         hsplice.linked hsplice.last_link hmouth
+
+/-- Flipping the switch of one *trailing* passage on a manufactured
+reflector's selected route cannot damage the reflector.  The flipped run
+replays the untouched prefix, the trailing passage restores its own groove,
+and the deterministic suffix completes with the reflector's original local
+action.  This is the state-repair half of the remaining forward splice. -/
+theorem ManufacturedReflector.single_flipped_trailing_repairs
+    {w : Wiring} {g e : Nat}
+    (B : ManufacturedReflector w e g)
+    (state : Tongues)
+    (hpaths : PathGrooves B.toSupported.paths state)
+    {oriented : Passage}
+    (horiented : oriented ∈ B.orientedRoute state)
+    (hbranch : oriented.1 % 3 ≠ 0) :
+    stepN w B.toSupported.travel
+        (e, flipAt state (passageSwitch oriented)) =
+      some (g, B.toSupported.action.apply state) := by
+  rcases oriented with ⟨p, x⟩
+  simp only [passageSwitch] at horiented ⊢
+  obtain ⟨before, after, hsplit⟩ :=
+    List.append_of_mem horiented
+  have hroute := B.orientedRoute_trace state hpaths
+  have hsimple := B.orientedRoute_simple state
+  have hgrooved := hroute.grooved_of_switchSimple hsimple
+  have hprefixData := simple_grooved_trace_prefix_to_occurrence
+    hroute hsplit hgrooved hsimple
+  have hprefix := hprefixData.1
+  have hforeign : ∀ passage ∈ before,
+      passageSwitch passage ≠ p / 3 := by
+    intro passage hpassage
+    exact hprefixData.2 passage hpassage
+  have hforward : arrive state p = (x, state) :=
+    groove_forward (hgrooved (p, x) (by
+      rw [hsplit]
+      exact List.mem_append_right before List.mem_cons_self))
+  have hroute' := hroute
+  rw [hsplit] at hroute'
+  obtain ⟨middle, hbefore, hafter⟩ := hroute'.split_append
+  have hmiddle : middle = (p, state) := by
+    have h₁ := hbefore.sound
+    have h₂ := hprefix.sound
+    rw [h₂] at h₁
+    exact (Option.some.inj h₁).symm
+  subst middle
+  cases hafter with
+  | @cons _ _ outside _ next _ _ _ hlink tail =>
+      have hone : PhysicalTrace w (p, state) [(p, x)]
+          (outside, state) :=
+        PhysicalTrace.cons hforward hlink (PhysicalTrace.nil _)
+      have hlead := hprefix.append hone
+      have hleadSplit : B.orientedRoute state =
+          (before ++ [(p, x)]) ++ after := by
+        rw [hsplit]
+        simp [List.append_assoc]
+      obtain ⟨tailSteps, hlength, hcomplete⟩ :=
+        B.complete_after_oriented_prefix state hpaths
+          hleadSplit hlead
+      have hrepair := flipped_prefix_trailing_then
+        hprefix hforeign rfl hbranch hforward hlink hcomplete
+      have htotal : B.toSupported.travel =
+          before.length + 1 + tailSteps := by
+        rw [hlength]
+        simp
+      rwa [← htotal] at hrepair
+
+/-- A strict suffix of the runway of a degenerate identity reflector is
+again an identity reflector.  If `(p,x)` is the discarded runway passage,
+the new reflector starts just beyond `x` and ends at `x`; moreover its whole
+support is foreign to the discarded passage's switch.  This is the exact
+opposite-facing reflector needed to compose with a lobe spliced at `x`. -/
+theorem ManufacturedStayReflector.suffix_after_runway_passage
+    {w : Wiring} {g e : Nat}
+    (R : ManufacturedStayReflector w e g)
+    (state : Tongues)
+    (hpaths : PathGrooves R.toSupported.paths state)
+    {before : List Passage} {p x : Nat} {after : List Passage}
+    {outside : Nat}
+    (hsplit : R.runway = before ++ (p, x) :: after)
+    (houtside : w.link x = some outside) :
+    ∃ C : ManufacturedStayReflector w outside x,
+      PathGrooves C.toSupported.paths state ∧
+      (LocalAction.flip (p / 3)).Avoids C.toSupported.paths := by
+  change PathGrooves [R.runway, [(R.mouth, R.arm)]] state at hpaths
+  have hrunwayGrooved := (pathGrooves_pair.mp hpaths).1
+  have hcoreGrooved := (pathGrooves_pair.mp hpaths).2
+  have hafterGrooved : PassagesGrooved state after := by
+    intro passage hpassage
+    exact hrunwayGrooved passage (by
+      rw [hsplit]
+      exact List.mem_append_right before
+        (List.mem_cons_of_mem _ hpassage))
+  have hsimpleRunway : SwitchSimple R.runway := by
+    have hs := R.simple
+    unfold SwitchSimple at hs ⊢
+    simp only [List.map_append] at hs
+    exact (List.nodup_append.mp hs).1
+  have hrun := R.runway_trace state hrunwayGrooved
+  have hprefixData := simple_grooved_trace_prefix_to_occurrence
+    hrun hsplit hrunwayGrooved hsimpleRunway
+  have hrun' := hrun
+  rw [hsplit] at hrun'
+  obtain ⟨middle, hbefore, hafter⟩ := hrun'.split_append
+  have hmiddle : middle = (p, state) := by
+    have h₁ := hbefore.sound
+    have h₂ := hprefixData.1.sound
+    rw [h₂] at h₁
+    exact (Option.some.inj h₁).symm
+  subst middle
+  cases hafter with
+  | @cons _ _ next _ nextState _ _ harrive hlink tail =>
+      have hforward : arrive state p = (x, state) :=
+        groove_forward (hrunwayGrooved (p, x) (by
+          rw [hsplit]
+          exact List.mem_append_right before List.mem_cons_self))
+      have hnextState : nextState = state := by
+        rw [harrive] at hforward
+        exact congrArg Prod.snd hforward
+      subst nextState
+      have hnext : next = outside := by
+        rw [houtside] at hlink
+        exact (Option.some.inj hlink).symm
+      subst next
+      have hcoreBack : arrive state R.arm = (R.mouth, state) :=
+        passagesGrooved_singleton.mp hcoreGrooved
+      have hcoreForward : arrive state R.mouth = (R.arm, state) :=
+        groove_forward hcoreBack
+      have hcore : PhysicalTrace w (R.mouth, state)
+          [(R.mouth, R.arm)] (R.arm, state) :=
+        PhysicalTrace.cons hcoreForward R.selfLink
+          (PhysicalTrace.nil _)
+      have hs := R.simple
+      unfold SwitchSimple at hs
+      rw [hsplit] at hs
+      simp only [List.map_append, List.map_cons, List.map_nil] at hs
+      have hs' :
+          (before.map passageSwitch ++
+            passageSwitch (p, x) ::
+              (after.map passageSwitch ++
+                [passageSwitch (R.mouth, R.arm)])).Nodup := by
+        simpa [List.append_assoc] using hs
+      have hrestNodup :
+          (passageSwitch (p, x) ::
+            (after.map passageSwitch ++
+              [passageSwitch (R.mouth, R.arm)])).Nodup :=
+        (List.nodup_append.mp hs').2.1
+      have htailSimple :
+          SwitchSimple (after ++ [(R.mouth, R.arm)]) := by
+        unfold SwitchSimple
+        simp only [List.map_append, List.map_cons, List.map_nil]
+        exact (List.nodup_cons.mp hrestNodup).2
+      have hdiscardedForeign :
+          passageSwitch (p, x) ∉
+            after.map passageSwitch ++
+              [passageSwitch (R.mouth, R.arm)] :=
+        (List.nodup_cons.mp hrestNodup).1
+      have havoid :
+          (LocalAction.flip (p / 3)).Avoids
+            [after, [(R.mouth, R.arm)]] := by
+        intro path hpath passage hpassage
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at hpath
+        apply fun hEq => hdiscardedForeign (by
+          have hkey : passageSwitch passage =
+              passageSwitch (p, x) := by
+            simpa [passageSwitch] using hEq
+          rcases hpath with rfl | rfl
+          · apply List.mem_append_left
+            apply List.mem_map.mpr
+            exact ⟨passage, hpassage, hkey⟩
+          · simp only [List.mem_singleton] at hpassage
+            subst passage
+            apply List.mem_append_right
+            simp [hkey])
+      let C : ManufacturedStayReflector w outside x := {
+        base := state
+        mouthState := state
+        returnState := state
+        runway := after
+        mouth := R.mouth
+        arm := R.arm
+        runwayTrace := tail
+        coreTrace := hcore
+        simple := htailSimple
+        stemEndpoint := R.stemEndpoint
+        selfLink := R.selfLink
+        entryEdge := houtside
+      }
+      refine ⟨C, ?_, ?_⟩
+      · change PathGrooves [after, [(R.mouth, R.arm)]] state
+        exact pathGrooves_pair.mpr ⟨hafterGrooved, hcoreGrooved⟩
+      · change (LocalAction.flip (p / 3)).Avoids
+          [after, [(R.mouth, R.arm)]]
+        exact havoid
+
+/-- The final changed-forward splice is periodic whenever the protected old
+reflector is the degenerate identity reflector.  A runway contact leaves a
+strict identity-reflector suffix opposite the newly spliced flip lobe.  A
+core contact makes the lobe's outside edge equal to its own mouth, so two
+lobe traversals close directly. -/
+theorem ManufacturedReflector.ChangedForwardMerge.eventuallyPeriodic_of_stay
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {R : ManufacturedStayReflector w e g}
+    (hmerge : A.ChangedForwardMerge (.stay R)) :
+    EventuallyPeriodic w
+      (g, (ManufacturedReflector.stay R).activatedState) := by
+  obtain ⟨entry, mouth, outside, candy, state, leadSteps, _tailSteps,
+      horiented, hentryBranch, hmouthStem, hmouthLink, hRpaths,
+      hCandy, hCandyForeign, hLobe, hreach, _hcomplete⟩ :=
+    hmerge.spliced_lobe_reflector
+  have hCandyFlip :
+      PassagesGrooved (flipAt state (mouth / 3)) candy :=
+    grooved_after_flip_other hCandy hCandyForeign
+  have hOldRoute :=
+    (ManufacturedReflector.stay R).orientedRoute_trace state hRpaths
+  have hOldSimple :=
+    (ManufacturedReflector.stay R).orientedRoute_simple state
+  have hOldGrooved := hOldRoute.grooved_of_switchSimple hOldSimple
+  have hOldForward : arrive state entry = (mouth, state) :=
+    groove_forward (hOldGrooved (entry, mouth) horiented)
+  have hentryMouthSwitch : entry / 3 = mouth / 3 := by
+    have hswitch := arrive_exit_switch state entry
+    rw [hOldForward] at hswitch
+    exact hswitch.symm
+  change (entry, mouth) ∈
+      R.runway ++ [(R.mouth, R.arm)] at horiented
+  rcases List.mem_append.mp horiented with hrunway | hcore
+  · obtain ⟨before, after, hsplit⟩ :=
+      List.append_of_mem hrunway
+    obtain ⟨C, hCpaths, hAvoid⟩ :=
+      R.suffix_after_runway_passage state hRpaths
+        hsplit hmouthLink
+    have hAvoid' :
+        (LocalAction.flip (mouth / 3)).Avoids
+          C.toSupported.paths := by
+      simpa [hentryMouthSwitch] using hAvoid
+    let L : SupportedReflector w mouth outside := {
+      travel := candy.length + 2
+      paths := [candy]
+      action := .flip (mouth / 3)
+      run := by
+        intro current hpaths
+        have hgrooved : PassagesGrooved current candy :=
+          hpaths candy (by simp)
+        obtain ⟨hstep, hnext⟩ := hLobe current hgrooved
+        constructor
+        · exact hstep
+        · intro path hpath
+          simp only [List.mem_singleton] at hpath
+          subst path
+          exact hnext
+    }
+    have hCflip : PathGrooves C.toSupported.paths
+        (flipAt state (mouth / 3)) :=
+      hCpaths.after_avoiding_action hAvoid'
+    have hLflip : PathGrooves L.paths
+        (flipAt state (mouth / 3)) := by
+      intro path hpath
+      simp only [L, List.mem_singleton] at hpath
+      subst path
+      exact hCandyFlip
+    have hperiod := C.toSupported.paired_period L
+      (by change True; trivial) hAvoid'
+      (flipAt state (mouth / 3)) hCflip hLflip
+    have hpositive :
+        0 < 2 * (C.toSupported.travel + L.travel) := by
+      dsimp [L]
+      omega
+    exact (eventuallyPeriodic_of_period hpositive hperiod).prepend hreach
+  · simp only [List.mem_singleton] at hcore
+    have hentryEq : entry = R.mouth :=
+      congrArg Prod.fst hcore
+    have hmouthEq : mouth = R.arm :=
+      congrArg Prod.snd hcore
+    subst entry
+    subst mouth
+    have houtsideEq : outside = R.arm := by
+      rw [R.selfLink] at hmouthLink
+      exact (Option.some.inj hmouthLink).symm
+    subst outside
+    have hfirst :=
+      (hLobe (flipAt state (R.arm / 3)) hCandyFlip).1
+    have hfirst' := hfirst
+    change stepN w (candy.length + 2)
+        (R.arm, flipAt state (R.arm / 3)) =
+          some (R.arm,
+            flipAt (flipAt state (R.arm / 3)) (R.arm / 3)) at hfirst'
+    rw [flipAt_flipAt state (R.arm / 3)] at hfirst'
+    have hfirst'' :
+        stepN w (candy.length + 2)
+          (R.arm, flipAt state (R.arm / 3)) =
+            some (R.arm, state) := by
+      exact hfirst'
+    have hsecond := (hLobe state hCandy).1
+    have hperiod :
+        stepN w ((candy.length + 2) + (candy.length + 2))
+          (R.arm, flipAt state (R.arm / 3)) =
+            some (R.arm, flipAt state (R.arm / 3)) := by
+      rw [stepN_add, hfirst'']
+      exact hsecond
+    have hpositive :
+        0 < (candy.length + 2) + (candy.length + 2) := by
+      omega
+    exact (eventuallyPeriodic_of_period hpositive hperiod).prepend hreach
 
 /-- **Exact open track core.**  Complete repair is periodic, every backward
 or mouth contact is periodic, and the raw two-reflector system therefore has
