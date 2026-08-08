@@ -11,6 +11,12 @@ jobs:
         working-directory: theory/lean
     steps:
       - uses: actions/checkout@v4
+      - name: Upload Lean source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-source
+          path: theory/lean
+          include-hidden-files: true
       - name: Install elan
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
@@ -18,4 +24,4 @@ jobs:
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build LinearBound AlternationBound SlotBound ReplayFacts PairBound SupportBound SupportMove EdgeReversal ReversalFacts MonotoneSupport HiddenFibre HiddenAbsorb HiddenDichotomy ThreeQuarterArithmetic ComponentCapacity ProfileCodeBound SupportSize LobeAbsorption EpochAggregation TreeReplay TreeEpochCode
+          lake build LinearBound AlternationBound SlotBound ReplayFacts PairBound SupportBound SupportMove EdgeReversal ReversalFacts MonotoneSupport HiddenFibre HiddenAbsorb HiddenDichotomy ThreeQuarterArithmetic ComponentCapacity ProfileCodeBound SupportSize LobeAbsorption EpochAggregation TreeReplay TreeEpochCode RootRank
