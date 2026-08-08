@@ -1,0 +1,37 @@
+name: Component-free strict bound Lean check
+on:
+  push:
+    branches: [agent/linear-bound-current]
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build existing proof base
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build RootRank
+      - name: Check component-free chain
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake env lean StarLobeDichotomy.lean
+          lake env lean EpochStrictBound.lean
+          lake env lean OutwardReplayCore.lean
+          lake env lean ReachReplay.lean
+          lake env lean TreeLobeCode.lean
+          lake env lean TreeLobeFrozenCode.lean
+          lake env lean FrozenNoFull.lean
+          lake env lean SparseFullCode.lean
+          lake env lean SparseArithmeticCore.lean
+          lake env lean FullLobeSparseCode.lean
+          lake env lean FullMarkerReplay.lean
+          lake env lean FullMarkerFrozenReplay.lean
+          lake env lean SparseEpochCertificateCore.lean
