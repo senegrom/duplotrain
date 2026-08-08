@@ -240,6 +240,11 @@ period in all three prefix cases (no action-switch contact, mouth capture, or
 trailing self-repair).  Thus
 `manufactured_pair_eventuallyPeriodic_or_changed_forward_merge` leaves only
 the state-changing, old-passage-self-repairing forward splice.
+`ChangedForwardMerge.spliced_lobe_reflector` now proves that this last splice
+always manufactures a concrete flip lobe at the merge switch and retains an
+exact suffix from the lobe's outside edge to the original boundary, applying
+the old reflector action.  This is a structural reduction, not yet a proof of
+periodicity: the new lobe action can touch the retained old support.
 The capstone `repair_or_facing_diversion` therefore completes a damaged
 reflector all the way to the opposite boundary unless that one explicit
 facing-first diversion occurs.  The endpoint-strengthened
