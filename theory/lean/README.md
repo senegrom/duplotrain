@@ -232,8 +232,14 @@ former final-mouth exception by an explicit two-capture period.  Finally,
 `completed_route_with_pair_support_periodic` invokes the already proved
 complete two-reflector theorem once repair has installed both supports.
 Consequently `manufactured_pair_protected_repair_outcomes` eliminates the
-old unspecified facing residual: only two concrete **forward merges** remain,
-one with no tongue change and one with the old passage self-repaired.
+old unspecified facing residual and names two concrete **forward merges**.
+`FacingForwardMerge.flip_candy` localizes the no-change merge to a reversed
+candy passage; `reverse_candy_suffix_absorbs` and
+`FacingForwardMerge.eventuallyPeriodic` then close it by an explicit positive
+period in all three prefix cases (no action-switch contact, mouth capture, or
+trailing self-repair).  Thus
+`manufactured_pair_eventuallyPeriodic_or_changed_forward_merge` leaves only
+the state-changing, old-passage-self-repairing forward splice.
 The capstone `repair_or_facing_diversion` therefore completes a damaged
 reflector all the way to the opposite boundary unless that one explicit
 facing-first diversion occurs.  The endpoint-strengthened

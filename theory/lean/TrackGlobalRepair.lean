@@ -53,6 +53,52 @@ theorem exists_first_satisfying_split
           · exact hhead
           · exact hbefore y hy
 
+/-- Two members of a switch-simple route that use the same switch are the
+same recorded passage. -/
+theorem SwitchSimple.passage_eq_of_mem
+    {route : List Passage} (hsimple : SwitchSimple route)
+    {left right : Passage}
+    (hleft : left ∈ route) (hright : right ∈ route)
+    (hswitch : passageSwitch left = passageSwitch right) :
+    left = right := by
+  unfold SwitchSimple at hsimple
+  induction route generalizing left right with
+  | nil => cases hleft
+  | cons head tail ih =>
+      simp only [List.map_cons] at hsimple
+      rw [List.nodup_cons] at hsimple
+      rcases List.mem_cons.mp hleft with hleftHead | hleftTail
+      · rcases List.mem_cons.mp hright with hrightHead | hrightTail
+        · exact hleftHead.trans hrightHead.symm
+        · exfalso
+          apply hsimple.1
+          have hmem : passageSwitch right ∈ tail.map passageSwitch :=
+            List.mem_map.mpr ⟨right, hrightTail, rfl⟩
+          rw [← hleftHead, hswitch]
+          exact hmem
+      · rcases List.mem_cons.mp hright with hrightHead | hrightTail
+        · exfalso
+          apply hsimple.1
+          have hmem : passageSwitch left ∈ tail.map passageSwitch :=
+            List.mem_map.mpr ⟨left, hleftTail, rfl⟩
+          rw [← hrightHead, ← hswitch]
+          exact hmem
+        · exact ih hsimple.2 hleftTail hrightTail hswitch
+
+/-- A switch-simple route cannot contain both orientations of one genuine
+passage. -/
+theorem SwitchSimple.not_both_orientations
+    {route : List Passage} (hsimple : SwitchSimple route)
+    {p x : Nat}
+    (hforward : (p, x) ∈ route)
+    (hreverse : (x, p) ∈ route)
+    (hswitch : p / 3 = x / 3)
+    (hne : p ≠ x) : False := by
+  have hEq := hsimple.passage_eq_of_mem hforward hreverse (by
+    simp only [passageSwitch]
+    exact hswitch)
+  exact hne (congrArg Prod.fst hEq)
+
 /-- Replay a damaged switch-simple route up to its first facing obstruction.
 The prefix is an actual physical trace in the new state and cannot touch the
 obstruction's switch.  Consequently that switch still has its initial tongue
@@ -1520,12 +1566,15 @@ theorem manufactured_pair_protected_repair_outcomes
     (hA : PathGrooves A.toSupported.paths B.baseState)
     (hB : PathGrooves B.toSupported.paths B.activatedState) :
     EventuallyPeriodic w (g, B.activatedState) ∨
-    (∃ before p x after contact fresh,
+    (∃ before p x after contact fresh path,
       A.orientedRoute B.activatedState =
         before ++ (p, x) :: after ∧
       PhysicalTrace w (g, B.activatedState) before (p, contact) ∧
       PathGrooves B.toSupported.paths contact ∧
       p % 3 = 0 ∧
+      B.activatedState (p / 3) ≠ B.baseState (p / 3) ∧
+      contact (p / 3) = B.activatedState (p / 3) ∧
+      path ∈ B.toSupported.paths ∧ (fresh, p) ∈ path ∧
       arrive contact p = (fresh, contact) ∧ fresh ≠ x ∧
       (p, fresh) ∈ B.orientedRoute contact) ∨
     (∃ approach p x suffix u v path old oriented repaired,
@@ -1571,8 +1620,10 @@ theorem manufactured_pair_protected_repair_outcomes
         hperiodic | hforward
       · exact Or.inl hperiodic
       · exact Or.inr (Or.inl ⟨before, p, x, after,
-          contact, fresh, hsplit, hprefix, hBcontact, hp,
-          harriveFresh, by simpa [hotherFresh] using hother,
+          contact, fresh, path, hsplit, hprefix, hBcontact, hp,
+          hchange, by simpa [passageSwitch] using hcontact,
+          hpath, hold, harriveFresh,
+          by simpa [hotherFresh] using hother,
           hforward⟩)
   · rcases hrest with hchanged | hcomplete
     · obtain ⟨approach, p, x, suffix, u, v, path, old,
@@ -1593,6 +1644,408 @@ theorem manufactured_pair_protected_repair_outcomes
             horientedGroove, horientedSwitch, hforwardExit,
             hrepair, hgroove⟩))
     · exact Or.inr (Or.inr (Or.inr hcomplete))
+
+/-- The no-change forward merge left by protected pair repair. -/
+def ManufacturedReflector.FacingForwardMerge
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g) : Prop :=
+  ∃ before p x after contact fresh path,
+    A.orientedRoute B.activatedState =
+      before ++ (p, x) :: after ∧
+    PhysicalTrace w (g, B.activatedState) before (p, contact) ∧
+    PathGrooves B.toSupported.paths contact ∧
+    p % 3 = 0 ∧
+    B.activatedState (p / 3) ≠ B.baseState (p / 3) ∧
+    contact (p / 3) = B.activatedState (p / 3) ∧
+    path ∈ B.toSupported.paths ∧ (fresh, p) ∈ path ∧
+    arrive contact p = (fresh, contact) ∧ fresh ≠ x ∧
+    (p, fresh) ∈ B.orientedRoute contact
+
+/-- A no-change forward merge can occur only in the reversed candy of a
+nondegenerate flip reflector.  Stay reflectors and runways retain their stored
+orientation in every selected route, so containing both `(fresh,p)` and
+`(p,fresh)` would violate switch simplicity. -/
+theorem ManufacturedReflector.FacingForwardMerge.flip_candy
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (hmerge : A.FacingForwardMerge B) :
+    ∃ (R : ManufacturedFlipReflector w e g)
+        (before : List Passage) (p x : Nat) (after : List Passage)
+        (contact : Tongues) (fresh : Nat),
+      B = .flip R ∧
+      A.orientedRoute B.activatedState =
+        before ++ (p, x) :: after ∧
+      PhysicalTrace w (g, B.activatedState) before (p, contact) ∧
+      PathGrooves [R.runway, R.candy] contact ∧
+      p % 3 = 0 ∧
+      arrive contact p = (fresh, contact) ∧ fresh ≠ x ∧
+      (fresh, p) ∈ R.candy ∧
+      contact R.actionSwitch = bval R.secondArm ∧
+      (p, fresh) ∈
+        (ManufacturedReflector.flip R).orientedRoute contact := by
+  obtain ⟨before, p, x, after, contact, fresh, path,
+      hsplit, hprefix, hpaths, hp, _hchange, _hcontact,
+      hpath, hold, harrive, hne, hforward⟩ := hmerge
+  have hsameSwitch : p / 3 = fresh / 3 := by
+    have hs := arrive_exit_switch contact p
+    rw [harrive] at hs
+    exact hs.symm
+  have hpfresh : p ≠ fresh := by
+    have hneLocal := arrive_exit_ne contact p
+    rw [harrive] at hneLocal
+    exact hneLocal.symm
+  cases B with
+  | stay R =>
+      change path ∈ [R.runway, [(R.mouth, R.arm)]] at hpath
+      change PathGrooves [R.runway, [(R.mouth, R.arm)]] contact at hpaths
+      change (p, fresh) ∈
+        (ManufacturedReflector.stay R).orientedRoute contact at hforward
+      have holdRoute : (fresh, p) ∈
+          (ManufacturedReflector.stay R).orientedRoute contact := by
+        simp only [List.mem_cons, List.not_mem_nil, or_false] at hpath
+        rcases hpath with rfl | rfl
+        · simp [ManufacturedReflector.orientedRoute, hold]
+        · simp only [List.mem_singleton] at hold
+          simp [ManufacturedReflector.orientedRoute, hold]
+      exact (SwitchSimple.not_both_orientations
+        ((ManufacturedReflector.stay R).orientedRoute_simple contact)
+        hforward holdRoute hsameSwitch hpfresh).elim
+  | flip R =>
+      change path ∈ [R.runway, R.candy] at hpath
+      change PathGrooves [R.runway, R.candy] contact at hpaths
+      change (p, fresh) ∈
+        (ManufacturedReflector.flip R).orientedRoute contact at hforward
+      simp only [List.mem_cons, List.not_mem_nil, or_false] at hpath
+      rcases hpath with hrunway | hcandy
+      · subst path
+        have holdRoute : (fresh, p) ∈
+            (ManufacturedReflector.flip R).orientedRoute contact := by
+          by_cases hselected :
+              contact R.actionSwitch = bval R.firstArm
+          · simp [ManufacturedReflector.orientedRoute,
+              hselected, hold]
+          · simp [ManufacturedReflector.orientedRoute,
+              hselected, hold]
+        exact (SwitchSimple.not_both_orientations
+          ((ManufacturedReflector.flip R).orientedRoute_simple contact)
+          hforward holdRoute hsameSwitch hpfresh).elim
+      · subst path
+        have hnotFirst :
+            contact R.actionSwitch ≠ bval R.firstArm := by
+          intro hselected
+          have holdRoute : (fresh, p) ∈
+              (ManufacturedReflector.flip R).orientedRoute contact := by
+            simp [ManufacturedReflector.orientedRoute,
+              hselected, hold]
+          exact SwitchSimple.not_both_orientations
+            ((ManufacturedReflector.flip R).orientedRoute_simple contact)
+            hforward holdRoute hsameSwitch hpfresh
+        have hsecond :
+            contact R.actionSwitch = bval R.secondArm := by
+          rcases R.selected_arm contact with hfirst | hsecond
+          · exact (hnotFirst hfirst).elim
+          · exact hsecond
+        exact ⟨R, before, p, x, after, contact, fresh,
+          rfl, hsplit, hprefix, hpaths, hp, harrive, hne,
+          hold, hsecond, hforward⟩
+
+/-- Once a forward facing merge enters the reversed candy of a flip
+reflector, the remaining suffix absorbs the reflector's action flip.  Starting
+at the merge stem in either the selected state or its action-flipped state,
+the train reaches the far boundary in the latter state.
+
+The proof is entirely local.  The remaining reversed candy avoids the action
+switch, so it replays in both states.  Its final trailing visit to `firstArm`
+then either makes the action flip or finds it already made, after which the
+old runway is retraced. -/
+theorem ManufacturedFlipReflector.reverse_candy_suffix_absorbs
+    {w : Wiring} {e g : Nat}
+    (R : ManufacturedFlipReflector w e g)
+    (contact : Tongues)
+    (hpaths : PathGrooves [R.runway, R.candy] contact)
+    (hsecond : contact R.actionSwitch = bval R.secondArm)
+    {before after : List Passage} {fresh p : Nat}
+    (hoccurs : R.candy = before ++ (fresh, p) :: after) :
+    let alternate := flipAt contact R.actionSwitch
+    ∃ travel, 0 < travel ∧
+      stepN w travel (p, contact) = some (g, alternate) ∧
+      stepN w travel (p, alternate) = some (g, alternate) := by
+  have hopp : bval R.secondArm = !(bval R.firstArm) :=
+    branch_values_opposite R.firstArm_branch R.secondArm_branch
+      (R.firstArm_switch.trans R.secondArm_switch.symm) R.arms_ne
+  have hnotFirst :
+      contact R.actionSwitch ≠ bval R.firstArm := by
+    intro hfirst
+    have heq : bval R.firstArm = bval R.secondArm :=
+      hfirst.symm.trans hsecond
+    rw [hopp] at heq
+    cases hvalue : bval R.firstArm <;> simp [hvalue] at heq
+  let alternate := flipAt contact R.actionSwitch
+  have hfirstAlternate :
+      alternate R.actionSwitch = bval R.firstArm := by
+    simp [alternate, flipAt, hsecond, hopp]
+  have hpathsAlternate :
+      PathGrooves [R.runway, R.candy] alternate := by
+    dsimp [alternate]
+    change PathGrooves [R.runway, R.candy]
+      ((LocalAction.flip R.actionSwitch).apply contact)
+    exact hpaths.after_avoiding_action R.support_foreign
+  let lead := R.runway ++
+    (R.mouth, R.secondArm) :: reversePassages after
+  let candyTail := reversePassages (before ++ [(fresh, p)])
+  have hrouteSplit :
+      (ManufacturedReflector.flip R).orientedRoute contact =
+        lead ++ candyTail := by
+    dsimp [lead, candyTail]
+    simp [ManufacturedReflector.orientedRoute, hnotFirst,
+      hoccurs, reversePassages_append, reversePassages,
+      List.append_assoc]
+  have hroute :=
+    (ManufacturedReflector.flip R).orientedRoute_trace contact hpaths
+  rw [hrouteSplit] at hroute
+  obtain ⟨middle, hlead, htail⟩ := hroute.split_append
+  have hprefixData := R.reverse_prefix_to_candy_occurrence
+    contact hpaths hsecond hoccurs
+  have hleadExpected :
+      PhysicalTrace w (e, contact) lead (p, contact) := by
+    simpa [lead] using hprefixData.1
+  have hmiddle : middle = (p, contact) := by
+    have h₁ := hlead.sound
+    have h₂ := hleadExpected.sound
+    rw [h₂] at h₁
+    exact (Option.some.inj h₁).symm
+  subst middle
+  have htailContact :
+      PhysicalTrace w (p, contact) candyTail (R.firstArm, contact) := by
+    simpa [ManufacturedReflector.orientedFinish, hnotFirst] using htail
+  have htailForeign : ∀ passage ∈ candyTail,
+      passageSwitch passage ≠ R.actionSwitch := by
+    intro passage hpassage
+    dsimp [candyTail] at hpassage
+    obtain ⟨old, holdSegment, hpassageEq⟩ :=
+      source_of_mem_reversePassages hpassage
+    subst passage
+    have holdCandy : old ∈ R.candy := by
+      rw [hoccurs]
+      rcases List.mem_append.mp holdSegment with holdBefore | holdLast
+      · exact List.mem_append_left ((fresh, p) :: after) holdBefore
+      · simp only [List.mem_singleton] at holdLast
+        subst old
+        exact List.mem_append_right before List.mem_cons_self
+    have havoid := R.support_foreign R.candy (by simp) old holdCandy
+    have hexit := R.candyTrace.passage_exit_switch old
+      (List.mem_cons_of_mem _ holdCandy)
+    have hswitch :
+        passageSwitch (old.2, old.1) = passageSwitch old := by
+      simp only [passageSwitch]
+      exact hexit
+    rw [hswitch]
+    exact havoid
+  have htailAlternate :
+      PhysicalTrace w (p, alternate) candyTail
+        (R.firstArm, alternate) :=
+    htailContact.flip_unvisited htailForeign
+  have hfirstGrooveAlternate :
+      arrive alternate R.firstArm = (R.mouth, alternate) :=
+    R.firstArm_groove_of_selected alternate hfirstAlternate
+  have hrunwayAlternate : PassagesGrooved alternate R.runway :=
+    (pathGrooves_pair.mp hpathsAlternate).1
+  have hreturnAlternate :
+      PhysicalTrace w (R.firstArm, alternate)
+        ((R.firstArm, R.mouth) :: reversePassages R.runway)
+        (g, alternate) :=
+    physicalTrace_contact_retraces_prefix R.runwayTrace
+      hrunwayAlternate R.entryEdge hfirstGrooveAlternate
+  have hflipBack : flipAt alternate R.actionSwitch = contact := by
+    dsimp [alternate]
+    exact flipAt_flipAt contact R.actionSwitch
+  have hfirstContact :
+      arrive contact R.firstArm = (R.mouth, alternate) := by
+    have hrepair := flipped_passage_forward_trailing
+      hfirstGrooveAlternate R.firstArm_branch
+    rw [R.firstArm_switch, hflipBack] at hrepair
+    exact hrepair
+  have hreturnContact :
+      PhysicalTrace w (R.firstArm, contact)
+        ((R.firstArm, R.mouth) :: reversePassages R.runway)
+        (g, alternate) :=
+    physicalTrace_contact_retraces_prefix R.runwayTrace
+      hrunwayAlternate R.entryEdge hfirstContact
+  let journey := candyTail ++
+    (R.firstArm, R.mouth) :: reversePassages R.runway
+  have hjourneyContact :
+      PhysicalTrace w (p, contact) journey (g, alternate) := by
+    simpa [journey] using htailContact.append hreturnContact
+  have hjourneyAlternate :
+      PhysicalTrace w (p, alternate) journey (g, alternate) := by
+    simpa [journey] using htailAlternate.append hreturnAlternate
+  refine ⟨journey.length, ?_, hjourneyContact.sound,
+    hjourneyAlternate.sound⟩
+  dsimp [journey]
+  simp only [List.length_append, List.length_cons]
+  omega
+
+/-- The apparent no-change forward residual is not a residual.  Its approach
+and the absorbing reverse-candy suffix form a period after at most one local
+repair of the protected reflector's action tongue. -/
+theorem ManufacturedReflector.FacingForwardMerge.eventuallyPeriodic
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (hmerge : A.FacingForwardMerge B) :
+    EventuallyPeriodic w (g, B.activatedState) := by
+  obtain ⟨R, before, p, x, after, contact, fresh,
+      hB, hrouteSplit, hprefix, hpaths, _hp, _harrive,
+      _hfreshNe, hcandyMem, hsecond, _hforward⟩ :=
+    hmerge.flip_candy
+  subst B
+  obtain ⟨candyBefore, candyAfter, hcandySplit⟩ :=
+    List.append_of_mem hcandyMem
+  let alternate := flipAt contact R.actionSwitch
+  obtain ⟨tailTravel, htailPositive, htailContact,
+      htailAlternate⟩ :=
+    R.reverse_candy_suffix_absorbs contact hpaths hsecond hcandySplit
+  have hrouteSimple :=
+    A.orientedRoute_simple
+      (ManufacturedReflector.flip R).activatedState
+  rw [hrouteSplit] at hrouteSimple
+  have hbeforeSimple : SwitchSimple before := by
+    unfold SwitchSimple at hrouteSimple ⊢
+    simp only [List.map_append, List.map_cons] at hrouteSimple
+    exact (List.nodup_append.mp hrouteSimple).1
+  have hbeforeGrooved : PassagesGrooved contact before :=
+    hprefix.grooved_of_switchSimple hbeforeSimple
+  have hprefixContact :
+      PhysicalTrace w (g, contact) before (p, contact) :=
+    hprefix.replay_grooved contact hbeforeGrooved
+  let loopSteps := before.length + tailTravel
+  have hlead :
+      stepN w loopSteps
+        (g, (ManufacturedReflector.flip R).activatedState) =
+          some (g, alternate) := by
+    dsimp [loopSteps]
+    rw [stepN_add, hprefix.sound]
+    exact htailContact
+  have hcontactToAlternate :
+      stepN w loopSteps (g, contact) = some (g, alternate) := by
+    dsimp [loopSteps]
+    rw [stepN_add, hprefixContact.sound]
+    exact htailContact
+  have hloopPositive : 0 < loopSteps := by
+    dsimp [loopSteps]
+    omega
+  by_cases htouch : ∃ passage ∈ before,
+      passageSwitch passage = R.actionSwitch
+  · obtain ⟨passage, hpassage, hswitch⟩ := htouch
+    obtain ⟨prior, later, hbeforeSplit⟩ :=
+      List.append_of_mem hpassage
+    have hdecomp : before.length =
+        prior.length + 1 + later.length := by
+      rw [hbeforeSplit]
+      simp only [List.length_append, List.length_cons]
+      omega
+    have hnormal :
+        stepN w before.length (g, contact) = some (p, contact) :=
+      hprefixContact.sound
+    rcases runway_fault_dichotomy_general R contact hpaths
+        hprefixContact hbeforeGrooved hbeforeSimple passage
+        hbeforeSplit hswitch hdecomp hnormal with
+      hcapture | hrepair
+    · obtain ⟨captureTravel, hcapture⟩ := hcapture
+      have hperiod :
+          stepN w (captureTravel + loopSteps) (g, alternate) =
+            some (g, alternate) := by
+        rw [stepN_add, hcapture]
+        exact hcontactToAlternate
+      have hperiodic : EventuallyPeriodic w (g, alternate) :=
+        eventuallyPeriodic_of_period (by omega) hperiod
+      exact hperiodic.prepend hlead
+    · have hperiod :
+          stepN w loopSteps (g, alternate) = some (g, alternate) := by
+        dsimp [loopSteps]
+        rw [stepN_add, hrepair]
+        exact htailContact
+      have hperiodic : EventuallyPeriodic w (g, alternate) :=
+        eventuallyPeriodic_of_period hloopPositive hperiod
+      exact hperiodic.prepend hlead
+  · have hforeign : ∀ passage ∈ before,
+        passageSwitch passage ≠ R.actionSwitch := by
+      intro passage hpassage hswitch
+      exact htouch ⟨passage, hpassage, hswitch⟩
+    have hprefixAlternate :
+        PhysicalTrace w (g, alternate) before (p, alternate) :=
+      hprefixContact.flip_unvisited hforeign
+    have hperiod :
+        stepN w loopSteps (g, alternate) = some (g, alternate) := by
+      dsimp [loopSteps]
+      rw [stepN_add, hprefixAlternate.sound]
+      exact htailAlternate
+    have hperiodic : EventuallyPeriodic w (g, alternate) :=
+      eventuallyPeriodic_of_period hloopPositive hperiod
+    exact hperiodic.prepend hlead
+
+/-- The state-changing forward merge left by protected pair repair. -/
+def ManufacturedReflector.ChangedForwardMerge
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g) : Prop :=
+  ∃ approach p x suffix u v path old oriented repaired,
+    A.orientedRoute B.activatedState =
+      approach ++ (p, x) :: suffix ∧
+    PhysicalTrace w (g, B.activatedState) approach (p, u) ∧
+    PathGrooves B.toSupported.paths u ∧
+    arrive u p = (x, v) ∧
+    path ∈ B.toSupported.paths ∧ old ∈ path ∧
+    passageSwitch old = p / 3 ∧
+    v (p / 3) ≠ u (p / 3) ∧
+    oriented ∈ B.orientedRoute u ∧
+    arrive u oriented.2 = (oriented.1, u) ∧
+    passageSwitch oriented = p / 3 ∧
+    x = oriented.2 ∧
+    arrive v oriented.1 = (oriented.2, repaired) ∧
+    arrive repaired oriented.2 = (oriented.1, repaired)
+
+/-- **Exact open track core.**  Complete repair is periodic, every backward
+or mouth contact is periodic, and the raw two-reflector system therefore has
+only the two named forward merges left.  This is the current general-`N`
+frontier of the direct track proof. -/
+theorem manufactured_pair_eventuallyPeriodic_or_forward_merges
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hA : PathGrooves A.toSupported.paths B.baseState)
+    (hB : PathGrooves B.toSupported.paths B.activatedState) :
+    EventuallyPeriodic w (g, B.activatedState) ∨
+      A.FacingForwardMerge B ∨ A.ChangedForwardMerge B := by
+  rcases manufactured_pair_protected_repair_outcomes A B hA hB with
+    hperiodic | hfacing | hchanged | hcomplete
+  · exact Or.inl hperiodic
+  · exact Or.inr (Or.inl hfacing)
+  · exact Or.inr (Or.inr hchanged)
+  · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
+    exact Or.inl
+      (A.completed_route_with_pair_support_periodic B
+        B.baseState B.activatedState finalState hA
+        hrepair hAfinal hBfinal)
+
+/-- **Single-residual track reduction.**  The no-change forward merge has an
+explicit period, so protected repair of two manufactured reflectors can fail
+to be periodic only at the state-changing, self-repairing forward splice. -/
+theorem manufactured_pair_eventuallyPeriodic_or_changed_forward_merge
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hA : PathGrooves A.toSupported.paths B.baseState)
+    (hB : PathGrooves B.toSupported.paths B.activatedState) :
+    EventuallyPeriodic w (g, B.activatedState) ∨
+      A.ChangedForwardMerge B := by
+  rcases manufactured_pair_eventuallyPeriodic_or_forward_merges
+      A B hA hB with hperiodic | hfacing | hchanged
+  · exact Or.inl hperiodic
+  · exact Or.inl hfacing.eventuallyPeriodic
+  · exact Or.inr hchanged
 
 /-- Provenance of a current-route facing obstruction.  It is a support groove
 that changed between the second reflector's base and activated states.  The
