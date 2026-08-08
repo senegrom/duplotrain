@@ -1,0 +1,28 @@
+name: Simple path replay Lean check
+on:
+  push:
+    branches: [agent/linear-bound-current]
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build base proof chain
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build RootRank
+      - name: Check path replay files
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake env lean StarLobeDichotomy.lean
+          lake env lean EpochStrictBound.lean
+          lake env lean OutwardReplayCore.lean
+          lake env lean SimplePathReplay.lean
