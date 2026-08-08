@@ -11,37 +11,13 @@ jobs:
         working-directory: theory/lean
     steps:
       - uses: actions/checkout@v4
-      - name: Upload Lean source snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: lean-source
-          path: theory/lean
-          include-hidden-files: true
       - name: Install elan and pinned Lean toolchain
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
           export PATH="$HOME/.elan/bin:$PATH"
           elan toolchain install "$(cat lean-toolchain)"
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-      - name: Archive and split pinned Lean toolchain
-        run: |
-          tar -C "$HOME/.elan/toolchains" -czf /tmp/lean-toolchain.tar.gz \
-            leanprover--lean4---v4.32.2
-          split -b 400M -d -a 1 /tmp/lean-toolchain.tar.gz \
-            /tmp/lean-toolchain.part-
-      - name: Upload pinned Lean toolchain part 0
-        uses: actions/upload-artifact@v4
-        with:
-          name: lean-toolchain-0
-          path: /tmp/lean-toolchain.part-0
-          compression-level: 0
-      - name: Upload pinned Lean toolchain part 1
-        uses: actions/upload-artifact@v4
-        with:
-          name: lean-toolchain-1
-          path: /tmp/lean-toolchain.part-1
-          compression-level: 0
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build LinearBound AlternationBound SlotBound ReplayFacts PairBound SupportBound SupportMove EdgeReversal ReversalFacts MonotoneSupport HiddenFibre HiddenAbsorb HiddenDichotomy ThreeQuarterArithmetic ComponentCapacity ProfileCodeBound SupportSize LobeAbsorption EpochAggregation TreeReplay TreeEpochCode RootRank
+          lake build LinearBound AlternationBound SlotBound ReplayFacts PairBound SupportBound SupportMove EdgeReversal ReversalFacts MonotoneSupport HiddenFibre HiddenAbsorb HiddenDichotomy ThreeQuarterArithmetic ComponentCapacity ProfileCodeBound SupportSize LobeAbsorption EpochAggregation TreeReplay TreeEpochCode RootRank StarIndependent ActiveLobes
