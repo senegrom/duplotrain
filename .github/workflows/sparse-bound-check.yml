@@ -1,0 +1,26 @@
+name: Sparse full-edge bound Lean check
+on:
+  push:
+    branches: [agent/linear-bound-current]
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build existing proof chain
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build RootRank
+      - name: Check sparse-code fallback
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake env lean SparseFullCode.lean
+          lake env lean SparseArithmeticCore.lean
