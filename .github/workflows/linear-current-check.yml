@@ -21,6 +21,16 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Archive pinned Lean toolchain
+        run: |
+          tar -C "$HOME/.elan/toolchains" -czf /tmp/lean-toolchain.tar.gz \
+            leanprover--lean4---v4.32.2
+      - name: Upload pinned Lean toolchain
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-toolchain
+          path: /tmp/lean-toolchain.tar.gz
+          compression-level: 0
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
