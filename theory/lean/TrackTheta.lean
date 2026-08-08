@@ -1838,6 +1838,61 @@ theorem ManufacturedReflector.orientedRoute_simple
       · simpa [ManufacturedReflector.orientedRoute, hselected] using
           R.reverse_support_simple
 
+/-- The selected one-way route is no longer than the complete out-and-back
+reflector traversal. -/
+theorem ManufacturedReflector.orientedRoute_length_le_travel
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e) (state : Tongues) :
+    (A.orientedRoute state).length ≤ A.toSupported.travel := by
+  cases A with
+  | stay R =>
+      simp [ManufacturedReflector.orientedRoute,
+        ManufacturedReflector.toSupported,
+        ManufacturedStayReflector.toSupported]
+      omega
+  | flip R =>
+      by_cases hselected :
+          state R.actionSwitch = bval R.firstArm
+      · simp [ManufacturedReflector.orientedRoute, hselected,
+          ManufacturedReflector.toSupported,
+          ManufacturedFlipReflector.toSupported]
+        omega
+      · simp [ManufacturedReflector.orientedRoute, hselected,
+          ManufacturedReflector.toSupported,
+          ManufacturedFlipReflector.toSupported,
+          reversePassages_length]
+        omega
+
+/-- Cancel any physical prefix of the selected outward route from the full
+reflector run.  The remaining deterministic suffix starts at the exposed
+edge and still reaches the reflector's far boundary with its advertised
+local action. -/
+theorem ManufacturedReflector.complete_after_oriented_prefix
+    {w : Wiring} {g e outside : Nat}
+    (A : ManufacturedReflector w g e) (state : Tongues)
+    (hpaths : PathGrooves A.toSupported.paths state)
+    {lead rest : List Passage}
+    (hsplit : A.orientedRoute state = lead ++ rest)
+    (hprefix : PhysicalTrace w (g, state) lead (outside, state)) :
+    ∃ tailSteps,
+      A.toSupported.travel = lead.length + tailSteps ∧
+      stepN w tailSteps (outside, state) =
+        some (e, A.toSupported.action.apply state) := by
+  have hprefixLeRoute : lead.length ≤
+      (A.orientedRoute state).length := by
+    rw [hsplit]
+    simp
+  have hprefixLeTravel : lead.length ≤ A.toSupported.travel :=
+    Nat.le_trans hprefixLeRoute
+      (A.orientedRoute_length_le_travel state)
+  let tailSteps := A.toSupported.travel - lead.length
+  have hlen : A.toSupported.travel = lead.length + tailSteps := by
+    dsimp [tailSteps]
+    omega
+  have hfull := (A.toSupported.run state hpaths).1
+  refine ⟨tailSteps, hlen, ?_⟩
+  exact suffix_after_physical_prefix hprefix hlen hfull
+
 /-- Every reusable support passage occurs on the selected outward route,
 possibly in the opposite orientation when the candy is traversed backwards.
 -/
@@ -2872,10 +2927,13 @@ theorem ManufacturedReflector.ForwardOrientedFault.spliced_lobe_reflector
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
     (hfault : A.ForwardOrientedFault B) :
-    ∃ (mouth outside : Nat) (candy : List Passage),
+    ∃ (mouth outside : Nat) (candy : List Passage)
+        (state : Tongues) (tailSteps : Nat),
       IsReflector w mouth outside (candy.length + 2)
         (fun state => PassagesGrooved state candy)
-        (fun state => flipAt state (mouth / 3)) := by
+        (fun state => flipAt state (mouth / 3)) ∧
+      stepN w tailSteps (outside, state) =
+        some (e, A.toSupported.action.apply state) := by
   obtain ⟨approach, p, x, suffix, u, v, oriented, repaired,
       hsplit, happroach, hpaths, harrive, hchanged,
       horiented, horientedGroove, _horientedSwitch,
@@ -2990,7 +3048,18 @@ theorem ManufacturedReflector.ForwardOrientedFault.spliced_lobe_reflector
   subst middle
   cases hOldAfter with
   | @cons _ _ outside _ oldAfter _ _ _hOldArrive hmouth _oldRest =>
-      refine ⟨s, outside, candy, ?_⟩
+      have hcontactTrace : PhysicalTrace w (a, u) [(a, s)]
+          (outside, u) :=
+        PhysicalTrace.cons (groove_forward horientedGroove) hmouth
+          (PhysicalTrace.nil _)
+      have hlead := hOldPrefixData.1.append hcontactTrace
+      have hleadSplit : A.orientedRoute u =
+          (oldPrefix ++ [(a, s)]) ++ oldTail := by
+        rw [hrouteSplit]
+        simp [List.append_assoc]
+      obtain ⟨tailSteps, _hlen, hcomplete⟩ :=
+        A.complete_after_oriented_prefix u hpaths hleadSplit hlead
+      refine ⟨s, outside, candy, u, tailSteps, ?_, hcomplete⟩
       exact stem_lobe_isReflector_foreign w candy
         hsStem haBranch hpBranch hsa hsp hap hCandyForeign
         hsplice.linked hsplice.last_link hmouth
