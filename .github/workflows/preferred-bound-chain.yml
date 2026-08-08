@@ -1,0 +1,38 @@
+name: Preferred strict-bound Lean chain
+on:
+  push:
+    branches: [agent/linear-bound-current]
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build established support base
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build ThreeQuarterArithmetic SupportMove HiddenAbsorb
+      - name: Check preferred strict-bound chain
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake env lean BlockSparseBoundCore.lean
+          lake env lean BlockSparseFixedCountCore.lean
+          lake env lean EndpointAccountingStandalone.lean
+          lake env lean BlockAbstractEpochBoundCore.lean
+          lake env lean LobeBooleanCodeCore.lean
+          lake env lean StarPairCountingCore.lean
+          lake env lean PersistentLobeSeparationStandalone.lean
+          lake env lean NoFullFreezeCore.lean
+          lake env lean PairedReachReplay.lean
+          lake env lean FullReachPersistencePaired.lean
+          lake env lean PairedNoFullReachFreeze.lean
+          lake env lean PairedPointwiseReplayCore.lean
+          lake env lean PairedBlockEpochStrictBound.lean
+          lake env lean BlockEpochAggregation.lean
