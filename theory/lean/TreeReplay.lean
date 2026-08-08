@@ -117,9 +117,11 @@ theorem rootedCells_sameEdge_replay
     rcases hfg with rfl | h
     · exact hfullJ
     · subst g
-      exact ⟨hfullJ.2, by
-        rw [m.bar_invol]
-        exact hfullJ.1⟩
+      constructor
+      · have h := hfullJ.2
+        rw [m.bar_invol] at h
+        exact h
+      · exact hfullJ.1
   exact rootedCells_snap_replay m e r0 hr0 cells hsupport
     hfullI hfullJf hroot
 
