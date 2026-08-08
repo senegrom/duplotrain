@@ -22,7 +22,6 @@ def EdgeRepresentatives (edges : List Nat) : Prop :=
   ∀ s, s ∈ edges → ∀ t, t ∈ edges → SameEdge m s t → s = t
 
 /-- Pick a confirmed endpoint when the edge is occupied. -/
-open Classical in
 noncomputable def chosenEndpoint (k s : Nat) : Nat :=
   if Confirmed m e r0 k s then s else m.bar s
 
@@ -46,7 +45,7 @@ theorem sameEdge_trans {a b c : Nat}
     (hab : SameEdge m a b) (hbc : SameEdge m b c) :
     SameEdge m a c := by
   rcases hab with hab | hab <;> rcases hbc with hbc | hbc
-  · exact Or.inl (hbc.trans hab.symm)
+  · exact Or.inl (hbc.trans hab)
   · subst b
     exact Or.inr hbc
   · subst c
