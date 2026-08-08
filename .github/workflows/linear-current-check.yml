@@ -23,15 +23,23 @@ jobs:
           export PATH="$HOME/.elan/bin:$PATH"
           elan toolchain install "$(cat lean-toolchain)"
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-      - name: Archive pinned Lean toolchain
+      - name: Archive and split pinned Lean toolchain
         run: |
           tar -C "$HOME/.elan/toolchains" -czf /tmp/lean-toolchain.tar.gz \
             leanprover--lean4---v4.32.2
-      - name: Upload pinned Lean toolchain
+          split -b 400M -d -a 1 /tmp/lean-toolchain.tar.gz \
+            /tmp/lean-toolchain.part-
+      - name: Upload pinned Lean toolchain part 0
         uses: actions/upload-artifact@v4
         with:
-          name: lean-toolchain
-          path: /tmp/lean-toolchain.tar.gz
+          name: lean-toolchain-0
+          path: /tmp/lean-toolchain.part-0
+          compression-level: 0
+      - name: Upload pinned Lean toolchain part 1
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-toolchain-1
+          path: /tmp/lean-toolchain.part-1
           compression-level: 0
       - name: Build proof targets
         run: |
