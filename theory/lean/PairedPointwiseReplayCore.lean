@@ -22,17 +22,22 @@ variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
 /-- Every full edge at a selected time has a representative in `edges`. -/
 def PairedAllFullRepresented
+    (m : Machine) (e r0 : Nat → Nat)
     (times : Nat → Prop) (edges : List Nat) : Prop :=
   ∀ k, times k → ∀ f, Full m e r0 k f →
     ∃ g, g ∈ edges ∧ SameEdge m f g
 
 /-- One coordinate is constant over the interval. -/
-def PairedPointFrozen (lo hi c : Nat) : Prop :=
-  ∀ i, lo ≤ i → i ≤ hi → ∀ j, lo ≤ j → j ≤ hi,
-    reg m e r0 i c = reg m e r0 j c
+def PairedPointFrozen
+    (m : Machine) (e r0 : Nat → Nat)
+    (lo hi c : Nat) : Prop :=
+  ∀ i, lo ≤ i → i ≤ hi →
+    ∀ j, lo ≤ j → j ≤ hi →
+      reg m e r0 i c = reg m e r0 j c
 
 /-- Exhaustive replay classification. -/
 def PairedReplayCover
+    (m : Machine) (e r0 : Nat → Nat)
     (lo hi : Nat) (cells lobes : List Nat) : Prop :=
   ∀ c ∈ cells,
     (∃ a, a ∈ lobes ∧ m.cellOf a = c) ∨
