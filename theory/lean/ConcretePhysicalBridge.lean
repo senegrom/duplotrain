@@ -1,5 +1,6 @@
 import StateLaw
 import PhysicalPrefixCount
+import FiniteListBounds
 
 /-!
 # Correct full physical-run bridge
@@ -75,7 +76,7 @@ theorem strict_physical_bound_of_overwriteCompilation
           (Echo.blockCoreEighth (4*N + 2) * 2^(7*N+18))) := by
   let observed := fun k => tonguesAt w c0 k
   have hndObserved : (sample.map observed).Nodup := by
-    apply nodup_map_of_fibre sample observed
+    apply FiniteListBounds.nodup_map_of_fibre sample observed
       (fun k => VectorCount.restrict N (tonguesAt w c0 k))
     · intro i hi j hj heq
       exact congrArg (VectorCount.restrict N) heq
@@ -138,7 +139,7 @@ theorem strictPhysicalStateLaw_of_compilation
         Echo.blockCoreEighth sample.length ≤
           Echo.blockCoreEighth (2 * (N + 1)) *
             (Echo.blockCoreEighth (2*N) *
-              (Echo.blockCoreEighth (4*N + 2) * 2^(7*N+18)) ) := by
+              (Echo.blockCoreEighth (4*N + 2) * 2^(7*N+18))) := by
   intro w N hN c0 sample hlive hnd
   obtain ⟨globalLo, globalHi, ⟨comp⟩⟩ :=
     hcompile w N hN c0 sample hlive
