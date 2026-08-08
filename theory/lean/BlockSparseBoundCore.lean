@@ -163,16 +163,8 @@ theorem blockCoreFourth_mul (x y : Nat) :
 theorem blockCoreFourth_two_pow (A : Nat) :
     fourth (2^A) = 2^(4*A) := by
   unfold fourth
-  calc
-    (2^A * 2^A) * (2^A * 2^A)
-        = 2^(A+A) * 2^(A+A) := by
-            exact congrArg₂ (fun x y : Nat => x * y)
-              (Nat.pow_add 2 A A).symm
-              (Nat.pow_add 2 A A).symm
-    _ = 2^((A+A)+(A+A)) :=
-      (Nat.pow_add 2 (A+A) (A+A)).symm
-    _ = 2^(4*A) := by
-      congr 1 <;> omega
+  simp only [← Nat.pow_add]
+  congr 1 <;> omega
 
 /-- Three bits of capacity per four coordinates, with a base-case constant. -/
 theorem blockUniverseCore_fourth_bound : ∀ n : Nat,
