@@ -510,7 +510,7 @@ private theorem nodup_subset_length_nat {xs pool : List Nat}
         | cons _ _ => simp
       omega
 
-private theorem nodup_nat_lt_length {N : Nat} {xs : List Nat}
+theorem nodup_nat_lt_length {N : Nat} {xs : List Nat}
     (hnd : xs.Nodup) (hlt : ∀ x ∈ xs, x < N) :
     xs.length ≤ N := by
   have hsub : ∀ x ∈ xs, x ∈ List.range N := by
@@ -521,7 +521,7 @@ private theorem nodup_nat_lt_length {N : Nat} {xs : List Nat}
 
 /-- Scan a list from the front until either it ends without repetition under
 `key`, or the next element repeats a key in the preceding simple prefix. -/
-private theorem first_repeat_by {α : Type} (key : α → Nat) :
+theorem first_repeat_by {α : Type} (key : α → Nat) :
     ∀ xs : List α,
       (xs.map key).Nodup ∨
         ∃ before repeated after,

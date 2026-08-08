@@ -167,9 +167,20 @@ structural induction (no `native_decide`, no `sorry`):
 (any cascade length, any gadget size, any N) — the mechanism that caps every
 observed cycle at 4 vectors, formalised.
 
-**Direct physical-track route (`TrackTrace.lean`, `TrackLobe.lean`,
-`TrackNormalForm.lean`).**  This is the current shortest route to the raw
-state law and does not pass through an assumed echo compiler:
+**Direct physical-track route (`TrackTrace.lean`, `TrackEdge.lean`,
+`TrackLobe.lean`, `TrackNormalForm.lean`).**  This is the current shortest
+route to the raw state law and does not pass through an assumed echo
+compiler.  `TrackEdge.lean` formalises the first-repeated-physical-edge proof
+of Chalcraft--Greene and Aaronson directly over `Wiring`:
+
+* `wireEdgeRep_eq_iff`: canonical edge-name equality is exactly equality up
+  to reversing the symmetric track edge.
+* `PhysicalTrace.switchSimple_of_edgeSimpleFrom`: **Observation 1**, including
+  the starting edge: before any physical edge repeats, no switch repeats.
+* `PhysicalTrace.edgeSimpleFrom_length_lt` and
+  `physical_edge_repeats_of_long_run`: an `N`-switch live run repeats a
+  physical edge by step `3*N`; this is a kernel-checked linear cutoff, not a
+  finiteness assumption.
 
 * `first_revisit_of_long_run`: every live `N+1`-passage run has a first
   revisited switch after a switch-simple prefix of length at most `N`.
@@ -187,11 +198,14 @@ state law and does not pass through an assumed echo compiler:
   local actions avoid one another's supports have a genuine period, by the
   four-corner Gray composition.
 
-The raw `StateLaw` remains **OPEN**.  The remaining direct-route theorem is
-the theta-intersection lemma: when the second simple exploration first meets
-the first reflector's support, it settles on a simple cycle; otherwise its
-new reflector support is disjoint, so `paired_period` applies.  No other
-dynamical or counting hypothesis remains on this route.
+The raw `StateLaw` remains **OPEN**.  The new edge cutoff and Observation 1
+close the combinatorial front end of the classical proof.  What remains is
+to formalise its orientation case split after the first repeated edge
+(same-direction simple cycle; reverse-direction line/lollipop/dumbbell; the
+degree-three theta collapse), and then count the linear transient plus the
+at-most-four-state attractor.  The older first-repeated-switch route still
+has an equivalent forward-theta residual; neither residual is being called
+proved.
 
 **`EchoMachine.lean` — the abstracted cycle dynamics** (T9 in
 ../lazy-point-theory.md): any wiring's trailing structure compiles to a
