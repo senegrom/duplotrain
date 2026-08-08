@@ -109,7 +109,9 @@ theorem treeCode_eq_snap_eq
       intro i j hi hj hsupport hcode
       have hpair : b.fullAt i = b.fullAt j ∧
           treeCode m e r0 rest i = treeCode m e r0 rest j := by
-        simpa only [treeCode, List.map_cons, List.cons.injEq] using hcode
+        change b.fullAt i :: treeCode m e r0 rest i =
+          b.fullAt j :: treeCode m e r0 rest j at hcode
+        exact List.cons.inj hcode
       have hhead : snap m e r0 b.cells j = snap m e r0 b.cells i := by
         exact rootedCells_sameEdge_replay m e r0 hr0 b.cells
           hsupport (b.full_full i hi) (b.full_full j hj)

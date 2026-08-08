@@ -1,7 +1,7 @@
-name: Future entry bound Lean check
+name: Standalone sparse combinatorics Lean check
 on:
   push:
-    branches: [agent/future-entry-bound]
+    branches: [agent/linear-bound-current]
   workflow_dispatch:
 jobs:
   lean:
@@ -11,13 +11,15 @@ jobs:
         working-directory: theory/lean
     steps:
       - uses: actions/checkout@v4
-      - name: Install elan and pinned Lean toolchain
+      - name: Install Lean
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
-          export PATH="$HOME/.elan/bin:$PATH"
-          elan toolchain install "$(cat lean-toolchain)"
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-      - name: Build proof targets
+      - name: Build arithmetic base
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build
+          lake build ThreeQuarterArithmetic
+      - name: Check standalone sparse theorem
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake env lean SparseCombinatorics.lean
