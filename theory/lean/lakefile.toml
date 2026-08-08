@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank", "StarIndependent", "ActiveLobes", "FixedSupportBound", "GrayTailCount", "GrayTailAggregation", "LobeBits", "CertifiedEpochBound", "RecencyRank", "RecencyTreeBlock", "NoFullFixed", "SupportTreeFull", "AutomaticTreeBlock", "AutomaticCycleFixed", "AutomaticEpochBound", "BoundaryReplay", "LobeForestBlock", "LobeForestActive", "MixedEpochBound", "LobeForestPartition", "CanonicalProjectedEpochFrame", "CanonicalPreTailGlobalBound", "CanonicalGlobalAbsorbedBound"]
+defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank", "StarIndependent", "ActiveLobes", "FixedSupportBound", "GrayTailCount", "GrayTailAggregation", "LobeBits", "CertifiedEpochBound", "RecencyRank", "RecencyTreeBlock", "NoFullFixed", "SupportTreeFull", "AutomaticTreeBlock", "AutomaticCycleFixed", "AutomaticEpochBound", "BoundaryReplay", "LobeForestBlock", "LobeForestActive", "MixedEpochBound", "LobeForestPartition", "CanonicalProjectedEpochFrame", "CanonicalPreTailGlobalBound", "CanonicalGlobalAbsorbedBound", "CertifiedLobeAbsorption", "SupportRelativeCertifiedEpochBound", "CanonicalCertifiedEpochBound", "CanonicalNoCertifiedGlobalBound", "CanonicalUnconditionalGlobalBound", "FiniteFrameSwitchCorollary"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -147,3 +147,21 @@ name = "CanonicalPreTailGlobalBound"
 
 [[lean_lib]]
 name = "CanonicalGlobalAbsorbedBound"
+
+[[lean_lib]]
+name = "CertifiedLobeAbsorption"
+
+[[lean_lib]]
+name = "SupportRelativeCertifiedEpochBound"
+
+[[lean_lib]]
+name = "CanonicalCertifiedEpochBound"
+
+[[lean_lib]]
+name = "CanonicalNoCertifiedGlobalBound"
+
+[[lean_lib]]
+name = "CanonicalUnconditionalGlobalBound"
+
+[[lean_lib]]
+name = "FiniteFrameSwitchCorollary"
