@@ -1,0 +1,38 @@
+name: Seven-tenths component bound Lean check
+on:
+  push:
+    branches: [agent/linear-bound-current]
+    paths:
+      - theory/lean/TreeCapacitySevenTenths.lean
+      - theory/lean/SevenTenthsAggregation.lean
+      - theory/lean/MixedEpochBound.lean
+      - theory/lean/TreeEpochCode.lean
+      - theory/lean/ComponentCapacity.lean
+      - theory/lean/ThreeQuarterArithmetic.lean
+      - .github/workflows/seven-tenths-bound-check.yml
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register theorem targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "TreeCapacitySevenTenths"
+          [[lean_lib]]
+          name = "SevenTenthsAggregation"
+          EOF
+      - name: Build seven-tenths theorems
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build TreeCapacitySevenTenths SevenTenthsAggregation
