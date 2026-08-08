@@ -49,10 +49,22 @@ theorem canonical_noCertified_supportWeight_fibre_bound
       have hhiMemF : hi ∈ fibre := by
         rw [hfibre]
         exact fibreMaxFrom_mem x rest
-      have hloData := List.mem_filter.mp (by
-        simpa [fibre] using hloMemF)
-      have hhiData := List.mem_filter.mp (by
-        simpa [fibre] using hhiMemF)
+      have hloInFilter :
+          lo ∈ ks.filter
+            (fun k => supportWeight m e r0 slots k = q) := by
+        simpa only [fibre] using hloMemF
+      have hhiInFilter :
+          hi ∈ ks.filter
+            (fun k => supportWeight m e r0 slots k = q) := by
+        simpa only [fibre] using hhiMemF
+      have hloFilter := List.mem_filter.mp hloInFilter
+      have hhiFilter := List.mem_filter.mp hhiInFilter
+      have hloData :
+          lo ∈ ks ∧ supportWeight m e r0 slots lo = q :=
+        ⟨hloFilter.1, of_decide_eq_true hloFilter.2⟩
+      have hhiData :
+          hi ∈ ks ∧ supportWeight m e r0 slots hi = q :=
+        ⟨hhiFilter.1, of_decide_eq_true hhiFilter.2⟩
       have hloGlobal := hks lo hloData.1
       have hhiGlobal := hks hi hhiData.1
       have hlohi : lo ≤ hi := by
