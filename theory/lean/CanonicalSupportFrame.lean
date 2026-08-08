@@ -1,5 +1,5 @@
 import CanonicalEdgeRepsCore
-import PairedNoFullReachFreeze
+import PairedPointwiseReplayCore
 
 /-!
 # Canonical finite support frame for one fixed-support epoch
@@ -21,8 +21,9 @@ namespace Echo
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
 /-- Finite slot coverage for projected cells on an interval. -/
-structure FiniteSlotFrame (lo hi : Nat)
-    (projected slots : List Nat) where
+structure FiniteSlotFrame
+    (m : Machine) (e r0 : Nat → Nat)
+    (lo hi : Nat) (projected slots : List Nat) where
   slots_nodup : slots.Nodup
   bar_closed : ∀ s ∈ slots, m.bar s ∈ slots
   bar_ne : ∀ s ∈ slots, m.bar s ≠ s
@@ -32,10 +33,11 @@ structure FiniteSlotFrame (lo hi : Nat)
     Confirmed m e r0 k x → m.cellOf x ∈ projected
 
 /-- Canonical occupied support representatives at a reference time. -/
-open Classical in
 noncomputable def canonicalSupportEdges
-    (slots : List Nat) (k0 : Nat) : List Nat :=
-  (canonicalEdgesCore m slots).filter
+    (m : Machine) (e r0 : Nat → Nat)
+    (slots : List Nat) (k0 : Nat) : List Nat := by
+  classical
+  exact (canonicalEdgesCore m slots).filter
     (fun s => Occupied m e r0 k0 s)
 
 /-- Same-edge representatives have equivalent occupancy. -/
@@ -55,7 +57,7 @@ theorem canonicalSupportEdges_ordered
   intro s hs
   have hc : s ∈ canonicalEdgesCore m slots :=
     (List.mem_filter.mp hs).1
-  exact (mem_canonicalEdgesCore_iff.mp hc).2
+  exact ((mem_canonicalEdgesCore_iff (m := m)).mp hc).2
 
 /-- Support-edge representatives remain duplicate-free. -/
 theorem canonicalSupportEdges_nodup
@@ -71,8 +73,8 @@ theorem canonicalSupportEdgeEnds_nodup
       (canonicalSupportEdges m e r0 slots k0)).Nodup := by
   apply orderedEdgeEndsCore_nodup m
     (canonicalSupportEdges m e r0 slots k0)
-    (canonicalSupportEdges_nodup m hnd k0)
-    (canonicalSupportEdges_ordered m slots k0)
+    (canonicalSupportEdges_nodup m e r0 hnd k0)
+    (canonicalSupportEdges_ordered m e r0 slots k0)
 
 /-- Every support representative is occupied at the reference time. -/
 theorem canonicalSupportEdges_occupied_at_ref
@@ -81,7 +83,7 @@ theorem canonicalSupportEdges_occupied_at_ref
       Occupied m e r0 k0 s := by
   classical
   intro s hs
-  exact (List.mem_filter.mp hs).2
+  exact of_decide_eq_true (List.mem_filter.mp hs).2
 
 /-- A selected projected register is represented by the common endpoint list. -/
 theorem frame_selected_in_support_ends
@@ -110,11 +112,15 @@ theorem frame_selected_in_support_ends
     (hsupport g).mpr hgOccK
   have hgSupport : g ∈ canonicalSupportEdges m e r0 slots k0 := by
     classical
-    exact List.mem_filter.mpr ⟨hg, hgOcc0⟩
+    exact List.mem_filter.mpr ⟨hg, decide_eq_true hgOcc0⟩
   have hends := core_rep_endpoints_mem m hgSupport
-  rcases hsg with rfl | hsg
-  · exact hends.1
+  rcases hsg with hsg | hsg
   · rw [hsg]
+    exact hends.1
+  · have hb := congrArg m.bar hsg
+    have hbar : m.bar g = s := by
+      simpa [m.bar_invol] using hb
+    rw [← hbar]
     exact hends.2
 
 /-- Every full edge has a common support representative. -/
@@ -148,13 +154,13 @@ theorem frame_allFull_represented
     (hsupport g).mpr hgOccK
   have hgSupport : g ∈ canonicalSupportEdges m e r0 slots k0 := by
     classical
-    exact List.mem_filter.mpr ⟨hg, hgOcc0⟩
+    exact List.mem_filter.mpr ⟨hg, decide_eq_true hgOcc0⟩
   exact ⟨g, hgSupport, hfg⟩
 
 /-- Every common support representative remains occupied throughout the epoch. -/
 theorem frame_support_edges_occupied
     {lo hi : Nat} {projected slots : List Nat}
-    (frame : FiniteSlotFrame m e r0 lo hi projected slots)
+    (_frame : FiniteSlotFrame m e r0 lo hi projected slots)
     (hfixed : PairedSupportFixed m e r0 lo hi)
     {k0 : Nat}
     (hk0Lo : lo ≤ k0) (hk0Hi : k0 ≤ hi) :
