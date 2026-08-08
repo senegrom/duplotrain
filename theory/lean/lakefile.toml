@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank", "StarIndependent", "ActiveLobes", "FixedSupportBound", "GrayTailCount", "GrayTailAggregation", "LobeBits", "CertifiedEpochBound", "RecencyRank", "RecencyTreeBlock", "NoFullFixed"]
+defaultTargets = ["DuplotrainProofs", "GeneralN", "EchoMachine", "VectorCount", "StateLaw", "LinearBound", "AlternationBound", "SlotBound", "ReplayFacts", "PairBound", "SupportBound", "SupportMove", "EdgeReversal", "ReversalFacts", "MonotoneSupport", "HiddenFibre", "HiddenAbsorb", "HiddenDichotomy", "ThreeQuarterArithmetic", "ComponentCapacity", "ProfileCodeBound", "SupportSize", "LobeAbsorption", "EpochAggregation", "TreeReplay", "TreeEpochCode", "RootRank", "StarIndependent", "ActiveLobes", "FixedSupportBound", "GrayTailCount", "GrayTailAggregation", "LobeBits", "CertifiedEpochBound", "RecencyRank", "RecencyTreeBlock", "NoFullFixed", "SupportTreeFull", "AutomaticTreeBlock", "AutomaticCycleFixed", "AutomaticEpochBound", "BoundaryReplay", "LobeForestBlock", "LobeForestActive", "MixedEpochBound", "LobeForestPartition"]
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -111,3 +111,30 @@ name = "RecencyTreeBlock"
 
 [[lean_lib]]
 name = "NoFullFixed"
+
+[[lean_lib]]
+name = "SupportTreeFull"
+
+[[lean_lib]]
+name = "AutomaticTreeBlock"
+
+[[lean_lib]]
+name = "AutomaticCycleFixed"
+
+[[lean_lib]]
+name = "AutomaticEpochBound"
+
+[[lean_lib]]
+name = "BoundaryReplay"
+
+[[lean_lib]]
+name = "LobeForestBlock"
+
+[[lean_lib]]
+name = "LobeForestActive"
+
+[[lean_lib]]
+name = "MixedEpochBound"
+
+[[lean_lib]]
+name = "LobeForestPartition"
