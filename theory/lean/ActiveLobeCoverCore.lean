@@ -18,12 +18,15 @@ namespace Echo
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
 /-- Cell `c` is written strictly after `lo` and no later than `hi`. -/
-def CellWrittenIn (lo hi c : Nat) : Prop :=
+def CellWrittenIn
+    (m : Machine) (e r0 : Nat → Nat)
+    (lo hi c : Nat) : Prop :=
   ∃ l, lo < l ∧ l ≤ hi ∧ m.cellOf (e l) = c
 
 /-- Every structurally lobed represented cell which is written in the interval
 has a representative in the active-lobe list. -/
 def ActiveLobesComplete
+    (m : Machine) (e r0 : Nat → Nat)
     (lo hi : Nat) (cells lobes : List Nat) : Prop :=
   ∀ c ∈ cells,
     (∃ a, m.cellOf a = c ∧ m.cellOf (m.bar a) = c) →
