@@ -393,15 +393,37 @@ run:
   productive write lands in its start cell can never reach that
   cell's mouth partner at all: **a lone alternating cell cannot steer
   itself** — the self-steering half of "no `(2)`-alone profile",
-  machine-checked for all N.  (The full m ≠ 1 on cycles additionally
-  needs the frozen-witness routing case, which reduces to
-  `divergence_names_steer` naming `star C` as a visited cell; the
-  assembly over eventual periodicity is the remaining step.)
+  machine-checked for all N.
+* **Every run is a rho** (`Periodicity.lean`: `state_repeat`,
+  `run_eventually_periodic`, `run_rho`): the pair (current entry,
+  registers) evolves autonomously in a finite space, so within
+  `|slots|^(|cells|+1) + 1` steps some state recurs and determinism
+  replays the stretch forever — pre-period and period explicitly
+  bounded, and on the tail entries *and* registers are periodic while
+  every productive step re-emits its token (`recurrence_emission`
+  instantiated on a real cycle, not a hypothetical one).
+* **m ≠ 1 on cycles: the lone writer freezes** (`LoneWriter.lean`).
+  If all productive steps of the periodic tail write one cell `C`,
+  foreign registers freeze; the walk can never stand at `star C`
+  after visiting `C` (the retrace palindrome), and a cell is only
+  ever *read* from its mouth partner — so `C`'s variation is
+  invisible to the routing.  Any two `C`-visits then have identical
+  futures (`lone_merge`), periodicity turns merged futures into
+  equal deliveries (`lone_arrivals_agree`), and `C` freezes too:
+  there are **no productive steps at all** (`lone_writer_quiet`).
+  Headline, composed with the rho theorem
+  (`rho_quiet_or_two_mouths`): **every eventual cycle is completely
+  quiet or steered from at least two distinct cells** — the dynamic
+  half of the one-mouth theorem, machine-checked for all N.  The
+  lone-alternating-tree case of lemma B is dead outright.
 
 Together these turn lemma B into a single sharp question: **can three
 or more tokens of the cycle's conserved population actually be
 consumed on the cycle?**  Every exhaustion says no — the population's
-effective size is 0 (functional collapse) or 2 (the Gray pair).
+effective size is 0 (functional collapse) or 2 (the Gray pair).  With
+m ≠ 1 proved, the open profiles are exactly: m = 0 (quiet — done,
+snapshots frozen), m = 2 (show it is the Gray pair, ≤ 4 vectors), and
+m ≥ 3 (show it cannot happen).
 
 ## f(N) ≤ N + O(1): what remains
 

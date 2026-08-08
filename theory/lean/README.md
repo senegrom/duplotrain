@@ -1,8 +1,24 @@
 # Formal proofs (Lean 4)
 
-Nineteen libraries, all self-contained (no Mathlib).  Core five below;
+Twenty libraries, all self-contained (no Mathlib).  Core five below;
 plus the accounting/monovariant satellites (all sorry-free, honestly
 conditional where marked):
+
+* `LoneWriter.lean` — **m ≠ 1 on cycles: the lone writer freezes.**
+  If every productive step of a periodic tail writes into a single
+  cell `C`, then every register — including `C`'s own — is constant,
+  and there are no productive steps at all.  The engine: foreign
+  registers freeze (`lone_frozen_foreign`); the walk can never stand
+  at `star C` after visiting `C` (`lone_no_partner`, by the retrace
+  palindrome), and a cell is only ever *read* from its partner, so
+  the lone writer's variation is invisible to its own steering; any
+  two `C`-visits therefore have identical futures (`lone_merge`), and
+  periodicity turns merged futures into equal deliveries
+  (`lone_arrivals_agree`), freezing `C` too.  Headline:
+  `rho_quiet_or_two_mouths` — **every eventual cycle is completely
+  quiet or steered from at least two distinct cells**, for every
+  machine, every run, every `N`.  The dynamic half of the one-mouth
+  theorem, and the death of the lone-alternating-tree case of lemma B.
 
 * `Periodicity.lean` — **every run is a rho**: the state (current
   entry + registers of the listed cells) evolves autonomously and
@@ -141,6 +157,9 @@ with A the run's alternation count.  The lobed case of B is proved
 outright (`absorb`).  The eventual cycle itself is no longer
 hypothetical: `Periodicity.run_rho` proves every run enters one, with
 explicit bounds, periodic registers, and conserved tokens on the tail.
+On that cycle the single-mouth case is now dead:
+`LoneWriter.rho_quiet_or_two_mouths` proves every cycle is quiet or
+steered from ≥ 2 cells — a lone alternating cell freezes outright.
 The pedigree/conservation theorems reduce B to a
 single sharp question: the cycle's conserved, repertoire-spanning
 token population (`recurrence_emission` + `future_register`) — can
