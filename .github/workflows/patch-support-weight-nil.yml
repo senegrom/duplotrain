@@ -9,30 +9,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Replace the final fibre base case
+      - name: Install the zero-sum fibre base lemma
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
 
           path = Path("theory/lean/SupportWeightFibres.lean")
           text = path.read_text()
-          pattern = re.compile(
-              r"  \| nil =>\n\s+intro _\n\s+simp \[supportFibreSizes, supportFibreSize\]"
-          )
+
+          marker = """      omega
+
+          /-- Integer fibres below `K` partition the list exactly. -/
+          """
+          insertion = """      omega
+
+          private theorem sum_map_zero_nat {α : Type}
+              (xs : List α) :
+              (xs.map (fun _ => 0)).sum = 0 := by
+            induction xs with
+            | nil => rfl
+            | cons _ rest ih => simp [ih]
+
+          /-- Integer fibres below `K` partition the list exactly. -/
+          """
+          if "private theorem sum_map_zero_nat" not in text:
+              if marker not in text:
+                  raise SystemExit("zero-sum insertion point did not match")
+              text = text.replace(marker, insertion, 1)
+
+          old = """  | nil =>
+            intro _
+            unfold supportFibreSizes
+            induction K with
+            | zero => rfl
+            | succ K ih =>
+                rw [List.range_succ, List.map_append, List.sum_append]
+                simp [supportFibreSize, ih]
+          """
           new = """  | nil =>
-              intro _
-              unfold supportFibreSizes
-              induction K with
-              | zero => rfl
-              | succ K ih =>
-                  rw [List.range_succ, List.map_append, List.sum_append]
-                  simp [supportFibreSize, ih]"""
-          updated, count = pattern.subn(new, text, count=1)
-          if count == 1:
-              path.write_text(updated)
-          elif "induction K with" not in text:
-              raise SystemExit("support-weight nil branch did not match")
+            intro _
+            unfold supportFibreSizes
+            simpa [supportFibreSize] using
+              (sum_map_zero_nat (List.range K))
+          """
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit("support-weight nil proof did not match")
+
+          path.write_text(text)
           PY
       - name: Commit repair
         run: |
@@ -40,6 +65,6 @@ jobs:
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
             git add theory/lean/SupportWeightFibres.lean
-            git commit -m "prove the support-fibre empty-list base case"
+            git commit -m "factor the support-fibre zero-sum base case"
             git push origin HEAD:agent/linear-bound-current
           fi
