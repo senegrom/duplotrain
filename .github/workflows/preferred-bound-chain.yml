@@ -66,13 +66,293 @@ jobs:
 
           path.write_text(text)
           PY
-      - name: Commit the proof-source repair
+      - name: Repair support-weight fibre lemmas
         run: |
-          if ! git diff --quiet -- CanonicalProjectedEpochFrame.lean; then
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("SupportWeightFibres.lean")
+          text = path.read_text()
+
+          def replace_once(label: str, old: str, new: str) -> None:
+              global text
+              if old in text:
+                  text = text.replace(old, new, 1)
+              elif new not in text:
+                  raise SystemExit(f"{label} did not match")
+
+          replace_once(
+              "supportFibreSize_cons",
+              "  by_cases h : f x = q <;> simp [supportFibreSize, h]\n",
+              "  by_cases h : f x = q <;>\n    simp [supportFibreSize, h, Nat.add_comm]\n",
+          )
+
+          old_sum = """theorem supportFibreSizes_sum {α : Type}
+              (K : Nat) (f : α → Nat) :
+              ∀ xs : List α,
+                (∀ x ∈ xs, f x < K) →
+                (supportFibreSizes K f xs).sum = xs.length := by
+            intro xs
+            induction xs with
+            | nil =>
+                intro _
+                simp [supportFibreSizes]
+            | cons x rest ih =>
+                intro hbound
+                have hx : f x < K := hbound x List.mem_cons_self
+                have hrest : ∀ y ∈ rest, f y < K := by
+                  intro y hy
+                  exact hbound y (List.mem_cons_of_mem _ hy)
+                have hpoint :
+                    supportFibreSizes K f (x :: rest) =
+                      (List.range K).map (fun q =>
+                        (if f x = q then 1 else 0) +
+                          supportFibreSize f q rest) := by
+                  unfold supportFibreSizes
+                  apply List.map_congr_left
+                  intro q _
+                  exact supportFibreSize_cons f q x rest
+                rw [hpoint, sum_map_add_nat]
+                rw [range_indicator_one K (f x) hx, ih hrest]
+                simp
+          """
+          new_sum = """theorem supportFibreSizes_sum {α : Type}
+              (K : Nat) (f : α → Nat) :
+              ∀ xs : List α,
+                (∀ x ∈ xs, f x < K) →
+                (supportFibreSizes K f xs).sum = xs.length := by
+            intro xs
+            induction xs with
+            | nil =>
+                intro _
+                simp [supportFibreSizes, supportFibreSize]
+            | cons x rest ih =>
+                intro hbound
+                have hx : f x < K := hbound x List.mem_cons_self
+                have hrest : ∀ y ∈ rest, f y < K := by
+                  intro y hy
+                  exact hbound y (List.mem_cons_of_mem _ hy)
+                have hpoint :
+                    supportFibreSizes K f (x :: rest) =
+                      (List.range K).map (fun q =>
+                        (if f x = q then 1 else 0) +
+                          supportFibreSize f q rest) := by
+                  unfold supportFibreSizes
+                  apply List.map_congr_left
+                  intro q _
+                  exact supportFibreSize_cons f q x rest
+                rw [hpoint, sum_map_add_nat,
+                  range_indicator_one K (f x) hx]
+                change 1 + (supportFibreSizes K f rest).sum =
+                  (x :: rest).length
+                rw [ih hrest]
+                simp [Nat.add_comm]
+          """
+          replace_once("supportFibreSizes_sum", old_sum, new_sum)
+
+          old_min_mem = """theorem fibreMinFrom_mem : ∀ x xs,
+              fibreMinFrom x xs ∈ x :: xs := by
+            intro x xs
+            induction xs generalizing x with
+            | nil =>
+                simp [fibreMinFrom]
+            | cons y ys ih =>
+                unfold fibreMinFrom
+                by_cases h : x ≤ fibreMinFrom y ys
+                · rw [Nat.min_eq_left h]
+                  exact List.mem_cons_self
+                · have hle : fibreMinFrom y ys ≤ x := by omega
+                  rw [Nat.min_eq_right hle]
+                  exact List.mem_cons_of_mem _ (ih y)
+          """
+          new_min_mem = """theorem fibreMinFrom_mem : ∀ x xs,
+              fibreMinFrom x xs ∈ x :: xs := by
+            intro x xs
+            induction xs generalizing x with
+            | nil =>
+                simp [fibreMinFrom]
+            | cons y ys ih =>
+                change x.min (fibreMinFrom y ys) ∈ x :: y :: ys
+                by_cases h : x ≤ fibreMinFrom y ys
+                · have hmin : x.min (fibreMinFrom y ys) = x :=
+                    Nat.min_eq_left h
+                  exact hmin.symm ▸ List.mem_cons_self
+                · have hle : fibreMinFrom y ys ≤ x := by omega
+                  have hmin : x.min (fibreMinFrom y ys) =
+                      fibreMinFrom y ys := Nat.min_eq_right hle
+                  exact hmin.symm ▸ List.mem_cons_of_mem _ (ih y)
+          """
+          replace_once("fibreMinFrom_mem", old_min_mem, new_min_mem)
+
+          old_max_mem = """theorem fibreMaxFrom_mem : ∀ x xs,
+              fibreMaxFrom x xs ∈ x :: xs := by
+            intro x xs
+            induction xs generalizing x with
+            | nil =>
+                simp [fibreMaxFrom]
+            | cons y ys ih =>
+                unfold fibreMaxFrom
+                by_cases h : x ≤ fibreMaxFrom y ys
+                · rw [Nat.max_eq_right h]
+                  exact List.mem_cons_of_mem _ (ih y)
+                · have hle : fibreMaxFrom y ys ≤ x := by omega
+                  rw [Nat.max_eq_left hle]
+                  exact List.mem_cons_self
+          """
+          new_max_mem = """theorem fibreMaxFrom_mem : ∀ x xs,
+              fibreMaxFrom x xs ∈ x :: xs := by
+            intro x xs
+            induction xs generalizing x with
+            | nil =>
+                simp [fibreMaxFrom]
+            | cons y ys ih =>
+                change x.max (fibreMaxFrom y ys) ∈ x :: y :: ys
+                by_cases h : x ≤ fibreMaxFrom y ys
+                · have hmax : x.max (fibreMaxFrom y ys) =
+                      fibreMaxFrom y ys := Nat.max_eq_right h
+                  exact hmax.symm ▸ List.mem_cons_of_mem _ (ih y)
+                · have hle : fibreMaxFrom y ys ≤ x := by omega
+                  have hmax : x.max (fibreMaxFrom y ys) = x :=
+                    Nat.max_eq_left hle
+                  exact hmax.symm ▸ List.mem_cons_self
+          """
+          replace_once("fibreMaxFrom_mem", old_max_mem, new_max_mem)
+
+          old_min_le = """theorem fibreMinFrom_le_mem : ∀ x xs y,
+              y ∈ x :: xs → fibreMinFrom x xs ≤ y := by
+            intro x xs
+            induction xs generalizing x with
+            | nil =>
+                intro y hy
+                simp only [List.mem_cons] at hy
+                rcases hy with rfl | hy
+                · exact Nat.le_refl _
+                · cases hy
+            | cons z zs ih =>
+                intro y hy
+                unfold fibreMinFrom
+                simp only [List.mem_cons] at hy
+                rcases hy with rfl | hy
+                · exact Nat.min_le_left _ _
+                · exact Nat.le_trans (Nat.min_le_right _ _) (ih z y hy)
+          """
+          new_min_le = """theorem fibreMinFrom_le_mem : ∀ x xs y,
+              y ∈ x :: xs → fibreMinFrom x xs ≤ y := by
+            intro x xs
+            induction xs generalizing x with
+            | nil =>
+                intro y hy
+                rcases List.mem_cons.mp hy with rfl | hy
+                · exact Nat.le_refl _
+                · cases hy
+            | cons z zs ih =>
+                intro y hy
+                change x.min (fibreMinFrom z zs) ≤ y
+                rcases List.mem_cons.mp hy with hxy | hyTail
+                · subst y
+                  exact Nat.min_le_left _ _
+                · exact Nat.le_trans (Nat.min_le_right _ _)
+                    (ih z y hyTail)
+          """
+          replace_once("fibreMinFrom_le_mem", old_min_le, new_min_le)
+
+          old_max_le = """theorem mem_le_fibreMaxFrom : ∀ x xs y,
+              y ∈ x :: xs → y ≤ fibreMaxFrom x xs := by
+            intro x xs
+            induction xs generalizing x with
+            | nil =>
+                intro y hy
+                simp only [List.mem_cons] at hy
+                rcases hy with rfl | hy
+                · exact Nat.le_refl _
+                · cases hy
+            | cons z zs ih =>
+                intro y hy
+                unfold fibreMaxFrom
+                simp only [List.mem_cons] at hy
+                rcases hy with rfl | hy
+                · exact Nat.le_max_left _ _
+                · exact Nat.le_trans (ih z y hy) (Nat.le_max_right _ _)
+          """
+          new_max_le = """theorem mem_le_fibreMaxFrom : ∀ x xs y,
+              y ∈ x :: xs → y ≤ fibreMaxFrom x xs := by
+            intro x xs
+            induction xs generalizing x with
+            | nil =>
+                intro y hy
+                rcases List.mem_cons.mp hy with rfl | hy
+                · exact Nat.le_refl _
+                · cases hy
+            | cons z zs ih =>
+                intro y hy
+                change y ≤ x.max (fibreMaxFrom z zs)
+                rcases List.mem_cons.mp hy with hxy | hyTail
+                · subst y
+                  exact Nat.le_max_left _ _
+                · exact Nat.le_trans (ih z y hyTail)
+                    (Nat.le_max_right _ _)
+          """
+          replace_once("mem_le_fibreMaxFrom", old_max_le, new_max_le)
+
+          old_filter = """theorem map_filter_nodup {α β : Type}
+              (f : α → β) (p : α → Prop) [DecidablePred p] :
+              ∀ {xs : List α},
+                (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by
+            intro xs hnd
+            induction xs with
+            | nil => simp
+            | cons x rest ih =>
+                simp only [List.map_cons, List.nodup_cons] at hnd
+                by_cases hx : p x
+                · simp only [List.filter_cons_of_pos hx, List.map_cons,
+                    List.nodup_cons]
+                  constructor
+                  · intro hm
+                    obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
+                    apply hnd.1
+                    exact List.mem_map.mpr
+                      ⟨y, (List.mem_filter.mp hy).1, hfy⟩
+                  · exact ih hnd.2
+                · simpa [List.filter_cons_of_neg hx] using ih hnd.2
+          """
+          new_filter = """theorem map_filter_nodup {α β : Type}
+              (f : α → β) (p : α → Prop) [DecidablePred p] :
+              ∀ {xs : List α},
+                (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by
+            intro xs hnd
+            induction xs with
+            | nil => simp
+            | cons x rest ih =>
+                have hnd' := List.nodup_cons.mp hnd
+                by_cases hx : p x
+                · have hfilter :
+                      (x :: rest).filter p = x :: rest.filter p := by
+                    simp [hx]
+                  rw [hfilter, List.map_cons, List.nodup_cons]
+                  constructor
+                  · intro hm
+                    obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
+                    apply hnd'.1
+                    exact List.mem_map.mpr
+                      ⟨y, (List.mem_filter.mp hy).1, hfy⟩
+                  · exact ih hnd'.2
+                · have hfilter :
+                      (x :: rest).filter p = rest.filter p := by
+                    simp [hx]
+                  rw [hfilter]
+                  exact ih hnd'.2
+          """
+          replace_once("map_filter_nodup", old_filter, new_filter)
+
+          path.write_text(text)
+          PY
+      - name: Commit proof-source repairs
+        run: |
+          if ! git diff --quiet -- CanonicalProjectedEpochFrame.lean SupportWeightFibres.lean; then
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add CanonicalProjectedEpochFrame.lean
-            git commit -m "align projected cells with Boolean partition"
+            git add CanonicalProjectedEpochFrame.lean SupportWeightFibres.lean
+            git commit -m "repair support-weight fibre foundations"
             git push origin HEAD:agent/linear-bound-current
           fi
       - name: Install Lean
