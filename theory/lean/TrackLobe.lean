@@ -102,19 +102,21 @@ theorem pin_eq_flipAt {u : Tongues} {q k : Nat}
       apply hj
       simpa [hq] using h), if_neg hj]
 
-/-- **Arbitrary simple lobe = two-state reflector.**
+/-- **Arbitrary mouth-avoiding lobe = two-state reflector.**
 
 `p` is the stem/mouth, `x` and `q` are its two candy-side branches, and
-`path` is the simple grooved path from the edge at `x` to the edge at `q`.
+`path` is a grooved path from the edge at `x` to the edge at `q` whose
+interior passages avoid the mouth switch.
 The stem edge leads to `outside`.  One reflection changes `u` to `pin u q`;
 the next restores `u`, with the same exact travel time. -/
-theorem stem_lobe_two_state_reflector
+theorem stem_lobe_two_state_reflector_foreign
     (w : Wiring) {p x q outside : Nat} {u : Tongues}
     (path : List Passage)
     (hpstem : p % 3 = 0)
     (hxbranch : x % 3 ≠ 0) (hqbranch : q % 3 ≠ 0)
     (hpx : p / 3 = x / 3) (hpq : p / 3 = q / 3)
-    (hsimple : SwitchSimple ((p, x) :: path))
+    (hpathForeign : ∀ passage ∈ path,
+      passageSwitch passage ≠ q / 3)
     (hlinked : LinkedPassages w ((p, x) :: path))
     (hgrooved : PassagesGrooved u ((p, x) :: path))
     (hfinal : w.link (lastPassageExit x path) = some q)
@@ -166,16 +168,6 @@ theorem stem_lobe_two_state_reflector
       some (lastPassageExit x path, u') := by
     simp [stepN, step, hpArrive, hqBack]
 
-  unfold SwitchSimple at hsimple
-  simp only [List.map_cons, List.nodup_cons] at hsimple
-  have hpathForeign : ∀ passage ∈ path,
-      passageSwitch passage ≠ q / 3 := by
-    intro passage hp hEq
-    apply hsimple.1
-    apply List.mem_map.mpr
-    refine ⟨passage, hp, ?_⟩
-    change passageSwitch passage = p / 3
-    exact hEq.trans hpq.symm
   have hpathGroovedU' : PassagesGrooved u' path := by
     unfold u'
     exact grooved_after_pin_other
@@ -217,17 +209,48 @@ theorem stem_lobe_two_state_reflector
     exact hfinishBack
   exact ⟨hfirst, hsecond⟩
 
-/-- **Universal lobe reflector.**  If the two candy arms are distinct, the
-arbitrary-path lobe implements `flipAt` at its mouth switch for every tongue
-vector under which the interior path remains grooved. -/
-theorem stem_lobe_isReflector
+/-- The switch-simple form of `stem_lobe_two_state_reflector_foreign`. -/
+theorem stem_lobe_two_state_reflector
+    (w : Wiring) {p x q outside : Nat} {u : Tongues}
+    (path : List Passage)
+    (hpstem : p % 3 = 0)
+    (hxbranch : x % 3 ≠ 0) (hqbranch : q % 3 ≠ 0)
+    (hpx : p / 3 = x / 3) (hpq : p / 3 = q / 3)
+    (hsimple : SwitchSimple ((p, x) :: path))
+    (hlinked : LinkedPassages w ((p, x) :: path))
+    (hgrooved : PassagesGrooved u ((p, x) :: path))
+    (hfinal : w.link (lastPassageExit x path) = some q)
+    (hmouth : w.link p = some outside) :
+    let u' := pin u q
+    stepN w (path.length + 2) (p, u) = some (outside, u') ∧
+      stepN w (path.length + 2) (p, u') = some (outside, u) := by
+  have hpathForeign : ∀ passage ∈ path,
+      passageSwitch passage ≠ q / 3 := by
+    unfold SwitchSimple at hsimple
+    simp only [List.map_cons, List.nodup_cons] at hsimple
+    intro passage hp hEq
+    apply hsimple.1
+    apply List.mem_map.mpr
+    refine ⟨passage, hp, ?_⟩
+    change passageSwitch passage = p / 3
+    exact hEq.trans hpq.symm
+  exact stem_lobe_two_state_reflector_foreign w path
+    hpstem hxbranch hqbranch hpx hpq hpathForeign
+    hlinked hgrooved hfinal hmouth
+
+/-- **Universal mouth-avoiding lobe reflector.**  If the two candy arms are
+distinct and the interior avoids the mouth switch, the arbitrary-path lobe
+implements `flipAt` at its mouth switch for every tongue vector under which
+the interior path remains grooved. -/
+theorem stem_lobe_isReflector_foreign
     (w : Wiring) {p x q outside : Nat}
     (path : List Passage)
     (hpstem : p % 3 = 0)
     (hxbranch : x % 3 ≠ 0) (hqbranch : q % 3 ≠ 0)
     (hpx : p / 3 = x / 3) (hpq : p / 3 = q / 3)
     (hxq : x ≠ q)
-    (hsimple : SwitchSimple ((p, x) :: path))
+    (hpathForeign : ∀ passage ∈ path,
+      passageSwitch passage ≠ p / 3)
     (hlinked : LinkedPassages w ((p, x) :: path))
     (hfinal : w.link (lastPassageExit x path) = some q)
     (hmouth : w.link p = some outside) :
@@ -237,14 +260,6 @@ theorem stem_lobe_isReflector
   have hxqsw : x / 3 = q / 3 := hpx.symm.trans hpq
   have hopp : bval q = !(bval x) :=
     branch_values_opposite hxbranch hqbranch hxqsw hxq
-  unfold SwitchSimple at hsimple
-  simp only [List.map_cons, List.nodup_cons] at hsimple
-  have hpathForeign : ∀ passage ∈ path,
-      passageSwitch passage ≠ p / 3 := by
-    intro passage hp hEq
-    apply hsimple.1
-    apply List.mem_map.mpr
-    exact ⟨passage, hp, hEq⟩
   intro state hpathGrooved
   let base := pin state x
   have hbaseAligned : base (x / 3) = bval x := by
@@ -267,12 +282,11 @@ theorem stem_lobe_isReflector
     rcases List.mem_cons.mp hp with hhead | htail
     · simpa [hhead] using hbaseHead
     · exact hbasePathGrooved passage htail
-  have hpairs := stem_lobe_two_state_reflector w path
+  have hpairs := stem_lobe_two_state_reflector_foreign w path
     hpstem hxbranch hqbranch hpx hpq
     (by
-      unfold SwitchSimple
-      simp only [List.map_cons, List.nodup_cons]
-      exact hsimple)
+      intro passage hp hEq
+      exact hpathForeign passage hp (hEq.trans hpq.symm))
     hlinked hbaseGrooved hfinal hmouth
   dsimp only at hpairs
   by_cases hsx : state (x / 3) = bval x
@@ -328,6 +342,33 @@ theorem stem_lobe_isReflector
     · change PassagesGrooved (flipAt state (p / 3)) path
       rw [← hbaseFlip]
       exact hbasePathGrooved
+
+/-- The switch-simple form of `stem_lobe_isReflector_foreign`. -/
+theorem stem_lobe_isReflector
+    (w : Wiring) {p x q outside : Nat}
+    (path : List Passage)
+    (hpstem : p % 3 = 0)
+    (hxbranch : x % 3 ≠ 0) (hqbranch : q % 3 ≠ 0)
+    (hpx : p / 3 = x / 3) (hpq : p / 3 = q / 3)
+    (hxq : x ≠ q)
+    (hsimple : SwitchSimple ((p, x) :: path))
+    (hlinked : LinkedPassages w ((p, x) :: path))
+    (hfinal : w.link (lastPassageExit x path) = some q)
+    (hmouth : w.link p = some outside) :
+    IsReflector w p outside (path.length + 2)
+      (fun u => PassagesGrooved u path)
+      (fun u => flipAt u (p / 3)) := by
+  have hpathForeign : ∀ passage ∈ path,
+      passageSwitch passage ≠ p / 3 := by
+    unfold SwitchSimple at hsimple
+    simp only [List.map_cons, List.nodup_cons] at hsimple
+    intro passage hp hEq
+    apply hsimple.1
+    apply List.mem_map.mpr
+    exact ⟨passage, hp, hEq⟩
+  exact stem_lobe_isReflector_foreign w path
+    hpstem hxbranch hqbranch hpx hpq hxq hpathForeign
+    hlinked hfinal hmouth
 
 /-- Extract the universal nondegenerate lobe reflector directly from a
 crossed first-revisit excursion.  The stem/branch orientation is not assumed:
