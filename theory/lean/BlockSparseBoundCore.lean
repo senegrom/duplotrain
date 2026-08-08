@@ -163,9 +163,16 @@ theorem blockCoreFourth_mul (x y : Nat) :
 theorem blockCoreFourth_two_pow (A : Nat) :
     fourth (2^A) = 2^(4*A) := by
   unfold fourth
-  rw [← Nat.pow_add, ← Nat.pow_add, ← Nat.pow_add]
-  congr 1
-  omega
+  calc
+    (2^A * 2^A) * (2^A * 2^A)
+        = 2^(A+A) * 2^(A+A) := by
+            exact congrArg₂ (fun x y : Nat => x * y)
+              (Nat.pow_add 2 A A).symm
+              (Nat.pow_add 2 A A).symm
+    _ = 2^((A+A)+(A+A)) :=
+      (Nat.pow_add 2 (A+A) (A+A)).symm
+    _ = 2^(4*A) := by
+      congr 1 <;> omega
 
 /-- Three bits of capacity per four coordinates, with a base-case constant. -/
 theorem blockUniverseCore_fourth_bound : ∀ n : Nat,
@@ -180,14 +187,14 @@ theorem blockUniverseCore_fourth_bound : ∀ n : Nat,
       calc
         fourth (8 * (blockUniverseCore n).length)
             = 4096 * fourth (blockUniverseCore n).length := by
-              simp [blockCoreFourth_mul, fourth,
+              simp [fourth,
                 Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm]
         _ ≤ 4096 * 2^(3*n+9) :=
           Nat.mul_le_mul_left 4096 ih
         _ = 2^(3*(n+4)+9) := by
-          rw [show 3*(n+4)+9 = (3*n+9)+12 by omega,
-            Nat.pow_add]
-          simp [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm]
+          have h4096 : 4096 = 2^12 := by decide
+          rw [h4096, ← Nat.pow_add]
+          congr 1 <;> omega
 
 /-- Eighth power for the final rational exponent. -/
 def blockCoreEighth (x : Nat) : Nat := fourth x * fourth x
@@ -211,16 +218,14 @@ theorem blockCore_eighth_bound
         Nat.mul_le_mul_left _ hu
       _ = 2^(4*A+3*M+9) := by
         rw [← Nat.pow_add]
-        congr 1
-        omega
+        congr 1 <;> omega
   unfold blockCoreEighth
   have hsq := Nat.mul_le_mul h4 h4
   have hpow :
       2^(4*A+3*M+9) * 2^(4*A+3*M+9) =
         2^(2*(4*A+3*M+9)) := by
     rw [← Nat.pow_add]
-    congr 1
-    omega
+    congr 1 <;> omega
   rw [hpow] at hsq
   have hexp : 2*(4*A+3*M+9) ≤ 7*C+18 := by
     omega
