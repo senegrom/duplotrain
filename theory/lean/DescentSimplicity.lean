@@ -58,8 +58,7 @@ theorem descent_path_length_eq_of_same_switch
           rw [hstem, hlink₂] at hlink₁
           injection hlink₁ with hnext
           subst p₂'
-          have htail := ih hrest₂ (Nat.le_antisymm
-            (Nat.le_refl (p₁' / 3)) (Nat.le_refl (p₁' / 3)))
+          have htail := ih hrest₂ rfl
           simp only [List.length_cons] at htail ⊢
           omega
 
