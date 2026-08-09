@@ -118,6 +118,7 @@ theorem loadedGroupProfile_capacity_eq
   | nil =>
       rfl
   | cons G rest ih =>
+      have hsize := G.tree.tree_size
       have hedge : G.tree.edges.length = G.tree.cells.length - 1 := by
         omega
       unfold loadedGroupProfile loadedGroupTreeBlocks loadedGroupLobes
