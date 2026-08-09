@@ -219,6 +219,122 @@ theorem RawBABAInterlacement.post_left_open_suffix_nonsimple
     hsimple hThirdLength hthirdLocal
   exact (hfirst.2 dSecond hSecondThird hsecondLocal) hlocalSame
 
+/-- Starting immediately outside the right BABA writer's opening traversal,
+the finite suffix through its own close is physically nonsimple whenever the
+right frame is a direct lobe.  The two repeated passages are consecutive at
+the close: time `third - 1` faces the lobe stem, and time `third` enters its
+unmatched branch.  This is the exact right-hand counterpart of
+`post_left_open_suffix_nonsimple`; no geometric symmetry principle is used. -/
+theorem RawBABAInterlacement.post_right_open_suffix_nonsimple
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    {prior second reroute third : Nat}
+    (B : RawBABAInterlacement
+      w N start prior second reroute third)
+    (hclose : Echo.ExactLobeWrite
+      (rawOverwriteMachine w) (rawOverwriteEntry w N start)
+      (rawOverwriteInitial start) third) :
+    ∃ (next finish : Nat × Tongues) (passages : List Passage),
+      stepN w (second + 1) start = some next ∧
+      passages.length = third - second ∧
+      PhysicalTrace w next passages finish ∧
+      ¬ SwitchSimple passages := by
+  obtain ⟨next, hnext⟩ :=
+    Option.isSome_iff_exists.mp B.rightFrame.open_productive.1
+  let span := third - second
+  have hspanTime : second + 1 + span = third + 1 := by
+    dsimp [span]
+    have hsecondThird :=
+      Nat.lt_trans B.second_lt_reroute B.reroute_lt_third
+    omega
+  have hglobal : (stepN w (second + 1 + span) start).isSome := by
+    rw [hspanTime]
+    exact B.rightFrame.close_productive.1
+  obtain ⟨finish, hfinish⟩ :=
+    stepN_suffix_some_of_reach hnext hglobal
+  obtain ⟨passages, hlength, htrace⟩ :=
+    physicalTrace_of_stepN w hfinish
+  refine ⟨next, finish, passages, hnext, hlength, htrace, ?_⟩
+  intro hsimple
+  have hthirdPos : 0 < third := by
+    have hsecondThird :=
+      Nat.lt_trans B.second_lt_reroute B.reroute_lt_third
+    omega
+  obtain ⟨_outside, state, hprevious, _hpost, _hstem⟩ :=
+    rawExactLobeWrite_observed_reflection
+      hN B.rightFrame.close_productive hclose hthirdPos
+  let dPrevious := third - 1 - (second + 1)
+  let dThird := third - (second + 1)
+  have hgap : second + 1 < third := by
+    have hsecondReroute := B.second_lt_reroute
+    have hrerouteThird := B.reroute_lt_third
+    omega
+  have hpreviousTime : second + 1 + dPrevious = third - 1 := by
+    dsimp [dPrevious]
+    omega
+  have hthirdTime : second + 1 + dThird = third := by
+    dsimp [dThird]
+    omega
+  have hpreviousLocal : stepN w dPrevious next =
+      some (3 * rawWriterAt w start third, state) := by
+    have h := hprevious
+    rw [← hpreviousTime, stepN_add, hnext] at h
+    exact h
+  have hpreviousLive : (stepN w dPrevious next).isSome := by
+    rw [hpreviousLocal]
+    simp
+  have hthirdGlobal : RawProductiveAt w N start
+      (second + 1 + dThird) := by
+    rw [hthirdTime]
+    exact B.rightFrame.close_productive
+  have hthirdLocal : RawProductiveAt w N next dThird :=
+    rawProductiveAt_sub_of_reach hnext hthirdGlobal
+  obtain ⟨thirdPost, hthirdPost⟩ :=
+    Option.isSome_iff_exists.mp hthirdLocal.1
+  obtain ⟨thirdPre, hthirdPre⟩ := stepN_prefix_some
+    (d := dThird) (K := dThird + 1) (by omega) hthirdPost
+  have hthirdLive : (stepN w dThird next).isSome := by
+    rw [hthirdPre]
+    simp
+  have hwriterPreviousShift :=
+    rawWriterAt_add_of_reach hnext hpreviousLive
+  rw [hpreviousTime] at hwriterPreviousShift
+  have hwriterThirdShift := rawWriterAt_add_of_reach hnext hthirdLive
+  rw [hthirdTime] at hwriterThirdShift
+  have hwriterPreviousGlobal :
+      rawWriterAt w start (third - 1) = rawWriterAt w start third := by
+    simp [rawWriterAt, rawEntryAt, hprevious]
+  have hlocalSame :
+      rawWriterAt w next dPrevious = rawWriterAt w next dThird := by
+    calc
+      rawWriterAt w next dPrevious = rawWriterAt w start (third - 1) :=
+        hwriterPreviousShift.symm
+      _ = rawWriterAt w start third := hwriterPreviousGlobal
+      _ = rawWriterAt w next dThird := hwriterThirdShift
+  have hPreviousThird : dPrevious < dThird := by
+    dsimp [dPrevious, dThird]
+    omega
+  have hThirdSpan : dThird < span := by
+    dsimp [dThird, span]
+    omega
+  have hPreviousLength : dPrevious < passages.length := by
+    rw [hlength]
+    exact Nat.lt_trans hPreviousThird hThirdSpan
+  have hThirdLength : dThird < passages.length := by
+    rw [hlength]
+    exact hThirdSpan
+  have hwriterPreviousPassage :=
+    htrace.rawWriterAt_eq_passageSwitch_getElem hPreviousLength
+  have hwriterThirdPassage :=
+    htrace.rawWriterAt_eq_passageSwitch_getElem hThirdLength
+  have hpair := List.pairwise_iff_getElem.mp hsimple
+  have hne := hpair dPrevious dThird
+    (by simpa using hPreviousLength)
+    (by simpa using hThirdLength) hPreviousThird
+  apply hne
+  simpa [hwriterPreviousPassage, hwriterThirdPassage] using hlocalSame
+
 /-- Mellit's second-repeat step, anchored to a raw exact-lobe event.
 
 The second reflector really has the opposite endpoints.  In that branch the
@@ -450,6 +566,79 @@ theorem RawBABAInterlacement.left_lobe_second_repeat_four_cover_or_contact
       htrace, hnonsimple⟩ := B.post_left_open_suffix_nonsimple
   rcases rawExactLobeWrite_second_repeat_four_cover_or_contact
       hN B.leftFrame.open_productive hexactPrior hnext htrace hnonsimple with
+    hcycle | htail
+  · obtain ⟨atRepeat, visited, hvisited, hsettles⟩ := hcycle
+    exact Or.inl ⟨next, atRepeat, visited, hnext, hvisited, hsettles⟩
+  · obtain ⟨A, R, K, hreach, hrunway, hcandy, haction, hquant⟩ :=
+      htail
+    exact Or.inr ⟨next, A, R, K, hnext, hreach,
+      hrunway, hcandy, haction, hquant⟩
+
+/-- The complete right-endpoint BABA bridge.
+
+An exact lobe at either endpoint of the right last-writer frame determines
+the same static canonical branch edge.  It is therefore available both at
+`second`, where the train leaves the manufactured lobe, and at `third`, where
+the observed two-step reflection proves that the suffix is nonsimple.  The
+same second-repeat theorem then gives a simple cycle, a literal four-vector
+cover, or a concrete support passage through the right BABA writer. -/
+theorem RawBABAInterlacement.right_lobe_second_repeat_four_cover_or_contact
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    {prior second reroute third : Nat}
+    (B : RawBABAInterlacement
+      w N start prior second reroute third)
+    (hright :
+      Echo.ExactLobeWrite
+          (rawOverwriteMachine w) (rawOverwriteEntry w N start)
+          (rawOverwriteInitial start) second ∨
+        Echo.ExactLobeWrite
+          (rawOverwriteMachine w) (rawOverwriteEntry w N start)
+          (rawOverwriteInitial start) third) :
+    (∃ (next atRepeat : Nat × Tongues) (visited : Nat),
+        stepN w (second + 1) start = some next ∧
+        stepN w visited next = some atRepeat ∧
+        SettlesOnSimpleCycle w atRepeat) ∨
+      (∃ (next : Nat × Tongues)
+          (A : ManufacturedFlipReflector w
+            (3 * rawWriterAt w start second) next.1)
+          (R : ManufacturedReflector w next.1
+            (3 * rawWriterAt w start second))
+          (K : Nat),
+        stepN w (second + 1) start = some next ∧
+        stepN w K start =
+          some (3 * rawWriterAt w start second, R.activatedState) ∧
+        A.runway = [] ∧ A.candy = [] ∧
+        A.actionSwitch = rawWriterAt w start second ∧
+        ∀ (times : List Nat) (history : List (List Bool)),
+          (∀ j ∈ times, j < K →
+            restrictedTonguesAt w N start j ∈ history) →
+          FourNoveltyCover w N start times history ∨
+            ∃ path ∈ R.toSupported.paths, ∃ passage ∈ path,
+              passageSwitch passage = rawWriterAt w start second) := by
+  have hcanonical :
+      w.link (3 * rawWriterAt w start second + 1) =
+        some (3 * rawWriterAt w start second + 2) := by
+    rcases hright with hsecond | hthird
+    · exact rawExactLobeWrite_normalized_link
+        hN B.rightFrame.open_productive hsecond
+    · have hclose := rawExactLobeWrite_normalized_link
+        hN B.rightFrame.close_productive hthird
+      simpa [B.rightFrame.same_writer] using hclose
+  have hexactSecond := canonicalDirectLobe_to_exactLobeWrite
+    hN B.rightFrame.open_productive hcanonical
+  have hcanonicalThird :
+      w.link (3 * rawWriterAt w start third + 1) =
+        some (3 * rawWriterAt w start third + 2) := by
+    simpa [B.rightFrame.same_writer] using hcanonical
+  have hexactThird := canonicalDirectLobe_to_exactLobeWrite
+    hN B.rightFrame.close_productive hcanonicalThird
+  obtain ⟨next, finish, passages, hnext, _hlength,
+      htrace, hnonsimple⟩ :=
+    B.post_right_open_suffix_nonsimple hN hexactThird
+  rcases rawExactLobeWrite_second_repeat_four_cover_or_contact
+      hN B.rightFrame.open_productive hexactSecond hnext htrace hnonsimple with
     hcycle | htail
   · obtain ⟨atRepeat, visited, hvisited, hsettles⟩ := hcycle
     exact Or.inl ⟨next, atRepeat, visited, hnext, hvisited, hsettles⟩
