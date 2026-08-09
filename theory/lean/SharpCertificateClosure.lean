@@ -1062,7 +1062,9 @@ theorem crossing_frame_open_in_caller_oriented_contact
       stepN w (escape + 1) start = some next ∧
       arrive cur.2 cur.1 = (3 * C, next.2) ∧
       arrive cur.2 old.2 = (old.1, cur.2) ∧
-      (3 * C = old.1 ∨ 3 * C = old.2) := by
+      next.2 = flipAt cur.2 C ∧
+      next.2 C ≠ cur.2 C ∧
+      3 * C = old.2 := by
   let d := left - callerStart
   have hd : d < caller.length := by
     dsimp [d]
@@ -1085,7 +1087,7 @@ theorem crossing_frame_open_in_caller_oriented_contact
     dsimp [old]
     exact List.getElem_mem hd
   obtain ⟨cur, next, C, hC, hcur, hnext, hstep,
-      _hentry, hexit, _hflip, _hback⟩ :=
+      _hentry, hexit, hflip, _hback⟩ :=
     rawProductiveAt_is_endpoint_pivot hN F.close_productive
   have holdWriter : passageSwitch old = C := by
     calc
@@ -1128,20 +1130,97 @@ theorem crossing_frame_open_in_caller_oriented_contact
     apply groove_transfer holdSettled
     rw [holdExitSwitch]
     exact hbit
+  have hcallerDecomp :
+      caller = caller.take d ++ old :: caller.drop (d + 1) := by
+    calc
+      caller = caller.take d ++ caller.drop d :=
+        (List.take_append_drop d caller).symm
+      _ = caller.take d ++ old :: caller.drop (d + 1) := by
+        rw [List.drop_eq_getElem_cons hd]
+  have hcallerSplit := hcaller
+  rw [hcallerDecomp] at hcallerSplit
+  obtain ⟨atOld, hprefix, htail⟩ := hcallerSplit.split_append
+  have hprefixSound := hprefix.sound
+  rw [List.length_take_of_le (Nat.le_of_lt hd)] at hprefixSound
+  have hatOld : atOld = localAtLeft := by
+    rw [hlocalAtLeft] at hprefixSound
+    exact (Option.some.inj hprefixSound).symm
+  have holdHead := htail.head_arrive
+  have holdEntry : atOld.1 = old.1 := holdHead.1
+  obtain ⟨afterOld, holdArrival⟩ := holdHead.2
+  have holdExit : exitPort atOld = old.2 := by
+    unfold exitPort
+    rw [holdEntry]
+    exact congrArg Prod.fst holdArrival
+  obtain ⟨openCur, _openNext, openC, hopenC, hopenCur,
+      _hopenNext, _hopenStep, _hopenEntry, hopenExit,
+      _hopenFlip, _hopenBack⟩ :=
+    rawProductiveAt_is_endpoint_pivot hN F.open_productive
+  have hglobalAtLeft :
+      stepN w left start = some localAtLeft := by
+    rw [← hleftTime, stepN_add, hcallerStart]
+    exact hlocalAtLeft
+  have hopenCurEq : openCur = localAtLeft := by
+    rw [hglobalAtLeft] at hopenCur
+    exact (Option.some.inj hopenCur).symm
+  have hopenCEq : openC = C := by
+    calc
+      openC = rawWriterAt w start left := hopenC
+      _ = rawWriterAt w start escape := F.same_writer
+      _ = C := hC.symm
+  have hforwardEndpoint : 3 * C = old.2 := by
+    calc
+      3 * C = 3 * openC := by rw [hopenCEq]
+      _ = exitPort openCur := hopenExit.symm
+      _ = exitPort atOld := by rw [hopenCurEq, hatOld]
+      _ = old.2 := holdExit
   have hparts := step_some_parts hstep
   have hfresh : arrive cur.2 cur.1 = (3 * C, next.2) := by
     apply Prod.ext
     · exact hexit
     · exact hparts.2.symm
-  have hentrySwitch : cur.1 / 3 = C := by
-    simpa [rawWriterAt, rawEntryAt, hcur] using hC.symm
-  have hsameSwitch : old.1 / 3 = cur.1 / 3 := by
-    change passageSwitch old = cur.1 / 3
-    rw [holdWriter, hentrySwitch]
-  have horiented := grooved_contact_exit_dichotomy
-    holdCur hfresh hsameSwitch
+  have hchanged : next.2 C ≠ cur.2 C := by
+    rw [hflip]
+    simp [flipAt]
   exact ⟨old, cur, next, C, holdMem, hC, holdWriter,
-    hcur, hnext, hfresh, holdCur, horiented⟩
+    hcur, hnext, hfresh, holdCur, hflip, hchanged,
+    hforwardEndpoint⟩
+
+/-- **A changed contact exiting through the old forward endpoint is the
+actual changed-forward merge residual.**
+
+This is deliberately stated with the concrete selected-route split and the
+concrete protected passage, rather than with a prepackaged merge hypothesis.
+The local cubic law repairs the old passage after the fresh pivot; all fields
+of `ChangedForwardMerge` are therefore consequences of the raw contact. -/
+theorem ManufacturedReflector.changedForwardMerge_of_forward_contact
+    {w : Wiring} {g e p x : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    {approach suffix path : List Passage}
+    {u v : Tongues} {old : Passage}
+    (hrouteSplit : A.orientedRoute B.activatedState =
+      approach ++ (p, x) :: suffix)
+    (happroach :
+      PhysicalTrace w (g, B.activatedState) approach (p, u))
+    (hpaths : PathGrooves B.toSupported.paths u)
+    (harrive : arrive u p = (x, v))
+    (hpath : path ∈ B.toSupported.paths)
+    (hold : old ∈ path)
+    (holdOriented : old ∈ B.orientedRoute u)
+    (hswitch : passageSwitch old = p / 3)
+    (hchanged : v (p / 3) ≠ u (p / 3))
+    (holdGroove : arrive u old.2 = (old.1, u))
+    (hforward : x = old.2) :
+    A.ChangedForwardMerge B := by
+  obtain ⟨repaired, hrepair, hrestored⟩ :=
+    forward_contact_repairs_old_passage holdGroove
+      (by simpa [hforward] using harrive)
+      (by simpa [passageSwitch] using hswitch) hchanged
+  exact ⟨approach, p, x, suffix, u, v, path, old,
+    old, repaired, hrouteSplit, happroach, hpaths,
+    harrive, hpath, hold, hswitch, hchanged, holdOriented,
+    holdGroove, hswitch, hforward, hrepair, hrestored⟩
 
 
 /-- **An early changed-forward repair gives the literal forbidden tail cover.**
