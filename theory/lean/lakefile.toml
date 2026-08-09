@@ -89,7 +89,14 @@ defaultTargets = [
   "HiddenAbsorb",
   "HiddenDichotomy",
   "HiddenFibre",
+  "KnownEdgeEighteen",
+  "KnownEdgeNineteen",
+  "KnownEdgeSeventeen",
+  "KnownEdgeTwenty",
   "KnownEdgeTwentyFour",
+  "KnownEdgeTwentyFourOverlap",
+  "KnownEdgeTwentyOne",
+  "KnownEdgeTwentyThree",
   "KoizumiCurveInvariant",
   "KoizumiFramePersistence",
   "KoizumiRawExtraction",
@@ -139,6 +146,13 @@ defaultTargets = [
   "NoFullFixed",
   "NoFullFreezeCore",
   "NoveltyAwareLasso",
+  "NoveltyAwareLassoEighteen",
+  "NoveltyAwareLassoNineteen",
+  "NoveltyAwareLassoOverlap",
+  "NoveltyAwareLassoSeventeen",
+  "NoveltyAwareLassoTwenty",
+  "NoveltyAwareLassoTwentyOne",
+  "NoveltyAwareLassoTwentyThree",
   "ObservedConfigurationFibre",
   "OneReserveCoordinateFrame",
   "OneReserveFromNoTail",
@@ -158,6 +172,7 @@ defaultTargets = [
   "PersistentLobeSeparationStandalone",
   "PhysicalPrefixCount",
   "PhysicalPrefixFibre",
+  "ProbePairedPeriod",
   "ProfileCodeBound",
   "RamanGapProductiveRefinement",
   "RamanInnerReplaySelectedTail",
@@ -209,7 +224,14 @@ defaultTargets = [
   "StarIndependent",
   "StarPairCountingCore",
   "StateLaw",
+  "StateLawEighteen",
+  "StateLawNineteen",
+  "StateLawSeventeen",
+  "StateLawTwenty",
   "StateLawTwentyFour",
+  "StateLawTwentyFourOverlap",
+  "StateLawTwentyOne",
+  "StateLawTwentyThree",
   "StationaryTail",
   "SteeringLaw",
   "SupportBound",
@@ -231,14 +253,27 @@ defaultTargets = [
   "TrackEndpointMatching",
   "TrackFiniteAlternation",
   "TrackGlobalRepair",
+  "TrackGlobalRepairSimple",
   "TrackLobe",
   "TrackNormalForm",
   "TrackNovelReplay",
   "TrackNoveltyCover",
   "TrackQuantitative",
+  "TrackQuantitativeRepairEighteen",
+  "TrackQuantitativeRepairFifteen",
+  "TrackQuantitativeRepairNineteen",
+  "TrackQuantitativeRepairSeventeen",
+  "TrackQuantitativeRepairSixteen",
+  "TrackQuantitativeRouteSharp",
   "TrackQuantitativeTight",
   "TrackStationaryTail",
+  "TrackStaySpliceSharp",
   "TrackTheta",
+  "TrackThetaCaptureSharp",
+  "TrackThetaCaptureTighter",
+  "TrackThetaSharp",
+  "TrackThetaSharper",
+  "TrackThetaTighter",
   "TrackTrace",
   "TreeCapacitySevenTenths",
   "TreeCapacityTwoThirds",
@@ -538,7 +573,28 @@ name = "HiddenDichotomy"
 name = "HiddenFibre"
 
 [[lean_lib]]
+name = "KnownEdgeEighteen"
+
+[[lean_lib]]
+name = "KnownEdgeNineteen"
+
+[[lean_lib]]
+name = "KnownEdgeSeventeen"
+
+[[lean_lib]]
+name = "KnownEdgeTwenty"
+
+[[lean_lib]]
 name = "KnownEdgeTwentyFour"
+
+[[lean_lib]]
+name = "KnownEdgeTwentyFourOverlap"
+
+[[lean_lib]]
+name = "KnownEdgeTwentyOne"
+
+[[lean_lib]]
+name = "KnownEdgeTwentyThree"
 
 [[lean_lib]]
 name = "KoizumiCurveInvariant"
@@ -688,6 +744,27 @@ name = "NoFullFreezeCore"
 name = "NoveltyAwareLasso"
 
 [[lean_lib]]
+name = "NoveltyAwareLassoEighteen"
+
+[[lean_lib]]
+name = "NoveltyAwareLassoNineteen"
+
+[[lean_lib]]
+name = "NoveltyAwareLassoOverlap"
+
+[[lean_lib]]
+name = "NoveltyAwareLassoSeventeen"
+
+[[lean_lib]]
+name = "NoveltyAwareLassoTwenty"
+
+[[lean_lib]]
+name = "NoveltyAwareLassoTwentyOne"
+
+[[lean_lib]]
+name = "NoveltyAwareLassoTwentyThree"
+
+[[lean_lib]]
 name = "ObservedConfigurationFibre"
 
 [[lean_lib]]
@@ -743,6 +820,9 @@ name = "PhysicalPrefixCount"
 
 [[lean_lib]]
 name = "PhysicalPrefixFibre"
+
+[[lean_lib]]
+name = "ProbePairedPeriod"
 
 [[lean_lib]]
 name = "ProfileCodeBound"
@@ -898,7 +978,28 @@ name = "StarPairCountingCore"
 name = "StateLaw"
 
 [[lean_lib]]
+name = "StateLawEighteen"
+
+[[lean_lib]]
+name = "StateLawNineteen"
+
+[[lean_lib]]
+name = "StateLawSeventeen"
+
+[[lean_lib]]
+name = "StateLawTwenty"
+
+[[lean_lib]]
 name = "StateLawTwentyFour"
+
+[[lean_lib]]
+name = "StateLawTwentyFourOverlap"
+
+[[lean_lib]]
+name = "StateLawTwentyOne"
+
+[[lean_lib]]
+name = "StateLawTwentyThree"
 
 [[lean_lib]]
 name = "StationaryTail"
@@ -964,6 +1065,9 @@ name = "TrackFiniteAlternation"
 name = "TrackGlobalRepair"
 
 [[lean_lib]]
+name = "TrackGlobalRepairSimple"
+
+[[lean_lib]]
 name = "TrackLobe"
 
 [[lean_lib]]
@@ -979,13 +1083,49 @@ name = "TrackNoveltyCover"
 name = "TrackQuantitative"
 
 [[lean_lib]]
+name = "TrackQuantitativeRepairEighteen"
+
+[[lean_lib]]
+name = "TrackQuantitativeRepairFifteen"
+
+[[lean_lib]]
+name = "TrackQuantitativeRepairNineteen"
+
+[[lean_lib]]
+name = "TrackQuantitativeRepairSeventeen"
+
+[[lean_lib]]
+name = "TrackQuantitativeRepairSixteen"
+
+[[lean_lib]]
+name = "TrackQuantitativeRouteSharp"
+
+[[lean_lib]]
 name = "TrackQuantitativeTight"
 
 [[lean_lib]]
 name = "TrackStationaryTail"
 
 [[lean_lib]]
+name = "TrackStaySpliceSharp"
+
+[[lean_lib]]
 name = "TrackTheta"
+
+[[lean_lib]]
+name = "TrackThetaCaptureSharp"
+
+[[lean_lib]]
+name = "TrackThetaCaptureTighter"
+
+[[lean_lib]]
+name = "TrackThetaSharp"
+
+[[lean_lib]]
+name = "TrackThetaSharper"
+
+[[lean_lib]]
+name = "TrackThetaTighter"
 
 [[lean_lib]]
 name = "TrackTrace"
