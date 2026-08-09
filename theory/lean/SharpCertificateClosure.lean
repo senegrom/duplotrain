@@ -944,6 +944,86 @@ theorem RawNovelAt.not_completed_retrace_endpoint
       _ = restrictedTonguesAt w N start (close + 1) := by
         rw [hclose]
 
+/-- **The crossing-caller branch exposes its old-side steering event.**
+
+Suppose `escape` is the first productive event after a completed caller
+return and its globally novel close has a last-writer frame crossing the
+caller.  Novelty forces a different parity-changing writer inside that
+frame.  It cannot occur on the returned side by first-escape minimality and
+cannot occur strictly inside the exact retrace.  Hence it lies on the old
+side of the caller contact.  It is either globally first, or its own
+last-writer frame strictly interlaces the crossing frame as
+`prior < left < reroute < escape`.
+
+This is the exact residual control-flow shape: after this theorem there is
+no unclassified raw-history case.  The interlaced alternative is the one
+that the physical facing/changed-forward analysis must turn into the
+two-reflector tail. -/
+theorem crossing_caller_first_escape_fresh_or_interlaced
+    {w : Wiring} {N repeatTime span returnTime left escape q : Nat}
+    {start : Nat × Tongues} {old settled : Tongues}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (H : RawRepeatedWriterNovelAt w N start escape)
+    (F : RawLastWriterFrame w N start left escape)
+    (hrepeat : stepN w repeatTime start = some (q, old))
+    (hpointwise : ∀ d, d ≤ span →
+      ∃ port, stepN w d (q, old) =
+        some (port, if d = 0 then old else settled))
+    (hreturnTime : returnTime = repeatTime + span)
+    (hminimal : ∀ t, returnTime ≤ t → t < escape →
+      ¬ RawProductiveAt w N start t) :
+    ∃ reroute,
+      left < reroute ∧ reroute ≤ repeatTime ∧
+      RawProductiveAt w N start reroute ∧
+      rawWriterAt w start reroute ≠ rawWriterAt w start escape ∧
+      (∀ t, left < t → t < reroute →
+        RawProductiveAt w N start t →
+        rawWriterAt w start t ≠ rawWriterAt w start reroute) ∧
+      (RawFirstWriterAt w N start reroute ∨
+        ∃ prior,
+          RawLastWriterFrame w N start prior reroute ∧
+          prior < left) := by
+  obtain ⟨C, reroute, _hC, hleftReroute, hrerouteEscape,
+      hrerouteProductive, hwriter, _hchange, hnoSame⟩ :=
+    H.first_changed_writer hN F
+  have hrerouteOld : reroute ≤ repeatTime := by
+    apply Classical.byContradiction
+    intro hnot
+    have hrepeatReroute : repeatTime < reroute := by omega
+    have hreturnReroute : returnTime ≤ reroute := by
+      rw [hreturnTime]
+      exact rawProductive_not_strictly_inside_pointwise_retrace
+        hrepeat hpointwise hrerouteProductive hrepeatReroute
+    exact hminimal reroute hreturnReroute hrerouteEscape
+      hrerouteProductive
+  have hdifferent : rawWriterAt w start reroute ≠
+      rawWriterAt w start escape :=
+    F.no_same_writer_between reroute hleftReroute
+      hrerouteEscape hrerouteProductive
+  refine ⟨reroute, hleftReroute, hrerouteOld,
+    hrerouteProductive, hdifferent, ?_, ?_⟩
+  · intro t hleftT htReroute htProductive
+    rw [hwriter]
+    exact hnoSame t hleftT htReroute htProductive
+  · by_cases hfirst : RawFirstWriterAt w N start reroute
+    · exact Or.inl hfirst
+    · right
+      obtain ⟨prior, G⟩ :=
+        last_writer_frame_of_productive_not_first
+          hrerouteProductive hfirst
+      refine ⟨prior, G, ?_⟩
+      by_cases hprior : prior < left
+      · exact hprior
+      · by_cases heq : prior = left
+        · subst prior
+          exact (hdifferent
+            (G.same_writer.symm.trans F.same_writer)).elim
+        · have hleftPrior : left < prior := by omega
+          exact (hnoSame prior hleftPrior G.order
+            G.open_productive
+            (G.same_writer.trans hwriter)).elim
+
 /-! ## Direct global-control-flow bridge
 
 The five-frame extraction below is useful geometric normal form, but the
