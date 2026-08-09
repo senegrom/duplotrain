@@ -5,6 +5,7 @@ on:
     paths:
       - theory/lean/PairTongueCountSharp.lean
       - theory/lean/CompleteRepairTongueCountSharp.lean
+      - theory/lean/TwoJourneyTailCountSharp.lean
       - theory/lean/KnownEdgeFifteen.lean
       - theory/lean/StateLawFifteen.lean
       - .github/workflows/push-below-17-check.yml
@@ -30,6 +31,8 @@ jobs:
           [[lean_lib]]
           name = "CompleteRepairTongueCountSharp"
           [[lean_lib]]
+          name = "TwoJourneyTailCountSharp"
+          [[lean_lib]]
           name = "KnownEdgeFifteen"
           [[lean_lib]]
           name = "StateLawFifteen"
@@ -38,6 +41,7 @@ jobs:
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build PairTongueCountSharp
-          if [ -f CompleteRepairTongueCountSharp.lean ]; then lake build CompleteRepairTongueCountSharp; fi
+          lake build CompleteRepairTongueCountSharp
+          lake build TwoJourneyTailCountSharp
           if [ -f KnownEdgeFifteen.lean ]; then lake build KnownEdgeFifteen; fi
           if [ -f StateLawFifteen.lean ]; then lake build StateLawFifteen; fi
