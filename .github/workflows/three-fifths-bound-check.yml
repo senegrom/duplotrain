@@ -7,6 +7,7 @@ on:
       - theory/lean/TreeLobeNotFullTwoThirds.lean
       - theory/lean/LobePartnerBounce.lean
       - theory/lean/LobeToggle.lean
+      - theory/lean/TwoReflectorEdgeTrap.lean
       - .github/workflows/three-fifths-bound-check.yml
   workflow_dispatch:
 jobs:
@@ -35,8 +36,10 @@ jobs:
           name = "LobePartnerBounce"
           [[lean_lib]]
           name = "LobeToggle"
+          [[lean_lib]]
+          name = "TwoReflectorEdgeTrap"
           EOF
       - name: Build improved component bounds
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TreeLobeLoadThreeFifths TreeLobeNotFullTwoThirds LobePartnerBounce LobeToggle
+          lake build TreeLobeLoadThreeFifths TreeLobeNotFullTwoThirds LobePartnerBounce LobeToggle TwoReflectorEdgeTrap
