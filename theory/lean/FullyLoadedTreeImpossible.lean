@@ -39,14 +39,18 @@ private theorem nodup_subset_length_loaded
         exact (List.mem_erase_of_ne hyx).mpr hyS
       have hle := ih hnd.2 hsub'
       rw [List.length_erase_of_mem hx] at hle
+      have hpos : 0 < ys.length := by
+        cases ys with
+        | nil => cases hx
+        | cons _ _ => simp
       simp only [List.length_cons]
       omega
 
 private theorem exists_third_cell
     (cells : List Nat) (hnd : cells.Nodup)
     (hlen : 3 ≤ cells.length)
-    {c d : Nat} (hc : c ∈ cells) (hd : d ∈ cells)
-    (hcd : c ≠ d) :
+    {c d : Nat} (_hc : c ∈ cells) (_hd : d ∈ cells)
+    (_hcd : c ≠ d) :
     ∃ z, z ∈ cells ∧ z ≠ c ∧ z ≠ d := by
   apply Classical.byContradiction
   intro hnone
@@ -101,7 +105,7 @@ theorem fully_loaded_tree_impossible
         rw [hc] at hsize
         simp at hsize
     | cons c rest =>
-        exact ⟨c, by rw [hc]; exact List.mem_cons_self⟩
+        exact ⟨c, List.mem_cons_self⟩
   rcases hload seed hseed with
     ⟨seedLobe, hseedRoot, hseedLoop,
       hseedOcc, hseedVar, hseedOut⟩
