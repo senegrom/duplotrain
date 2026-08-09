@@ -525,3 +525,9 @@ name = "RunwayHistoricalThree"
 
 [[lean_lib]]
 name = "SelfEpochFour"
+
+[[lean_lib]]
+name = "KoizumiFramePersistence"
+
+[[lean_lib]]
+name = "UnlinkedCounterObstruction"

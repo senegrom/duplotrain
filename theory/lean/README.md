@@ -520,6 +520,21 @@ vectors.  A duplicate-free sample from that epoch has length at most four.
 The still-open extraction step is to obtain one fixed endpoint pair from an
 arbitrary maximal self-pivot interval.
 
+**`KoizumiFramePersistence.lean` — repeated writers force self-pivots.**
+Selected-curve reachability persists through every step until a productive
+self-pivot occurs.  Hence two productive visits to the same switch force a
+self-pivot either at the closing visit or strictly between the visits.  A
+self-pivot-free prefix has only first writers and therefore at most `N+1`
+distinct restricted tongue vectors.
+
+**`UnlinkedCounterObstruction.lean` — reusable-counter audit.**  A raw step
+changes at most one independent tongue; same-mouth switch-simple calls become
+idempotent, while repaired two-reflector tails have the existing four-state
+bound.  In particular, the raw model cannot realize the mechanically linked
+updates used by exponential cooperative-point layouts.  The general
+`26*N+3` theorem also rules out a reusable binary counter above that capacity;
+this audit does not by itself prove the sharper `N+6` law.
+
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single
 train on any `N`-switch lazy-point layout ever sees at most `N + 6`
