@@ -454,6 +454,22 @@ theorems, no `native_decide`, no `sorry`:
 | `quiet_mouth_unreachable` | **the quiet mouth is unreachable**: no productive-free stretch can lead from a cell to its mouth partner — the quiet path is forced to be its own `bar`-reflection (the machine-level retrace), whose middle is a `star` fixed point or an unproductive mouth crossing, both impossible |
 | `read_back_productive` / `lone_write_no_mouth` | **a lone alternating cell cannot steer itself**: reading a cell's variation back costs a productive step in between, and a walk whose every productive write lands in its start cell can *never* reach that cell's mouth partner — for every machine, every run, every `N` |
 
+**`TrackFiniteAlternation.lean` / `TrackEndpointMatching.lean` — the exact
+finite raw target.**  A productive raw pass is proved to be precisely an
+unmatched-endpoint pivot.  First productive writers contribute at most `N`
+novel vectors, so the open sharp problem is isolated as
+`FiveRepeatedWriterNovelty`: every finite prefix has at most five globally
+novel productive rewrites by an already-used writer.  The proved theorem
+`stateLaw_of_fiveRepeatedWriterNovelty` closes the actual `StateLaw` from that
+single proposition; the proposition itself remains **OPEN**.
+
+**`TrackCurveGrowth.lean` — selected-curve monotonicity.**  `CurveEdge` and
+`CurveReach` model the curves formed by ordinary track edges and the currently
+selected stem–branch passages.  `unmatched_pivot_strict_curve_growth` proves
+that a productive non-self pivot preserves the complete old train curve and
+strictly adds the switch stem.  This formalizes the curve-shrinking invariant;
+the complementary self-pivot nesting case is still the transient obstacle.
+
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single
 train on any `N`-switch lazy-point layout ever sees at most `N + 6`
