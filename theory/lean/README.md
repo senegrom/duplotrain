@@ -361,6 +361,25 @@ identity-reflector case, or flip-reflector runway case.
 * `SupportedReflector.paired_period`: two opposite supported reflectors whose
   local actions avoid one another's supports have a genuine period, by the
   four-corner Gray composition.
+* `ManufacturedReflector.manufacturing_journey_distinct_le_N_add_two`: the
+  complete first-reflector construction, including its arbitrarily long exact
+  retrace, exposes at most `N+2` distinct restricted tongue vectors.
+* `ManufacturedReflector.travel_two_phase_tongues`: every intermediate time
+  in one concrete reflector traversal has exactly the incoming vector or its
+  one local-action image.
+* `manufactured_pair_all_time_four_phase_tongues` and
+  `manufactured_pair_four_novelty_cover`: a compatible opposite manufactured
+  pair has only the four Gray-corner tongue vectors at **every** future time,
+  not merely at the period endpoints.
+* `manufactured_flip_candy_splice_absolute_one_novelty`: the foreign-candy
+  repair residual contributes at most one genuinely new vector, including
+  its eventual paired-reflector tail.
+* `cyclic_minimal_stable_blocker_lobe_or_recurrent_six_chip_nest`: cyclic
+  restoration-frame descent eliminates the wraparound blocker; its only
+  non-lobe residue is a strict six-chip nest with a fresh third root.
+* `collapsed_geometry_recurrent_snapshots_four`: under the recurrent closed
+  component certificate, both collapsed visible-chip geometries have at most
+  four snapshots.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
 now proves an unconditional general linear theorem.
@@ -436,8 +455,12 @@ OPEN: nothing in this repository proves that coefficient-one bound.**
 `GeneralN.state_law_linear_twenty_six` proves the identical
 raw-track statement with `26*N+3` in place of `N+6`;
 `state_law_two_pow` is the older elementary pigeonhole ceiling.  The
-remaining problem is improving `26*N+3` to
-`N+O(1)` (conjecturally `N+4`).
+remaining problem is the global assembly: every arbitrary repair branch must
+be covered by the `N+2` manufactured-prefix history plus at most four tail
+vectors without double-charging overlapping support.  The strict nested-
+restoration/reserve branch and the runway side of a foreign splice are not
+yet discharged by the sharp novelty interface.  Closing that assembly would
+improve `26*N+3` to `N+6` (the conjectured sharp form remains `N+4`).
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real
 pigeonhole proof (induction on N, splitting on the first coordinate),
