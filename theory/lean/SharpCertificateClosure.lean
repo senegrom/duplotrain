@@ -1,6 +1,7 @@
 import RunwayHistoricalThree
 import SharpStateLawAssembly
 import FiveFrameObstruction
+import SixEventReduction
 
 /-!
 # Closing the sharp certificate from a raw five-frame tail
@@ -1024,6 +1025,277 @@ theorem crossing_caller_first_escape_fresh_or_interlaced
             G.open_productive
             (G.same_writer.trans hwriter)).elim
 
+/-- **A caller-contained crossing is an oriented physical support contact.**
+
+Assume the previous occurrence of the first post-return escape lies in the
+recorded caller.  The corresponding caller passage is grooved in the return
+state.  Since no productive event occurs before the selected escape, that
+groove survives to the escape configuration.  The productive escape enters
+the same switch through its unmatched branch and exits through the stem.
+The cubic contact law therefore says that this stem is exactly one of the
+two endpoints of the old caller passage.
+
+The two alternatives in the conclusion are the concrete inputs of the
+existing theta analysis: exit through the old entry is the backward/cycle
+case, while exit through the old exit is the forward repair/merge case. -/
+theorem crossing_frame_open_in_caller_oriented_contact
+    {w : Wiring} {N callerStart returnTime left escape g edge : Nat}
+    {start finish : Nat × Tongues}
+    {base settled : Tongues} {caller : List Passage}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (hcallerStart : stepN w callerStart start = some (g, base))
+    (hcaller : PhysicalTrace w (g, base) caller finish)
+    (hgrooved : PassagesGrooved settled caller)
+    (hreturn : stepN w returnTime start = some (edge, settled))
+    (hreturnEscape : returnTime ≤ escape)
+    (hminimal : ∀ t, returnTime ≤ t → t < escape →
+      ¬ RawProductiveAt w N start t)
+    (F : RawLastWriterFrame w N start left escape)
+    (hleftStart : callerStart ≤ left)
+    (hleftEnd : left < callerStart + caller.length) :
+    ∃ (old : Passage) (cur next : Nat × Tongues) (C : Nat),
+      old ∈ caller ∧
+      C = rawWriterAt w start escape ∧
+      passageSwitch old = C ∧
+      stepN w escape start = some cur ∧
+      stepN w (escape + 1) start = some next ∧
+      arrive cur.2 cur.1 = (3 * C, next.2) ∧
+      arrive cur.2 old.2 = (old.1, cur.2) ∧
+      (3 * C = old.1 ∨ 3 * C = old.2) := by
+  let d := left - callerStart
+  have hd : d < caller.length := by
+    dsimp [d]
+    omega
+  have hleftTime : callerStart + d = left := by
+    dsimp [d]
+    omega
+  obtain ⟨localAtLeft, hlocalAtLeft⟩ := stepN_prefix_some
+    (d := d) (K := caller.length) (Nat.le_of_lt hd) hcaller.sound
+  have hlocalLive : (stepN w d (g, base)).isSome := by
+    rw [hlocalAtLeft]
+    simp
+  have hshiftWriter := rawWriterAt_add_of_reach
+    hcallerStart hlocalLive
+  rw [hleftTime] at hshiftWriter
+  have hlocalWriter :=
+    hcaller.rawWriterAt_eq_passageSwitch_getElem hd
+  let old : Passage := caller[d]
+  have holdMem : old ∈ caller := by
+    dsimp [old]
+    exact List.getElem_mem hd
+  obtain ⟨cur, next, C, hC, hcur, hnext, hstep,
+      _hentry, hexit, _hflip, _hback⟩ :=
+    rawProductiveAt_is_endpoint_pivot hN F.close_productive
+  have holdWriter : passageSwitch old = C := by
+    calc
+      passageSwitch old = rawWriterAt w (g, base) d := by
+        dsimp [old]
+        exact hlocalWriter.symm
+      _ = rawWriterAt w start left := hshiftWriter.symm
+      _ = rawWriterAt w start escape := F.same_writer
+      _ = C := hC.symm
+  have hCLt : C < N := by
+    rw [hC]
+    exact rawProductiveAt_writer_lt hN F.close_productive
+  let quietSpan := escape - returnTime
+  have hreturnSum : returnTime + quietSpan = escape := by
+    dsimp [quietSpan]
+    omega
+  have hquiet : ∀ t, returnTime ≤ t →
+      t < returnTime + quietSpan →
+      ¬ RawProductiveAt w N start t := by
+    intro t ht hbound
+    apply hminimal t ht
+    rw [hreturnSum] at hbound
+    exact hbound
+  have hquietVector := restrictedTonguesAt_eq_of_quiet_interval
+    (first := returnTime) (span := quietSpan) (finish := cur)
+    (by simpa [hreturnSum] using hcur) hquiet
+  have hrestrict : VectorCount.restrict N cur.2 =
+      VectorCount.restrict N settled := by
+    simpa [restrictedTonguesAt, tonguesAt, hreturnSum,
+      hcur, hreturn] using hquietVector
+  have hbit : cur.2 C = settled C :=
+    restrict_eq_apply hrestrict hCLt
+  have holdSettled : arrive settled old.2 = (old.1, settled) :=
+    hgrooved old holdMem
+  have holdExitSwitch : old.2 / 3 = C := by
+    have hs := arrive_exit_switch settled old.2
+    rw [holdSettled] at hs
+    exact hs.symm.trans holdWriter
+  have holdCur : arrive cur.2 old.2 = (old.1, cur.2) := by
+    apply groove_transfer holdSettled
+    rw [holdExitSwitch]
+    exact hbit
+  have hparts := step_some_parts hstep
+  have hfresh : arrive cur.2 cur.1 = (3 * C, next.2) := by
+    apply Prod.ext
+    · exact hexit
+    · exact hparts.2.symm
+  have hentrySwitch : cur.1 / 3 = C := by
+    simpa [rawWriterAt, rawEntryAt, hcur] using hC.symm
+  have hsameSwitch : old.1 / 3 = cur.1 / 3 := by
+    change passageSwitch old = cur.1 / 3
+    rw [holdWriter, hentrySwitch]
+  have horiented := grooved_contact_exit_dichotomy
+    holdCur hfresh hsameSwitch
+  exact ⟨old, cur, next, C, holdMem, hC, holdWriter,
+    hcur, hnext, hfresh, holdCur, horiented⟩
+
+
+/-- **An early changed-forward repair gives the literal forbidden tail cover.**
+
+For a raw six-event obstruction, suppose the physical repair has already
+reached a changed-forward merge and its complete construction lead finishes
+no later than the first selected post-state, z0 + 1.  Every lead vector is
+then either a canonical first-writer vector or exactly the paid z0 + 1
+vector.  The historical-entry theta theorem leaves at most three additional
+vectors for all five later closes.  Transporting those local vectors back to
+absolute time constructs the exact budget-four cover forbidden by the
+six-event no-tail theorem in the importing closure module.
+
+The start-time inequality is deliberately explicit: a merge extracted later
+than this does not, by itself, cover all five selected closes. -/
+theorem RawSixEventReduction.early_changedForward_tail_four_cover
+    {w : Wiring} {N g e shift : Nat}
+    {start : Nat × Tongues}
+    (R : RawSixEventReduction w N start)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedFlipReflector w e g}
+    (hmerge : A.ChangedForwardMerge (.flip B))
+    (hreach : stepN w shift start =
+      some (g, (ManufacturedReflector.flip B).activatedState))
+    (hlead_before_first :
+      shift + A.toSupported.travel ≤ R.z0 + 1) :
+    NoveltyCoverOn w N start
+      [R.z1 + 1, R.z2 + 1, R.z3 + 1, R.z4 + 1, R.z5 + 1]
+      (rawFirstWriterHistory w N start (R.z5 + 1) ++
+        [restrictedTonguesAt w N start (R.z0 + 1)]) 4 := by
+  classical
+  let localStart : Nat × Tongues :=
+    (g, (ManufacturedReflector.flip B).activatedState)
+  let history :=
+    rawFirstWriterHistory w N start (R.z5 + 1) ++
+      [restrictedTonguesAt w N start (R.z0 + 1)]
+  let localTimes :=
+    [R.z1 + 1 - shift, R.z2 + 1 - shift,
+      R.z3 + 1 - shift, R.z4 + 1 - shift,
+      R.z5 + 1 - shift]
+  change NoveltyCoverOn w N start
+    [R.z1 + 1, R.z2 + 1, R.z3 + 1, R.z4 + 1, R.z5 + 1]
+    history 4
+  have o01 : R.z0 < R.z1 := R.order01
+  have o12 : R.z1 < R.z2 := R.order12
+  have o23 : R.z2 < R.z3 := R.order23
+  have o34 : R.z3 < R.z4 := R.order34
+  have o45 : R.z4 < R.z5 := R.order45
+  have hshiftFirst : shift ≤ R.z0 + 1 := by
+    exact Nat.le_trans (Nat.le_add_right shift A.toSupported.travel)
+      hlead_before_first
+  have hperiodic : EventuallyPeriodic w localStart := by
+    simpa [localStart] using hmerge.eventuallyPeriodic
+  have hlive : ∀ d, ∃ finish, stepN w d localStart = some finish := by
+    intro d
+    obtain ⟨lead, period, settled, hpositive, hsettled, hperiod⟩ :=
+      hperiodic
+    have hcycles :
+        stepN w ((d + 1) * period) settled = some settled :=
+      stepN_mul_period_pair_novelty hperiod (d + 1)
+    have hfar :
+        stepN w (lead + (d + 1) * period) localStart =
+          some settled := by
+      rw [stepN_add, hsettled]
+      exact hcycles
+    have hone : 1 ≤ period := by omega
+    have hmul := Nat.mul_le_mul_left (d + 1) hone
+    simp only [Nat.mul_one] at hmul
+    have hbound : d ≤ lead + (d + 1) * period := by omega
+    exact stepN_prefix_some
+      (d := d) (K := lead + (d + 1) * period) hbound hfar
+  have hprefixHistory : ∀ t, t ≤ R.z0 + 1 →
+      restrictedTonguesAt w N start t ∈ history := by
+    intro t ht
+    by_cases hpost : t = R.z0 + 1
+    · subst t
+      dsimp [history]
+      exact List.mem_append_right _ (by simp)
+    · have ht0 : t ≤ R.z0 := by omega
+      have hcovered := restrictedTonguesAt_mem_finite_writer_cover
+        w N start (R.z5 + 1) t (by omega)
+      rcases List.mem_append.mp hcovered with hfirst | hrepeated
+      · dsimp [history]
+        exact List.mem_append_left _ hfirst
+      · obtain ⟨k, hk, hvector⟩ := List.mem_map.mp hrepeated
+        have Hk : RawRepeatedWriterNovelAt w N start k :=
+          (mem_rawRepeatedWriterNovelTimes_iff.mp hk).2
+        by_cases hk0 : k < R.z0
+        · exact (R.first0 k hk0 Hk).elim
+        · have htimeBefore : t < k + 1 := by omega
+          exact (Hk.2.2.post_ne_earlier htimeBefore hvector).elim
+  have hleadHistorical : ∀ j, j ≤ A.toSupported.travel →
+      restrictedTonguesAt w N localStart j ∈ history := by
+    intro j hj
+    obtain ⟨finish, hfinish⟩ := hlive j
+    have hshiftVector := restrictedTonguesAt_add_of_reach
+      (N := N) (d := j) hreach hfinish
+    rw [← hshiftVector]
+    apply hprefixHistory
+    omega
+  have hlocalCover :
+      NoveltyCoverOn w N localStart localTimes history 3 :=
+    hmerge.runway_or_candy_absolute_three_novelty
+      N history hleadHistorical localTimes
+  have htransport : ∀ t, shift ≤ t →
+      restrictedTonguesAt w N localStart (t - shift) =
+        restrictedTonguesAt w N start t := by
+    intro t ht
+    obtain ⟨finish, hfinish⟩ := hlive (t - shift)
+    have hshiftVector := restrictedTonguesAt_add_of_reach
+      (N := N) (d := t - shift) hreach hfinish
+    rw [← hshiftVector]
+    congr 1
+    omega
+  obtain ⟨fresh, hfreshLength, hlocalMem⟩ := hlocalCover
+  have hm1 : restrictedTonguesAt w N start (R.z1 + 1) ∈
+      history ++ fresh := by
+    have hm := hlocalMem (R.z1 + 1 - shift) (by
+      simp [localTimes])
+    rw [htransport (R.z1 + 1) (by omega)] at hm
+    exact hm
+  have hm2 : restrictedTonguesAt w N start (R.z2 + 1) ∈
+      history ++ fresh := by
+    have hm := hlocalMem (R.z2 + 1 - shift) (by
+      simp [localTimes])
+    rw [htransport (R.z2 + 1) (by omega)] at hm
+    exact hm
+  have hm3 : restrictedTonguesAt w N start (R.z3 + 1) ∈
+      history ++ fresh := by
+    have hm := hlocalMem (R.z3 + 1 - shift) (by
+      simp [localTimes])
+    rw [htransport (R.z3 + 1) (by omega)] at hm
+    exact hm
+  have hm4 : restrictedTonguesAt w N start (R.z4 + 1) ∈
+      history ++ fresh := by
+    have hm := hlocalMem (R.z4 + 1 - shift) (by
+      simp [localTimes])
+    rw [htransport (R.z4 + 1) (by omega)] at hm
+    exact hm
+  have hm5 : restrictedTonguesAt w N start (R.z5 + 1) ∈
+      history ++ fresh := by
+    have hm := hlocalMem (R.z5 + 1 - shift) (by
+      simp [localTimes])
+    rw [htransport (R.z5 + 1) (by omega)] at hm
+    exact hm
+  refine ⟨fresh, by omega, ?_⟩
+  intro t ht
+  simp only [List.mem_cons, List.not_mem_nil, or_false] at ht
+  rcases ht with rfl | rfl | rfl | rfl | rfl
+  · exact hm1
+  · exact hm2
+  · exact hm3
+  · exact hm4
+  · exact hm5
 /-! ## Direct global-control-flow bridge
 
 The five-frame extraction below is useful geometric normal form, but the
