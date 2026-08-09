@@ -338,6 +338,9 @@ name = "RelevantFiniteFrame"
 name = "ReplayFacts"
 
 [[lean_lib]]
+name = "RestorationFrames"
+
+[[lean_lib]]
 name = "ReversalFacts"
 
 [[lean_lib]]
