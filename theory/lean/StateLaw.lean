@@ -5,17 +5,17 @@ import VectorCount
 # The state law — the target theorem, in the language of tracks and switches
 
 This file states the actual claim about trains, tracks and switches.
-**`StateLaw` is OPEN — it is not proved anywhere in this repository.**
-What is proved is the same statement with `2 ^ N` in place of `N + 6`
-(`state_law_two_pow` below), and a conditional machine-level assembly
-(`Echo.state_law`) whose two hypotheses — the Gray tail and the
-one-alternation transient — are the unproved core of the problem.
+**`StateLaw` is OPEN — its specific `N + 6` bound is not proved.**
+What is now proved is the unconditional general linear bound `34*N+3`
+(`state_law_linear` in `TrackQuantitative.lean`), as well as the elementary
+`2 ^ N` bound (`state_law_two_pow` below).  The coefficient-one improvement
+from `34*N+3` to `N+O(1)` is the remaining problem.
 
-There is now also a direct physical-track route in `TrackTrace`, `TrackLobe`,
-`TrackNormalForm`, and `TrackTheta`: the first-repeated-edge fork, both
-reflector cases, and every theta-intersection orientation are proved.  Its
-remaining gap is the global two-component assembly and the final tongue-vector
-count; `StateLaw` stays explicitly open until both are kernel-checked.
+The direct physical-track route in `TrackTrace`, `TrackLobe`, `TrackNormalForm`,
+`TrackTheta`, `TrackGlobalRepair`, and `TrackQuantitative` closes the global
+two-component assembly, retains explicit lasso lengths, and proves the final
+`34*N+3` tongue-vector count.  `StateLaw` stays explicitly open because it asks
+for the much sharper `N+6` count.
 
 ## How to read the statement
 
@@ -61,10 +61,9 @@ def StateLaw : Prop :=
       (ks.map fun k => VectorCount.restrict N (tonguesAt w c0 k)).Nodup →
       ks.length ≤ N + 6
 
-/-- The exponential bound on exactly the same statement, **proved**:
-replace `N + 6` by `2 ^ N`.  This is the pigeonhole ceiling — it shows
-the statement well-formed and marks the gap the open problem must
-close: `2 ^ N` versus `N + 6`. -/
+/-- The elementary exponential bound on exactly the same statement, **proved**.
+`TrackQuantitative.state_law_linear` supersedes it asymptotically with
+`34*N+3`; the open gap is now `34*N+3` versus `N+6`. -/
 theorem state_law_two_pow (w : Wiring) (N : Nat)
     (_hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (c0 : Nat × Tongues) (ks : List Nat)

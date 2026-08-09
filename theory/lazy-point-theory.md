@@ -16,15 +16,13 @@ an active switch flips both ways. Distinct tongue vectors on a cycle with
 > **Cycle theorem.** Every eventual cycle has at most 2 active switches,
 > hence at most 4 distinct tongue vectors.
 
-is reduced to bounding actives. Status: **the state law is OPEN** — its
-precise statement, in the raw language of tracks and switches, is
-`GeneralN.StateLaw` in `lean/StateLaw.lean`, and nothing proves it.  What
-is proved: the same statement with 2^N in place of N + 6
-(`state_law_two_pow`); T1–T3/T5–T8 below; and a counting scaffold
-(`Echo.state_law`) showing the law would follow from two properties of
-runs — the Gray tail (**B**) and the one-alternation transient (**C**).
-B and C are *the core of the problem*, not side lemmas; T9's compilation
-of wirings into the register machine is itself paper-only.  Evidence:
+is reduced to bounding actives. Status: the specific coefficient-one
+`GeneralN.StateLaw` (`N+6`) is **OPEN**, but the unconditional general bound
+`f(N) ≤ 34N+3` is proved as `GeneralN.state_law_linear` in
+`lean/TrackQuantitative.lean`.  The proof is a direct physical-track lasso
+argument and does not assume the echo-machine Gray-tail properties.  The
+separate echo-machine route still reduces the sharper bound to the Gray tail
+(**B**) and one-alternation transient (**C**); those remain open.  Evidence:
 exhaustive for N ≤ 4 on wirings (140,152, in Lean), unbeaten by
 cycle-objective search through N = 7, and exhaustive across all small
 machines (`echo_machine.py`).
