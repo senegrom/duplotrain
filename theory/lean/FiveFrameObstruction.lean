@@ -505,6 +505,172 @@ private theorem PhysicalTrace.simple_same_exit_cycle_traces
     · exact hsimple.2
   exact ⟨htransient, hstable, hsimpleCycle⟩
 
+/-- Strengthened first-revisit fork retaining the exact switch-simple cycle
+trace in the absorbing branch.  This extra data is what lets a later raw
+novelty rule that branch out, rather than treating `SettlesOnSimpleCycle` as
+an opaque eventual-periodicity certificate. -/
+private theorem PhysicalTrace.first_revisit_cycle_traces_or_retrace
+    {w : Wiring}
+    {start : Nat × Tongues} {runway body : List Passage}
+    {p x q y : Nat} {u₀ u v : Tongues}
+    (hrunway : PhysicalTrace w start runway (p, u₀))
+    (hbody : PhysicalTrace w (p, u₀) ((p, x) :: body) (q, u))
+    (hsimple : SwitchSimple (runway ++ (p, x) :: body))
+    (hsame : p / 3 = q / 3)
+    (hrepeat : arrive u q = (y, v)) :
+    (∃ cycle settled,
+        cycle ≠ [] ∧
+        PhysicalTrace w (q, u) cycle (q, settled) ∧
+        PhysicalTrace w (q, settled) cycle (q, settled) ∧
+        SwitchSimple cycle) ∨
+      (∃ settled,
+        stepN w (runway.length + 1) (q, u) =
+          (w.link start.1).map (fun ell => (ell, settled))) := by
+  have hsimpleBody : SwitchSimple ((p, x) :: body) := by
+    unfold SwitchSimple at hsimple ⊢
+    simp only [List.map_append] at hsimple
+    exact (List.nodup_append.mp hsimple).2.1
+  have holdStem :
+      p = 3 * passageSwitch (p, x) ∨
+        x = 3 * passageSwitch (p, x) :=
+    hbody.passage_stem_endpoint (p, x) List.mem_cons_self
+  have hrepeatStem :
+      q = 3 * passageSwitch (q, y) ∨
+        y = 3 * passageSwitch (q, y) := by
+    have hs := arrive_stem_endpoint u q
+    rw [hrepeat] at hs
+    exact hs
+  have hsame' : passageSwitch (p, x) = passageSwitch (q, y) := by
+    simpa [passageSwitch] using hsame
+  have hshare : p = q ∨ p = y ∨ x = q ∨ x = y :=
+    recorded_passages_share_port holdStem hrepeatStem hsame'
+  rcases hshare with hpq | hpy | hxq | hxy
+  · subst q
+    have hgrooved := hbody.grooved_of_switchSimple hsimpleBody
+    have hlinked := hbody.linked
+    have hfinal : w.link (lastPassageExit x body) = some p :=
+      hbody.last_link
+    have hstable :
+        PhysicalTrace w (p, u) ((p, x) :: body) (p, u) :=
+      grooved_passages_physicalTrace w u p x p body
+        hlinked hgrooved hfinal
+    exact Or.inl ⟨(p, x) :: body, u, by simp,
+      hstable, hstable, hsimpleBody⟩
+  · subst y
+    exact Or.inr ⟨v, hrunway.simple_cross_exit_retraces_prefix
+      hbody hsimple hrepeat⟩
+  · subst q
+    have hfull := hrunway.append hbody
+    have hgrooved := hfull.grooved_of_switchSimple hsimple
+    have hold : arrive u x = (p, u) :=
+      hgrooved (p, x) (by
+        apply List.mem_append_right runway
+        exact List.mem_cons_self)
+    rw [hrepeat] at hold
+    injection hold with hyp huv
+    subst y
+    subst v
+    exact Or.inr ⟨u, hrunway.simple_cross_exit_retraces_prefix
+      hbody hsimple (by simpa using hrepeat)⟩
+  · subst y
+    obtain ⟨htransient, hstable, hsimpleCycle⟩ :=
+      hbody.simple_same_exit_cycle_traces hsimpleBody hrepeat
+    exact Or.inl ⟨(q, x) :: body, v, by simp,
+      htransient, hstable, hsimpleCycle⟩
+
+/-- Once a switch-simple cycle has been entered, no serially later globally
+novel repeated-writer frame can exist.  Before the first lap closes, writer
+identity is injective along the simple trace.  From the end of that lap on,
+all tongues are grooved and the complete tongue vector is constant. -/
+private theorem serial_repeated_novel_after_simple_cycle_trace_false
+    {w : Wiring} {N : Nat} {global : Nat × Tongues}
+    {base laterOpen laterClose p : Nat} {u settled : Tongues}
+    {cycle : List Passage}
+    (hbase : stepN w base global = some (p, u))
+    (htransient : PhysicalTrace w (p, u) cycle (p, settled))
+    (hstable : PhysicalTrace w (p, settled) cycle (p, settled))
+    (hsimple : SwitchSimple cycle)
+    (hnonempty : cycle ≠ [])
+    (G : RawLastWriterFrame w N global laterOpen laterClose)
+    (H : RawRepeatedWriterNovelAt w N global laterClose)
+    (hserial : base ≤ laterOpen) : False := by
+  cases hcycle : cycle with
+  | nil => exact hnonempty hcycle
+  | cons passage rest =>
+      rcases passage with ⟨head, x⟩
+      have htransient' :
+          PhysicalTrace w (p, u) ((head, x) :: rest) (p, settled) := by
+        simpa [hcycle] using htransient
+      have hstable' :
+          PhysicalTrace w (p, settled) ((head, x) :: rest)
+            (p, settled) := by
+        simpa [hcycle] using hstable
+      have hsimple' : SwitchSimple ((head, x) :: rest) := by
+        simpa [hcycle] using hsimple
+      have hhead : p = head := htransient'.head_arrive.1
+      subst head
+      let period := ((p, x) :: rest).length
+      have hsettledAt :
+          stepN w (base + period) global = some (p, settled) := by
+        rw [stepN_add, hbase]
+        simpa [period] using htransient'.sound
+      have hcycleGrooved :
+          PassagesGrooved settled ((p, x) :: rest) :=
+        hstable'.grooved_of_switchSimple hsimple'
+      have hcycleLinked : LinkedPassages w ((p, x) :: rest) :=
+        hstable'.linked
+      have hcycleFinal :
+          w.link (lastPassageExit x rest) = some p :=
+        hstable'.last_link
+      have hbaseOpen : base ≤ laterOpen := hserial
+      have hopenClose : laterOpen < laterClose := G.order
+      by_cases hbeforeStable : laterClose < base + period
+      · let i := laterOpen - base
+        let j := laterClose - base
+        have hi : i < period := by
+          dsimp [i]
+          omega
+        have hj : j < period := by
+          dsimp [j]
+          omega
+        have htimeI : base + i = laterOpen := by
+          dsimp [i]
+          omega
+        have htimeJ : base + j = laterClose := by
+          dsimp [j]
+          omega
+        have hsameWriter :
+            rawWriterAt w global (base + i) =
+              rawWriterAt w global (base + j) := by
+          rw [htimeI, htimeJ]
+          exact G.same_writer
+        have hij := htransient'.rawWriterAt_add_injective
+          hbase hsimple' hi hj hsameWriter
+        have hopenClose : laterOpen = laterClose := by omega
+        exact (Nat.ne_of_lt G.order) hopenClose
+      · have hge : base + period ≤ laterClose :=
+          Nat.le_of_not_gt hbeforeStable
+        let d := laterClose + 1 - (base + period)
+        have hsplit :
+            laterClose + 1 = base + period + d := by
+          dsimp [d]
+          omega
+        obtain ⟨port, hfuture⟩ :=
+          grooved_cycle_forever_state w settled p x rest
+            hcycleLinked hcycleGrooved hcycleFinal d
+        have hpostAt : stepN w (laterClose + 1) global =
+            some (port, settled) := by
+          rw [hsplit, stepN_add, hsettledAt]
+          exact hfuture
+        have hvector :
+            restrictedTonguesAt w N global (laterClose + 1) =
+              restrictedTonguesAt w N global (base + period) := by
+          simp [restrictedTonguesAt, tonguesAt, hpostAt, hsettledAt]
+        apply H.2.2
+        apply List.mem_map.mpr
+        exact ⟨base + period, List.mem_range.mpr (by omega),
+          hvector.symm⟩
+
 /-- **Concrete elimination of the independent serial-frame case.**
 
 Let `[left,right]` be a repeated productive-writer frame.  If its complete
@@ -739,6 +905,113 @@ theorem five_serial_novelties_force_first_repeated_switch
   exact ⟨before, close, passages, runway, repeated, suffix,
     hbeforeAt, hcloseAt, by simpa [span] using hlength,
     htrace, hsplit, hsimple, hrepeat⟩
+
+/-- **The serial branch has only the backward outcome.**
+
+For five actual globally novel repeated-writer frames, a serial break forces
+the first repeated switch in the first frame to retrace its complete caller
+runway.  The absorbing branch of the first-revisit fork is impossible:
+the selected later frame would repeat a writer either within the
+switch-simple first lap (contradicting switch simplicity), or after the
+cycle is grooved (contradicting global novelty).
+
+The conclusion exposes the exact raw `stepN` return through the edge by
+which the first frame was entered.  It does not assume a recursively
+certified repair module and does not assume `IrreflexiveLinks`. -/
+theorem five_serial_novelties_force_exact_caller_retrace
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    {z₀ z₁ z₂ z₃ z₄ : Nat}
+    (H₀ : RawRepeatedWriterNovelAt w N start z₀)
+    (H₁ : RawRepeatedWriterNovelAt w N start z₁)
+    (H₂ : RawRepeatedWriterNovelAt w N start z₂)
+    (H₃ : RawRepeatedWriterNovelAt w N start z₃)
+    (H₄ : RawRepeatedWriterNovelAt w N start z₄)
+    {a₀ q₀ a₁ q₁ a₂ q₂ a₃ q₃ a₄ q₄ : Nat}
+    (F₀ : RawNovelClosingFrame w N start a₀ q₀ z₀)
+    (F₁ : RawNovelClosingFrame w N start a₁ q₁ z₁)
+    (F₂ : RawNovelClosingFrame w N start a₂ q₂ z₂)
+    (F₃ : RawNovelClosingFrame w N start a₃ q₃ z₃)
+    (F₄ : RawNovelClosingFrame w N start a₄ q₄ z₄)
+    (hserial : FiveFrameSerialBreak z₀ a₁ a₂ a₃ a₄) :
+    ∃ before atRepeat repeatTime backSteps settled,
+      stepN w a₀ start = some before ∧
+      stepN w repeatTime start = some atRepeat ∧
+      a₀ ≤ repeatTime ∧ repeatTime < z₀ ∧
+      0 < backSteps ∧ backSteps ≤ N + 1 ∧
+      stepN w backSteps atRepeat =
+        (w.link before.1).map (fun ell => (ell, settled)) := by
+  obtain ⟨before, close, passages, runway, repeated, suffix,
+      hbefore, _hclose, hlength, htrace, hsplit, hsimple,
+      hrepeatMem⟩ :=
+    five_serial_novelties_force_first_repeated_switch
+      hN H₀ H₁ H₂ H₃ H₄ F₀ F₁ F₂ F₃ F₄ hserial
+  rw [hsplit] at htrace
+  obtain ⟨atRepeat, hprefix, hafter⟩ := htrace.split_append
+  obtain ⟨old, hold, hsameSwitch⟩ := List.mem_map.mp hrepeatMem
+  obtain ⟨caller, body, hrunway⟩ := List.append_of_mem hold
+  rw [hrunway] at hprefix
+  obtain ⟨atOld, hcaller, hbody⟩ := hprefix.split_append
+  rcases old with ⟨p, x⟩
+  rcases repeated with ⟨q, y⟩
+  have hatOldPort : atOld.1 = p := hbody.head_arrive.1
+  rcases atOld with ⟨oldPort, u₀⟩
+  simp only at hatOldPort
+  subst oldPort
+  have hatRepeatPort : atRepeat.1 = q := hafter.head_arrive.1
+  rcases atRepeat with ⟨repeatPort, u⟩
+  simp only at hatRepeatPort
+  subst repeatPort
+  obtain ⟨v, hrepeat⟩ := hafter.head_arrive.2
+  have hsimpleFrame :
+      SwitchSimple (caller ++ (p, x) :: body) := by
+    simpa [hrunway] using hsimple
+  have hswitch : p / 3 = q / 3 := by
+    simpa [passageSwitch] using hsameSwitch
+  have hprefixSound :
+      stepN w runway.length before = some (q, u) := by
+    simpa [hrunway] using hprefix.sound
+  let repeatTime := a₀ + runway.length
+  have hrepeatAt :
+      stepN w repeatTime start = some (q, u) := by
+    dsimp [repeatTime]
+    rw [stepN_add, hbefore]
+    exact hprefixSound
+  have hrunwayShort : runway.length < passages.length := by
+    rw [hsplit]
+    simp
+  have hrepeatBeforeClose : repeatTime < z₀ := by
+    dsimp [repeatTime]
+    have hframeOrder := F₀.outer.order
+    omega
+  rcases hcaller.first_revisit_cycle_traces_or_retrace
+      hbody hsimpleFrame hswitch hrepeat with hcycle | hretrace
+  · obtain ⟨cycle, cycleState, hnonempty, htransient,
+        hstable, hcycleSimple⟩ := hcycle
+    rcases hserial with hs | hs | hs | hs
+    · exact (serial_repeated_novel_after_simple_cycle_trace_false
+        hrepeatAt htransient hstable hcycleSimple hnonempty
+          F₁.outer H₁ (by omega)).elim
+    · exact (serial_repeated_novel_after_simple_cycle_trace_false
+        hrepeatAt htransient hstable hcycleSimple hnonempty
+          F₂.outer H₂ (by omega)).elim
+    · exact (serial_repeated_novel_after_simple_cycle_trace_false
+        hrepeatAt htransient hstable hcycleSimple hnonempty
+          F₃.outer H₃ (by omega)).elim
+    · exact (serial_repeated_novel_after_simple_cycle_trace_false
+        hrepeatAt htransient hstable hcycleSimple hnonempty
+          F₄.outer H₄ (by omega)).elim
+  · obtain ⟨settled, hback⟩ := hretrace
+    have hcallerSimple : SwitchSimple caller := by
+      unfold SwitchSimple at hsimpleFrame ⊢
+      simp only [List.map_append, List.map_cons] at hsimpleFrame
+      exact (List.nodup_append.mp hsimpleFrame).1
+    have hcallerLe : caller.length ≤ N :=
+      hcaller.simple_length_le hN hcallerSimple
+    exact ⟨before, (q, u), repeatTime, caller.length + 1, settled,
+      hbefore, hrepeatAt, by omega, hrepeatBeforeClose,
+      by omega, by omega, hback⟩
 
 /-- Encountering an external self-link is an exact identity reflection.
 After the preceding passage exits through the self-linked port, the next
