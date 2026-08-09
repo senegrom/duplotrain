@@ -14,22 +14,17 @@ early-visit/trapping arguments on loaded support components.
 
 namespace Echo
 
-/-- A discrete function which differs at two times changes at an adjacent
-step in between. -/
-theorem exists_adjacent_change
+private theorem exists_adjacent_change_gap
     {α : Type} (f : Nat → α) :
-    ∀ {p q : Nat}, p < q → f p ≠ f q →
-      ∃ k, p ≤ k ∧ k < q ∧ f (k+1) ≠ f k := by
-  intro p q hpq
-  obtain ⟨d, hq⟩ : ∃ d, q = p + d + 1 :=
-    ⟨q-p-1, by omega⟩
-  subst q
-  induction d generalizing p with
+    ∀ d p, f p ≠ f (p+d+1) →
+      ∃ k, p ≤ k ∧ k < p+d+1 ∧ f (k+1) ≠ f k := by
+  intro d
+  induction d with
   | zero =>
-      intro hne
-      exact ⟨p, Nat.le_refl _, by omega, hne⟩
+      intro p hne
+      exact ⟨p, Nat.le_refl _, by omega, hne.symm⟩
   | succ d ih =>
-      intro hne
+      intro p hne
       by_cases hfirst : f (p+1) = f p
       · have htail : f (p+1) ≠ f ((p+1)+d+1) := by
           intro h
@@ -38,11 +33,25 @@ theorem exists_adjacent_change
             f p = f (p+1) := hfirst.symm
             _ = f ((p+1)+d+1) := h
             _ = f (p+(d+1)+1) := by congr 1 <;> omega
-        obtain ⟨k, hkLo, hkHi, hkNe⟩ :=
-          ih (p := p+1) htail
+        obtain ⟨k, hkLo, hkHi, hkNe⟩ := ih (p+1) htail
         refine ⟨k, by omega, ?_, hkNe⟩
         omega
       · exact ⟨p, Nat.le_refl _, by omega, hfirst⟩
+
+/-- A discrete function which differs at two times changes at an adjacent
+step in between. -/
+theorem exists_adjacent_change
+    {α : Type} (f : Nat → α)
+    {p q : Nat} (hpq : p < q) (hne : f p ≠ f q) :
+    ∃ k, p ≤ k ∧ k < q ∧ f (k+1) ≠ f k := by
+  obtain ⟨d, hq⟩ : ∃ d, q = p+d+1 :=
+    ⟨q-p-1, by omega⟩
+  have hgap : f p ≠ f (p+d+1) := by
+    rw [← hq]
+    exact hne
+  obtain ⟨k, hkLo, hkHi, hkNe⟩ :=
+    exists_adjacent_change_gap f d p hgap
+  exact ⟨k, hkLo, by omega, hkNe⟩
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
