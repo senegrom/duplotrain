@@ -81,6 +81,10 @@ private theorem nodup_subset_equal_cover
       exact h ▸ hx
     exact (List.mem_erase_of_ne hxy).mpr (hsub x hx)
   have hle := nodup_subset_length_load hxnd hsubErase
+  have hpos : 0 < ys.length := by
+    cases ys with
+    | nil => cases hy
+    | cons _ _ => simp
   rw [List.length_erase_of_mem hy, hlen] at hle
   omega
 
@@ -98,10 +102,10 @@ theorem lobeForestPartnerCells_nodup
     (lobes : List (SupportLobeForestEpoch m e r0 times))
     (hroots : (lobeForestRoots m e r0 lobes).Nodup) :
     (lobeForestPartnerCells m e r0 lobes).Nodup := by
-  unfold lobeForestPartnerCells lobeForestRoots
-  have h := nodup_map_star m
-    (lobes.map (fun B => B.root m)) hroots
-  simpa [List.map_map, Function.comp_def] using h
+  have hroots' : (lobes.map (fun B => B.root m)).Nodup := by
+    simpa [lobeForestRoots] using hroots
+  unfold lobeForestPartnerCells
+  exact nodup_map_star m _ hroots'
 
 /-- **One-component load bound.** -/
 theorem supportTree_lobe_load_notFullyLoaded
