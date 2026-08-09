@@ -192,7 +192,8 @@ theorem loaded_groups_epoch_two_thirds
   have hcapacity := loadedGroupProfile_capacity_eq
     m e r0 hrun hr0 groups
   have hcountProfile : ks.length ≤ notFullLoadedCapacity profile := by
-    dsimp [blocks, lobes, profile] at hcountProfile ⊢
+    change ks.length ≤
+      notFullLoadedCapacity (loadedGroupProfile m e r0 groups)
     rw [hcapacity]
     exact hcount
   have hall : ∀ p ∈ profile, NotFullyLoaded p.1 p.2 := by
