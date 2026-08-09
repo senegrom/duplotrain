@@ -117,6 +117,7 @@ theorem ManufacturedReflector.traversal_then_lasso_distinct_le_succ
   have hhistoryLen : history.length ≤ cap + 1 := by
     dsimp [history]
     simp only [List.length_append, List.length_cons, List.length_nil]
+    rw [htailReducedLen, htailLen]
     omega
   exact Nat.le_trans hcount hhistoryLen
 
