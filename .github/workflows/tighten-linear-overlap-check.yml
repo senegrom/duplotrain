@@ -21,6 +21,11 @@ on:
       - theory/lean/NoveltyAwareLassoTwenty.lean
       - theory/lean/KnownEdgeTwenty.lean
       - theory/lean/StateLawTwenty.lean
+      - theory/lean/TrackGlobalRepairSimple.lean
+      - theory/lean/TrackQuantitativeRepairSeventeen.lean
+      - theory/lean/NoveltyAwareLassoNineteen.lean
+      - theory/lean/KnownEdgeNineteen.lean
+      - theory/lean/StateLawNineteen.lean
       - theory/lean/ProbePairedPeriod.lean
       - .github/workflows/tighten-linear-overlap-check.yml
   workflow_dispatch:
@@ -77,6 +82,16 @@ jobs:
           [[lean_lib]]
           name = "StateLawTwenty"
           [[lean_lib]]
+          name = "TrackGlobalRepairSimple"
+          [[lean_lib]]
+          name = "TrackQuantitativeRepairSeventeen"
+          [[lean_lib]]
+          name = "NoveltyAwareLassoNineteen"
+          [[lean_lib]]
+          name = "KnownEdgeNineteen"
+          [[lean_lib]]
+          name = "StateLawNineteen"
+          [[lean_lib]]
           name = "ProbePairedPeriod"
           EOF
       - name: Build tightened linear theorems
@@ -100,4 +115,9 @@ jobs:
           lake build NoveltyAwareLassoTwenty
           lake build KnownEdgeTwenty
           lake build StateLawTwenty
+          lake build TrackGlobalRepairSimple
+          if [ -f TrackQuantitativeRepairSeventeen.lean ]; then lake build TrackQuantitativeRepairSeventeen; fi
+          if [ -f NoveltyAwareLassoNineteen.lean ]; then lake build NoveltyAwareLassoNineteen; fi
+          if [ -f KnownEdgeNineteen.lean ]; then lake build KnownEdgeNineteen; fi
+          if [ -f StateLawNineteen.lean ]; then lake build StateLawNineteen; fi
           lake env lean ProbePairedPeriod.lean
