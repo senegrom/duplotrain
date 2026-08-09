@@ -208,14 +208,15 @@ theorem state_law_linear_eighteen
                 omega
   · have hsmall : N = 0 ∨ N = 1 := by omega
     rcases hsmall with rfl | rfl
-    · have hp := VectorCount.trajectory_count_le 0
-        (tonguesAt w start) times (by
-          simpa [restrictedTonguesAt] using hnd)
+    · change (times.map (fun k =>
+        VectorCount.restrict 0 (tonguesAt w start k))).Nodup at hnd
+      have hp := VectorCount.trajectory_count_le 0
+        (tonguesAt w start) times hnd
       omega
-    · have hp := VectorCount.trajectory_count_le 1
-        (tonguesAt w start) times (by
-          simpa [restrictedTonguesAt] using hnd)
-      norm_num at hp ⊢
+    · change (times.map (fun k =>
+        VectorCount.restrict 1 (tonguesAt w start k))).Nodup at hnd
+      have hp := VectorCount.trajectory_count_le 1
+        (tonguesAt w start) times hnd
       omega
 
 end GeneralN
