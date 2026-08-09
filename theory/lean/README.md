@@ -43,7 +43,9 @@ five below, then the satellites:
   distinct reflector/support cells, `two_reflector_edge_register_block`
   proves the exact register update: only the two lobe registers toggle;
   after the initialization block, `two_reflector_edge_state_period_eight`
-  gives a complete eight-step machine-state recurrence.
+  gives a complete eight-step machine-state recurrence, and
+  `two_reflector_edge_snapshots_four` proves that every later family of
+  distinct register snapshots has cardinality at most four.
 
 * `LobeDichotomy.lean` — **every cycle cell is a Gray flipper or
   foreign-valued.**  A slot can only be delivered by reading its
