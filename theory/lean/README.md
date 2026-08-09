@@ -323,6 +323,18 @@ reflector actions, hence contributes at most four tongue vectors.  Until
 that quantitative extraction is formalized, the repository does **not**
 claim the `N+6` state law.
 
+`TrackQuantitative.lean` begins that extraction with a checked bounded-lasso
+interface.  `EventuallyPeriodicWithin w c cap` retains `lead + period ≤ cap`;
+`reduce_time`, `configuration_count`, and `tongue_vector_count` prove that
+such a lasso admits at most `cap` distinct sampled configurations or tongue
+vectors.  The first-revisit proof now has a quantitative sibling:
+`first_activated_quantitative_outcome` gives either a lasso of size `3*N` or
+an activated manufactured reflector reached within `2*N+1` steps.  Moreover
+every manufactured reflector has travel at most `2*N`, and a disjoint pair's
+explicit four-corner period fits within `8*N`.  These are unconditional,
+general-`N` components; propagating a linear cap through the intersecting
+two-reflector repair branches is the remaining quantitative capstone.
+
 **`EchoMachine.lean` — the abstracted cycle dynamics** (T9 in
 ../lazy-point-theory.md): any wiring's trailing structure compiles to a
 forest of trees; the cycle dynamics reduces to a register machine (one

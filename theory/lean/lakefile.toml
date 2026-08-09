@@ -407,6 +407,9 @@ name = "TrackEdge"
 name = "TrackGlobalRepair"
 
 [[lean_lib]]
+name = "TrackQuantitative"
+
+[[lean_lib]]
 name = "TreeCapacitySevenTenths"
 
 [[lean_lib]]

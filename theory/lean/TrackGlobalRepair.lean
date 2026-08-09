@@ -4925,4 +4925,69 @@ theorem long_run_eventually_periodic
       simpa [hactivatedB] using hpair
     exact (hpairAtStateB.prepend hreachB).prepend hreachA
 
+/-- A manufactured reflector's full out-and-back travel is at most twice
+the length of its switch-simple construction exploration. -/
+theorem ManufacturedReflector.travel_le_two_mul_exploration_length
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e) :
+    A.toSupported.travel ≤ 2 * A.exploration.length := by
+  cases A with
+  | stay R =>
+      simp [ManufacturedReflector.toSupported,
+        ManufacturedReflector.exploration,
+        ManufacturedStayReflector.toSupported]
+      omega
+  | flip R =>
+      simp [ManufacturedReflector.toSupported,
+        ManufacturedReflector.exploration,
+        ManufacturedFlipReflector.toSupported]
+      omega
+
+/-- In an `N`-switch wiring every manufactured reflector macro has travel
+at most `2*N`. -/
+theorem ManufacturedReflector.travel_le_two_mul_switches
+    {w : Wiring} {N g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N) :
+    A.toSupported.travel ≤ 2 * N := by
+  have hexploration : A.exploration.length ≤ N :=
+    A.exploration_trace.simple_length_le hN A.exploration_simple
+  have htravel := A.travel_le_two_mul_exploration_length
+  omega
+
+/-- Entry-free form of the global theorem.  One live step supplies the
+incoming physical edge needed by `long_run_eventually_periodic`; therefore
+any run live for `3*N+3` steps is eventually periodic. -/
+theorem long_run_eventually_periodic_without_entry
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start finish : Nat × Tongues}
+    (hlive : stepN w (3 * N + 3) start = some finish) :
+    EventuallyPeriodic w start := by
+  have hsplit : 3 * N + 3 = 1 + (3 * N + 2) := by omega
+  rw [hsplit, stepN_add] at hlive
+  cases hone : stepN w 1 start with
+  | none =>
+      rw [hone] at hlive
+      contradiction
+  | some middle =>
+      rw [hone] at hlive
+      simp only [Option.bind_some] at hlive
+      rcases start with ⟨startPort, startState⟩
+      have honeStep : stepN w 1 (startPort, startState) =
+          some middle := hone
+      simp only [stepN, step] at hone
+      let localStep := arrive startState startPort
+      cases hlink : w.link localStep.1 with
+      | none =>
+          simp [localStep, hlink] at hone
+      | some entry =>
+          have hmiddle : middle = (entry, localStep.2) := by
+            simpa [localStep, hlink] using hone.symm
+          subst middle
+          have hperiodic := long_run_eventually_periodic hN hlive hlink
+          exact hperiodic.prepend honeStep
+
 end GeneralN
