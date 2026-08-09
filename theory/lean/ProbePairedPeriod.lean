@@ -3,5 +3,8 @@ import TrackQuantitativeTight
 namespace GeneralN
 
 #check SupportedReflector.paired_period
+#check ManufacturedFlipReflector.suffix_after_runway_passage_with_travel
+#check ManufacturedReflector.ChangedForwardMerge.spliced_lobe_reflector
+#check manufactured_flip_arbitrary_lobe_theta_half
 
 end GeneralN
