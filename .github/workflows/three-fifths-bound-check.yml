@@ -15,6 +15,7 @@ on:
       - theory/lean/LoadedTreeGroupsTwoThirds.lean
       - theory/lean/LoadedTreeGroupBudget.lean
       - theory/lean/LoadedTreeGroupsWithFreeTwoThirds.lean
+      - theory/lean/AutomaticLoadedTwoThirds.lean
       - .github/workflows/three-fifths-bound-check.yml
   workflow_dispatch:
 jobs:
@@ -59,8 +60,10 @@ jobs:
           name = "LoadedTreeGroupBudget"
           [[lean_lib]]
           name = "LoadedTreeGroupsWithFreeTwoThirds"
+          [[lean_lib]]
+          name = "AutomaticLoadedTwoThirds"
           EOF
       - name: Build improved component bounds
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TreeLobeLoadThreeFifths TreeLobeNotFullTwoThirds LobePartnerBounce LobeToggle TwoReflectorEdgeTrap TwoReflectorFiniteTrap LobeVariationVisit FullyLoadedTreeImpossible TreeLobeLoadBound LoadedTreeGroupsTwoThirds LoadedTreeGroupBudget LoadedTreeGroupsWithFreeTwoThirds
+          lake build TreeLobeLoadThreeFifths TreeLobeNotFullTwoThirds LobePartnerBounce LobeToggle TwoReflectorEdgeTrap TwoReflectorFiniteTrap LobeVariationVisit FullyLoadedTreeImpossible TreeLobeLoadBound LoadedTreeGroupsTwoThirds LoadedTreeGroupBudget LoadedTreeGroupsWithFreeTwoThirds AutomaticLoadedTwoThirds
