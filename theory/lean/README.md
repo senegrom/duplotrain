@@ -54,7 +54,16 @@ five below, then the satellites:
   written cell's mouth (converse of `mouth_delivery_lobe`), so two
   consecutive productive lobe deliveries form such a pair.  Combined
   with `lobe_or_cross`, the alternation program's open frontier is
-  confined to cross-valued (foreign-partnered) writers.
+  confined to cross-valued (foreign-partnered) writers.  The first
+  cross-side theorem is in: `cross_mirror_sails`, the exact dual of
+  `mouth_stand_return` — if the write preceding the mouth-stand write
+  was a *cross* delivery, the mirrored return step is **quiet**: the
+  walk lands on the cross delivery's foreign read cell carrying its
+  unchanged register, and the mirror continues into deeper history.
+  So after a mouth-stand write the mirrored return is productive if
+  and only if the preceding write was a lobe delivery; a cross write
+  cannot terminate the retrace, only a stale register further back
+  can, and the stale registers are exactly the interim writers'.
 
 * `LobePartnerBounce.lean`, `LobeToggle.lean`, and
   `LobeVariationVisit.lean` — **an occupied lobe is a forced parity

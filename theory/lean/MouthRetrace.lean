@@ -463,4 +463,118 @@ theorem lobe_pair_seed (hrun : IsRun m e r0)
   stand_a := lobe_delivery_stands m e r0 hrun hr0 hlobe_a
   stand_b := lobe_delivery_stands m e r0 hrun hr0 hlobe_b
 
+/-! ## The cross dual: the mirror sails through a cross write
+
+`mouth_stand_return` shows the mirrored return step after a mouth-stand
+write is *productive* — into the previous writer — when the previous
+delivery was a lobe slot.  The exact dual holds when the previous
+delivery was a cross slot (its bar-partner outside the written cell):
+the mirror's final arrival is the *unchanged register of the foreign
+read cell*, so the return step is **quiet** and the walk keeps
+mirroring into deeper history.  After a mouth-stand write, the mirrored
+return is productive if and only if the previous write was a lobe
+delivery.  This is the engine for the cross-writer half of the
+alternation program: a cross write cannot terminate the retrace — only
+a stale register further back can, and the stale registers are exactly
+the interim writers'. -/
+
+/-- **The cross sail-through.**  If the write preceding a mouth-stand
+write was a cross delivery, the mirrored return step is quiet: the
+walk lands on the foreign read cell of that cross delivery, carrying
+its unchanged register. -/
+theorem cross_mirror_sails (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (hbar : ∀ s, m.bar s ≠ s) {t2 t3 : Nat} (h23 : t2 < t3)
+    (hq : ∀ s, t2 < s → s < t3 → ¬ ProductiveStep m e r0 s)
+    (hstand3 : m.cellOf (e t3) = m.star (m.cellOf (e (t3 + 1))))
+    (hcross2 : m.cellOf (m.bar (e (t2 + 1))) ≠ m.cellOf (e (t2 + 1))) :
+    e (t3 + (t3 - t2) + 1) = m.bar (e (t2 + 1)) ∧
+    m.cellOf (e (t3 + (t3 - t2) + 1))
+      = m.cellOf (m.bar (e (t2 + 1))) ∧
+    ¬ ProductiveStep m e r0 (t3 + (t3 - t2)) := by
+  obtain ⟨hmirror, hquiet⟩ :=
+    mouth_retrace m e r0 hrun hr0 hbar h23 hq hstand3
+      (t3 - t2) (by omega) (Nat.le_refl _)
+  have hidxm : t3 + 1 - (t3 - t2) = t2 + 1 := by omega
+  rw [hidxm] at hmirror
+  have hidxa : t3 + (t3 - t2) + 1 = t3 + 1 + (t3 - t2) := by omega
+  have hval : e (t3 + (t3 - t2) + 1) = m.bar (e (t2 + 1)) := by
+    rw [hidxa]
+    exact hmirror
+  have hcell : m.cellOf (e (t3 + (t3 - t2) + 1))
+      = m.cellOf (m.bar (e (t2 + 1))) := congrArg m.cellOf hval
+  -- the read cell of the cross delivery is not the mouth-stand writer:
+  -- otherwise both stands coincide, the frozen register is fetched
+  -- twice, and the two deliveries agree — making the cross delivery a
+  -- lobe delivery after all
+  have hR2C3 : m.cellOf (m.bar (e (t2 + 1)))
+      ≠ m.cellOf (e (t3 + 1)) := by
+    intro hEq
+    by_cases hXC3 : m.cellOf (e (t2 + 1)) = m.cellOf (e (t3 + 1))
+    · exact hcross2 (hEq.trans hXC3.symm)
+    · apply hXC3
+      have hw2 := witness m e r0 hrun hr0 t2
+      have hstand2 : m.cellOf (e t2)
+          = m.star (m.cellOf (e (t3 + 1))) := by
+        have h := congrArg m.star (hw2.1.symm.trans hEq)
+        rw [m.star_invol] at h
+        exact h
+      have hd2 : e (t2 + 1)
+          = m.bar (reg m e r0 t2 (m.cellOf (e (t3 + 1)))) := by
+        have h := hrun t2
+        rw [hstand2, m.star_invol] at h
+        exact h
+      have hd3 : e (t3 + 1)
+          = m.bar (reg m e r0 t3 (m.cellOf (e (t3 + 1)))) := by
+        have h := hrun t3
+        rw [hstand3, m.star_invol] at h
+        exact h
+      have hregC3 : reg m e r0 t3 (m.cellOf (e (t3 + 1)))
+          = reg m e r0 t2 (m.cellOf (e (t3 + 1))) := by
+        have hh := quiet_reg m e r0 (i := t2 + 1) (t3 - t2 - 1)
+          (fun t ht1 ht2 => hq t (by omega) (by omega))
+        have hidx : t2 + 1 + (t3 - t2 - 1) = t3 := by omega
+        rw [hidx] at hh
+        have hskip : reg m e r0 (t2 + 1) (m.cellOf (e (t3 + 1)))
+            = reg m e r0 t2 (m.cellOf (e (t3 + 1))) :=
+          reg_skip m e r0 hXC3
+        exact (hh _).trans hskip
+      have h5 : m.bar (reg m e r0 t2 (m.cellOf (e (t3 + 1))))
+          = e (t3 + 1) := by
+        rw [← hregC3]
+        exact hd3.symm
+      exact congrArg m.cellOf (hd2.trans h5)
+  -- the cross read cell still holds the fetched slot: the final
+  -- arrival equals its register, so the step is quiet
+  have hheld : reg m e r0 t2 (m.cellOf (m.bar (e (t2 + 1))))
+      = m.bar (e (t2 + 1)) := by
+    have hw := witness m e r0 hrun hr0 t2
+    rw [hw.1]
+    exact hw.2
+  have hc1 : reg m e r0 (t3 + (t3 - t2))
+        (m.cellOf (m.bar (e (t2 + 1))))
+      = reg m e r0 (t3 + 1) (m.cellOf (m.bar (e (t2 + 1)))) := by
+    have hh := quiet_reg m e r0 (i := t3 + 1) (t3 - t2 - 1)
+      (fun t ht1 ht2 => hquiet t (by omega) (by omega))
+    have hidx : t3 + 1 + (t3 - t2 - 1) = t3 + (t3 - t2) := by omega
+    rw [hidx] at hh
+    exact hh _
+  have hc2 : reg m e r0 (t3 + 1) (m.cellOf (m.bar (e (t2 + 1))))
+      = reg m e r0 t3 (m.cellOf (m.bar (e (t2 + 1)))) :=
+    reg_skip m e r0 (fun hcc => hR2C3 hcc.symm)
+  have hc3 : reg m e r0 t3 (m.cellOf (m.bar (e (t2 + 1))))
+      = reg m e r0 (t2 + 1) (m.cellOf (m.bar (e (t2 + 1)))) := by
+    have hh := quiet_reg m e r0 (i := t2 + 1) (t3 - t2 - 1)
+      (fun t ht1 ht2 => hq t (by omega) (by omega))
+    have hidx : t2 + 1 + (t3 - t2 - 1) = t3 := by omega
+    rw [hidx] at hh
+    exact hh _
+  have hc4 : reg m e r0 (t2 + 1) (m.cellOf (m.bar (e (t2 + 1))))
+      = reg m e r0 t2 (m.cellOf (m.bar (e (t2 + 1)))) :=
+    reg_skip m e r0 (fun hcc => hcross2 hcc.symm)
+  refine ⟨hval, hcell, ?_⟩
+  intro hp
+  apply hp
+  rw [hcell, hval, hc1, hc2, hc3, hc4, hheld]
+
 end Echo
