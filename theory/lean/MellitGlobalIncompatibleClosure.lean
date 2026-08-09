@@ -119,7 +119,14 @@ theorem ManufacturedReflector.activated_support_grooves
         intro heq
         apply hforeign
         exact heq.trans R.secondArm_switch
-      exact arrive_preserves_other R.crossed hne
+      have hexitSwitch : passage.2 / 3 = passageSwitch passage := by
+        have hs := arrive_exit_switch R.returnState passage.2
+        rw [hold] at hs
+        exact hs.symm
+      have hne2 : passage.2 / 3 ≠ R.secondArm / 3 := by
+        rw [hexitSwitch]
+        exact hne
+      exact arrive_preserves_other R.crossed hne2
 
 /-! ## The direct lobe saturates its switch
 

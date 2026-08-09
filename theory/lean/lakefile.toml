@@ -1,5 +1,270 @@
-name = "duplotrain-proofs"
-defaultTargets = ["ActiveLobeCoverCore", "ActiveLobes", "Alternation", "AlternationBound", "AutomaticCycleFixed", "AutomaticEpochBound", "AutomaticTreeBlock", "BlockAbstractEpochBoundCore", "BlockEpochAggregation", "BlockGlobalArithmetic", "BlockSparseBoundCore", "BlockSparseFixedCountCore", "BoundaryReplay", "CanonicalActiveLobeFrame", "CanonicalCertifiedEpochBound", "CanonicalConfigurationRepresentatives", "CanonicalEdgeRepsCore", "CanonicalFibonacciEpochBound", "CanonicalGlobalAbsorbedBound", "CanonicalNoCertifiedGlobalBound", "CanonicalPreTailGlobalBound", "CanonicalProjectedEpochFrame", "CanonicalSupportFrame", "CanonicalUnconditionalGlobalBound", "CellHeat", "CertifiedEpochBound", "CertifiedLobeAbsorption", "CollapsedChipDynamics", "ComponentCapacity", "ConcreteAscentTrace", "ConcreteCascadeFacts", "ConcreteCertifiedEchoRun", "ConcreteEchoBridge", "ConcreteEchoMachine", "ConcreteEchoRun", "ConcreteEchoStep", "ConcreteFiniteBounds", "ConcreteMachine", "ConcreteOverwriteBridge", "ConcretePhysicalBridge", "ConcreteTraceRegisters", "ConcreteTreeCodes", "ConcreteTreeDisjoint", "ConcreteTreeRetrace", "DescentRouteCatalogue", "DescentSimplicity", "DeterministicOverwriteReturn", "DuplotrainProofs", "EchoConfigCount", "EchoConfiguration", "EchoMachine", "EchoOverwriteFibre", "EdgeReversal", "EndpointAccountingStandalone", "EndpointEpochExtraction", "EpochAggregation", "ExternalLobeOrbit", "ExternalLobeReflectionCore", "ExternalLobeRoundtrip", "FibonacciCapacityMonotone", "FibonacciSparseBound", "FiniteFrameSwitchCorollary", "FiniteFullyLobedComponentTrap", "FiniteListBounds", "FirstReflectorNovelty", "FiveFrameObstruction", "FixedSupportBound", "ForeignSpliceNovelty", "FullComponentRootUniqueness", "FullReachPersistencePaired", "FullyLoadedTreeImpossible", "FullyLobedComponentTrap", "FutureEntryBound", "GeneralN", "GrayTailAggregation", "GrayTailCount", "HiddenAbsorb", "HiddenDichotomy", "HiddenFibre", "KoizumiCurveInvariant", "KoizumiFramePersistence", "KoizumiRawExtraction", "LinearBound", "LoadedTreeGroupBudget", "LoadedTreeGroupsTwoThirds", "LoadedTreeGroupsWithFreeTwoThirds", "LobeAbsorption", "LobeBits", "LobeBooleanCodeCore", "LobeDichotomy", "LobeForestActive", "LobeForestBlock", "LobeForestPartition", "LobePartnerBounce", "LobeToggle", "LobeVariationVisit", "LoneWriter", "ManufacturedPairNovelty", "ManufacturedPairTailNovelty", "MixedEpochBound", "MixedEpochTwoThirdsFiniteNoTail", "MixedEpochTwoThirdsFromReserves", "MixedEpochTwoThirdsNoTail", "MonotoneSupport", "NestedRestorationCharge", "NestedRestorationElimination", "NoFullFixed", "NoFullFreezeCore", "ObservedConfigurationFibre", "OneReserveCoordinateFrame", "OneReserveFromNoTail", "OneReserveListAssemblyV2", "OverwriteDynamics", "OverwriteLasso", "PairBound", "PairMultiplicity", "PairedBlockEpochStrictBound", "PairedNoFullReachFreeze", "PairedPointwiseReplayCore", "PairedReachReplay", "PairedRouterRoundtrip", "Periodicity", "PersistentLobeSeparationStandalone", "PhysicalPrefixCount", "PhysicalPrefixFibre", "ProfileCodeBound", "RecencyRank", "RecencyTreeBlock", "RecursiveSerialRepair", "RelevantCanonicalFrame", "RelevantCertifiedFibonacciEpochBound", "RelevantEdgeFibonacciConfigBound", "RelevantEdgeFibonacciGlobalBound", "RelevantEdgeFibonacciPhysicalBound", "RelevantEdgeRepresentativeSupport", "RelevantFibonacciConfigBound", "RelevantFibonacciGlobalBound", "RelevantFibonacciNBound", "RelevantFibonacciPhysicalBound", "RelevantFiniteFrame", "RepeatedNoveltyDecomposition", "RepeatedNoveltySelfAnchors", "ReplayFacts", "ReservedComponentCounting", "RestorationFrameOrdering", "RestorationFrames", "ReuseForcesReplayClosure", "ReversalFacts", "RootRank", "RunwayHistoricalThree", "RunwaySpliceNovelty", "SelfEpochAmortization", "SelfEpochFour", "SelfPivotStrictShrink", "SelfShrinkChargeClosure", "SevenTenthsAggregation", "SharpCertificateClosure", "SharpStateLawAssembly", "SkewWalk", "SlotBound", "StarIndependent", "StarPairCountingCore", "StateLaw", "StationaryTail", "SteeringLaw", "SupportBound", "SupportMove", "SupportRelativeCertifiedEpochBound", "SupportRelativeEpochStrictBound", "SupportRelativeFibonacciEpochBound", "SupportRelativeNoLobe", "SupportRelativePointwiseReplay", "SupportSize", "SupportTreeFull", "SupportWeightFibres", "ThreeQuarterArithmetic", "TokenState", "TrackCurveGrowth", "TrackCurveShrinkGlobal", "TrackEdge", "TrackEndpointMatching", "TrackFiniteAlternation", "TrackGlobalRepair", "TrackLobe", "TrackNormalForm", "TrackNovelReplay", "TrackNoveltyCover", "TrackQuantitative", "TrackQuantitativeTight", "TrackStationaryTail", "TrackTheta", "TrackTrace", "TreeCapacitySevenTenths", "TreeCapacityTwoThirds", "TreeEpochCode", "TreeLobeLoadBound", "TreeLobeLoadThreeFifths", "TreeLobeNotFullTwoThirds", "TreeReplay", "TripleFramePhysicalClosure", "TripleInterlacementObstruction", "TwoReflectorEdgeTrap", "TwoReflectorFiniteTrap", "TwoStateConfigurationFibre", "TwoSwitchOneShotObstruction", "TwoThirdsAggregation", "TwoToOneConfigurationCount", "UnlinkedCounterObstruction", "VectorCount", "VisibleChipReduction"]
+name = "duplotrain"
+defaultTargets = [
+  "ActiveLobeCoverCore",
+  "ActiveLobes",
+  "Alternation",
+  "AlternationBound",
+  "AutomaticCycleFixed",
+  "AutomaticEpochBound",
+  "AutomaticTreeBlock",
+  "BABAInterlacementTail",
+  "BABAPartnerReflectorTail",
+  "BlockAbstractEpochBoundCore",
+  "BlockEpochAggregation",
+  "BlockGlobalArithmetic",
+  "BlockSparseBoundCore",
+  "BlockSparseFixedCountCore",
+  "BoundaryReplay",
+  "CanonicalActiveLobeFrame",
+  "CanonicalCertifiedEpochBound",
+  "CanonicalConfigurationRepresentatives",
+  "CanonicalEdgeRepsCore",
+  "CanonicalFibonacciEpochBound",
+  "CanonicalGlobalAbsorbedBound",
+  "CanonicalNoCertifiedGlobalBound",
+  "CanonicalPreTailGlobalBound",
+  "CanonicalProjectedEpochFrame",
+  "CanonicalSupportFrame",
+  "CanonicalUnconditionalGlobalBound",
+  "CellHeat",
+  "CertifiedEpochBound",
+  "CertifiedLobeAbsorption",
+  "CollapsedChipDynamics",
+  "ComponentCapacity",
+  "ConcreteAscentTrace",
+  "ConcreteCascadeFacts",
+  "ConcreteCertifiedEchoRun",
+  "ConcreteEchoBridge",
+  "ConcreteEchoMachine",
+  "ConcreteEchoRun",
+  "ConcreteEchoStep",
+  "ConcreteFiniteBounds",
+  "ConcreteMachine",
+  "ConcreteOverwriteBridge",
+  "ConcretePhysicalBridge",
+  "ConcreteTraceRegisters",
+  "ConcreteTreeCodes",
+  "ConcreteTreeDisjoint",
+  "ConcreteTreeRetrace",
+  "CrossingCallerSerialAssembly",
+  "CrossingCallerSharpTail",
+  "CrossingCallerWindowExtraction",
+  "DescentRouteCatalogue",
+  "DescentSimplicity",
+  "DeterministicOverwriteReturn",
+  "DuplotrainProofs",
+  "EchoConfigCount",
+  "EchoConfiguration",
+  "EchoMachine",
+  "EchoOverwriteFibre",
+  "EdgeReversal",
+  "EndpointAccountingStandalone",
+  "EndpointEpochExtraction",
+  "EpochAggregation",
+  "ExternalLobeOrbit",
+  "ExternalLobeReflectionCore",
+  "ExternalLobeRoundtrip",
+  "FacingForwardNovelty",
+  "FibonacciCapacityMonotone",
+  "FibonacciSparseBound",
+  "FiniteFrameSwitchCorollary",
+  "FiniteFullyLobedComponentTrap",
+  "FiniteListBounds",
+  "FirstReflectorNovelty",
+  "FirstRepeatedSwitchSharpOutcome",
+  "FirstWriterRetraceFree",
+  "FiveFrameObstruction",
+  "FixedSupportBound",
+  "ForeignSpliceNovelty",
+  "FullComponentRootUniqueness",
+  "FullReachPersistencePaired",
+  "FullyLoadedTreeImpossible",
+  "FullyLobedComponentTrap",
+  "FutureEntryBound",
+  "GeneralN",
+  "GlobalSerialContinuation",
+  "GrayTailAggregation",
+  "GrayTailCount",
+  "HiddenAbsorb",
+  "HiddenDichotomy",
+  "HiddenFibre",
+  "KoizumiCurveInvariant",
+  "KoizumiFramePersistence",
+  "KoizumiRawExtraction",
+  "LinearBound",
+  "LoadedTreeGroupBudget",
+  "LoadedTreeGroupsTwoThirds",
+  "LoadedTreeGroupsWithFreeTwoThirds",
+  "LobeAbsorption",
+  "LobeBits",
+  "LobeBooleanCodeCore",
+  "LobeDichotomy",
+  "LobeForestActive",
+  "LobeForestBlock",
+  "LobeForestPartition",
+  "LobePartnerBounce",
+  "LobeToggle",
+  "LobeVariationVisit",
+  "LoneWriter",
+  "ManufacturedPairNovelty",
+  "ManufacturedPairTailNovelty",
+  "MellitABCABCRecursionBase",
+  "MellitDirectStateBound",
+  "MellitEarlySecondRepeatAssembly",
+  "MellitGlobalIncompatibleClosure",
+  "MellitGlobalNoveltyBound",
+  "MellitNoncompatibleSecondRepeat",
+  "MellitRamanBABAAssembly",
+  "MellitRamanQuietClosure",
+  "MellitRamanResidueDescent",
+  "MellitRamanStrictDescentAssembly",
+  "MellitRamanTopLevelRecursion",
+  "MellitSharpTail",
+  "MellitSupportInteraction",
+  "MinimalBABADogbone",
+  "MinimalBABAQuietCharge",
+  "MinimalBABAQuietDogbone",
+  "MinimalBABASecondRepeat",
+  "MinimalForeignCrossingClosure",
+  "MixedEpochBound",
+  "MixedEpochTwoThirdsFiniteNoTail",
+  "MixedEpochTwoThirdsFromReserves",
+  "MixedEpochTwoThirdsNoTail",
+  "MonotoneSupport",
+  "MouthRetrace",
+  "NestedRestorationCharge",
+  "NestedRestorationElimination",
+  "NoFullFixed",
+  "NoFullFreezeCore",
+  "ObservedConfigurationFibre",
+  "OneReserveCoordinateFrame",
+  "OneReserveFromNoTail",
+  "OneReserveListAssemblyV2",
+  "OverlappingFiveWindowReduction",
+  "OverlappingSerialWindows",
+  "OverwriteDynamics",
+  "OverwriteLasso",
+  "PairBound",
+  "PairMultiplicity",
+  "PairedBlockEpochStrictBound",
+  "PairedNoFullReachFreeze",
+  "PairedPointwiseReplayCore",
+  "PairedReachReplay",
+  "PairedRouterRoundtrip",
+  "Periodicity",
+  "PersistentLobeSeparationStandalone",
+  "PhysicalPrefixCount",
+  "PhysicalPrefixFibre",
+  "ProfileCodeBound",
+  "RamanGapProductiveRefinement",
+  "RamanInnerReplaySelectedTail",
+  "RamanOuterGapStrictDescent",
+  "RecencyRank",
+  "RecencyTreeBlock",
+  "RecursiveSerialExtraction",
+  "RecursiveSerialRepair",
+  "RelevantCanonicalFrame",
+  "RelevantCertifiedFibonacciEpochBound",
+  "RelevantEdgeFibonacciConfigBound",
+  "RelevantEdgeFibonacciGlobalBound",
+  "RelevantEdgeFibonacciPhysicalBound",
+  "RelevantEdgeRepresentativeSupport",
+  "RelevantFibonacciConfigBound",
+  "RelevantFibonacciGlobalBound",
+  "RelevantFibonacciNBound",
+  "RelevantFibonacciPhysicalBound",
+  "RelevantFiniteFrame",
+  "RepeatedNoveltyDecomposition",
+  "RepeatedNoveltySelfAnchors",
+  "ReplayFacts",
+  "ReservedComponentCounting",
+  "RestorationFamilyBound",
+  "RestorationFrameOrdering",
+  "RestorationFrames",
+  "ReuseForcesReplayClosure",
+  "ReversalFacts",
+  "RootRank",
+  "RunwayHistoricalThree",
+  "RunwaySpliceNovelty",
+  "SelectedSupportContactClosure",
+  "SelectedTripleSharpClosure",
+  "SelfEpochAmortization",
+  "SelfEpochFour",
+  "SelfPivotStrictShrink",
+  "SelfShrinkChargeClosure",
+  "SerialPairSupportContact",
+  "SerialSerialCallerAssembly",
+  "SerialSerialPlacementClosure",
+  "SevenTenthsAggregation",
+  "SharpCertificateClosure",
+  "SharpSixEventAssembly",
+  "SharpStateLawAssembly",
+  "SixEventReduction",
+  "SixEventSharpClosure",
+  "SkewWalk",
+  "SlotBound",
+  "StarIndependent",
+  "StarPairCountingCore",
+  "StateLaw",
+  "StationaryTail",
+  "SteeringLaw",
+  "SupportBound",
+  "SupportMove",
+  "SupportRelativeCertifiedEpochBound",
+  "SupportRelativeEpochStrictBound",
+  "SupportRelativeFibonacciEpochBound",
+  "SupportRelativeNoLobe",
+  "SupportRelativePointwiseReplay",
+  "SupportSize",
+  "SupportTreeFull",
+  "SupportWeightFibres",
+  "ThirdWriterTail",
+  "ThreeQuarterArithmetic",
+  "TokenState",
+  "TrackCurveGrowth",
+  "TrackCurveShrinkGlobal",
+  "TrackEdge",
+  "TrackEndpointMatching",
+  "TrackFiniteAlternation",
+  "TrackGlobalRepair",
+  "TrackLobe",
+  "TrackNormalForm",
+  "TrackNovelReplay",
+  "TrackNoveltyCover",
+  "TrackQuantitative",
+  "TrackQuantitativeTight",
+  "TrackStationaryTail",
+  "TrackTheta",
+  "TrackTrace",
+  "TreeCapacitySevenTenths",
+  "TreeCapacityTwoThirds",
+  "TreeEpochCode",
+  "TreeLobeLoadBound",
+  "TreeLobeLoadThreeFifths",
+  "TreeLobeNotFullTwoThirds",
+  "TreeReplay",
+  "TripleFramePhysicalClosure",
+  "TripleInterlacementObstruction",
+  "TripleSelfLinkCycleClosure",
+  "TripleSelfLinkFinalAssembly",
+  "TripleSelfLinkFirstLap",
+  "TripleSelfLinkNoTailClosure",
+  "TripleSelfLinkPlacement",
+  "TripleSelfLinkRawTail",
+  "TripleSelfLinkReplay",
+  "TripleSelfLinkSelectedClosure",
+  "TripleSelfLinkSimpleCycleClosure",
+  "TripleSelfLinkSimpleCycleTail",
+  "TwoReflectorEdgeTrap",
+  "TwoReflectorFiniteTrap",
+  "TwoStateConfigurationFibre",
+  "TwoSwitchOneShotObstruction",
+  "TwoThirdsAggregation",
+  "TwoToOneConfigurationCount",
+  "UnlinkedCounterObstruction",
+  "VectorCount",
+  "VisibleChipReduction"
+]
 
 [[lean_lib]]
 name = "ActiveLobeCoverCore"
@@ -21,6 +286,12 @@ name = "AutomaticEpochBound"
 
 [[lean_lib]]
 name = "AutomaticTreeBlock"
+
+[[lean_lib]]
+name = "BABAInterlacementTail"
+
+[[lean_lib]]
+name = "BABAPartnerReflectorTail"
 
 [[lean_lib]]
 name = "BlockAbstractEpochBoundCore"
@@ -134,6 +405,15 @@ name = "ConcreteTreeDisjoint"
 name = "ConcreteTreeRetrace"
 
 [[lean_lib]]
+name = "CrossingCallerSerialAssembly"
+
+[[lean_lib]]
+name = "CrossingCallerSharpTail"
+
+[[lean_lib]]
+name = "CrossingCallerWindowExtraction"
+
+[[lean_lib]]
 name = "DescentRouteCatalogue"
 
 [[lean_lib]]
@@ -179,6 +459,9 @@ name = "ExternalLobeReflectionCore"
 name = "ExternalLobeRoundtrip"
 
 [[lean_lib]]
+name = "FacingForwardNovelty"
+
+[[lean_lib]]
 name = "FibonacciCapacityMonotone"
 
 [[lean_lib]]
@@ -195,6 +478,12 @@ name = "FiniteListBounds"
 
 [[lean_lib]]
 name = "FirstReflectorNovelty"
+
+[[lean_lib]]
+name = "FirstRepeatedSwitchSharpOutcome"
+
+[[lean_lib]]
+name = "FirstWriterRetraceFree"
 
 [[lean_lib]]
 name = "FiveFrameObstruction"
@@ -222,6 +511,9 @@ name = "FutureEntryBound"
 
 [[lean_lib]]
 name = "GeneralN"
+
+[[lean_lib]]
+name = "GlobalSerialContinuation"
 
 [[lean_lib]]
 name = "GrayTailAggregation"
@@ -299,6 +591,60 @@ name = "ManufacturedPairNovelty"
 name = "ManufacturedPairTailNovelty"
 
 [[lean_lib]]
+name = "MellitABCABCRecursionBase"
+
+[[lean_lib]]
+name = "MellitDirectStateBound"
+
+[[lean_lib]]
+name = "MellitEarlySecondRepeatAssembly"
+
+[[lean_lib]]
+name = "MellitGlobalIncompatibleClosure"
+
+[[lean_lib]]
+name = "MellitGlobalNoveltyBound"
+
+[[lean_lib]]
+name = "MellitNoncompatibleSecondRepeat"
+
+[[lean_lib]]
+name = "MellitRamanBABAAssembly"
+
+[[lean_lib]]
+name = "MellitRamanQuietClosure"
+
+[[lean_lib]]
+name = "MellitRamanResidueDescent"
+
+[[lean_lib]]
+name = "MellitRamanStrictDescentAssembly"
+
+[[lean_lib]]
+name = "MellitRamanTopLevelRecursion"
+
+[[lean_lib]]
+name = "MellitSharpTail"
+
+[[lean_lib]]
+name = "MellitSupportInteraction"
+
+[[lean_lib]]
+name = "MinimalBABADogbone"
+
+[[lean_lib]]
+name = "MinimalBABAQuietCharge"
+
+[[lean_lib]]
+name = "MinimalBABAQuietDogbone"
+
+[[lean_lib]]
+name = "MinimalBABASecondRepeat"
+
+[[lean_lib]]
+name = "MinimalForeignCrossingClosure"
+
+[[lean_lib]]
 name = "MixedEpochBound"
 
 [[lean_lib]]
@@ -312,6 +658,9 @@ name = "MixedEpochTwoThirdsNoTail"
 
 [[lean_lib]]
 name = "MonotoneSupport"
+
+[[lean_lib]]
+name = "MouthRetrace"
 
 [[lean_lib]]
 name = "NestedRestorationCharge"
@@ -336,6 +685,12 @@ name = "OneReserveFromNoTail"
 
 [[lean_lib]]
 name = "OneReserveListAssemblyV2"
+
+[[lean_lib]]
+name = "OverlappingFiveWindowReduction"
+
+[[lean_lib]]
+name = "OverlappingSerialWindows"
 
 [[lean_lib]]
 name = "OverwriteDynamics"
@@ -380,10 +735,22 @@ name = "PhysicalPrefixFibre"
 name = "ProfileCodeBound"
 
 [[lean_lib]]
+name = "RamanGapProductiveRefinement"
+
+[[lean_lib]]
+name = "RamanInnerReplaySelectedTail"
+
+[[lean_lib]]
+name = "RamanOuterGapStrictDescent"
+
+[[lean_lib]]
 name = "RecencyRank"
 
 [[lean_lib]]
 name = "RecencyTreeBlock"
+
+[[lean_lib]]
+name = "RecursiveSerialExtraction"
 
 [[lean_lib]]
 name = "RecursiveSerialRepair"
@@ -434,6 +801,9 @@ name = "ReplayFacts"
 name = "ReservedComponentCounting"
 
 [[lean_lib]]
+name = "RestorationFamilyBound"
+
+[[lean_lib]]
 name = "RestorationFrameOrdering"
 
 [[lean_lib]]
@@ -455,6 +825,12 @@ name = "RunwayHistoricalThree"
 name = "RunwaySpliceNovelty"
 
 [[lean_lib]]
+name = "SelectedSupportContactClosure"
+
+[[lean_lib]]
+name = "SelectedTripleSharpClosure"
+
+[[lean_lib]]
 name = "SelfEpochAmortization"
 
 [[lean_lib]]
@@ -467,13 +843,31 @@ name = "SelfPivotStrictShrink"
 name = "SelfShrinkChargeClosure"
 
 [[lean_lib]]
+name = "SerialPairSupportContact"
+
+[[lean_lib]]
+name = "SerialSerialCallerAssembly"
+
+[[lean_lib]]
+name = "SerialSerialPlacementClosure"
+
+[[lean_lib]]
 name = "SevenTenthsAggregation"
 
 [[lean_lib]]
 name = "SharpCertificateClosure"
 
 [[lean_lib]]
+name = "SharpSixEventAssembly"
+
+[[lean_lib]]
 name = "SharpStateLawAssembly"
+
+[[lean_lib]]
+name = "SixEventReduction"
+
+[[lean_lib]]
+name = "SixEventSharpClosure"
 
 [[lean_lib]]
 name = "SkewWalk"
@@ -525,6 +919,9 @@ name = "SupportTreeFull"
 
 [[lean_lib]]
 name = "SupportWeightFibres"
+
+[[lean_lib]]
+name = "ThirdWriterTail"
 
 [[lean_lib]]
 name = "ThreeQuarterArithmetic"
@@ -605,6 +1002,36 @@ name = "TripleFramePhysicalClosure"
 name = "TripleInterlacementObstruction"
 
 [[lean_lib]]
+name = "TripleSelfLinkCycleClosure"
+
+[[lean_lib]]
+name = "TripleSelfLinkFinalAssembly"
+
+[[lean_lib]]
+name = "TripleSelfLinkFirstLap"
+
+[[lean_lib]]
+name = "TripleSelfLinkNoTailClosure"
+
+[[lean_lib]]
+name = "TripleSelfLinkPlacement"
+
+[[lean_lib]]
+name = "TripleSelfLinkRawTail"
+
+[[lean_lib]]
+name = "TripleSelfLinkReplay"
+
+[[lean_lib]]
+name = "TripleSelfLinkSelectedClosure"
+
+[[lean_lib]]
+name = "TripleSelfLinkSimpleCycleClosure"
+
+[[lean_lib]]
+name = "TripleSelfLinkSimpleCycleTail"
+
+[[lean_lib]]
 name = "TwoReflectorEdgeTrap"
 
 [[lean_lib]]
@@ -630,3 +1057,4 @@ name = "VectorCount"
 
 [[lean_lib]]
 name = "VisibleChipReduction"
+

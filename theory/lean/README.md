@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-One hundred and forty-eight libraries, all self-contained (no
+Two hundred and sixty-four libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -29,6 +29,32 @@ five below, then the satellites:
   every periodic tail.  The still-open step is to prove that the next
   letter must return to the preceding pair, rather than introduce a
   third writer.
+
+* `MouthRetrace.lean` — **the four-beat engine: a mouth-stand write
+  mirrors its approach, and a mouth-stand pair locks the writer word
+  to two letters forever.**  All results are local — no periodicity
+  hypotheses anywhere.  A delivery standing at the written cell's
+  mouth is automatically productive (`mouth_stand_productive`) and its
+  writer differs from the previous one (`mouth_stand_writers_ne`).
+  The headline `mouth_retrace`: after a mouth-stand write at `t3`
+  following a quiet stretch from the previous write at `t2`, the walk
+  retraces its whole approach as the `bar`-mirror of itself,
+  `e (t3+1+j) = bar (e (t3+1-j))` for `1 ≤ j ≤ t3-t2`, quietly until
+  the last step.  The mirror ends on the previous writer's fresh
+  register, so the next productive step occurs at the exactly mirrored
+  time `t3 + (t3-t2)` and **writes the previous cell again**
+  (`mouth_stand_return`): a third letter cannot follow two mouth-stand
+  writes.  Iterating (`MouthPair`, `mouth_pair_step`,
+  `mouth_pair_forever`, `mouth_pair_writer_period`): one consecutive
+  mouth-stand pair forces productive steps exactly at the arithmetic
+  times `b + k*(b-a)`, every delivery a mouth stand, the writer word
+  `B C B C …` — two-letter periodic forever with equal spacing, the
+  four-beat law's alternation half.  Finally `lobe_delivery_stands` and
+  `lobe_pair_seed`: a delivery of a lobe slot *must* stand at the
+  written cell's mouth (converse of `mouth_delivery_lobe`), so two
+  consecutive productive lobe deliveries form such a pair.  Combined
+  with `lobe_or_cross`, the alternation program's open frontier is
+  confined to cross-valued (foreign-partnered) writers.
 
 * `LobePartnerBounce.lean`, `LobeToggle.lean`, and
   `LobeVariationVisit.lean` — **an occupied lobe is a forced parity
