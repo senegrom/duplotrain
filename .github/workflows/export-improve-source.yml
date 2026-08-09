@@ -1,0 +1,16 @@
+name: Export improve-linear-bound source
+on:
+  push:
+    branches: [agent/improve-linear-bound]
+  workflow_dispatch:
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: improve-linear-bound-source
+          path: .
+          include-hidden-files: true
+          retention-days: 1
