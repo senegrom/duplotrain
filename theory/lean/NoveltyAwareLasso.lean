@@ -7,7 +7,7 @@ namespace GeneralN
 
 /-- The complete lasso window, represented as restricted tongue vectors. -/
 def EventuallyPeriodicWithin.tongueHistory
-    {w : Wiring} (h : EventuallyPeriodicWithin w start cap)
+    {w : Wiring} (_h : EventuallyPeriodicWithin w start cap)
     (N : Nat) : List (List Bool) :=
   (List.range cap).map (restrictedTonguesAt w N start)
 
@@ -66,6 +66,14 @@ theorem two_manufacturing_journeys_then_repair_distinct_le
   let secondHistory := B.sharpConstructionHistory N
   let tailHistory := hlocal.tongueHistory N
   let history := (firstHistory ++ secondHistory) ++ tailHistory
+  have hgroovesAActivated :
+      PathGrooves A.toSupported.paths A.activatedState := by
+    rw [← hactivatedA]
+    exact hgroovesA
+  have hgroovesBActivated :
+      PathGrooves B.toSupported.paths B.activatedState := by
+    rw [← hactivatedB]
+    exact hgroovesB
   have hreachTotal : stepN w totalTravel start =
       some (start.1, stateB) := by
     dsimp [totalTravel]
@@ -79,7 +87,8 @@ theorem two_manufacturing_journeys_then_repair_distinct_le
       apply List.mem_append_left secondHistory
       dsimp [firstHistory]
       have hm := A.manufacturing_journey_mem_sharpHistory
-        hgroovesA (j := k) (by simpa [firstTravel] using hfirst)
+        hgroovesAActivated (j := k)
+          (by simpa [firstTravel] using hfirst)
       simpa [hbaseA] using hm
     · by_cases hsecond : k ≤ totalTravel
       · let d := k - firstTravel
@@ -93,7 +102,8 @@ theorem two_manufacturing_journeys_then_repair_distinct_le
         have hliveD := stepN_prefix_some hdLe hreachB
         have hshift := tonguesAt_add_of_reaches hreachA hliveD
         have hm := B.manufacturing_journey_mem_sharpHistory
-          hgroovesB (j := d) (by simpa [secondTravel] using hdLe)
+          hgroovesBActivated (j := d)
+            (by simpa [secondTravel] using hdLe)
         apply List.mem_append_left tailHistory
         apply List.mem_append_right firstHistory
         have heq : restrictedTonguesAt w N start k =
@@ -113,7 +123,8 @@ theorem two_manufacturing_journeys_then_repair_distinct_le
           cases hd : stepN w d (start.1, stateB) with
           | none =>
               have hnone : stepN w k start = none := by
-                rw [hkEq, stepN_add, hreachTotal, hd]
+                rw [hkEq, stepN_add, hreachTotal]
+                simp [hd]
               rw [hnone] at hkLive
               simp at hkLive
           | some finish => exact ⟨finish, rfl⟩
@@ -128,14 +139,21 @@ theorem two_manufacturing_journeys_then_repair_distinct_le
         rw [heq]
         exact hm
   have hcover := zero_novelty_cover_of_mem times history hmem
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  have hfirstLen := A.sharpConstructionHistory_length hN
-  have hsecondLen := B.sharpConstructionHistory_length hN
+  have hcountRaw := noveltyCoverOn_distinct_count hcover hnd
+  have hcount : times.length ≤ history.length := by
+    simpa using hcountRaw
+  have hfirstLen : firstHistory.length ≤ N + 2 := by
+    dsimp [firstHistory]
+    exact A.sharpConstructionHistory_length hN
+  have hsecondLen : secondHistory.length ≤ N + 2 := by
+    dsimp [secondHistory]
+    exact B.sharpConstructionHistory_length hN
   have htailLen : tailHistory.length = 22 * N := by
     simp [tailHistory, EventuallyPeriodicWithin.tongueHistory]
-  dsimp [history] at hcount
-  simp only [List.length_append] at hcount
-  dsimp [firstHistory, secondHistory, tailHistory] at hcount
-  omega
+  have hhistoryLen : history.length ≤ 24 * N + 4 := by
+    dsimp [history]
+    simp only [List.length_append]
+    omega
+  exact Nat.le_trans hcount hhistoryLen
 
 end GeneralN
