@@ -476,6 +476,47 @@ theorem CertifiedEndpointEmptyABCABC.forces_identity_reflector
         (fun state => state) :=
   certified_used_self_link_has_identity_reflector C.forces_used_self_link
 
+/-- Instance-level physical reduction.  Once each selected increasing triple
+has been certified, a five-frame triple case is either a selected strict nest
+or it exposes an explicit two-step identity reflector. -/
+theorem FiveFrameTripleCase.certified_reflector_or_strict_nest
+    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
+    {z0 z1 z2 z3 z4 : Nat}
+    (T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4)
+    (hcompile : forall S : SelectedFiveFrameABCABC T,
+      Nonempty (CertifiedEndpointEmptyABCABC S)) :
+    Or (Nonempty (SelectedFiveFrameStrictNest T))
+      (exists (S : SelectedFiveFrameABCABC T),
+        exists (C : CertifiedEndpointEmptyABCABC S),
+          exists q, exists outside,
+            And (w.link (C.run.entry q) = some (C.run.entry q))
+              (IsReflector w (3 * (C.run.entry q / 3)) outside 2
+                (fun state => state (C.run.entry q / 3) = bval (C.run.entry q))
+                (fun state => state))) := by
+  rcases T.select_endpoint_triple with habc | hstrict
+  · obtain ⟨S⟩ := habc
+    obtain ⟨C⟩ := hcompile S
+    obtain ⟨q, outside, hlink, hreflector⟩ :=
+      C.forces_identity_reflector
+    exact Or.inr ⟨S, C, q, outside, hlink, hreflector⟩
+  · exact Or.inl hstrict
+
+/-- Under genuine physical irreflexivity, certified `ABCABC` selection and
+strict-nest exclusion already contradict the grouped five-frame outcome. -/
+theorem FiveFrameTripleCase.impossible_of_irreflexive
+    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
+    {z0 z1 z2 z3 z4 : Nat}
+    (T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4)
+    (hirr : IrreflexiveLinks w)
+    (hcompile : forall S : SelectedFiveFrameABCABC T,
+      Nonempty (CertifiedEndpointEmptyABCABC S))
+    (hnoNest : Not (Nonempty (SelectedFiveFrameStrictNest T))) : False := by
+  rcases T.select_endpoint_triple with habc | hstrict
+  · obtain ⟨S⟩ := habc
+    obtain ⟨C⟩ := hcompile S
+    exact C.impossible_of_irreflexive hirr
+  · exact hnoNest hstrict
+
 /-! ## Exact decomposition of the raw target -/
 
 /-- Raw-to-certified extraction obligation for each selected increasing
