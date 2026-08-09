@@ -74,11 +74,17 @@ theorem known_edge_long_run_distinct_le_fifteen
           (restrictedTonguesAt w N (start.1, stateB))).Nodup →
         tailTimes.length ≤ 13 * N + 3 := by
       intro tailTimes htailLive htailNodup
-      rw [hactivatedB]
+      have htailLive' : ∀ k ∈ tailTimes,
+          (stepN w k (start.1, B.activatedState)).isSome := by
+        simpa [← hactivatedB] using htailLive
+      have htailNodup' :
+          (tailTimes.map
+            (restrictedTonguesAt w N
+              (start.1, B.activatedState))).Nodup := by
+        simpa [← hactivatedB] using htailNodup
       exact manufactured_pair_protected_repair_distinct_le_thirteen_succ_three
         hN A B hAatBase hBatActivated tailTimes
-          (by simpa [hactivatedB] using htailLive)
-          (by simpa [hactivatedB] using htailNodup)
+          htailLive' htailNodup'
     have hassembled :=
       two_manufacturing_journeys_then_direct_tail_distinct_le
         (tailCap := 13 * N + 3)
