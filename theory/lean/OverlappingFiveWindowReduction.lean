@@ -236,6 +236,45 @@ theorem six_repeated_novelties_have_consecutive_first_six
         (by simpa [z4] using hk4) (by simpa [z5] using hk5)
   }⟩
 
+/-- Every repeated novelty between the first and sixth canonical events is
+one of those six events.  This is the convenient elimination form of the
+five no-gap fields for post-return escape arguments. -/
+theorem RawConsecutiveSixEvents.repeated_event_eq_selected
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (C : RawConsecutiveSixEvents w N start) {k : Nat}
+    (H : RawRepeatedWriterNovelAt w N start k)
+    (hlo : C.z0 ≤ k) (hhi : k ≤ C.z5) :
+    k = C.z0 ∨ k = C.z1 ∨ k = C.z2 ∨
+      k = C.z3 ∨ k = C.z4 ∨ k = C.z5 := by
+  by_cases hk0 : k = C.z0
+  · exact Or.inl hk0
+  have hz0k : C.z0 < k := by omega
+  by_cases hk1 : k = C.z1
+  · exact Or.inr (Or.inl hk1)
+  by_cases hkBefore1 : k < C.z1
+  · exact (C.no_event01 k hz0k hkBefore1 H).elim
+  have hz1k : C.z1 < k := by omega
+  by_cases hk2 : k = C.z2
+  · exact Or.inr (Or.inr (Or.inl hk2))
+  by_cases hkBefore2 : k < C.z2
+  · exact (C.no_event12 k hz1k hkBefore2 H).elim
+  have hz2k : C.z2 < k := by omega
+  by_cases hk3 : k = C.z3
+  · exact Or.inr (Or.inr (Or.inr (Or.inl hk3)))
+  by_cases hkBefore3 : k < C.z3
+  · exact (C.no_event23 k hz2k hkBefore3 H).elim
+  have hz3k : C.z3 < k := by omega
+  by_cases hk4 : k = C.z4
+  · exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hk4))))
+  by_cases hkBefore4 : k < C.z4
+  · exact (C.no_event34 k hz3k hkBefore4 H).elim
+  have hz4k : C.z4 < k := by omega
+  have hk5 : k = C.z5 := by
+    by_cases hkBefore5 : k < C.z5
+    · exact (C.no_event45 k hz4k hkBefore5 H).elim
+    · omega
+  exact Or.inr (Or.inr (Or.inr (Or.inr (Or.inr hk5))))
+
 /-- The raw data of six chronological repeated-writer novelties, one actual
 closing frame for each event, and the serial-or-triple outcome in both
 overlapping five-event windows. -/
