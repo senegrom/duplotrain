@@ -505,6 +505,47 @@ private theorem PhysicalTrace.simple_same_exit_cycle_traces
     · exact hsimple.2
   exact ⟨htransient, hstable, hsimpleCycle⟩
 
+/-- In the crossed first-revisit branch, the contact can only change the
+revisited switch.  Since that switch does not occur on the simple caller
+runway, every caller passage remains grooved in the contact state. -/
+private theorem PhysicalTrace.caller_grooved_after_cross_contact
+    {w : Wiring}
+    {start : Nat × Tongues} {runway body : List Passage}
+    {p x q : Nat} {u₀ u v : Tongues}
+    (hrunway : PhysicalTrace w start runway (p, u₀))
+    (hbody : PhysicalTrace w (p, u₀) ((p, x) :: body) (q, u))
+    (hsimple : SwitchSimple (runway ++ (p, x) :: body))
+    (hsame : p / 3 = q / 3)
+    (hcontact : arrive u q = (p, v)) :
+    PassagesGrooved v runway := by
+  have hfull := hrunway.append hbody
+  have hfullGrooved := hfull.grooved_of_switchSimple hsimple
+  unfold SwitchSimple at hsimple
+  simp only [List.map_append, List.map_cons] at hsimple
+  have hparts := List.nodup_append.mp hsimple
+  have hpNotPrefix : p / 3 ∉ runway.map passageSwitch := by
+    intro hp
+    have hne := hparts.2.2 (p / 3) hp
+      (p / 3) (by simp [passageSwitch])
+    exact hne rfl
+  intro passage hp
+  have hold := hfullGrooved passage
+    (List.mem_append_left _ hp)
+  have hpassageNe : passageSwitch passage ≠ q / 3 := by
+    intro hEq
+    apply hpNotPrefix
+    apply List.mem_map.mpr
+    exact ⟨passage, hp, hEq.trans hsame.symm⟩
+  have hexitSwitch : passage.2 / 3 = passageSwitch passage := by
+    have hs := arrive_exit_switch u passage.2
+    rw [hold] at hs
+    exact hs.symm
+  have hforeign : passage.2 / 3 ≠ q / 3 := by
+    rw [hexitSwitch]
+    exact hpassageNe
+  exact groove_transfer hold
+    (arrive_preserves_other hcontact hforeign)
+
 /-- Strengthened first-revisit fork retaining the exact switch-simple cycle
 trace in the absorbing branch.  This extra data is what lets a later raw
 novelty rule that branch out, rather than treating `SettlesOnSimpleCycle` as
@@ -524,6 +565,8 @@ private theorem PhysicalTrace.first_revisit_cycle_traces_or_retrace
         PhysicalTrace w (q, settled) cycle (q, settled) ∧
         SwitchSimple cycle) ∨
       (∃ settled,
+        PassagesGrooved settled runway ∧
+        arrive u q = (p, settled) ∧
         stepN w (runway.length + 1) (q, u) =
           (w.link start.1).map (fun ell => (ell, settled))) := by
   have hsimpleBody : SwitchSimple ((p, x) :: body) := by
@@ -557,8 +600,11 @@ private theorem PhysicalTrace.first_revisit_cycle_traces_or_retrace
     exact Or.inl ⟨(p, x) :: body, u, by simp,
       hstable, hstable, hsimpleBody⟩
   · subst y
-    exact Or.inr ⟨v, hrunway.simple_cross_exit_retraces_prefix
-      hbody hsimple hrepeat⟩
+    have hgrooved := hrunway.caller_grooved_after_cross_contact
+      hbody hsimple hsame hrepeat
+    exact Or.inr ⟨v, hgrooved, hrepeat,
+      hrunway.simple_cross_exit_retraces_prefix
+        hbody hsimple hrepeat⟩
   · subst q
     have hfull := hrunway.append hbody
     have hgrooved := hfull.grooved_of_switchSimple hsimple
@@ -566,12 +612,17 @@ private theorem PhysicalTrace.first_revisit_cycle_traces_or_retrace
       hgrooved (p, x) (by
         apply List.mem_append_right runway
         exact List.mem_cons_self)
+    have hcontact₀ : arrive u x = (p, u) := hold
     rw [hrepeat] at hold
     injection hold with hyp huv
     subst y
     subst v
-    exact Or.inr ⟨u, hrunway.simple_cross_exit_retraces_prefix
-      hbody hsimple (by simpa using hrepeat)⟩
+    have hcontact : arrive u x = (p, u) := hcontact₀
+    have hgrooved := hrunway.caller_grooved_after_cross_contact
+      hbody hsimple hsame hcontact
+    exact Or.inr ⟨u, hgrooved, hcontact,
+      hrunway.simple_cross_exit_retraces_prefix
+        hbody hsimple (by simpa using hrepeat)⟩
   · subst y
     obtain ⟨htransient, hstable, hsimpleCycle⟩ :=
       hbody.simple_same_exit_cycle_traces hsimpleBody hrepeat
@@ -1002,7 +1053,7 @@ theorem five_serial_novelties_force_exact_caller_retrace
     · exact (serial_repeated_novel_after_simple_cycle_trace_false
         hrepeatAt htransient hstable hcycleSimple hnonempty
           F₄.outer H₄ (by omega)).elim
-  · obtain ⟨settled, hback⟩ := hretrace
+  · obtain ⟨settled, _hgrooved, _hcontact, hback⟩ := hretrace
     have hcallerSimple : SwitchSimple caller := by
       unfold SwitchSimple at hsimpleFrame ⊢
       simp only [List.map_append, List.map_cons] at hsimpleFrame
@@ -1012,6 +1063,180 @@ theorem five_serial_novelties_force_exact_caller_retrace
     exact ⟨before, (q, u), repeatTime, caller.length + 1, settled,
       hbefore, hrepeatAt, by omega, hrepeatBeforeClose,
       by omega, by omega, hback⟩
+
+/-- Every reached configuration has an actual incoming edge when the initial
+configuration has one.  At positive time that edge is the preceding
+configuration's immutable exit connection. -/
+private theorem reached_configuration_has_entry_edge
+    {w : Wiring} {start reached : Nat × Tongues}
+    {initialEdge k : Nat}
+    (hentry : w.link initialEdge = some start.1)
+    (hreach : stepN w k start = some reached) :
+    ∃ edge, w.link edge = some reached.1 := by
+  cases k with
+  | zero =>
+      have hreached : reached = start := by
+        simpa [stepN] using Option.some.inj hreach.symm
+      subst reached
+      exact ⟨initialEdge, hentry⟩
+  | succ k =>
+      obtain ⟨before, hbefore⟩ := stepN_prefix_some
+        (d := k) (K := k + 1) (by omega) hreach
+      have hsplit := stepN_add w k 1 start
+      rw [hreach, hbefore] at hsplit
+      simp only [Option.bind_some] at hsplit
+      have hone : stepN w 1 before = some reached := hsplit.symm
+      have hstep : step w before = some reached := by
+        simpa [stepN] using hone
+      exact ⟨exitPort before, (step_some_parts hstep).1⟩
+
+/-- **Pointwise serial-retrace certificate.**
+
+The exact caller retrace forced by five serial novelties retains all data
+needed by the novelty calculus:
+
+* the caller's actual `PhysicalTrace`;
+* the fact that every caller passage is grooved in the contact state;
+* the contact equation at the repeated switch;
+* the exact incoming edge and exact re-entry configuration; and
+* a pointwise statement saying depth zero has the contact's old vector and
+  every positive depth through the completed retrace has the one settled
+  vector.
+
+Consequently any sample contained in this backward segment has a
+`NoveltyCoverOn ... 1` over any history already containing the contact's old
+vector.  This is an unconditional conclusion from the five raw serial
+frames, not a recursively assumed return certificate. -/
+theorem five_serial_novelties_completed_retrace_one_novelty
+    {w : Wiring} {N initialEdge : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    (hentry : w.link initialEdge = some start.1)
+    {z₀ z₁ z₂ z₃ z₄ : Nat}
+    (H₀ : RawRepeatedWriterNovelAt w N start z₀)
+    (H₁ : RawRepeatedWriterNovelAt w N start z₁)
+    (H₂ : RawRepeatedWriterNovelAt w N start z₂)
+    (H₃ : RawRepeatedWriterNovelAt w N start z₃)
+    (H₄ : RawRepeatedWriterNovelAt w N start z₄)
+    {a₀ q₀ a₁ q₁ a₂ q₂ a₃ q₃ a₄ q₄ : Nat}
+    (F₀ : RawNovelClosingFrame w N start a₀ q₀ z₀)
+    (F₁ : RawNovelClosingFrame w N start a₁ q₁ z₁)
+    (F₂ : RawNovelClosingFrame w N start a₂ q₂ z₂)
+    (F₃ : RawNovelClosingFrame w N start a₃ q₃ z₃)
+    (F₄ : RawNovelClosingFrame w N start a₄ q₄ z₄)
+    (hserial : FiveFrameSerialBreak z₀ a₁ a₂ a₃ a₄) :
+    ∃ g base oldEntry mouthState q u settled edge repeatTime caller,
+      stepN w a₀ start = some (g, base) ∧
+      PhysicalTrace w (g, base) caller (oldEntry, mouthState) ∧
+      SwitchSimple caller ∧
+      PassagesGrooved settled caller ∧
+      caller.length ≤ N ∧
+      w.link edge = some g ∧
+      stepN w repeatTime start = some (q, u) ∧
+      a₀ ≤ repeatTime ∧ repeatTime < z₀ ∧
+      arrive u q = (oldEntry, settled) ∧
+      stepN w (caller.length + 1) (q, u) = some (edge, settled) ∧
+      (∀ d, d ≤ caller.length + 1 →
+        ∃ port, stepN w d (q, u) =
+          some (port, if d = 0 then u else settled)) ∧
+      (∀ history times,
+        VectorCount.restrict N u ∈ history →
+        (∀ j, j ∈ times →
+          repeatTime ≤ j ∧ j ≤ repeatTime + caller.length + 1) →
+        NoveltyCoverOn w N start times history 1) := by
+  obtain ⟨before, close, passages, runway, repeated, suffix,
+      hbefore, _hclose, hlength, htrace, hsplit, hsimple,
+      hrepeatMem⟩ :=
+    five_serial_novelties_force_first_repeated_switch
+      hN H₀ H₁ H₂ H₃ H₄ F₀ F₁ F₂ F₃ F₄ hserial
+  rcases before with ⟨g, base⟩
+  rw [hsplit] at htrace
+  obtain ⟨atRepeat, hprefix, hafter⟩ := htrace.split_append
+  obtain ⟨old, hold, hsameSwitch⟩ := List.mem_map.mp hrepeatMem
+  obtain ⟨caller, body, hrunway⟩ := List.append_of_mem hold
+  rw [hrunway] at hprefix
+  obtain ⟨atOld, hcaller, hbody⟩ := hprefix.split_append
+  rcases old with ⟨p, x⟩
+  rcases repeated with ⟨q, y⟩
+  have hatOldPort : atOld.1 = p := hbody.head_arrive.1
+  rcases atOld with ⟨oldPort, mouthState⟩
+  simp only at hatOldPort
+  subst oldPort
+  have hatRepeatPort : atRepeat.1 = q := hafter.head_arrive.1
+  rcases atRepeat with ⟨repeatPort, u⟩
+  simp only at hatRepeatPort
+  subst repeatPort
+  obtain ⟨v, hrepeat⟩ := hafter.head_arrive.2
+  have hsimpleFrame :
+      SwitchSimple (caller ++ (p, x) :: body) := by
+    simpa [hrunway] using hsimple
+  have hcallerSimple : SwitchSimple caller := by
+    unfold SwitchSimple at hsimpleFrame ⊢
+    simp only [List.map_append, List.map_cons] at hsimpleFrame
+    exact (List.nodup_append.mp hsimpleFrame).1
+  have hcallerLe : caller.length ≤ N :=
+    hcaller.simple_length_le hN hcallerSimple
+  have hswitch : p / 3 = q / 3 := by
+    simpa [passageSwitch] using hsameSwitch
+  have hprefixSound :
+      stepN w runway.length (g, base) = some (q, u) := by
+    simpa [hrunway] using hprefix.sound
+  let repeatTime := a₀ + runway.length
+  have hrepeatAt :
+      stepN w repeatTime start = some (q, u) := by
+    dsimp [repeatTime]
+    rw [stepN_add, hbefore]
+    exact hprefixSound
+  have hrunwayShort : runway.length < passages.length := by
+    rw [hsplit]
+    simp
+  have hrepeatBeforeClose : repeatTime < z₀ := by
+    dsimp [repeatTime]
+    have hframeOrder := F₀.outer.order
+    omega
+  rcases hcaller.first_revisit_cycle_traces_or_retrace
+      hbody hsimpleFrame hswitch hrepeat with hcycle | hretrace
+  · obtain ⟨cycle, cycleState, hnonempty, htransient,
+        hstable, hcycleSimple⟩ := hcycle
+    rcases hserial with hs | hs | hs | hs
+    · exact (serial_repeated_novel_after_simple_cycle_trace_false
+        hrepeatAt htransient hstable hcycleSimple hnonempty
+          F₁.outer H₁ (by omega)).elim
+    · exact (serial_repeated_novel_after_simple_cycle_trace_false
+        hrepeatAt htransient hstable hcycleSimple hnonempty
+          F₂.outer H₂ (by omega)).elim
+    · exact (serial_repeated_novel_after_simple_cycle_trace_false
+        hrepeatAt htransient hstable hcycleSimple hnonempty
+          F₃.outer H₃ (by omega)).elim
+    · exact (serial_repeated_novel_after_simple_cycle_trace_false
+        hrepeatAt htransient hstable hcycleSimple hnonempty
+          F₄.outer H₄ (by omega)).elim
+  · obtain ⟨settled, hgrooved, hcontact, hback⟩ := hretrace
+    obtain ⟨edge, hedge⟩ :=
+      reached_configuration_has_entry_edge hentry hbefore
+    have hreverse : w.link g = some edge := w.symm _ _ hedge
+    have hreturn :
+        stepN w (caller.length + 1) (q, u) =
+          some (edge, settled) := by
+      simpa [hreverse] using hback
+    have hpointwise : ∀ d, d ≤ caller.length + 1 →
+        ∃ port, stepN w d (q, u) =
+          some (port, if d = 0 then u else settled) :=
+      (physicalTrace_contact_retraces_prefix_pointwise
+        hcaller hgrooved hedge hcontact).2
+    have hcover : ∀ history times,
+        VectorCount.restrict N u ∈ history →
+        (∀ j, j ∈ times →
+          repeatTime ≤ j ∧ j ≤ repeatTime + caller.length + 1) →
+        NoveltyCoverOn w N start times history 1 := by
+      intro history times hu htimes
+      exact completed_retrace_at_one_novelty_cover
+        hcaller hgrooved hedge hcontact hrepeatAt
+          N history hu times htimes
+    exact ⟨g, base, p, mouthState, q, u, settled, edge,
+      repeatTime, caller, hbefore, hcaller, hcallerSimple,
+      hgrooved, hcallerLe, hedge, hrepeatAt, by omega,
+      hrepeatBeforeClose, hcontact, hreturn, hpointwise, hcover⟩
 
 /-- Encountering an external self-link is an exact identity reflection.
 After the preceding passage exits through the self-linked port, the next
