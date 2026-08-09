@@ -116,7 +116,7 @@ theorem ManufacturedReflector.traversal_then_lasso_distinct_le_succ
     omega
   have hhistoryExact : history.length = 2 + tailReduced.length := by
     dsimp [history]
-    rfl
+    omega
   have hhistoryLen : history.length ≤ cap + 1 := by
     rw [hhistoryExact, htailReducedLen, htailLen]
     omega
