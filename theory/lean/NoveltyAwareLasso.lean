@@ -87,7 +87,7 @@ theorem two_manufacturing_journeys_then_repair_distinct_le
       apply List.mem_append_left secondHistory
       dsimp [firstHistory]
       have hm := A.manufacturing_journey_mem_sharpHistory
-        hgroovesAActivated (j := k)
+        (N := N) hgroovesAActivated (j := k)
           (by simpa [firstTravel] using hfirst)
       simpa [hbaseA] using hm
     · by_cases hsecond : k ≤ totalTravel
@@ -102,7 +102,7 @@ theorem two_manufacturing_journeys_then_repair_distinct_le
         have hliveD := stepN_prefix_some hdLe hreachB
         have hshift := tonguesAt_add_of_reaches hreachA hliveD
         have hm := B.manufacturing_journey_mem_sharpHistory
-          hgroovesBActivated (j := d)
+          (N := N) hgroovesBActivated (j := d)
             (by simpa [secondTravel] using hdLe)
         apply List.mem_append_left tailHistory
         apply List.mem_append_right firstHistory
