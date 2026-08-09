@@ -608,4 +608,45 @@ theorem RawOverlappingFiveWindowReduction.sharp_shape_closure
     exact .selectedTriple T hcloses
       (T.sharp_closure_paid hN R hcloses)
 
+/-- The original sharp residue together with the unconditional closure of
+its actual head/tail shape.  This structure does not add a hypothesis: both
+fields are constructed from the same raw reduction. -/
+structure RawSharpSixEventClosure
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (R : RawOverlappingFiveWindowReduction w N start) : Prop where
+  residue : RawSharpSixEventResidue R
+  closedShape : RawSharpShapeClosure R
+
+/-- Attach the selected-triple closure to the exact sharp six-event residue
+constructed from one canonical overlapping-window reduction. -/
+theorem RawOverlappingFiveWindowReduction.toSharpSixEventClosure
+    {w : Wiring} {N initialEdge : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    (hentry : w.link initialEdge = some start.1)
+    (R : RawOverlappingFiveWindowReduction w N start) :
+    RawSharpSixEventClosure R := {
+  residue := R.toSharpSixEventResidue hN hentry
+  closedShape := R.sharp_shape_closure hN hentry
+}
+
+/-- **Unconditional six-event handoff.**  Six selected repeated-writer
+novelties now reduce to a sharp residue whose selected-triple branch is
+already compiled to physical BABA closure or fully paid strict nesting. -/
+theorem six_repeated_novelties_reduce_to_sharp_closure
+    {w : Wiring} {N initialEdge : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (start : Nat × Tongues)
+    (hentry : w.link initialEdge = some start.1)
+    (K : Nat)
+    (hsix : 6 ≤ (rawRepeatedWriterNovelTimes w N start K).length) :
+    ∃ R : RawOverlappingFiveWindowReduction w N start,
+      RawSharpSixEventClosure R := by
+  obtain ⟨R, _hraw⟩ :=
+    six_repeated_novelties_reduce_to_sharp_residue
+      hN start hentry K hsix
+  exact ⟨R, R.toSharpSixEventClosure hN hentry⟩
+
 end GeneralN
