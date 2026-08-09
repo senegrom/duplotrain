@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Two hundred and sixty-four libraries, all self-contained (no
+Two hundred and sixty-eight libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -421,11 +421,23 @@ identity-reflector case, or flip-reflector runway case.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
 now proves an unconditional general linear theorem.
-`GeneralN.state_law_linear_twenty_six` says that any one-train
-run on an `N`-switch wiring visits at most `26*N+3`
-pairwise-distinct tongue vectors.  The theorem is stated over raw
+`GeneralN.state_law_linear_twenty_four`
+(`StateLawTwentyFour.lean`) says that any one-train
+run on an `N`-switch wiring visits at most `24*N+5`
+pairwise-distinct tongue vectors, superseding the earlier
+`state_law_linear_twenty_six` (`26*N+3`).  The theorem is stated over raw
 `Wiring`/`stepN`, with no small-`N` enumeration and no conditional hypothesis.
 The repository does **not** claim the sharper `N+6` state law.
+
+The improvement comes from the novelty-aware lasso
+(`FirstActivatedExact.lean`, `NoveltyAwareLasso.lean`,
+`KnownEdgeTwentyFour.lean`, `StateLawTwentyFour.lean`): the two
+manufacturing journeys of the repaired pair are charged for their
+*construction history* — whose dimension is explicit — rather than
+their full travel, trimming the double-counted approach segments.
+`known_edge_long_run_distinct_le_twenty_four` gives `24*N+4` when the
+entry edge is known; the entry-free assembly runs one step to expose
+the entry edge, shifts the sampled times, and pays `+1` for time zero.
 
 `TrackQuantitative.lean` completes the extraction with a checked bounded-lasso
 interface.  `EventuallyPeriodicWithin w c cap` retains `lead + period ≤ cap`;
@@ -569,8 +581,9 @@ train on any `N`-switch lazy-point layout ever sees at most `N + 6`
 distinct tongue vectors — directly over `Wiring`/`stepN`, decodable
 piece by piece as track, switches and the lazy-point rule.  **It is
 OPEN: nothing in this repository proves that coefficient-one bound.**
-`GeneralN.state_law_linear_twenty_six` proves the identical
-raw-track statement with `26*N+3` in place of `N+6`;
+`GeneralN.state_law_linear_twenty_four` proves the identical
+raw-track statement with `24*N+5` in place of `N+6`
+(superseding `state_law_linear_twenty_six`'s `26*N+3`);
 `state_law_two_pow` is the older elementary pigeonhole ceiling.  The
 remaining problem is the global assembly: every arbitrary repair branch must
 be covered by the `N+2` manufactured-prefix history plus at most four tail
@@ -578,7 +591,7 @@ vectors without double-charging overlapping support.  The local runway and
 candy novelty branches are now discharged; the strict nested-restoration /
 raw repeated-writer decomposition is not yet connected to that sharp
 certificate.  Closing that assembly would
-improve `26*N+3` to `N+6` (the conjectured sharp form remains `N+4`).
+improve `24*N+5` to `N+6` (the conjectured sharp form remains `N+4`).
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real
 pigeonhole proof (induction on N, splitting on the first coordinate),

@@ -31,6 +31,7 @@ theorem known_edge_long_run_distinct_le_twenty_four
       simpa [← hactivatedB] using hgroovesB
     have hlocal := manufactured_pair_protected_repair_within_twenty_two
       hN A B hAatBase hBatActivated
+    rw [← hactivatedB] at hlocal
     exact two_manufacturing_journeys_then_repair_distinct_le
       hN A B stateA stateB hbaseA hactivatedA hreachA hgroovesA
       hbaseB hactivatedB hreachB hgroovesB hlocal times hlive hnd

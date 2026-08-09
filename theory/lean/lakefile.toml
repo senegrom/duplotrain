@@ -70,6 +70,7 @@ defaultTargets = [
   "FiniteFrameSwitchCorollary",
   "FiniteFullyLobedComponentTrap",
   "FiniteListBounds",
+  "FirstActivatedExact",
   "FirstReflectorNovelty",
   "FirstRepeatedSwitchSharpOutcome",
   "FirstWriterRetraceFree",
@@ -88,6 +89,7 @@ defaultTargets = [
   "HiddenAbsorb",
   "HiddenDichotomy",
   "HiddenFibre",
+  "KnownEdgeTwentyFour",
   "KoizumiCurveInvariant",
   "KoizumiFramePersistence",
   "KoizumiRawExtraction",
@@ -136,6 +138,7 @@ defaultTargets = [
   "NestedRestorationElimination",
   "NoFullFixed",
   "NoFullFreezeCore",
+  "NoveltyAwareLasso",
   "ObservedConfigurationFibre",
   "OneReserveCoordinateFrame",
   "OneReserveFromNoTail",
@@ -206,6 +209,7 @@ defaultTargets = [
   "StarIndependent",
   "StarPairCountingCore",
   "StateLaw",
+  "StateLawTwentyFour",
   "StationaryTail",
   "SteeringLaw",
   "SupportBound",
@@ -477,6 +481,9 @@ name = "FiniteFullyLobedComponentTrap"
 name = "FiniteListBounds"
 
 [[lean_lib]]
+name = "FirstActivatedExact"
+
+[[lean_lib]]
 name = "FirstReflectorNovelty"
 
 [[lean_lib]]
@@ -529,6 +536,9 @@ name = "HiddenDichotomy"
 
 [[lean_lib]]
 name = "HiddenFibre"
+
+[[lean_lib]]
+name = "KnownEdgeTwentyFour"
 
 [[lean_lib]]
 name = "KoizumiCurveInvariant"
@@ -673,6 +683,9 @@ name = "NoFullFixed"
 
 [[lean_lib]]
 name = "NoFullFreezeCore"
+
+[[lean_lib]]
+name = "NoveltyAwareLasso"
 
 [[lean_lib]]
 name = "ObservedConfigurationFibre"
@@ -883,6 +896,9 @@ name = "StarPairCountingCore"
 
 [[lean_lib]]
 name = "StateLaw"
+
+[[lean_lib]]
+name = "StateLawTwentyFour"
 
 [[lean_lib]]
 name = "StationaryTail"
