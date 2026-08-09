@@ -154,7 +154,7 @@ theorem two_reflector_edge_entries
     m e r0 hrun hx haLobe haPartner hbLobe hbPartner
     haOcc hbOcc n
   have hcases : r = 0 ∨ r = 1 ∨ r = 2 ∨ r = 3 := by omega
-  rcases hcases with rfl | rfl | rfl | rfl
+  rcases hcases with hr0 | hr1 | hr2 | hr3
   · left
     have hidx : j = k + 4*n := by omega
     rw [hidx]
