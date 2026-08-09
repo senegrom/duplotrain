@@ -83,20 +83,20 @@ private theorem map_filter_nodup_assignment
   induction xs with
   | nil => simp
   | cons x rest ih =>
-      simp only [List.map_cons, List.nodup_cons] at hnd
+      have hnd' := List.nodup_cons.mp hnd
       cases hp : p x with
       | false =>
           simp only [List.filter_cons, hp]
-          exact ih hnd.2
+          exact ih hnd'.2
       | true =>
-          simp only [List.filter_cons, hp, List.map_cons, List.nodup_cons]
-          constructor
-          · intro hmem
+          simp only [List.filter_cons, hp, List.map_cons]
+          have hnot : f x ∉ (rest.filter p).map f := by
+            intro hmem
+            apply hnd'.1
             obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hmem
-            apply hnd.1
             exact List.mem_map.mpr
               ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-          · exact ih hnd.2
+          exact List.Nodup.cons hnot (ih hnd'.2)
 
 /-- Filtering a globally root-distinct lobe list preserves root distinctness. -/
 theorem assigned_lobe_roots_nodup
@@ -121,13 +121,7 @@ theorem partner_mem_automaticTreeCells_iff
     (c : Nat) :
     c ∈ automaticTreeCells m e r0 trees ↔
       ∃ T, T ∈ trees ∧ c ∈ T.cells := by
-  unfold automaticTreeCells
-  rw [List.mem_flatMap]
-  constructor
-  · rintro ⟨T, hT, hc⟩
-    exact ⟨T, hT, hc⟩
-  · rintro ⟨T, hT, hc⟩
-    exact ⟨T, hT, hc⟩
+  simp [automaticTreeCells]
 
 /-- Every active lobe is either assigned to a listed tree or belongs to the
 free list. -/
