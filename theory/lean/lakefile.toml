@@ -419,6 +419,9 @@ name = "TrackNovelReplay"
 name = "TrackNoveltyCover"
 
 [[lean_lib]]
+name = "TrackStationaryTail"
+
+[[lean_lib]]
 name = "TrackTheta"
 
 [[lean_lib]]
