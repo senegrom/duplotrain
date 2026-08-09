@@ -193,20 +193,20 @@ theorem ManufacturedReflector.completed_route_with_pair_support_distinct_le_thir
   have htimesNodup : times.Nodup :=
     completesharp_nodup_of_map_nodup
       (restrictedTonguesAt w N (g, state)) hnd
-  let prefix := times.filter (fun k => decide (k < L))
-  let tail := times.filter (fun k => decide (L ≤ k))
-  let shifted := tail.map (fun k => k - L)
-  have hprefixNodup : prefix.Nodup := by
-    dsimp [prefix]
+  let preTimes := times.filter (fun k => decide (k < L))
+  let tailTimes := times.filter (fun k => decide (L ≤ k))
+  let shifted := tailTimes.map (fun k => k - L)
+  have hpreNodup : preTimes.Nodup := by
+    dsimp [preTimes]
     exact completesharp_nodup_filter_nat _ htimesNodup
-  have hprefixLt : ∀ k ∈ prefix, k < L := by
+  have hpreLt : ∀ k ∈ preTimes, k < L := by
     intro k hk
     exact of_decide_eq_true (List.mem_filter.mp hk).2
-  have hprefixBound : prefix.length ≤ L :=
-    nodup_nat_lt_length hprefixNodup hprefixLt
+  have hpreBound : preTimes.length ≤ L :=
+    nodup_nat_lt_length hpreNodup hpreLt
   have htailVector : shifted.map
       (restrictedTonguesAt w N endpoint) =
-      tail.map (restrictedTonguesAt w N (g, state)) := by
+      tailTimes.map (restrictedTonguesAt w N (g, state)) := by
     dsimp [shifted]
     rw [List.map_map]
     apply List.map_congr_left
@@ -230,8 +230,8 @@ theorem ManufacturedReflector.completed_route_with_pair_support_distinct_le_thir
         simp [Function.comp_apply, restrictedTonguesAt, tonguesAt,
           hglobal, htailRun]
   have htailNodup :
-      (tail.map (restrictedTonguesAt w N (g, state))).Nodup := by
-    dsimp [tail]
+      (tailTimes.map (restrictedTonguesAt w N (g, state))).Nodup := by
+    dsimp [tailTimes]
     exact completesharp_nodup_map_filter _ hnd
   have hshiftedNodup :
       (shifted.map (restrictedTonguesAt w N endpoint)).Nodup := by
@@ -252,10 +252,10 @@ theorem ManufacturedReflector.completed_route_with_pair_support_distinct_le_thir
     manufactured_pair_reached_tongue_vector_count_twelve_succ_three
       hN A B finalState hAfinal hBfinal hpairReach shifted
         hshiftedLive hshiftedNodup
-  have htailLength : tail.length = shifted.length := by
+  have htailLength : tailTimes.length = shifted.length := by
     simp [shifted]
   have hpartition := completesharp_lt_ge_partition L times
-  dsimp [prefix, tail] at hpartition hprefixBound htailLength
+  dsimp [preTimes, tailTimes] at hpartition hpreBound htailLength
   omega
 
 end GeneralN
