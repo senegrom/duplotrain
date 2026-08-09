@@ -371,6 +371,10 @@ identity-reflector case, or flip-reflector runway case.
   `manufactured_pair_four_novelty_cover`: a compatible opposite manufactured
   pair has only the four Gray-corner tongue vectors at **every** future time,
   not merely at the period endpoints.
+* `manufacturing_journey_then_pair_distinct_le_N_add_six`: once a first
+  manufactured journey reaches such a compatible pair, the complete raw
+  trajectory satisfies the target `N+6` bound, with future liveness derived
+  from the pair period rather than assumed.
 * `manufactured_flip_candy_splice_absolute_one_novelty`: the foreign-candy
   repair residual contributes at most one genuinely new vector, including
   its eventual paired-reflector tail.
