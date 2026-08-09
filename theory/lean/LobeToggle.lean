@@ -81,7 +81,7 @@ theorem lobe_endpoint_predecessor_partner
       exact hfar.symm
   have hs := congrArg m.star hstar
   rw [m.star_invol] at hs
-  exact hs.symm
+  exact hs
 
 /-- If a persistent occupied lobe register changes in one step, that change
 was caused by an entry into its mouth-partner cell. -/
