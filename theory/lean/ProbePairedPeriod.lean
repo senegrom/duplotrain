@@ -8,7 +8,6 @@ namespace GeneralN
 #check ManufacturedReflector.ChangedForwardMerge.spliced_lobe_reflector
 #check manufactured_flip_arbitrary_lobe_theta_half
 #check manufactured_pair_protected_repair_quantitative_outcomes
-#check ManufacturedReflector.FacingMerge.within_twelve
 #check ManufacturedReflector.ChangedForwardMerge.runway_or_candy_absolute_four_novelty
 #check ManufacturedReflector.ChangedForwardMerge.distinct_le_N_add_five
 #check manufactured_pair_four_novelty_cover
