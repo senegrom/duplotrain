@@ -24,6 +24,8 @@ jobs:
           cat >> lakefile.toml <<'EOF'
 
           [[lean_lib]]
+          name = "TreeCapacitySevenTenths"
+          [[lean_lib]]
           name = "TreeLobeLoadThreeFifths"
           [[lean_lib]]
           name = "LobePartnerBounce"
@@ -31,5 +33,4 @@ jobs:
       - name: Build three-fifths theorem
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TreeLobeLoadThreeFifths
-          if [ -f LobePartnerBounce.lean ]; then lake build LobePartnerBounce; fi
+          lake build TreeLobeLoadThreeFifths LobePartnerBounce
