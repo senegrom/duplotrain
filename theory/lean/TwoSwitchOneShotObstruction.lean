@@ -241,6 +241,41 @@ theorem RawCDCWord.simple_frame_never_falls
 
 /-- **Complete isolated two-switch fork.**
 
+Before cutting either boundary edge, the exact structural result says that
+the first repeat either starts a non-falling trajectory or returns over the
+plain-track edge attached to the original input port. This explicitly names
+the return edge and is the form used when reasoning about gluing modules. -/
+theorem two_switch_first_repeat_cycle_or_input_return
+    {w : Wiring}
+    (hports : forall p q, w.link p = some q ->
+      And (p < 6) (q < 6))
+    {start finish : Nat × Tongues}
+    (hlive : stepN w 3 start = some finish) :
+    exists atRepeat visited,
+      And (stepN w visited start = some atRepeat)
+      (And (visited <= 2)
+        (Or (forall n, (stepN w n atRepeat).isSome)
+          (exists backSteps, exists settled : Tongues,
+            And (backSteps <= 3)
+              (stepN w backSteps atRepeat =
+                (w.link start.1).map
+                  (fun ell => (ell, settled)))))) := by
+  have hN : forall p q, w.link p = some q ->
+      And (p < 3 * 2) (q < 3 * 2) := by
+    intro p q hlink
+    have h := hports p q hlink
+    omega
+  obtain ⟨atRepeat, visited, hat, hvisited, hcycle | hreturn⟩ :=
+    first_repeat_outcome_of_long_run
+      (w := w) (N := 2) hN (by simpa using hlive)
+  · exact ⟨atRepeat, visited, hat, by omega,
+      Or.inl hcycle.never_falls⟩
+  · obtain ⟨backSteps, settled, hback, hreturn⟩ := hreturn
+    exact ⟨atRepeat, visited, hat, by omega, Or.inr
+      ⟨backSteps, settled, by omega, hreturn⟩⟩
+
+/-- **Complete isolated two-switch fork.**
+
 If all track edges belong to the two represented switches and the input edge
 is cut open, every run which survives three steps has already done one of
 two things: entered a trajectory which can never fall, or retraced and fallen
@@ -260,17 +295,12 @@ theorem isolated_two_switch_first_repeat_outcome
           (exists backSteps,
             And (backSteps <= 3)
               (stepN w backSteps atRepeat = none)))) := by
-  have hN : forall p q, w.link p = some q ->
-      And (p < 3 * 2) (q < 3 * 2) := by
-    intro p q hlink
-    have h := hports p q hlink
-    omega
-  have houtcome := first_repeat_outcome_of_long_run
-    (w := w) (N := 2) hN (by simpa using hlive)
+  have houtcome := two_switch_first_repeat_cycle_or_input_return
+    hports hlive
   obtain ⟨atRepeat, visited, hat, hvisited, hcycle | hreturn⟩ :=
     houtcome
   · exact ⟨atRepeat, visited, hat, by omega,
-      Or.inl hcycle.never_falls⟩
+      Or.inl hcycle⟩
   · obtain ⟨backSteps, settled, hback, hreturn⟩ := hreturn
     refine ⟨atRepeat, visited, hat, by omega, Or.inr
       ⟨backSteps, by omega, ?_⟩⟩
