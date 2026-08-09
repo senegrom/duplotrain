@@ -223,6 +223,28 @@ structure SelectedStrictNestEarlierSelected
   beforeClosing : k < T.frames.closingAt S.i0
   selected : RawSixSelectedTime C k
 
+/-- A novel close of any last-writer frame has a productive event strictly
+inside that frame.  A quiet interior would replay the opening vector and
+contradict novelty. -/
+theorem RawLastWriterFrame.novel_close_has_interior_productive
+    {w : Wiring} {N : Nat}
+    (hN : ∀ a b, w.link a = some b →
+      a < 3 * N ∧ b < 3 * N)
+    {start : Nat × Tongues} {opening closing : Nat}
+    (F : RawLastWriterFrame w N start opening closing)
+    (hnovel : RawNovelAt w N start closing) :
+    ∃ k, opening < k ∧ k < closing ∧
+      RawProductiveAt w N start k := by
+  by_cases hex : ∃ k, opening < k ∧ k < closing ∧
+      RawProductiveAt w N start k
+  · exact hex
+  · exfalso
+    apply F.quiet_close_not_novel hN
+      (fun k hopen hclose hprod => by
+        apply hex
+        exact ⟨k, hopen, hclose, hprod⟩)
+    exact hnovel
+
 /-- The innermost close of a selected strict nest cannot have a completely
 quiet interior.  Otherwise the quiet-frame replay theorem contradicts the
 novelty of that selected close. -/
@@ -239,17 +261,8 @@ theorem SelectedFiveFrameStrictNest.innermost_has_productive
       T.frames.openingAt S.i0 < k ∧
       k < T.frames.closingAt S.i0 ∧
       RawProductiveAt w N start k := by
-  by_cases hex : ∃ k,
-      T.frames.openingAt S.i0 < k ∧
-      k < T.frames.closingAt S.i0 ∧
-      RawProductiveAt w N start k
-  · exact hex
-  · exfalso
-    apply (T.frames.outerAt S.i0).quiet_close_not_novel hN
-      (fun k hopen hclose hprod => by
-        apply hex
-        exact ⟨k, hopen, hclose, hprod⟩)
-    exact hnovel
+  exact (T.frames.outerAt S.i0).novel_close_has_interior_productive
+    hN hnovel
 
 /-- Paid outcomes for the strict nest, plus its single smallest recursive
 constructor.  A productive event strictly inside the innermost selected
@@ -305,6 +318,75 @@ theorem SelectedFiveFrameStrictNest.sharp_closure
       selected := hkSelected
     }⟩
 
+/-- The fully paid endpoint of well-founded selected-close descent. -/
+inductive SelectedFramePaidClosure
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    (close : Nat) : Prop
+  | firstWriterCharge (k : Nat)
+      (hearlier : k < close)
+      (hfirst : RawFirstWriterAt w N start k)
+  | earlierReplay (k : Nat)
+      (hearlier : k < close)
+      (hreplay : RamanEarlierVectorReplayAt w N start k)
+
+/-- **Well-founded selected-close assembly.**  Starting from any selected
+novel close and any of its raw last-writer frames, repeated descent through
+an interior selected novelty terminates at a first-writer charge or an
+earlier-vector replay.  The measure is the literal raw close time. -/
+theorem selected_frame_paid_closure
+    {w : Wiring} {N : Nat}
+    (hN : ∀ a b, w.link a = some b →
+      a < 3 * N ∧ b < 3 * N)
+    {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start) :
+    ∀ close,
+      RawSixSelectedTime C close →
+      ∀ opening,
+        RawLastWriterFrame w N start opening close →
+        SelectedFramePaidClosure C close := by
+  intro close
+  apply Nat.strongRecOn (motive := fun close =>
+    RawSixSelectedTime C close →
+    ∀ opening,
+      RawLastWriterFrame w N start opening close →
+      SelectedFramePaidClosure C close) close
+  intro close ih hselected opening F
+  have hcloseEvent := hselected.rawRepeatedWriterNovelAt
+  obtain ⟨k, _hopen, hclose, hprod⟩ :=
+    F.novel_close_has_interior_productive hN hcloseEvent.2.2
+  rcases rawProductiveAt_outer_disposition C hprod with
+    hlate | hfirst | hreplay | hkSelected
+  · have hcloseLe : close ≤ C.z5 := hselected.le_z5
+    omega
+  · exact .firstWriterCharge k hclose hfirst
+  · exact .earlierReplay k hclose hreplay
+  · have Hk := hkSelected.rawRepeatedWriterNovelAt
+    obtain ⟨left, Fk⟩ := Hk.last_writer_frame
+    rcases ih k hclose hkSelected left Fk with
+      ⟨j, hj, hfirst⟩ | ⟨j, hj, hreplay⟩
+    · exact .firstWriterCharge j (Nat.lt_trans hj hclose) hfirst
+    · exact .earlierReplay j (Nat.lt_trans hj hclose) hreplay
+
+/-- The selected strict nest is therefore fully paid: the earlier-selected
+constructor of `SelectedStrictNestSharpClosure` is consumed by strong
+induction and does not survive. -/
+theorem SelectedFiveFrameStrictNest.paid_closure
+    {w : Wiring} {N : Nat}
+    (hN : ∀ a b, w.link a = some b →
+      a < 3 * N ∧ b < 3 * N)
+    {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    {z0 z1 z2 z3 z4 : Nat}
+    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
+    (S : SelectedFiveFrameStrictNest T)
+    (hselected : ∀ i,
+      RawSixSelectedTime C (T.frames.closingAt i)) :
+    SelectedFramePaidClosure C (T.frames.closingAt S.i0) :=
+  selected_frame_paid_closure hN C
+    (T.frames.closingAt S.i0) (hselected S.i0)
+    (T.frames.openingAt S.i0) (T.frames.outerAt S.i0)
+
 /-- Refined selected-triple closure with the erased close-time provenance
 supplied explicitly.  The only non-paid/non-physical leaf is now
 `SelectedStrictNestEarlierSelected`, whose close time strictly decreases. -/
@@ -322,6 +404,24 @@ inductive SelectedTripleSharpClosureWithWindow
   | strictNest
       (S : SelectedFiveFrameStrictNest T.tripleCase)
       (closed : SelectedStrictNestSharpClosure C S)
+
+/-- Stronger selected-triple closure after consuming strict selected-close
+descent by well-founded induction. -/
+inductive SelectedTripleSharpClosurePaid
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    (T : RawSelectedEndpointTripleResidue w N start) : Prop
+  | abcabc
+      (S : SelectedFiveFrameABCABC T.tripleCase)
+      (prior second reroute third : Nat)
+      (B : RawBABAInterlacement
+        w N start prior second reroute third)
+      (minimal : RawBABAOverlapMinimal B)
+      (closed : RawBABAChargeReplayClosure C B)
+  | strictNestPaid
+      (S : SelectedFiveFrameStrictNest T.tripleCase)
+      (paid : SelectedFramePaidClosure C
+        (T.tripleCase.frames.closingAt S.i0))
 
 /-- Refined version of `sharp_closure`: with the exact selected-close
 relation restored, strict nesting is paid or recurses to one strictly earlier
@@ -344,5 +444,168 @@ theorem RawSelectedEndpointTripleResidue.sharp_closure_with_window
       (hmin.charge_replay_closure hN C)
   · obtain ⟨S⟩ := hstrict
     exact .strictNest S (S.sharp_closure hN C hselected)
+
+/-- Strict nesting leaves no residual once close provenance is available. -/
+theorem RawSelectedEndpointTripleResidue.sharp_closure_paid
+    {w : Wiring} {N : Nat}
+    (hN : ∀ a b, w.link a = some b →
+      a < 3 * N ∧ b < 3 * N)
+    {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    (T : RawSelectedEndpointTripleResidue w N start)
+    (hselected : T.ClosesInSelectedWindow C) :
+    SelectedTripleSharpClosurePaid C T := by
+  rcases T.selected with habc | hstrict
+  · obtain ⟨S⟩ := habc
+    let B0 := S.first_pair_rawBABA
+    obtain ⟨prior, second, reroute, third, B, hmin⟩ :=
+      B0.exists_overlap_minimal
+    exact .abcabc S prior second reroute third B hmin
+      (hmin.charge_replay_closure hN C)
+  · obtain ⟨S⟩ := hstrict
+    exact .strictNestPaid S (S.paid_closure hN C hselected)
+
+/-! ## Preserve the selected-close provenance at construction time -/
+
+/-- The concrete selected triple coming from the head five-event window. -/
+def RawOverlappingFiveWindowReduction.headSelectedEndpointTriple
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (R : RawOverlappingFiveWindowReduction w N start)
+    (htriple : FiveFrameTripleOutcome
+      R.a0 R.z0 R.a1 R.z1 R.a2 R.z2 R.a3 R.z3 R.a4 R.z4) :
+    RawSelectedEndpointTripleResidue w N start :=
+  let T := R.headTripleCase htriple
+  {
+    z0 := R.z0
+    z1 := R.z1
+    z2 := R.z2
+    z3 := R.z3
+    z4 := R.z4
+    tripleCase := T
+    selected := T.select_endpoint_triple
+  }
+
+/-- The concrete selected triple coming from the tail five-event window. -/
+def RawOverlappingFiveWindowReduction.tailSelectedEndpointTriple
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (R : RawOverlappingFiveWindowReduction w N start)
+    (htriple : FiveFrameTripleOutcome
+      R.a1 R.z1 R.a2 R.z2 R.a3 R.z3 R.a4 R.z4 R.a5 R.z5) :
+    RawSelectedEndpointTripleResidue w N start :=
+  let T := R.tailTripleCase htriple
+  {
+    z0 := R.z1
+    z1 := R.z2
+    z2 := R.z3
+    z3 := R.z4
+    z4 := R.z5
+    tripleCase := T
+    selected := T.select_endpoint_triple
+  }
+
+/-- Every close retained by the head selected triple is definitionally one
+of `z0, ..., z4` in the canonical six-event window. -/
+theorem RawOverlappingFiveWindowReduction.headSelectedEndpointTriple_closes
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (R : RawOverlappingFiveWindowReduction w N start)
+    (htriple : FiveFrameTripleOutcome
+      R.a0 R.z0 R.a1 R.z1 R.a2 R.z2 R.a3 R.z3 R.a4 R.z4) :
+    (R.headSelectedEndpointTriple htriple).ClosesInSelectedWindow R := by
+  intro i
+  rcases i with ⟨i, hi⟩
+  cases i with
+  | zero =>
+      exact Or.inl rfl
+  | succ i =>
+      cases i with
+      | zero =>
+          exact Or.inr (Or.inl rfl)
+      | succ i =>
+          cases i with
+          | zero =>
+              exact Or.inr (Or.inr (Or.inl rfl))
+          | succ i =>
+              cases i with
+              | zero =>
+                  exact Or.inr (Or.inr (Or.inr (Or.inl rfl)))
+              | succ i =>
+                  cases i with
+                  | zero =>
+                      exact Or.inr (Or.inr (Or.inr
+                        (Or.inr (Or.inl rfl))))
+                  | succ i =>
+                      omega
+
+/-- Every close retained by the tail selected triple is definitionally one
+of `z1, ..., z5` in the canonical six-event window. -/
+theorem RawOverlappingFiveWindowReduction.tailSelectedEndpointTriple_closes
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (R : RawOverlappingFiveWindowReduction w N start)
+    (htriple : FiveFrameTripleOutcome
+      R.a1 R.z1 R.a2 R.z2 R.a3 R.z3 R.a4 R.z4 R.a5 R.z5) :
+    (R.tailSelectedEndpointTriple htriple).ClosesInSelectedWindow R := by
+  intro i
+  rcases i with ⟨i, hi⟩
+  cases i with
+  | zero =>
+      exact Or.inr (Or.inl rfl)
+  | succ i =>
+      cases i with
+      | zero =>
+          exact Or.inr (Or.inr (Or.inl rfl))
+      | succ i =>
+          cases i with
+          | zero =>
+              exact Or.inr (Or.inr (Or.inr (Or.inl rfl)))
+          | succ i =>
+              cases i with
+              | zero =>
+                  exact Or.inr (Or.inr (Or.inr
+                    (Or.inr (Or.inl rfl))))
+              | succ i =>
+                  cases i with
+                  | zero =>
+                      exact Or.inr (Or.inr (Or.inr
+                        (Or.inr (Or.inr rfl))))
+                  | succ i =>
+                      omega
+
+/-- Strengthened top-level shape: the serial/serial descent is retained, but
+every selected-triple branch now carries its complete sharp closure and the
+proof that its close times are the actual canonical selected events. -/
+inductive RawSharpShapeClosure
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (R : RawOverlappingFiveWindowReduction w N start) : Prop
+  | serialSerial (descent : RawSerialSerialNestedDescent R)
+  | selectedTriple
+      (T : RawSelectedEndpointTripleResidue w N start)
+      (selectedCloses : T.ClosesInSelectedWindow R)
+      (closed : SelectedTripleSharpClosurePaid R T)
+
+/-- **Construction-level selected-triple closure.**  Splitting the actual
+head/tail shapes preserves close-time provenance automatically.  No caller
+must assume the extra relation, and no certified-echo compiler is used. -/
+theorem RawOverlappingFiveWindowReduction.sharp_shape_closure
+    {w : Wiring} {N initialEdge : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    (hentry : w.link initialEdge = some start.1)
+    (R : RawOverlappingFiveWindowReduction w N start) :
+    RawSharpShapeClosure R := by
+  rcases R.head_shape with hhead | hhead
+  · rcases R.tail_shape with htail | htail
+    · exact .serialSerial
+        (R.serial_serial_nested_descent hN hentry hhead htail)
+    · let T := R.tailSelectedEndpointTriple htail
+      have hcloses : T.ClosesInSelectedWindow R :=
+        R.tailSelectedEndpointTriple_closes htail
+      exact .selectedTriple T hcloses
+        (T.sharp_closure_paid hN R hcloses)
+  · let T := R.headSelectedEndpointTriple hhead
+    have hcloses : T.ClosesInSelectedWindow R :=
+      R.headSelectedEndpointTriple_closes hhead
+    exact .selectedTriple T hcloses
+      (T.sharp_closure_paid hN R hcloses)
 
 end GeneralN
