@@ -114,10 +114,11 @@ theorem ManufacturedReflector.traversal_then_lasso_distinct_le_succ
     obtain ⟨lead, period, settled, hperiodPos, hcap,
       _hlead, _hperiod⟩ := hlocal
     omega
-  have hhistoryLen : history.length ≤ cap + 1 := by
+  have hhistoryExact : history.length = 2 + tailReduced.length := by
     dsimp [history]
-    simp only [List.length_append, List.length_cons, List.length_nil]
-    rw [htailReducedLen, htailLen]
+    rfl
+  have hhistoryLen : history.length ≤ cap + 1 := by
+    rw [hhistoryExact, htailReducedLen, htailLen]
     omega
   exact Nat.le_trans hcount hhistoryLen
 
