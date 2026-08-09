@@ -89,15 +89,16 @@ private theorem map_filter_nodup_assignment
           simp only [List.filter_cons, hp]
           exact ih hnd'.2
       | true =>
-          simp only [List.filter_cons, hp, List.map_cons]
           have hnot : f x ∉ (rest.filter p).map f := by
             intro hmem
             apply hnd'.1
             obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hmem
             exact List.mem_map.mpr
               ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-          rw [List.nodup_cons]
-          exact ⟨hnot, ih hnd'.2⟩
+          have hcons :
+              (f x :: (rest.filter p).map f).Nodup :=
+            List.nodup_cons.mpr ⟨hnot, ih hnd'.2⟩
+          simpa [List.filter_cons, hp] using hcons
 
 /-- Filtering a globally root-distinct lobe list preserves root distinctness. -/
 theorem assigned_lobe_roots_nodup
