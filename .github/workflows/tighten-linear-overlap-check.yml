@@ -21,6 +21,7 @@ on:
       - theory/lean/NoveltyAwareLassoTwenty.lean
       - theory/lean/KnownEdgeTwenty.lean
       - theory/lean/StateLawTwenty.lean
+      - theory/lean/ProbePairedPeriod.lean
       - .github/workflows/tighten-linear-overlap-check.yml
   workflow_dispatch:
 jobs:
@@ -75,6 +76,8 @@ jobs:
           name = "KnownEdgeTwenty"
           [[lean_lib]]
           name = "StateLawTwenty"
+          [[lean_lib]]
+          name = "ProbePairedPeriod"
           EOF
       - name: Build tightened linear theorems
         run: |
@@ -92,8 +95,9 @@ jobs:
           lake build KnownEdgeTwentyOne
           lake build StateLawTwentyOne
           lake build TrackThetaCaptureSharp
-          if [ -f TrackThetaSharper.lean ]; then lake build TrackThetaSharper; fi
-          if [ -f TrackQuantitativeRepairEighteen.lean ]; then lake build TrackQuantitativeRepairEighteen; fi
-          if [ -f NoveltyAwareLassoTwenty.lean ]; then lake build NoveltyAwareLassoTwenty; fi
-          if [ -f KnownEdgeTwenty.lean ]; then lake build KnownEdgeTwenty; fi
-          if [ -f StateLawTwenty.lean ]; then lake build StateLawTwenty; fi
+          lake build TrackThetaSharper
+          lake build TrackQuantitativeRepairEighteen
+          lake build NoveltyAwareLassoTwenty
+          lake build KnownEdgeTwenty
+          lake build StateLawTwenty
+          lake env lean ProbePairedPeriod.lean
