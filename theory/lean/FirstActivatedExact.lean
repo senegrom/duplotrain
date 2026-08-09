@@ -1,4 +1,5 @@
 import TrackQuantitativeTight
+import FirstReflectorNovelty
 
 /-! Exact-length manufactured-reflector extraction. -/
 
@@ -62,24 +63,35 @@ theorem first_activated_quantitative_outcome_exact
     exact (hlocal.prepend hvisited).weaken (by omega)
   · right
     obtain ⟨A, state, hgrooves, hbase, hactivated,
-      hback, hpreserves⟩ := hreflector
-    have htravelEq :
-        A.exploration.length + A.runway.length + 1 =
-          (runway ++ (p, x) :: path).length + runway.length + 1 := by
-      cases A <;> simp [ManufacturedReflector.exploration,
-        ManufacturedReflector.runway]
-    refine ⟨A, state, ?_, hgrooves, hbase, hactivated, ?_, hpreserves⟩
-    · rw [htravelEq]
-      have hrunwayLe : runway.length ≤
-          (runway ++ (p, x) :: path).length := by simp
-      omega
-    · rw [htravelEq]
+      _hback, hpreserves⟩ := hreflector
+    have hexplorationLe : A.exploration.length ≤ N :=
+      A.exploration_trace.simple_length_le hN A.exploration_simple
+    have hrunwayLe : A.runway.length ≤ A.exploration.length := by
+      cases A <;>
+        simp [ManufacturedReflector.runway,
+          ManufacturedReflector.exploration]
+    have hgroovesActivated :
+        PathGrooves A.toSupported.paths A.activatedState := by
+      rw [← hactivated]
+      exact hgrooves
+    have hbackExact :
+        stepN w (A.runway.length + 1) A.preReturn =
+          some (e, A.activatedState) := by
+      have htrace := physicalTrace_contact_retraces_prefix
+        A.runway_trace (A.runway_grooved hgroovesActivated)
+        A.entryEdge A.return_arrive_mouth
+      simpa [reversePassages_length] using htrace.sound
+    have hreachBase :
+        stepN w (A.exploration.length + A.runway.length + 1)
+          (start.1, A.baseState) = some (e, A.activatedState) := by
       have hlen :
-          (runway ++ (p, x) :: path).length + runway.length + 1 =
-            (runway ++ (p, x) :: path).length +
-              (runway.length + 1) := by omega
-      rw [hlen, stepN_add, hvisited]
-      exact hback
+          A.exploration.length + A.runway.length + 1 =
+            A.exploration.length + (A.runway.length + 1) := by omega
+      rw [hlen, stepN_add, A.exploration_trace.sound]
+      exact hbackExact
+    refine ⟨A, state, ?_, hgrooves, hbase, hactivated, ?_, hpreserves⟩
+    · omega
+    · simpa [hbase, hactivated] using hreachBase
 
 /-- Exact-length two-component extraction. -/
 theorem two_component_quantitative_outcome_exact
