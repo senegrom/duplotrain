@@ -39,7 +39,11 @@ five below, then the satellites:
   persistent lobe reflectors facing the endpoints of one occupied support
   edge form an exact four-step trap.**  The endpoint entries repeat every
   four steps and all entries stay in the resulting six-slot alphabet,
-  both indefinitely and up to a finite occupancy horizon.
+  both indefinitely and up to a finite occupancy horizon.  For four
+  distinct reflector/support cells, `two_reflector_edge_register_block`
+  proves the exact register update: only the two lobe registers toggle;
+  after the initialization block, `two_reflector_edge_state_period_eight`
+  gives a complete eight-step machine-state recurrence.
 
 * `LobeDichotomy.lean` — **every cycle cell is a Gray flipper or
   foreign-valued.**  A slot can only be delivered by reading its
