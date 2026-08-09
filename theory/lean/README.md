@@ -1,8 +1,26 @@
 # Formal proofs (Lean 4)
 
-One hundred and thirty-nine libraries, all self-contained (no
+One hundred and forty-three libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
+
+* `Alternation.lean` — **the alternation seed of the four-beat law.**
+  The abstract exhaustion (`../tools/baltern.py`) shows every active
+  cycle has exactly four productive writes per period, strictly
+  alternating between its two cells.  Machine-checked here: if two
+  *consecutive* productive steps write the same cell `C` and the walk
+  avoids `C` and `star C` strictly between the arrivals, the stretch
+  after the second write **replays** the stretch after the first
+  (`consecutive_replay` — every read is the same frozen register),
+  the wrap step re-delivers the second slot unproductively, and the
+  machine closes a completely quiet loop (`consecutive_avoid_loop`)
+  — which contradicts the periodic recurrence of the write itself
+  (`productive_periodic`, `state_replay_iter`,
+  `productive_iff_of_state_eq`).  Headline
+  `consecutive_same_write_visits`: **between two consecutive
+  productive writes of one cell, the walk must stand in that cell or
+  at its mouth partner strictly in between — adjacent same-cell
+  writes are impossible.**
 
 * `LobeDichotomy.lean` — **every cycle cell is a Gray flipper or
   foreign-valued.**  A slot can only be delivered by reading its
