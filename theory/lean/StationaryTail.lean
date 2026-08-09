@@ -71,6 +71,87 @@ theorem stationary_tail_step (hrun : IsRun m e r0) {K : Nat}
       unfold tailCell
       congr 2 <;> omega
 
+/-- Two visits to the same cell on a stationary projection have identical
+cell futures.  This is the deterministic-orbit fact used to minimize a
+recurrent cell period. -/
+theorem stationary_tail_merge (hrun : IsRun m e r0) {K : Nat}
+    (hstationary : ∀ t, K ≤ t → ∀ c,
+      nextCell m e r0 (t+1) c = nextCell m e r0 t c)
+    {i j : Nat} (hij : tailCell m e K i = tailCell m e K j) :
+    ∀ n, tailCell m e K (i+n) = tailCell m e K (j+n) := by
+  intro n
+  induction n with
+  | zero => simpa using hij
+  | succ n ih =>
+      calc
+        tailCell m e K (i+(n+1)) =
+            nextCell m e r0 K (tailCell m e K (i+n)) := by
+          have h := (stationary_tail_step m e r0 hrun hstationary (i+n)).symm
+          simpa [Nat.add_assoc] using h
+        _ = nextCell m e r0 K (tailCell m e K (j+n)) := by rw [ih]
+        _ = tailCell m e K (j+(n+1)) := by
+          have h := stationary_tail_step m e r0 hrun hstationary (j+n)
+          simpa [Nat.add_assoc] using h
+
+/-- Every periodic stationary cell orbit has a primitive positive period.
+Minimality is enough: if two cells inside the first period agreed, deterministic
+future propagation would produce a strictly shorter period. -/
+theorem exists_primitive_cell_period (hrun : IsRun m e r0) {K q : Nat}
+    (hq : 0 < q)
+    (hperiod : ∀ n,
+      tailCell m e K (n+q) = tailCell m e K n)
+    (hstationary : ∀ t, K ≤ t → ∀ c,
+      nextCell m e r0 (t+1) c = nextCell m e r0 t c) :
+    ∃ p, PrimitiveCellPeriod m e K p := by
+  classical
+  have main : ∀ q, 0 < q →
+      (∀ n, tailCell m e K (n+q) = tailCell m e K n) →
+      ∃ p, PrimitiveCellPeriod m e K p := by
+    intro q
+    refine Nat.strongRecOn (motive := fun q =>
+      0 < q →
+      (∀ n, tailCell m e K (n+q) = tailCell m e K n) →
+      ∃ p, PrimitiveCellPeriod m e K p) q ?_
+    intro q ih hq hperiod
+    by_cases hinj : ∀ i, i < q → ∀ j, j < q →
+        tailCell m e K i = tailCell m e K j → i = j
+    · exact ⟨q, hq, hperiod, hinj⟩
+    · simp at hinj
+      obtain ⟨i, hi, j, hj, heq, hne⟩ := hinj
+      have ordered : ∀ {a b : Nat}, a < q → b < q → a < b →
+          tailCell m e K a = tailCell m e K b →
+          ∃ p, PrimitiveCellPeriod m e K p := by
+        intro a b ha hb hab habCell
+        let s := q - (b-a)
+        have hspos : 0 < s := by
+          dsimp [s]
+          omega
+        have hslt : s < q := by
+          dsimp [s]
+          omega
+        have hfuture := stationary_tail_merge m e r0 hrun
+          hstationary habCell
+        have hsperiod : ∀ n,
+            tailCell m e K (n+s) = tailCell m e K n := by
+          intro n
+          have hmerge := hfuture (q-b+n)
+          have hleft : n+s = a+(q-b+n) := by
+            dsimp [s]
+            omega
+          have hright : b+(q-b+n) = n+q := by omega
+          calc
+            tailCell m e K (n+s) =
+                tailCell m e K (a+(q-b+n)) := by rw [hleft]
+            _ = tailCell m e K (b+(q-b+n)) := hmerge
+            _ = tailCell m e K (n+q) := by rw [hright]
+            _ = tailCell m e K n := hperiod n
+        exact ih s hslt hspos hsperiod
+      by_cases hijlt : i < j
+      · exact ordered hi hj hijlt heq
+      · have hjilt : j < i := by omega
+        exact ordered hj hi hjilt heq.symm
+  exact main q hq hperiod
+
 /-- The fixed projection also carries the star of the next orbit cell back to
 the star of the current one. -/
 theorem stationary_tail_reversal (hrun : IsRun m e r0)
@@ -498,6 +579,37 @@ theorem stationary_recurrent_tail_four (hrun : IsRun m e r0)
     simpa only [Nat.add_assoc] using h
   exact stationary_primitive_tail_four m e r0 hrun hr0
     ⟨hq, hcellperiod, hprimitive⟩ hstationary
+    (support_fixed_of_register_period m e r0 hrun hr0 hq hregperiod)
+    hanchor cells ks hks hnd
+
+/-- **Stationary recurrent tail: four snapshots, without a supplied primitive
+period.**  Exact entry/register recurrence supplies a positive cell period;
+`exists_primitive_cell_period` minimizes it internally. -/
+theorem stationary_recurrent_tail_four_unconditional
+    (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) {K q : Nat}
+    (hq : 0 < q)
+    (hentryperiod : ∀ t, K ≤ t → e (t+q) = e t)
+    (hregperiod : ∀ t c, K ≤ t →
+      reg m e r0 (t+q) c = reg m e r0 t c)
+    (hstationary : ∀ t, K ≤ t → ∀ c,
+      nextCell m e r0 (t+1) c = nextCell m e r0 t c)
+    (hanchor : ProductiveStep m e r0 K)
+    (cells ks : List Nat)
+    (hks : ∀ j ∈ ks, K ≤ j)
+    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
+    ks.length ≤ 4 := by
+  have hcellperiod : ∀ n,
+      tailCell m e K (n+q) = tailCell m e K n := by
+    intro n
+    unfold tailCell
+    have h := congrArg m.cellOf
+      (hentryperiod (K+n) (Nat.le_add_right _ _))
+    simpa only [Nat.add_assoc] using h
+  obtain ⟨p, hprimitive⟩ := exists_primitive_cell_period
+    m e r0 hrun hq hcellperiod hstationary
+  exact stationary_primitive_tail_four m e r0 hrun hr0 hprimitive
+    hstationary
     (support_fixed_of_register_period m e r0 hrun hr0 hq hregperiod)
     hanchor cells ks hks hnd
 
