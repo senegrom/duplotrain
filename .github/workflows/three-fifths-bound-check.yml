@@ -5,6 +5,7 @@ on:
     paths:
       - theory/lean/TreeLobeLoadThreeFifths.lean
       - theory/lean/LobePartnerBounce.lean
+      - theory/lean/LobeToggle.lean
       - .github/workflows/three-fifths-bound-check.yml
   workflow_dispatch:
 jobs:
@@ -29,8 +30,10 @@ jobs:
           name = "TreeLobeLoadThreeFifths"
           [[lean_lib]]
           name = "LobePartnerBounce"
+          [[lean_lib]]
+          name = "LobeToggle"
           EOF
       - name: Build three-fifths theorem
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TreeLobeLoadThreeFifths LobePartnerBounce
+          lake build TreeLobeLoadThreeFifths LobePartnerBounce LobeToggle
