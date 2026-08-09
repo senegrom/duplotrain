@@ -252,10 +252,8 @@ reflector, with support foreign to the discarded switch.  Consequently
 `ChangedForwardMerge.eventuallyPeriodic_of_stay` closes the complete old
 identity-reflector branch: a runway splice is a paired-reflector Gray period,
 while a splice at the self-linked core closes after two lobe traversals.
-This is still not the full periodicity theorem: the protected old **flip**
-reflector branch initially remains because the new lobe action can touch
-either its runway or candy support.  The next layer now closes the whole
-runway half.  `ManufacturedFlipReflector.suffix_after_runway_passage`
+For the protected old **flip** reflector,
+`ManufacturedFlipReflector.suffix_after_runway_passage`
 normalizes either candy orientation and packages the strict runway suffix as
 an opposite manufactured flip reflector.  The generic
 `manufactured_flip_arbitrary_lobe_theta_half`,
@@ -266,7 +264,28 @@ without assuming the spliced candy is switch-simple.  Therefore
 and intersecting-action runway cases, while
 `ChangedForwardMerge.eventuallyPeriodic_or_flip_candy` and
 `nonrunway_oriented_branch_entry_is_candy` reduce the sole remaining case to
-an explicitly oriented passage strictly inside the old candy.
+an explicitly oriented passage strictly inside the old candy.  That final
+candy residual is now closed too.  `candy_completion_latched` proves that the
+untouched old tail becomes idempotent after its action is pinned.  If the
+fresh approach avoids the old action,
+`manufactured_flip_candy_splice_periodic_of_approach_foreign` gives one
+settling lap followed by an explicit fixed macro-period.  If it meets the old
+action, `physicalTrace_endpoints_eq_before_avoided_switch` and
+`facing_approach_to_candy_splice_impossible` show that the first meeting
+cannot be facing—the fresh and old routes would otherwise reach the splice
+switch through the same arm.  The remaining trailing meeting repairs the old
+action and closes by
+`manufactured_flip_candy_splice_periodic_of_approach_contact`.
+Consequently `ChangedForwardMerge.eventuallyPeriodic` closes both old
+reflector kinds, and
+`manufactured_pair_protected_repair_eventuallyPeriodic` closes every outcome
+of protected two-reflector repair.
+
+The raw global structural result is now complete:
+`long_run_eventually_periodic` states that, on every arbitrary `N`-switch
+wiring, any run live for `3*N+2` steps from a known incoming physical edge is
+eventually periodic.  It is proved directly over `Wiring`/`stepN`, with no
+finite-`N` enumeration and no planarity assumption.
 The capstone `repair_or_facing_diversion` therefore completes a damaged
 reflector all the way to the opposite boundary unless that one explicit
 facing-first diversion occurs.  The endpoint-strengthened
@@ -295,14 +314,14 @@ identity-reflector case, or flip-reflector runway case.
   local actions avoid one another's supports have a genuine period, by the
   four-corner Gray composition.
 
-The raw `StateLaw` remains **OPEN**.  The new edge cutoff and the complete
-four-way first-edge outcome close the local front end of the classical
-proof.  What remains is the global composition of its return/retrace cases
-into the line/lollipop/dumbbell attractors (including the degree-three theta
-collapse), followed by counting the linear transient plus the at-most-four
-attractor states.  The older first-repeated-switch route still has an
-equivalent forward-theta residual; neither global residual is being called
-proved.
+The raw `StateLaw` remains **OPEN**.  The direct-track argument now closes the
+global structural half—eventual periodicity and every degree-three theta
+collapse—but `EventuallyPeriodic` deliberately forgets the quantitative
+shape of its witness.  What remains is to retain/count the linear repair
+transient and prove that the constructed attractor changes only the two
+reflector actions, hence contributes at most four tongue vectors.  Until
+that quantitative extraction is formalized, the repository does **not**
+claim the `N+6` state law.
 
 **`EchoMachine.lean` — the abstracted cycle dynamics** (T9 in
 ../lazy-point-theory.md): any wiring's trailing structure compiles to a
