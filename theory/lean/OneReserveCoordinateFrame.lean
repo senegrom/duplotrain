@@ -56,6 +56,7 @@ theorem OneReserveCoordinateFrame.count
   have hle := frame_subset_length
     frame.coordinates_nodup frame.coordinates_subset
   simp only [List.length_append] at hle
+  rw [frame.partners_length, frame.reserves_length] at hle
   omega
 
 /-- **Stable mixed `2/3` endpoint from a coordinate frame.** -/

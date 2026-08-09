@@ -47,7 +47,7 @@ theorem fully_lobed_component_roundtrip_on
   have hkJ : k ≤ J := by omega
   have hfirst : OccupiedLobeAt m e r0 k
       (m.star (m.cellOf (e k))) :=
-    hlubed k hkI hkJ (m.cellOf (e k)) hentry
+    hlobed k hkI hkJ (m.cellOf (e k)) hentry
   have hl1 := next_lobe_of_occupied_partner m e r0 hrun hfirst
   have hreflect := lobe_entry_reflects m e r0 hrun hr0 hl1
   have hwrite : reg m e r0 k (m.cellOf (e k)) = e k :=
@@ -58,7 +58,7 @@ theorem fully_lobed_component_roundtrip_on
     rwa [hwrite] at hc
   have hsecond : OccupiedLobeAt m e r0 (k+2)
       (m.star (m.cellOf (e (k+2)))) :=
-    hlubed (k+2) (by omega) (by omega)
+    hlobed (k+2) (by omega) (by omega)
       (m.cellOf (e (k+2))) hnextCell
   exact two_occupied_external_lobes_roundtrip
     m e r0 hrun hr0 hfirst hsecond
@@ -89,7 +89,7 @@ theorem fully_lobed_component_orbit_on
         rw [hi]
         exact hentry
       have hround := fully_lobed_component_roundtrip_on
-        m e r0 hrun hr0 cells hclosed hlubed hqI hq4J hqEntry
+        m e r0 hrun hr0 cells hclosed hlobed hqI hq4J hqEntry
       have hidx : q+4 = k + 4*(n+1) := by
         dsimp [q]
         omega
@@ -121,16 +121,19 @@ theorem exists_unreflected_component_cell_on
       ∃ j, I ≤ j ∧ j ≤ J ∧
         ¬ OccupiedLobeAt m e r0 j (m.star c) := by
   classical
-  by_contra hnone
-  have hall : FullyExternallyLobedOn m e r0 cells I J := by
-    intro j hjI hjJ c hc
-    by_contra hnot
-    apply hnone
-    exact ⟨c, hc, j, hjI, hjJ, hnot⟩
-  rcases hvisit with ⟨k, hkI, hkJ, hentry⟩
-  have horbit := fully_lobed_component_orbit_on
-    m e r0 hrun hr0 cells hclosed hall hkI hkJ hentry
-  exact (hnoTail k hkI hkJ hentry) horbit
+  by_cases hnone : ∃ c, c ∈ cells ∧
+      ∃ j, I ≤ j ∧ j ≤ J ∧ ¬ OccupiedLobeAt m e r0 j (m.star c)
+  · exact hnone
+  · exfalso
+    have hall : FullyExternallyLobedOn m e r0 cells I J := by
+      intro j hjI hjJ c hc
+      by_cases hnot : OccupiedLobeAt m e r0 j (m.star c)
+      · exact hnot
+      · exact absurd ⟨c, hc, j, hjI, hjJ, hnot⟩ hnone
+    rcases hvisit with ⟨k, hkI, hkJ, hentry⟩
+    have horbit := fully_lobed_component_orbit_on
+      m e r0 hrun hr0 cells hclosed hall hkI hkJ hentry
+    exact (hnoTail k hkI hkJ hentry) horbit
 
 /-- Active roots persistent on a finite interval. -/
 def PersistentActiveLobeRootsOn

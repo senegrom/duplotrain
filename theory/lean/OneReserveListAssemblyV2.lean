@@ -29,6 +29,14 @@ def IsComponentReserveV2
     (roots cells : List Nat) (r : Nat) : Prop :=
   r ∈ cells ∧ m.star r ∉ roots
 
+/-- Pointwise lifting of a relation to equal-length lists (local copy
+of Mathlib's `PairForall`, absent from core). -/
+inductive PairForall {α β : Type} (R : α → β → Prop) :
+    List α → List β → Prop
+  | nil : PairForall R [] []
+  | cons {a : α} {b : β} {as : List α} {bs : List β} :
+      R a b → PairForall R as bs → PairForall R (a :: as) (b :: bs)
+
 /-- Select one reserve per component. -/
 theorem exists_component_reserve_list_v2
     (roots : List Nat) :
@@ -36,24 +44,24 @@ theorem exists_component_reserve_list_v2
       (∀ cells ∈ components,
         ∃ r, IsComponentReserveV2 m roots cells r) →
       ∃ reserves,
-        List.Forall₂ (IsComponentReserveV2 m roots)
+        PairForall (IsComponentReserveV2 m roots)
           components reserves := by
   intro components
   induction components with
   | nil =>
       intro _
-      exact ⟨[], List.Forall₂.nil⟩
+      exact ⟨[], PairForall.nil⟩
   | cons cells rest ih =>
       intro h
       obtain ⟨r, hr⟩ := h cells List.mem_cons_self
       obtain ⟨rs, hrs⟩ := ih (fun other ho =>
         h other (List.mem_cons_of_mem _ ho))
-      exact ⟨r :: rs, List.Forall₂.cons hr hrs⟩
+      exact ⟨r :: rs, PairForall.cons hr hrs⟩
 
 private theorem reserve_v2_length
     {roots : List Nat} :
     ∀ {components : List (List Nat)} {reserves : List Nat},
-      List.Forall₂ (IsComponentReserveV2 m roots)
+      PairForall (IsComponentReserveV2 m roots)
         components reserves →
       reserves.length = components.length := by
   intro components reserves h
@@ -64,7 +72,7 @@ private theorem reserve_v2_length
 private theorem reserve_v2_mem_component
     {roots : List Nat} :
     ∀ {components : List (List Nat)} {reserves : List Nat},
-      List.Forall₂ (IsComponentReserveV2 m roots)
+      PairForall (IsComponentReserveV2 m roots)
         components reserves →
       ∀ r ∈ reserves,
         ∃ cells, cells ∈ components ∧ r ∈ cells := by
@@ -86,7 +94,7 @@ theorem component_reserves_nodup_v2
     {roots : List Nat} :
     ∀ {components : List (List Nat)} {reserves : List Nat},
       ComponentListsDisjointV2 components →
-      List.Forall₂ (IsComponentReserveV2 m roots)
+      PairForall (IsComponentReserveV2 m roots)
         components reserves →
       reserves.Nodup := by
   intro components reserves hdis hrel
@@ -195,18 +203,25 @@ theorem one_reserve_component_count_v2
     rcases reserve_v2_mem_component m hrel r hr with
       ⟨cells, hc, hrc⟩
     exact hcomponentsAwayRoots cells hc r hrc
+  have hstar_not_root : ∀ {comps : List (List Nat)} {rs : List Nat},
+      PairForall (IsComponentReserveV2 m roots) comps rs →
+      ∀ r ∈ rs, m.star r ∉ roots := by
+    intro comps rs h
+    induction h with
+    | nil =>
+        intro r hr
+        cases hr
+    | @cons cells x rest rs hx hrest ih =>
+        intro r hr
+        simp only [List.mem_cons] at hr
+        rcases hr with hr | hr
+        · rw [hr]
+          exact hx.2
+        · exact ih r hr
   have hresAwayPartners : ∀ r ∈ reserves,
       r ∉ roots.map m.star := by
     intro r hr
-    have hnot : m.star r ∉ roots := by
-      induction hrel with
-      | nil => cases hr
-      | @cons cells x rest rs hx hrest ih =>
-          simp only [List.mem_cons] at hr
-          rcases hr with rfl | hr
-          · exact hx.2
-          · exact ih hr
-    exact reserve_v2_not_partner m hnot
+    exact reserve_v2_not_partner m (hstar_not_root hrel r hr)
   have htotalNodup :
       ((roots ++ roots.map m.star) ++ reserves).Nodup := by
     rw [List.nodup_append]

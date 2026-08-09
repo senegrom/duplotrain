@@ -44,7 +44,7 @@ theorem external_lobe_orbit_phases
     (hbLobe : m.cellOf (m.bar b) = m.cellOf b)
     (haOcc : ∀ j, k ≤ j → Occupied m e r0 j a)
     (hbOcc : ∀ j, k ≤ j → Occupied m e r0 j b) :
-    ExternalReflectorTailFrom m e r0 k s a b := by
+    ExternalReflectorTailFrom m e k s a b := by
   have hstarts : ∀ n, e (k + 4*n) = s := by
     intro n
     induction n with
@@ -88,7 +88,7 @@ theorem external_lobe_orbit_certificate
     (hbLobe : m.cellOf (m.bar b) = m.cellOf b)
     (haOcc : ∀ j, k ≤ j → Occupied m e r0 j a)
     (hbOcc : ∀ j, k ≤ j → Occupied m e r0 j b) :
-    ∃ s a b, ExternalReflectorTailFrom m e r0 k s a b := by
+    ∃ s a b, ExternalReflectorTailFrom m e k s a b := by
   exact ⟨s, a, b,
     external_lobe_orbit_phases m e r0 hrun hstart
       haCell haLobe hbCell hbLobe haOcc hbOcc⟩

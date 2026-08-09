@@ -1,5 +1,5 @@
 name = "duplotrain-proofs"
-defaultTargets = ["ActiveLobeCoverCore", "ActiveLobes", "Alternation", "AlternationBound", "AutomaticCycleFixed", "AutomaticEpochBound", "AutomaticTreeBlock", "BlockAbstractEpochBoundCore", "BlockEpochAggregation", "BlockGlobalArithmetic", "BlockSparseBoundCore", "BlockSparseFixedCountCore", "BoundaryReplay", "CanonicalActiveLobeFrame", "CanonicalCertifiedEpochBound", "CanonicalConfigurationRepresentatives", "CanonicalEdgeRepsCore", "CanonicalFibonacciEpochBound", "CanonicalGlobalAbsorbedBound", "CanonicalNoCertifiedGlobalBound", "CanonicalPreTailGlobalBound", "CanonicalProjectedEpochFrame", "CanonicalSupportFrame", "CanonicalUnconditionalGlobalBound", "CellHeat", "CertifiedEpochBound", "CertifiedLobeAbsorption", "CollapsedChipDynamics", "ComponentCapacity", "ConcreteAscentTrace", "ConcreteCascadeFacts", "ConcreteCertifiedEchoRun", "ConcreteEchoBridge", "ConcreteEchoMachine", "ConcreteEchoRun", "ConcreteEchoStep", "ConcreteFiniteBounds", "ConcreteMachine", "ConcreteOverwriteBridge", "ConcretePhysicalBridge", "ConcreteTraceRegisters", "ConcreteTreeCodes", "ConcreteTreeDisjoint", "ConcreteTreeRetrace", "DescentRouteCatalogue", "DescentSimplicity", "DeterministicOverwriteReturn", "DuplotrainProofs", "EchoConfigCount", "EchoConfiguration", "EchoMachine", "EchoOverwriteFibre", "EdgeReversal", "EndpointAccountingStandalone", "EndpointEpochExtraction", "EpochAggregation", "FibonacciCapacityMonotone", "FibonacciSparseBound", "FiniteFrameSwitchCorollary", "FiniteListBounds", "FirstReflectorNovelty", "FiveFrameObstruction", "FixedSupportBound", "ForeignSpliceNovelty", "FullComponentRootUniqueness", "FullReachPersistencePaired", "FutureEntryBound", "GeneralN", "GrayTailAggregation", "GrayTailCount", "HiddenAbsorb", "HiddenDichotomy", "HiddenFibre", "KoizumiCurveInvariant", "KoizumiFramePersistence", "KoizumiRawExtraction", "LinearBound", "LobeAbsorption", "LobeBits", "LobeBooleanCodeCore", "LobeDichotomy", "LobeForestActive", "LobeForestBlock", "LobeForestPartition", "LobePartnerBounce", "LobeToggle", "LobeVariationVisit", "LoneWriter", "ManufacturedPairNovelty", "ManufacturedPairTailNovelty", "MixedEpochBound", "MonotoneSupport", "NestedRestorationCharge", "NestedRestorationElimination", "NoFullFixed", "NoFullFreezeCore", "ObservedConfigurationFibre", "OverwriteDynamics", "OverwriteLasso", "PairBound", "PairMultiplicity", "PairedBlockEpochStrictBound", "PairedNoFullReachFreeze", "PairedPointwiseReplayCore", "PairedReachReplay", "Periodicity", "PersistentLobeSeparationStandalone", "PhysicalPrefixCount", "PhysicalPrefixFibre", "ProfileCodeBound", "RecencyRank", "RecencyTreeBlock", "RelevantCanonicalFrame", "RelevantCertifiedFibonacciEpochBound", "RelevantEdgeFibonacciConfigBound", "RelevantEdgeFibonacciGlobalBound", "RelevantEdgeFibonacciPhysicalBound", "RelevantEdgeRepresentativeSupport", "RelevantFibonacciConfigBound", "RelevantFibonacciGlobalBound", "RelevantFibonacciNBound", "RelevantFibonacciPhysicalBound", "RelevantFiniteFrame", "RepeatedNoveltyDecomposition", "RepeatedNoveltySelfAnchors", "ReplayFacts", "ReversalFacts", "RootRank", "RunwayHistoricalThree", "RunwaySpliceNovelty", "SelfEpochAmortization", "SelfEpochFour", "SelfPivotStrictShrink", "SevenTenthsAggregation", "SharpCertificateClosure", "SharpStateLawAssembly", "SkewWalk", "SlotBound", "StarIndependent", "StarPairCountingCore", "StateLaw", "StationaryTail", "SteeringLaw", "SupportBound", "SupportMove", "SupportRelativeCertifiedEpochBound", "SupportRelativeEpochStrictBound", "SupportRelativeFibonacciEpochBound", "SupportRelativeNoLobe", "SupportRelativePointwiseReplay", "SupportSize", "SupportTreeFull", "SupportWeightFibres", "ThreeQuarterArithmetic", "TokenState", "TrackCurveGrowth", "TrackCurveShrinkGlobal", "TrackEdge", "TrackEndpointMatching", "TrackFiniteAlternation", "TrackGlobalRepair", "TrackLobe", "TrackNormalForm", "TrackNovelReplay", "TrackNoveltyCover", "TrackTheta", "TrackTrace", "TreeCapacitySevenTenths", "TreeEpochCode", "TreeReplay", "TripleFramePhysicalClosure", "TripleInterlacementObstruction", "TwoReflectorEdgeTrap", "TwoReflectorFiniteTrap", "TwoStateConfigurationFibre", "TwoSwitchOneShotObstruction", "TwoToOneConfigurationCount", "UnlinkedCounterObstruction", "VectorCount", "VisibleChipReduction", "RecursiveSerialRepair"]
+defaultTargets = ["ActiveLobeCoverCore", "ActiveLobes", "Alternation", "AlternationBound", "AutomaticCycleFixed", "AutomaticEpochBound", "AutomaticTreeBlock", "BlockAbstractEpochBoundCore", "BlockEpochAggregation", "BlockGlobalArithmetic", "BlockSparseBoundCore", "BlockSparseFixedCountCore", "BoundaryReplay", "CanonicalActiveLobeFrame", "CanonicalCertifiedEpochBound", "CanonicalConfigurationRepresentatives", "CanonicalEdgeRepsCore", "CanonicalFibonacciEpochBound", "CanonicalGlobalAbsorbedBound", "CanonicalNoCertifiedGlobalBound", "CanonicalPreTailGlobalBound", "CanonicalProjectedEpochFrame", "CanonicalSupportFrame", "CanonicalUnconditionalGlobalBound", "CellHeat", "CertifiedEpochBound", "CertifiedLobeAbsorption", "CollapsedChipDynamics", "ComponentCapacity", "ConcreteAscentTrace", "ConcreteCascadeFacts", "ConcreteCertifiedEchoRun", "ConcreteEchoBridge", "ConcreteEchoMachine", "ConcreteEchoRun", "ConcreteEchoStep", "ConcreteFiniteBounds", "ConcreteMachine", "ConcreteOverwriteBridge", "ConcretePhysicalBridge", "ConcreteTraceRegisters", "ConcreteTreeCodes", "ConcreteTreeDisjoint", "ConcreteTreeRetrace", "DescentRouteCatalogue", "DescentSimplicity", "DeterministicOverwriteReturn", "DuplotrainProofs", "EchoConfigCount", "EchoConfiguration", "EchoMachine", "EchoOverwriteFibre", "EdgeReversal", "EndpointAccountingStandalone", "EndpointEpochExtraction", "EpochAggregation", "ExternalLobeOrbit", "ExternalLobeReflectionCore", "ExternalLobeRoundtrip", "FibonacciCapacityMonotone", "FibonacciSparseBound", "FiniteFrameSwitchCorollary", "FiniteFullyLobedComponentTrap", "FiniteListBounds", "FirstReflectorNovelty", "FiveFrameObstruction", "FixedSupportBound", "ForeignSpliceNovelty", "FullComponentRootUniqueness", "FullReachPersistencePaired", "FullyLoadedTreeImpossible", "FullyLobedComponentTrap", "FutureEntryBound", "GeneralN", "GrayTailAggregation", "GrayTailCount", "HiddenAbsorb", "HiddenDichotomy", "HiddenFibre", "KoizumiCurveInvariant", "KoizumiFramePersistence", "KoizumiRawExtraction", "LinearBound", "LoadedTreeGroupBudget", "LoadedTreeGroupsTwoThirds", "LoadedTreeGroupsWithFreeTwoThirds", "LobeAbsorption", "LobeBits", "LobeBooleanCodeCore", "LobeDichotomy", "LobeForestActive", "LobeForestBlock", "LobeForestPartition", "LobePartnerBounce", "LobeToggle", "LobeVariationVisit", "LoneWriter", "ManufacturedPairNovelty", "ManufacturedPairTailNovelty", "MixedEpochBound", "MixedEpochTwoThirdsFiniteNoTail", "MixedEpochTwoThirdsFromReserves", "MixedEpochTwoThirdsNoTail", "MonotoneSupport", "NestedRestorationCharge", "NestedRestorationElimination", "NoFullFixed", "NoFullFreezeCore", "ObservedConfigurationFibre", "OneReserveCoordinateFrame", "OneReserveFromNoTail", "OneReserveListAssemblyV2", "OverwriteDynamics", "OverwriteLasso", "PairBound", "PairMultiplicity", "PairedBlockEpochStrictBound", "PairedNoFullReachFreeze", "PairedPointwiseReplayCore", "PairedReachReplay", "PairedRouterRoundtrip", "Periodicity", "PersistentLobeSeparationStandalone", "PhysicalPrefixCount", "PhysicalPrefixFibre", "ProfileCodeBound", "RecencyRank", "RecencyTreeBlock", "RecursiveSerialRepair", "RelevantCanonicalFrame", "RelevantCertifiedFibonacciEpochBound", "RelevantEdgeFibonacciConfigBound", "RelevantEdgeFibonacciGlobalBound", "RelevantEdgeFibonacciPhysicalBound", "RelevantEdgeRepresentativeSupport", "RelevantFibonacciConfigBound", "RelevantFibonacciGlobalBound", "RelevantFibonacciNBound", "RelevantFibonacciPhysicalBound", "RelevantFiniteFrame", "RepeatedNoveltyDecomposition", "RepeatedNoveltySelfAnchors", "ReplayFacts", "ReservedComponentCounting", "RestorationFrameOrdering", "RestorationFrames", "ReuseForcesReplayClosure", "ReversalFacts", "RootRank", "RunwayHistoricalThree", "RunwaySpliceNovelty", "SelfEpochAmortization", "SelfEpochFour", "SelfPivotStrictShrink", "SelfShrinkChargeClosure", "SevenTenthsAggregation", "SharpCertificateClosure", "SharpStateLawAssembly", "SkewWalk", "SlotBound", "StarIndependent", "StarPairCountingCore", "StateLaw", "StationaryTail", "SteeringLaw", "SupportBound", "SupportMove", "SupportRelativeCertifiedEpochBound", "SupportRelativeEpochStrictBound", "SupportRelativeFibonacciEpochBound", "SupportRelativeNoLobe", "SupportRelativePointwiseReplay", "SupportSize", "SupportTreeFull", "SupportWeightFibres", "ThreeQuarterArithmetic", "TokenState", "TrackCurveGrowth", "TrackCurveShrinkGlobal", "TrackEdge", "TrackEndpointMatching", "TrackFiniteAlternation", "TrackGlobalRepair", "TrackLobe", "TrackNormalForm", "TrackNovelReplay", "TrackNoveltyCover", "TrackQuantitative", "TrackQuantitativeTight", "TrackStationaryTail", "TrackTheta", "TrackTrace", "TreeCapacitySevenTenths", "TreeCapacityTwoThirds", "TreeEpochCode", "TreeLobeLoadBound", "TreeLobeLoadThreeFifths", "TreeLobeNotFullTwoThirds", "TreeReplay", "TripleFramePhysicalClosure", "TripleInterlacementObstruction", "TwoReflectorEdgeTrap", "TwoReflectorFiniteTrap", "TwoStateConfigurationFibre", "TwoSwitchOneShotObstruction", "TwoThirdsAggregation", "TwoToOneConfigurationCount", "UnlinkedCounterObstruction", "VectorCount", "VisibleChipReduction"]
 
 [[lean_lib]]
 name = "ActiveLobeCoverCore"
@@ -164,7 +164,19 @@ name = "EdgeReversal"
 name = "EndpointAccountingStandalone"
 
 [[lean_lib]]
+name = "EndpointEpochExtraction"
+
+[[lean_lib]]
 name = "EpochAggregation"
+
+[[lean_lib]]
+name = "ExternalLobeOrbit"
+
+[[lean_lib]]
+name = "ExternalLobeReflectionCore"
+
+[[lean_lib]]
+name = "ExternalLobeRoundtrip"
 
 [[lean_lib]]
 name = "FibonacciCapacityMonotone"
@@ -176,10 +188,16 @@ name = "FibonacciSparseBound"
 name = "FiniteFrameSwitchCorollary"
 
 [[lean_lib]]
+name = "FiniteFullyLobedComponentTrap"
+
+[[lean_lib]]
 name = "FiniteListBounds"
 
 [[lean_lib]]
 name = "FirstReflectorNovelty"
+
+[[lean_lib]]
+name = "FiveFrameObstruction"
 
 [[lean_lib]]
 name = "FixedSupportBound"
@@ -192,6 +210,12 @@ name = "FullComponentRootUniqueness"
 
 [[lean_lib]]
 name = "FullReachPersistencePaired"
+
+[[lean_lib]]
+name = "FullyLoadedTreeImpossible"
+
+[[lean_lib]]
+name = "FullyLobedComponentTrap"
 
 [[lean_lib]]
 name = "FutureEntryBound"
@@ -218,7 +242,22 @@ name = "HiddenFibre"
 name = "KoizumiCurveInvariant"
 
 [[lean_lib]]
+name = "KoizumiFramePersistence"
+
+[[lean_lib]]
+name = "KoizumiRawExtraction"
+
+[[lean_lib]]
 name = "LinearBound"
+
+[[lean_lib]]
+name = "LoadedTreeGroupBudget"
+
+[[lean_lib]]
+name = "LoadedTreeGroupsTwoThirds"
+
+[[lean_lib]]
+name = "LoadedTreeGroupsWithFreeTwoThirds"
 
 [[lean_lib]]
 name = "LobeAbsorption"
@@ -263,7 +302,22 @@ name = "ManufacturedPairTailNovelty"
 name = "MixedEpochBound"
 
 [[lean_lib]]
+name = "MixedEpochTwoThirdsFiniteNoTail"
+
+[[lean_lib]]
+name = "MixedEpochTwoThirdsFromReserves"
+
+[[lean_lib]]
+name = "MixedEpochTwoThirdsNoTail"
+
+[[lean_lib]]
 name = "MonotoneSupport"
+
+[[lean_lib]]
+name = "NestedRestorationCharge"
+
+[[lean_lib]]
+name = "NestedRestorationElimination"
 
 [[lean_lib]]
 name = "NoFullFixed"
@@ -272,13 +326,16 @@ name = "NoFullFixed"
 name = "NoFullFreezeCore"
 
 [[lean_lib]]
-name = "NestedRestorationElimination"
-
-[[lean_lib]]
-name = "NestedRestorationCharge"
-
-[[lean_lib]]
 name = "ObservedConfigurationFibre"
+
+[[lean_lib]]
+name = "OneReserveCoordinateFrame"
+
+[[lean_lib]]
+name = "OneReserveFromNoTail"
+
+[[lean_lib]]
+name = "OneReserveListAssemblyV2"
 
 [[lean_lib]]
 name = "OverwriteDynamics"
@@ -305,6 +362,9 @@ name = "PairedPointwiseReplayCore"
 name = "PairedReachReplay"
 
 [[lean_lib]]
+name = "PairedRouterRoundtrip"
+
+[[lean_lib]]
 name = "Periodicity"
 
 [[lean_lib]]
@@ -324,6 +384,9 @@ name = "RecencyRank"
 
 [[lean_lib]]
 name = "RecencyTreeBlock"
+
+[[lean_lib]]
+name = "RecursiveSerialRepair"
 
 [[lean_lib]]
 name = "RelevantCanonicalFrame"
@@ -359,13 +422,25 @@ name = "RelevantFibonacciPhysicalBound"
 name = "RelevantFiniteFrame"
 
 [[lean_lib]]
+name = "RepeatedNoveltyDecomposition"
+
+[[lean_lib]]
+name = "RepeatedNoveltySelfAnchors"
+
+[[lean_lib]]
 name = "ReplayFacts"
+
+[[lean_lib]]
+name = "ReservedComponentCounting"
+
+[[lean_lib]]
+name = "RestorationFrameOrdering"
 
 [[lean_lib]]
 name = "RestorationFrames"
 
 [[lean_lib]]
-name = "RestorationFrameOrdering"
+name = "ReuseForcesReplayClosure"
 
 [[lean_lib]]
 name = "ReversalFacts"
@@ -374,10 +449,31 @@ name = "ReversalFacts"
 name = "RootRank"
 
 [[lean_lib]]
+name = "RunwayHistoricalThree"
+
+[[lean_lib]]
 name = "RunwaySpliceNovelty"
 
 [[lean_lib]]
+name = "SelfEpochAmortization"
+
+[[lean_lib]]
+name = "SelfEpochFour"
+
+[[lean_lib]]
+name = "SelfPivotStrictShrink"
+
+[[lean_lib]]
+name = "SelfShrinkChargeClosure"
+
+[[lean_lib]]
 name = "SevenTenthsAggregation"
+
+[[lean_lib]]
+name = "SharpCertificateClosure"
+
+[[lean_lib]]
+name = "SharpStateLawAssembly"
 
 [[lean_lib]]
 name = "SkewWalk"
@@ -437,28 +533,10 @@ name = "ThreeQuarterArithmetic"
 name = "TokenState"
 
 [[lean_lib]]
-name = "TrackLobe"
-
-[[lean_lib]]
-name = "TrackNormalForm"
-
-[[lean_lib]]
-name = "TrackNovelReplay"
-
-[[lean_lib]]
-name = "TrackNoveltyCover"
-
-[[lean_lib]]
-name = "TrackStationaryTail"
-
-[[lean_lib]]
-name = "TrackTheta"
-
-[[lean_lib]]
-name = "TrackTrace"
-
-[[lean_lib]]
 name = "TrackCurveGrowth"
+
+[[lean_lib]]
+name = "TrackCurveShrinkGlobal"
 
 [[lean_lib]]
 name = "TrackEdge"
@@ -473,19 +551,58 @@ name = "TrackFiniteAlternation"
 name = "TrackGlobalRepair"
 
 [[lean_lib]]
+name = "TrackLobe"
+
+[[lean_lib]]
+name = "TrackNormalForm"
+
+[[lean_lib]]
+name = "TrackNovelReplay"
+
+[[lean_lib]]
+name = "TrackNoveltyCover"
+
+[[lean_lib]]
 name = "TrackQuantitative"
 
 [[lean_lib]]
 name = "TrackQuantitativeTight"
 
 [[lean_lib]]
+name = "TrackStationaryTail"
+
+[[lean_lib]]
+name = "TrackTheta"
+
+[[lean_lib]]
+name = "TrackTrace"
+
+[[lean_lib]]
 name = "TreeCapacitySevenTenths"
+
+[[lean_lib]]
+name = "TreeCapacityTwoThirds"
 
 [[lean_lib]]
 name = "TreeEpochCode"
 
 [[lean_lib]]
+name = "TreeLobeLoadBound"
+
+[[lean_lib]]
+name = "TreeLobeLoadThreeFifths"
+
+[[lean_lib]]
+name = "TreeLobeNotFullTwoThirds"
+
+[[lean_lib]]
 name = "TreeReplay"
+
+[[lean_lib]]
+name = "TripleFramePhysicalClosure"
+
+[[lean_lib]]
+name = "TripleInterlacementObstruction"
 
 [[lean_lib]]
 name = "TwoReflectorEdgeTrap"
@@ -497,64 +614,19 @@ name = "TwoReflectorFiniteTrap"
 name = "TwoStateConfigurationFibre"
 
 [[lean_lib]]
+name = "TwoSwitchOneShotObstruction"
+
+[[lean_lib]]
+name = "TwoThirdsAggregation"
+
+[[lean_lib]]
 name = "TwoToOneConfigurationCount"
+
+[[lean_lib]]
+name = "UnlinkedCounterObstruction"
 
 [[lean_lib]]
 name = "VectorCount"
 
 [[lean_lib]]
 name = "VisibleChipReduction"
-
-[[lean_lib]]
-name = "KoizumiRawExtraction"
-
-[[lean_lib]]
-name = "RepeatedNoveltyDecomposition"
-
-[[lean_lib]]
-name = "SharpStateLawAssembly"
-
-[[lean_lib]]
-name = "TrackCurveShrinkGlobal"
-
-[[lean_lib]]
-name = "TripleInterlacementObstruction"
-
-[[lean_lib]]
-name = "RunwayHistoricalThree"
-
-[[lean_lib]]
-name = "SelfEpochFour"
-
-[[lean_lib]]
-name = "KoizumiFramePersistence"
-
-[[lean_lib]]
-name = "UnlinkedCounterObstruction"
-
-[[lean_lib]]
-name = "RepeatedNoveltySelfAnchors"
-
-[[lean_lib]]
-name = "EndpointEpochExtraction"
-
-[[lean_lib]]
-name = "FiveFrameObstruction"
-
-[[lean_lib]]
-name = "SelfEpochAmortization"
-
-[[lean_lib]]
-name = "SelfPivotStrictShrink"
-
-[[lean_lib]]
-name = "SharpCertificateClosure"
-
-[[lean_lib]]
-name = "TripleFramePhysicalClosure"
-
-[[lean_lib]]
-name = "TwoSwitchOneShotObstruction"
-
-[[lean_lib]]
-name = "RecursiveSerialRepair"
