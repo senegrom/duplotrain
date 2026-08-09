@@ -6,6 +6,10 @@ on:
       - theory/lean/NoveltyAwareLassoOverlap.lean
       - theory/lean/KnownEdgeTwentyFourOverlap.lean
       - theory/lean/StateLawTwentyFourOverlap.lean
+      - theory/lean/TrackQuantitativeRouteSharp.lean
+      - theory/lean/NoveltyAwareLassoTwentyThree.lean
+      - theory/lean/KnownEdgeTwentyThree.lean
+      - theory/lean/StateLawTwentyThree.lean
       - .github/workflows/tighten-linear-overlap-check.yml
   workflow_dispatch:
 jobs:
@@ -30,10 +34,22 @@ jobs:
           name = "KnownEdgeTwentyFourOverlap"
           [[lean_lib]]
           name = "StateLawTwentyFourOverlap"
+          [[lean_lib]]
+          name = "TrackQuantitativeRouteSharp"
+          [[lean_lib]]
+          name = "NoveltyAwareLassoTwentyThree"
+          [[lean_lib]]
+          name = "KnownEdgeTwentyThree"
+          [[lean_lib]]
+          name = "StateLawTwentyThree"
           EOF
-      - name: Build overlap-aware theorem
+      - name: Build tightened linear theorems
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build NoveltyAwareLassoOverlap
-          if [ -f KnownEdgeTwentyFourOverlap.lean ]; then lake build KnownEdgeTwentyFourOverlap; fi
-          if [ -f StateLawTwentyFourOverlap.lean ]; then lake build StateLawTwentyFourOverlap; fi
+          lake build KnownEdgeTwentyFourOverlap
+          lake build StateLawTwentyFourOverlap
+          if [ -f TrackQuantitativeRouteSharp.lean ]; then lake build TrackQuantitativeRouteSharp; fi
+          if [ -f NoveltyAwareLassoTwentyThree.lean ]; then lake build NoveltyAwareLassoTwentyThree; fi
+          if [ -f KnownEdgeTwentyThree.lean ]; then lake build KnownEdgeTwentyThree; fi
+          if [ -f StateLawTwentyThree.lean ]; then lake build StateLawTwentyThree; fi
