@@ -169,10 +169,10 @@ noncomputable def canonicalLoadedGroups
       VariesOnInterval m e r0 I J (B.root m)) :
     List (LoadedTreeGroup m e r0 I J) := by
   classical
-  exact trees.map fun T =>
+  exact trees.attach.map fun ⟨T, hT⟩ =>
     { tree := T
       lobes := lobesAssignedToTree m e r0 T lobes
-      min_cells := hmin T (by assumption)
+      min_cells := hmin T hT
       roots_nodup := assigned_lobe_roots_nodup
         m e r0 T lobes hroots
       partners_in_tree := by
@@ -187,7 +187,7 @@ noncomputable def canonicalLoadedGroups
         apply hout
         exact (partner_mem_automaticTreeCells_iff
           m e r0 trees (B.root m)).mpr
-          ⟨T, by assumption, hroot⟩
+          ⟨T, hT, hroot⟩
       varying := by
         intro B hB
         exact hvar B
