@@ -48,8 +48,11 @@ theorem external_lobe_reflects
     · rw [hnext, haLobe, haCell]
     · rw [hnext, haCell]
   have hwrite : reg m e r0 k (m.cellOf s) = s := by
-    apply reg_write m e r0
-    rw [hstart]
+    calc
+      reg m e r0 k (m.cellOf s) = e k := by
+        apply reg_write m e r0
+        rw [hstart]
+      _ = s := hstart
   have hforeign :
       m.cellOf (e (k+1)) ≠ m.cellOf s := by
     intro h

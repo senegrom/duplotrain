@@ -48,10 +48,12 @@ theorem exists_unreflected_component_cell
       ∃ j, lo ≤ j ∧
         ¬ OccupiedLobeAt m e r0 j (m.star c) := by
   classical
-  by_contra hnone
+  apply Classical.byContradiction
+  intro hnone
   have hall : FullyExternallyLobedFrom m e r0 cells lo := by
     intro j hj c hc
-    by_contra hnot
+    apply Classical.byContradiction
+    intro hnot
     apply hnone
     exact ⟨c, hc, j, hj, hnot⟩
   rcases hvisit with ⟨k, hk, hentry⟩

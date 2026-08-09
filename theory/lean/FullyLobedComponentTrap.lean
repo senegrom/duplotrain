@@ -87,6 +87,7 @@ theorem fully_lobed_component_orbit
         dsimp [q]
         omega
       rw [← hidx, hround.2]
+      exact ih
 
 /-- A convenient contradiction form: a trajectory which never returns to its
 starting entry cannot be visiting a fully externally lobed closed component. -/

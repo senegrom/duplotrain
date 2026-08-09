@@ -52,8 +52,11 @@ theorem paired_router_roundtrip
     rw [h1, m.bar_invol] at h3raw
     exact h3raw
   have hwriteU : reg m e r0 k (m.cellOf s) = s := by
-    apply reg_write m e r0
-    rw [hstart]
+    calc
+      reg m e r0 k (m.cellOf s) = e k := by
+        apply reg_write m e r0
+        rw [hstart]
+      _ = s := hstart
   have hstableU :
       reg m e r0 (k+3) (m.cellOf s) =
         reg m e r0 k (m.cellOf s) := by
