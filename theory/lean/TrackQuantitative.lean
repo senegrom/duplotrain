@@ -1881,10 +1881,10 @@ theorem manufactured_flip_runway_splice_within_twenty_four
     exact eventuallyPeriodicWithin_of_period hpositive (by omega) hperiod
 
 /-- Every state-changing forward merge into a manufactured flip reflector
-has a lasso of size at most `30*N`.  Runway contacts use the bounded
+has a lasso of size at most `26*N`.  Runway contacts use the bounded
 arbitrary-lobe theta theorem; candy contacts use the exact cycle length
 exported by the two splice lemmas. -/
-theorem ManufacturedReflector.ChangedForwardMerge.flip_within_thirty
+theorem ManufacturedReflector.ChangedForwardMerge.flip_within_twenty_six
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →
       p < 3 * N ∧ q < 3 * N)
@@ -1892,7 +1892,7 @@ theorem ManufacturedReflector.ChangedForwardMerge.flip_within_thirty
     {R : ManufacturedFlipReflector w e g}
     (hmerge : A.ChangedForwardMerge (.flip R)) :
     EventuallyPeriodicWithin w
-      (g, (ManufacturedReflector.flip R).activatedState) (30 * N) := by
+      (g, (ManufacturedReflector.flip R).activatedState) (26 * N) := by
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
       approach, candy, state, leadSteps, _tailSteps, horiented,
       hrouteSplit, hOldTail, hApproach, hApproachGrooved,
@@ -1993,7 +1993,32 @@ theorem ManufacturedReflector.ChangedForwardMerge.flip_within_thirty
           omega, by omega, hcycleLead', hcyclePeriod'⟩
       exact (hlocal.prepend hreach).weaken (by omega)
 
+/-- Backward-compatible weakening of `flip_within_twenty_six`. -/
+theorem ManufacturedReflector.ChangedForwardMerge.flip_within_thirty
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {R : ManufacturedFlipReflector w e g}
+    (hmerge : A.ChangedForwardMerge (.flip R)) :
+    EventuallyPeriodicWithin w
+      (g, (ManufacturedReflector.flip R).activatedState) (30 * N) :=
+  (hmerge.flip_within_twenty_six hN).weaken (by omega)
+
 /-- Uniform wrapper for the two possible old-reflector actions. -/
+theorem ManufacturedReflector.ChangedForwardMerge.within_twenty_six
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (hmerge : A.ChangedForwardMerge B) :
+    EventuallyPeriodicWithin w (g, B.activatedState) (26 * N) := by
+  cases B with
+  | stay R => exact (hmerge.stay_within_sixteen hN).weaken (by omega)
+  | flip R => exact hmerge.flip_within_twenty_six hN
+
+/-- Backward-compatible weakening of `within_twenty_six`. -/
 theorem ManufacturedReflector.ChangedForwardMerge.within_thirty
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →
@@ -2001,11 +2026,8 @@ theorem ManufacturedReflector.ChangedForwardMerge.within_thirty
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
     (hmerge : A.ChangedForwardMerge B) :
-    EventuallyPeriodicWithin w (g, B.activatedState) (30 * N) := by
-  cases B with
-  | stay R =>
-      exact (hmerge.stay_within_sixteen hN).weaken (by omega)
-  | flip R => exact hmerge.flip_within_thirty hN
+    EventuallyPeriodicWithin w (g, B.activatedState) (30 * N) :=
+  (hmerge.within_twenty_six hN).weaken (by omega)
 
 /-- Quantitative form of a backward contact.  If both the protected prefix
 and the fresh approach have length at most `2*N`, the approach followed by
@@ -2452,7 +2474,29 @@ theorem manufactured_pair_protected_repair_quantitative_outcomes
     · exact Or.inr (Or.inr (Or.inr hcomplete))
 
 /-- **Quantitative protected-repair theorem.**  Damaged support is repaired
-or absorbed into a forward splice within a lasso cap of `30*N`. -/
+or absorbed into a forward splice within a lasso cap of `26*N`. -/
+theorem manufactured_pair_protected_repair_within_twenty_six
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hA : PathGrooves A.toSupported.paths B.baseState)
+    (hB : PathGrooves B.toSupported.paths B.activatedState) :
+    EventuallyPeriodicWithin w (g, B.activatedState) (26 * N) := by
+  rcases manufactured_pair_protected_repair_quantitative_outcomes
+      hN A B hA hB with hperiodic | hrest
+  · exact hperiodic.weaken (by omega)
+  · rcases hrest with hfacing | hrest
+    · exact (hfacing.within_twelve hN).weaken (by omega)
+    · rcases hrest with hchanged | hcomplete
+      · exact hchanged.within_twenty_six hN
+      · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
+        exact (A.completed_route_with_pair_support_within hN B
+          B.baseState B.activatedState finalState hA hrepair
+          hAfinal hBfinal).weaken (by omega)
+
+/-- Backward-compatible weakening of the `26*N` repair theorem. -/
 theorem manufactured_pair_protected_repair_within_thirty
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →
@@ -2461,29 +2505,20 @@ theorem manufactured_pair_protected_repair_within_thirty
     (B : ManufacturedReflector w e g)
     (hA : PathGrooves A.toSupported.paths B.baseState)
     (hB : PathGrooves B.toSupported.paths B.activatedState) :
-    EventuallyPeriodicWithin w (g, B.activatedState) (30 * N) := by
-  rcases manufactured_pair_protected_repair_quantitative_outcomes
-      hN A B hA hB with hperiodic | hrest
-  · exact hperiodic.weaken (by omega)
-  · rcases hrest with hfacing | hrest
-    · exact (hfacing.within_twelve hN).weaken (by omega)
-    · rcases hrest with hchanged | hcomplete
-      · exact hchanged.within_thirty hN
-      · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
-        exact (A.completed_route_with_pair_support_within hN B
-          B.baseState B.activatedState finalState hA hrepair
-          hAfinal hBfinal).weaken (by omega)
+    EventuallyPeriodicWithin w (g, B.activatedState) (30 * N) :=
+  (manufactured_pair_protected_repair_within_twenty_six
+    hN A B hA hB).weaken (by omega)
 
-/-- **Global quantitative lasso with a known incoming edge.**  A run live for
-`3*N+2` steps has lead plus period at most `34*N+2`. -/
-theorem long_run_eventually_periodic_within
+/-- **Tightened global quantitative lasso with a known incoming edge.**
+A run live for `3*N+2` steps has lead plus period at most `30*N+2`. -/
+theorem long_run_eventually_periodic_within_thirty
     {w : Wiring} {N e : Nat}
     (hN : ∀ p q, w.link p = some q →
       p < 3 * N ∧ q < 3 * N)
     {start finish : Nat × Tongues}
     (hlive : stepN w (3 * N + 2) start = some finish)
     (hentry : w.link e = some start.1) :
-    EventuallyPeriodicWithin w start (34 * N + 2) := by
+    EventuallyPeriodicWithin w start (30 * N + 2) := by
   rcases long_run_within_or_damaged_pair hN hlive hentry with
     hperiodic | hdamaged
   · exact hperiodic.weaken (by omega)
@@ -2497,7 +2532,7 @@ theorem long_run_eventually_periodic_within
     have hBatActivated :
         PathGrooves B.toSupported.paths B.activatedState := by
       simpa [← hactivatedB] using hgroovesB
-    have hlocal := manufactured_pair_protected_repair_within_thirty
+    have hlocal := manufactured_pair_protected_repair_within_twenty_six
       hN A B hAatBase hBatActivated
     have hreach : stepN w (firstTravel + secondTravel) start =
         some (start.1, B.activatedState) := by
@@ -2505,15 +2540,27 @@ theorem long_run_eventually_periodic_within
       simpa [hactivatedB] using hreachB
     exact (hlocal.prepend hreach).weaken (by omega)
 
-/-- Entry-free global lasso.  The first live step supplies the incoming edge,
-so `3*N+3` live steps imply a `34*N+3` lasso from the original start. -/
-theorem long_run_eventually_periodic_within_without_entry
+/-- Backward-compatible weakening of the tightened known-entry lasso. -/
+theorem long_run_eventually_periodic_within
+    {w : Wiring} {N e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start finish : Nat × Tongues}
+    (hlive : stepN w (3 * N + 2) start = some finish)
+    (hentry : w.link e = some start.1) :
+    EventuallyPeriodicWithin w start (34 * N + 2) :=
+  (long_run_eventually_periodic_within_thirty hN hlive hentry).weaken
+    (by omega)
+
+/-- Tightened entry-free global lasso.  The first live step supplies the
+incoming edge, so `3*N+3` live steps imply a `30*N+3` lasso. -/
+theorem long_run_eventually_periodic_within_thirty_without_entry
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q →
       p < 3 * N ∧ q < 3 * N)
     {start finish : Nat × Tongues}
     (hlive : stepN w (3 * N + 3) start = some finish) :
-    EventuallyPeriodicWithin w start (34 * N + 3) := by
+    EventuallyPeriodicWithin w start (30 * N + 3) := by
   have hsplit : 3 * N + 3 = 1 + (3 * N + 2) := by omega
   rw [hsplit, stepN_add] at hlive
   cases hone : stepN w 1 start with
@@ -2535,17 +2582,26 @@ theorem long_run_eventually_periodic_within_without_entry
           have hmiddle : middle = (entry, localStep.2) := by
             simpa [localStep, hlink] using hone.symm
           subst middle
-          have hlocal := long_run_eventually_periodic_within
+          have hlocal := long_run_eventually_periodic_within_thirty
             hN hlive hlink
           exact (hlocal.prepend honeStep).weaken (by omega)
 
-/-- **GENERAL LINEAR STATE LAW (proved).**  In the raw language of tracks,
-switches, train steps, and sampled tongue vectors, any `N`-switch lazy-point
-layout exposes at most `34*N+3` distinct switch settings to one train.
+/-- Backward-compatible weakening of the tightened entry-free lasso. -/
+theorem long_run_eventually_periodic_within_without_entry
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start finish : Nat × Tongues}
+    (hlive : stepN w (3 * N + 3) start = some finish) :
+    EventuallyPeriodicWithin w start (34 * N + 3) :=
+  (long_run_eventually_periodic_within_thirty_without_entry hN hlive).weaken
+    (by omega)
 
-This is the requested unconditional `O(N)` theorem.  It does not assert the
-still-open sharper `N+6` bound of `StateLaw`. -/
-theorem state_law_linear
+/-- **TIGHTENED GENERAL LINEAR STATE LAW (proved).**  In the raw language of
+tracks, switches, train steps, and sampled tongue vectors, any `N`-switch
+lazy-point layout exposes at most `30*N+3` distinct switch settings to one
+train. -/
+theorem state_law_linear_thirty
     (w : Wiring) (N : Nat)
     (hN : ∀ p q, w.link p = some q →
       p < 3 * N ∧ q < 3 * N)
@@ -2553,11 +2609,11 @@ theorem state_law_linear
     (hlive : ∀ k ∈ ks, (stepN w k c0).isSome)
     (hnd : (ks.map fun k =>
       VectorCount.restrict N (tonguesAt w c0 k)).Nodup) :
-    ks.length ≤ 34 * N + 3 := by
+    ks.length ≤ 30 * N + 3 := by
   cases hlong : stepN w (3 * N + 3) c0 with
   | some finish =>
       have hperiodic :=
-        long_run_eventually_periodic_within_without_entry hN hlong
+        long_run_eventually_periodic_within_thirty_without_entry hN hlong
       exact hperiodic.tongue_vector_count ks hlive hnd
   | none =>
       have hksNodup : ks.Nodup := by
@@ -2584,5 +2640,22 @@ theorem state_law_linear
           simp [hnone] at hkLive
       have hshort := nodup_nat_lt_length hksNodup hlt
       omega
+
+/-- **GENERAL LINEAR STATE LAW (proved).**  Compatibility form of
+`state_law_linear_thirty`, with the former `34*N+3` conclusion.
+
+This is the requested unconditional `O(N)` theorem.  It does not assert the
+still-open sharper `N+6` bound of `StateLaw`. -/
+theorem state_law_linear
+    (w : Wiring) (N : Nat)
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (c0 : Nat × Tongues) (ks : List Nat)
+    (hlive : ∀ k ∈ ks, (stepN w k c0).isSome)
+    (hnd : (ks.map fun k =>
+      VectorCount.restrict N (tonguesAt w c0 k)).Nodup) :
+    ks.length ≤ 34 * N + 3 := by
+  exact Nat.le_trans (state_law_linear_thirty w N hN c0 ks hlive hnd)
+    (by omega)
 
 end GeneralN

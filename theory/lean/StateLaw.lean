@@ -6,15 +6,15 @@ import VectorCount
 
 This file states the actual claim about trains, tracks and switches.
 **`StateLaw` is OPEN — its specific `N + 6` bound is not proved.**
-What is now proved is the unconditional general linear bound `34*N+3`
-(`state_law_linear` in `TrackQuantitative.lean`), as well as the elementary
+What is now proved is the unconditional general linear bound `30*N+3`
+(`state_law_linear_thirty` in `TrackQuantitative.lean`), as well as the elementary
 `2 ^ N` bound (`state_law_two_pow` below).  The coefficient-one improvement
-from `34*N+3` to `N+O(1)` is the remaining problem.
+from `30*N+3` to `N+O(1)` is the remaining problem.
 
 The direct physical-track route in `TrackTrace`, `TrackLobe`, `TrackNormalForm`,
 `TrackTheta`, `TrackGlobalRepair`, and `TrackQuantitative` closes the global
 two-component assembly, retains explicit lasso lengths, and proves the final
-`34*N+3` tongue-vector count.  `StateLaw` stays explicitly open because it asks
+`30*N+3` tongue-vector count.  `StateLaw` stays explicitly open because it asks
 for the much sharper `N+6` count.
 
 ## How to read the statement
@@ -62,8 +62,8 @@ def StateLaw : Prop :=
       ks.length ≤ N + 6
 
 /-- The elementary exponential bound on exactly the same statement, **proved**.
-`TrackQuantitative.state_law_linear` supersedes it asymptotically with
-`34*N+3`; the open gap is now `34*N+3` versus `N+6`. -/
+`TrackQuantitative.state_law_linear_thirty` supersedes it asymptotically with
+`30*N+3`; the open gap is now `30*N+3` versus `N+6`. -/
 theorem state_law_two_pow (w : Wiring) (N : Nat)
     (_hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (c0 : Nat × Tongues) (ks : List Nat)

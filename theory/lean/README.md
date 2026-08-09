@@ -352,8 +352,8 @@ identity-reflector case, or flip-reflector runway case.
   four-corner Gray composition.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
-now proves an unconditional general linear theorem.  `state_law_linear` says
-that any one-train run on an `N`-switch wiring visits at most `34*N+3`
+now proves an unconditional general linear theorem.  `state_law_linear_thirty` says
+that any one-train run on an `N`-switch wiring visits at most `30*N+3`
 pairwise-distinct tongue vectors.  The theorem is stated over raw
 `Wiring`/`stepN`, with no small-`N` enumeration and no conditional hypothesis.
 The repository does **not** claim the sharper `N+6` state law.
@@ -368,8 +368,8 @@ an activated manufactured reflector reached within `2*N+1` steps.  Moreover
 every manufactured reflector has travel at most `2*N`, a disjoint pair's
 explicit four-corner period fits within `8*N`, all intersecting and damaged
 support branches fit within `30*N`, and a live entry-free run has a lasso
-within `34*N+3`.  `state_law_linear` then handles both live long runs and runs
-that fall off early to obtain the same `34*N+3` vector bound.
+within `30*N+3`.  `state_law_linear_thirty` then handles both live long runs and
+runs that fall off early to obtain the same `30*N+3` vector bound.
 
 **`EchoMachine.lean` — the abstracted cycle dynamics** (T9 in
 ../lazy-point-theory.md): any wiring's trailing structure compiles to a
@@ -418,9 +418,9 @@ train on any `N`-switch lazy-point layout ever sees at most `N + 6`
 distinct tongue vectors — directly over `Wiring`/`stepN`, decodable
 piece by piece as track, switches and the lazy-point rule.  **It is
 OPEN: nothing in this repository proves that coefficient-one bound.**
-`TrackQuantitative.state_law_linear` proves the identical raw-track statement
-with `34*N+3` in place of `N+6`; `state_law_two_pow` is the older elementary
-pigeonhole ceiling.  The remaining problem is improving `34*N+3` to
+`TrackQuantitative.state_law_linear_thirty` proves the identical raw-track
+statement with `30*N+3` in place of `N+6`; `state_law_two_pow` is the older
+elementary pigeonhole ceiling.  The remaining problem is improving `30*N+3` to
 `N+O(1)` (conjecturally `N+4`).
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real

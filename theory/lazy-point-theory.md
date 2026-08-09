@@ -18,7 +18,7 @@ an active switch flips both ways. Distinct tongue vectors on a cycle with
 
 is reduced to bounding actives. Status: the specific coefficient-one
 `GeneralN.StateLaw` (`N+6`) is **OPEN**, but the unconditional general bound
-`f(N) ≤ 34N+3` is proved as `GeneralN.state_law_linear` in
+`f(N) ≤ 30N+3` is proved as `GeneralN.state_law_linear_thirty` in
 `lean/TrackQuantitative.lean`.  The proof is a direct physical-track lasso
 argument and does not assume the echo-machine Gray-tail properties.  The
 separate echo-machine route still reduces the sharper bound to the Gray tail
