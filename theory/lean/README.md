@@ -506,6 +506,20 @@ complete-state replay.  The theorem is compiled and unconditional under its
 explicit recurrence/minimality hypotheses.  Extracting those certificates
 from every finite raw novelty history is still the global gap.
 
+**`RunwayHistoricalThree.lean` — the local runway residual is closed.**
+When the first corner of the explicit four-phase runway/candy cover is already
+historical, at most three phases can be globally fresh.  Both intersecting and
+disjoint changed-forward merges therefore manufacture an existing
+`KnownEdgeSharpRepairCertificate`; their local distinct-state bound is
+`N+4`.  This does not itself extract such a merge from every raw run.
+
+**`SelfEpochFour.lean` — certified two-endpoint epochs.**  If every productive
+write in an interval belongs to either of two named endpoint switches, all
+other tongues remain fixed and the interval lies in four explicit Gray-square
+vectors.  A duplicate-free sample from that epoch has length at most four.
+The still-open extraction step is to obtain one fixed endpoint pair from an
+arbitrary maximal self-pivot interval.
+
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single
 train on any `N`-switch lazy-point layout ever sees at most `N + 6`
