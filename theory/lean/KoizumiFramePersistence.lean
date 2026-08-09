@@ -263,4 +263,70 @@ theorem repeated_writer_close_self_or_interior_self
     rw [← hsame]
     simpa [hsum] using hpersist
 
+/-- In a prefix with no productive self-pivot, every productive writer is
+necessarily appearing for the first time.  A repeated writer would force a
+self-pivot by `repeated_writer_close_self_or_interior_self`. -/
+theorem rawProductiveAt_first_of_no_self_prefix
+    {w : Wiring} {N K : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues} {k : Nat}
+    (hk : k < K)
+    (havoid : ∀ j, j < K → RawProductiveAt w N start j →
+      ¬ RawTrainCurveSelfAt w start j)
+    (hprod : RawProductiveAt w N start k) :
+    RawFirstWriterAt w N start k := by
+  refine ⟨hprod, ?_⟩
+  intro j hj hjprod hsame
+  rcases repeated_writer_close_self_or_interior_self
+      hN hj hjprod hprod hsame with hclose | hinterior
+  · exact (havoid k hk hprod hclose).elim
+  · obtain ⟨t, _hjt, htk, htprod, htself⟩ := hinterior
+    exact (havoid t (by omega) htprod htself).elim
+
+/-- A self-pivot-free prefix has no repeated-writer novelty events at all. -/
+theorem rawRepeatedWriterNovelTimes_eq_nil_of_no_self
+    {w : Wiring} {N K : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    (start : Nat × Tongues)
+    (havoid : ∀ j, j < K → RawProductiveAt w N start j →
+      ¬ RawTrainCurveSelfAt w start j) :
+    rawRepeatedWriterNovelTimes w N start K = [] := by
+  classical
+  cases htimes : rawRepeatedWriterNovelTimes w N start K with
+  | nil => rfl
+  | cons k rest =>
+      exfalso
+      have hkMem : k ∈ rawRepeatedWriterNovelTimes w N start K := by
+        rw [htimes]
+        exact List.mem_cons_self
+      have hkData := mem_rawRepeatedWriterNovelTimes_iff.mp hkMem
+      have hkFirst := rawProductiveAt_first_of_no_self_prefix
+        hN hkData.1 havoid hkData.2.1
+      exact hkData.2.2.1 hkFirst
+
+/-- **Sharp merge-only state bound.**
+
+Any finite raw prefix with no productive self-pivot has at most `N+1`
+distinct restricted tongue vectors: the initial vector and at most one first
+write per physical switch.  This improves the port-count `3*N` growth bound
+to the switch-count relevant to the requested state law. -/
+theorem distinct_samples_le_N_add_one_without_self
+    {w : Wiring} {N K : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    (start : Nat × Tongues)
+    (havoid : ∀ j, j < K → RawProductiveAt w N start j →
+      ¬ RawTrainCurveSelfAt w start j)
+    (times : List Nat)
+    (htimes : ∀ k, k ∈ times → k ≤ K)
+    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
+    times.length ≤ N + 1 := by
+  have hempty := rawRepeatedWriterNovelTimes_eq_nil_of_no_self
+    hN start havoid
+  have hbudget :
+      (rawRepeatedWriterNovelTimes w N start K).length ≤ 0 := by
+    rw [hempty]
+    simp
+  simpa using distinct_samples_le_of_repeated_writer_novelty
+    w N hN start K 0 hbudget times htimes hnd
+
 end GeneralN
