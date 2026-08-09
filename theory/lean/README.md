@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-One hundred and forty-three libraries, all self-contained (no
+One hundred and forty-eight libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -29,6 +29,17 @@ five below, then the satellites:
   every periodic tail.  The still-open step is to prove that the next
   letter must return to the preceding pair, rather than introduce a
   third writer.
+
+* `LobePartnerBounce.lean`, `LobeToggle.lean`, and
+  `LobeVariationVisit.lean` — **an occupied lobe is a forced parity
+  counter.**  Entering its mouth partner forces a two-step bounce
+  `e (k+2) = bar (e k)` and toggles the lobe register exactly; conversely,
+  every change of a persistent occupied lobe has such a partner visit.
+* `TwoReflectorEdgeTrap.lean` and `TwoReflectorFiniteTrap.lean` — **two
+  persistent lobe reflectors facing the endpoints of one occupied support
+  edge form an exact four-step trap.**  The endpoint entries repeat every
+  four steps and all entries stay in the resulting six-slot alphabet,
+  both indefinitely and up to a finite occupancy horizon.
 
 * `LobeDichotomy.lean` — **every cycle cell is a Gray flipper or
   foreign-valued.**  A slot can only be delivered by reading its

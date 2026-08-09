@@ -36,7 +36,7 @@ theorem two_reflector_edge_start_period_until
       have hqk : k ≤ q := by dsimp [q]; omega
       have hqJ : q ≤ J := by dsimp [q]; omega
       have hq2J : q+2 ≤ J := by dsimp [q]; omega
-      have hstart : e q = x := ih (by dsimp [q]; omega)
+      have hstart : e q = x := ih (by omega)
       have hblock := two_reflector_edge_one_block
         m e r0 hrun (k := q) (x := x) (a := a) (b := b)
         hstart haLobe haPartner (haOcc q hqk hqJ)
@@ -96,7 +96,9 @@ theorem two_reflector_edge_entries_until
       m e r0 hrun haLobe haCurrent (haOcc q hqk hqJ)
     have hidx : j = q+1 := by dsimp [q] at *; omega
     rw [hidx]
-    exact hnext
+    rcases hnext with ha | ha
+    · exact Or.inl ha
+    · exact Or.inr (Or.inl ha)
   · right; left
     have hq2J : q+2 ≤ J := by dsimp [q] at *; omega
     have hbounce := occupied_lobe_partner_bounce

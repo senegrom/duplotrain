@@ -162,7 +162,9 @@ theorem two_reflector_edge_entries
   · right; right
     have hidx : j = k + 4*n + 1 := by omega
     rw [hidx]
-    exact hblock.2.1
+    rcases hblock.2.1 with ha | ha
+    · exact Or.inl ha
+    · exact Or.inr (Or.inl ha)
   · right; left
     have hidx : j = k + 4*n + 2 := by omega
     rw [hidx]
