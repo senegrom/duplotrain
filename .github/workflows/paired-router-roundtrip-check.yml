@@ -1,0 +1,37 @@
+name: Paired router roundtrip Lean check
+on:
+  push:
+    branches: [agent/linear-bound-current]
+    paths:
+      - theory/lean/ExternalLobeRoundtrip.lean
+      - theory/lean/ExternalLobeReflectionCore.lean
+      - theory/lean/PairedRouterRoundtrip.lean
+      - .github/workflows/paired-router-roundtrip-check.yml
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register theorem targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "ExternalLobeRoundtrip"
+          [[lean_lib]]
+          name = "ExternalLobeReflectionCore"
+          [[lean_lib]]
+          name = "PairedRouterRoundtrip"
+          EOF
+      - name: Build paired router theorem
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build ExternalLobeRoundtrip ExternalLobeReflectionCore PairedRouterRoundtrip
