@@ -483,6 +483,29 @@ For an extracted `TrainFreeCurveShrinkHistory`,
 that history uniformly from raw trajectories—and charging self-pivots before
 later merges—remains open.
 
+**`KoizumiRawExtraction.lean` / `TrackCurveShrinkGlobal.lean` — raw curve
+surgery and its finite budget.**  Every productive `stepN` event is now
+classified as either a self-pivot or strict growth of the selected train
+curve.  Nonproductive live steps preserve that curve exactly.  Consequently,
+any finite live prefix in which all productive pivots are non-self contains at
+most `3*N` productive pivots.  This is unconditional general-`N` progress, but
+does not yet control self-pivot epochs.
+
+**`RepeatedNoveltyDecomposition.lean` / `SharpStateLawAssembly.lean` — the
+raw sharp residual.**  A globally novel repeated writer has a last-writer
+frame and an interior rerouter; choosing a changed coordinate yields a fresh
+or interlacing rerouting frame with immutable stem successors.  The exact open
+known-edge statement is `KnownEdgeFourRepeatedWriterNovelty`: five such novel
+closing frames cannot coexist.  That proposition implies the public `N+6`
+`StateLaw`, but it is not asserted as proved.
+
+**`TripleInterlacementObstruction.lean` — cyclic-minimal crossing
+obstruction.**  In an irreflexive physical wiring, a certified cyclic-minimal
+endpoint-empty `ABCABC` restoration pattern forces either a lobe or an earlier
+complete-state replay.  The theorem is compiled and unconditional under its
+explicit recurrence/minimality hypotheses.  Extracting those certificates
+from every finite raw novelty history is still the global gap.
+
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single
 train on any `N`-switch lazy-point layout ever sees at most `N + 6`

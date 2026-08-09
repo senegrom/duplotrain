@@ -6,15 +6,16 @@ import VectorCount
 
 This file states the actual claim about trains, tracks and switches.
 **`StateLaw` is OPEN — its specific `N + 6` bound is not proved.**
-What is now proved is the unconditional general linear bound `30*N+3`
-(`state_law_linear_thirty` in `TrackQuantitative.lean`), as well as the elementary
+What is now proved is the unconditional general linear bound `26*N+3`
+(`state_law_linear_twenty_six` in `TrackQuantitativeTight.lean`), as well as the elementary
 `2 ^ N` bound (`state_law_two_pow` below).  The coefficient-one improvement
-from `30*N+3` to `N+O(1)` is the remaining problem.
+from `26*N+3` to `N+O(1)` is the remaining problem.
 
 The direct physical-track route in `TrackTrace`, `TrackLobe`, `TrackNormalForm`,
-`TrackTheta`, `TrackGlobalRepair`, and `TrackQuantitative` closes the global
+`TrackTheta`, `TrackGlobalRepair`, `TrackQuantitative`, and
+`TrackQuantitativeTight` close the global
 two-component assembly, retains explicit lasso lengths, and proves the final
-`30*N+3` tongue-vector count.  `StateLaw` stays explicitly open because it asks
+`26*N+3` tongue-vector count.  `StateLaw` stays explicitly open because it asks
 for the much sharper `N+6` count.
 
 ## How to read the statement
