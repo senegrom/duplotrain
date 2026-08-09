@@ -381,6 +381,10 @@ identity-reflector case, or flip-reflector runway case.
 * `cyclic_minimal_stable_blocker_lobe_or_recurrent_six_chip_nest`: cyclic
   restoration-frame descent eliminates the wraparound blocker; its only
   non-lobe residue is a strict six-chip nest with a fresh third root.
+* `strictly_nested_repeated_writer_novel_openings_le_switches`: every
+  repeated-writer novel opening in one strict nested restoration family is
+  charged injectively to a physical switch, giving a coefficient-one bound
+  for that branch.
 * `collapsed_geometry_recurrent_snapshots_four`: under the recurrent closed
   component certificate, both collapsed visible-chip geometries have at most
   four snapshots.
