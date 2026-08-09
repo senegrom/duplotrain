@@ -47,6 +47,12 @@ private theorem loaded_treeFifth_mul (x y : Nat) :
   unfold treeFifth fourth
   simp only [Nat.mul_assoc, Nat.mul_left_comm, Nat.mul_comm]
 
+private theorem loaded_treeFifth_mono {x y : Nat} (h : x ≤ y) :
+    treeFifth x ≤ treeFifth y := by
+  have h4 := fourth_mono h
+  unfold treeFifth
+  exact Nat.mul_le_mul h4 h
+
 private theorem loaded_treeFifth_two_pow (a : Nat) :
     treeFifth (2^a) = 2^(a+a+a+a+a) := by
   unfold treeFifth fourth
@@ -177,7 +183,7 @@ theorem three_fifths_of_loaded_profile
     (hload : ∀ p ∈ profile, p.2 ≤ 2)
     (hcellBudget : 2*free + loadedTreeCells profile ≤ C) :
     treeFifth S ≤ 2^(3*C) := by
-  have hmono := treeFifth_mono hcount
+  have hmono := loaded_treeFifth_mono hcount
   have hcap := loadedTreeCapacity_with_free_fifth
     profile free hmin hload
   have hbudget :
