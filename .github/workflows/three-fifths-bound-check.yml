@@ -18,6 +18,7 @@ on:
       - theory/lean/AutomaticLoadedTwoThirds.lean
       - theory/lean/TwoThirdsAggregation.lean
       - theory/lean/CanonicalLoadedAssignment.lean
+      - theory/lean/CanonicalLoadedCover.lean
       - .github/workflows/three-fifths-bound-check.yml
   workflow_dispatch:
 jobs:
@@ -68,8 +69,10 @@ jobs:
           name = "TwoThirdsAggregation"
           [[lean_lib]]
           name = "CanonicalLoadedAssignment"
+          [[lean_lib]]
+          name = "CanonicalLoadedCover"
           EOF
       - name: Build improved component bounds
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TreeLobeLoadThreeFifths TreeLobeNotFullTwoThirds LobePartnerBounce LobeToggle TwoReflectorEdgeTrap TwoReflectorFiniteTrap LobeVariationVisit FullyLoadedTreeImpossible TreeLobeLoadBound LoadedTreeGroupsTwoThirds LoadedTreeGroupBudget LoadedTreeGroupsWithFreeTwoThirds AutomaticLoadedTwoThirds TwoThirdsAggregation CanonicalLoadedAssignment
+          lake build TreeLobeLoadThreeFifths TreeLobeNotFullTwoThirds LobePartnerBounce LobeToggle TwoReflectorEdgeTrap TwoReflectorFiniteTrap LobeVariationVisit FullyLoadedTreeImpossible TreeLobeLoadBound LoadedTreeGroupsTwoThirds LoadedTreeGroupBudget LoadedTreeGroupsWithFreeTwoThirds AutomaticLoadedTwoThirds TwoThirdsAggregation CanonicalLoadedAssignment CanonicalLoadedCover
