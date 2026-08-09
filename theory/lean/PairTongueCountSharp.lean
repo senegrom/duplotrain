@@ -46,7 +46,7 @@ theorem ManufacturedReflector.traversal_then_lasso_distinct_le_succ
   let outgoingVector := VectorCount.restrict N outgoing
   let tailHistory := hlocal.tongueHistory N
   let tailReduced := tailHistory.erase outgoingVector
-  let history := incomingVector :: tailReduced
+  let history := [incomingVector, outgoingVector] ++ tailReduced
   have hrun : stepN w travel (g, state) = some (e, outgoing) := by
     dsimp [travel, outgoing]
     exact (A.toSupported.run state hpaths).1
@@ -57,25 +57,17 @@ theorem ManufacturedReflector.traversal_then_lasso_distinct_le_succ
       dsimp [outgoingVector]
       simp [restrictedTonguesAt, tonguesAt, stepN]
     rw [← hzero]
-    simpa [tailHistory] using hm
+    simpa [tailHistory, outgoing] using hm
   have hmem : ∀ k ∈ times,
       restrictedTonguesAt w N (g, state) k ∈ history := by
     intro k hk
     by_cases hprefix : k ≤ travel
     · have hphase := A.travel_two_phase_tongues state hpaths hprefix
       rcases hphase with hin | hout
-      · left
-        simpa [restrictedTonguesAt, hin, incomingVector]
-      · by_cases heq : incomingVector = outgoingVector
-        · left
-          simpa [restrictedTonguesAt, hout, incomingVector,
-            outgoingVector, outgoing, heq]
-        · right
-          have houtReduced : outgoingVector ∈ tailReduced := by
-            dsimp [tailReduced]
-            exact (List.mem_erase_of_ne heq.symm).mpr houtTail
-          simpa [restrictedTonguesAt, hout, outgoingVector, outgoing]
-            using houtReduced
+      · dsimp [history]
+        simp [restrictedTonguesAt, hin, incomingVector]
+      · dsimp [history]
+        simp [restrictedTonguesAt, hout, outgoingVector, outgoing]
     · let d := k - travel
       have hkEq : k = travel + d := by
         dsimp [d]
@@ -93,6 +85,9 @@ theorem ManufacturedReflector.traversal_then_lasso_distinct_le_succ
         | some finish => exact ⟨finish, rfl⟩
       have hshift := tonguesAt_add_of_reaches hrun hlocalLive
       have hm := hlocal.mem_tongueHistory (N := N) (k := d)
+      have hm' : restrictedTonguesAt w N (e, outgoing) d ∈
+          tailHistory := by
+        simpa [tailHistory, outgoing] using hm
       have heq : restrictedTonguesAt w N (g, state) k =
           restrictedTonguesAt w N (e, outgoing) d := by
         unfold restrictedTonguesAt
@@ -101,18 +96,11 @@ theorem ManufacturedReflector.traversal_then_lasso_distinct_le_succ
       rw [heq]
       by_cases houtEq :
           restrictedTonguesAt w N (e, outgoing) d = outgoingVector
-      · by_cases hio : incomingVector = outgoingVector
-        · left
-          simpa [houtEq, hio]
-        · right
-          dsimp [tailReduced]
-          exact (List.mem_erase_of_ne (by
-            intro hbad
-            apply hio
-            exact hbad.symm)).mpr (by simpa [houtEq] using hm)
-      · right
+      · dsimp [history]
+        simp [houtEq]
+      · apply List.mem_append_right [incomingVector, outgoingVector]
         dsimp [tailReduced]
-        exact (List.mem_erase_of_ne houtEq).mpr hm
+        exact (List.mem_erase_of_ne houtEq).mpr hm'
   have hcover := pairsharp_zero_novelty_cover_of_mem times history hmem
   have hcountRaw := noveltyCoverOn_distinct_count hcover hnd
   have hcount : times.length ≤ history.length := by
@@ -128,7 +116,7 @@ theorem ManufacturedReflector.traversal_then_lasso_distinct_le_succ
     omega
   have hhistoryLen : history.length ≤ cap + 1 := by
     dsimp [history]
-    simp only [List.length_cons]
+    simp only [List.length_append, List.length_cons, List.length_nil]
     omega
   exact Nat.le_trans hcount hhistoryLen
 
@@ -152,6 +140,9 @@ theorem manufactured_pair_tongue_vector_count_twelve_succ_three
       (restrictedTonguesAt w N (g, state))).Nodup) :
     times.length ≤ 12 * N + 3 := by
   classical
+  have hnd' : (times.map (fun k =>
+      VectorCount.restrict N (tonguesAt w (g, state) k))).Nodup := by
+    exact hnd
   cases A with
   | stay SA =>
       cases B with
@@ -159,8 +150,7 @@ theorem manufactured_pair_tongue_vector_count_twelve_succ_three
           have hlocal := manufactured_pair_within_eight_mul_switches_of_avoids
             hN (.stay SA) (.stay SB) state hA hB
               (by trivial) (by trivial)
-          have hc := hlocal.tongue_vector_count times hlive (by
-            simpa [restrictedTonguesAt] using hnd)
+          have hc := hlocal.tongue_vector_count times hlive hnd'
           omega
       | flip FB =>
           change PathGrooves
@@ -171,8 +161,7 @@ theorem manufactured_pair_tongue_vector_count_twelve_succ_three
           · have hlocal := manufactured_pair_within_eight_mul_switches_of_avoids
               hN (.stay SA) (.flip FB) state hA hB
                 (by trivial) hBA
-            have hc := hlocal.tongue_vector_count times hlive (by
-              simpa [restrictedTonguesAt] using hnd)
+            have hc := hlocal.tongue_vector_count times hlive hnd'
             omega
           · have hcontact := contact_of_not_avoids_flip hBA
             have hlocal := manufactured_flip_then_stay_within_eight
@@ -183,8 +172,8 @@ theorem manufactured_pair_tongue_vector_count_twelve_succ_three
               simpa [ManufacturedReflector.toSupported,
                 ManufacturedStayReflector.toSupported, LocalAction.apply]
                 using hlocal
-            have hc := (ManufacturedReflector.stay SA).
-              traversal_then_lasso_distinct_le_succ state hA hlocal'
+            have hc := ManufacturedReflector.traversal_then_lasso_distinct_le_succ
+              (ManufacturedReflector.stay SA) state hA hlocal'
                 times hlive hnd
             omega
   | flip FA =>
@@ -198,14 +187,12 @@ theorem manufactured_pair_tongue_vector_count_twelve_succ_three
           · have hlocal := manufactured_pair_within_eight_mul_switches_of_avoids
               hN (.flip FA) (.stay SB) state hA hB
                 hAB (by trivial)
-            have hc := hlocal.tongue_vector_count times hlive (by
-              simpa [restrictedTonguesAt] using hnd)
+            have hc := hlocal.tongue_vector_count times hlive hnd'
             omega
           · have hcontact := contact_of_not_avoids_flip hAB
             have hlocal := manufactured_flip_then_stay_within_eight
               hN FA SB state hA hB hcontact
-            have hc := hlocal.tongue_vector_count times hlive (by
-              simpa [restrictedTonguesAt] using hnd)
+            have hc := hlocal.tongue_vector_count times hlive hnd'
             omega
       | flip FB =>
           change PathGrooves [FA.runway, FA.candy] state at hA
@@ -216,8 +203,7 @@ theorem manufactured_pair_tongue_vector_count_twelve_succ_three
                 [FA.runway, FA.candy]
             · have hlocal := manufactured_pair_within_eight_mul_switches_of_avoids
                 hN (.flip FA) (.flip FB) state hA hB hAB hBA
-              have hc := hlocal.tongue_vector_count times hlive (by
-                simpa [restrictedTonguesAt] using hnd)
+              have hc := hlocal.tongue_vector_count times hlive hnd'
               omega
             · have hcontactBA := contact_of_not_avoids_flip hBA
               have hArun := (FA.toSupported.run state hA)
@@ -236,8 +222,8 @@ theorem manufactured_pair_tongue_vector_count_twelve_succ_three
                 simpa [ManufacturedReflector.toSupported,
                   ManufacturedFlipReflector.toSupported, LocalAction.apply]
                   using hlocal
-              have hc := (ManufacturedReflector.flip FA).
-                traversal_then_lasso_distinct_le_succ state hA hlocal'
+              have hc := ManufacturedReflector.traversal_then_lasso_distinct_le_succ
+                (ManufacturedReflector.flip FA) state hA hlocal'
                   times hlive hnd
               omega
           · have hcontactAB := contact_of_not_avoids_flip hAB
@@ -245,14 +231,12 @@ theorem manufactured_pair_tongue_vector_count_twelve_succ_three
                 [FA.runway, FA.candy]
             · have hlocal := manufactured_one_sided_theta_within_twelve_succ_two
                 hN FA FB state hA hB hcontactAB hBA
-              have hc := hlocal.tongue_vector_count times hlive (by
-                simpa [restrictedTonguesAt] using hnd)
+              have hc := hlocal.tongue_vector_count times hlive hnd'
               omega
             · have hcontactBA := contact_of_not_avoids_flip hBA
               have hlocal := manufactured_two_sided_theta_within_twelve_succ_two
                 hN FA FB state hA hB hcontactAB hcontactBA
-              have hc := hlocal.tongue_vector_count times hlive (by
-                simpa [restrictedTonguesAt] using hnd)
+              have hc := hlocal.tongue_vector_count times hlive hnd'
               omega
 
 end GeneralN
