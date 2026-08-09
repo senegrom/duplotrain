@@ -253,8 +253,20 @@ reflector, with support foreign to the discarded switch.  Consequently
 identity-reflector branch: a runway splice is a paired-reflector Gray period,
 while a splice at the self-linked core closes after two lobe traversals.
 This is still not the full periodicity theorem: the protected old **flip**
-reflector branch remains open because the new lobe action can touch either
-its runway or candy support.
+reflector branch initially remains because the new lobe action can touch
+either its runway or candy support.  The next layer now closes the whole
+runway half.  `ManufacturedFlipReflector.suffix_after_runway_passage`
+normalizes either candy orientation and packages the strict runway suffix as
+an opposite manufactured flip reflector.  The generic
+`manufactured_flip_arbitrary_lobe_theta_half`,
+`arbitrary_lobe_reverse_trace`, and
+`manufactured_flip_arbitrary_lobe_period` prove the required theta period
+without assuming the spliced candy is switch-simple.  Therefore
+`manufactured_flip_runway_splice_periodic` closes both the disjoint-action
+and intersecting-action runway cases, while
+`ChangedForwardMerge.eventuallyPeriodic_or_flip_candy` and
+`nonrunway_oriented_branch_entry_is_candy` reduce the sole remaining case to
+an explicitly oriented passage strictly inside the old candy.
 The capstone `repair_or_facing_diversion` therefore completes a damaged
 reflector all the way to the opposite boundary unless that one explicit
 facing-first diversion occurs.  The endpoint-strengthened
@@ -263,8 +275,9 @@ unmatched tail between the old-route and fresh-exploration endpoints, rather
 than only their prefix-comparability.  The global capstone lifts the repaired
 journey back to the original train start while retaining the forward-fault
 certificate.  All new reductions are unconditional and general-`N`; the open
-global track case is now the state-changing forward splice into an old flip
-reflector, not the former facing-first diversion or identity-reflector case.
+global track case is now the state-changing forward splice strictly inside
+an old flip reflector's candy, not the former facing-first diversion,
+identity-reflector case, or flip-reflector runway case.
 
 * `first_revisit_of_long_run`: every live `N+1`-passage run has a first
   revisited switch after a switch-simple prefix of length at most `N`.
