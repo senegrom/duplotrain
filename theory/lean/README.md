@@ -46,6 +46,11 @@ five below, then the satellites:
   gives a complete eight-step machine-state recurrence, and
   `two_reflector_edge_snapshots_four` proves that every later family of
   distinct register snapshots has cardinality at most four.
+* `StationaryTail.lean` — **a recurrent tail whose complete cell-level routing
+  projection has stopped changing has at most four register snapshots.**
+  `stationary_recurrent_tail_four_complete` derives a primitive cell period
+  internally and handles both the forever-quiet and productive cases; callers
+  need only exact entry/register recurrence and projection stationarity.
 
 * `LobeDichotomy.lean` — **every cycle cell is a Gray flipper or
   foreign-valued.**  A slot can only be delivered by reading its
@@ -358,8 +363,9 @@ identity-reflector case, or flip-reflector runway case.
   four-corner Gray composition.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
-now proves an unconditional general linear theorem.  `state_law_linear_thirty` says
-that any one-train run on an `N`-switch wiring visits at most `30*N+3`
+now proves an unconditional general linear theorem.
+`TrackQuantitativeTight.state_law_linear_twenty_six` says that any one-train
+run on an `N`-switch wiring visits at most `26*N+3`
 pairwise-distinct tongue vectors.  The theorem is stated over raw
 `Wiring`/`stepN`, with no small-`N` enumeration and no conditional hypothesis.
 The repository does **not** claim the sharper `N+6` state law.
@@ -371,11 +377,14 @@ such a lasso admits at most `cap` distinct sampled configurations or tongue
 vectors.  The first-revisit proof now has a quantitative sibling:
 `first_activated_quantitative_outcome` gives either a lasso of size `3*N` or
 an activated manufactured reflector reached within `2*N+1` steps.  Moreover
-every manufactured reflector has travel at most `2*N`, a disjoint pair's
-explicit four-corner period fits within `8*N`, all intersecting and damaged
-support branches fit within `30*N`, and a live entry-free run has a lasso
-within `30*N+3`.  `state_law_linear_thirty` then handles both live long runs and
-runs that fall off early to obtain the same `30*N+3` vector bound.
+every manufactured reflector has travel at most `2*N`, and a disjoint pair's
+explicit four-corner period fits within `8*N`.
+`TrackQuantitativeTight.lean` exports the exact runway-prefix and
+suffix-travel identities: shortening at a runway contact removes twice the
+discarded prefix plus the contacted passage.  This tightens changed flip
+merges to `18*N`, protected repair to `22*N`, and an entry-free global
+lasso to `26*N+3`.  `state_law_linear_twenty_six` handles both live long
+runs and runs that fall off early to obtain the same `26*N+3` vector bound.
 
 **`EchoMachine.lean` — the abstracted cycle dynamics** (T9 in
 ../lazy-point-theory.md): any wiring's trailing structure compiles to a
@@ -424,9 +433,10 @@ train on any `N`-switch lazy-point layout ever sees at most `N + 6`
 distinct tongue vectors — directly over `Wiring`/`stepN`, decodable
 piece by piece as track, switches and the lazy-point rule.  **It is
 OPEN: nothing in this repository proves that coefficient-one bound.**
-`TrackQuantitative.state_law_linear_thirty` proves the identical raw-track
-statement with `30*N+3` in place of `N+6`; `state_law_two_pow` is the older
-elementary pigeonhole ceiling.  The remaining problem is improving `30*N+3` to
+`TrackQuantitativeTight.state_law_linear_twenty_six` proves the identical
+raw-track statement with `26*N+3` in place of `N+6`;
+`state_law_two_pow` is the older elementary pigeonhole ceiling.  The
+remaining problem is improving `26*N+3` to
 `N+O(1)` (conjecturally `N+4`).
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real

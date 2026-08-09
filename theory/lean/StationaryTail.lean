@@ -613,4 +613,97 @@ theorem stationary_recurrent_tail_four_unconditional
     (support_fixed_of_register_period m e r0 hrun hr0 hq hregperiod)
     hanchor cells ks hks hnd
 
+/-- **Complete stationary recurrent-tail theorem.**  No productive anchor is
+required.  A quiet tail has one register snapshot.  Otherwise, shift every
+sample by a common multiple of the recurrence period beyond any productive
+time and apply `stationary_recurrent_tail_four_unconditional` there. -/
+theorem stationary_recurrent_tail_four_complete
+    (hrun : IsRun m e r0)
+    (hr0 : ∀ c, m.cellOf (r0 c) = c) {K q : Nat}
+    (hq : 0 < q)
+    (hentryperiod : ∀ t, K ≤ t → e (t+q) = e t)
+    (hregperiod : ∀ t c, K ≤ t →
+      reg m e r0 (t+q) c = reg m e r0 t c)
+    (hstationary : ∀ t, K ≤ t → ∀ c,
+      nextCell m e r0 (t+1) c = nextCell m e r0 t c)
+    (cells ks : List Nat)
+    (hks : ∀ j ∈ ks, K ≤ j)
+    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
+    ks.length ≤ 4 := by
+  by_cases hactive : ∃ t, K ≤ t ∧ ProductiveStep m e r0 t
+  · obtain ⟨t, hKt, hprod⟩ := hactive
+    let D := (t+1)*q
+    let shifted := ks.map (fun j => j+D)
+    have hD : t+1 ≤ D := by
+      have hmul := Nat.mul_le_mul_left (t+1) (show 1 ≤ q by omega)
+      simpa [D] using hmul
+    have hregmul : ∀ n s c, K ≤ s →
+        reg m e r0 (s+n*q) c = reg m e r0 s c := by
+      intro n
+      induction n with
+      | zero => intro s c _; simp
+      | succ n ih =>
+          intro s c hs
+          have harith : s+(n+1)*q = (s+n*q)+q := by
+            rw [Nat.succ_mul]
+            omega
+          calc
+            reg m e r0 (s+(n+1)*q) c =
+                reg m e r0 ((s+n*q)+q) c := by rw [harith]
+            _ = reg m e r0 (s+n*q) c :=
+              hregperiod (s+n*q) c (by omega)
+            _ = reg m e r0 s c := ih s c hs
+    have hsnapshift : ∀ j, K ≤ j →
+        snap m e r0 cells (j+D) = snap m e r0 cells j := by
+      intro j hj
+      unfold snap
+      apply List.map_congr_left
+      intro c _
+      simpa [D] using hregmul (t+1) j c hj
+    have hshiftedTimes : ∀ j ∈ shifted, t ≤ j := by
+      intro j hj
+      obtain ⟨old, _hold, rfl⟩ := List.mem_map.mp hj
+      dsimp [D]
+      omega
+    have hshiftedMap : shifted.map (snap m e r0 cells) =
+        ks.map (snap m e r0 cells) := by
+      dsimp [shifted]
+      rw [List.map_map]
+      apply List.map_congr_left
+      intro j hj
+      dsimp [Function.comp]
+      exact hsnapshift j (hks j hj)
+    have hshiftedNodup :
+        (shifted.map (snap m e r0 cells)).Nodup := by
+      rw [hshiftedMap]
+      exact hnd
+    have htail := stationary_recurrent_tail_four_unconditional
+      m e r0 hrun hr0 hq
+      (fun s hs => hentryperiod s (by omega))
+      (fun s c hs => hregperiod s c (by omega))
+      (fun s hs c => hstationary s (by omega) c)
+      hprod cells shifted hshiftedTimes hshiftedNodup
+    simpa [shifted] using htail
+  · have hquiet : ∀ t, K ≤ t → ¬ ProductiveStep m e r0 t := by
+      intro t ht hp
+      exact hactive ⟨t, ht, hp⟩
+    let only := [snap m e r0 cells K]
+    have hcover : ∀ j, K ≤ j → snap m e r0 cells j ∈ only := by
+      intro j hj
+      obtain ⟨d, rfl⟩ : ∃ d, j = K+d := ⟨j-K, by omega⟩
+      have hsnap : snap m e r0 cells (K+d) = snap m e r0 cells K := by
+        unfold snap
+        apply List.map_congr_left
+        intro c _
+        exact quiet_reg m e r0 d
+          (fun s hs _ => hquiet s hs) c
+      simp [only, hsnap]
+    have hsub : ∀ v ∈ ks.map (snap m e r0 cells), v ∈ only := by
+      intro v hv
+      obtain ⟨j, hj, rfl⟩ := List.mem_map.mp hv
+      exact hcover j (hks j hj)
+    have hle := nodup_subset_length_stationary hnd hsub
+    have hone : ks.length ≤ 1 := by simpa [only] using hle
+    omega
+
 end Echo
