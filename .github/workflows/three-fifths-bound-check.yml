@@ -1,9 +1,10 @@
-name: Three-fifths loaded-component Lean check
+name: Improved component bounds Lean check
 on:
   push:
     branches: [agent/linear-bound-current]
     paths:
       - theory/lean/TreeLobeLoadThreeFifths.lean
+      - theory/lean/TreeLobeNotFullTwoThirds.lean
       - theory/lean/LobePartnerBounce.lean
       - theory/lean/LobeToggle.lean
       - .github/workflows/three-fifths-bound-check.yml
@@ -29,11 +30,13 @@ jobs:
           [[lean_lib]]
           name = "TreeLobeLoadThreeFifths"
           [[lean_lib]]
+          name = "TreeLobeNotFullTwoThirds"
+          [[lean_lib]]
           name = "LobePartnerBounce"
           [[lean_lib]]
           name = "LobeToggle"
           EOF
-      - name: Build three-fifths theorem
+      - name: Build improved component bounds
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TreeLobeLoadThreeFifths LobePartnerBounce LobeToggle
+          lake build TreeLobeLoadThreeFifths TreeLobeNotFullTwoThirds LobePartnerBounce LobeToggle
