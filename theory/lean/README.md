@@ -364,7 +364,7 @@ identity-reflector case, or flip-reflector runway case.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
 now proves an unconditional general linear theorem.
-`TrackQuantitativeTight.state_law_linear_twenty_six` says that any one-train
+`GeneralN.state_law_linear_twenty_six` says that any one-train
 run on an `N`-switch wiring visits at most `26*N+3`
 pairwise-distinct tongue vectors.  The theorem is stated over raw
 `Wiring`/`stepN`, with no small-`N` enumeration and no conditional hypothesis.
@@ -433,7 +433,7 @@ train on any `N`-switch lazy-point layout ever sees at most `N + 6`
 distinct tongue vectors — directly over `Wiring`/`stepN`, decodable
 piece by piece as track, switches and the lazy-point rule.  **It is
 OPEN: nothing in this repository proves that coefficient-one bound.**
-`TrackQuantitativeTight.state_law_linear_twenty_six` proves the identical
+`GeneralN.state_law_linear_twenty_six` proves the identical
 raw-track statement with `26*N+3` in place of `N+6`;
 `state_law_two_pow` is the older elementary pigeonhole ceiling.  The
 remaining problem is improving `26*N+3` to

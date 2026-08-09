@@ -62,8 +62,9 @@ def StateLaw : Prop :=
       ks.length ≤ N + 6
 
 /-- The elementary exponential bound on exactly the same statement, **proved**.
-`TrackQuantitative.state_law_linear_thirty` supersedes it asymptotically with
-`30*N+3`; the open gap is now `30*N+3` versus `N+6`. -/
+`GeneralN.state_law_linear_twenty_six` supersedes it
+asymptotically with `26*N+3`; the open gap is now `26*N+3` versus
+`N+6`. -/
 theorem state_law_two_pow (w : Wiring) (N : Nat)
     (_hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (c0 : Nat × Tongues) (ks : List Nat)

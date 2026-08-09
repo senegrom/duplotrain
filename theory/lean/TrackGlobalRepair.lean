@@ -2546,7 +2546,7 @@ theorem ManufacturedStayReflector.suffix_after_runway_passage
 flip reflector.  The candy is oriented according to the current tongue, so
 the shortened reflector is immediately usable in `state`.  Its support is
 foreign to the discarded runway switch. -/
-theorem ManufacturedFlipReflector.suffix_after_runway_passage
+theorem ManufacturedFlipReflector.suffix_after_runway_passage_with_travel
     {w : Wiring} {g e : Nat}
     (R : ManufacturedFlipReflector w e g)
     (state : Tongues)
@@ -2559,7 +2559,9 @@ theorem ManufacturedFlipReflector.suffix_after_runway_passage
       C.actionSwitch = R.actionSwitch ∧
       p / 3 ≠ C.actionSwitch ∧
       PathGrooves C.toSupported.paths state ∧
-      (LocalAction.flip (p / 3)).Avoids C.toSupported.paths := by
+      (LocalAction.flip (p / 3)).Avoids C.toSupported.paths ∧
+      C.toSupported.travel + 2 * (before.length + 1) =
+        R.toSupported.travel := by
   change PathGrooves [R.runway, R.candy] state at hpaths
   have hrunwayGrooved := (pathGrooves_pair.mp hpaths).1
   have hCandyGrooved := (pathGrooves_pair.mp hpaths).2
@@ -2682,12 +2684,19 @@ theorem ManufacturedFlipReflector.suffix_after_runway_passage
           arms_ne := R.arms_ne
           entryEdge := houtside
         }
-        refine ⟨C, rfl, hdiscardedOldForeign, ?_, ?_⟩
+        refine ⟨C, rfl, hdiscardedOldForeign, ?_, ?_, ?_⟩
         · change PathGrooves [after, R.candy] state
           exact pathGrooves_pair.mpr ⟨hafterGrooved, hCandyGrooved⟩
         · change (LocalAction.flip (p / 3)).Avoids
             [after, R.candy]
           exact havoid
+        · change
+            (2 * after.length + R.candy.length + 2) +
+                2 * (before.length + 1) =
+              2 * R.runway.length + R.candy.length + 2
+          rw [hsplit]
+          simp
+          omega
       · have hreverseGrooved :
             PassagesGrooved state (reversePassages R.candy) := by
           intro passage hpassage
@@ -2771,7 +2780,7 @@ theorem ManufacturedFlipReflector.suffix_after_runway_passage
           arms_ne := Ne.symm R.arms_ne
           entryEdge := houtside
         }
-        refine ⟨C, rfl, hdiscardedOldForeign, ?_, ?_⟩
+        refine ⟨C, rfl, hdiscardedOldForeign, ?_, ?_, ?_⟩
         · change PathGrooves
             [after, reversePassages R.candy] state
           exact pathGrooves_pair.mpr
@@ -2779,6 +2788,34 @@ theorem ManufacturedFlipReflector.suffix_after_runway_passage
         · change (LocalAction.flip (p / 3)).Avoids
             [after, reversePassages R.candy]
           exact havoid
+        · change
+            (2 * after.length + (reversePassages R.candy).length + 2) +
+                2 * (before.length + 1) =
+              2 * R.runway.length + R.candy.length + 2
+          rw [reversePassages_length, hsplit]
+          simp
+          omega
+
+/-- Backward-compatible projection of the strengthened runway-suffix
+theorem. -/
+theorem ManufacturedFlipReflector.suffix_after_runway_passage
+    {w : Wiring} {g e : Nat}
+    (R : ManufacturedFlipReflector w e g)
+    (state : Tongues)
+    (hpaths : PathGrooves R.toSupported.paths state)
+    {before : List Passage} {p x : Nat} {after : List Passage}
+    {outside : Nat}
+    (hsplit : R.runway = before ++ (p, x) :: after)
+    (houtside : w.link x = some outside) :
+    ∃ C : ManufacturedFlipReflector w outside x,
+      C.actionSwitch = R.actionSwitch ∧
+      p / 3 ≠ C.actionSwitch ∧
+      PathGrooves C.toSupported.paths state ∧
+      (LocalAction.flip (p / 3)).Avoids C.toSupported.paths := by
+  rcases R.suffix_after_runway_passage_with_travel state hpaths
+      hsplit houtside with
+    ⟨C, haction, hne, hCpaths, havoid, _htravel⟩
+  exact ⟨C, haction, hne, hCpaths, havoid⟩
 
 /-- A grooved route beginning at the far boundary of an old manufactured
 flip reflector cannot be disrupted by that reflector's flipped action.  At
