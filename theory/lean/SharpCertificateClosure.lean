@@ -396,6 +396,149 @@ theorem ManufacturedReflector.manufacturing_repeatedWriterNovelty_le_one
     hcover hnew hnd
   simpa [postTimes, rawRepeatedWriterPostTimes, start, J] using hcount
 
+/-! ## First-revisit extraction from an arbitrary finite physical prefix -/
+
+/-- A nonsimple finite physical trace already contains the complete activated
+first-revisit normal form; the `N+1` liveness wrapper used elsewhere is not
+needed once the concrete trace is available.  This is the control-flow
+bridge used by raw repeated-writer frame spans. -/
+theorem PhysicalTrace.first_revisit_activated_outcome
+    {w : Wiring} {start finish : Nat × Tongues}
+    {passages : List Passage} {entryEdge : Nat}
+    (htrace : PhysicalTrace w start passages finish)
+    (hnonsimple : ¬ SwitchSimple passages)
+    (hentry : w.link entryEdge = some start.1) :
+    ∃ atRepeat visited,
+      stepN w visited start = some atRepeat ∧
+      (SettlesOnSimpleCycle w atRepeat ∨
+        ∃ (A : ManufacturedReflector w start.1 entryEdge)
+            (state : Tongues) (backSteps : Nat),
+          PathGrooves A.toSupported.paths state ∧
+          A.baseState = start.2 ∧
+          state = A.activatedState ∧
+          stepN w backSteps atRepeat = some (entryEdge, state) ∧
+          (∀ j, j ∉ A.exploration.map passageSwitch →
+            state j = start.2 j)) := by
+  obtain ⟨before, repeated, after, hsplit, hsimple, hrepeatMem⟩ :=
+    first_revisit_split hnonsimple
+  rw [hsplit] at htrace
+  obtain ⟨atRepeat, hbeforeTrace, hafterTrace⟩ :=
+    htrace.split_append
+  obtain ⟨old, hold, hsameSwitch⟩ := List.mem_map.mp hrepeatMem
+  obtain ⟨runway, path, hbeforeSplit⟩ := List.append_of_mem hold
+  rw [hbeforeSplit] at hbeforeTrace
+  obtain ⟨atOld, hrunway, hexcursion⟩ :=
+    hbeforeTrace.split_append
+  rcases old with ⟨p, x⟩
+  rcases repeated with ⟨q, y⟩
+  have hatOldPort : atOld.1 = p := hexcursion.head_arrive.1
+  rcases atOld with ⟨oldPort, u₀⟩
+  simp only at hatOldPort
+  subst oldPort
+  have hatRepeatPort : atRepeat.1 = q := hafterTrace.head_arrive.1
+  rcases atRepeat with ⟨repeatPort, u⟩
+  simp only at hatRepeatPort
+  subst repeatPort
+  obtain ⟨v, hrepeat⟩ := hafterTrace.head_arrive.2
+  have hsimpleBefore : SwitchSimple (runway ++ (p, x) :: path) := by
+    simpa [hbeforeSplit] using hsimple
+  have hswitch : p / 3 = q / 3 := by
+    simpa [passageSwitch] using hsameSwitch
+  have hout := first_revisit_cycle_or_activated_manufactured_reflector w
+    hrunway hexcursion hsimpleBefore hswitch hrepeat hentry
+  refine ⟨(q, u), before.length, ?_, ?_⟩
+  · simpa [hbeforeSplit] using hbeforeTrace.sound
+  · rcases hout with hcycle | hreflector
+    · exact Or.inl hcycle
+    · obtain ⟨A, state, hpaths, hbase, hactivated,
+          hback, hpreserves⟩ := hreflector
+      exact Or.inr ⟨A, state, runway.length + 1,
+        hpaths, hbase, hactivated, hback, hpreserves⟩
+
+/-- Every configuration actually reached from a known-edge start again has
+a concrete incoming physical edge.  At time zero it is the supplied edge;
+after a positive number of steps it is the preceding configuration's exit. -/
+theorem exists_entryEdge_of_reach
+    {w : Wiring} {start reached : Nat × Tongues}
+    {initialEdge k : Nat}
+    (hentry : w.link initialEdge = some start.1)
+    (hreach : stepN w k start = some reached) :
+    ∃ edge, w.link edge = some reached.1 := by
+  cases k with
+  | zero =>
+      have hreached : reached = start := by
+        simpa [stepN] using Option.some.inj hreach.symm
+      subst reached
+      exact ⟨initialEdge, hentry⟩
+  | succ k =>
+      obtain ⟨before, hbefore⟩ := stepN_prefix_some
+        (d := k) (K := k + 1) (by omega) hreach
+      have hsplit := stepN_add w k 1 start
+      rw [hreach, hbefore] at hsplit
+      simp only [Option.bind_some] at hsplit
+      have hone : stepN w 1 before = some reached := hsplit.symm
+      have hstep : step w before = some reached := by
+        simpa [stepN] using hone
+      exact ⟨exitPort before, (step_some_parts hstep).1⟩
+
+/-- The serial branch of five raw repeated novelties now yields an actual
+first-revisit control-flow outcome at the first frame: either a reached
+simple cycle or a fully activated manufactured reflector with its concrete
+incoming edge.  No runway-tail choice is assumed. -/
+theorem five_serial_novelties_first_activated_outcome
+    {w : Wiring} {N initialEdge : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    (hentry : w.link initialEdge = some start.1)
+    {z₀ z₁ z₂ z₃ z₄ : Nat}
+    (H₀ : RawRepeatedWriterNovelAt w N start z₀)
+    (H₁ : RawRepeatedWriterNovelAt w N start z₁)
+    (H₂ : RawRepeatedWriterNovelAt w N start z₂)
+    (H₃ : RawRepeatedWriterNovelAt w N start z₃)
+    (H₄ : RawRepeatedWriterNovelAt w N start z₄)
+    {a₀ q₀ a₁ q₁ a₂ q₂ a₃ q₃ a₄ q₄ : Nat}
+    (F₀ : RawNovelClosingFrame w N start a₀ q₀ z₀)
+    (F₁ : RawNovelClosingFrame w N start a₁ q₁ z₁)
+    (F₂ : RawNovelClosingFrame w N start a₂ q₂ z₂)
+    (F₃ : RawNovelClosingFrame w N start a₃ q₃ z₃)
+    (F₄ : RawNovelClosingFrame w N start a₄ q₄ z₄)
+    (hserial : FiveFrameSerialBreak z₀ a₁ a₂ a₃ a₄) :
+    ∃ (before close : Nat × Tongues) (edge : Nat)
+        (atRepeat : Nat × Tongues) (visited : Nat),
+      stepN w a₀ start = some before ∧
+      stepN w z₀ start = some close ∧
+      w.link edge = some before.1 ∧
+      stepN w visited before = some atRepeat ∧
+      (SettlesOnSimpleCycle w atRepeat ∨
+        ∃ (A : ManufacturedReflector w before.1 edge)
+            (state : Tongues) (backSteps : Nat),
+          PathGrooves A.toSupported.paths state ∧
+          A.baseState = before.2 ∧
+          state = A.activatedState ∧
+          stepN w backSteps atRepeat = some (edge, state) ∧
+          (∀ j, j ∉ A.exploration.map passageSwitch →
+            state j = before.2 j)) := by
+  obtain ⟨before, close, passages, runway, repeated, suffix,
+      hbefore, hclose, _hlength, htrace, hsplit, hsimple,
+      hrepeat⟩ :=
+    five_serial_novelties_force_first_repeated_switch
+      hN H₀ H₁ H₂ H₃ H₄ F₀ F₁ F₂ F₃ F₄ hserial
+  have hnonsimple : ¬ SwitchSimple passages := by
+    intro hallSimple
+    unfold SwitchSimple at hallSimple
+    rw [hsplit] at hallSimple
+    simp only [List.map_append, List.map_cons] at hallSimple
+    have hparts := List.nodup_append.mp hallSimple
+    have hdisjoint := hparts.2.2 (passageSwitch repeated)
+      hrepeat (passageSwitch repeated) (by simp)
+    exact hdisjoint rfl
+  obtain ⟨edge, hedge⟩ := exists_entryEdge_of_reach hentry hbefore
+  obtain ⟨atRepeat, visited, hvisited, houtcome⟩ :=
+    htrace.first_revisit_activated_outcome hnonsimple hedge
+  exact ⟨before, close, edge, atRepeat, visited,
+    hbefore, hclose, hedge, hvisited, houtcome⟩
+
 /-- A later globally novel post-vector differs from every earlier vector. -/
 theorem RawNovelAt.post_ne_earlier
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
@@ -714,6 +857,306 @@ theorem stateLaw_of_earlyChangedForwardDichotomy
   stateLaw_of_knownEdgeFourRepeatedWriterNovelty
     (knownEdgeFourRepeatedWriterNovelty_of_earlyChangedForwardDichotomy
       hcontrol)
+
+/-! ## The changed-forward theorem needs only its actual short lead -/
+
+/-- A changed-forward merge exposes a concrete pre-splice `leadSteps`, no
+longer than the old reflector's macro travel.  Historical coverage is needed
+only through that actual lead, not through every nominal step of
+`A.toSupported.travel`.  Once this shorter prefix is historical, the entire
+future has the same absolute three-vector novelty cover. -/
+theorem ManufacturedReflector.ChangedForwardMerge.exists_short_lead_three_novelty
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {R : ManufacturedFlipReflector w e g}
+    (hmerge : A.ChangedForwardMerge (.flip R)) :
+    ∃ leadSteps, leadSteps ≤ A.toSupported.travel ∧
+      ∀ (N : Nat) (history : List (List Bool)),
+        (∀ j, j ≤ leadSteps →
+          restrictedTonguesAt w N
+            (g, (ManufacturedReflector.flip R).activatedState) j ∈
+              history) →
+        ∀ times : List Nat,
+          NoveltyCoverOn w N
+            (g, (ManufacturedReflector.flip R).activatedState)
+            times history 3 := by
+  obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
+      approach, candy, state, leadSteps, _tailSteps, horiented,
+      hrouteSplit, hOldTail, hApproach, hApproachGrooved,
+      hApproachForeign, _hCandyEq, hentryBranch, _hmouthStem,
+      hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
+      hRpaths, _hCandy, hCandyForeignNew, hLobe, hreach,
+      _hcomplete, hleadLen, _htailLen, happroachLe⟩ :=
+    hmerge.spliced_lobe_reflector
+  have hleadLe : leadSteps ≤ A.toSupported.travel := by
+    rw [hleadLen]
+    exact happroachLe
+  refine ⟨leadSteps, hleadLe, ?_⟩
+  intro N history hleadHistorical times
+  have hentryHistorical : VectorCount.restrict N
+      (flipAt state (mouth / 3)) ∈ history := by
+    have hvector : restrictedTonguesAt w N
+        (g, (ManufacturedReflector.flip R).activatedState)
+        leadSteps =
+        VectorCount.restrict N (flipAt state (mouth / 3)) := by
+      simp [restrictedTonguesAt, tonguesAt, hreach]
+    rw [← hvector]
+    exact hleadHistorical leadSteps (Nat.le_refl _)
+  by_cases hrunway : (entry, mouth) ∈ R.runway
+  · obtain ⟨before, after, hrunwaySplit⟩ :=
+      List.append_of_mem hrunway
+    obtain ⟨C, _hCAction, hEntryOldNe, hCpaths,
+        hNewAvoidsCRaw, _htravel⟩ :=
+      R.suffix_after_runway_passage_with_travel state hRpaths
+        hrunwaySplit hmouthLink
+    have hentrySwitch : entry / 3 = mouth / 3 := by
+      have hheadGroove : arrive state entry = (mouth, state) :=
+        hfullGrooved (mouth, entry) List.mem_cons_self
+      have hswitch := arrive_exit_switch state entry
+      rw [hheadGroove] at hswitch
+      exact hswitch.symm
+    have hActionsNe : mouth / 3 ≠ C.actionSwitch := by
+      rw [← hentrySwitch]
+      exact hEntryOldNe
+    have hNewAvoidsC : (LocalAction.flip (mouth / 3)).Avoids
+        C.toSupported.paths := by
+      simpa [hentrySwitch] using hNewAvoidsCRaw
+    by_cases hcontact : ∃ passage ∈ candy,
+        passageSwitch passage = C.actionSwitch
+    · apply manufactured_flip_arbitrary_lobe_absolute_three_novelty
+        C state hCpaths hNewAvoidsC hentryBranch hentrySwitch
+        hfullGrooved hfullTrace hcrossed hCandyForeignNew hLobe
+        hmouthLink hcontact hreach times history hentryHistorical
+      intro j _hj hjLead
+      exact hleadHistorical j (Nat.le_of_lt hjLead)
+    · have hCandyForeignOld : ∀ passage ∈ candy,
+          passageSwitch passage ≠ C.actionSwitch := by
+        intro passage hp hEq
+        exact hcontact ⟨passage, hp, hEq⟩
+      apply manufactured_suffix_explicit_lobe_absolute_three_novelty
+        C state hCpaths hNewAvoidsC hActionsNe hentryBranch
+        hentrySwitch hfullGrooved hfullTrace hcrossed
+        hCandyForeignNew hCandyForeignOld hLobe hmouthLink hreach
+        times history hentryHistorical
+      intro j _hj hjLead
+      exact hleadHistorical j (Nat.le_of_lt hjLead)
+  · obtain ⟨old, hold, horientation⟩ :=
+      R.nonrunway_oriented_branch_entry_is_candy state
+        horiented hrunway hentryBranch
+    have hentryGrooved : arrive state entry = (mouth, state) :=
+      hfullGrooved (mouth, entry) List.mem_cons_self
+    have hone := manufactured_flip_candy_splice_absolute_one_novelty
+      R state hRpaths hrouteSplit hOldTail hrunway hentryBranch
+      hold horientation hentryGrooved hApproach hApproachGrooved
+      hApproachForeign hcrossed hmouthLink harms hreach
+      N history hentryHistorical times (by
+        intro j _hj hjLead
+        exact hleadHistorical j (Nat.le_of_lt hjLead))
+    obtain ⟨fresh, hfresh, hmem⟩ := hone
+    exact ⟨fresh, by omega, hmem⟩
+
+/-- Reusable package for the actual short lead selected by a changed-forward
+merge. -/
+structure ChangedForwardShortLead
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (R : ManufacturedFlipReflector w e g) where
+  leadSteps : Nat
+  lead_le : leadSteps ≤ A.toSupported.travel
+  three_novelty : ∀ (N : Nat) (history : List (List Bool)),
+    (∀ j, j ≤ leadSteps →
+      restrictedTonguesAt w N
+        (g, (ManufacturedReflector.flip R).activatedState) j ∈ history) →
+    ∀ times : List Nat,
+      NoveltyCoverOn w N
+        (g, (ManufacturedReflector.flip R).activatedState)
+        times history 3
+
+/-- Every changed-forward merge has a short-lead package. -/
+theorem ManufacturedReflector.ChangedForwardMerge.has_shortLead
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {R : ManufacturedFlipReflector w e g}
+    (hmerge : A.ChangedForwardMerge (.flip R)) :
+    Nonempty (ChangedForwardShortLead A R) := by
+  obtain ⟨leadSteps, hlead, hthree⟩ :=
+    hmerge.exists_short_lead_three_novelty
+  exact ⟨{
+    leadSteps := leadSteps
+    lead_le := hlead
+    three_novelty := hthree
+  }⟩
+
+/-- Generic absolute counting step: one exceptional pre-tail vector followed
+by a reached local three-vector novelty cover gives at most four raw repeated
+novelties. -/
+theorem rawRepeatedWriterNovelTimes_le_four_of_reached_three_cover
+    {w : Wiring} {N K g shift : Nat}
+    {start : Nat × Tongues} {localState : Tongues}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (hreach : stepN w shift start = some (g, localState))
+    (extra : List (List Bool))
+    (hextra : extra.length ≤ 1)
+    (hbeforeCovered : ∀ t,
+      t ∈ rawRepeatedWriterPostTimes w N start K → t < shift →
+      restrictedTonguesAt w N start t ∈
+        rawFirstWriterHistory w N start K ++ extra)
+    (htail : NoveltyCoverOn w N (g, localState)
+      ((rawRepeatedWriterPostTimes w N start K).map
+        (fun t => t - shift))
+      (rawFirstWriterHistory w N start K ++ extra) 3) :
+    (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 := by
+  let postTimes := rawRepeatedWriterPostTimes w N start K
+  let history := rawFirstWriterHistory w N start K
+  obtain ⟨tailFresh, htailLength, htailMem⟩ := htail
+  let fresh := extra ++ tailFresh
+  have hfreshLength : fresh.length ≤ 4 := by
+    dsimp [fresh]
+    simp only [List.length_append]
+    omega
+  have hcover : NoveltyCoverOn w N start postTimes history 4 := by
+    refine ⟨fresh, hfreshLength, ?_⟩
+    intro t ht
+    by_cases htshift : t < shift
+    · have hm := hbeforeCovered t (by simpa [postTimes] using ht) htshift
+      rcases List.mem_append.mp hm with hm | hm
+      · exact List.mem_append_left fresh hm
+      · exact List.mem_append_right history
+          (List.mem_append_left tailFresh hm)
+    · have hshiftLe : shift ≤ t := by omega
+      let d := t - shift
+      have hd : d ∈ (rawRepeatedWriterPostTimes w N start K).map
+          (fun s => s - shift) := by
+        apply List.mem_map.mpr
+        exact ⟨t, by simpa [postTimes] using ht, rfl⟩
+      have htLive : (stepN w t start).isSome := by
+        dsimp [postTimes] at ht
+        obtain ⟨k, hk, hkt⟩ := List.mem_map.mp ht
+        subst t
+        exact (mem_rawRepeatedWriterNovelTimes_iff.mp hk).2.1.1
+      have hvector := restrictedTonguesAt_sub_of_reach
+        (N := N) hreach hshiftLe htLive
+      have hm := htailMem d hd
+      dsimp [d] at hm
+      rw [← hvector] at hm
+      rcases List.mem_append.mp hm with hm | hm
+      · rcases List.mem_append.mp hm with hm | hm
+        · exact List.mem_append_left fresh hm
+        · exact List.mem_append_right history
+            (List.mem_append_left tailFresh hm)
+      · exact List.mem_append_right history
+          (List.mem_append_right extra hm)
+  have hnew : ∀ t ∈ postTimes,
+      restrictedTonguesAt w N start t ∉ history := by
+    simpa [postTimes, history] using
+      repeatedWriterPostTimes_avoid_firstHistory
+        (w := w) (N := N) hN start K
+  have hnd :
+      (postTimes.map (restrictedTonguesAt w N start)).Nodup := by
+    dsimp [postTimes]
+    rw [map_repeatedWriterPostTimes_eq_fresh]
+    exact rawRepeatedWriterFresh_nodup w N start K
+  have hcount := noveltyCoverOn_fresh_distinct_count
+    hcover hnew hnd
+  simpa [postTimes, rawRepeatedWriterPostTimes] using hcount
+
+/-- **Shortest current direct-control-flow bridge.**  The global extraction
+need cover only the merge's actual short lead by the canonical history plus
+one exceptional vector.  No nominal `A.travel` coverage is required. -/
+theorem rawRepeatedWriterNovelTimes_le_four_of_short_changedForward
+    {w : Wiring} {N K g e shift : Nat}
+    {start : Nat × Tongues}
+    {A : ManufacturedReflector w g e}
+    {R : ManufacturedFlipReflector w e g}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (_hmerge : A.ChangedForwardMerge (.flip R))
+    (hreach : stepN w shift start =
+      some (g, (ManufacturedReflector.flip R).activatedState))
+    (S : ChangedForwardShortLead A R)
+    (extra : List (List Bool))
+    (hextra : extra.length ≤ 1)
+    (hbeforeCovered : ∀ t,
+      t ∈ rawRepeatedWriterPostTimes w N start K → t < shift →
+      restrictedTonguesAt w N start t ∈
+        rawFirstWriterHistory w N start K ++ extra)
+    (hleadCovered : ∀ j, j ≤ S.leadSteps →
+      restrictedTonguesAt w N
+        (g, (ManufacturedReflector.flip R).activatedState) j ∈
+          rawFirstWriterHistory w N start K ++ extra) :
+    (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 := by
+  apply rawRepeatedWriterNovelTimes_le_four_of_reached_three_cover
+    hN hreach extra hextra hbeforeCovered
+  exact S.three_novelty N
+    (rawFirstWriterHistory w N start K ++ extra)
+    hleadCovered
+    ((rawRepeatedWriterPostTimes w N start K).map
+      (fun t => t - shift))
+
+/-- Strongest direct certificate currently required from global control
+flow.  Compared with `EarlyChangedForwardHistoryCertificate`, its history
+obligation stops at the physically extracted short lead. -/
+structure ShortEarlyChangedForwardHistoryCertificate
+    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) where
+  g : Nat
+  e : Nat
+  A : ManufacturedReflector w g e
+  R : ManufacturedFlipReflector w e g
+  shift : Nat
+  merge : A.ChangedForwardMerge (.flip R)
+  reached : stepN w shift start =
+    some (g, (ManufacturedReflector.flip R).activatedState)
+  shortLead : ChangedForwardShortLead A R
+  extra : List (List Bool)
+  extra_length : extra.length ≤ 1
+  before_covered : ∀ t,
+    t ∈ rawRepeatedWriterPostTimes w N start K → t < shift →
+    restrictedTonguesAt w N start t ∈
+      rawFirstWriterHistory w N start K ++ extra
+  lead_covered : ∀ j, j ≤ shortLead.leadSteps →
+    restrictedTonguesAt w N
+      (g, (ManufacturedReflector.flip R).activatedState) j ∈
+        rawFirstWriterHistory w N start K ++ extra
+
+/-- The short direct certificate proves the four-event bound. -/
+theorem ShortEarlyChangedForwardHistoryCertificate.repeatedWriterNovelty_le_four
+    {w : Wiring} {N K : Nat} {start : Nat × Tongues}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (C : ShortEarlyChangedForwardHistoryCertificate w N start K) :
+    (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 := by
+  exact rawRepeatedWriterNovelTimes_le_four_of_short_changedForward
+    hN C.merge C.reached C.shortLead C.extra C.extra_length
+      C.before_covered C.lead_covered
+
+/-- Weakest current exhaustive raw-run residual: already small, or one short
+changed-forward history certificate. -/
+def KnownEdgeShortEarlyChangedForwardDichotomy : Prop :=
+  ∀ (w : Wiring) (N e : Nat),
+    (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
+    ∀ (start : Nat × Tongues) (K : Nat),
+      w.link e = some start.1 →
+      (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 ∨
+        Nonempty
+          (ShortEarlyChangedForwardHistoryCertificate w N start K)
+
+/-- The short exhaustive control-flow dichotomy closes the public known-edge
+four-event theorem. -/
+theorem knownEdgeFourRepeatedWriterNovelty_of_shortEarlyDichotomy
+    (hcontrol : KnownEdgeShortEarlyChangedForwardDichotomy) :
+    KnownEdgeFourRepeatedWriterNovelty := by
+  intro w N e hN start K hentry
+  rcases hcontrol w N e hN start K hentry with hsmall | hcertificate
+  · exact hsmall
+  · obtain ⟨C⟩ := hcertificate
+    exact C.repeatedWriterNovelty_le_four hN
+
+/-- And therefore the same short exhaustive dichotomy closes `StateLaw`. -/
+theorem stateLaw_of_shortEarlyChangedForwardDichotomy
+    (hcontrol : KnownEdgeShortEarlyChangedForwardDichotomy) : StateLaw :=
+  stateLaw_of_knownEdgeFourRepeatedWriterNovelty
+    (knownEdgeFourRepeatedWriterNovelty_of_shortEarlyDichotomy hcontrol)
 
 /-- The complete fixed-track content extracted from one raw repeated-writer
 novelty.  Both the parity rerouter and the closing writer leave by immutable
