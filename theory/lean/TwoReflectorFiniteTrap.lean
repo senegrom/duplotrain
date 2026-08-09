@@ -36,7 +36,9 @@ theorem two_reflector_edge_start_period_until
       have hqk : k ≤ q := by dsimp [q]; omega
       have hqJ : q ≤ J := by dsimp [q]; omega
       have hq2J : q+2 ≤ J := by dsimp [q]; omega
-      have hstart : e q = x := ih (by dsimp [q]; omega)
+      have hprevBound : k + 4*n ≤ J := by omega
+      have hstart0 : e (k + 4*n) = x := ih hprevBound
+      have hstart : e q = x := by simpa [q] using hstart0
       have hblock := two_reflector_edge_one_block
         m e r0 hrun (k := q) (x := x) (a := a) (b := b)
         hstart haLobe haPartner (haOcc q hqk hqJ)
