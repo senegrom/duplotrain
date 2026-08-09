@@ -70,6 +70,57 @@ private theorem action_contact_of_not_avoids
   | flip k =>
       exact ⟨k, rfl, contact_of_not_avoids_flip hnot⟩
 
+/-- Every manufactured reflector's activated state grooves the reusable
+support retained by the constructor.  This restores information that some
+later residue packages intentionally omit.
+
+For an identity reflector the complete simple exploration is already grooved
+in its return state.  For a flip reflector it is grooved in `returnState`;
+the activating trailing passage changes only the excluded mouth switch, so
+all runway and candy grooves transfer to `afterReturn`. -/
+theorem ManufacturedReflector.activated_support_grooves
+    {w : Wiring} {g e : Nat}
+    (B : ManufacturedReflector w g e) :
+    PathGrooves B.toSupported.paths B.activatedState := by
+  cases B with
+  | stay R =>
+      change PathGrooves
+        [R.runway, [(R.mouth, R.arm)]] R.returnState
+      have hgrooved :=
+        (R.runwayTrace.append R.coreTrace).grooved_of_switchSimple R.simple
+      change PassagesGrooved R.returnState
+        (R.runway ++ [(R.mouth, R.arm)]) at hgrooved
+      apply pathGrooves_pair.mpr
+      constructor
+      · intro passage hpassage
+        exact hgrooved passage (List.mem_append_left _ hpassage)
+      · intro passage hpassage
+        exact hgrooved passage (List.mem_append_right _ hpassage)
+  | flip R =>
+      change PathGrooves [R.runway, R.candy] R.afterReturn
+      have hgrooved :=
+        (R.runwayTrace.append R.candyTrace).grooved_of_switchSimple R.simple
+      change PassagesGrooved R.returnState
+        (R.runway ++ (R.mouth, R.firstArm) :: R.candy) at hgrooved
+      have hreturnPaths : PathGrooves
+          [R.runway, R.candy] R.returnState := by
+        apply pathGrooves_pair.mpr
+        constructor
+        · intro passage hpassage
+          exact hgrooved passage (List.mem_append_left _ hpassage)
+        · intro passage hpassage
+          exact hgrooved passage (List.mem_append_right _
+            (List.mem_cons_of_mem _ hpassage))
+      intro path hpath passage hpassage
+      have hold := hreturnPaths path hpath passage hpassage
+      apply groove_transfer hold
+      have hforeign := R.support_foreign path hpath passage hpassage
+      have hne : passageSwitch passage ≠ R.secondArm / 3 := by
+        intro heq
+        apply hforeign
+        exact heq.trans R.secondArm_switch
+      exact arrive_preserves_other R.crossed hne
+
 /-! ## The direct lobe saturates its switch
 
 When both retained paths of a manufactured flip reflector are empty, its
@@ -408,11 +459,11 @@ theorem RawOverlappingFiveWindowReduction.early_direct_lobe_pure_crossing_false
     (B : ManufacturedReflector w e g)
     (hRunway : D.runway = [])
     (hCandy : D.candy = [])
-    (hBpaths : PathGrooves B.toSupported.paths B.activatedState)
     (H : EarlyDirectLobePureCrossingResidue (K := K) C D B) : False := by
   obtain ⟨⟨path, hpath, passage, hpassage, hswitch⟩, _⟩ := H
   exact direct_lobe_support_contact_false D B B.activatedState
-    hRunway hCandy hBpaths hpath hpassage hswitch
+    hRunway hCandy B.activated_support_grooves
+      hpath hpassage hswitch
 
 /-- Every opposite pair is support-compatible or has a concrete oriented
 support intersection.  This is a pure matching statement over physical
@@ -546,6 +597,6 @@ theorem RawOverlappingFiveWindowReduction.first_turnaround_then_direct_pair_repe
     hbound | hpure
   · exact hbound
   · exact (C.early_direct_lobe_pure_crossing_false
-      D B hRunway hCandy hBpaths hpure).elim
+      D B hRunway hCandy hpure).elim
 
 end GeneralN
