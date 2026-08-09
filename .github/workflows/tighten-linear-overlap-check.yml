@@ -15,6 +15,12 @@ on:
       - theory/lean/NoveltyAwareLassoTwentyOne.lean
       - theory/lean/KnownEdgeTwentyOne.lean
       - theory/lean/StateLawTwentyOne.lean
+      - theory/lean/TrackThetaCaptureSharp.lean
+      - theory/lean/TrackThetaSharper.lean
+      - theory/lean/TrackQuantitativeRepairEighteen.lean
+      - theory/lean/NoveltyAwareLassoTwenty.lean
+      - theory/lean/KnownEdgeTwenty.lean
+      - theory/lean/StateLawTwenty.lean
       - .github/workflows/tighten-linear-overlap-check.yml
   workflow_dispatch:
 jobs:
@@ -57,6 +63,18 @@ jobs:
           name = "KnownEdgeTwentyOne"
           [[lean_lib]]
           name = "StateLawTwentyOne"
+          [[lean_lib]]
+          name = "TrackThetaCaptureSharp"
+          [[lean_lib]]
+          name = "TrackThetaSharper"
+          [[lean_lib]]
+          name = "TrackQuantitativeRepairEighteen"
+          [[lean_lib]]
+          name = "NoveltyAwareLassoTwenty"
+          [[lean_lib]]
+          name = "KnownEdgeTwenty"
+          [[lean_lib]]
+          name = "StateLawTwenty"
           EOF
       - name: Build tightened linear theorems
         run: |
@@ -73,3 +91,9 @@ jobs:
           lake build NoveltyAwareLassoTwentyOne
           lake build KnownEdgeTwentyOne
           lake build StateLawTwentyOne
+          lake build TrackThetaCaptureSharp
+          if [ -f TrackThetaSharper.lean ]; then lake build TrackThetaSharper; fi
+          if [ -f TrackQuantitativeRepairEighteen.lean ]; then lake build TrackQuantitativeRepairEighteen; fi
+          if [ -f NoveltyAwareLassoTwenty.lean ]; then lake build NoveltyAwareLassoTwenty; fi
+          if [ -f KnownEdgeTwenty.lean ]; then lake build KnownEdgeTwenty; fi
+          if [ -f StateLawTwenty.lean ]; then lake build StateLawTwenty; fi
