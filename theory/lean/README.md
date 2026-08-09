@@ -470,6 +470,15 @@ that a productive non-self pivot preserves the complete old train curve and
 strictly adds the switch stem.  This formalizes the curve-shrinking invariant;
 the complementary self-pivot nesting case is still the transient obstacle.
 
+**`KoizumiCurveInvariant.lean` — finite empty-curve descent.**  The selected
+internal matching is symmetric, the resulting curve graph has degree at most
+two, and `flipAt_is_curve_endpoint_pivot` identifies the exact local surgery.
+For an extracted `TrainFreeCurveShrinkHistory`,
+`trainFreeCurve_affects_le_switches` gives at most `N` strict replacements and
+`no_infinite_trainFreeCurve_shrink` rules out an infinite descent.  Extracting
+that history uniformly from raw trajectories—and charging self-pivots before
+later merges—remains open.
+
 **`StateLaw.lean` — the target theorem, in the language of tracks and
 switches.**  `GeneralN.StateLaw` states the actual claim — a single
 train on any `N`-switch lazy-point layout ever sees at most `N + 6`
