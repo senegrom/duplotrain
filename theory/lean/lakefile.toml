@@ -344,6 +344,9 @@ name = "ReplayFacts"
 name = "RestorationFrames"
 
 [[lean_lib]]
+name = "RestorationFrameOrdering"
+
+[[lean_lib]]
 name = "ReversalFacts"
 
 [[lean_lib]]
