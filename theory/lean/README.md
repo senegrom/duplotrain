@@ -378,6 +378,10 @@ identity-reflector case, or flip-reflector runway case.
 * `manufactured_flip_candy_splice_absolute_one_novelty`: the foreign-candy
   repair residual contributes at most one genuinely new vector, including
   its eventual paired-reflector tail.
+* `ChangedForwardMerge.runway_or_candy_absolute_four_novelty`: every
+  changed-forward contact—runway or candy, with disjoint or intersecting
+  suffix actions—has an absolute four-vector Gray cover.  The local runway
+  novelty branch now has no residual case.
 * `cyclic_minimal_stable_blocker_lobe_or_recurrent_six_chip_nest`: cyclic
   restoration-frame descent eliminates the wraparound blocker; its only
   non-lobe residue is a strict six-chip nest with a fresh third root.
@@ -490,9 +494,10 @@ raw-track statement with `26*N+3` in place of `N+6`;
 `state_law_two_pow` is the older elementary pigeonhole ceiling.  The
 remaining problem is the global assembly: every arbitrary repair branch must
 be covered by the `N+2` manufactured-prefix history plus at most four tail
-vectors without double-charging overlapping support.  The strict nested-
-restoration/reserve branch and the runway side of a foreign splice are not
-yet discharged by the sharp novelty interface.  Closing that assembly would
+vectors without double-charging overlapping support.  The local runway and
+candy novelty branches are now discharged; the strict nested-restoration /
+raw repeated-writer decomposition is not yet connected to that sharp
+certificate.  Closing that assembly would
 improve `26*N+3` to `N+6` (the conjectured sharp form remains `N+4`).
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real
