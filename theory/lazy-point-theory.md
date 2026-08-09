@@ -469,6 +469,42 @@ the steering law pins its walk to rails-and-stands, and the lobe
 dichotomy makes each writer a Gray flipper or cross-coupled), and
 m ≥ 3 (show it cannot happen).
 
+## The abstract-machine exhaustion: B holds with arbitrary registers
+
+Three experiments (`tools/bsearch.py`, `tools/bclassify.py`,
+`tools/baltern.py`) settle whether abstract lemma B needs wiring
+structure.  2,302,176 simulated runs — exhaustive over every abstract
+machine with 2 cells (4 and 6 slots) and 4 cells (6 slots): every
+surjective cell assignment × every fixed-point-free `bar` matching ×
+**every** well-formed initial register map × every start slot — plus
+~1.7M random machines up to 8 cells and 14 slots.  Results:
+
+* **Zero violations**: max Σ(σ−1) = 2, max cycle snapshots = 4, even
+  with adversarially pre-loaded initial registers.  Abstract B needs
+  no wiring structure.
+* **The only profiles are `()` and `(2,2)`** — `(2)` never occurs,
+  exactly as `lone_writer_quiet` predicts (one writer ⇒ no writes).
+* **Classification of all 315,081 active cycles**: each active cell
+  is a *lobe flipper* (both values bar-partnered inside the cell —
+  the case `lobe_gray_lock` already closes) or an *out cell* (both
+  values partnered into frozen cells — fed by frozen witnesses,
+  steered by the other writer).  The *cross-coupled* type (values
+  bar-paired into the other active cell) **never occurs**: a cross
+  import synchronizes the pair and freezes it.  Every active cycle
+  visits the **full Gray square** (all four register pairs).
+* **The four-beat law**: all 265,525 active cycles have **exactly
+  four productive writes per period, strictly alternating** between
+  the two active cells.  No exception.
+
+Proof path for the alternation (the biggest remaining step): two
+consecutive same-cell writes make the window between them
+single-writer; all other registers are constant there, so the walk is
+a finite automaton in (position, reg C1) and must close a
+single-writer loop — making the whole future single-writer, which
+`lone_writer_quiet` freezes, contradicting the writes themselves.
+Alternation then caps each cell at two values per period and kills
+every Σ(σ−1) ≥ 3 profile.
+
 ## The strict-base ceiling: below 2^N unconditionally
 
 Independently of the N + O(1) program, the support-epoch campaign
