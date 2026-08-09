@@ -775,4 +775,84 @@ theorem cyclic_minimal_foreign_blocker_shared_close
     exact hreturnB.symm.trans hreturn0
   exact ⟨hre, hje, hwriter, hold⟩
 
+/-- A first restoration cannot have its old register value already restored
+strictly before its declared closing time.  The returned register would
+itself generate an earlier first restoration. -/
+theorem first_restoration_forbids_early_returned_register
+    (hr0 : forall c, m.cellOf (r0 c) = c)
+    {t0 u0 b : Nat}
+    (houter : FirstRestorationFrame m e r0 t0 u0)
+    (hgap : t0+1 < b) (hbu0 : b < u0)
+    (hwriter : writerAt m e b = writerAt m e t0)
+    (hold : oldSlot m e r0 b = oldSlot m e r0 t0) : False := by
+  have hreturn : reg m e r0 b (writerAt m e t0) =
+      oldSlot m e r0 t0 := by
+    calc
+      reg m e r0 b (writerAt m e t0) =
+          reg m e r0 b (writerAt m e b) := by rw [hwriter]
+      _ = oldSlot m e r0 b := by rfl
+      _ = oldSlot m e r0 t0 := hold
+  obtain ⟨v, hvb, hvframe⟩ :=
+    exists_first_restoration_frame_of_register_return
+      m e r0 hr0 houter.1.1 hgap hreturn
+  have hne := houter.2 v hvframe.1.2.1 (by omega)
+  exact hne hvframe.1.2.2.2.2
+
+/-- Hence the exact shared-close boundary identified above is impossible in
+a well-formed machine.  A foreign blocker whose failed read is at or after
+`u0` cannot occur in a cyclic-overlap-minimal crossing. -/
+theorem cyclic_minimal_foreign_blocker_at_or_after_close_impossible
+    (hr0 : forall c, m.cellOf (r0 c) = c)
+    {K p t0 u0 t1 u1 b j r : Nat}
+    (hmin : CyclicOverlapMinimalForeignRestorationCrossing
+      m e r0 K p t0 u0 t1 u1)
+    (hframe : ForeignRestorationFrame m e r0 b r)
+    (ht1b : t1 < b) (hbu0 : b < u0)
+    (hrperiod : r < b+p)
+    (hstable : StableBlockerUntil m e r0 b j)
+    (hu0j : u0 <= j) : False := by
+  obtain ⟨hre, _hje, hwriter, hold⟩ :=
+    cyclic_minimal_foreign_blocker_shared_close
+      m e r0 hmin hframe ht1b hbu0 hrperiod hstable hu0j
+  have hframe0 : ForeignRestorationFrame m e r0 t0 u0 :=
+    hmin.1.1.1.1
+  have ht0t1 : t0 < t1 := hmin.1.1.1.2.2.1
+  apply first_restoration_forbids_early_returned_register
+    m e r0 hr0 hframe0.1 (by omega) hbu0
+  · exact hwriter
+  · exact hold
+
+/-- **Closed blocker-order implication.**  If the failed read is at or after
+the first closing time, cyclic overlap descent eliminates every foreign
+restoration.  The first blocker restoration must contain an exact lobe flip
+at its opening or closing endpoint. -/
+theorem cyclic_minimal_blocker_at_or_after_close_lobe
+    (hr0 : forall c, m.cellOf (r0 c) = c)
+    {K p t0 u0 t1 u1 b j : Nat}
+    (hper : RestorationPeriodicTail m e r0 K p)
+    (hmin : CyclicOverlapMinimalForeignRestorationCrossing
+      m e r0 K p t0 u0 t1 u1)
+    (hKb : K <= b)
+    (ht1b : t1 < b) (hbu0 : b < u0)
+    (hstable : StableBlockerUntil m e r0 b j)
+    (hu0j : u0 <= j) :
+    exists r,
+      b < r ∧ r < b+p ∧
+      FirstRestorationFrame m e r0 b r ∧
+      (ExactLobeWrite m e r0 b ∨ ExactLobeWrite m e r0 r) := by
+  obtain ⟨r, hbr, hrperiod, hfirst⟩ :=
+    productive_has_first_restoration_before_period m e r0 hr0
+      hper.positive hKb hper.register hstable.productive
+  refine ⟨r, hbr, hrperiod, hfirst, ?_⟩
+  by_cases hopen : SameEdgeWrite m e r0 b
+  · exact Or.inl (productive_sameEdgeWrite_exact_lobe
+      m e r0 hr0 hstable.productive hopen)
+  · by_cases hclose : SameEdgeWrite m e r0 r
+    · exact Or.inr (productive_sameEdgeWrite_exact_lobe
+        m e r0 hr0 hfirst.1.2.2.1 hclose)
+    · have hforeign : ForeignRestorationFrame m e r0 b r :=
+        ⟨hfirst, hopen, hclose⟩
+      exact (cyclic_minimal_foreign_blocker_at_or_after_close_impossible
+        m e r0 hr0 hmin hforeign ht1b hbu0 hrperiod hstable hu0j).elim
+
 end Echo
