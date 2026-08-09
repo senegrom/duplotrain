@@ -1,0 +1,39 @@
+name: Tighten linear overlap Lean check
+on:
+  push:
+    branches: [agent/tighten-linear-beyond-24]
+    paths:
+      - theory/lean/NoveltyAwareLassoOverlap.lean
+      - theory/lean/KnownEdgeTwentyFourOverlap.lean
+      - theory/lean/StateLawTwentyFourOverlap.lean
+      - .github/workflows/tighten-linear-overlap-check.yml
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register theorem targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "NoveltyAwareLassoOverlap"
+          [[lean_lib]]
+          name = "KnownEdgeTwentyFourOverlap"
+          [[lean_lib]]
+          name = "StateLawTwentyFourOverlap"
+          EOF
+      - name: Build overlap-aware theorem
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build NoveltyAwareLassoOverlap
+          if [ -f KnownEdgeTwentyFourOverlap.lean ]; then lake build KnownEdgeTwentyFourOverlap; fi
+          if [ -f StateLawTwentyFourOverlap.lean ]; then lake build StateLawTwentyFourOverlap; fi
