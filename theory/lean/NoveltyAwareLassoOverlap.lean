@@ -85,8 +85,11 @@ theorem two_manufacturing_journeys_then_repair_distinct_le_overlap
     simp [ManufacturedReflector.sharpConstructionHistory, hactivatedA]
   have hASecond : aBoundary ∈ secondHistory := by
     dsimp [aBoundary, secondHistory]
-    simp [ManufacturedReflector.sharpConstructionHistory,
-      restrictedTonguesAt, tonguesAt, hbaseB]
+    unfold ManufacturedReflector.sharpConstructionHistory
+    apply List.mem_append_left
+    apply List.mem_map.mpr
+    refine ⟨0, List.mem_range.mpr (by omega), ?_⟩
+    simp [restrictedTonguesAt, tonguesAt, stepN, hbaseB]
   have hBSecond : bBoundary ∈ secondHistory := by
     dsimp [bBoundary, secondHistory]
     simp [ManufacturedReflector.sharpConstructionHistory, hactivatedB]
@@ -98,8 +101,12 @@ theorem two_manufacturing_journeys_then_repair_distinct_le_overlap
       exact (List.mem_erase_of_ne hBA).mpr hBSecond
   have hBTail : bBoundary ∈ tailHistory := by
     have hm := hlocal.mem_tongueHistory (N := N) (k := 0)
-    simpa [tailHistory, bBoundary, restrictedTonguesAt, tonguesAt]
-      using hm
+    have hzero :
+        restrictedTonguesAt w N (start.1, stateB) 0 = bBoundary := by
+      dsimp [bBoundary]
+      simp [restrictedTonguesAt, tonguesAt, stepN]
+    rw [← hzero]
+    simpa [tailHistory] using hm
   have hmem : ∀ k ∈ times,
       restrictedTonguesAt w N start k ∈ history := by
     intro k hk
