@@ -395,4 +395,123 @@ theorem consecutive_same_write_visits (hrun : IsRun m e r0)
     rw [harith] at hrec
     exact hnoprod (p - 1) hrec
 
+/-! ## Consecutive productive writers are different
+
+The preceding theorem leaves two possible visits between consecutive
+productive writes of one cell: the cell itself or its mouth partner.  Both
+are impossible on an active periodic tail.  A quiet visit to the mouth is
+excluded by `quiet_mouth_unreachable`.  A quiet return to the same cell has
+the same entry and the same registers, so determinism repeats that quiet loop
+forever and contradicts the later productive write.
+-/
+
+/-- A productive-free return to the same cell returns to the complete same
+machine state. -/
+theorem quiet_return_same_cell_state
+    (cells : List Nat) {i q : Nat}
+    (hquiet : forall t, i <= t -> t < i + q ->
+      Not (ProductiveStep m e r0 t))
+    (hcell : m.cellOf (e (i + q)) = m.cellOf (e i)) :
+    stateCode m e r0 cells i = stateCode m e r0 cells (i + q) := by
+  have hregs : forall c,
+      reg m e r0 (i + q) c = reg m e r0 i c :=
+    quiet_reg m e r0 q hquiet
+  have hentry : e (i + q) = e i := by
+    calc
+      e (i + q) = reg m e r0 (i + q) (m.cellOf (e (i + q))) :=
+        (reg_write m e r0 rfl).symm
+      _ = reg m e r0 i (m.cellOf (e (i + q))) := hregs _
+      _ = reg m e r0 i (m.cellOf (e i)) := by rw [hcell]
+      _ = e i := reg_write m e r0 rfl
+  unfold stateCode snap
+  have hmap : cells.map (reg m e r0 i) =
+      cells.map (reg m e r0 (i + q)) := by
+    apply List.map_congr_left
+    intro c _
+    exact (hregs c).symm
+  rw [hentry, hmap]
+
+/-- A nonempty quiet state loop is quiet forever. -/
+theorem quiet_state_loop_forever (hrun : IsRun m e r0)
+    (cells : List Nat)
+    (hcells : forall k, m.star (m.cellOf (e k)) ∈ cells)
+    (hallcells : forall s, m.cellOf s ∈ cells)
+    {i q : Nat} (hqpos : 0 < q)
+    (hstate : stateCode m e r0 cells i =
+      stateCode m e r0 cells (i + q))
+    (hquiet : forall s, s < q ->
+      Not (ProductiveStep m e r0 (i + s))) :
+    forall n, Not (ProductiveStep m e r0 (i + n)) := by
+  intro n
+  have hmod := Nat.div_add_mod n q
+  have hrlt : n % q < q := Nat.mod_lt _ hqpos
+  have hiter := state_replay_iter m e r0 hrun cells hcells hstate
+    (n / q) (n % q)
+  have harith : i + n / q * q + n % q = i + n := by
+    have hcomm : q * (n / q) = (n / q) * q := Nat.mul_comm _ _
+    omega
+  rw [harith] at hiter
+  have hiff := productive_iff_of_state_eq m e r0 hrun cells hcells
+    hallcells hiter
+  intro hprod
+  exact hquiet (n % q) hrlt (hiff.mpr hprod)
+
+/-- **Adjacent letters of the productive-writer word are distinct.**  On a
+periodic tail, two consecutive productive steps (with no productive step
+strictly between them) cannot write the same cell. -/
+theorem consecutive_productive_write_cells_ne
+    (hrun : IsRun m e r0)
+    (hr0 : forall c, m.cellOf (r0 c) = c)
+    (hbar : forall s, m.bar s ≠ s)
+    (cells : List Nat)
+    (hcells : forall k, m.star (m.cellOf (e k)) ∈ cells)
+    (hallcells : forall s, m.cellOf s ∈ cells)
+    {K p : Nat} (hp : 0 < p)
+    (hper : forall t, K <= t -> e (t + p) = e t)
+    (hregper : forall t c, K <= t ->
+      reg m e r0 (t + p) c = reg m e r0 t c)
+    {t1 t2 : Nat} (hK : K <= t1) (h12 : t1 < t2)
+    (hquiet : forall s, t1 < s -> s < t2 ->
+      Not (ProductiveStep m e r0 s))
+    (hp1 : ProductiveStep m e r0 t1)
+    (hp2 : ProductiveStep m e r0 t2) :
+    m.cellOf (e (t1 + 1)) ≠ m.cellOf (e (t2 + 1)) := by
+  intro hsame
+  let C := m.cellOf (e (t1 + 1))
+  have hc1 : m.cellOf (e (t1 + 1)) = C := rfl
+  have hc2 : m.cellOf (e (t2 + 1)) = C := by
+    exact hsame.symm.trans hc1
+  obtain ⟨l, hlpos, hlbound, hvisit⟩ :=
+    consecutive_same_write_visits m e r0 hrun cells hcells hallcells
+      hp hper hregper hK h12 hquiet hp1 hp2 hc1 hc2
+  let i := t1 + 1
+  have hsegment : forall t, i <= t -> t < i + l ->
+      Not (ProductiveStep m e r0 t) := by
+    intro t hit hti
+    exact hquiet t (by dsimp [i] at hit; omega)
+      (by dsimp [i] at hti; omega)
+  rcases hvisit with hsameCell | hmouth
+  · have hcellReturn : m.cellOf (e (i + l)) = m.cellOf (e i) := by
+      dsimp [i]
+      rw [hc1]
+      exact hsameCell
+    have hstate := quiet_return_same_cell_state m e r0 cells
+      hsegment hcellReturn
+    have hforever := quiet_state_loop_forever m e r0 hrun cells hcells
+      hallcells hlpos hstate
+      (fun s hs => hsegment (i+s) (by omega) (by omega))
+    have hidx : t2 = i + (t2 - i) := by
+      dsimp [i]
+      omega
+    have hnot := hforever (t2 - i)
+    rw [← hidx] at hnot
+    exact hnot hp2
+  · have hmouth' :
+        m.cellOf (e (i + l)) = m.star (m.cellOf (e i)) := by
+      dsimp [i]
+      rw [hc1]
+      exact hmouth
+    exact quiet_mouth_unreachable m e r0 hrun hr0 hbar
+      hsegment hmouth'
+
 end Echo

@@ -19,8 +19,16 @@ five below, then the satellites:
   `productive_iff_of_state_eq`).  Headline
   `consecutive_same_write_visits`: **between two consecutive
   productive writes of one cell, the walk must stand in that cell or
-  at its mouth partner strictly in between — adjacent same-cell
-  writes are impossible.**
+  at its mouth partner strictly in between.**  The two remaining cases
+  are now both eliminated: `quiet_return_same_cell_state` and
+  `quiet_state_loop_forever` show that a quiet return to the same cell
+  is a permanently quiet deterministic loop, while
+  `quiet_mouth_unreachable` excludes the mouth visit.  Hence
+  `consecutive_productive_write_cells_ne` proves outright that
+  **adjacent letters of the productive-writer word are distinct** on
+  every periodic tail.  The still-open step is to prove that the next
+  letter must return to the preceding pair, rather than introduce a
+  third writer.
 
 * `LobeDichotomy.lean` — **every cycle cell is a Gray flipper or
   foreign-valued.**  A slot can only be delivered by reading its

@@ -505,6 +505,16 @@ single-writer loop — making the whole future single-writer, which
 Alternation then caps each cell at two values per period and kills
 every Σ(σ−1) ≥ 3 profile.
 
+The first word-level step is now machine-checked in
+`lean/Alternation.lean`.  A quiet return to the same cell repeats the
+complete machine state and is quiet forever; a quiet visit to its mouth
+partner is impossible by the retrace palindrome.  Combined with the
+periodic replay theorem, `consecutive_productive_write_cells_ne` proves
+that two consecutive productive writes always target different cells.
+What remains is the genuinely stronger two-letter claim: after writers
+`C,D`, the next productive writer is `C` (or the tail has already gone
+quiet).  No such claim is assumed by the current state-law bounds.
+
 ## The strict-base ceiling: below 2^N unconditionally
 
 Independently of the N + O(1) program, the support-epoch campaign
