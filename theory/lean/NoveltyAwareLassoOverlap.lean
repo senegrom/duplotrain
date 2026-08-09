@@ -3,17 +3,10 @@ import NoveltyAwareLasso
 /-!
 # Overlap-aware novelty lasso
 
-`NoveltyAwareLasso` bounds two manufactured construction journeys followed by
-a `22*N` repair lasso by concatenating three finite histories.  Two boundary
-vectors occur in both neighbouring histories:
-
-* the activated state of the first reflector is the base state of the second;
-* the activated state of the second reflector is time zero of the repair
-  lasso.
-
-Erase one occurrence at each boundary.  Pointwise coverage is preserved: an
-erased value is already present in the preceding history.  This saves two
-states without changing any dynamical hypothesis.
+Two manufactured construction histories and a subsequent bounded lasso share
+their boundary vectors.  The activated state of the first reflector is the
+base state of the second, and the activated state of the second is time zero
+of the lasso.  Erasing one copy at each boundary saves two vectors.
 -/
 
 namespace GeneralN
@@ -28,11 +21,11 @@ private theorem overlap_zero_novelty_cover_of_mem
   intro k hk
   simpa using hmem k hk
 
-/-- Two exact manufactured journeys followed by a bounded local lasso expose
-at most `24*N+2` pairwise-distinct tongue vectors.  This is the overlap-aware
-version of `two_manufacturing_journeys_then_repair_distinct_le`. -/
-theorem two_manufacturing_journeys_then_repair_distinct_le_overlap
-    {w : Wiring} {N e : Nat}
+/-- **Generic overlap-aware lasso count.**  If the suffix lasso has cap
+`cap`, two exact manufactured construction journeys followed by that suffix
+expose at most `2*N + cap + 2` pairwise-distinct tongue vectors. -/
+theorem two_manufacturing_journeys_then_lasso_distinct_le_overlap
+    {w : Wiring} {N e cap : Nat}
     (hN : ∀ p q, w.link p = some q →
       p < 3 * N ∧ q < 3 * N)
     {start : Nat × Tongues}
@@ -51,11 +44,11 @@ theorem two_manufacturing_journeys_then_repair_distinct_le_overlap
       (B.exploration.length + B.runway.length + 1) (e, stateA) =
         some (start.1, stateB))
     (hgroovesB : PathGrooves B.toSupported.paths stateB)
-    (hlocal : EventuallyPeriodicWithin w (start.1, stateB) (22 * N))
+    (hlocal : EventuallyPeriodicWithin w (start.1, stateB) cap)
     (times : List Nat)
     (hlive : ∀ k ∈ times, (stepN w k start).isSome)
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ 24 * N + 2 := by
+    times.length ≤ 2 * N + cap + 2 := by
   let firstTravel := A.exploration.length + A.runway.length + 1
   let secondTravel := B.exploration.length + B.runway.length + 1
   let totalTravel := firstTravel + secondTravel
@@ -191,7 +184,7 @@ theorem two_manufacturing_journeys_then_repair_distinct_le_overlap
   have hsecondLen : secondHistory.length ≤ N + 2 := by
     dsimp [secondHistory]
     exact B.sharpConstructionHistory_length hN
-  have htailLen : tailHistory.length = 22 * N := by
+  have htailLen : tailHistory.length = cap := by
     simp [tailHistory, EventuallyPeriodicWithin.tongueHistory]
   have hsecondReducedLen :
       secondReduced.length = secondHistory.length - 1 := by
@@ -201,14 +194,45 @@ theorem two_manufacturing_journeys_then_repair_distinct_le_overlap
       tailReduced.length = tailHistory.length - 1 := by
     dsimp [tailReduced]
     exact List.length_erase_of_mem hBTail
-  have htailPositive : 0 < 22 * N := by
+  have htailPositive : 0 < cap := by
     obtain ⟨lead, period, settled, hperiodPos, hcap, _hlead, _hperiod⟩ :=
       hlocal
     omega
-  have hhistoryLen : history.length ≤ 24 * N + 2 := by
+  have hhistoryLen : history.length ≤ 2 * N + cap + 2 := by
     dsimp [history]
     simp only [List.length_append]
     omega
   exact Nat.le_trans hcount hhistoryLen
+
+/-- The original `22*N` repair-lasso corollary. -/
+theorem two_manufacturing_journeys_then_repair_distinct_le_overlap
+    {w : Wiring} {N e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    (A : ManufacturedReflector w start.1 e)
+    (B : ManufacturedReflector w e start.1)
+    (stateA stateB : Tongues)
+    (hbaseA : A.baseState = start.2)
+    (hactivatedA : stateA = A.activatedState)
+    (hreachA : stepN w
+      (A.exploration.length + A.runway.length + 1) start =
+        some (e, stateA))
+    (hgroovesA : PathGrooves A.toSupported.paths stateA)
+    (hbaseB : B.baseState = stateA)
+    (hactivatedB : stateB = B.activatedState)
+    (hreachB : stepN w
+      (B.exploration.length + B.runway.length + 1) (e, stateA) =
+        some (start.1, stateB))
+    (hgroovesB : PathGrooves B.toSupported.paths stateB)
+    (hlocal : EventuallyPeriodicWithin w (start.1, stateB) (22 * N))
+    (times : List Nat)
+    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
+    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
+    times.length ≤ 24 * N + 2 := by
+  have h := two_manufacturing_journeys_then_lasso_distinct_le_overlap
+    hN A B stateA stateB hbaseA hactivatedA hreachA hgroovesA
+    hbaseB hactivatedB hreachB hgroovesB hlocal times hlive hnd
+  omega
 
 end GeneralN
