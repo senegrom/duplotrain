@@ -26,6 +26,12 @@ on:
       - theory/lean/NoveltyAwareLassoNineteen.lean
       - theory/lean/KnownEdgeNineteen.lean
       - theory/lean/StateLawNineteen.lean
+      - theory/lean/TrackThetaCaptureTighter.lean
+      - theory/lean/TrackThetaTighter.lean
+      - theory/lean/TrackQuantitativeRepairSixteen.lean
+      - theory/lean/NoveltyAwareLassoEighteen.lean
+      - theory/lean/KnownEdgeEighteen.lean
+      - theory/lean/StateLawEighteen.lean
       - theory/lean/ProbePairedPeriod.lean
       - .github/workflows/tighten-linear-overlap-check.yml
   workflow_dispatch:
@@ -92,6 +98,18 @@ jobs:
           [[lean_lib]]
           name = "StateLawNineteen"
           [[lean_lib]]
+          name = "TrackThetaCaptureTighter"
+          [[lean_lib]]
+          name = "TrackThetaTighter"
+          [[lean_lib]]
+          name = "TrackQuantitativeRepairSixteen"
+          [[lean_lib]]
+          name = "NoveltyAwareLassoEighteen"
+          [[lean_lib]]
+          name = "KnownEdgeEighteen"
+          [[lean_lib]]
+          name = "StateLawEighteen"
+          [[lean_lib]]
           name = "ProbePairedPeriod"
           EOF
       - name: Build tightened linear theorems
@@ -116,8 +134,14 @@ jobs:
           lake build KnownEdgeTwenty
           lake build StateLawTwenty
           lake build TrackGlobalRepairSimple
-          if [ -f TrackQuantitativeRepairSeventeen.lean ]; then lake build TrackQuantitativeRepairSeventeen; fi
-          if [ -f NoveltyAwareLassoNineteen.lean ]; then lake build NoveltyAwareLassoNineteen; fi
-          if [ -f KnownEdgeNineteen.lean ]; then lake build KnownEdgeNineteen; fi
-          if [ -f StateLawNineteen.lean ]; then lake build StateLawNineteen; fi
+          lake build TrackQuantitativeRepairSeventeen
+          lake build NoveltyAwareLassoNineteen
+          lake build KnownEdgeNineteen
+          lake build StateLawNineteen
+          lake build TrackThetaCaptureTighter
+          if [ -f TrackThetaTighter.lean ]; then lake build TrackThetaTighter; fi
+          if [ -f TrackQuantitativeRepairSixteen.lean ]; then lake build TrackQuantitativeRepairSixteen; fi
+          if [ -f NoveltyAwareLassoEighteen.lean ]; then lake build NoveltyAwareLassoEighteen; fi
+          if [ -f KnownEdgeEighteen.lean ]; then lake build KnownEdgeEighteen; fi
+          if [ -f StateLawEighteen.lean ]; then lake build StateLawEighteen; fi
           lake env lean ProbePairedPeriod.lean
