@@ -439,11 +439,16 @@ def PersistentLobeRootAt (c lo : Nat) : Prop :=
     m.cellOf (m.bar a) = m.cellOf a ∧
     ∀ j, lo ≤ j → Occupied m e r0 j a
 
-/-- The finite root list is exact: membership is equivalent to carrying a
-persistent occupied lobe.  This completeness clause prevents the reserve
-alternative from becoming vacuous by choosing too few named roots. -/
-def CompletePersistentLobeRoots (roots : List Nat) (lo : Nat) : Prop :=
-  ∀ c, c ∈ roots ↔ PersistentLobeRootAt m e r0 c lo
+/-- The finite root list is exact relative to one finite component: it lists
+precisely the mouth partners of component cells which carry persistent
+occupied lobes.  Restricting completeness to the component is essential in
+the `Nat`-indexed abstract machine, where irrelevant cells need not form a
+finite global support. -/
+def CompletePersistentLobeRoots
+    (cells roots : List Nat) (lo : Nat) : Prop :=
+  ∀ r, r ∈ roots ↔
+    PersistentLobeRootAt m e r0 r lo ∧
+      ∃ c, c ∈ cells ∧ r = m.star c
 
 /-- The complete-root version of the component trichotomy gives a genuine
 unlobed reserve, rather than a cell merely absent from an arbitrary list. -/
@@ -456,7 +461,7 @@ theorem closed_component_reflector_or_collapsed_or_unlobed_reserve
     (cells roots : List Nat)
     (hclosed : SelectedClosedFrom m e r0 cells lo)
     (hvisit : ComponentVisitedFrom m e cells lo)
-    (hroots : CompletePersistentLobeRoots m e r0 roots lo) :
+    (hroots : CompletePersistentLobeRoots m e r0 cells roots lo) :
     (∃ k x a b, lo ≤ k ∧ e k = x ∧
       CompatibleTwoReflectorTail m e r0 k x a b) ∨
     (∃ k x, lo ≤ k ∧ e k = x ∧
@@ -465,7 +470,7 @@ theorem closed_component_reflector_or_collapsed_or_unlobed_reserve
       ¬ PersistentLobeRootAt m e r0 (m.star c) lo := by
   have hactive : PersistentActiveLobeRoots m e r0 roots lo := by
     intro c hc
-    exact (hroots c).mp hc
+    exact ((hroots c).mp hc).1
   rcases closed_component_reflector_or_collapsed_or_reserve
       m e r0 hrun hr0 hrec hKlo cells roots hclosed hvisit hactive with
     htrap | hcollapsed | ⟨c, hc, hreserve⟩
@@ -475,7 +480,8 @@ theorem closed_component_reflector_or_collapsed_or_unlobed_reserve
     apply Or.inr
     refine ⟨c, hc, ?_⟩
     intro hpersistent
-    exact hreserve ((hroots (m.star c)).mpr hpersistent)
+    exact hreserve ((hroots (m.star c)).mpr
+      ⟨hpersistent, c, hc, rfl⟩)
 
 /-- A finite component certificate tied to one actual visible full-edge-chip
 move.  Both physical endpoint cells belong to the component, selected edges
@@ -488,7 +494,7 @@ structure VisibleChipComponentFrame
   oldCell : m.cellOf (oldSlot m e r0 k) ∈ cells
   newCell : m.cellOf (e (k+1)) ∈ cells
   selectedClosed : SelectedClosedFrom m e r0 cells lo
-  rootsComplete : CompletePersistentLobeRoots m e r0 roots lo
+  rootsComplete : CompletePersistentLobeRoots m e r0 cells roots lo
 
 /-- **The exact component-extraction gap.**
 
