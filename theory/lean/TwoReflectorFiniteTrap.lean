@@ -91,14 +91,14 @@ theorem two_reflector_edge_entries_until
     rw [hidx]
     exact hstart
   · right; right
-    have hq1J : q+1 ≤ J := by dsimp [q] at *; omega
     have hnext := occupied_lobe_partner_next_endpoint
       m e r0 hrun haLobe haCurrent (haOcc q hqk hqJ)
     have hidx : j = q+1 := by dsimp [q] at *; omega
     rw [hidx]
-    exact hnext
+    rcases hnext with ha | hbara
+    · exact Or.inl ha
+    · exact Or.inr (Or.inl hbara)
   · right; left
-    have hq2J : q+2 ≤ J := by dsimp [q] at *; omega
     have hbounce := occupied_lobe_partner_bounce
       m e r0 hrun haLobe haCurrent (haOcc q hqk hqJ)
     have hidx : j = q+2 := by dsimp [q] at *; omega
