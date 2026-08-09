@@ -105,7 +105,8 @@ theorem lobeForestPartnerCells_nodup
   have hroots' : (lobes.map (fun B => B.root m)).Nodup := by
     simpa [lobeForestRoots] using hroots
   unfold lobeForestPartnerCells
-  exact nodup_map_star m _ hroots'
+  simpa [List.map_map, Function.comp_def] using
+    (nodup_map_star m (lobes.map (fun B => B.root m)) hroots')
 
 /-- **One-component load bound.** -/
 theorem supportTree_lobe_load_notFullyLoaded
