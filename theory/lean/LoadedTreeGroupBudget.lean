@@ -42,7 +42,13 @@ theorem loadedGroupChargedCells_length :
       have hroots :
           (lobeForestRoots m e r0 G.lobes).length = G.lobes.length := by
         simp [lobeForestRoots]
-      rw [hroots, ih]
+      rw [hroots]
+      change
+        G.tree.cells.length + G.lobes.length +
+            (loadedGroupChargedCells m e r0 rest).length =
+          G.tree.cells.length + G.lobes.length +
+            notFullLoadedCells (loadedGroupProfile m e r0 rest)
+      rw [ih]
 
 private theorem charged_nodup_subset_length
     {xs ys : List Nat}
