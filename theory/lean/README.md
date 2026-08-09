@@ -513,12 +513,14 @@ disjoint changed-forward merges therefore manufacture an existing
 `KnownEdgeSharpRepairCertificate`; their local distinct-state bound is
 `N+4`.  This does not itself extract such a merge from every raw run.
 
-**`SelfEpochFour.lean` — certified two-endpoint epochs.**  If every productive
-write in an interval belongs to either of two named endpoint switches, all
-other tongues remain fixed and the interval lies in four explicit Gray-square
-vectors.  A duplicate-free sample from that epoch has length at most four.
-The still-open extraction step is to obtain one fixed endpoint pair from an
-arbitrary maximal self-pivot interval.
+**`SelfEpochFour.lean` / `EndpointEpochExtraction.lean` — arbitrary self-only
+epochs.**  If every productive write in an interval is a train-curve
+self-pivot, the unmatched-branch endpoint carrier can only shrink and contains
+at most two switch names.  The extraction theorem chooses those two fixed
+writers, proves every other tongue stable, and places the whole interval in
+four explicit Gray-square vectors.  Thus any duplicate-free sample from an
+arbitrary live self-only epoch has length at most four.  The remaining global
+step is to amortize strict self-shrinks against the non-self growth epochs.
 
 **`KoizumiFramePersistence.lean` — repeated writers force self-pivots.**
 Selected-curve reachability persists through every step until a productive
