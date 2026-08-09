@@ -458,6 +458,457 @@ theorem manufactured_flip_candy_splice_approach_foreign_one_novelty
       (htimes d hd)
   · exact hinitial
 
+/-- Once the approach-foreign splice has latched the old reflector action,
+one complete macro loop is pointwise constant in the doubly-latched tongue
+vector.  This is stronger than merely returning to the same endpoint. -/
+theorem manufactured_flip_candy_splice_approach_foreign_settled_tongues
+    {w : Wiring} {g e outside entry mouth returnPort : Nat}
+    (R : ManufacturedFlipReflector w e g)
+    (state : Tongues)
+    (hpaths : PathGrooves R.toSupported.paths state)
+    {oldPrefix oldTail approach : List Passage}
+    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
+      oldPrefix ++ (entry, mouth) :: oldTail)
+    (htail : PhysicalTrace w (outside, state) oldTail
+      ((ManufacturedReflector.flip R).orientedFinish state, state))
+    (hnotRunway : (entry, mouth) ∉ R.runway)
+    (hentryBranch : entry % 3 ≠ 0)
+    {old : Passage} (hold : old ∈ R.candy)
+    (horientation : (entry, mouth) = old ∨
+      (entry, mouth) = (old.2, old.1))
+    (hentryGrooved : arrive state entry = (mouth, state))
+    (happroach : PhysicalTrace w (g, state) approach
+      (returnPort, state))
+    (happroachGrooved : PassagesGrooved state approach)
+    (happroachForeignNew : ∀ passage ∈ approach,
+      passageSwitch passage ≠ mouth / 3)
+    (happroachForeignOld : ∀ passage ∈ approach,
+      passageSwitch passage ≠ R.actionSwitch)
+    (hcrossed : arrive state returnPort =
+      (mouth, flipAt state (mouth / 3)))
+    (hmouthLink : w.link mouth = some outside)
+    {d : Nat}
+    (hd : d <= oldTail.length + R.runway.length +
+      approach.length + 2) :
+    ∃ port,
+      stepN w d
+          (outside,
+            flipAt (flipAt state (mouth / 3)) R.actionSwitch) =
+        some (port,
+          flipAt (flipAt state (mouth / 3)) R.actionSwitch) := by
+  let finish := (ManufacturedReflector.flip R).orientedFinish state
+  let completion := oldTail ++
+    ((finish, R.mouth) :: reversePassages R.runway)
+  let newState := flipAt state (mouth / 3)
+  let bothState := flipAt newState R.actionSwitch
+
+  have hentryNew : entry / 3 = mouth / 3 := by
+    have hs := arrive_exit_switch state entry
+    rw [hentryGrooved] at hs
+    exact hs.symm
+  have hentryOld : entry / 3 ≠ R.actionSwitch :=
+    R.candy_entry_foreign_action hold horientation
+  have hnewOld : mouth / 3 ≠ R.actionSwitch := by
+    intro hEq
+    exact hentryOld (hentryNew.trans hEq)
+  have hreturnNew : returnPort / 3 = mouth / 3 := by
+    have hs := arrive_exit_switch state returnPort
+    rw [hcrossed] at hs
+    exact hs.symm
+  have hreturnOld : returnPort / 3 ≠ R.actionSwitch := by
+    rw [hreturnNew]
+    exact hnewOld
+  have hcomm :
+      flipAt (flipAt state R.actionSwitch) (mouth / 3) =
+        bothState := by
+    dsimp [bothState, newState]
+    exact flipAt_comm (Ne.symm hnewOld)
+
+  have hcompletionData := R.candy_completion_foreign state hpaths
+    hsplit htail hnotRunway hold horientation
+  change PhysicalTrace w (outside, state) completion
+      (g, flipAt state R.actionSwitch) ∧
+    (∀ passage ∈ completion,
+      passageSwitch passage ≠ entry / 3) at hcompletionData
+  have hcompletionForeignNew : ∀ passage ∈ completion,
+      passageSwitch passage ≠ mouth / 3 := by
+    intro passage hp hEq
+    exact hcompletionData.2 passage hp (hEq.trans hentryNew.symm)
+  have htailForeignNew : ∀ passage ∈ oldTail,
+      passageSwitch passage ≠ mouth / 3 := by
+    intro passage hp
+    exact hcompletionForeignNew passage
+      (List.mem_append_left _ hp)
+  have htailForeignOld := R.candy_tail_foreign_action state
+    hsplit hnotRunway hentryBranch
+
+  have hrouteTrace :=
+    (ManufacturedReflector.flip R).orientedRoute_trace state hpaths
+  have hrouteGrooved : PassagesGrooved state
+      ((ManufacturedReflector.flip R).orientedRoute state) :=
+    hrouteTrace.grooved_of_switchSimple
+      ((ManufacturedReflector.flip R).orientedRoute_simple state)
+  have htailGrooved : PassagesGrooved state oldTail := by
+    intro passage hp
+    exact hrouteGrooved passage (by
+      rw [hsplit]
+      exact List.mem_append_right oldPrefix
+        (List.mem_cons_of_mem _ hp))
+  have htailGroovedNew : PassagesGrooved newState oldTail := by
+    dsimp [newState]
+    exact grooved_after_flip_other htailGrooved htailForeignNew
+  have htailGroovedBoth : PassagesGrooved bothState oldTail := by
+    dsimp [bothState]
+    exact grooved_after_flip_other htailGroovedNew htailForeignOld
+
+  have hlatched := R.candy_completion_latched state hpaths
+    hsplit htail hnotRunway hentryBranch
+  change PhysicalTrace w (outside, flipAt state R.actionSwitch)
+      completion (g, flipAt state R.actionSwitch) at hlatched
+  have hlatchedBoth :=
+    hlatched.flip_unvisited hcompletionForeignNew
+  rw [hcomm] at hlatchedBoth
+  change PhysicalTrace w (outside, bothState)
+    completion (g, bothState) at hlatchedBoth
+
+  have hreturn := R.oriented_return_trace state hpaths
+  change PhysicalTrace w (finish, state)
+    ((finish, R.mouth) :: reversePassages R.runway)
+    (g, flipAt state R.actionSwitch) at hreturn
+  cases hreturn with
+  | @cons _ _ next _ after _ _ harrive hlink tail =>
+      have hafterEq : after = flipAt state R.actionSwitch := by
+        have hlocal := R.oriented_finish_arrive state
+        rw [harrive] at hlocal
+        exact congrArg Prod.snd hlocal
+      subst after
+      have hreturnBack := arrive_back state finish
+      rw [R.oriented_finish_arrive state] at hreturnBack
+      have hreturnBoth :=
+        arrive_flip_other hreturnBack (Ne.symm hnewOld)
+      rw [hcomm] at hreturnBoth
+      have hreturnGrooved : PassagesGrooved bothState
+          [(finish, R.mouth)] := by
+        intro passage hp
+        simp only [List.mem_singleton] at hp
+        subst passage
+        exact hreturnBoth
+
+      have hreverseForeignNew :
+          ∀ passage ∈ reversePassages R.runway,
+            passageSwitch passage ≠ mouth / 3 := by
+        intro passage hp
+        apply hcompletionForeignNew passage
+        apply List.mem_append_right oldTail
+        exact List.mem_cons_of_mem _ hp
+      have hrunwaySimple :=
+        (ManufacturedReflector.flip R).runway_simple
+      have hreverseSimple : SwitchSimple
+          (reversePassages R.runway) := by
+        unfold SwitchSimple at hrunwaySimple ⊢
+        rw [map_passageSwitch_reversePassages R.runwayTrace]
+        exact nodup_reverse_nat_foreign hrunwaySimple
+      have hreverseGroovedOld : PassagesGrooved
+          (flipAt state R.actionSwitch)
+          (reversePassages R.runway) :=
+        tail.grooved_of_switchSimple hreverseSimple
+      have hreverseGroovedBoth : PassagesGrooved bothState
+          (reversePassages R.runway) := by
+        have hgrooved := grooved_after_flip_other
+          hreverseGroovedOld hreverseForeignNew
+        rw [hcomm] at hgrooved
+        exact hgrooved
+      have hcompletionGrooved : PassagesGrooved bothState completion := by
+        dsimp [completion]
+        apply passagesGrooved_append htailGroovedBoth
+        intro passage hp
+        rcases List.mem_cons.mp hp with hp | hp
+        · subst passage
+          exact hreturnGrooved _ List.mem_cons_self
+        · exact hreverseGroovedBoth passage hp
+
+      have happroachNew :=
+        happroach.flip_unvisited happroachForeignNew
+      have happroachBoth :=
+        happroachNew.flip_unvisited happroachForeignOld
+      change PhysicalTrace w (g, bothState) approach
+        (returnPort, bothState) at happroachBoth
+      have happroachGroovedNew : PassagesGrooved newState approach := by
+        dsimp [newState]
+        exact grooved_after_flip_other happroachGrooved
+          happroachForeignNew
+      have happroachGroovedBoth : PassagesGrooved bothState approach := by
+        dsimp [bothState]
+        exact grooved_after_flip_other happroachGroovedNew
+          happroachForeignOld
+
+      have hback := arrive_back state returnPort
+      rw [hcrossed] at hback
+      have hcontactNew : arrive newState returnPort =
+          (mouth, newState) := by
+        dsimp [newState]
+        exact groove_forward hback
+      have hcontactBoth := arrive_flip_other hcontactNew hreturnOld
+      have hcontactTrace : PhysicalTrace w
+          (returnPort, bothState) [(returnPort, mouth)]
+          (outside, bothState) :=
+        PhysicalTrace.cons hcontactBoth hmouthLink (PhysicalTrace.nil _)
+      have hcontactGrooved : PassagesGrooved bothState
+          [(returnPort, mouth)] := by
+        intro passage hp
+        simp only [List.mem_singleton] at hp
+        subst passage
+        have hg := arrive_back bothState returnPort
+        rw [hcontactBoth] at hg
+        exact hg
+
+      have hperiodTrace :=
+        (hlatchedBoth.append happroachBoth).append hcontactTrace
+      have hperiodGrooved : PassagesGrooved bothState
+          ((completion ++ approach) ++ [(returnPort, mouth)]) :=
+        passagesGrooved_append
+          (passagesGrooved_append hcompletionGrooved
+            happroachGroovedBoth)
+          hcontactGrooved
+      obtain ⟨port, hrun⟩ :=
+        hperiodTrace.grooved_prefix_tongues bothState
+          hperiodGrooved (by
+            simpa [completion, List.length_append,
+              reversePassages_length, Nat.add_assoc,
+              Nat.add_comm, Nat.add_left_comm] using hd)
+      exact ⟨port, by simpa [bothState, newState] using hrun⟩
+
+/-- Exact endpoint of the first approach-foreign macro.  The older
+periodicity theorem intentionally hid this configuration behind an
+existential; the pointwise lift needs its port and tongue vector exposed. -/
+theorem manufactured_flip_candy_splice_approach_foreign_lead_endpoint
+    {w : Wiring} {g e outside entry mouth returnPort : Nat}
+    (R : ManufacturedFlipReflector w e g)
+    (state : Tongues)
+    (hpaths : PathGrooves R.toSupported.paths state)
+    {oldPrefix oldTail approach : List Passage}
+    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
+      oldPrefix ++ (entry, mouth) :: oldTail)
+    (htail : PhysicalTrace w (outside, state) oldTail
+      ((ManufacturedReflector.flip R).orientedFinish state, state))
+    (hnotRunway : (entry, mouth) ∉ R.runway)
+    {old : Passage} (hold : old ∈ R.candy)
+    (horientation : (entry, mouth) = old ∨
+      (entry, mouth) = (old.2, old.1))
+    (hentryGrooved : arrive state entry = (mouth, state))
+    (happroach : PhysicalTrace w (g, state) approach
+      (returnPort, state))
+    (happroachForeignNew : ∀ passage ∈ approach,
+      passageSwitch passage ≠ mouth / 3)
+    (happroachForeignOld : ∀ passage ∈ approach,
+      passageSwitch passage ≠ R.actionSwitch)
+    (hcrossed : arrive state returnPort =
+      (mouth, flipAt state (mouth / 3)))
+    (hmouthLink : w.link mouth = some outside) :
+    stepN w (oldTail.length + R.runway.length +
+        approach.length + 2)
+      (outside, flipAt state (mouth / 3)) =
+        some (outside,
+          flipAt (flipAt state (mouth / 3)) R.actionSwitch) := by
+  let finish := (ManufacturedReflector.flip R).orientedFinish state
+  let completion := oldTail ++
+    ((finish, R.mouth) :: reversePassages R.runway)
+  have hentryNew : entry / 3 = mouth / 3 := by
+    have hs := arrive_exit_switch state entry
+    rw [hentryGrooved] at hs
+    exact hs.symm
+  have hentryOld : entry / 3 ≠ R.actionSwitch :=
+    R.candy_entry_foreign_action hold horientation
+  have hnewOld : mouth / 3 ≠ R.actionSwitch := by
+    intro hEq
+    exact hentryOld (hentryNew.trans hEq)
+  have hreturnNew : returnPort / 3 = mouth / 3 := by
+    have hs := arrive_exit_switch state returnPort
+    rw [hcrossed] at hs
+    exact hs.symm
+  have hreturnOld : returnPort / 3 ≠ R.actionSwitch := by
+    rw [hreturnNew]
+    exact hnewOld
+  have hcompletionData := R.candy_completion_foreign state hpaths
+    hsplit htail hnotRunway hold horientation
+  change PhysicalTrace w (outside, state) completion
+      (g, flipAt state R.actionSwitch) ∧
+    (∀ passage ∈ completion,
+      passageSwitch passage ≠ entry / 3) at hcompletionData
+  have hcompletionForeignNew : ∀ passage ∈ completion,
+      passageSwitch passage ≠ mouth / 3 := by
+    intro passage hp hEq
+    exact hcompletionData.2 passage hp (hEq.trans hentryNew.symm)
+  have hcomm :
+      flipAt (flipAt state R.actionSwitch) (mouth / 3) =
+        flipAt (flipAt state (mouth / 3)) R.actionSwitch :=
+    flipAt_comm (Ne.symm hnewOld)
+  have hcompletionNew :=
+    hcompletionData.1.flip_unvisited hcompletionForeignNew
+  rw [hcomm] at hcompletionNew
+  have happroachNew :=
+    happroach.flip_unvisited happroachForeignNew
+  have happroachBoth :=
+    happroachNew.flip_unvisited happroachForeignOld
+  have hback := arrive_back state returnPort
+  rw [hcrossed] at hback
+  have hcontactNew :
+      arrive (flipAt state (mouth / 3)) returnPort =
+        (mouth, flipAt state (mouth / 3)) :=
+    groove_forward hback
+  have hcontactBoth := arrive_flip_other hcontactNew hreturnOld
+  have hcontactTrace : PhysicalTrace w
+      (returnPort,
+        flipAt (flipAt state (mouth / 3)) R.actionSwitch)
+      [(returnPort, mouth)]
+      (outside,
+        flipAt (flipAt state (mouth / 3)) R.actionSwitch) :=
+    PhysicalTrace.cons hcontactBoth hmouthLink (PhysicalTrace.nil _)
+  have hleadTrace :=
+    (hcompletionNew.append happroachBoth).append hcontactTrace
+  simpa [completion, List.length_append, reversePassages_length,
+    Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hleadTrace.sound
+
+/-- The approach-foreign branch has the same two-vector phase law for all
+future times: one lead macro reaches the doubly-latched state, and every
+subsequent macro is pointwise constant there. -/
+theorem manufactured_flip_candy_splice_approach_foreign_all_two_phases
+    {w : Wiring} {g e outside entry mouth returnPort : Nat}
+    (R : ManufacturedFlipReflector w e g)
+    (state : Tongues)
+    (hpaths : PathGrooves R.toSupported.paths state)
+    {oldPrefix oldTail approach : List Passage}
+    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
+      oldPrefix ++ (entry, mouth) :: oldTail)
+    (htail : PhysicalTrace w (outside, state) oldTail
+      ((ManufacturedReflector.flip R).orientedFinish state, state))
+    (hnotRunway : (entry, mouth) ∉ R.runway)
+    (hentryBranch : entry % 3 ≠ 0)
+    {old : Passage} (hold : old ∈ R.candy)
+    (horientation : (entry, mouth) = old ∨
+      (entry, mouth) = (old.2, old.1))
+    (hentryGrooved : arrive state entry = (mouth, state))
+    (happroach : PhysicalTrace w (g, state) approach
+      (returnPort, state))
+    (happroachGrooved : PassagesGrooved state approach)
+    (happroachForeignNew : ∀ passage ∈ approach,
+      passageSwitch passage ≠ mouth / 3)
+    (happroachForeignOld : ∀ passage ∈ approach,
+      passageSwitch passage ≠ R.actionSwitch)
+    (hcrossed : arrive state returnPort =
+      (mouth, flipAt state (mouth / 3)))
+    (hmouthLink : w.link mouth = some outside) :
+    ∀ d, ∃ port phase,
+      stepN w d (outside, flipAt state (mouth / 3)) =
+          some (port, phase) ∧
+        (phase = flipAt state (mouth / 3) ∨
+          phase = flipAt (flipAt state (mouth / 3))
+            R.actionSwitch) := by
+  let period := oldTail.length + R.runway.length +
+    approach.length + 2
+  let newState := flipAt state (mouth / 3)
+  let bothState := flipAt newState R.actionSwitch
+  have hlead : stepN w period (outside, newState) =
+      some (outside, bothState) := by
+    have hclosed :=
+      manufactured_flip_candy_splice_approach_foreign_lead_endpoint
+        R state hpaths hsplit htail hnotRunway hold horientation
+        hentryGrooved happroach happroachForeignNew
+        happroachForeignOld hcrossed hmouthLink
+    simpa [period, newState, bothState] using hclosed
+  have hsettledPeriod : stepN w period (outside, bothState) =
+      some (outside, bothState) := by
+    obtain ⟨settled, hleadOpaque, hperiodOpaque⟩ :=
+      (manufactured_flip_candy_splice_periodic_of_approach_foreign
+        R state hpaths hsplit htail hnotRunway hentryBranch hold
+        horientation hentryGrooved happroach happroachForeignNew
+        happroachForeignOld hcrossed hmouthLink).2
+    have hsettled : settled = (outside, bothState) := by
+      have hs : some settled = some (outside, bothState) := by
+        rw [← hleadOpaque]
+        simpa [period, newState, bothState] using hlead
+      exact Option.some.inj hs
+    subst settled
+    simpa [period, bothState, newState] using hperiodOpaque
+  have hpositive : 0 < period := by
+    dsimp [period]
+    omega
+  have hsettledAll : ∀ d, ∃ port,
+      stepN w d (outside, bothState) = some (port, bothState) := by
+    intro d
+    obtain ⟨port, phase, hrun, hphase⟩ :=
+      periodic_two_phase_prefix_tongues hpositive hsettledPeriod
+        (v := bothState) (fun r hr => by
+          obtain ⟨port, hlocal⟩ :=
+            manufactured_flip_candy_splice_approach_foreign_settled_tongues
+              R state hpaths hsplit htail hnotRunway hentryBranch hold
+              horientation hentryGrooved happroach happroachGrooved
+              happroachForeignNew happroachForeignOld hcrossed hmouthLink
+              (by simpa [period] using hr)
+          exact ⟨port, bothState, by
+            simpa [bothState, newState] using hlocal, Or.inl rfl⟩) d
+    rcases hphase with rfl | rfl
+    · exact ⟨port, hrun⟩
+    · exact ⟨port, hrun⟩
+  intro d
+  by_cases hfirst : d <= period
+  · exact manufactured_flip_candy_splice_approach_foreign_two_phases
+      R state hpaths hsplit htail hnotRunway hentryBranch hold
+      horientation hentryGrooved happroach happroachGrooved
+      happroachForeignNew happroachForeignOld hcrossed hmouthLink
+      (by simpa [period] using hfirst)
+  · let r := d - period
+    have hd : d = period + r := by
+      dsimp [r]
+      omega
+    obtain ⟨port, hrun⟩ := hsettledAll r
+    refine ⟨port, bothState, ?_, Or.inr ?_⟩
+    · rw [hd, stepN_add, hlead]
+      exact hrun
+    · rfl
+
+/-- Unrestricted-time novelty cover for the approach-foreign orbit. -/
+theorem manufactured_flip_candy_splice_approach_foreign_all_one_novelty
+    {w : Wiring} {g e outside entry mouth returnPort : Nat}
+    (R : ManufacturedFlipReflector w e g)
+    (state : Tongues)
+    (hpaths : PathGrooves R.toSupported.paths state)
+    {oldPrefix oldTail approach : List Passage}
+    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
+      oldPrefix ++ (entry, mouth) :: oldTail)
+    (htail : PhysicalTrace w (outside, state) oldTail
+      ((ManufacturedReflector.flip R).orientedFinish state, state))
+    (hnotRunway : (entry, mouth) ∉ R.runway)
+    (hentryBranch : entry % 3 ≠ 0)
+    {old : Passage} (hold : old ∈ R.candy)
+    (horientation : (entry, mouth) = old ∨
+      (entry, mouth) = (old.2, old.1))
+    (hentryGrooved : arrive state entry = (mouth, state))
+    (happroach : PhysicalTrace w (g, state) approach
+      (returnPort, state))
+    (happroachGrooved : PassagesGrooved state approach)
+    (happroachForeignNew : ∀ passage ∈ approach,
+      passageSwitch passage ≠ mouth / 3)
+    (happroachForeignOld : ∀ passage ∈ approach,
+      passageSwitch passage ≠ R.actionSwitch)
+    (hcrossed : arrive state returnPort =
+      (mouth, flipAt state (mouth / 3)))
+    (hmouthLink : w.link mouth = some outside)
+    (N : Nat) (history : List (List Bool))
+    (hinitial : VectorCount.restrict N
+      (flipAt state (mouth / 3)) ∈ history)
+    (times : List Nat) :
+    NoveltyCoverOn w N (outside, flipAt state (mouth / 3))
+      times history 1 := by
+  apply noveltyCoverOn_one_fresh_of_two_phases
+    (v := flipAt (flipAt state (mouth / 3)) R.actionSwitch)
+  · intro d _hd
+    exact manufactured_flip_candy_splice_approach_foreign_all_two_phases
+      R state hpaths hsplit htail hnotRunway hentryBranch hold
+      horientation hentryGrooved happroach happroachGrooved
+      happroachForeignNew happroachForeignOld hcrossed hmouthLink d
+  · exact hinitial
+
 /-! ## The approach-contact candy splice -/
 
 /-- **Pointwise phase law for the approach-contact candy splice.**
@@ -909,5 +1360,182 @@ theorem manufactured_flip_candy_splice_approach_contact_all_one_novelty
       horientation hentryGrooved happroach happroachGrooved
       happroachForeignNew hcrossed hmouthLink harms hcontact d
   · exact hinitial
+
+/-! ## Absolute-time changed-forward lift -/
+
+/-- Shift a relative two-phase law into an arbitrary ambient trajectory.
+All times before the splice are required to be historical; from the splice
+time onward the local initial phase is historical and only the second phase
+can be fresh. -/
+theorem noveltyCoverOn_absolute_of_relative_two_phases
+    {w : Wiring} {N K localPort : Nat}
+    {start : Nat × Tongues} {u v : Tongues}
+    {times : List Nat} {history : List (List Bool)}
+    (hreach : stepN w K start = some (localPort, u))
+    (hphase : ∀ d, ∃ port phase,
+      stepN w d (localPort, u) = some (port, phase) ∧
+        (phase = u ∨ phase = v))
+    (hu : VectorCount.restrict N u ∈ history)
+    (hlead : ∀ j ∈ times, j < K →
+      restrictedTonguesAt w N start j ∈ history) :
+    NoveltyCoverOn w N start times history 1 := by
+  refine ⟨[VectorCount.restrict N v], by simp, ?_⟩
+  intro j hj
+  by_cases hjK : j < K
+  · exact List.mem_append_left _ (hlead j hj hjK)
+  · let d := j - K
+    have hjEq : j = K + d := by
+      dsimp [d]
+      omega
+    obtain ⟨port, phase, hlocal, hphaseEq⟩ := hphase d
+    have hglobal : stepN w j start = some (port, phase) := by
+      rw [hjEq, stepN_add, hreach]
+      exact hlocal
+    have hvector : restrictedTonguesAt w N start j =
+        VectorCount.restrict N phase := by
+      simp [restrictedTonguesAt, tonguesAt, hglobal]
+    rw [hvector]
+    rcases hphaseEq with rfl | rfl
+    · exact List.mem_append_left _ hu
+    · exact List.mem_append_right history (by simp)
+
+/-- **Single absolute-time candy-splice theorem.**
+
+This combines the approach-contact and approach-foreign branches.  The
+ambient run reaches the splice at absolute time `K`; its earlier selected
+times are historical.  The entire residual from `K` onward—including the
+first completion and the eventual paired-reflector cycle—uses the historical
+splice vector plus at most the one doubly-latched vector.  No route-length
+quantity appears in the budget. -/
+theorem manufactured_flip_candy_splice_absolute_one_novelty
+    {w : Wiring} {g e outside entry mouth returnPort : Nat}
+    (R : ManufacturedFlipReflector w e g)
+    (state : Tongues)
+    (hpaths : PathGrooves R.toSupported.paths state)
+    {oldPrefix oldTail approach : List Passage}
+    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
+      oldPrefix ++ (entry, mouth) :: oldTail)
+    (htail : PhysicalTrace w (outside, state) oldTail
+      ((ManufacturedReflector.flip R).orientedFinish state, state))
+    (hnotRunway : (entry, mouth) ∉ R.runway)
+    (hentryBranch : entry % 3 ≠ 0)
+    {old : Passage} (hold : old ∈ R.candy)
+    (horientation : (entry, mouth) = old ∨
+      (entry, mouth) = (old.2, old.1))
+    (hentryGrooved : arrive state entry = (mouth, state))
+    (happroach : PhysicalTrace w (g, state) approach
+      (returnPort, state))
+    (happroachGrooved : PassagesGrooved state approach)
+    (happroachForeignNew : ∀ passage ∈ approach,
+      passageSwitch passage ≠ mouth / 3)
+    (hcrossed : arrive state returnPort =
+      (mouth, flipAt state (mouth / 3)))
+    (hmouthLink : w.link mouth = some outside)
+    (harms : entry ≠ returnPort)
+    {start : Nat × Tongues} {K : Nat}
+    (hreach : stepN w K start =
+      some (outside, flipAt state (mouth / 3)))
+    (N : Nat) (history : List (List Bool))
+    (hinitial : VectorCount.restrict N
+      (flipAt state (mouth / 3)) ∈ history)
+    (times : List Nat)
+    (hleadHistorical : ∀ j ∈ times, j < K →
+      restrictedTonguesAt w N start j ∈ history) :
+    NoveltyCoverOn w N start times history 1 := by
+  apply noveltyCoverOn_absolute_of_relative_two_phases hreach
+    (v := flipAt (flipAt state (mouth / 3)) R.actionSwitch)
+  · intro d
+    by_cases hcontact : ∃ passage ∈ approach,
+        passageSwitch passage = R.actionSwitch
+    · exact manufactured_flip_candy_splice_approach_contact_all_two_phases
+        R state hpaths hsplit htail hnotRunway hentryBranch hold
+        horientation hentryGrooved happroach happroachGrooved
+        happroachForeignNew hcrossed hmouthLink harms hcontact d
+    · have happroachForeignOld : ∀ passage ∈ approach,
+          passageSwitch passage ≠ R.actionSwitch := by
+        intro passage hp hEq
+        exact hcontact ⟨passage, hp, hEq⟩
+      exact manufactured_flip_candy_splice_approach_foreign_all_two_phases
+        R state hpaths hsplit htail hnotRunway hentryBranch hold
+        horientation hentryGrooved happroach happroachGrooved
+        happroachForeignNew happroachForeignOld hcrossed hmouthLink d
+  · exact hinitial
+  · exact hleadHistorical
+
+/-- `spliced_lobe_reflector` supplies every geometric and dynamic premise of
+the absolute theorem.  Therefore an arbitrary changed-forward merge into a
+flip reflector has just two possibilities: the selected old passage lies on
+the runway (the separately handled runway residual), or the complete strict
+candy residual has an absolute one-novelty cover.
+
+The history premise is deliberately explicit and independent of the sampled
+times: it covers the construction lead through `A.travel`.  Since the splice
+time is at most that travel, the splice's initial vector is historical. -/
+theorem ManufacturedReflector.ChangedForwardMerge.runway_or_candy_absolute_one_novelty
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {R : ManufacturedFlipReflector w e g}
+    (hmerge : A.ChangedForwardMerge (.flip R))
+    (N : Nat) (history : List (List Bool))
+    (hleadHistorical : ∀ j, j ≤ A.toSupported.travel →
+      restrictedTonguesAt w N
+        (g, (ManufacturedReflector.flip R).activatedState) j ∈ history)
+    (times : List Nat) :
+    (∃ entry mouth state,
+      (entry, mouth) ∈
+        (ManufacturedReflector.flip R).orientedRoute state ∧
+      (entry, mouth) ∈ R.runway) ∨
+    NoveltyCoverOn w N
+      (g, (ManufacturedReflector.flip R).activatedState)
+      times history 1 := by
+  obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
+      approach, _candy, state, leadSteps, _tailSteps, horiented,
+      hrouteSplit, hOldTail, hApproach, hApproachGrooved,
+      hApproachForeign, _hCandyEq, hentryBranch, _hmouthStem,
+      hmouthLink, harms, hfullGrooved, _hfullTrace, hcrossed,
+      hRpaths, _hCandy, _hCandyForeign, _hLobe, hreach,
+      _hcomplete, hleadLen, _htailLen, happroachLe⟩ :=
+    hmerge.spliced_lobe_reflector
+  by_cases hrunway : (entry, mouth) ∈ R.runway
+  · exact Or.inl ⟨entry, mouth, state, horiented, hrunway⟩
+  · right
+    obtain ⟨old, hold, horientation⟩ :=
+      R.nonrunway_oriented_branch_entry_is_candy state
+        horiented hrunway hentryBranch
+    have hentryGrooved : arrive state entry = (mouth, state) :=
+      hfullGrooved (mouth, entry) List.mem_cons_self
+    have hleadLe : leadSteps ≤ A.toSupported.travel := by
+      rw [hleadLen]
+      exact happroachLe
+    have hinitial : VectorCount.restrict N
+        (flipAt state (mouth / 3)) ∈ history := by
+      have hvector : restrictedTonguesAt w N
+          (g, (ManufacturedReflector.flip R).activatedState)
+          leadSteps =
+          VectorCount.restrict N (flipAt state (mouth / 3)) := by
+        simp [restrictedTonguesAt, tonguesAt, hreach]
+      rw [← hvector]
+      exact hleadHistorical leadSteps hleadLe
+    apply manufactured_flip_candy_splice_absolute_one_novelty
+      R state hRpaths hrouteSplit hOldTail hrunway hentryBranch
+      hold horientation hentryGrooved hApproach hApproachGrooved
+      hApproachForeign hcrossed hmouthLink harms hreach
+      N history hinitial times
+    intro j _hj hjLead
+    apply hleadHistorical j
+    omega
+
+/-- Budget handoff used by the global assembly: a pre-existing four-exception
+cover followed by this one-exception candy residual remains inside the
+absolute five-exception budget. -/
+theorem four_cover_then_candy_splice_five
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    {priorTimes spliceTimes : List Nat}
+    {history : List (List Bool)}
+    (hprior : FourNoveltyCover w N start priorTimes history)
+    (hsplice : NoveltyCoverOn w N start spliceTimes history 1) :
+    NoveltyCoverOn w N start (priorTimes ++ spliceTimes) history 5 := by
+  have hcombined := noveltyCoverOn_append hprior hsplice
+  simpa [FourNoveltyCover] using hcombined
 
 end GeneralN
