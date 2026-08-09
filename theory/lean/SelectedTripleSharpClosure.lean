@@ -1,6 +1,7 @@
 import SharpSixEventAssembly
 import MellitRamanBABAAssembly
 import MinimalBABAQuietCharge
+import RamanOuterGapStrictDescent
 
 /-!
 # Sharp closure of one selected endpoint triple
@@ -196,5 +197,152 @@ theorem RawSelectedEndpointTripleResidue.sharp_closure
       (hmin.charge_replay_closure hN C)
   · obtain ⟨S⟩ := hstrict
     exact .strictNest S
+
+/-! ## Sharpen the strict nest when its erased event provenance is restored -/
+
+/-- The transparent provenance relation which the current
+`RawSelectedEndpointTripleResidue` structure does not store: each of its five
+closing times is one of the canonical six selected novelties. -/
+def RawSelectedEndpointTripleResidue.ClosesInSelectedWindow
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    (T : RawSelectedEndpointTripleResidue w N start) : Prop :=
+  ∀ i, RawSixSelectedTime C (T.tripleCase.frames.closingAt i)
+
+/-- The one genuinely recursive strict-nest residue: a selected novelty lies
+strictly inside the innermost selected frame.  Its selected close time is
+strictly smaller than that frame's selected close time. -/
+structure SelectedStrictNestEarlierSelected
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    {z0 z1 z2 z3 z4 : Nat}
+    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
+    (S : SelectedFiveFrameStrictNest T) : Type where
+  k : Nat
+  afterOpening : T.frames.openingAt S.i0 < k
+  beforeClosing : k < T.frames.closingAt S.i0
+  selected : RawSixSelectedTime C k
+
+/-- The innermost close of a selected strict nest cannot have a completely
+quiet interior.  Otherwise the quiet-frame replay theorem contradicts the
+novelty of that selected close. -/
+theorem SelectedFiveFrameStrictNest.innermost_has_productive
+    {w : Wiring} {N : Nat}
+    (hN : ∀ a b, w.link a = some b →
+      a < 3 * N ∧ b < 3 * N)
+    {start : Nat × Tongues}
+    {z0 z1 z2 z3 z4 : Nat}
+    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
+    (S : SelectedFiveFrameStrictNest T)
+    (hnovel : RawNovelAt w N start (T.frames.closingAt S.i0)) :
+    ∃ k,
+      T.frames.openingAt S.i0 < k ∧
+      k < T.frames.closingAt S.i0 ∧
+      RawProductiveAt w N start k := by
+  by_cases hex : ∃ k,
+      T.frames.openingAt S.i0 < k ∧
+      k < T.frames.closingAt S.i0 ∧
+      RawProductiveAt w N start k
+  · exact hex
+  · exfalso
+    apply (T.frames.outerAt S.i0).quiet_close_not_novel hN
+      (fun k hopen hclose hprod => by
+        apply hex
+        exact ⟨k, hopen, hclose, hprod⟩)
+    exact hnovel
+
+/-- Paid outcomes for the strict nest, plus its single smallest recursive
+constructor.  A productive event strictly inside the innermost selected
+frame is either a first-writer charge, an earlier-vector replay, or an
+earlier selected novelty. -/
+inductive SelectedStrictNestSharpClosure
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    {z0 z1 z2 z3 z4 : Nat}
+    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
+    (S : SelectedFiveFrameStrictNest T) : Prop
+  | firstWriterCharge (k : Nat)
+      (hopen : T.frames.openingAt S.i0 < k)
+      (hclose : k < T.frames.closingAt S.i0)
+      (hfirst : RawFirstWriterAt w N start k)
+  | earlierReplay (k : Nat)
+      (hopen : T.frames.openingAt S.i0 < k)
+      (hclose : k < T.frames.closingAt S.i0)
+      (hreplay : RamanEarlierVectorReplayAt w N start k)
+  | earlierSelected
+      (residue : Nonempty (SelectedStrictNestEarlierSelected C S))
+
+/-- Restore the selected-event provenance and close two of the three strict
+nest branches immediately.  The `afterSelectedTail` case is impossible
+because the productive witness occurs before a selected close. -/
+theorem SelectedFiveFrameStrictNest.sharp_closure
+    {w : Wiring} {N : Nat}
+    (hN : ∀ a b, w.link a = some b →
+      a < 3 * N ∧ b < 3 * N)
+    {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    {z0 z1 z2 z3 z4 : Nat}
+    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
+    (S : SelectedFiveFrameStrictNest T)
+    (hselected : ∀ i,
+      RawSixSelectedTime C (T.frames.closingAt i)) :
+    SelectedStrictNestSharpClosure C S := by
+  have hcloseSelected := hselected S.i0
+  have hcloseEvent := hcloseSelected.rawRepeatedWriterNovelAt
+  obtain ⟨k, hopen, hclose, hprod⟩ :=
+    S.innermost_has_productive hN hcloseEvent.2.2
+  rcases rawProductiveAt_outer_disposition C hprod with
+    hlate | hfirst | hreplay | hkSelected
+  · have hcloseLe : T.frames.closingAt S.i0 ≤ C.z5 :=
+      hcloseSelected.le_z5
+    omega
+  · exact .firstWriterCharge k hopen hclose hfirst
+  · exact .earlierReplay k hopen hclose hreplay
+  · exact .earlierSelected ⟨{
+      k := k
+      afterOpening := hopen
+      beforeClosing := hclose
+      selected := hkSelected
+    }⟩
+
+/-- Refined selected-triple closure with the erased close-time provenance
+supplied explicitly.  The only non-paid/non-physical leaf is now
+`SelectedStrictNestEarlierSelected`, whose close time strictly decreases. -/
+inductive SelectedTripleSharpClosureWithWindow
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    (T : RawSelectedEndpointTripleResidue w N start) : Prop
+  | abcabc
+      (S : SelectedFiveFrameABCABC T.tripleCase)
+      (prior second reroute third : Nat)
+      (B : RawBABAInterlacement
+        w N start prior second reroute third)
+      (minimal : RawBABAOverlapMinimal B)
+      (closed : RawBABAChargeReplayClosure C B)
+  | strictNest
+      (S : SelectedFiveFrameStrictNest T.tripleCase)
+      (closed : SelectedStrictNestSharpClosure C S)
+
+/-- Refined version of `sharp_closure`: with the exact selected-close
+relation restored, strict nesting is paid or recurses to one strictly earlier
+selected close. -/
+theorem RawSelectedEndpointTripleResidue.sharp_closure_with_window
+    {w : Wiring} {N : Nat}
+    (hN : ∀ a b, w.link a = some b →
+      a < 3 * N ∧ b < 3 * N)
+    {start : Nat × Tongues}
+    (C : RawOverlappingFiveWindowReduction w N start)
+    (T : RawSelectedEndpointTripleResidue w N start)
+    (hselected : T.ClosesInSelectedWindow C) :
+    SelectedTripleSharpClosureWithWindow C T := by
+  rcases T.selected with habc | hstrict
+  · obtain ⟨S⟩ := habc
+    let B0 := S.first_pair_rawBABA
+    obtain ⟨prior, second, reroute, third, B, hmin⟩ :=
+      B0.exists_overlap_minimal
+    exact .abcabc S prior second reroute third B hmin
+      (hmin.charge_replay_closure hN C)
+  · obtain ⟨S⟩ := hstrict
+    exact .strictNest S (S.sharp_closure hN C hselected)
 
 end GeneralN
