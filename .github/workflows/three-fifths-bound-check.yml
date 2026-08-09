@@ -11,6 +11,7 @@ on:
       - theory/lean/TwoReflectorFiniteTrap.lean
       - theory/lean/LobeVariationVisit.lean
       - theory/lean/FullyLoadedTreeImpossible.lean
+      - theory/lean/TreeLobeLoadBound.lean
       - .github/workflows/three-fifths-bound-check.yml
   workflow_dispatch:
 jobs:
@@ -47,8 +48,10 @@ jobs:
           name = "LobeVariationVisit"
           [[lean_lib]]
           name = "FullyLoadedTreeImpossible"
+          [[lean_lib]]
+          name = "TreeLobeLoadBound"
           EOF
       - name: Build improved component bounds
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TreeLobeLoadThreeFifths TreeLobeNotFullTwoThirds LobePartnerBounce LobeToggle TwoReflectorEdgeTrap TwoReflectorFiniteTrap LobeVariationVisit FullyLoadedTreeImpossible
+          lake build TreeLobeLoadThreeFifths TreeLobeNotFullTwoThirds LobePartnerBounce LobeToggle TwoReflectorEdgeTrap TwoReflectorFiniteTrap LobeVariationVisit FullyLoadedTreeImpossible TreeLobeLoadBound
