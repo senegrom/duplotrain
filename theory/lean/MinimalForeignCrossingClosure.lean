@@ -366,4 +366,171 @@ theorem RawBABAOverlapMinimal.pure_foreign_strict_descent_package
     exact hmin.inner_raw_frame_lobe_or_strict_descent
       hN hpure F hsecond hopening
 
+/-- If any raw frame opens in the overlap, one has a least closing time.
+This is the well-founded selector used below; it minimizes an actual natural
+time, not a newly assumed certificate. -/
+private theorem exists_minimal_close_interior_raw_frame
+    {w : Wiring} {N : Nat} {start : Nat × Tongues}
+    {second reroute : Nat}
+    (hex : ∃ opening closing,
+      second < opening ∧ opening < reroute ∧
+      RawLastWriterFrame w N start opening closing) :
+    ∃ opening closing,
+      second < opening ∧ opening < reroute ∧
+      RawLastWriterFrame w N start opening closing ∧
+      ∀ opening' closing',
+        second < opening' →
+        opening' < reroute →
+        RawLastWriterFrame w N start opening' closing' →
+        closing' < closing → False := by
+  obtain ⟨opening0, closing0, hsecond0, hopen0, F0⟩ := hex
+  let P : Nat → Prop := fun closing =>
+    ∃ opening,
+      second < opening ∧ opening < reroute ∧
+      RawLastWriterFrame w N start opening closing
+  have hsecondClose0 : second < closing0 :=
+    Nat.lt_trans hsecond0 F0.order
+  have hbounded :
+      ∃ closing, second < closing ∧ closing < closing0 + 1 ∧ P closing := by
+    exact ⟨closing0, hsecondClose0, by omega,
+      ⟨opening0, hsecond0, hopen0, F0⟩⟩
+  obtain ⟨closing, hsecondClose, _hbound, hP, hfirst⟩ :=
+    exists_first_between_of_exists P second (closing0 + 1) hbounded
+  obtain ⟨opening, hsecond, hopen, F⟩ := hP
+  refine ⟨opening, closing, hsecond, hopen, F, ?_⟩
+  intro opening' closing' hsecond' hopen' F' hclose'
+  have hsecondClose' : second < closing' :=
+    Nat.lt_trans hsecond' F'.order
+  exact hfirst closing' hsecondClose' hclose'
+    ⟨opening', hsecond', hopen', F'⟩
+
+/-- **Sharp assumption-free residue of a pure overlap-minimal BABA.**
+
+Either an interior raw frame reaches a physical direct lobe, an interior
+productive event is a globally first writer, there is no interior
+last-writer frame at all, or there is a least-closing foreign frame wholly
+inside the overlap and its open interval is raw-quiet.
+
+The last two alternatives are the exact missing existence/routing lemma.
+Order minimality alone cannot manufacture a productive event inside a quiet
+physical route.  In particular this theorem does not call the pure crossing
+eliminated and does not treat the sparse overwrite sequence as an IsRun. -/
+theorem RawBABAOverlapMinimal.pure_foreign_lobe_charge_or_quiet_residual
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    {prior second reroute third : Nat}
+    {B : RawBABAInterlacement
+      w N start prior second reroute third}
+    (hmin : RawBABAOverlapMinimal B)
+    (hpure : Echo.ForeignRestorationCrossing
+      (rawOverwriteMachine w) (rawOverwriteEntry w N start)
+      (rawOverwriteInitial start)
+      prior reroute second third) :
+    (∃ k, RawReachedDirectLobeAt w start k) ∨
+    (∃ k, second < k ∧ k < reroute ∧
+      RawFirstWriterAt w N start k) ∨
+    ((∀ opening closing,
+        second < opening →
+        opening < reroute →
+        RawLastWriterFrame w N start opening closing →
+        False) ∨
+      ∃ opening closing,
+        second < opening ∧
+        opening < reroute ∧
+        opening < closing ∧
+        closing < reroute ∧
+        Echo.ForeignRestorationFrame
+          (rawOverwriteMachine w) (rawOverwriteEntry w N start)
+          (rawOverwriteInitial start) opening closing ∧
+        (∀ opening' closing',
+          second < opening' →
+          opening' < reroute →
+          RawLastWriterFrame w N start opening' closing' →
+          closing' < closing → False) ∧
+        (∀ k, opening < k → k < closing →
+          ¬ RawProductiveAt w N start k)) := by
+  classical
+  by_cases hex : ∃ opening closing,
+      second < opening ∧ opening < reroute ∧
+      RawLastWriterFrame w N start opening closing
+  · obtain ⟨opening, closing, hsecond, hopen, F, hminimal⟩ :=
+      exists_minimal_close_interior_raw_frame hex
+    rcases F.endpoint_lobe_or_foreign_restoration hN with
+      hlobeOpen | hlobeClose | hforeign
+    · exact Or.inl
+        ⟨closing,
+          F.endpoint_lobe_reaches_close hN (Or.inl hlobeOpen)⟩
+    · exact Or.inl
+        ⟨closing,
+          F.endpoint_lobe_reaches_close hN (Or.inr hlobeClose)⟩
+    · have hclose : closing < reroute :=
+        (hmin.pure_foreign_strict_descent_package hN hpure).1
+          opening closing hforeign hsecond hopen
+      have hinteriorFirst :
+          ∀ k, opening < k → k < closing →
+            RawProductiveAt w N start k →
+            RawFirstWriterAt w N start k := by
+        intro k hopenK hkClose hprod
+        by_cases hfirst : RawFirstWriterAt w N start k
+        · exact hfirst
+        · obtain ⟨left, G⟩ :=
+            last_writer_frame_of_productive_not_first hprod hfirst
+          by_cases hleftLe : left ≤ second
+          · have hleftLt : left < second := by
+              by_cases hleftEq : left = second
+              · subst left
+                have hkThird : k < third :=
+                  Nat.lt_trans (Nat.lt_trans hkClose hclose) B.reroute_lt_third
+                have hne :=
+                  B.rightFrame.no_same_writer_between k
+                    (by omega) hkThird hprod
+                exact (hne
+                  (G.same_writer.symm.trans
+                    B.rightFrame.same_writer)).elim
+              · omega
+            have hkThird : k < third :=
+              Nat.lt_trans (Nat.lt_trans hkClose hclose) B.reroute_lt_third
+            have hdiff :
+                rawWriterAt w start k ≠
+                  rawWriterAt w start third :=
+              B.rightFrame.no_same_writer_between k
+                (by omega) hkThird hprod
+            let C : RawBABAInterlacement
+                w N start left second k third := {
+              prior_lt_second := hleftLt
+              second_lt_reroute := by omega
+              reroute_lt_third := hkThird
+              leftFrame := G
+              rightFrame := B.rightFrame
+              different_writers := hdiff
+            }
+            have hsmaller : C.overlap < B.overlap := by
+              change k - second < reroute - second
+              omega
+            exact (hmin left second k third C hsmaller).elim
+          · have hsecondLeft : second < left := by omega
+            have hleftReroute : left < reroute :=
+              Nat.lt_trans G.order (Nat.lt_trans hkClose hclose)
+            exact (hminimal left k hsecondLeft hleftReroute
+              G hkClose).elim
+      by_cases hinterior : ∃ k,
+          opening < k ∧ k < closing ∧
+          RawProductiveAt w N start k
+      · obtain ⟨k, hopenK, hkClose, hprod⟩ := hinterior
+        exact Or.inr (Or.inl
+          ⟨k, by omega, by omega,
+            hinteriorFirst k hopenK hkClose hprod⟩)
+      · have hquiet : ∀ k, opening < k → k < closing →
+            ¬ RawProductiveAt w N start k := by
+          intro k hopenK hkClose hprod
+          exact hinterior ⟨k, hopenK, hkClose, hprod⟩
+        exact Or.inr (Or.inr (Or.inr
+          ⟨opening, closing, hsecond, hopen, F.order, hclose,
+            hforeign, hminimal, hquiet⟩))
+  · exact Or.inr (Or.inr (Or.inl (by
+      intro opening closing hsecond hopen F
+      exact hex ⟨opening, closing, hsecond, hopen, F⟩)))
+
 end GeneralN
