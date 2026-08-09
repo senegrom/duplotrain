@@ -1,0 +1,457 @@
+import TripleFramePhysicalClosure
+
+/-!
+# The self-linked escape in the five-frame obstruction
+
+The abstract triple obstruction can end at a fixed `bar` entry.  For the
+canonical raw-track compiler this is an external branch linked to itself.
+This file records the exact raw consequence: the selected switch makes a
+two-passage identity bounce, and any switch-simple runway leading to it is
+retraced completely without changing a tongue.
+
+The final section isolates the remaining global control-flow obligation.  It
+does not assume link irreflexivity and it does not call the local bounce a
+global replay.  The missing extraction must place the encountered bounce in
+the raw five-frame history and return either the already-forbidden complete
+echo replay or the existing `RunwayTailBeforeSecond` novelty certificate.
+-/
+
+namespace GeneralN
+
+/-! ## Exact raw semantics of a self-linked selected branch -/
+
+/-- A selected self-linked branch is literally the two recorded passages
+`stem -> branch -> stem`, after which the immutable stem edge leads to
+`outside`.  The full tongue vector is unchanged. -/
+theorem self_link_exact_two_passage_trace
+    {w : Wiring} {branch outside : Nat} {state : Tongues}
+    (hbranch : branch % 3 ≠ 0)
+    (hself : w.link branch = some branch)
+    (hmouth : w.link (3 * (branch / 3)) = some outside)
+    (hselected : state (branch / 3) = bval branch) :
+    PhysicalTrace w (3 * (branch / 3), state)
+      [(3 * (branch / 3), branch),
+       (branch, 3 * (branch / 3))]
+      (outside, state) := by
+  have hstemMod : (3 * (branch / 3)) % 3 = 0 := by omega
+  have hstemDiv : (3 * (branch / 3)) / 3 = branch / 3 := by omega
+  have hforward :
+      arrive state (3 * (branch / 3)) = (branch, state) := by
+    simp [arrive, hstemMod, hstemDiv, hselected,
+      branchPort_bval hbranch]
+  have hpin : pin state branch = state := pin_of_agrees hselected
+  have hback :
+      arrive state branch = (3 * (branch / 3), state) := by
+    simp [arrive, hbranch, hpin]
+  exact PhysicalTrace.cons hforward hself
+    (PhysicalTrace.cons hback hmouth (PhysicalTrace.nil _))
+
+/-- Step-count form of `self_link_exact_two_passage_trace`. -/
+theorem self_link_exact_two_step_bounce
+    {w : Wiring} {branch outside : Nat} {state : Tongues}
+    (hbranch : branch % 3 ≠ 0)
+    (hself : w.link branch = some branch)
+    (hmouth : w.link (3 * (branch / 3)) = some outside)
+    (hselected : state (branch / 3) = bval branch) :
+    stepN w 2 (3 * (branch / 3), state) = some (outside, state) := by
+  simpa using
+    (self_link_exact_two_passage_trace hbranch hself hmouth hselected).sound
+
+/-- Package the local self-link as the degenerate manufactured reflector used
+by the global repair theory.  Its runway is empty and its only support passage
+is the selected self-linked arm. -/
+theorem self_link_core_stay_reflector
+    {w : Wiring} {branch outside : Nat} {state : Tongues}
+    (hbranch : branch % 3 ≠ 0)
+    (hself : w.link branch = some branch)
+    (hmouth : w.link (3 * (branch / 3)) = some outside)
+    (hselected : state (branch / 3) = bval branch) :
+    Nonempty (ManufacturedStayReflector w
+      (3 * (branch / 3)) outside) := by
+  have hstemMod : (3 * (branch / 3)) % 3 = 0 := by omega
+  have hstemDiv : (3 * (branch / 3)) / 3 = branch / 3 := by omega
+  have hforward :
+      arrive state (3 * (branch / 3)) = (branch, state) := by
+    simp [arrive, hstemMod, hstemDiv, hselected,
+      branchPort_bval hbranch]
+  have hentry : w.link outside = some (3 * (branch / 3)) :=
+    w.symm _ _ hmouth
+  let R : ManufacturedStayReflector w
+      (3 * (branch / 3)) outside := {
+    base := state
+    mouthState := state
+    returnState := state
+    runway := []
+    mouth := 3 * (branch / 3)
+    arm := branch
+    runwayTrace := PhysicalTrace.nil _
+    coreTrace := PhysicalTrace.cons hforward hself (PhysicalTrace.nil _)
+    simple := by simp [SwitchSimple, passageSwitch]
+    stemEndpoint := Or.inl (by omega)
+    selfLink := hself
+    entryEdge := hentry
+  }
+  exact Nonempty.intro R
+
+/-- Sandwiching the local bounce behind an arbitrary switch-simple runway
+gives an exact identity reflector: the train traverses the runway, bounces on
+the self-link, retraces every runway passage, and returns across the incoming
+edge with the identical tongue vector. -/
+theorem self_link_retraces_switch_simple_runway
+    {w : Wiring} {start : Prod Nat Tongues}
+    {runway : List Passage} {branch incoming : Nat}
+    {state : Tongues}
+    (hrunway : PhysicalTrace w start runway
+      (3 * (branch / 3), state))
+    (hsimple : SwitchSimple
+      (runway ++ [(3 * (branch / 3), branch)]))
+    (hbranch : branch % 3 ≠ 0)
+    (hself : w.link branch = some branch)
+    (hentry : w.link incoming = some start.1)
+    (hselected : state (branch / 3) = bval branch) :
+    IsReflector w start.1 incoming (2 * runway.length + 2)
+      (fun u => PassagesGrooved u runway /\
+        arrive u branch = (3 * (branch / 3), u))
+      (fun u => u) := by
+  have hstemMod : (3 * (branch / 3)) % 3 = 0 := by omega
+  have hstemDiv : (3 * (branch / 3)) / 3 = branch / 3 := by omega
+  have hforward :
+      arrive state (3 * (branch / 3)) = (branch, state) := by
+    simp [arrive, hstemMod, hstemDiv, hselected,
+      branchPort_bval hbranch]
+  have hcore : PhysicalTrace w (3 * (branch / 3), state)
+      [(3 * (branch / 3), branch)] (branch, state) :=
+    PhysicalTrace.cons hforward hself (PhysicalTrace.nil _)
+  exact same_exit_revisit_full_reflector w hrunway hcore
+    hsimple hentry
+
+/-! ## Extraction from the certified fixed-entry branch -/
+
+/-- An encountered self-link in a certified run carries an exact raw
+two-passage bounce, not merely an abstract fixed point of `bar`. -/
+theorem certified_used_self_link_has_exact_bounce
+    {w : Wiring} {run : CertifiedConcreteEchoRun w}
+    (huse : CertifiedRunUsesSelfLink run) :
+    exists q outside,
+      w.link (run.entry q) = some (run.entry q) /\
+      forall state,
+        state (run.entry q / 3) = bval (run.entry q) ->
+        PhysicalTrace w (3 * (run.entry q / 3), state)
+          [(3 * (run.entry q / 3), run.entry q),
+           (run.entry q, 3 * (run.entry q / 3))]
+          (outside, state) := by
+  obtain ⟨q, hself⟩ := huse
+  have hslot := run.toConcreteAscentTrace.freeSlot q
+  rcases hslot.1 with ⟨initial, tail, landing, finish, hd⟩
+  cases hd with
+  | last hbranch hmouth _ =>
+      exact ⟨q, landing, hself, fun state hselected =>
+        self_link_exact_two_passage_trace
+          hbranch hself hmouth hselected⟩
+  | @cons _ p next landing tail _ hbranch hmouth _ _ =>
+      exact ⟨q, next, hself, fun state hselected =>
+        self_link_exact_two_passage_trace
+          hbranch hself hmouth hselected⟩
+
+/-- The same encountered self-link is an actual degenerate manufactured
+reflector in the raw wiring.  The selected state is chosen explicitly by
+pinning the encountered branch. -/
+theorem certified_used_self_link_has_stay_reflector
+    {w : Wiring} {run : CertifiedConcreteEchoRun w}
+    (huse : CertifiedRunUsesSelfLink run) :
+    exists q outside : Nat, exists state : Tongues,
+      state (run.entry q / 3) = bval (run.entry q) /\
+      Nonempty (ManufacturedStayReflector w
+        (3 * (run.entry q / 3)) outside) := by
+  obtain ⟨q, hself⟩ := huse
+  have hslot := run.toConcreteAscentTrace.freeSlot q
+  let state := pin (run.boundary q) (run.entry q)
+  have hselected : state (run.entry q / 3) = bval (run.entry q) := by
+    simp [state, pin]
+  rcases hslot.1 with ⟨initial, tail, landing, finish, hd⟩
+  cases hd with
+  | last hbranch hmouth _ =>
+      exact ⟨q, landing, state, hselected,
+        self_link_core_stay_reflector
+          hbranch hself hmouth hselected⟩
+  | @cons _ p next landing tail _ hbranch hmouth _ _ =>
+      exact ⟨q, next, state, hselected,
+        self_link_core_stay_reflector
+          hbranch hself hmouth hselected⟩
+
+/-- Concrete certificate form: the non-irreflexive escape selected by the
+triple obstruction always supplies a raw stay reflector. -/
+theorem CertifiedEndpointEmptyABCABC.forces_stay_reflector
+    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
+    {z0 z1 z2 z3 z4 : Nat}
+    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
+    {S : SelectedFiveFrameABCABC T}
+    (C : CertifiedEndpointEmptyABCABC S) :
+    exists q outside : Nat, exists state : Tongues,
+      state (C.run.entry q / 3) = bval (C.run.entry q) /\
+      Nonempty (ManufacturedStayReflector w
+        (3 * (C.run.entry q / 3)) outside) :=
+  certified_used_self_link_has_stay_reflector C.forces_used_self_link
+
+/-! ## Exact periodic closure once global repair reaches the self-link -/
+
+/-- If global repair reaches a changed-forward splice into the extracted
+identity reflector, the existing raw theta theorem gives a genuine periodic
+tail.  No irreflexivity premise is used. -/
+theorem changed_forward_into_self_link_is_periodic
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {R : ManufacturedStayReflector w e g}
+    (hmerge : A.ChangedForwardMerge (.stay R)) :
+    EventuallyPeriodic w
+      (g, (ManufacturedReflector.stay R).activatedState) :=
+  hmerge.eventuallyPeriodic_of_stay
+
+/-- In the compatible opposite-pair case, the self-link gives an exact
+complete raw-configuration replay after the standard two-reflector period. -/
+theorem flip_then_self_link_exact_period
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedFlipReflector w g e)
+    (R : ManufacturedStayReflector w e g)
+    (state : Tongues)
+    (hA : PathGrooves (ManufacturedReflector.flip A).toSupported.paths state)
+    (hR : PathGrooves (ManufacturedReflector.stay R).toSupported.paths state)
+    (hAR : (ManufacturedReflector.flip A).toSupported.action.Avoids
+      (ManufacturedReflector.stay R).toSupported.paths) :
+    stepN w (2 * ((ManufacturedReflector.flip A).toSupported.travel +
+        (ManufacturedReflector.stay R).toSupported.travel))
+      (g, state) = some (g, state) := by
+  exact (ManufacturedReflector.flip A).toSupported.paired_period
+    (ManufacturedReflector.stay R).toSupported hAR (by trivial)
+      state hA hR
+
+/-- The compatible flip/self-link pair has only two tongue vectors at every
+raw time, not merely at its macro endpoints. -/
+theorem flip_then_self_link_all_time_two_phase_tongues
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedFlipReflector w g e)
+    (R : ManufacturedStayReflector w e g)
+    (state : Tongues)
+    (hA : PathGrooves (ManufacturedReflector.flip A).toSupported.paths state)
+    (hR : PathGrooves (ManufacturedReflector.stay R).toSupported.paths state)
+    (hAR : (ManufacturedReflector.flip A).toSupported.action.Avoids
+      (ManufacturedReflector.stay R).toSupported.paths)
+    (d : Nat) :
+    tonguesAt w (g, state) d ∈
+      [state, flipAt state A.actionSwitch] := by
+  have hfour := manufactured_pair_all_time_four_phase_tongues
+    (ManufacturedReflector.flip A) (ManufacturedReflector.stay R)
+      state hA hR hAR (by trivial) d
+  simp [ManufacturedReflector.toSupported,
+    ManufacturedFlipReflector.toSupported,
+    ManufacturedStayReflector.toSupported,
+    LocalAction.apply] at hfour
+  rcases hfour with hstate | hflip | hrestore
+  · simp [hstate]
+  · simp [hflip]
+  · rw [flipAt_flipAt] at hrestore
+    simp [hrestore]
+
+/-- Consequently every sample of the compatible flip/self-link tail has a
+two-vector novelty cover over any supplied history. -/
+theorem flip_then_self_link_two_novelty_cover
+    {w : Wiring} {g e N : Nat}
+    (A : ManufacturedFlipReflector w g e)
+    (R : ManufacturedStayReflector w e g)
+    (state : Tongues)
+    (hA : PathGrooves (ManufacturedReflector.flip A).toSupported.paths state)
+    (hR : PathGrooves (ManufacturedReflector.stay R).toSupported.paths state)
+    (hAR : (ManufacturedReflector.flip A).toSupported.action.Avoids
+      (ManufacturedReflector.stay R).toSupported.paths)
+    (times : List Nat) (history : List (List Bool)) :
+    NoveltyCoverOn w N (g, state) times history 2 := by
+  let fresh :=
+    [VectorCount.restrict N state,
+     VectorCount.restrict N (flipAt state A.actionSwitch)]
+  refine ⟨fresh, by simp [fresh], ?_⟩
+  intro d _hd
+  have hphase := flip_then_self_link_all_time_two_phase_tongues
+    A R state hA hR hAR d
+  simp at hphase
+  apply List.mem_append_right history
+  rcases hphase with hstate | hflip
+  · simp [fresh, restrictedTonguesAt, hstate]
+  · simp [fresh, restrictedTonguesAt, hflip]
+
+/-- A compatible flip/self-link pair reached no later than the second closing
+frame.  This is the exact periodic-tail certificate naturally produced when
+the global repair construction meets the encountered self-link. -/
+structure SelfLinkPairTailBeforeSecond
+    (w : Wiring) (N : Nat) (start : Prod Nat Tongues)
+    (second : Nat) where
+  g : Nat
+  e : Nat
+  A : ManufacturedFlipReflector w g e
+  R : ManufacturedStayReflector w e g
+  state : Tongues
+  shift : Nat
+  reached : stepN w shift start = some (g, state)
+  live : forall d, exists finish,
+    stepN w d (g, state) = some finish
+  groovesA : PathGrooves
+    (ManufacturedReflector.flip A).toSupported.paths state
+  groovesR : PathGrooves
+    (ManufacturedReflector.stay R).toSupported.paths state
+  compatible : (ManufacturedReflector.flip A).toSupported.action.Avoids
+    (ManufacturedReflector.stay R).toSupported.paths
+  reached_before_second : shift <= second + 1
+
+/-- Four chronological global novelties cannot occur after a compatible
+flip/self-link pair has been reached: the entire raw tail has only two tongue
+vectors. -/
+theorem no_five_fixed_stem_novelties_of_self_link_pair_tail
+    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
+    (F : FiveFixedStemNovelFrames w N start)
+    (P : SelfLinkPairTailBeforeSecond w N start F.z₁) : False := by
+  let localStart : Prod Nat Tongues := (P.g, P.state)
+  let localTimes :=
+    [F.z₁ + 1 - P.shift,
+     F.z₂ + 1 - P.shift,
+     F.z₃ + 1 - P.shift,
+     F.z₄ + 1 - P.shift]
+  have hcover : NoveltyCoverOn w N localStart localTimes [] 2 := by
+    dsimp [localStart]
+    exact flip_then_self_link_two_novelty_cover
+      P.A P.R P.state P.groovesA P.groovesR P.compatible
+        localTimes []
+  have hz₁₂ : F.z₁ < F.z₂ := F.order₁₂
+  have hz₂₃ : F.z₂ < F.z₃ := F.order₂₃
+  have hz₃₄ : F.z₃ < F.z₄ := F.order₃₄
+  have hshiftLe₁ : P.shift <= F.z₁ + 1 := P.reached_before_second
+  have hshiftLe₂ : P.shift <= F.z₂ + 1 := by omega
+  have hshiftLe₃ : P.shift <= F.z₃ + 1 := by omega
+  have hshiftLe₄ : P.shift <= F.z₄ + 1 := by omega
+  have hv₁ : restrictedTonguesAt w N localStart
+      (F.z₁ + 1 - P.shift) =
+      restrictedTonguesAt w N start (F.z₁ + 1) := by
+    obtain ⟨finish, hfinish⟩ := P.live (F.z₁ + 1 - P.shift)
+    have h := restrictedTonguesAt_add_of_reach
+      (N := N) (d := F.z₁ + 1 - P.shift) P.reached hfinish
+    dsimp [localStart]
+    rw [← h]
+    congr 1
+    omega
+  have hv₂ : restrictedTonguesAt w N localStart
+      (F.z₂ + 1 - P.shift) =
+      restrictedTonguesAt w N start (F.z₂ + 1) := by
+    obtain ⟨finish, hfinish⟩ := P.live (F.z₂ + 1 - P.shift)
+    have h := restrictedTonguesAt_add_of_reach
+      (N := N) (d := F.z₂ + 1 - P.shift) P.reached hfinish
+    dsimp [localStart]
+    rw [← h]
+    congr 1
+    omega
+  have hv₃ : restrictedTonguesAt w N localStart
+      (F.z₃ + 1 - P.shift) =
+      restrictedTonguesAt w N start (F.z₃ + 1) := by
+    obtain ⟨finish, hfinish⟩ := P.live (F.z₃ + 1 - P.shift)
+    have h := restrictedTonguesAt_add_of_reach
+      (N := N) (d := F.z₃ + 1 - P.shift) P.reached hfinish
+    dsimp [localStart]
+    rw [← h]
+    congr 1
+    omega
+  have hv₄ : restrictedTonguesAt w N localStart
+      (F.z₄ + 1 - P.shift) =
+      restrictedTonguesAt w N start (F.z₄ + 1) := by
+    obtain ⟨finish, hfinish⟩ := P.live (F.z₄ + 1 - P.shift)
+    have h := restrictedTonguesAt_add_of_reach
+      (N := N) (d := F.z₄ + 1 - P.shift) P.reached hfinish
+    dsimp [localStart]
+    rw [← h]
+    congr 1
+    omega
+  have hglobalNodup := four_raw_novel_post_vectors_nodup
+    F.order₁₂ F.order₂₃ F.order₃₄
+    F.event₁.2.2 F.event₂.2.2 F.event₃.2.2 F.event₄.2.2
+  have hlocalNodup :
+      (localTimes.map (restrictedTonguesAt w N localStart)).Nodup := by
+    simpa [localTimes, hv₁, hv₂, hv₃, hv₄] using hglobalNodup
+  have hcount := noveltyCoverOn_distinct_count hcover hlocalNodup
+  have hlength : localTimes.length = 4 := by simp [localTimes]
+  have hle : localTimes.length <= 2 := by simpa using hcount
+  rw [hlength] at hle
+  omega
+
+/-! ## The remaining raw five-frame control-flow interface -/
+
+/-- Resolution data sufficient to eliminate the encountered self-link in one
+selected five-frame certificate.  The replay branch contradicts the
+certificate's `no_replay` field; the runway branch contradicts the four later
+globally novel states by `no_five_fixed_stem_novelties_of_runway_tail`.
+
+This proposition deliberately contains the unresolved placement step.  The
+unconditional theorems above produce the physical identity reflector, but the
+current certified clock does not state where its witness lies in the raw
+five-frame timeline. -/
+def CertifiedSelfLinkReplayOrTail
+    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
+    {z0 z1 z2 z3 z4 : Nat}
+    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
+    {S : SelectedFiveFrameABCABC T}
+    (F : FiveFixedStemNovelFrames w N start)
+    (C : CertifiedEndpointEmptyABCABC S) : Prop :=
+  Echo.EarlierCompleteStateReplay
+      (canonicalEchoMachine w) (encodedEntries C.run.entry)
+      C.run.initialRegister C.K C.period \/
+    Nonempty (RunwayTailBeforeSecond w N start F.z₁) \/
+    Nonempty (SelfLinkPairTailBeforeSecond w N start F.z₁)
+
+/-- Either resolution branch is incompatible with the five fixed-stem
+novelties and the certified no-replay condition. -/
+theorem CertifiedEndpointEmptyABCABC.impossible_of_self_link_resolution
+    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
+    {z0 z1 z2 z3 z4 : Nat}
+    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
+    {S : SelectedFiveFrameABCABC T}
+    (F : FiveFixedStemNovelFrames w N start)
+    (C : CertifiedEndpointEmptyABCABC S)
+    (hresolve : CertifiedSelfLinkReplayOrTail F C) : False := by
+  rcases hresolve with hreplay | hrunway | hpair
+  · exact C.no_replay hreplay
+  · obtain ⟨tail⟩ := hrunway
+    exact no_five_fixed_stem_novelties_of_runway_tail F tail
+  · obtain ⟨tail⟩ := hpair
+    exact no_five_fixed_stem_novelties_of_self_link_pair_tail F tail
+
+/-- The exact remaining global placement law for the non-irreflexive branch.
+It asks only that an encountered self-link be placed by the raw compiler into
+the complete-replay or early-runway alternatives above. -/
+def KnownEdgeABCABCSelfLinkReplayOrTailClosure : Prop :=
+  forall (w : Wiring) (N e : Nat),
+    (forall p q, w.link p = some q -> p < 3 * N /\ q < 3 * N) ->
+    forall (start : Prod Nat Tongues),
+      w.link e = some start.1 ->
+      forall F : FiveFixedStemNovelFrames w N start,
+        forall T : FiveFrameTripleCase w N start
+          F.z₀ F.z₁ F.z₂ F.z₃ F.z₄,
+          forall S : SelectedFiveFrameABCABC T,
+            forall C : CertifiedEndpointEmptyABCABC S,
+              CertifiedRunUsesSelfLink C.run ->
+              CertifiedSelfLinkReplayOrTail F C
+
+/-- **Self-link-aware triple closure.**  Physical compilation, the explicit
+self-link replay/runway placement law, and strict-nest exclusion suffice for
+the raw triple obstruction.  This removes both global `IrreflexiveLinks` and
+the former premise that simply declared every encountered self-link
+impossible. -/
+theorem knownEdgeTripleFrameObstruction_of_selfLinkReplayOrTail
+    (hcompile : KnownEdgeABCABCPhysicalCertification)
+    (hself : KnownEdgeABCABCSelfLinkReplayOrTailClosure)
+    (hnest : KnownEdgeSelectedStrictNestObstruction) :
+    KnownEdgeTripleFrameObstruction := by
+  intro w N e hN start hentry F T
+  rcases T.select_endpoint_triple with habc | hstrict
+  · obtain ⟨S⟩ := habc
+    obtain ⟨C⟩ := hcompile w N e hN start hentry F T S
+    exact C.impossible_of_self_link_resolution F
+      (hself w N e hN start hentry F T S C C.forces_used_self_link)
+  · obtain ⟨S⟩ := hstrict
+    exact hnest w N e hN start hentry F T S
+
+end GeneralN
