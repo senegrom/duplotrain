@@ -96,7 +96,8 @@ private theorem map_filter_nodup_assignment
             obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hmem
             exact List.mem_map.mpr
               ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-          exact List.Nodup.cons hnot (ih hnd'.2)
+          rw [List.nodup_cons]
+          exact ⟨hnot, ih hnd'.2⟩
 
 /-- Filtering a globally root-distinct lobe list preserves root distinctness. -/
 theorem assigned_lobe_roots_nodup
