@@ -1,0 +1,39 @@
+name: Apply stay-splice membership fix
+on:
+  push:
+    branches: [agent/push-below-14]
+    paths:
+      - .github/workflows/apply-stay-splice-fix.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply Lean source fix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('theory/lean/TrackStaySpliceAllTime.lean')
+          text = path.read_text()
+          old = '''      apply List.mem_append_right history
+      rcases hphase with h | h
+      · left
+        simpa [alternate] using congrArg (VectorCount.restrict N) h
+      · right
+        simpa using congrArg (VectorCount.restrict N) h
+'''
+          new = '''      apply List.mem_append_right history
+      rcases hphase with rfl | rfl <;> simp [alternate]
+'''
+          if old not in text:
+              raise SystemExit('target block not found')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add theory/lean/TrackStaySpliceAllTime.lean
+          git diff --cached --check
+          git commit -m "fix stay-splice tail membership"
+          git push origin HEAD:agent/push-below-14
