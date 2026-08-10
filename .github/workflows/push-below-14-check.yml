@@ -9,6 +9,8 @@ on:
       - theory/lean/TrackStaySpliceAllTime.lean
       - theory/lean/KnownEdgeEleven.lean
       - theory/lean/StateLawEleven.lean
+      - theory/lean/KnownEdgeEight.lean
+      - theory/lean/StateLawEight.lean
       - .github/workflows/push-below-14-check.yml
   workflow_dispatch:
 jobs:
@@ -39,6 +41,10 @@ jobs:
           name = "KnownEdgeEleven"
           [[lean_lib]]
           name = "StateLawEleven"
+          [[lean_lib]]
+          name = "KnownEdgeEight"
+          [[lean_lib]]
+          name = "StateLawEight"
           EOF
       - name: Build available targets
         run: |
@@ -47,5 +53,7 @@ jobs:
           lake build TrackStayContactAllTime
           lake build PairTongueCountAbsoluteFour
           lake build TrackStaySpliceAllTime
-          if [ -f KnownEdgeEleven.lean ]; then lake build KnownEdgeEleven; fi
-          if [ -f StateLawEleven.lean ]; then lake build StateLawEleven; fi
+          lake build KnownEdgeEleven
+          lake build StateLawEleven
+          lake build KnownEdgeEight
+          lake build StateLawEight
