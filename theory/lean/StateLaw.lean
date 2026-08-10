@@ -6,13 +6,13 @@ import VectorCount
 
 This file states the actual claim about trains, tracks and switches.
 **`StateLaw` is OPEN — its specific `N + 6` bound is not proved.**
-What is now proved is the unconditional general linear bound `15*N+7`
-(`state_law_linear_fifteen` in `StateLawFifteen.lean`, via direct tongue
-counting of the protected-repair tail over the novelty-aware overlap
-lasso; it supersedes the `17*N+5`, `18*N+3`, `24*N+5` and `26*N+3`
-predecessors), as well as the elementary
+What is now proved is the unconditional general linear bound `14*N+9`
+(`state_law_linear_fourteen` in `StateLawFourteen.lean`, via the absolute
+four-phase law for flip/flip reflector pairs and direct tongue counting
+of the protected-repair tail; it supersedes the `15*N+7`, `17*N+5`,
+`18*N+3`, `24*N+5` and `26*N+3` predecessors), as well as the elementary
 `2 ^ N` bound (`state_law_two_pow` below).  The coefficient-one improvement
-from `15*N+7` to `N+O(1)` is the remaining problem.
+from `14*N+9` to `N+O(1)` is the remaining problem.
 
 The direct physical-track route in `TrackTrace`, `TrackLobe`, `TrackNormalForm`,
 `TrackTheta`, `TrackGlobalRepair`, `TrackQuantitative`, and
@@ -66,8 +66,8 @@ def StateLaw : Prop :=
       ks.length ≤ N + 6
 
 /-- The elementary exponential bound on exactly the same statement, **proved**.
-`GeneralN.state_law_linear_fifteen` supersedes it
-asymptotically with `15*N+7`; the open gap is now `15*N+7` versus
+`GeneralN.state_law_linear_fourteen` supersedes it
+asymptotically with `14*N+9`; the open gap is now `14*N+9` versus
 `N+6`. -/
 theorem state_law_two_pow (w : Wiring) (N : Nat)
     (_hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)

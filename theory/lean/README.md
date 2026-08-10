@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Three hundred and ten libraries, all self-contained (no
+Three hundred and thirteen libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -430,12 +430,13 @@ identity-reflector case, or flip-reflector runway case.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
 now proves an unconditional general linear theorem.
-`GeneralN.state_law_linear_fifteen`
-(`StateLawFifteen.lean`) says that any one-train
-run on an `N`-switch wiring visits at most `15*N+7`
+`GeneralN.state_law_linear_fourteen`
+(`StateLawFourteen.lean`) says that any one-train
+run on an `N`-switch wiring visits at most `14*N+9`
 pairwise-distinct tongue vectors, superseding the earlier
-`state_law_linear_seventeen` (`17*N+5`), `state_law_linear_eighteen`
-(`18*N+3`), `state_law_linear_twenty_four` (`24*N+5`) and
+`state_law_linear_fifteen` (`15*N+7`), `state_law_linear_seventeen`
+(`17*N+5`), `state_law_linear_eighteen` (`18*N+3`),
+`state_law_linear_twenty_four` (`24*N+5`) and
 `state_law_linear_twenty_six` (`26*N+3`).  The theorem is
 stated over raw `Wiring`/`stepN`, with no small-`N` enumeration and no
 conditional hypothesis.
@@ -476,17 +477,25 @@ intersection at most three, and — the capstone —
 manufactured pair, however its supports intersect (disjoint, one-sided,
 or mutual), is live forever and visits only the four corners
 `state, state+A, state+B, state+A+B`; `manufactured_flip_pair_distinct_le_four`
-turns this into a liveness-free count of four.  The remaining
-time-counted branches, in binding order, are: the changed-forward splice
-(`13*N`; its flip case has a four-novelty cover in
-`RunwaySpliceNovelty.lean` awaiting a lead-window assembly, its stay case
-needs the analogous pointwise treatment of the spliced-lobe pair), the
-facing branch and periodic outcome (`12*N` each;
-`FacingForwardNovelty.lean` already has the bounded pointwise tail), and
-the stay/flip contact pair (`8*N`, `manufactured_flip_then_stay_within_eight`).
-Converting those turns every tail constant and drives the law toward the
-`≈7*N` set by the first-activated periodic outcome (`5*N+1`) plus the
-`2*N+3` journey histories.
+turns this into a liveness-free count of four.
+
+The counting assembly absorbs the phase laws in
+`PairTongueCountFour.lean` and `KnownEdgeFourteen.lean`: the
+reflector-pair count drops to `8*N+4` (avoiding and flip/flip pairs cost
+four flat; only the stay/flip contact geometries still pay `8*N+1`),
+complete repair to `9*N+4`, and the changed-forward flip splice to
+`2*N+5` (its four-novelty cover's lead hypothesis is discharged by
+position-counting the `2*N+1` lead window).  Protected repair fits in
+`12*N+5`, known-edge in `14*N+8`.  The remaining time-counted branches,
+in binding order, are: the periodic and facing outcomes of the repair
+dichotomy (`12*N` each; `FacingForwardNovelty.lean` already holds the
+facing pointwise tail awaiting the same lead-window discharge), the
+changed stay splice (`9*N`; needs the spliced-lobe analogue of the theta
+pointwise treatment), and the stay/flip contact pair (`8*N+1`,
+`manufactured_flip_then_stay_within_eight`).  Converting those turns
+every tail constant and drives the law toward the `≈7*N` set by the
+first-activated periodic outcome (`5*N+1`) plus the `2*N+3` journey
+histories.
 
 `TrackQuantitative.lean` completes the extraction with a checked bounded-lasso
 interface.  `EventuallyPeriodicWithin w c cap` retains `lead + period ≤ cap`;

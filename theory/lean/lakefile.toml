@@ -92,6 +92,7 @@ defaultTargets = [
   "HiddenFibre",
   "KnownEdgeEighteen",
   "KnownEdgeFifteen",
+  "KnownEdgeFourteen",
   "KnownEdgeNineteen",
   "KnownEdgeSeventeen",
   "KnownEdgeTwenty",
@@ -165,6 +166,7 @@ defaultTargets = [
   "OverwriteLasso",
   "PairBound",
   "PairMultiplicity",
+  "PairTongueCountFour",
   "PairTongueCountSharp",
   "PairedBlockEpochStrictBound",
   "PairedNoFullReachFreeze",
@@ -229,6 +231,7 @@ defaultTargets = [
   "StateLaw",
   "StateLawEighteen",
   "StateLawFifteen",
+  "StateLawFourteen",
   "StateLawNineteen",
   "StateLawSeventeen",
   "StateLawTwenty",
@@ -589,6 +592,9 @@ name = "KnownEdgeEighteen"
 name = "KnownEdgeFifteen"
 
 [[lean_lib]]
+name = "KnownEdgeFourteen"
+
+[[lean_lib]]
 name = "KnownEdgeNineteen"
 
 [[lean_lib]]
@@ -808,6 +814,9 @@ name = "PairBound"
 name = "PairMultiplicity"
 
 [[lean_lib]]
+name = "PairTongueCountFour"
+
+[[lean_lib]]
 name = "PairTongueCountSharp"
 
 [[lean_lib]]
@@ -998,6 +1007,9 @@ name = "StateLawEighteen"
 
 [[lean_lib]]
 name = "StateLawFifteen"
+
+[[lean_lib]]
+name = "StateLawFourteen"
 
 [[lean_lib]]
 name = "StateLawNineteen"
