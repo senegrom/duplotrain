@@ -1,0 +1,59 @@
+name: Push below coefficient 14
+on:
+  push:
+    branches: [agent/push-below-14]
+    paths:
+      - theory/lean/TrackEarlyRepairSharp.lean
+      - theory/lean/TrackStayContactAllTime.lean
+      - theory/lean/PairTongueCountAbsoluteFour.lean
+      - theory/lean/TrackStaySpliceAllTime.lean
+      - theory/lean/KnownEdgeEleven.lean
+      - theory/lean/StateLawEleven.lean
+      - theory/lean/KnownEdgeEight.lean
+      - theory/lean/StateLawEight.lean
+      - .github/workflows/push-below-14-check.yml
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register experimental targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "TrackEarlyRepairSharp"
+          [[lean_lib]]
+          name = "TrackStayContactAllTime"
+          [[lean_lib]]
+          name = "PairTongueCountAbsoluteFour"
+          [[lean_lib]]
+          name = "TrackStaySpliceAllTime"
+          [[lean_lib]]
+          name = "KnownEdgeEleven"
+          [[lean_lib]]
+          name = "StateLawEleven"
+          [[lean_lib]]
+          name = "KnownEdgeEight"
+          [[lean_lib]]
+          name = "StateLawEight"
+          EOF
+      - name: Build available targets
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build TrackEarlyRepairSharp
+          lake build TrackStayContactAllTime
+          lake build PairTongueCountAbsoluteFour
+          lake build TrackStaySpliceAllTime
+          lake build KnownEdgeEleven
+          lake build StateLawEleven
+          lake build KnownEdgeEight
+          lake build StateLawEight
