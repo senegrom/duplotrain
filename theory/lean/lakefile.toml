@@ -30,6 +30,7 @@ defaultTargets = [
   "CertifiedEpochBound",
   "CertifiedLobeAbsorption",
   "CollapsedChipDynamics",
+  "CompleteRepairTongueCountSharp",
   "ComponentCapacity",
   "ConcreteAscentTrace",
   "ConcreteCascadeFacts",
@@ -90,6 +91,7 @@ defaultTargets = [
   "HiddenDichotomy",
   "HiddenFibre",
   "KnownEdgeEighteen",
+  "KnownEdgeFifteen",
   "KnownEdgeNineteen",
   "KnownEdgeSeventeen",
   "KnownEdgeTwenty",
@@ -163,6 +165,7 @@ defaultTargets = [
   "OverwriteLasso",
   "PairBound",
   "PairMultiplicity",
+  "PairTongueCountSharp",
   "PairedBlockEpochStrictBound",
   "PairedNoFullReachFreeze",
   "PairedPointwiseReplayCore",
@@ -225,6 +228,7 @@ defaultTargets = [
   "StarPairCountingCore",
   "StateLaw",
   "StateLawEighteen",
+  "StateLawFifteen",
   "StateLawNineteen",
   "StateLawSeventeen",
   "StateLawTwenty",
@@ -269,8 +273,10 @@ defaultTargets = [
   "TrackStationaryTail",
   "TrackStaySpliceSharp",
   "TrackTheta",
+  "TrackThetaAllTime",
   "TrackThetaCaptureSharp",
   "TrackThetaCaptureTighter",
+  "TrackThetaPointwiseCore",
   "TrackThetaSharp",
   "TrackThetaSharper",
   "TrackThetaTighter",
@@ -294,6 +300,7 @@ defaultTargets = [
   "TripleSelfLinkSelectedClosure",
   "TripleSelfLinkSimpleCycleClosure",
   "TripleSelfLinkSimpleCycleTail",
+  "TwoJourneyTailCountSharp",
   "TwoReflectorEdgeTrap",
   "TwoReflectorFiniteTrap",
   "TwoStateConfigurationFibre",
@@ -394,6 +401,9 @@ name = "CertifiedLobeAbsorption"
 
 [[lean_lib]]
 name = "CollapsedChipDynamics"
+
+[[lean_lib]]
+name = "CompleteRepairTongueCountSharp"
 
 [[lean_lib]]
 name = "ComponentCapacity"
@@ -574,6 +584,9 @@ name = "HiddenFibre"
 
 [[lean_lib]]
 name = "KnownEdgeEighteen"
+
+[[lean_lib]]
+name = "KnownEdgeFifteen"
 
 [[lean_lib]]
 name = "KnownEdgeNineteen"
@@ -795,6 +808,9 @@ name = "PairBound"
 name = "PairMultiplicity"
 
 [[lean_lib]]
+name = "PairTongueCountSharp"
+
+[[lean_lib]]
 name = "PairedBlockEpochStrictBound"
 
 [[lean_lib]]
@@ -981,6 +997,9 @@ name = "StateLaw"
 name = "StateLawEighteen"
 
 [[lean_lib]]
+name = "StateLawFifteen"
+
+[[lean_lib]]
 name = "StateLawNineteen"
 
 [[lean_lib]]
@@ -1113,10 +1132,16 @@ name = "TrackStaySpliceSharp"
 name = "TrackTheta"
 
 [[lean_lib]]
+name = "TrackThetaAllTime"
+
+[[lean_lib]]
 name = "TrackThetaCaptureSharp"
 
 [[lean_lib]]
 name = "TrackThetaCaptureTighter"
+
+[[lean_lib]]
+name = "TrackThetaPointwiseCore"
 
 [[lean_lib]]
 name = "TrackThetaSharp"
@@ -1186,6 +1211,9 @@ name = "TripleSelfLinkSimpleCycleClosure"
 
 [[lean_lib]]
 name = "TripleSelfLinkSimpleCycleTail"
+
+[[lean_lib]]
+name = "TwoJourneyTailCountSharp"
 
 [[lean_lib]]
 name = "TwoReflectorEdgeTrap"

@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Three hundred and three libraries, all self-contained (no
+Three hundred and ten libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -430,34 +430,63 @@ identity-reflector case, or flip-reflector runway case.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
 now proves an unconditional general linear theorem.
-`GeneralN.state_law_linear_seventeen`
-(`StateLawSeventeen.lean`) says that any one-train
-run on an `N`-switch wiring visits at most `17*N+5`
+`GeneralN.state_law_linear_fifteen`
+(`StateLawFifteen.lean`) says that any one-train
+run on an `N`-switch wiring visits at most `15*N+7`
 pairwise-distinct tongue vectors, superseding the earlier
-`state_law_linear_eighteen` (`18*N+3`), `state_law_linear_twenty_four`
-(`24*N+5`) and `state_law_linear_twenty_six` (`26*N+3`).  The theorem is
+`state_law_linear_seventeen` (`17*N+5`), `state_law_linear_eighteen`
+(`18*N+3`), `state_law_linear_twenty_four` (`24*N+5`) and
+`state_law_linear_twenty_six` (`26*N+3`).  The theorem is
 stated over raw `Wiring`/`stepN`, with no small-`N` enumeration and no
 conditional hypothesis.
 The repository does **not** claim the sharper `N+6` state law.
 
-Three layers of improvement feed the current constant.  The novelty-aware
+Four layers of improvement feed the current constant.  The novelty-aware
 lasso (`FirstActivatedExact.lean`, `NoveltyAwareLasso.lean`): the two
 manufacturing journeys of the repaired pair are charged for their
 *construction history* — whose dimension is explicit — rather than
-their full travel, trimming the double-counted approach segments.
-The overlap-aware count (`NoveltyAwareLassoOverlap.lean`): the boundary
-vectors between journey A, journey B and the tail lasso are shared, so one
-copy is erased at each seam, giving `2*N + cap + 2` for a tail lasso of cap
-`cap`.  The sharp repair cap (`TrackThetaCaptureSharp/Tighter.lean`,
+their full travel.  The overlap-aware count
+(`NoveltyAwareLassoOverlap.lean`): boundary vectors between journey A,
+journey B and the tail are shared, so one copy is erased at each seam.
+The sharp repair caps (`TrackThetaCaptureSharp/Tighter.lean`,
 `TrackStaySpliceSharp.lean`, `TrackQuantitativeRepairSeventeen/Fifteen.lean`):
 theta captures cost `2*N+1`, a theta half `6*N+1`, the reflector pair
-`14*N+2`; the changed-forward splice closes within `13*N` (`9*N` for the
-stay geometry, `13*N` for flip), and the complete-repair branch — the
-bottleneck — costs the `N`-step switch-simple repair route plus the
-`14*N+2` pair lasso, i.e. `15*N+2`.
-`known_edge_long_run_distinct_le_seventeen` gives `17*N+4` when the
-entry edge is known; the entry-free assembly runs one step to expose
-the entry edge, shifts the sampled times, and pays `+1` for time zero.
+`14*N+2`, the changed-forward splice `13*N` (`9*N` stay, `13*N` flip),
+protected repair `15*N+2`.  Direct tongue counting
+(`PairTongueCountSharp.lean`, `CompleteRepairTongueCountSharp.lean`,
+`TwoJourneyTailCountSharp.lean`, `KnownEdgeFifteen.lean`): tongue-vector
+novelty replaces physical travel where the two diverge — a complete
+traversal has two tongue phases regardless of its length, so the pair
+lasso counts `12*N+3` distinct vectors and complete repair `13*N+3`;
+`known_edge_long_run_distinct_le_fifteen` gives `15*N+6` known-edge and
+the entry-free assembly pays `+1` for time zero.
+
+**The pointwise theta program** (`TrackThetaPointwiseCore.lean`,
+`TrackThetaAllTime.lean`) pushes that trade to its limit for flip/flip
+reflector pairs.  The support-fault dichotomy is proved *pointwise* and
+without any switch-count hypothesis: every step of a capture shows one of
+two tongue phases, every step of a repairing traversal one of three
+(`manufactured_support_fault_dichotomy_pointwise`, over the six contact
+geometries runway/candy-forward/candy-reverse × facing/trailing).
+Composed around the theta cycles this yields absolute laws:
+a one-sided intersection visits at most four tongue vectors ever
+(`manufactured_one_sided_theta_all_time_four_phase`), a mutual
+intersection at most three, and — the capstone —
+`manufactured_flip_pair_all_time_four_phase`: **any** flip/flip
+manufactured pair, however its supports intersect (disjoint, one-sided,
+or mutual), is live forever and visits only the four corners
+`state, state+A, state+B, state+A+B`; `manufactured_flip_pair_distinct_le_four`
+turns this into a liveness-free count of four.  The remaining
+time-counted branches, in binding order, are: the changed-forward splice
+(`13*N`; its flip case has a four-novelty cover in
+`RunwaySpliceNovelty.lean` awaiting a lead-window assembly, its stay case
+needs the analogous pointwise treatment of the spliced-lobe pair), the
+facing branch and periodic outcome (`12*N` each;
+`FacingForwardNovelty.lean` already has the bounded pointwise tail), and
+the stay/flip contact pair (`8*N`, `manufactured_flip_then_stay_within_eight`).
+Converting those turns every tail constant and drives the law toward the
+`≈7*N` set by the first-activated periodic outcome (`5*N+1`) plus the
+`2*N+3` journey histories.
 
 `TrackQuantitative.lean` completes the extraction with a checked bounded-lasso
 interface.  `EventuallyPeriodicWithin w c cap` retains `lead + period ≤ cap`;
