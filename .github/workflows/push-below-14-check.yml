@@ -4,6 +4,7 @@ on:
     branches: [agent/push-below-14]
     paths:
       - theory/lean/TrackEarlyRepairSharp.lean
+      - theory/lean/TrackStayContactAllTime.lean
       - theory/lean/KnownEdgeEleven.lean
       - theory/lean/StateLawEleven.lean
       - .github/workflows/push-below-14-check.yml
@@ -27,6 +28,8 @@ jobs:
           [[lean_lib]]
           name = "TrackEarlyRepairSharp"
           [[lean_lib]]
+          name = "TrackStayContactAllTime"
+          [[lean_lib]]
           name = "KnownEdgeEleven"
           [[lean_lib]]
           name = "StateLawEleven"
@@ -35,5 +38,6 @@ jobs:
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build TrackEarlyRepairSharp
+          lake build TrackStayContactAllTime
           if [ -f KnownEdgeEleven.lean ]; then lake build KnownEdgeEleven; fi
           if [ -f StateLawEleven.lean ]; then lake build StateLawEleven; fi
