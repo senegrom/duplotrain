@@ -322,11 +322,7 @@ theorem ManufacturedReflector.ChangedForwardMerge.stay_distinct_le_n_succ_two
         simp [restrictedTonguesAt, tonguesAt, hglobal]
       rw [hvector]
       apply List.mem_append_right history
-      rcases hphase with h | h
-      · left
-        simpa [alternate] using congrArg (VectorCount.restrict N) h
-      · right
-        simpa using congrArg (VectorCount.restrict N) h
+      rcases hphase with rfl | rfl <;> simp [alternate]
   have hcount := noveltyCoverOn_distinct_count hcover hnd
   have hhistoryLen : history.length = lead := by simp [history]
   omega
