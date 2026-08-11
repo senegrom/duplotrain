@@ -51,6 +51,46 @@ private theorem nodup_subset_length_two_history
       simp only [List.length_cons]
       omega
 
+private theorem nodup_filter_nat_two_history (p : Nat → Bool) :
+    ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
+  intro xs
+  induction xs with
+  | nil => intro _; simp
+  | cons x rest ih =>
+      intro hnd
+      rw [List.nodup_cons] at hnd
+      cases hp : p x with
+      | true =>
+          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
+          exact ⟨fun hmem => hnd.1 ((List.mem_filter.mp hmem).1),
+            ih hnd.2⟩
+      | false =>
+          simp only [List.filter_cons, hp]
+          exact ih hnd.2
+
+private theorem nodup_map_nat_of_injective_on_two_history
+    {f : Nat → Nat} {xs : List Nat}
+    (hinj : ∀ x, x ∈ xs → ∀ y, y ∈ xs →
+      f x = f y → x = y)
+    (hnd : xs.Nodup) :
+    (xs.map f).Nodup := by
+  induction xs with
+  | nil => simp
+  | cons x rest ih =>
+      rw [List.nodup_cons] at hnd
+      rw [List.map_cons, List.nodup_cons]
+      constructor
+      · intro hm
+        obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
+        have hxy := hinj x List.mem_cons_self y
+          (List.mem_cons_of_mem _ hy) hfy.symm
+        exact hnd.1 (hxy ▸ hy)
+      · exact ih
+          (fun a ha b hb => hinj a
+            (List.mem_cons_of_mem _ ha)
+            b (List.mem_cons_of_mem _ hb))
+          hnd.2
+
 private theorem count_map_range_two_of_eq
     {α : Type} [BEq α] [LawfulBEq α]
     (f : Nat → α) :
@@ -166,6 +206,72 @@ theorem PhysicalTrace.simple_changed_passage_survives
             finish.2 (passageSwitch (p, x)) := hv.symm
         _ = start.2 (passageSwitch (p, x)) := hfinish
         _ = u (passageSwitch (p, x)) := hu.symm
+
+/-- Raw-time form of
+`PhysicalTrace.simple_changed_passage_survives`: every productive event
+inside a switch-simple physical trace leaves its writer changed at the
+trace endpoint. -/
+theorem PhysicalTrace.simple_raw_productive_writer_survives
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start finish : Nat × Tongues}
+    {passages : List Passage}
+    (htrace : PhysicalTrace w start passages finish)
+    (hsimple : SwitchSimple passages)
+    {k : Nat} (hk : k < passages.length)
+    (hprod : RawProductiveAt w N start k) :
+    finish.2 (rawWriterAt w start k) ≠
+      start.2 (rawWriterAt w start k) := by
+  let old : Passage := passages[k]
+  have hsplit :
+      passages =
+        passages.take k ++ old :: passages.drop (k + 1) := by
+    calc
+      passages = passages.take k ++ passages.drop k :=
+        (List.take_append_drop k passages).symm
+      _ = passages.take k ++ old :: passages.drop (k + 1) := by
+        rw [List.drop_eq_getElem_cons hk]
+  have htrace' := htrace
+  rw [hsplit] at htrace'
+  obtain ⟨atOld, hprefix, htail⟩ := htrace'.split_append
+  obtain ⟨cur, next, hcur, _hnext, hstep, hchange⟩ :=
+    rawProductiveAt_changes_writer hN hprod
+  have hprefixSound := hprefix.sound
+  rw [List.length_take_of_le (Nat.le_of_lt hk)] at hprefixSound
+  have hatOld : atOld = cur := by
+    rw [hcur] at hprefixSound
+    exact (Option.some.inj hprefixSound).symm
+  subst atOld
+  have hhead := htail.head_arrive
+  have hentry : cur.1 = old.1 := hhead.1
+  obtain ⟨afterOld, harriveOld⟩ := hhead.2
+  have harriveOld' :
+      arrive cur.2 old.1 = (old.2, afterOld) := by
+    simpa [old] using harriveOld
+  have hnextTongue : next.2 = afterOld := by
+    calc
+      next.2 = (arrive cur.2 cur.1).2 :=
+        (step_some_parts hstep).2
+      _ = afterOld := by
+        rw [hentry, harriveOld']
+  have harriveProductive :
+      arrive cur.2 old.1 = (old.2, next.2) := by
+    rw [harriveOld', hnextTongue]
+  have hprefix' :
+      PhysicalTrace w start (passages.take k)
+        (old.1, cur.2) := by
+    simpa [← hentry] using hprefix
+  have hchangedOld :
+      next.2 (passageSwitch old) ≠
+        cur.2 (passageSwitch old) := by
+    simpa [passageSwitch, ← hentry] using hchange
+  have hsurvives :=
+    htrace.simple_changed_passage_survives hsimple hsplit
+      hprefix' harriveProductive hchangedOld
+  have hwriter :=
+    htrace.rawWriterAt_eq_passageSwitch_getElem hk
+  simpa [old, hwriter] using hsurvives
 
 /-- A reflector's manufacturing exploration is exactly the selected outward
 route in its base state.  This identifies the second construction with the
@@ -350,6 +456,48 @@ theorem ManufacturedReflector.second_exploration_reusable_passage_unproductive
       _ = B.baseState (passageSwitch (p, x)) := by
             rw [hexit, hswitch]
 
+/-- Endpoint groove preservation excludes every productive writer of the
+second simple exploration from the first reflector's reusable support. -/
+theorem ManufacturedReflector.second_exploration_productive_writer_not_reusable
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbaseGrooves :
+      PathGrooves A.toSupported.paths B.baseState)
+    (hpreGrooves :
+      PathGrooves A.toSupported.paths B.preReturn.2)
+    {k : Nat} (hk : k < B.exploration.length)
+    (hprod :
+      RawProductiveAt w N (e, B.baseState) k) :
+    rawWriterAt w (e, B.baseState) k ∉
+      A.reusableSwitches := by
+  intro hreusable
+  have hsurvives :=
+    B.exploration_trace.simple_raw_productive_writer_survives
+      hN B.exploration_simple hk hprod
+  obtain ⟨path, hpath, old, hold, hswitch⟩ :=
+    A.mem_reusableSwitches hreusable
+  have hbaseOld := hbaseGrooves path hpath old hold
+  have hpreOld := hpreGrooves path hpath old hold
+  have hagree :=
+    grooved_states_agree_on_passage hbaseOld hpreOld
+  have hexit :
+      old.2 / 3 = passageSwitch old := by
+    have hs := arrive_exit_switch B.baseState old.2
+    rw [hbaseOld] at hs
+    exact hs.symm
+  apply hsurvives
+  calc
+    B.preReturn.2 (rawWriterAt w (e, B.baseState) k) =
+        B.preReturn.2 (old.2 / 3) := by
+          rw [hexit, hswitch]
+    _ = B.baseState (old.2 / 3) := hagree.symm
+    _ = B.baseState (rawWriterAt w (e, B.baseState) k) := by
+          rw [hexit, hswitch]
+
+
 /-- Removing the facing action mouth loses at most one exploration switch. -/
 theorem ManufacturedReflector.exploration_length_le_reusable_add_one
     {w : Wiring} {g e : Nat}
@@ -403,6 +551,121 @@ theorem ManufacturedReflector.reusableSwitch_lt
       · exact List.mem_append_left _ hrunway
       · exact List.mem_append_right R.runway
           (List.mem_cons_of_mem _ hcandy)
+
+/-- Coefficient-one coordinate charge in the groove-preserved branch.
+The first reflector's reusable switches and all productive first writers of
+the second simple exploration are disjoint and together occupy at most the
+`N` available switch coordinates. -/
+theorem ManufacturedReflector.reusable_add_second_first_writers_le
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbaseGrooves :
+      PathGrooves A.toSupported.paths B.baseState)
+    (hpreGrooves :
+      PathGrooves A.toSupported.paths B.preReturn.2) :
+    A.reusableSwitches.length +
+      (rawFirstWriterTimes w N (e, B.baseState)
+        B.exploration.length).length ≤ N := by
+  classical
+  let times :=
+    rawFirstWriterTimes w N (e, B.baseState)
+      B.exploration.length
+  let writers := times.map (rawWriterAt w (e, B.baseState))
+  have htimesNodup : times.Nodup := by
+    dsimp [times, rawFirstWriterTimes]
+    exact nodup_filter_nat_two_history _ List.nodup_range
+  have hwritersNodup : writers.Nodup := by
+    dsimp [writers]
+    apply nodup_map_nat_of_injective_on_two_history
+    · intro i hi j hj hEq
+      have hiData :=
+        mem_rawFirstWriterTimes_iff.mp (by
+          simpa [times] using hi)
+      have hjData :=
+        mem_rawFirstWriterTimes_iff.mp (by
+          simpa [times] using hj)
+      exact rawFirstWriterAt_injective
+        hiData.2 hjData.2 hEq
+    · exact htimesNodup
+  have hdisjoint :
+      ∀ oldSwitch ∈ A.reusableSwitches,
+        ∀ freshSwitch ∈ writers,
+          oldSwitch ≠ freshSwitch := by
+    intro oldSwitch hOld freshSwitch hFresh hEq
+    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
+    have hkData :=
+      mem_rawFirstWriterTimes_iff.mp (by
+        simpa [times] using hk)
+    have houtside :=
+      A.second_exploration_productive_writer_not_reusable
+        hN B hbaseGrooves hpreGrooves
+          hkData.1 hkData.2.1
+    apply houtside
+    rw [← hEq]
+    exact hOld
+  let switches := A.reusableSwitches ++ writers
+  have hnd : switches.Nodup := by
+    dsimp [switches]
+    exact List.nodup_append.mpr
+      ⟨A.reusableSwitches_nodup, hwritersNodup, hdisjoint⟩
+  have hlt : ∀ C ∈ switches, C < N := by
+    intro C hC
+    rcases List.mem_append.mp hC with hOld | hFresh
+    · exact A.reusableSwitch_lt hN hOld
+    · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
+      have hkData :=
+        mem_rawFirstWriterTimes_iff.mp (by
+          simpa [times] using hk)
+      exact rawProductiveAt_writer_lt hN hkData.2.1
+  have hbound := nodup_nat_lt_length hnd hlt
+  have hlength :
+      A.reusableSwitches.length + times.length ≤ N := by
+    simpa [switches, writers] using hbound
+  simpa [times] using hlength
+/-- The second construction compressed to its initial vector, the post-vector
+of each productive first writer in the switch-simple exploration, and its
+single activated endpoint.  Quiet old-support passages create no entry. -/
+noncomputable def ManufacturedReflector.writerConstructionHistory
+    {w : Wiring} {g e : Nat}
+    (B : ManufacturedReflector w g e) (N : Nat) :
+    List (List Bool) :=
+  rawFirstWriterHistory w N (g, B.baseState)
+      B.exploration.length ++
+    [VectorCount.restrict N B.activatedState]
+
+/-- The compressed writer history represents every vector of the ordinary
+sharp construction history. -/
+theorem ManufacturedReflector.mem_writerConstructionHistory_of_mem_sharp
+    {w : Wiring} {N g e : Nat}
+    (B : ManufacturedReflector w g e)
+    {x : List Bool}
+    (hx : x ∈ B.sharpConstructionHistory N) :
+    x ∈ B.writerConstructionHistory N := by
+  classical
+  unfold ManufacturedReflector.sharpConstructionHistory at hx
+  rcases List.mem_append.mp hx with hprefix | hactivated
+  · obtain ⟨j, hj, rfl⟩ := List.mem_map.mp hprefix
+    apply List.mem_append_left
+    apply B.exploration_trace.restrictedTonguesAt_mem_rawFirstWriterHistory
+      B.exploration_simple j
+    have hjlt := List.mem_range.mp hj
+    omega
+  · apply List.mem_append_right
+    simpa using hactivated
+
+/-- Exact size of the compressed writer history. -/
+theorem ManufacturedReflector.writerConstructionHistory_length
+    {w : Wiring} {N g e : Nat}
+    (B : ManufacturedReflector w g e) :
+    (B.writerConstructionHistory N).length =
+      (rawFirstWriterTimes w N (g, B.baseState)
+        B.exploration.length).length + 2 := by
+  simp [ManufacturedReflector.writerConstructionHistory,
+    rawFirstWriterHistory]
+
 
 /-- The disjoint reusable/fresh coordinate charge is global: together the
 two lists consume at most the `N` available switches. -/
@@ -634,6 +897,240 @@ theorem ManufacturedReflector.base_mem_sharpHistoryCore
   apply List.mem_map.mpr
   refine ⟨0, List.mem_range.mpr (by omega), ?_⟩
   simp [restrictedTonguesAt, tonguesAt, stepN]
+
+/-- Coefficient-one cover for the two completed constructions in the
+endpoint-groove-preserved branch.  The common activation boundary is erased
+from the compressed second history and retained by the first core. -/
+noncomputable def ManufacturedReflector.preservedTwoHistoryCore
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (N : Nat) : List (List Bool) :=
+  A.sharpHistoryCore N ++
+    (B.writerConstructionHistory N).erase
+      (VectorCount.restrict N A.activatedState)
+
+/-- The coefficient-one two-construction cover has size at most `N+3`.
+The additional three are the first reflector's possible facing mouth, the
+initial shared vector, and the second reflector's activated endpoint. -/
+theorem ManufacturedReflector.preservedTwoHistoryCore_length_le_N_add_three
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbase : B.baseState = A.activatedState)
+    (hbaseGrooves :
+      PathGrooves A.toSupported.paths B.baseState)
+    (hpreGrooves :
+      PathGrooves A.toSupported.paths B.preReturn.2) :
+    (A.preservedTwoHistoryCore B N).length ≤ N + 3 := by
+  have hboundary :
+      VectorCount.restrict N A.activatedState ∈
+        B.writerConstructionHistory N := by
+    apply List.mem_append_left
+    simp [rawFirstWriterHistory, restrictedTonguesAt,
+      tonguesAt, stepN, hbase]
+  have hcharge :=
+    A.reusable_add_second_first_writers_le
+      hN B hbaseGrooves hpreGrooves
+  have houter := A.exploration_length_le_reusable_add_one
+  unfold ManufacturedReflector.preservedTwoHistoryCore
+  rw [List.length_append, List.length_erase_of_mem hboundary,
+    A.sharpHistoryCore_length,
+    B.writerConstructionHistory_length]
+  omega
+
+/-- No represented construction vector is lost by coefficient-one
+compression or by erasing the common boundary. -/
+theorem ManufacturedReflector.mem_preservedTwoHistoryCore
+    {w : Wiring} {N g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    {x : List Bool}
+    (hx : x ∈ A.sharpConstructionHistory N ∨
+      x ∈ B.sharpConstructionHistory N) :
+    x ∈ A.preservedTwoHistoryCore B N := by
+  rcases hx with hA | hB
+  · apply List.mem_append_left
+    exact A.mem_sharpHistoryCore_of_mem hA
+  · have hBcompressed :=
+      B.mem_writerConstructionHistory_of_mem_sharp hB
+    by_cases hboundary :
+        x = VectorCount.restrict N A.activatedState
+    · subst x
+      apply List.mem_append_left
+      exact A.activated_mem_sharpHistoryCore
+    · apply List.mem_append_right
+      exact (List.mem_erase_of_ne hboundary).mpr hBcompressed
+/-- Two exact manufacturing journeys whose first support is still grooved
+at the second pre-return, followed by a directly counted tail, expose only
+`N + tailCap + 2` distinct vectors.  The coefficient-one construction
+history costs `N+3`, and the tail shares its time-zero boundary. -/
+theorem two_manufacturing_journeys_preserved_support_then_tail_distinct_le
+    {w : Wiring} {N e tailCap : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    (A : ManufacturedReflector w start.1 e)
+    (B : ManufacturedReflector w e start.1)
+    (stateA stateB : Tongues)
+    (hbaseA : A.baseState = start.2)
+    (hactivatedA : stateA = A.activatedState)
+    (hreachA : stepN w
+      (A.exploration.length + A.runway.length + 1) start =
+        some (e, stateA))
+    (hgroovesA :
+      PathGrooves A.toSupported.paths stateA)
+    (hbaseB : B.baseState = stateA)
+    (hactivatedB : stateB = B.activatedState)
+    (hreachB : stepN w
+      (B.exploration.length + B.runway.length + 1)
+        (e, stateA) = some (start.1, stateB))
+    (hgroovesB :
+      PathGrooves B.toSupported.paths stateB)
+    (hpreGrooves :
+      PathGrooves A.toSupported.paths B.preReturn.2)
+    (htail : ∀ (tailTimes : List Nat),
+      (∀ k ∈ tailTimes,
+        (stepN w k (start.1, stateB)).isSome) →
+      (tailTimes.map (restrictedTonguesAt w N
+        (start.1, stateB))).Nodup →
+      tailTimes.length ≤ tailCap)
+    (htailPos : 0 < tailCap)
+    (times : List Nat)
+    (hlive : ∀ k ∈ times,
+      (stepN w k start).isSome)
+    (hnd : (times.map
+      (restrictedTonguesAt w N start)).Nodup) :
+    times.length ≤ N + tailCap + 2 := by
+  let firstTravel :=
+    A.exploration.length + A.runway.length + 1
+  let secondTravel :=
+    B.exploration.length + B.runway.length + 1
+  let totalTravel := firstTravel + secondTravel
+  let history := A.preservedTwoHistoryCore B N
+  have hgroovesAActivated :
+      PathGrooves A.toSupported.paths A.activatedState := by
+    rw [← hactivatedA]
+    exact hgroovesA
+  have hgroovesBActivated :
+      PathGrooves B.toSupported.paths B.activatedState := by
+    rw [← hactivatedB]
+    exact hgroovesB
+  have hbaseAB :
+      B.baseState = A.activatedState :=
+    hbaseB.trans hactivatedA
+  have hbaseGrooves :
+      PathGrooves A.toSupported.paths B.baseState := by
+    rw [hbaseB]
+    exact hgroovesA
+  have hreachTotal :
+      stepN w totalTravel start =
+        some (start.1, stateB) := by
+    dsimp [totalTravel]
+    rw [stepN_add, hreachA]
+    exact hreachB
+  have hprefixCover : ∀ d, d ≤ totalTravel →
+      restrictedTonguesAt w N start d ∈ history := by
+    intro d hd
+    by_cases hfirst : d ≤ firstTravel
+    · dsimp [history]
+      apply A.mem_preservedTwoHistoryCore B
+      left
+      have hm := A.manufacturing_journey_mem_sharpHistory
+        (N := N) hgroovesAActivated (j := d)
+          (by simpa [firstTravel] using hfirst)
+      simpa [hbaseA] using hm
+    · let q := d - firstTravel
+      have hdEq : d = firstTravel + q := by
+        dsimp [q]
+        omega
+      have hqLe : q ≤ secondTravel := by
+        dsimp [totalTravel] at hd
+        dsimp [q]
+        omega
+      have hliveQ := stepN_prefix_some hqLe hreachB
+      have hshift :=
+        tonguesAt_add_of_reaches hreachA hliveQ
+      have hm := B.manufacturing_journey_mem_sharpHistory
+        (N := N) hgroovesBActivated (j := q)
+          (by simpa [secondTravel] using hqLe)
+      have hm' :
+          restrictedTonguesAt w N (e, stateA) q ∈
+            B.sharpConstructionHistory N := by
+        simpa [hbaseB] using hm
+      have heq :
+          restrictedTonguesAt w N start d =
+            restrictedTonguesAt w N (e, stateA) q := by
+        unfold restrictedTonguesAt
+        rw [hdEq]
+        exact congrArg (VectorCount.restrict N) hshift
+      rw [heq]
+      dsimp [history]
+      exact A.mem_preservedTwoHistoryCore B (Or.inr hm')
+  have hboundary :
+      VectorCount.restrict N stateB ∈ history := by
+    dsimp [history]
+    apply A.mem_preservedTwoHistoryCore B
+    right
+    simp [ManufacturedReflector.sharpConstructionHistory,
+      hactivatedB]
+  have hcount :=
+    boundary_history_then_direct_tail_distinct_le
+      hreachTotal history hprefixCover hboundary
+        htail htailPos times hlive hnd
+  have hhistory :
+      history.length ≤ N + 3 := by
+    dsimp [history]
+    exact A.preservedTwoHistoryCore_length_le_N_add_three
+      hN B hbaseAB hbaseGrooves hpreGrooves
+  omega
+
+/-- The complete four-vector protected tail therefore gives the sharp
+`N+6` count in the pre-return-groove-preserved branch. -/
+theorem two_manufacturing_journeys_preserved_support_then_four_tail_le_N_add_six
+    {w : Wiring} {N e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues}
+    (A : ManufacturedReflector w start.1 e)
+    (B : ManufacturedReflector w e start.1)
+    (stateA stateB : Tongues)
+    (hbaseA : A.baseState = start.2)
+    (hactivatedA : stateA = A.activatedState)
+    (hreachA : stepN w
+      (A.exploration.length + A.runway.length + 1) start =
+        some (e, stateA))
+    (hgroovesA :
+      PathGrooves A.toSupported.paths stateA)
+    (hbaseB : B.baseState = stateA)
+    (hactivatedB : stateB = B.activatedState)
+    (hreachB : stepN w
+      (B.exploration.length + B.runway.length + 1)
+        (e, stateA) = some (start.1, stateB))
+    (hgroovesB :
+      PathGrooves B.toSupported.paths stateB)
+    (hpreGrooves :
+      PathGrooves A.toSupported.paths B.preReturn.2)
+    (htail : ∀ (tailTimes : List Nat),
+      (∀ k ∈ tailTimes,
+        (stepN w k (start.1, stateB)).isSome) →
+      (tailTimes.map (restrictedTonguesAt w N
+        (start.1, stateB))).Nodup →
+      tailTimes.length ≤ 4)
+    (times : List Nat)
+    (hlive : ∀ k ∈ times,
+      (stepN w k start).isSome)
+    (hnd : (times.map
+      (restrictedTonguesAt w N start)).Nodup) :
+    times.length ≤ N + 6 := by
+  have hcount :=
+    two_manufacturing_journeys_preserved_support_then_tail_distinct_le
+      hN A B stateA stateB hbaseA hactivatedA hreachA
+      hgroovesA hbaseB hactivatedB hreachB hgroovesB
+      hpreGrooves htail (by omega) times hlive hnd
+  omega
 
 /-- A membership cover for the union of two sharp histories.  It erases one
 internal duplicate from each history and then erases the shared activation
