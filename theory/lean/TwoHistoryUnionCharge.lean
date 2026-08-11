@@ -541,6 +541,221 @@ structure SecondHistorySupportContact
   approach_fresh : ∀ prior ∈ approach, ¬ A.TouchesSupport prior
   touches : A.TouchesSupport fresh
 
+/-! ## Stop the second charge at its first old-support contact -/
+
+/-- The old reusable coordinates and the second journey's strictly
+pre-contact coordinates are disjoint and individually simple. -/
+theorem SecondHistorySupportContact.reusable_append_approach_nodup
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B) :
+    (A.reusableSwitches ++ C.approach.map passageSwitch).Nodup := by
+  apply List.nodup_append.mpr
+  refine ⟨A.reusableSwitches_nodup, ?_, ?_⟩
+  · have hsimple := B.exploration_simple
+    unfold SwitchSimple at hsimple
+    rw [C.split] at hsimple
+    simp only [List.map_append, List.map_cons] at hsimple
+    exact (List.nodup_append.mp hsimple).1
+  · intro oldSwitch holdSwitch freshSwitch hfreshSwitch hEq
+    obtain ⟨path, hpath, old, hold, holdEq⟩ :=
+      A.mem_reusableSwitches holdSwitch
+    obtain ⟨prior, hprior, hpriorEq⟩ :=
+      List.mem_map.mp hfreshSwitch
+    apply C.approach_fresh prior hprior
+    refine ⟨path, hpath, old, hold, ?_⟩
+    exact holdEq.trans (hEq.trans hpriorEq.symm)
+
+/-- The old support and the fresh approach together consume at most N
+switch coordinates. -/
+theorem SecondHistorySupportContact.reusable_add_approach_le
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B) :
+    A.reusableSwitches.length + C.approach.length ≤ N := by
+  let switches :=
+    A.reusableSwitches ++ C.approach.map passageSwitch
+  have hnd : switches.Nodup := by
+    simpa [switches] using C.reusable_append_approach_nodup
+  have hlt : ∀ k ∈ switches, k < N := by
+    intro k hk
+    rcases List.mem_append.mp hk with hA | hB
+    · exact A.reusableSwitch_lt hN hA
+    · obtain ⟨passage, hpassage, rfl⟩ := List.mem_map.mp hB
+      apply B.exploration_trace.switch_lt hN passage
+      rw [C.split]
+      exact List.mem_append_left _ hpassage
+  have hbound := nodup_nat_lt_length hnd hlt
+  simpa [switches] using hbound
+
+/-- The full first exploration and the strictly pre-contact part of the
+second exploration cost at most N+1 passages. -/
+theorem SecondHistorySupportContact.first_exploration_add_approach_le
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B) :
+    A.exploration.length + C.approach.length ≤ N + 1 := by
+  have hsupport := C.reusable_add_approach_le hN
+  have hA := A.exploration_length_le_reusable_add_one
+  omega
+
+/-- Restricted tongue vectors of the second journey from its shared initial
+boundary through the post-vector of the first old-support contact. -/
+def SecondHistorySupportContact.prefixHistory
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (N : Nat) : List (List Bool) :=
+  (List.range (C.approach.length + 2)).map
+    (restrictedTonguesAt w N (e, B.baseState))
+
+/-- Every second-journey vector through the contact belongs to the literal
+prefix history. -/
+theorem SecondHistorySupportContact.mem_prefixHistory
+    {w : Wiring} {N g e j : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (hj : j ≤ C.approach.length + 1) :
+    restrictedTonguesAt w N (e, B.baseState) j ∈
+      C.prefixHistory N := by
+  unfold SecondHistorySupportContact.prefixHistory
+  apply List.mem_map.mpr
+  exact ⟨j, List.mem_range.mpr (by omega), rfl⟩
+
+/-- The second prefix begins at the activated endpoint of the first
+construction, so this shared boundary may be erased once. -/
+theorem SecondHistorySupportContact.boundary_mem_prefixHistory
+    {w : Wiring} {N g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (hbase : B.baseState = A.activatedState) :
+    VectorCount.restrict N A.activatedState ∈ C.prefixHistory N := by
+  have hzero := C.mem_prefixHistory (N := N) (j := 0) (by omega)
+  simpa [restrictedTonguesAt, tonguesAt, stepN, hbase] using hzero
+
+/-- A coefficient-one cover: the compressed first sharp history, followed
+only by the second prefix through first contact, with the shared boundary
+removed from the latter. -/
+def SecondHistorySupportContact.contactHistory
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (N : Nat) : List (List Bool) :=
+  A.sharpHistoryCore N ++
+    (C.prefixHistory N).erase
+      (VectorCount.restrict N A.activatedState)
+
+/-- Exact length of the first-contact cover. -/
+theorem SecondHistorySupportContact.contactHistory_length
+    {w : Wiring} {N g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (hbase : B.baseState = A.activatedState) :
+    (C.contactHistory N).length =
+      A.exploration.length + C.approach.length + 2 := by
+  have hboundary := C.boundary_mem_prefixHistory (N := N) hbase
+  unfold SecondHistorySupportContact.contactHistory
+  rw [List.length_append, List.length_erase_of_mem hboundary,
+    A.sharpHistoryCore_length]
+  simp [SecondHistorySupportContact.prefixHistory]
+  omega
+
+/-- The first-contact cover has coefficient one: at most N+3 vectors. -/
+theorem SecondHistorySupportContact.contactHistory_length_le_N_add_three
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (hbase : B.baseState = A.activatedState) :
+    (C.contactHistory N).length ≤ N + 3 := by
+  have hlength := C.contactHistory_length (N := N) hbase
+  have hcharge := C.first_exploration_add_approach_le hN
+  omega
+
+/-- Erasing the internal and shared-boundary repetitions loses no vector:
+the cover contains every first sharp-history vector and every second vector
+through the first contact. -/
+theorem SecondHistorySupportContact.mem_contactHistory
+    {w : Wiring} {N g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    {x : List Bool}
+    (hx : x ∈ A.sharpConstructionHistory N ∨
+      x ∈ C.prefixHistory N) :
+    x ∈ C.contactHistory N := by
+  rcases hx with hxA | hxB
+  · apply List.mem_append_left
+    exact A.mem_sharpHistoryCore_of_mem hxA
+  · by_cases hboundary :
+        x = VectorCount.restrict N A.activatedState
+    · subst x
+      apply List.mem_append_left
+      exact A.activated_mem_sharpHistoryCore
+    · apply List.mem_append_right
+      exact (List.mem_erase_of_ne hboundary).mpr hxB
+
+/-- **Coefficient-one first-contact union charge.**
+
+Any duplicate-free selection drawn from the first complete sharp history and
+the second journey only through its first old-support contact has size at
+most N+3.  No overlap between the two lists is assumed. -/
+theorem SecondHistorySupportContact.first_contact_prefix_nodup_union_le_N_add_three
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (hbase : B.baseState = A.activatedState)
+    (pool : List (List Bool))
+    (hpool : ∀ x ∈ pool,
+      x ∈ A.sharpConstructionHistory N ∨
+        x ∈ C.prefixHistory N)
+    (hnd : pool.Nodup) :
+    pool.length ≤ N + 3 := by
+  have hsubset : ∀ x ∈ pool, x ∈ C.contactHistory N := by
+    intro x hx
+    exact C.mem_contactHistory (hpool x hx)
+  have hcover := nodup_subset_length_two_history hnd hsubset
+  have hlength := C.contactHistory_length_le_N_add_three hN hbase
+  omega
+
+/-- A three-vector post-contact novelty theorem is exactly sufficient for
+the target N+6 count: the complete second construction is never paid for.
+This is the generic assembly interface for the contact classification. -/
+theorem SecondHistorySupportContact.prefix_then_three_novelty_distinct_le_N_add_six
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (hbase : B.baseState = A.activatedState)
+    (times : List Nat)
+    (hcover : NoveltyCoverOn w N (e, B.baseState)
+      times (C.contactHistory N) 3)
+    (hnd : (times.map
+      (restrictedTonguesAt w N (e, B.baseState))).Nodup) :
+    times.length ≤ N + 6 := by
+  have hcount := noveltyCoverOn_distinct_count hcover hnd
+  have hlength := C.contactHistory_length_le_N_add_three hN hbase
+  omega
+
 /-- **Unconditional two-history reduction.**  Exact first-activation data
 give either the `N+4` union charge or the first physical old-support contact;
 the theorem does not assume that the histories overlap. -/
