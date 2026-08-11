@@ -23,16 +23,63 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register consolidated proof targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "FacingForwardConstant"
+          [[lean_lib]]
+          name = "ProtectedRepairConstant"
+          [[lean_lib]]
+          name = "KnownEdgeTwo"
+          [[lean_lib]]
+          name = "KnownEdgeTwoAll"
+          [[lean_lib]]
+          name = "KnownEdgeAllLift"
+          [[lean_lib]]
+          name = "StateLawTwo"
+          [[lean_lib]]
+          name = "RunwayHistoricalTwo"
+          [[lean_lib]]
+          name = "ChangedFlipCountFive"
+          [[lean_lib]]
+          name = "ProtectedRepairFive"
+          [[lean_lib]]
+          name = "KnownEdgeTailCap"
+          [[lean_lib]]
+          name = "StateLawTwoSharp"
+          [[lean_lib]]
+          name = "SingleCoordinateFlip"
+          [[lean_lib]]
+          name = "RunwayHistoricalOne"
+          [[lean_lib]]
+          name = "ChangedFlipCountFour"
+          [[lean_lib]]
+          name = "ProbeCompleteRepair"
+          [[lean_lib]]
+          name = "PairActionCorners"
+          [[lean_lib]]
+          name = "CompleteRepairFour"
+          [[lean_lib]]
+          name = "ProtectedRepairFour"
+          [[lean_lib]]
+          name = "KnownEdgeTwoSharper"
+          [[lean_lib]]
+          name = "StateLawTwoSharper"
+          [[lean_lib]]
+          name = "CoefficientOneSeven"
+          [[lean_lib]]
+          name = "ProbeSimpleCycleTail"
+          EOF
       - name: Check unconditional coefficient-two theorem
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake env lean StateLawTwoSharper.lean
+          lake build StateLawTwoSharper
       - name: Check coefficient-one local closure
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake env lean TripleSelfLinkSimpleCycleTail.lean
-          lake env lean CoefficientOneSeven.lean
-          lake env lean ProbeSimpleCycleTail.lean
+          lake build TripleSelfLinkSimpleCycleTail CoefficientOneSeven ProbeSimpleCycleTail
       - name: Publish consolidated checkpoint
         if: success()
         run: |
