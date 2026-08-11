@@ -66,14 +66,9 @@ theorem manufactured_pair_all_time_action_corners_tongues
             obtain ⟨port, phase, hrun, hphase⟩ :=
               manufactured_stay_then_flip_contact_all_time_two_phase
                 SA FB state hA hB hcontact d
-            have ht : tonguesAt w (SA.runwayTrace.start.1, state) d =
-                phase := by
+            have ht : tonguesAt w (g, state) d = phase := by
               simp [tonguesAt, hrun]
-            change tonguesAt w (g, state) d ∈
-              manufacturedPairActionCorners (.stay SA) (.flip FB) state
-            have ht' : tonguesAt w (g, state) d = phase := by
-              simpa using ht
-            rw [ht']
+            rw [ht]
             rcases hphase with rfl | rfl <;>
               simp [manufacturedPairActionCorners,
                 ManufacturedReflector.toSupported,
@@ -91,11 +86,25 @@ theorem manufactured_pair_all_time_action_corners_tongues
           · have hmem := manufactured_pair_all_time_four_phase_tongues
               (.flip FA) (.stay SB) state hA hB
                 hAB (by trivial) d
-            simpa [manufacturedPairActionCorners,
-              ManufacturedReflector.toSupported,
-              ManufacturedStayReflector.toSupported,
-              ManufacturedFlipReflector.toSupported,
-              LocalAction.apply, flipAt_flipAt] using hmem
+            have hmem' :
+                tonguesAt w (g, state) d = state ∨
+                  tonguesAt w (g, state) d =
+                    flipAt state FA.actionSwitch := by
+              simpa [ManufacturedReflector.toSupported,
+                ManufacturedStayReflector.toSupported,
+                ManufacturedFlipReflector.toSupported,
+                LocalAction.apply, flipAt_flipAt] using hmem
+            rcases hmem' with h | h
+            · simp [manufacturedPairActionCorners,
+                ManufacturedReflector.toSupported,
+                ManufacturedStayReflector.toSupported,
+                ManufacturedFlipReflector.toSupported,
+                LocalAction.apply, h]
+            · simp [manufacturedPairActionCorners,
+                ManufacturedReflector.toSupported,
+                ManufacturedStayReflector.toSupported,
+                ManufacturedFlipReflector.toSupported,
+                LocalAction.apply, h]
           · have hcontact := contact_of_not_avoids_flip hAB
             obtain ⟨port, phase, hrun, hphase⟩ :=
               manufactured_flip_then_stay_all_time_two_phase
