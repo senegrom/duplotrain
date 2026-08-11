@@ -7,6 +7,10 @@ on:
       - theory/lean/KnownEdgeFour.lean
       - theory/lean/StateLawFour.lean
       - theory/lean/FirstCycleCount.lean
+      - theory/lean/ChangedFlipCountActual.lean
+      - theory/lean/ProtectedRepairThree.lean
+      - theory/lean/KnownEdgeThree.lean
+      - theory/lean/StateLawThree.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
 jobs:
@@ -33,8 +37,18 @@ jobs:
           name = "StateLawFour"
           [[lean_lib]]
           name = "FirstCycleCount"
+          [[lean_lib]]
+          name = "ChangedFlipCountActual"
+          [[lean_lib]]
+          name = "ProtectedRepairThree"
+          [[lean_lib]]
+          name = "KnownEdgeThree"
+          [[lean_lib]]
+          name = "StateLawThree"
           EOF
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build OneJourneyTailCount KnownEdgeFour StateLawFour FirstCycleCount
+          lake build OneJourneyTailCount KnownEdgeFour StateLawFour \
+            FirstCycleCount ChangedFlipCountActual ProtectedRepairThree \
+            KnownEdgeThree StateLawThree
