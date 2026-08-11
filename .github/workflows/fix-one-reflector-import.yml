@@ -1,0 +1,36 @@
+name: Fix one-reflector continuation import
+
+on:
+  push:
+    branches: [agent/upper-bound-unified]
+    paths:
+      - .github/workflows/fix-one-reflector-import.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import manufacturing endpoint helper
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('theory/lean/OneReflectorContinuation.lean')
+          text = path.read_text()
+          marker = 'import TwoHistoryUnionCharge\n'
+          addition = 'import NoveltyChargeBound\n'
+          if addition not in text:
+              if marker not in text:
+                  raise SystemExit('import marker not found')
+              text = text.replace(marker, marker + addition, 1)
+          path.write_text(text)
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add theory/lean/OneReflectorContinuation.lean
+          git diff --cached --check
+          git commit -m "import manufacturing endpoint helper in continuation proof"
+          git push origin HEAD:agent/upper-bound-unified
