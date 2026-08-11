@@ -1,4 +1,4 @@
-import StateLawTwoSharp
+import ProtectedRepairFour
 
 /-!
 # Charging two opposite construction histories once
@@ -1217,7 +1217,7 @@ theorem ManufacturedReflector.two_sharp_histories_nodup_union_le_N_add_two
 
 /-- A concrete old-support contact, retaining the exact physical prefix and
 suffix of the second exploration. -/
-structure SecondHistorySupportContact
+structure SecondHistoryContactData
     (w : Wiring) (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g) where
   approach : List Passage
@@ -1230,8 +1230,225 @@ structure SecondHistorySupportContact
   suffix_trace :
     PhysicalTrace w (fresh.1, contactState) (fresh :: suffix) B.preReturn
   old_grooves : PathGrooves A.toSupported.paths contactState
-  approach_fresh : ∀ prior ∈ approach, ¬ A.TouchesSupport prior
   touches : A.TouchesSupport fresh
+
+/-- A first old-support contact is contact data whose strict approach has no
+earlier old-support passage.  The dynamic contact theorems below only need
+the parent data; freshness is retained here for the original coordinate
+charge and for callers that genuinely stop at the first contact. -/
+structure SecondHistorySupportContact
+    (w : Wiring) (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    extends SecondHistoryContactData w A B where
+  approach_fresh : ∀ prior ∈ approach, ¬ A.TouchesSupport prior
+
+instance {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g} :
+    Coe (SecondHistorySupportContact w A B)
+      (SecondHistoryContactData w A B) :=
+  ⟨SecondHistorySupportContact.toSecondHistoryContactData⟩
+
+/-! ## Charge a prefix ending at the first damaging support passage -/
+
+/-- Every contact approach is a prefix of the second switch-simple
+exploration. -/
+theorem SecondHistoryContactData.approach_simple
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B) :
+    SwitchSimple C.approach := by
+  have hs := B.exploration_simple
+  unfold SwitchSimple at hs ⊢
+  rw [C.split] at hs
+  simp only [List.map_append, List.map_cons] at hs
+  exact (List.nodup_append.mp hs).1
+
+/-- If both endpoints of a switch-simple contact approach groove the old
+support, every productive prefix writer is outside that support.  The write
+survives by simplicity, so an old-support writer would contradict endpoint
+agreement on the corresponding old passage. -/
+theorem SecondHistoryContactData.approach_productive_writer_not_reusable
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B)
+    (hbaseGrooves : PathGrooves A.toSupported.paths B.baseState)
+    {k : Nat} (hk : k < C.approach.length)
+    (hprod : RawProductiveAt w N (e, B.baseState) k) :
+    rawWriterAt w (e, B.baseState) k ∉ A.reusableSwitches := by
+  intro hreusable
+  have hsurvives :
+      C.contactState (rawWriterAt w (e, B.baseState) k) ≠
+        B.baseState (rawWriterAt w (e, B.baseState) k) :=
+    C.approach_trace.simple_raw_productive_writer_survives
+      hN C.approach_simple hk hprod
+  obtain ⟨path, hpath, old, hold, hswitch⟩ :=
+    A.mem_reusableSwitches hreusable
+  have hbaseOld := hbaseGrooves path hpath old hold
+  have hcontactOld := C.old_grooves path hpath old hold
+  have hagree :=
+    grooved_states_agree_on_passage hbaseOld hcontactOld
+  have hexit : old.2 / 3 = passageSwitch old := by
+    have hs := arrive_exit_switch B.baseState old.2
+    rw [hbaseOld] at hs
+    exact hs.symm
+  apply hsurvives
+  calc
+    C.contactState (rawWriterAt w (e, B.baseState) k) =
+        C.contactState (old.2 / 3) := by rw [hexit, hswitch]
+    _ = B.baseState (old.2 / 3) := hagree.symm
+    _ = B.baseState (rawWriterAt w (e, B.baseState) k) := by
+      rw [hexit, hswitch]
+
+/-- The old reusable support and all productive first writers before the
+damaging contact occupy disjoint switch coordinates, hence cost at most N
+altogether. -/
+theorem SecondHistoryContactData.reusable_add_approach_first_writers_le
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B)
+    (hbaseGrooves : PathGrooves A.toSupported.paths B.baseState) :
+    A.reusableSwitches.length +
+      (rawFirstWriterTimes w N (e, B.baseState)
+        C.approach.length).length ≤ N := by
+  classical
+  let times :=
+    rawFirstWriterTimes w N (e, B.baseState) C.approach.length
+  let writers := times.map (rawWriterAt w (e, B.baseState))
+  have htimesNodup : times.Nodup := by
+    dsimp [times, rawFirstWriterTimes]
+    exact nodup_filter_nat_two_history _ List.nodup_range
+  have hwritersNodup : writers.Nodup := by
+    dsimp [writers]
+    apply nodup_map_nat_of_injective_on_two_history
+    · intro i hi j hj hEq
+      have hiData := mem_rawFirstWriterTimes_iff.mp (by
+        simpa [times] using hi)
+      have hjData := mem_rawFirstWriterTimes_iff.mp (by
+        simpa [times] using hj)
+      exact rawFirstWriterAt_injective
+        hiData.2 hjData.2 hEq
+    · exact htimesNodup
+  have hdisjoint :
+      ∀ oldSwitch ∈ A.reusableSwitches,
+        ∀ freshSwitch ∈ writers, oldSwitch ≠ freshSwitch := by
+    intro oldSwitch hOld freshSwitch hFresh hEq
+    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
+    have hkData := mem_rawFirstWriterTimes_iff.mp (by
+      simpa [times] using hk)
+    have houtside :=
+      C.approach_productive_writer_not_reusable
+        hN hbaseGrooves hkData.1 hkData.2.1
+    apply houtside
+    rw [← hEq]
+    exact hOld
+  let switches := A.reusableSwitches ++ writers
+  have hnd : switches.Nodup := by
+    dsimp [switches]
+    exact List.nodup_append.mpr
+      ⟨A.reusableSwitches_nodup, hwritersNodup, hdisjoint⟩
+  have hlt : ∀ C₀ ∈ switches, C₀ < N := by
+    intro C₀ hC
+    rcases List.mem_append.mp hC with hOld | hFresh
+    · exact A.reusableSwitch_lt hN hOld
+    · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
+      have hkData := mem_rawFirstWriterTimes_iff.mp (by
+        simpa [times] using hk)
+      exact rawProductiveAt_writer_lt hN hkData.2.1
+  have hbound := nodup_nat_lt_length hnd hlt
+  have hlength :
+      A.reusableSwitches.length + times.length ≤ N := by
+    simpa [switches, writers] using hbound
+  simpa [times] using hlength
+
+/-- The compressed second prefix consists of its canonical first-writer
+history and the post-contact vector. -/
+noncomputable def SecondHistoryContactData.damageWriterHistory
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B)
+    (N : Nat) (next : Tongues) : List (List Bool) :=
+  rawFirstWriterHistory w N (e, B.baseState) C.approach.length ++
+    [VectorCount.restrict N next]
+
+/-- Coefficient-one history through a damaging support contact. -/
+noncomputable def SecondHistoryContactData.damageContactHistory
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B)
+    (N : Nat) (next : Tongues) : List (List Bool) :=
+  A.sharpHistoryCore N ++
+    (C.damageWriterHistory N next).erase
+      (VectorCount.restrict N A.activatedState)
+
+/-- Every literal second-prefix vector through the contact occurs in the
+compressed writer history. -/
+theorem SecondHistoryContactData.prefix_mem_damageWriterHistory
+    {w : Wiring} {N g e j : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B)
+    {next : Tongues}
+    (harrive : arrive C.contactState C.fresh.1 = (C.fresh.2, next))
+    (hj : j ≤ C.approach.length + 1) :
+    restrictedTonguesAt w N (e, B.baseState) j ∈
+      C.damageWriterHistory N next := by
+  unfold SecondHistoryContactData.damageWriterHistory
+  by_cases hprefix : j ≤ C.approach.length
+  · apply List.mem_append_left
+    exact C.approach_trace.restrictedTonguesAt_mem_rawFirstWriterHistory
+      C.approach_simple j hprefix
+  · have hjEq : j = C.approach.length + 1 := by omega
+    obtain ⟨q, post, hhead, hone⟩ :=
+      physicalTrace_head_step_two_history C.suffix_trace
+    have hpost : post = next := by
+      rw [harrive] at hhead
+      exact (Prod.mk.inj hhead).2.symm
+    have hglobal :
+        stepN w j (e, B.baseState) = some (q, next) := by
+      rw [hjEq, stepN_add, C.approach_trace.sound]
+      simpa [hpost] using hone
+    apply List.mem_append_right
+    simp [restrictedTonguesAt, tonguesAt, hglobal]
+
+/-- The damaging-contact history has coefficient one and length at most
+N+3. -/
+theorem SecondHistoryContactData.damageContactHistory_length_le_N_add_three
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B)
+    (hbase : B.baseState = A.activatedState)
+    (hbaseGrooves : PathGrooves A.toSupported.paths B.baseState)
+    (next : Tongues) :
+    (C.damageContactHistory N next).length ≤ N + 3 := by
+  have hboundary :
+      VectorCount.restrict N A.activatedState ∈
+        C.damageWriterHistory N next := by
+    unfold SecondHistoryContactData.damageWriterHistory
+    apply List.mem_append_left
+    simp [rawFirstWriterHistory, restrictedTonguesAt,
+      tonguesAt, stepN, hbase]
+  have hcharge :=
+    C.reusable_add_approach_first_writers_le hN hbaseGrooves
+  have houter := A.exploration_length_le_reusable_add_one
+  unfold SecondHistoryContactData.damageContactHistory
+  rw [List.length_append, List.length_erase_of_mem hboundary,
+    A.sharpHistoryCore_length]
+  simp [SecondHistoryContactData.damageWriterHistory,
+    rawFirstWriterHistory]
+  omega
 
 /-! ## Stop the second charge at its first old-support contact -/
 
@@ -1300,36 +1517,36 @@ theorem SecondHistorySupportContact.first_exploration_add_approach_le
 
 /-- Restricted tongue vectors of the second journey from its shared initial
 boundary through the post-vector of the first old-support contact. -/
-def SecondHistorySupportContact.prefixHistory
+def SecondHistoryContactData.prefixHistory
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     (N : Nat) : List (List Bool) :=
   (List.range (C.approach.length + 2)).map
     (restrictedTonguesAt w N (e, B.baseState))
 
 /-- Every second-journey vector through the contact belongs to the literal
 prefix history. -/
-theorem SecondHistorySupportContact.mem_prefixHistory
+theorem SecondHistoryContactData.mem_prefixHistory
     {w : Wiring} {N g e j : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     (hj : j ≤ C.approach.length + 1) :
     restrictedTonguesAt w N (e, B.baseState) j ∈
       C.prefixHistory N := by
-  unfold SecondHistorySupportContact.prefixHistory
+  unfold SecondHistoryContactData.prefixHistory
   apply List.mem_map.mpr
   exact ⟨j, List.mem_range.mpr (by omega), rfl⟩
 
 /-- The second prefix begins at the activated endpoint of the first
 construction, so this shared boundary may be erased once. -/
-theorem SecondHistorySupportContact.boundary_mem_prefixHistory
+theorem SecondHistoryContactData.boundary_mem_prefixHistory
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     (hbase : B.baseState = A.activatedState) :
     VectorCount.restrict N A.activatedState ∈ C.prefixHistory N := by
   have hzero := C.mem_prefixHistory (N := N) (j := 0) (by omega)
@@ -1338,17 +1555,51 @@ theorem SecondHistorySupportContact.boundary_mem_prefixHistory
 /-- A coefficient-one cover: the compressed first sharp history, followed
 only by the second prefix through first contact, with the shared boundary
 removed from the latter. -/
-def SecondHistorySupportContact.contactHistory
+def SecondHistoryContactData.contactHistory
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     (N : Nat) : List (List Bool) :=
   A.sharpHistoryCore N ++
     (C.prefixHistory N).erase
       (VectorCount.restrict N A.activatedState)
 
 /-- Exact length of the first-contact cover. -/
+theorem SecondHistoryContactData.contactHistory_length
+    {w : Wiring} {N g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B)
+    (hbase : B.baseState = A.activatedState) :
+    (C.contactHistory N).length =
+      A.exploration.length + C.approach.length + 2 := by
+  have hboundary := C.boundary_mem_prefixHistory (N := N) hbase
+  unfold SecondHistoryContactData.contactHistory
+  rw [List.length_append, List.length_erase_of_mem hboundary,
+    A.sharpHistoryCore_length]
+  simp [SecondHistoryContactData.prefixHistory]
+  omega
+
+/-- Compatibility view of the generalized prefix history for a literal
+first-support contact. -/
+abbrev SecondHistorySupportContact.prefixHistory
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (N : Nat) : List (List Bool) :=
+  C.toSecondHistoryContactData.prefixHistory N
+
+/-- Compatibility view of the generalized contact history. -/
+abbrev SecondHistorySupportContact.contactHistory
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistorySupportContact w A B)
+    (N : Nat) : List (List Bool) :=
+  C.toSecondHistoryContactData.contactHistory N
+
 theorem SecondHistorySupportContact.contactHistory_length
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
@@ -1356,13 +1607,8 @@ theorem SecondHistorySupportContact.contactHistory_length
     (C : SecondHistorySupportContact w A B)
     (hbase : B.baseState = A.activatedState) :
     (C.contactHistory N).length =
-      A.exploration.length + C.approach.length + 2 := by
-  have hboundary := C.boundary_mem_prefixHistory (N := N) hbase
-  unfold SecondHistorySupportContact.contactHistory
-  rw [List.length_append, List.length_erase_of_mem hboundary,
-    A.sharpHistoryCore_length]
-  simp [SecondHistorySupportContact.prefixHistory]
-  omega
+      A.exploration.length + C.approach.length + 2 :=
+  C.toSecondHistoryContactData.contactHistory_length hbase
 
 /-- The first-contact cover has coefficient one: at most N+3 vectors. -/
 theorem SecondHistorySupportContact.contactHistory_length_le_N_add_three
@@ -1381,11 +1627,11 @@ theorem SecondHistorySupportContact.contactHistory_length_le_N_add_three
 /-- Erasing the internal and shared-boundary repetitions loses no vector:
 the cover contains every first sharp-history vector and every second vector
 through the first contact. -/
-theorem SecondHistorySupportContact.mem_contactHistory
+theorem SecondHistoryContactData.mem_contactHistory
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     {x : List Bool}
     (hx : x ∈ A.sharpConstructionHistory N ∨
       x ∈ C.prefixHistory N) :
@@ -1403,11 +1649,11 @@ theorem SecondHistorySupportContact.mem_contactHistory
 
 /-- The vector immediately before the first old-support contact is already
 present in the coefficient-one contact history. -/
-theorem SecondHistorySupportContact.contact_pre_mem
+theorem SecondHistoryContactData.contact_pre_mem
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B) :
+    (C : SecondHistoryContactData w A B) :
     VectorCount.restrict N C.contactState ∈ C.contactHistory N := by
   apply C.mem_contactHistory
   right
@@ -1419,11 +1665,11 @@ theorem SecondHistorySupportContact.contact_pre_mem
 /-- The contact history also contains the post-vector installed by the
 contact passage.  This is the second historical corner needed by the
 forward-splice Gray square. -/
-theorem SecondHistorySupportContact.contact_post_mem
+theorem SecondHistoryContactData.contact_post_mem
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B) :
+    (C : SecondHistoryContactData w A B) :
     ∃ next,
       arrive C.contactState C.fresh.1 = (C.fresh.2, next) ∧
       VectorCount.restrict N next ∈ C.contactHistory N := by
@@ -1441,6 +1687,38 @@ theorem SecondHistorySupportContact.contact_post_mem
     exact hone
   simpa [restrictedTonguesAt, tonguesAt, hglobal] using hm
 
+/-- The literal contact history used by the dynamic classification embeds
+in the compressed coefficient-one history. -/
+theorem SecondHistoryContactData.mem_damageContactHistory_of_mem_contactHistory
+    {w : Wiring} {N g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B)
+    {next : Tongues}
+    (harrive : arrive C.contactState C.fresh.1 = (C.fresh.2, next))
+    {x : List Bool} (hx : x ∈ C.contactHistory N) :
+    x ∈ C.damageContactHistory N next := by
+  unfold SecondHistoryContactData.contactHistory at hx
+  unfold SecondHistoryContactData.damageContactHistory
+  rcases List.mem_append.mp hx with hxA | hxPrefix
+  · exact List.mem_append_left _ hxA
+  · have hxPrefix' : x ∈ C.prefixHistory N :=
+      List.mem_of_mem_erase hxPrefix
+    obtain ⟨j, hj, rfl⟩ := List.mem_map.mp hxPrefix'
+    have hjLe : j ≤ C.approach.length + 1 := by
+      have hjLt := List.mem_range.mp hj
+      omega
+    have hwriter := C.prefix_mem_damageWriterHistory
+      (N := N) harrive hjLe
+    by_cases hboundary :
+        restrictedTonguesAt w N (e, B.baseState) j =
+          VectorCount.restrict N A.activatedState
+    · rw [hboundary]
+      apply List.mem_append_left
+      exact A.activated_mem_sharpHistoryCore
+    · apply List.mem_append_right
+      exact (List.mem_erase_of_ne hboundary).mpr hwriter
+
 /- **Coefficient-one first-contact union charge.**
 
 Any duplicate-free selection drawn from the first complete sharp history and
@@ -1450,11 +1728,11 @@ most N+3.  No overlap between the two lists is assumed. -/
 /-- A first changing contact is either the explicit backward lasso or, after
 swapping the opposite journeys, exactly the existing changed-forward merge.
 The forward witness keeps the literal first-contact approach and passage. -/
-theorem SecondHistorySupportContact.changed_periodic_or_swapped_forward
+theorem SecondHistoryContactData.changed_periodic_or_swapped_forward
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     (hbase : B.baseState = A.activatedState)
     {next : Tongues}
     (harrive :
@@ -1724,11 +2002,11 @@ theorem first_forward_contact_active_lead_two_history
 the two action-image corners beyond the coefficient-one contact history.
 Both the contact state and the state immediately after the contact are
 already present in that history. -/
-theorem SecondHistorySupportContact.changed_forward_flip_two_novelty
+theorem SecondHistoryContactData.changed_forward_flip_two_novelty
     {w : Wiring} {N g e : Nat}
     {R : ManufacturedFlipReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w (.flip R) B)
+    (C : SecondHistoryContactData w (.flip R) B)
     {next : Tongues}
     (harrive :
       arrive C.contactState C.fresh.1 = (C.fresh.2, next))
@@ -1873,11 +2151,11 @@ private theorem twoHistory_twoPhase_concat
 /-- Exact all-time two-phase tail for a first changing forward contact into a
 stay reflector.  The entry time is the literal post-contact time of
 prefixHistory, not an existentially reconstructed lead. -/
-theorem SecondHistorySupportContact.changed_forward_stay_two_phase_tail
+theorem SecondHistoryContactData.changed_forward_stay_two_phase_tail
     {w : Wiring} {g e : Nat}
     {R : ManufacturedStayReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w (.stay R) B)
+    (C : SecondHistoryContactData w (.stay R) B)
     {next : Tongues}
     (harrive :
       arrive C.contactState C.fresh.1 = (C.fresh.2, next))
@@ -2134,11 +2412,11 @@ theorem SecondHistorySupportContact.changed_forward_stay_two_phase_tail
 /-- The stay-reflector forward branch uses only the two already historical
 contact corners, hence it satisfies the requested budget two with an empty
 fresh list. -/
-theorem SecondHistorySupportContact.changed_forward_stay_two_novelty
+theorem SecondHistoryContactData.changed_forward_stay_two_novelty
     {w : Wiring} {N g e : Nat}
     {R : ManufacturedStayReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w (.stay R) B)
+    (C : SecondHistoryContactData w (.stay R) B)
     {next : Tongues}
     (harrive :
       arrive C.contactState C.fresh.1 = (C.fresh.2, next))
@@ -2347,11 +2625,11 @@ theorem backward_contact_all_time_two_phase_two_history
 /-- Any backward first support contact, changing or not, has no novelty after
 the literal contact prefix: its two possible states are precisely the
 pre-vector and post-vector already recorded by prefixHistory. -/
-theorem SecondHistorySupportContact.backward_contact_two_novelty
+theorem SecondHistoryContactData.backward_contact_two_novelty
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     {next : Tongues}
     (harrive :
       arrive C.contactState C.fresh.1 = (C.fresh.2, next))
@@ -2499,11 +2777,11 @@ theorem SecondHistorySupportContact.backward_contact_two_novelty
 unconditional two-novelty cover: backward orientation is the historical
 two-phase lasso, while forward orientation is the exact stay/flip splice
 proved above. -/
-theorem SecondHistorySupportContact.changed_contact_two_novelty
+theorem SecondHistoryContactData.changed_contact_two_novelty
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     {next : Tongues}
     (harrive :
       arrive C.contactState C.fresh.1 = (C.fresh.2, next))
@@ -2537,6 +2815,31 @@ theorem SecondHistorySupportContact.changed_contact_two_novelty
         exact C.changed_forward_flip_two_novelty
           harrive hchanged horiented horientedGroove
           horientedSwitch hforwardExit hrepair hrestored times
+
+/-- The already-proved two-novelty contact tail transfers unchanged from
+the literal prefix history to the compressed coefficient-one history. -/
+theorem SecondHistoryContactData.changed_contact_two_novelty_charged
+    {w : Wiring} {N g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (C : SecondHistoryContactData w A B)
+    {next : Tongues}
+    (harrive : arrive C.contactState C.fresh.1 = (C.fresh.2, next))
+    (hchanged : next (C.fresh.1 / 3) ≠
+      C.contactState (C.fresh.1 / 3))
+    (times : List Nat) :
+    NoveltyCoverOn w N (e, B.baseState) times
+      (C.damageContactHistory N next) 2 := by
+  obtain ⟨fresh, hfresh, hmem⟩ :=
+    C.changed_contact_two_novelty harrive hchanged times
+  refine ⟨fresh, hfresh, ?_⟩
+  intro k hk
+  rcases List.mem_append.mp (hmem k hk) with hhistory | hfreshMem
+  · apply List.mem_append_left
+    exact C.mem_damageContactHistory_of_mem_contactHistory
+      harrive hhistory
+  · exact List.mem_append_right _ hfreshMem
+
 private theorem grooved_same_switch_passages_eq_or_reverse_two_history
     {state : Tongues} {old fresh : Passage}
     (hold : arrive state old.2 = (old.1, state))
@@ -2570,11 +2873,11 @@ private theorem grooved_same_switch_passages_eq_or_reverse_two_history
 /-- At an unchanged first support contact, every backward orientation is
 already covered by the historical two-phase lasso.  The only residue is the
 literal forward passage on the old selected route. -/
-theorem SecondHistorySupportContact.facing_contact_two_novelty_or_forward
+theorem SecondHistoryContactData.facing_contact_two_novelty_or_forward
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     {next : Tongues}
     (harrive :
       arrive C.contactState C.fresh.1 = (C.fresh.2, next))
@@ -2646,11 +2949,11 @@ The second suffix and the old selected-route suffix are deterministic traces
 from the same post-contact configuration.  If the second suffix stops first,
 its pre-return state is still the contact state; otherwise the unmatched
 second suffix is an explicit physical residual from the old pre-return. -/
-theorem SecondHistorySupportContact.facing_forward_residual_or_stable
+theorem SecondHistoryContactData.facing_forward_residual_or_stable
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
+    (C : SecondHistoryContactData w A B)
     (hforward :
       C.fresh ∈ A.orientedRoute C.contactState) :
     ∃ oldPrefix oldTail,
@@ -3154,5 +3457,213 @@ theorem ManufacturedReflector.second_history_damage_is_turning_resource
           v (passageSwitch old) ≠ u (passageSwitch old)) := by
   exact A.broken_support_change_location B stateA stateB
     hbase hactivated hgrooves hpreserves hbroken
+
+/-! ## First damaging contact: coefficient-one all-time assembly -/
+
+/-- If the second construction has already reached a changing old-support
+contact, the whole two-journey run has at most N+5 distinct restricted
+tongue vectors.  The first journey and compressed second prefix cost N+3;
+the classified post-contact dynamics cost two more. -/
+theorem ManufacturedReflector.changed_support_contact_all_run_distinct_le_N_add_five
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (C : SecondHistoryContactData w A B)
+    (hbase : B.baseState = A.activatedState)
+    (hA : PathGrooves A.toSupported.paths A.activatedState)
+    {next : Tongues}
+    (harrive : arrive C.contactState C.fresh.1 = (C.fresh.2, next))
+    (hchanged : next (C.fresh.1 / 3) ≠
+      C.contactState (C.fresh.1 / 3))
+    (times : List Nat)
+    (hlive : ∀ k ∈ times,
+      (stepN w k (g, A.baseState)).isSome)
+    (hnd : (times.map
+      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
+    times.length ≤ N + 5 := by
+  let firstTravel :=
+    A.exploration.length + A.runway.length + 1
+  let localTimes :=
+    (times.filter (fun k => decide (firstTravel < k))).map
+      (fun k => k - firstTravel)
+  let history := C.damageContactHistory N next
+  have hreachA :
+      stepN w firstTravel (g, A.baseState) =
+        some (e, A.activatedState) := by
+    simpa [firstTravel] using
+      A.manufacturing_journey_reaches_activated hA
+  have hreachBoundary :
+      stepN w firstTravel (g, A.baseState) =
+        some (e, B.baseState) := by
+    simpa [hbase] using hreachA
+  have hlocalCover :
+      NoveltyCoverOn w N (e, B.baseState) localTimes history 2 := by
+    dsimp [localTimes, history]
+    exact C.changed_contact_two_novelty_charged
+      harrive hchanged _
+  obtain ⟨fresh, hfreshLength, hlocalMem⟩ := hlocalCover
+  have hcover : NoveltyCoverOn w N (g, A.baseState)
+      times history 2 := by
+    refine ⟨fresh, hfreshLength, ?_⟩
+    intro k hk
+    by_cases hprefix : k ≤ firstTravel
+    · have hm := A.manufacturing_journey_mem_sharpHistory
+        (N := N) hA (j := k) (by
+          simpa [firstTravel] using hprefix)
+      apply List.mem_append_left
+      dsimp [history]
+      unfold SecondHistoryContactData.damageContactHistory
+      exact List.mem_append_left _
+        (A.mem_sharpHistoryCore_of_mem hm)
+    · have hafter : firstTravel < k := by omega
+      let q := k - firstTravel
+      have hkEq : k = firstTravel + q := by
+        dsimp [q]
+        omega
+      have hkFiltered :
+          k ∈ times.filter (fun t => decide (firstTravel < t)) := by
+        apply List.mem_filter.mpr
+        exact ⟨hk, by simp [hafter]⟩
+      have hqMem : q ∈ localTimes := by
+        dsimp [localTimes]
+        apply List.mem_map.mpr
+        exact ⟨k, hkFiltered, rfl⟩
+      have hglobalLive := hlive k hk
+      have hlocalLive :
+          (stepN w q (e, B.baseState)).isSome := by
+        rw [hkEq, stepN_add, hreachBoundary] at hglobalLive
+        exact hglobalLive
+      have hlocalReach :
+          ∃ finish, stepN w q (e, B.baseState) = some finish :=
+        Option.isSome_iff_exists.mp hlocalLive
+      have hshift :=
+        tonguesAt_add_of_reaches hreachBoundary hlocalReach
+      have hvector :
+          restrictedTonguesAt w N (g, A.baseState) k =
+            restrictedTonguesAt w N (e, B.baseState) q := by
+        unfold restrictedTonguesAt
+        rw [hkEq]
+        exact congrArg (VectorCount.restrict N) hshift
+      rw [hvector]
+      exact hlocalMem q hqMem
+  have hcount := noveltyCoverOn_distinct_count hcover hnd
+  have hbaseGrooves :
+      PathGrooves A.toSupported.paths B.baseState := by
+    rw [hbase]
+    exact hA
+  have hhistory : history.length ≤ N + 3 := by
+    dsimp [history]
+    exact C.damageContactHistory_length_le_N_add_three
+      hN hbase hbaseGrooves next
+  omega
+
+/-- Either the old support remains grooved at the second pre-return, or the
+first damaging support passage supplies freshness-free contact data and an
+actual tongue change.  Earlier harmless support passages are retained in
+the approach; they are not recursively classified or charged. -/
+theorem ManufacturedReflector.preReturn_grooved_or_changed_support_contact
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbase : B.baseState = A.activatedState)
+    (hA : PathGrooves A.toSupported.paths A.activatedState) :
+    PathGrooves A.toSupported.paths B.preReturn.2 ∨
+      ∃ C : SecondHistoryContactData w A B, ∃ next : Tongues,
+        arrive C.contactState C.fresh.1 = (C.fresh.2, next) ∧
+        next (C.fresh.1 / 3) ≠ C.contactState (C.fresh.1 / 3) := by
+  have hbaseGrooves :
+      PathGrooves A.toSupported.paths B.baseState := by
+    rw [hbase]
+    exact hA
+  by_cases hpre : PathGrooves A.toSupported.paths B.preReturn.2
+  · exact Or.inl hpre
+  · right
+    obtain ⟨approach, p, x, suffix, u, v, path, old,
+        hsplit, hprefix, hgrooves, harrive,
+        hpath, hold, hswitch, hchanged, _hExit⟩ :=
+      B.exploration_trace.first_changed_support_passage
+        hbaseGrooves hpre
+    have hfull := B.exploration_trace
+    rw [hsplit] at hfull
+    obtain ⟨middle, hbefore, hafter⟩ := hfull.split_append
+    have hmiddle : middle = (p, u) := by
+      have h₁ := hbefore.sound
+      have h₂ := hprefix.sound
+      rw [h₂] at h₁
+      exact (Option.some.inj h₁).symm
+    subst middle
+    let C : SecondHistoryContactData w A B := {
+      approach := approach
+      fresh := (p, x)
+      suffix := suffix
+      contactState := u
+      split := hsplit
+      approach_trace := hprefix
+      suffix_trace := hafter
+      old_grooves := hgrooves
+      touches := ⟨path, hpath, old, hold, by
+        simpa [passageSwitch] using hswitch⟩
+    }
+    refine ⟨C, v, ?_, ?_⟩
+    · simpa [C] using harrive
+    · simpa [C] using hchanged
+
+/-- **Two opposite manufactured reflectors, raw all-times coefficient-one
+bound.**  If the old support survives to the second pre-return, the verified
+four-vector protected repair gives N+6.  Otherwise the first damaging
+support passage invokes the N+5 theorem above.  This is an unconditional
+general-N theorem over the actual `stepN` trajectory. -/
+theorem ManufacturedReflector.two_reflector_all_run_distinct_le_N_add_six
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbase : B.baseState = A.activatedState)
+    (hA : PathGrooves A.toSupported.paths A.activatedState)
+    (hB : PathGrooves B.toSupported.paths B.activatedState)
+    (times : List Nat)
+    (hlive : ∀ k ∈ times,
+      (stepN w k (g, A.baseState)).isSome)
+    (hnd : (times.map
+      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
+    times.length ≤ N + 6 := by
+  rcases A.preReturn_grooved_or_changed_support_contact
+      B hbase hA with hpre | ⟨C, next, harrive, hchanged⟩
+  · have hreachA : stepN w
+        (A.exploration.length + A.runway.length + 1)
+        (g, A.baseState) = some (e, A.activatedState) :=
+      A.manufacturing_journey_reaches_activated hA
+    have hreachB := B.manufacturing_journey_reaches_activated hB
+    have hreachB' : stepN w
+        (B.exploration.length + B.runway.length + 1)
+        (e, A.activatedState) = some (g, B.activatedState) := by
+      rw [← hbase]
+      exact hreachB
+    have hAatBase :
+        PathGrooves A.toSupported.paths B.baseState := by
+      rw [hbase]
+      exact hA
+    have htail : ∀ tailTimes : List Nat,
+        (∀ k ∈ tailTimes,
+          (stepN w k (g, B.activatedState)).isSome) →
+        (tailTimes.map
+          (restrictedTonguesAt w N
+            (g, B.activatedState))).Nodup →
+        tailTimes.length ≤ 4 := by
+      intro tailTimes htailLive htailNodup
+      exact manufactured_pair_protected_repair_distinct_le_four
+        A B hAatBase hB tailTimes htailLive htailNodup
+    exact
+      two_manufacturing_journeys_preserved_support_then_four_tail_le_N_add_six
+        hN A B A.activatedState B.activatedState
+        rfl rfl hreachA hA hbase rfl hreachB' hB hpre htail
+        times hlive hnd
+  · have hc : times.length ≤ N + 5 :=
+      A.changed_support_contact_all_run_distinct_le_N_add_five
+        hN B C hbase hA harrive hchanged times hlive hnd
+    omega
 
 end GeneralN
