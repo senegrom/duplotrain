@@ -6,6 +6,7 @@ on:
       - theory/lean/OneJourneyTailCount.lean
       - theory/lean/KnownEdgeFour.lean
       - theory/lean/StateLawFour.lean
+      - theory/lean/FirstCycleCount.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
 jobs:
@@ -30,8 +31,10 @@ jobs:
           name = "KnownEdgeFour"
           [[lean_lib]]
           name = "StateLawFour"
+          [[lean_lib]]
+          name = "FirstCycleCount"
           EOF
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build OneJourneyTailCount KnownEdgeFour StateLawFour
+          lake build OneJourneyTailCount KnownEdgeFour StateLawFour FirstCycleCount
