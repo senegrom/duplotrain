@@ -1506,3 +1506,15 @@ name = "TwoHistoryUnionCharge"
 [[lean_lib]]
 name = "PartialSecondRunSharp"
 
+[[lean_lib]]
+name = "KnownEdgeNAddFiveAlt"
+
+[[lean_lib]]
+name = "ArbitraryStartCoefficientOneBoundary"
+
+[[lean_lib]]
+name = "BoundaryAbsentSecondWriter"
+
+[[lean_lib]]
+name = "BoundaryPresentSecondWriter"
+
