@@ -31,14 +31,15 @@ theorem knownEdgeFiveRepeatedWriterNovelty_of_sharpSixEventResidueImpossible
     (hclose : IncomingSharpSixEventResidueImpossible) :
     KnownEdgeFiveRepeatedWriterNovelty := by
   intro w N e hN start K hentry
-  by_contra hnot
-  have hsix :
-      6 ≤ (rawRepeatedWriterNovelTimes w N start K).length := by
-    omega
-  obtain ⟨R, hR⟩ :=
-    six_repeated_novelties_reduce_to_sharp_residue
+  by_cases hsmall :
+      (rawRepeatedWriterNovelTimes w N start K).length ≤ 5
+  · exact hsmall
+  · have hsix :
+        6 ≤ (rawRepeatedWriterNovelTimes w N start K).length := by
+      omega
+    exact (six_repeated_novelties_false_of_sharp_residue_impossible
       hN start hentry K hsix
-  exact hclose w N e hN start hentry R hR
+      (fun R => hclose w N e hN start hentry R)).elim
 
 /-- First-writer charging plus five repeated-writer novelties gives the
 known-edge `N+6` count. -/
