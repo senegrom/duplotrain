@@ -16,41 +16,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Add namespaced legacy contact calculus
+      - name: Isolate original legacy contact calculus
         run: |
+          git show d615f15a2249933dc27d528ac6b4c87b508a4f7e:theory/lean/TwoHistoryUnionCharge.lean \
+            > theory/lean/TwoHistoryUnionChargeLegacy.lean
+
           python - <<'PY'
           from pathlib import Path
-          import subprocess
-
-          old = subprocess.check_output([
-              'git', 'show',
-              'd615f15a2249933dc27d528ac6b4c87b508a4f7e:theory/lean/TwoHistoryUnionCharge.lean'
-          ], text=True)
-          marker = 'namespace GeneralN\n'
-          if marker not in old:
-              raise SystemExit('legacy namespace marker not found')
-          old = old.replace(marker, 'namespace GeneralN.Legacy\n', 1)
-          end_marker = 'end GeneralN'
-          pos = old.rfind(end_marker)
-          if pos < 0:
-              raise SystemExit('legacy end marker not found')
-          old = old[:pos] + 'end GeneralN.Legacy' + old[pos + len(end_marker):]
-          Path('theory/lean/TwoHistoryUnionChargeLegacy.lean').write_text(old)
 
           target = Path('theory/lean/MellitFiveNoveltyAssembly.lean')
           text = target.read_text()
-          import_marker = 'import TwoHistoryUnionCharge\n'
-          if 'import TwoHistoryUnionChargeLegacy\n' not in text:
-              if import_marker not in text:
-                  raise SystemExit('Mellit import marker not found')
-              text = text.replace(
-                  import_marker,
-                  import_marker + 'import TwoHistoryUnionChargeLegacy\n',
-                  1,
-              )
           text = text.replace(
-              'SecondHistoryContactData',
+              'import TwoHistoryUnionCharge\nimport TwoHistoryUnionChargeLegacy\n',
+              'import TwoHistoryUnionChargeLegacy\n',
+              1,
+          )
+          text = text.replace(
               'Legacy.SecondHistoryContactData',
+              'SecondHistoryContactData',
           )
           target.write_text(text)
           PY
@@ -59,5 +42,5 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add theory/lean/TwoHistoryUnionChargeLegacy.lean theory/lean/MellitFiveNoveltyAssembly.lean
           git diff --cached --check
-          git commit -m "preserve legacy contact calculus for 2N+5 proof"
+          git commit -m "isolate legacy contact calculus for 2N+5 proof"
           git push origin HEAD:agent/upper-bound-unified
