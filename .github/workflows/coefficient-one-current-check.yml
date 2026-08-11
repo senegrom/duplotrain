@@ -5,10 +5,13 @@ on:
     paths:
       - theory/lean/TripleSelfLinkSimpleCycleTail.lean
       - theory/lean/TripleSelfLinkSimpleCycleNoTail.lean
+      - theory/lean/TraceRetainingFirstRevisit.lean
+      - theory/lean/TraceRetainingBABASecondRepeat.lean
+      - theory/lean/PointwiseSimpleCycleTail.lean
       - theory/lean/CoefficientOneSeven.lean
       - theory/lean/ProbeSimpleCycleTail.lean
       - theory/lean/COEFFICIENT_ONE_STATUS.md
-      - COEFFICIENT_ONE_CURRENT.md
+      - UPPER_BOUND_PROGRESS.md
       - .github/workflows/coefficient-one-current-check.yml
   workflow_dispatch:
 jobs:
@@ -23,10 +26,27 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register proof targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "TraceRetainingFirstRevisit"
+
+          [[lean_lib]]
+          name = "TraceRetainingBABASecondRepeat"
+
+          [[lean_lib]]
+          name = "PointwiseSimpleCycleTail"
+          EOF
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build TripleSelfLinkSimpleCycleTail
+          lake build SharpSixEventAssembly
+          lake build TraceRetainingFirstRevisit
+          lake build TraceRetainingBABASecondRepeat
+          lake build PointwiseSimpleCycleTail
           lake env lean CoefficientOneSeven.lean
           lake env lean ProbeSimpleCycleTail.lean
       - name: Publish proof checkpoint
@@ -41,6 +61,11 @@ jobs:
             echo "- RawSixEventReduction.tail_simple_cycle_false"
             echo "- RawSixEventReduction.tail_cycle_self_link_false"
             echo "- CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_is_early"
+            echo "- PhysicalTrace.first_revisit_trace_or_activated_reflector"
+            echo "- rawExactLobeWrite_second_repeat_cycle_traces_or_pair"
+            echo "- ReachedStableSimpleCycle.one_vector_tail"
+            echo "- PhysicalTrace.simple_same_exit_cycle_all_positive"
+            echo "- PhysicalTrace.simple_same_exit_cycle_absolute_positive_vector"
             echo
             echo "Conditional quantitative bridge:"
             echo "- knownEdgeFiveRepeatedWriterNovelty_of_sharpSixEventResidueImpossible"
@@ -48,6 +73,7 @@ jobs:
             echo "- stateLawNAddSeven_of_sharpSixEventResidueImpossible"
             echo
             echo "The selected self-link raw-cycle residual is closed."
-            echo "Closing the exact sharp six-event residue would now yield N+7 globally (N+6 from a known incoming edge)."
+            echo "The same-exit first-revisit cycle now has a single settled vector at every positive raw time, not only after a complete lap."
+            echo "Closing the exact sharp six-event residue would yield N+7 globally (N+6 from a known incoming edge)."
             echo "The sharp N+6 StateLaw still requires the five-event/four-repeated-novelty closure."
           } >> "$GITHUB_STEP_SUMMARY"
