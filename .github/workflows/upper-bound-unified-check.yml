@@ -73,3 +73,4 @@ jobs:
             echo "- pointwise simple-cycle tail checked"
             echo "- first old-support contact reduced to the unchanged-forward two-novelty law"
           } >> "$GITHUB_STEP_SUMMARY"
+# isolated legacy module intentionally coexists only at the module level
