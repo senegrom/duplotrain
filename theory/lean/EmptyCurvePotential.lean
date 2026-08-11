@@ -959,13 +959,133 @@ structure RawEmptyCurveShrinkInterval
     ((stepN w endTime start).getD start) T
   shrink : EmptyCurveUpdate S T
 
+/-! ## The raw LIFO-pop versus overwrite fork -/
+
+/-- Every prefix of the reverse traversal of a still-grooved physical path
+preserves the complete tongue vector.  This is the arbitrary-path analogue
+of cascade retrace: the path may contain facing and trailing passages in any
+mixture. -/
+theorem linked_grooved_retrace_prefix_tongues_unchanged
+    (w : Wiring) (u : Tongues) (p x ell : Nat) (rest : List Passage)
+    (hlinked : LinkedPassages w ((p, x) :: rest))
+    (hgrooved : PassagesGrooved u ((p, x) :: rest))
+    (hentry : w.link ell = some p) :
+    forall d, d <= ((p, x) :: rest).length ->
+      exists q,
+        stepN w d (lastPassageExit x rest, u) = some (q, u) := by
+  induction rest generalizing p x ell with
+  | nil =>
+      intro d hd
+      have hcases : d = 0 ∨ d = 1 := by
+        simp only [List.length_cons, List.length_nil] at hd
+        omega
+      rcases hcases with rfl | rfl
+      · exact ⟨x, rfl⟩
+      · exact ⟨ell,
+          retrace_linked_passages w u p x ell []
+            hlinked hgrooved hentry⟩
+  | cons passage rest ih =>
+      rcases passage with ⟨q, y⟩
+      intro d hd
+      have htailLinked : LinkedPassages w ((q, y) :: rest) := hlinked.2
+      have htailGrooved : PassagesGrooved u ((q, y) :: rest) := by
+        intro passage hp
+        exact hgrooved passage (List.mem_cons_of_mem _ hp)
+      have hxq : w.link x = some q := hlinked.1
+      by_cases hprefix : d <= ((q, y) :: rest).length
+      · obtain ⟨r, hr⟩ :=
+          ih q y x htailLinked htailGrooved hxq d hprefix
+        exact ⟨r, by simpa [lastPassageExit] using hr⟩
+      · have hfull : d = ((p, x) :: (q, y) :: rest).length := by
+          simp only [List.length_cons] at hd hprefix ⊢
+          omega
+        subst d
+        exact ⟨ell,
+          retrace_linked_passages w u p x ell ((q, y) :: rest)
+            hlinked hgrooved hentry⟩
+
+/-- A switch-simple physical excursion has a tongue-quiet LIFO return at
+every depth. -/
+theorem PhysicalTrace.simple_retrace_prefix_tongues_unchanged
+    {w : Wiring} {before after : Nat × Tongues}
+    {p x ell : Nat} {rest : List Passage}
+    (trace : PhysicalTrace w before ((p, x) :: rest) after)
+    (hsimple : SwitchSimple ((p, x) :: rest))
+    (hentry : w.link ell = some p) :
+    forall d, d <= ((p, x) :: rest).length ->
+      exists q,
+        stepN w d (lastPassageExit x rest, after.2) =
+          some (q, after.2) := by
+  exact linked_grooved_retrace_prefix_tongues_unchanged
+    w after.2 p x ell rest trace.linked
+      (trace.grooved_of_switchSimple hsimple) hentry
+
+/-- **Raw LIFO/overwrite dichotomy.**  For an actual physical excursion,
+either every depth of the return is tongue-quiet, or its passage word repeats
+a switch writer.  Thus a non-LIFO return cannot be free: it exposes an
+overwrite contact in the old support. -/
+theorem PhysicalTrace.retrace_prefix_or_repeated_writer
+    {w : Wiring} {before after : Nat × Tongues}
+    {p x ell : Nat} {rest : List Passage}
+    (trace : PhysicalTrace w before ((p, x) :: rest) after)
+    (hentry : w.link ell = some p) :
+    (forall d, d <= ((p, x) :: rest).length ->
+      exists q,
+        stepN w d (lastPassageExit x rest, after.2) =
+          some (q, after.2)) ∨
+      ¬ SwitchSimple ((p, x) :: rest) := by
+  by_cases hsimple : SwitchSimple ((p, x) :: rest)
+  · exact Or.inl
+      (trace.simple_retrace_prefix_tongues_unchanged hsimple hentry)
+  · exact Or.inr hsimple
+
+private theorem ec_nodup_constant_length_le_one
+    {alpha : Type} [BEq alpha] [LawfulBEq alpha]
+    {xs : List alpha} {value : alpha}
+    (hnd : xs.Nodup) (hconst : forall x, x ∈ xs -> x = value) :
+    xs.length <= 1 := by
+  have hle := nodup_subset_length_emptyCurve hnd
+    (ys := [value]) (by
+      intro x hx
+      rw [hconst x hx]
+      simp)
+  simpa using hle
+
+/-- A duplicate-free sample taken anywhere during a genuine LIFO pop has at
+most one tongue vector, independently of the path length and of `N`. -/
+theorem PhysicalTrace.simple_retrace_nodup_vectors_le_one
+    {w : Wiring} {before after : Nat × Tongues}
+    {p x ell : Nat} {rest : List Passage}
+    (trace : PhysicalTrace w before ((p, x) :: rest) after)
+    (hsimple : SwitchSimple ((p, x) :: rest))
+    (hentry : w.link ell = some p)
+    (N : Nat) (times : List Nat)
+    (htimes : forall d, d ∈ times -> d <= ((p, x) :: rest).length)
+    (hnd : (times.map (restrictedTonguesAt w N
+      (lastPassageExit x rest, after.2))).Nodup) :
+    times.length <= 1 := by
+  have hconst : forall value,
+      value ∈ times.map (restrictedTonguesAt w N
+        (lastPassageExit x rest, after.2)) ->
+      value = VectorCount.restrict N after.2 := by
+    intro value hvalue
+    obtain ⟨d, hd, rfl⟩ := List.mem_map.mp hvalue
+    obtain ⟨q, hq⟩ :=
+      trace.simple_retrace_prefix_tongues_unchanged
+        hsimple hentry d (htimes d hd)
+    simp [restrictedTonguesAt, tonguesAt, hq]
+  have hle := ec_nodup_constant_length_le_one hnd hconst
+  simpa only [List.length_map] using hle
+
 /-!
 ## Remaining global step
 
-The raw dichotomy and the `N`-bound close all non-self accounting.  What
-remains is the stack/replay theorem for self contacts: a self pop must replay
-a previous boundary vector or enter the self-only four-snapshot tail.  No
-theorem in this module assumes that statement.
+The raw dichotomy and the `N`-bound close all non-self accounting.  The
+theorems above prove that every genuine LIFO pop contributes no new vector,
+and that a non-LIFO return contains a repeated support writer.  What remains
+is the global injective charge: assign every such repeated-support contact to
+a previously uncharged overwrite, or prove that the run has entered the
+self-only four-snapshot tail.  No theorem in this module assumes that step.
 -/
 
 end GeneralN
