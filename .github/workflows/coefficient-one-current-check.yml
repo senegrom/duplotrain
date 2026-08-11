@@ -5,10 +5,11 @@ on:
     paths:
       - theory/lean/TripleSelfLinkSimpleCycleTail.lean
       - theory/lean/TripleSelfLinkSimpleCycleNoTail.lean
+      - theory/lean/TraceRetainingFirstRevisit.lean
       - theory/lean/CoefficientOneSeven.lean
       - theory/lean/ProbeSimpleCycleTail.lean
       - theory/lean/COEFFICIENT_ONE_STATUS.md
-      - COEFFICIENT_ONE_CURRENT.md
+      - UPPER_BOUND_PROGRESS.md
       - .github/workflows/coefficient-one-current-check.yml
   workflow_dispatch:
 jobs:
@@ -28,6 +29,7 @@ jobs:
           export PATH="$HOME/.elan/bin:$PATH"
           lake build TripleSelfLinkSimpleCycleTail
           lake build SharpSixEventAssembly
+          lake env lean TraceRetainingFirstRevisit.lean
           lake env lean CoefficientOneSeven.lean
           lake env lean ProbeSimpleCycleTail.lean
       - name: Publish proof checkpoint
@@ -42,6 +44,7 @@ jobs:
             echo "- RawSixEventReduction.tail_simple_cycle_false"
             echo "- RawSixEventReduction.tail_cycle_self_link_false"
             echo "- CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_is_early"
+            echo "- PhysicalTrace.first_revisit_trace_or_activated_reflector"
             echo
             echo "Conditional quantitative bridge:"
             echo "- knownEdgeFiveRepeatedWriterNovelty_of_sharpSixEventResidueImpossible"
@@ -49,6 +52,7 @@ jobs:
             echo "- stateLawNAddSeven_of_sharpSixEventResidueImpossible"
             echo
             echo "The selected self-link raw-cycle residual is closed."
-            echo "Closing the exact sharp six-event residue would now yield N+7 globally (N+6 from a known incoming edge)."
+            echo "The generic first-revisit API now retains the physical stable cycle lap needed for pointwise novelty accounting."
+            echo "Closing the exact sharp six-event residue would yield N+7 globally (N+6 from a known incoming edge)."
             echo "The sharp N+6 StateLaw still requires the five-event/four-repeated-novelty closure."
           } >> "$GITHUB_STEP_SUMMARY"
