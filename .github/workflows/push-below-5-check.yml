@@ -1,0 +1,37 @@
+name: Push below coefficient 5
+on:
+  push:
+    branches: [agent/push-below-5]
+    paths:
+      - theory/lean/OneJourneyTailCount.lean
+      - theory/lean/KnownEdgeFour.lean
+      - theory/lean/StateLawFour.lean
+      - .github/workflows/push-below-5-check.yml
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register proof targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "OneJourneyTailCount"
+          [[lean_lib]]
+          name = "KnownEdgeFour"
+          [[lean_lib]]
+          name = "StateLawFour"
+          EOF
+      - name: Build proof targets
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build OneJourneyTailCount KnownEdgeFour StateLawFour
