@@ -8,34 +8,68 @@ import TrackStaySpliceAllTime
 
 Start the splice tail at the contact port, one step before the changed tongue
 is installed.  Time zero has the contact state; the first step installs the
-single flipped tongue; the existing all-time stay-splice analysis shows that
-every later state is one of those same two phases.  Thus the tail costs two
-vectors.  The protected repair approach is itself two-phase and shares its
-contact endpoint with that tail, so the whole branch costs at most three.
+single flipped tongue; every later state is one of those same two phases.
+The protected repair approach is itself two-phase and shares its contact
+endpoint with that tail, so the whole branch costs at most three vectors.
 -/
 
 namespace GeneralN
 
-/-- From the pre-contact state of a changed-forward stay splice, every future
-tongue vector is either the contact state or its one-switch flip. -/
-theorem ManufacturedReflector.ChangedForwardMerge.stay_precontact_two_phase
+private theorem stayconstant_twoPhase_concat
+    {w : Wiring} {start middle : Nat × Tongues}
+    {left right : Nat} {u v : Tongues}
+    (hleft : stepN w left start = some middle)
+    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
+      stepN w d start = some (port, phase) ∧
+        (phase = u ∨ phase = v))
+    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
+      stepN w d middle = some (port, phase) ∧
+        (phase = u ∨ phase = v))
+    (d : Nat) (hd : d ≤ left + right) :
+    ∃ port phase, stepN w d start = some (port, phase) ∧
+      (phase = u ∨ phase = v) := by
+  by_cases hdl : d ≤ left
+  · exact hleftPhase d hdl
+  · let r := d - left
+    have hr : r ≤ right := by
+      dsimp [r]
+      omega
+    have hdecomp : d = left + r := by
+      dsimp [r]
+      omega
+    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
+    refine ⟨port, phase, ?_, hphase⟩
+    rw [hdecomp, stepN_add, hleft]
+    simpa using hrun
+
+/-- Joint certificate: the exact active repair approach and its exact
+pre-contact stay-splice tail are exported from the same splice witnesses. -/
+theorem ManufacturedReflector.ChangedForwardMerge.stay_active_precontact_two_phase
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     {R : ManufacturedStayReflector w e g}
     (hmerge : A.ChangedForwardMerge (.stay R)) :
-    ∃ returnPort state k,
+    ∃ approach returnPort state k,
+      PhysicalTrace w
+        (g, (ManufacturedReflector.stay R).activatedState)
+        approach (returnPort, state) ∧
+      SwitchSimple approach ∧
+      (∀ passage ∈ approach,
+        passage ∈ A.orientedRoute
+          (ManufacturedReflector.stay R).activatedState) ∧
+      PathGrooves (ManufacturedReflector.stay R).toSupported.paths state ∧
       ∀ d, ∃ port phase,
         stepN w d (returnPort, state) = some (port, phase) ∧
         (phase = flipAt state k ∨ phase = state) := by
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, _oldTail,
       approach, candy, state, _leadSteps, _tailSteps, horiented,
-      _hrouteSplit, _hOldTail, _hApproachReplay, _hApproachSimple,
+      _hrouteSplit, _hOldTail, _hApproachReplay, hApproachSimple,
       _hApproachGrooved, _hApproachForeign, _hCandyEq,
       hentryBranch, _hmouthStem, hmouthLink, _harms,
       hfullGrooved, hfullTrace, hcrossed,
       hRpaths, hCandy, hCandyForeign, hLobe, _hreach,
       _hcomplete, _hleadLen, _htailLen, _happroachLe,
-      _hActiveApproach, _hApproachRoute⟩ :=
+      hActiveApproach, hApproachRoute⟩ :=
     hmerge.spliced_lobe_reflector_active_lead
   let k := mouth / 3
   let alternate := flipAt state k
@@ -139,13 +173,13 @@ theorem ManufacturedReflector.ChangedForwardMerge.stay_precontact_two_phase
           stepN w d (outside, alternate) = some (port, phase) ∧
             (phase = alternate ∨ phase = state) := by
         intro d hd
-        exact staySplice_twoPhase_concat hCaltEnd hCaltPhase
+        exact stayconstant_twoPhase_concat hCaltEnd hCaltPhase
           hReversePhase d (by simpa [half] using hd)
       have hHalfStatePhase : ∀ d, d ≤ half → ∃ port phase,
           stepN w d (outside, state) = some (port, phase) ∧
             (phase = alternate ∨ phase = state) := by
         intro d hd
-        exact staySplice_twoPhase_concat hCstateEnd hCstatePhase
+        exact stayconstant_twoPhase_concat hCstateEnd hCstatePhase
           hForwardPhase d (by simpa [half] using hd)
       let period := half + half
       have hperiod : stepN w period (outside, alternate) =
@@ -157,7 +191,7 @@ theorem ManufacturedReflector.ChangedForwardMerge.stay_precontact_two_phase
           stepN w d (outside, alternate) = some (port, phase) ∧
             (phase = alternate ∨ phase = state) := by
         intro d hd
-        exact staySplice_twoPhase_concat hHalfAlt hHalfAltPhase
+        exact stayconstant_twoPhase_concat hHalfAlt hHalfAltPhase
           hHalfStatePhase d (by simpa [period] using hd)
       have hpositive : 0 < period := by
         have hcpos := (ManufacturedReflector.stay C).travel_pos
@@ -215,7 +249,7 @@ theorem ManufacturedReflector.ChangedForwardMerge.stay_precontact_two_phase
           stepN w d (R.arm, alternate) = some (port, phase) ∧
             (phase = alternate ∨ phase = state) := by
         intro d hd
-        exact staySplice_twoPhase_concat hReverseEnd hReversePhase
+        exact stayconstant_twoPhase_concat hReverseEnd hReversePhase
           hForwardPhase d (by simpa [period] using hd)
       have hpositive : 0 < period := by
         dsimp [period, lTravel]
@@ -224,47 +258,21 @@ theorem ManufacturedReflector.ChangedForwardMerge.stay_precontact_two_phase
   have hone : stepN w 1 (returnPort, state) =
       some (outside, alternate) := by
     simp [stepN, step, hcrossed, hmouthLink, alternate, k]
-  refine ⟨returnPort, state, k, ?_⟩
-  intro d
-  cases d with
-  | zero =>
-      exact ⟨returnPort, state, by simp [stepN], Or.inr rfl⟩
-  | succ n =>
-      obtain ⟨port, phase, hrun, hphase⟩ := hallAfter n
-      refine ⟨port, phase, ?_, hphase⟩
-      rw [show n + 1 = 1 + n by omega, stepN_add, hone]
-      simpa using hrun
-
-/-- The pre-contact stay-splice tail contains at most two restricted tongue
-vectors. -/
-theorem ManufacturedReflector.ChangedForwardMerge.stay_precontact_distinct_le_two
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {R : ManufacturedStayReflector w e g}
-    (hmerge : A.ChangedForwardMerge (.stay R)) :
-    ∃ returnPort state,
-      ∀ times : List Nat,
-        (times.map (restrictedTonguesAt w N (returnPort, state))).Nodup →
-        times.length ≤ 2 := by
-  obtain ⟨returnPort, state, k, hall⟩ := hmerge.stay_precontact_two_phase
-  refine ⟨returnPort, state, ?_⟩
-  intro times hnd
-  let history := [VectorCount.restrict N state,
-    VectorCount.restrict N (flipAt state k)]
-  have hcover : NoveltyCoverOn w N (returnPort, state) times [] 2 := by
-    refine ⟨history, by simp [history], ?_⟩
-    intro d hd
-    simp only [List.nil_append]
-    obtain ⟨port, phase, hrun, hphase⟩ := hall d
-    have hvec : restrictedTonguesAt w N (returnPort, state) d =
-        VectorCount.restrict N phase := by
-      simp [restrictedTonguesAt, tonguesAt, hrun]
-    rw [hvec]
-    rcases hphase with h | h
-    · simp [history, h]
-    · simp [history, h]
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  simpa using hcount
+  have hall : ∀ d, ∃ port phase,
+      stepN w d (returnPort, state) = some (port, phase) ∧
+        (phase = flipAt state k ∨ phase = state) := by
+    intro d
+    cases d with
+    | zero =>
+        exact ⟨returnPort, state, by simp [stepN], Or.inr rfl⟩
+    | succ n =>
+        obtain ⟨port, phase, hrun, hphase⟩ := hallAfter n
+        refine ⟨port, phase, ?_, ?_⟩
+        · rw [show n + 1 = 1 + n by omega, stepN_add, hone]
+          simpa using hrun
+        · simpa [alternate] using hphase
+  exact ⟨approach, returnPort, state, k,
+    hActiveApproach, hApproachSimple, hApproachRoute, hRpaths, hall⟩
 
 /-- **Protected changed-forward stay count:** at most three distinct restricted
 tongue vectors. -/
@@ -283,39 +291,34 @@ theorem ManufacturedReflector.ChangedForwardMerge.stay_distinct_le_three
     (hnd : (times.map (restrictedTonguesAt w N
       (g, (ManufacturedReflector.stay R).activatedState))).Nodup) :
     times.length ≤ 3 := by
-  obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
-      approach, candy, state, leadSteps, tailSteps, horiented,
-      hrouteSplit, hOldTail, hApproachReplay, hApproachSimple,
-      hApproachGrooved, hApproachForeign, hCandyEq,
-      hentryBranch, hmouthStem, hmouthLink, harms,
-      hfullGrooved, hfullTrace, hcrossed, hRpaths, hCandy,
-      hCandyForeign, hLobe, hreach, hcomplete,
-      hleadLen, htailLen, happroachLe,
-      hActiveApproach, hApproachRoute⟩ :=
-    hmerge.spliced_lobe_reflector_active_lead
+  obtain ⟨approach, returnPort, state, k,
+      hActiveApproach, hApproachSimple, hApproachRoute,
+      hRpaths, hall⟩ := hmerge.stay_active_precontact_two_phase
   have hphase := A.repair_prefix_two_phase (.stay R) hA hBstart
     hActiveApproach hApproachSimple hApproachRoute hRpaths
-  obtain ⟨tailPort, tailState, htailCount⟩ :=
-    hmerge.stay_precontact_distinct_le_two (N := N)
-  -- The pre-contact witnesses are the same deterministic contact exposed by
-  -- the active splice package; use the package's named contact directly.
   have htail : ∀ tailTimes : List Nat,
-      (∀ k ∈ tailTimes, (stepN w k (returnPort, state)).isSome) →
+      (∀ d ∈ tailTimes, (stepN w d (returnPort, state)).isSome) →
       (tailTimes.map
         (restrictedTonguesAt w N (returnPort, state))).Nodup →
       tailTimes.length ≤ 2 := by
     intro tailTimes _ htailNodup
-    -- Re-run the pointwise theorem at the named package witnesses to avoid
-    -- relying on existential witness identity.
-    obtain ⟨rp, st, k, hall⟩ := hmerge.stay_precontact_two_phase
-    -- The existential package is deterministic but does not export witness
-    -- equality; establish the bound directly from the named splice geometry
-    -- instead via the same all-time theorem is left to simplification below.
-    have hnamed : rp = returnPort ∧ st = state := by
-      -- Both are produced by the same canonical splice package.
-      simp_all
-    rcases hnamed with ⟨rfl, rfl⟩
-    exact htailCount tailTimes htailNodup
+    let history := [VectorCount.restrict N state,
+      VectorCount.restrict N (flipAt state k)]
+    have hcover : NoveltyCoverOn w N (returnPort, state)
+        tailTimes [] 2 := by
+      refine ⟨history, by simp [history], ?_⟩
+      intro d hd
+      simp only [List.nil_append]
+      obtain ⟨port, phase, hrun, hphaseTail⟩ := hall d
+      have hvec : restrictedTonguesAt w N (returnPort, state) d =
+          VectorCount.restrict N phase := by
+        simp [restrictedTonguesAt, tonguesAt, hrun]
+      rw [hvec]
+      rcases hphaseTail with h | h
+      · simp [history, h]
+      · simp [history, h]
+    have hcount := noveltyCoverOn_distinct_count hcover htailNodup
+    simpa using hcount
   exact two_phase_prefix_then_direct_tail_distinct_le_succ
     hActiveApproach.sound hphase htail (by omega) times hlive hnd
 
