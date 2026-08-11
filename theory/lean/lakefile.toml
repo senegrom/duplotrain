@@ -347,7 +347,33 @@ defaultTargets = [
   "TwoToOneConfigurationCount",
   "UnlinkedCounterObstruction",
   "VectorCount",
-  "VisibleChipReduction"
+  "VisibleChipReduction",
+  "ArbitraryStartDirectLift",
+  "ChangedFlipCountFour",
+  "CompleteRepairFour",
+  "FirstChangedSupportTail",
+  "FirstContactGrayTail",
+  "MellitDirectSharpAssembly",
+  "MellitDynamicResidual",
+  "MellitFiveNoveltyAssembly",
+  "NoveltyChargeBound",
+  "OldContactContinuation",
+  "OneReflectorContinuation",
+  "PairActionCorners",
+  "PointwiseSimpleCycleTail",
+  "ProtectedRepairFour",
+  "RunwayHistoricalOne",
+  "ShortSuffixCount",
+  "ShrinkingCurveFinal",
+  "SingleCoordinateFlip",
+  "StateLawTwoCandidate",
+  "StateLawTwoFive",
+  "StateLawTwoSharp",
+  "StateLawTwoSharper",
+  "StateLawTwoSixUltra",
+  "TraceRetainingBABASecondRepeat",
+  "TraceRetainingFirstRevisit",
+  "TwoHistoryUnionCharge"
 ]
 
 [[lean_lib]]
@@ -1393,4 +1419,82 @@ name = "VectorCount"
 
 [[lean_lib]]
 name = "VisibleChipReduction"
+
+[[lean_lib]]
+name = "ArbitraryStartDirectLift"
+
+[[lean_lib]]
+name = "ChangedFlipCountFour"
+
+[[lean_lib]]
+name = "CompleteRepairFour"
+
+[[lean_lib]]
+name = "FirstChangedSupportTail"
+
+[[lean_lib]]
+name = "FirstContactGrayTail"
+
+[[lean_lib]]
+name = "MellitDirectSharpAssembly"
+
+[[lean_lib]]
+name = "MellitDynamicResidual"
+
+[[lean_lib]]
+name = "MellitFiveNoveltyAssembly"
+
+[[lean_lib]]
+name = "NoveltyChargeBound"
+
+[[lean_lib]]
+name = "OldContactContinuation"
+
+[[lean_lib]]
+name = "OneReflectorContinuation"
+
+[[lean_lib]]
+name = "PairActionCorners"
+
+[[lean_lib]]
+name = "PointwiseSimpleCycleTail"
+
+[[lean_lib]]
+name = "ProtectedRepairFour"
+
+[[lean_lib]]
+name = "RunwayHistoricalOne"
+
+[[lean_lib]]
+name = "ShortSuffixCount"
+
+[[lean_lib]]
+name = "ShrinkingCurveFinal"
+
+[[lean_lib]]
+name = "SingleCoordinateFlip"
+
+[[lean_lib]]
+name = "StateLawTwoCandidate"
+
+[[lean_lib]]
+name = "StateLawTwoFive"
+
+[[lean_lib]]
+name = "StateLawTwoSharp"
+
+[[lean_lib]]
+name = "StateLawTwoSharper"
+
+[[lean_lib]]
+name = "StateLawTwoSixUltra"
+
+[[lean_lib]]
+name = "TraceRetainingBABASecondRepeat"
+
+[[lean_lib]]
+name = "TraceRetainingFirstRevisit"
+
+[[lean_lib]]
+name = "TwoHistoryUnionCharge"
 

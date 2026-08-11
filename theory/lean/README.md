@@ -429,20 +429,14 @@ identity-reflector case, or flip-reflector runway case.
   four snapshots.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
-now proves an unconditional general linear theorem.
-`GeneralN.state_law_linear_three_sharp`
-(`StateLawThreeSharp.lean`) says that any one-train
-run on an `N`-switch wiring visits at most `3*N+7`
-pairwise-distinct tongue vectors, superseding the earlier
-`state_law_linear_four` (`4*N+9`), `state_law_linear_five` (`5*N+9`),
-`state_law_linear_eight` (`8*N+7`), `state_law_linear_eleven`
-(`11*N+8`), `state_law_linear_fourteen` (`14*N+9`),
-`state_law_linear_fifteen` (`15*N+7`), `state_law_linear_seventeen`
-(`17*N+5`), `state_law_linear_eighteen` (`18*N+3`),
-`state_law_linear_twenty_four` (`24*N+5`) and
-`state_law_linear_twenty_six` (`26*N+3`).  The theorem is
-stated over raw `Wiring`/`stepN`, with no small-`N` enumeration and no
-conditional hypothesis.
+now proves the unconditional raw bound `2*N+5`.
+`GeneralN.state_law_linear_two_add_five` (`StateLawTwoFive.lean`) is stated
+over raw `Wiring`/`stepN`, with no small-`N` enumeration and no conditional
+hypothesis.  Its known-incoming-edge core is the sharper `2*N+4` theorem.
+The improvement uses the exact `N+6` all-times charge for a completed pair of
+opposite manufactured reflectors; the remaining dead and simple-cycle
+branches cost at most `2*N+2` and `2*N+4`.  It supersedes the earlier
+`2*N+6`, `3*N+7`, `4*N+9`, and larger linear bounds.
 The repository does **not** claim the sharper `N+6` state law.
 
 Four layers of improvement feed the current constant.  The novelty-aware
