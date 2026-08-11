@@ -8,6 +8,7 @@ on:
       - theory/lean/StateLawFour.lean
       - theory/lean/FirstCycleCount.lean
       - theory/lean/ChangedFlipCountActual.lean
+      - theory/lean/ChangedFlipCountConstant.lean
       - theory/lean/ProtectedRepairThree.lean
       - theory/lean/KnownEdgeThree.lean
       - theory/lean/StateLawThree.lean
@@ -50,6 +51,8 @@ jobs:
           [[lean_lib]]
           name = "ChangedFlipCountActual"
           [[lean_lib]]
+          name = "ChangedFlipCountConstant"
+          [[lean_lib]]
           name = "ProtectedRepairThree"
           [[lean_lib]]
           name = "KnownEdgeThree"
@@ -80,9 +83,10 @@ jobs:
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build OneJourneyTailCount KnownEdgeFour StateLawFour \
-            FirstCycleCount ChangedFlipCountActual ProtectedRepairThree \
-            KnownEdgeThree StateLawThree BoundaryOverlapTailCount \
-            TwoJourneyBoundaryTailCount KnownEdgeThreeSharp KnownEdgeLift \
-            StateLawThreeSharp SimpleTraceOneNetChange RepairLeadTwoPhase \
+            FirstCycleCount ChangedFlipCountActual ChangedFlipCountConstant \
+            ProtectedRepairThree KnownEdgeThree StateLawThree \
+            BoundaryOverlapTailCount TwoJourneyBoundaryTailCount \
+            KnownEdgeThreeSharp KnownEdgeLift StateLawThreeSharp \
+            SimpleTraceOneNetChange RepairLeadTwoPhase \
             TwoPhasePrefixTailCount TrackEarlyRepairConstant \
             TrackGlobalRepairActiveLead
