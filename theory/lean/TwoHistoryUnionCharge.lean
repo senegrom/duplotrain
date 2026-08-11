@@ -20,6 +20,79 @@ All statements are over `Wiring`, `PhysicalTrace`, and `stepN`, for arbitrary
 
 namespace GeneralN
 
+private theorem nodup_subset_length_two_history
+    {α : Type} [BEq α] [LawfulBEq α] :
+    ∀ {xs cover : List α},
+      xs.Nodup →
+      (∀ x ∈ xs, x ∈ cover) →
+      xs.length ≤ cover.length := by
+  intro xs
+  induction xs with
+  | nil =>
+      intro cover _ _
+      exact Nat.zero_le _
+  | cons x rest ih =>
+      intro cover hnd hsub
+      rw [List.nodup_cons] at hnd
+      have hx : x ∈ cover := hsub x List.mem_cons_self
+      have hrest : ∀ y ∈ rest, y ∈ cover.erase x := by
+        intro y hy
+        have hyCover : y ∈ cover :=
+          hsub y (List.mem_cons_of_mem _ hy)
+        have hyx : y ≠ x := fun heq => hnd.1 (heq ▸ hy)
+        exact (List.mem_erase_of_ne hyx).mpr hyCover
+      have hle := ih hnd.2 hrest
+      have herase : (cover.erase x).length = cover.length - 1 :=
+        List.length_erase_of_mem hx
+      have hpositive : 0 < cover.length := by
+        cases cover with
+        | nil => cases hx
+        | cons _ _ => simp
+      simp only [List.length_cons]
+      omega
+
+private theorem count_map_range_two_of_eq
+    {α : Type} [BEq α] [LawfulBEq α]
+    (f : Nat → α) :
+    ∀ {n i j : Nat},
+      i < j → j < n → f i = f j →
+      2 ≤ ((List.range n).map f).count (f i) := by
+  intro n
+  induction n with
+  | zero =>
+      intro i j hij hj _
+      omega
+  | succ n ih =>
+      intro i j hij hj hEq
+      rw [List.range_succ, List.map_append, List.count_append]
+      by_cases hjLast : j = n
+      · subst j
+        have hi : i < n := by omega
+        have hmem : f i ∈ (List.range n).map f := by
+          apply List.mem_map.mpr
+          exact ⟨i, List.mem_range.mpr hi, rfl⟩
+        have hone : 1 ≤ ((List.range n).map f).count (f i) :=
+          List.one_le_count_iff.mpr hmem
+        have hsingle : ([n].map f).count (f i) = 1 := by
+          simp [← hEq]
+        omega
+      · have hjn : j < n := by omega
+        have htwo := ih hij hjn hEq
+        omega
+
+private theorem mem_erase_of_count_two
+    {α : Type} [BEq α] [LawfulBEq α]
+    {x y : α} {xs : List α}
+    (htwo : 2 ≤ xs.count x)
+    (hy : y ∈ xs) :
+    y ∈ xs.erase x := by
+  by_cases hyx : y = x
+  · subst y
+    apply List.count_pos_iff.mp
+    rw [List.count_erase_self]
+    omega
+  · exact (List.mem_erase_of_ne hyx).mpr hy
+
 /-- Switch coordinates belonging to the reusable support of a manufactured
 reflector.  For a flip reflector this deliberately omits the facing action
 mouth; that passage cannot itself change a tongue. -/
@@ -204,6 +277,252 @@ theorem ManufacturedReflector.two_sharp_histories_length_le_N_add_four
     List.length_cons, List.length_nil] at herase ⊢
   omega
 
+/-! ## Removing the internal duplicate of each sharp history -/
+
+/-- The facing mouth passage of a nondegenerate manufactured reflector does
+not change a tongue.  Consequently the state at the end of the runway occurs
+again one passage later in the sharp exploration prefix. -/
+private theorem ManufacturedFlipReflector.runway_boundary_repeated
+    {w : Wiring} {g e N : Nat}
+    (R : ManufacturedFlipReflector w g e) :
+    restrictedTonguesAt w N (g, R.base) R.runway.length =
+      restrictedTonguesAt w N (g, R.base) (R.runway.length + 1) := by
+  have hAtRunway :
+      tonguesAt w (g, R.base) R.runway.length = R.mouthState := by
+    simp [tonguesAt, R.runwayTrace.sound]
+  have hstepOne :
+      ∃ q, stepN w 1 (R.mouth, R.mouthState) =
+        some (q, R.mouthState) := by
+    have htrace := R.candyTrace
+    cases htrace with
+    | @cons p x q u v passages finish harrive hlink tail =>
+        have hv : v = R.mouthState := by
+          unfold arrive at harrive
+          rw [if_pos R.mouth_is_stem] at harrive
+          exact (Prod.mk.inj harrive).2.symm
+        refine ⟨q, ?_⟩
+        simp [stepN, step, harrive, hlink, hv]
+  have hAtNext :
+      tonguesAt w (g, R.base) (R.runway.length + 1) =
+        R.mouthState := by
+    have hlive :
+        ∃ finish, stepN w 1 (R.mouth, R.mouthState) = some finish := by
+      obtain ⟨q, hq⟩ := hstepOne
+      exact ⟨(q, R.mouthState), hq⟩
+    have hshift := tonguesAt_add_of_reaches
+      (K := R.runway.length) (d := 1) R.runwayTrace.sound hlive
+    obtain ⟨q, hq⟩ := hstepOne
+    rw [hshift]
+    simp [tonguesAt, hq]
+  simp only [restrictedTonguesAt]
+  rw [hAtRunway, hAtNext]
+
+/-- A canonical value that occurs twice in every sharp construction history.
+For a stay reflector it is the pre-return/activated value.  For a flip
+reflector it is the unchanged value on the two sides of the facing mouth
+passage. -/
+def ManufacturedReflector.sharpHistoryDuplicate
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e) (N : Nat) : List Bool :=
+  match A with
+  | .stay R => VectorCount.restrict N R.returnState
+  | .flip R =>
+      restrictedTonguesAt w N (g, R.base) R.runway.length
+
+/-- Every sharp construction history has an internal repetition, independent
+of any relation to a second history. -/
+theorem ManufacturedReflector.sharpHistoryDuplicate_count
+    {w : Wiring} {g e N : Nat}
+    (A : ManufacturedReflector w g e) :
+    2 ≤ (A.sharpConstructionHistory N).count
+      (A.sharpHistoryDuplicate N) := by
+  cases A with
+  | stay R =>
+      let f := restrictedTonguesAt w N (g, R.base)
+      let x := VectorCount.restrict N R.returnState
+      have hxPrefix :
+          x ∈ (List.range
+            ((R.runway ++ [(R.mouth, R.arm)]).length + 1)).map f := by
+        apply List.mem_map.mpr
+        refine ⟨(R.runway ++ [(R.mouth, R.arm)]).length,
+          List.mem_range.mpr (by omega), ?_⟩
+        dsimp [f, x]
+        have hs :
+            stepN w (R.runway.length + 1) (g, R.base) =
+              some (R.arm, R.returnState) := by
+          simpa [
+          ManufacturedReflector.exploration,
+            ManufacturedReflector.baseState,
+            ManufacturedReflector.preReturn] using
+              (ManufacturedReflector.stay R).exploration_trace.sound
+        simp [restrictedTonguesAt, tonguesAt, hs]
+      change 2 ≤
+        (((List.range
+          ((R.runway ++ [(R.mouth, R.arm)]).length + 1)).map f) ++
+            [x]).count x
+      rw [List.count_append]
+      have hone :
+          1 ≤ ((List.range
+            ((R.runway ++ [(R.mouth, R.arm)]).length + 1)).map f).count x :=
+        List.one_le_count_iff.mpr hxPrefix
+      have hsingle : [x].count x = 1 := by simp
+      omega
+  | flip R =>
+      let f := restrictedTonguesAt w N (g, R.base)
+      have hEq : f R.runway.length = f (R.runway.length + 1) := by
+        exact R.runway_boundary_repeated
+      have hnext :
+          R.runway.length + 1 <
+            (R.runway ++ (R.mouth, R.firstArm) :: R.candy).length + 1 := by
+        simp only [List.length_append, List.length_cons]
+        omega
+      have hprefix := count_map_range_two_of_eq f
+        (n :=
+          (R.runway ++ (R.mouth, R.firstArm) :: R.candy).length + 1)
+        (i := R.runway.length) (j := R.runway.length + 1)
+        (by omega) hnext hEq
+      change 2 ≤
+        (((List.range
+          ((R.runway ++ (R.mouth, R.firstArm) :: R.candy).length + 1)).map f) ++
+            [VectorCount.restrict N R.afterReturn]).count
+              (f R.runway.length)
+      rw [List.count_append]
+      omega
+
+/-- The sharp history with one guaranteed internal repetition removed. -/
+def ManufacturedReflector.sharpHistoryCore
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e) (N : Nat) : List (List Bool) :=
+  (A.sharpConstructionHistory N).erase (A.sharpHistoryDuplicate N)
+
+/-- Erasing the canonical duplicate loses no represented tongue vector. -/
+theorem ManufacturedReflector.mem_sharpHistoryCore_of_mem
+    {w : Wiring} {g e N : Nat}
+    (A : ManufacturedReflector w g e)
+    {x : List Bool}
+    (hx : x ∈ A.sharpConstructionHistory N) :
+    x ∈ A.sharpHistoryCore N := by
+  exact mem_erase_of_count_two A.sharpHistoryDuplicate_count hx
+
+/-- The compressed sharp history costs exactly one more vector than the
+simple exploration has passages. -/
+theorem ManufacturedReflector.sharpHistoryCore_length
+    {w : Wiring} {g e N : Nat}
+    (A : ManufacturedReflector w g e) :
+    (A.sharpHistoryCore N).length = A.exploration.length + 1 := by
+  have hmem :
+      A.sharpHistoryDuplicate N ∈ A.sharpConstructionHistory N :=
+    List.count_pos_iff.mp (by
+      have htwo := A.sharpHistoryDuplicate_count (N := N)
+      omega)
+  unfold ManufacturedReflector.sharpHistoryCore
+  rw [List.length_erase_of_mem hmem]
+  simp [ManufacturedReflector.sharpConstructionHistory]
+
+/-- The activated endpoint is retained by the compressed first history. -/
+theorem ManufacturedReflector.activated_mem_sharpHistoryCore
+    {w : Wiring} {g e N : Nat}
+    (A : ManufacturedReflector w g e) :
+    VectorCount.restrict N A.activatedState ∈ A.sharpHistoryCore N := by
+  apply A.mem_sharpHistoryCore_of_mem
+  simp [ManufacturedReflector.sharpConstructionHistory]
+
+/-- Time zero, hence the reflector's base state, is retained by the compressed
+history. -/
+theorem ManufacturedReflector.base_mem_sharpHistoryCore
+    {w : Wiring} {g e N : Nat}
+    (A : ManufacturedReflector w g e) :
+    VectorCount.restrict N A.baseState ∈ A.sharpHistoryCore N := by
+  apply A.mem_sharpHistoryCore_of_mem
+  unfold ManufacturedReflector.sharpConstructionHistory
+  apply List.mem_append_left
+  apply List.mem_map.mpr
+  refine ⟨0, List.mem_range.mpr (by omega), ?_⟩
+  simp [restrictedTonguesAt, tonguesAt, stepN]
+
+/-- A membership cover for the union of two sharp histories.  It erases one
+internal duplicate from each history and then erases the shared activation
+boundary from the second compressed history. -/
+def ManufacturedReflector.twoSharpHistoryCore
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (N : Nat) : List (List Bool) :=
+  A.sharpHistoryCore N ++
+    (B.sharpHistoryCore N).erase
+      (VectorCount.restrict N A.activatedState)
+
+/-- The second compressed history really contains the shared A-to-B boundary,
+so the final erasure removes one element. -/
+theorem ManufacturedReflector.twoSharpHistoryCore_length
+    {w : Wiring} {g e N : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbase : B.baseState = A.activatedState) :
+    (A.twoSharpHistoryCore B N).length =
+      A.exploration.length + B.exploration.length + 1 := by
+  have hboundary :
+      VectorCount.restrict N A.activatedState ∈ B.sharpHistoryCore N := by
+    simpa [hbase] using B.base_mem_sharpHistoryCore (N := N)
+  unfold ManufacturedReflector.twoSharpHistoryCore
+  rw [List.length_append, List.length_erase_of_mem hboundary,
+    A.sharpHistoryCore_length, B.sharpHistoryCore_length]
+  omega
+
+/-- Every vector from either original sharp history remains in the compressed
+two-history cover.  At the erased common boundary the first compressed
+history supplies the representative. -/
+theorem ManufacturedReflector.mem_twoSharpHistoryCore
+    {w : Wiring} {g e N : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    {x : List Bool}
+    (hx : x ∈ A.sharpConstructionHistory N ∨
+      x ∈ B.sharpConstructionHistory N) :
+    x ∈ A.twoSharpHistoryCore B N := by
+  rcases hx with hxA | hxB
+  · apply List.mem_append_left
+    exact A.mem_sharpHistoryCore_of_mem hxA
+  · by_cases hboundary :
+        x = VectorCount.restrict N A.activatedState
+    · subst x
+      apply List.mem_append_left
+      exact A.activated_mem_sharpHistoryCore
+    · apply List.mem_append_right
+      exact (List.mem_erase_of_ne hboundary).mpr
+        (B.mem_sharpHistoryCore_of_mem hxB)
+
+/-- **NODUP two-history union charge, support-avoiding branch.**
+
+After the two internal repetitions and the shared boundary are erased, every
+vector represented by either construction history fits in N+2 slots.
+Unlike the earlier N+4 theorem, this statement bounds an arbitrary
+duplicate-free union rather than the length of a particular raw list. -/
+theorem ManufacturedReflector.two_sharp_histories_nodup_union_le_N_add_two
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbase : B.baseState = A.activatedState)
+    (havoid : A.SupportAvoidsExploration B)
+    (pool : List (List Bool))
+    (hpool : ∀ x ∈ pool,
+      x ∈ A.sharpConstructionHistory N ∨
+        x ∈ B.sharpConstructionHistory N)
+    (hnd : pool.Nodup) :
+    pool.length ≤ N + 2 := by
+  have hsubset :
+      ∀ x ∈ pool, x ∈ A.twoSharpHistoryCore B N := by
+    intro x hx
+    exact A.mem_twoSharpHistoryCore B (hpool x hx)
+  have hcover :=
+    nodup_subset_length_two_history hnd hsubset
+  have hpaths :=
+    A.two_explorations_length_le_N_add_one hN B havoid
+  have hcore := A.twoSharpHistoryCore_length (N := N) B hbase
+  omega
+
 /-- A concrete old-support contact, retaining the exact physical prefix and
 suffix of the second exploration. -/
 structure SecondHistorySupportContact
@@ -244,6 +563,53 @@ theorem ManufacturedReflector.two_history_bound_or_first_support_contact
         hN B hbase hAvoid)
   · right
     have hgroovesBase : PathGrooves A.toSupported.paths B.baseState := by
+      simpa [hbase] using hgrooves
+    obtain ⟨approach, fresh, suffix, contactState, hsplit,
+        hbefore, hafter, hcontactGrooves, hfresh, htouch⟩ :=
+      A.first_support_contact_trace B A.activatedState hbase
+        hgrooves hAvoid
+    exact ⟨{
+      approach := approach
+      fresh := fresh
+      suffix := suffix
+      contactState := contactState
+      split := hsplit
+      approach_trace := by simpa [hbase] using hbefore
+      suffix_trace := hafter
+      old_grooves := hcontactGrooves
+      approach_fresh := hfresh
+      touches := htouch
+    }⟩
+
+/-- **Unconditional NODUP two-history reduction.**
+
+For the exact pair of opposite manufacturing journeys, every duplicate-free
+selection from their two sharp histories has size at most N+2 unless the
+second physical exploration has a concrete first contact with the reusable
+support of the first.  No overlap premise is supplied by the caller. -/
+theorem ManufacturedReflector.two_history_nodup_union_bound_or_first_contact
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbase : B.baseState = A.activatedState)
+    (hgrooves : PathGrooves A.toSupported.paths A.activatedState)
+    (pool : List (List Bool))
+    (hpool : ∀ x ∈ pool,
+      x ∈ A.sharpConstructionHistory N ∨
+        x ∈ B.sharpConstructionHistory N)
+    (hnd : pool.Nodup) :
+    pool.length ≤ N + 2 ∨
+      Nonempty (SecondHistorySupportContact w A B) := by
+  classical
+  by_cases hAvoid : A.SupportAvoidsExploration B
+  · exact Or.inl
+      (A.two_sharp_histories_nodup_union_le_N_add_two
+        hN B hbase hAvoid pool hpool hnd)
+  · right
+    have hgroovesBase :
+        PathGrooves A.toSupported.paths B.baseState := by
       simpa [hbase] using hgrooves
     obtain ⟨approach, fresh, suffix, contactState, hsplit,
         hbefore, hafter, hcontactGrooves, hfresh, htouch⟩ :=
