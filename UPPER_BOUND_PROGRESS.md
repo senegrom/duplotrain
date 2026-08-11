@@ -1,142 +1,141 @@
-# Upper-bound proof work
+# Unified upper-bound proof work
 
-Branch: `agent/coefficient-one-current`
+Branch: `agent/upper-bound-unified`
 
-This is the visible coefficient-one working branch. Its focused GitHub
-Actions workflow is green at commit
-`382eb3ce3b3a901c0f9ec648f541fafe06c307c2` (run `31509055310`).
+This branch is the visible integration point for the active upper-bound
+programmes.  It is an octopus merge of:
 
-## Current unconditional bound
+* `agent/upper-bound-current` at `dacb3110846c26043e85fd6c2f4e545bfd299168`;
+* `agent/coefficient-one-current` at `5fb946657966dc5d7f9d83cd2858c187b26651e2`;
+* `codex/first-repeated-edge-proof` at `d615f15a2249933dc27d528ac6b4c87b508a4f7e`.
 
-The strongest unconditional theorem currently kernel-checked in the
-repository is on `agent/push-below-5`:
+The merge commit is `43a8ca081bfdb3fc20b4baa9ac2bd222ed6f0d0c`.
+The independent Codex module was retained under the nonconflicting name
+`theory/lean/CodexStateLawTwoSharp.lean`.
+
+## Strongest unconditional bound
+
+The strongest previously kernel-checked endpoint included in this tree is:
 
 ```text
 known incoming edge:  2*N + 6
 arbitrary start:       2*N + 7
 ```
 
-## Kernel-checked results on this branch
-
-### Selected self-link cycle closure
-
-`theory/lean/TripleSelfLinkSimpleCycleTail.lean` closes the stable
-simple-cycle half of the selected self-link raw-cycle obstruction. Together
-with the already closed opposite-reflector half, this proves that the
-self-link forced by the selected `ABCABC` obstruction cannot first appear on
-a later periodic raw cycle: it must occur at an actual raw time inside the
-selected window.
-
-The checked theorem chain is:
-
-```lean
-rawTwoVectorTail_of_stable_simple_cycle_exact
-RawCycleThroughSelfLink.close_tail_of_simple_cycle_trace_exact
-RawSixEventReduction.tail_simple_cycle_false
-RawSixEventReduction.tail_cycle_self_link_false
-CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_is_early
-```
-
-### Trace-retaining first revisit and BABA second repeat
-
-The ordinary predicate `SettlesOnSimpleCycle` stores only period endpoints,
-which is too weak for pointwise novelty accounting. The branch now contains
-kernel-checked trace-valued replacements:
-
-```lean
-PhysicalTrace.first_revisit_trace_or_activated_reflector
-rawExactLobeWrite_second_repeat_cycle_traces_or_pair
-ReachedStableSimpleCycle
-reachedStableSimpleCycle_of_prefix
-ReachedStableSimpleCycle.one_vector_tail
-```
-
-These preserve the transient lap, the stable switch-simple lap and the exact
-absolute raw reach. Consequently the cycle leaf of a Mellit/BABA second
-repeat can be converted into an explicit all-time one-vector tail rather than
-an unqualified eventual-periodicity statement.
-
-### Pointwise one-change cycle tail
-
-`theory/lean/PointwiseSimpleCycleTail.lean` strengthens that result. In the
-actual same-exit first-revisit construction, the first cycle passage performs
-the only possible tongue change; the remaining transient lap and every later
-lap are already grooved in the settled state. The following now
-kernel-checks:
-
-```lean
-PhysicalTrace.simple_same_exit_cycle_positive_prefix
-PhysicalTrace.stable_simple_cycle_all_time
-PhysicalTrace.simple_same_exit_cycle_all_positive
-PhysicalTrace.simple_same_exit_cycle_absolute_positive_vector
-```
-
-Thus every raw time strictly after the reached repeat has the single settled
-restricted tongue vector. For the selected BABA cycle leaf, the tongue-state
-part of the four-vector contradiction is now closed; only the selected-time
-placement must be transported through the BABA classifier.
-
-## Nearest coefficient-one bound: `N + 7`
-
-`theory/lean/CoefficientOneSeven.lean` kernel-checks the exact quantitative
-payoff of the canonical six-event reduction:
-
-```lean
-knownEdgeFiveRepeatedWriterNovelty_of_sharpSixEventResidueImpossible
-knownEdge_distinct_le_N_add_six_of_fiveRepeatedWriterNovelty
-stateLawNAddSeven_of_sharpSixEventResidueImpossible
-```
-
-Thus proving the single raw geometric proposition
-`IncomingSharpSixEventResidueImpossible` would immediately give
+Its public source endpoint is:
 
 ```text
-known incoming edge:  N + 6
-arbitrary start:       N + 7
+theory/lean/StateLawTwoSharper.lean
 ```
 
-This is a conditional bridge, not yet an unconditional improved bound.
+The independently developed Codex proof of the weaker arbitrary-start bound
+`2*N + 8` is also preserved as `CodexStateLawTwoSharp.lean`.  It contributes
+additional two-history and two-reflector lemmas even though its final numeric
+endpoint is one larger.
 
-## Sharp coefficient-one target: `N + 6`
+## Coefficient-one milestones
 
-The final target remains:
+### Conditional `N + 7`
+
+`theory/lean/CoefficientOneSeven.lean` proves the exact payoff of the current
+six-event reduction:
+
+```text
+sharp six-event residue impossible
+  => known incoming edge: N + 6
+  => arbitrary start:      N + 7
+```
+
+The implication is kernel-checked; the raw geometric residue remains open.
+
+### Target `N + 6`
+
+The sharp target is:
 
 ```text
 known incoming edge:  N + 5
 arbitrary start:       N + 6
 ```
 
-It follows from `KnownEdgeFourRepeatedWriterNovelty`, the raw theorem that at
-most four globally novel repeated-writer events occur after entering through
-a known physical edge.
+It follows from the raw assertion that at most four globally novel
+repeated-writer events occur after entry through a known physical edge.
 
-The `N+7` milestone needs exclusion of six repeated novelties. The sharper
-`N+6` milestone needs exclusion of five repeated novelties, so it cannot use
-the two overlapping five-event windows available in the six-event reduction.
-It requires one additional historical-vector overlap or a direct five-frame
-runway extraction.
+## Integrated coefficient-one progress
 
-## Remaining geometry
+### Pointwise simple-cycle tail
 
-For the six-event route to `N+7`, strict nesting is already paid by
-well-founded descent through selected close times. The remaining work is:
-
-1. carry the trace-valued, pointwise-constant BABA cycle branch through the
-   endpoint-lobe classifier and show that at most three selected post-close
-   vectors precede its one-vector suffix;
-2. convert the other overlap-minimal BABA leaves—late pair, early pure
-   crossing, direct lobe, first-writer charge and quiet replay—into the
-   existing forbidden four-vector cover or a strictly smaller raw residue;
-3. close the serial/serial branch by a well-founded suffix argument that
-   preserves the consecutive selected-event window.
-
-For `N+6`, the preferred extra saving is the already visible Gray-corner
-identity: the first-turnaround contact vector is the initial corner of the
-following pair. A complete five-frame proof must ensure that this overlap is
-available in every global branch, not only the compatible/direct-lobe cases.
-
-Detailed proof map and verification policy:
+The following green modules from `agent/coefficient-one-current` are present:
 
 ```text
-theory/lean/COEFFICIENT_ONE_STATUS.md
+theory/lean/TraceRetainingFirstRevisit.lean
+theory/lean/TraceRetainingBABASecondRepeat.lean
+theory/lean/PointwiseSimpleCycleTail.lean
 ```
+
+They retain the transient and stable switch-simple laps and prove that every
+positive raw time after the reached same-exit repeat has the single settled
+restricted tongue vector.  This removes the tongue-state uncertainty from the
+BABA simple-cycle leaf; only its placement relative to the selected closes
+remains.
+
+### Selected self-link cycle closure
+
+`theory/lean/TripleSelfLinkSimpleCycleTail.lean` closes both outcomes of the
+selected periodic self-link branch: the opposite-reflector outcome and the
+stable simple-cycle outcome each give an explicit two-vector tail which
+rotates back to the selected close.
+
+### Two-history contact reduction
+
+The integrated files
+
+```text
+theory/lean/TwoHistoryUnionCharge.lean
+theory/lean/ContactHistorySharpBound.lean
+```
+
+show that changing first old-support contacts, and unchanged contacts not
+following the old selected route forward, have a two-vector novelty cover over
+an exact history of length at most `N + 3`.  The sole local contact residue is:
+
+```lean
+FacingForwardContactTwoNoveltyLaw
+```
+
+Proving that law gives the local `N + 5` count immediately.
+
+### Independent two-reflector assembly
+
+`theory/lean/CodexStateLawTwoSharp.lean` retains the other agent's complete
+source for an unconditional two-reflector assembly.  In particular it closes
+preserved-support and first-damaged-support branches without residual
+recursion, providing reusable history-overlap lemmas for the coefficient-one
+programme.
+
+## Current proof frontier
+
+For the six-event route to `N + 7`, the remaining tasks are:
+
+1. transport the pointwise-constant BABA cycle leaf to the literal selected
+   post-close list and charge the at-most-three earlier closes;
+2. close the other overlap-minimal BABA leaves by a forbidden four-vector cover
+   or a strictly smaller residue;
+3. close the serial/serial branch by well-founded suffix descent while
+   preserving the consecutive-event window.
+
+For the sharper `N + 6` route, the most concentrated local target is the
+unchanged forward first-support contact.  A successful proof should reuse the
+existing facing-forward constant-tail geometry rather than introduce a new
+period-length count.
+
+## Verification
+
+The branch-local workflow is:
+
+```text
+.github/workflows/upper-bound-unified-check.yml
+```
+
+It checks the unconditional endpoint, both coefficient-one reductions, the
+trace-retaining cycle modules, the contact-history modules, and the renamed
+independent Codex endpoint in one repository tree.
