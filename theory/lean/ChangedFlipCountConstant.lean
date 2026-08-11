@@ -34,8 +34,8 @@ theorem ManufacturedReflector.ChangedForwardMerge.flip_three_history_three_novel
         times history 3 := by
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
       approach, candy, state, leadSteps, _tailSteps, horiented,
-      hrouteSplit, hOldTail, _hApproachReplay, hApproachSimple,
-      _hApproachGrooved, _hApproachForeign, _hCandyEq,
+      hrouteSplit, hOldTail, hApproachReplay, hApproachSimple,
+      hApproachGrooved, hApproachForeign, _hCandyEq,
       hentryBranch, _hmouthStem, hmouthLink, harms,
       hfullGrooved, hfullTrace, hcrossed, hRpaths, _hCandy,
       hCandyForeignNew, hLobe, hreach, _hcomplete,
@@ -114,20 +114,8 @@ theorem ManufacturedReflector.ChangedForwardMerge.flip_three_history_three_novel
       hfullGrooved (mouth, entry) List.mem_cons_self
     have hone := manufactured_flip_candy_splice_absolute_one_novelty
       R state hRpaths hrouteSplit hOldTail hrunway hentryBranch
-      hold horientation hentryGrooved
-      hActiveApproach
-      (hActiveApproach.grooved_of_switchSimple hApproachSimple)
-      (by
-        intro passage hp
-        have hforeign := hmerge.spliced_lobe_reflector_active_lead
-        -- use the exported candy-foreign certificate below via the
-        -- equivalent approach replay package
-        have hmem : passage ∈ candy := by
-          -- `candy = reverse oldPrefix ++ approach` is hidden above only
-          -- because it is not needed elsewhere; recover the required switch
-          -- inequality from the full candy certificate.
-          sorry)
-      hcrossed hmouthLink harms hreach
+      hold horientation hentryGrooved hApproachReplay hApproachGrooved
+      hApproachForeign hcrossed hmouthLink harms hreach
       N history hentryHistorical times (by
         intro j _hj hjLead
         exact hleadHistorical j hjLead)
