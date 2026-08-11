@@ -20,7 +20,7 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-      - name: Register unified proof targets
+      - name: Register all Lean modules
         run: |
           register_target() {
             target="$1"
@@ -32,25 +32,8 @@ jobs:
               } >> lakefile.toml
             fi
           }
-          for target in \
-            StateLawTwoSharper \
-            ContactHistorySharpBound \
-            CoefficientOneSeven \
-            TripleSelfLinkSimpleCycleTail \
-            PointwiseSimpleCycleTail \
-            TraceRetainingFirstRevisit \
-            TraceRetainingBABASecondRepeat \
-            CodexStateLawTwoSharp \
-            MellitFiveNoveltyAssembly \
-            StateLawTwoFive \
-            OneReflectorContinuation \
-            EchoRawBridgeSharp \
-            EmptyCurvePotential \
-            MellitDynamicResidual \
-            StateLawParametricAudit \
-            TwoHistoryUnionCharge
-          do
-            register_target "$target"
+          for source in *.lean; do
+            register_target "${source%.lean}"
           done
       - name: Check strongest unconditional bound endpoints
         run: |
