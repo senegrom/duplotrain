@@ -20,6 +20,9 @@ on:
       - theory/lean/ProbeCompleteRepair.lean
       - theory/lean/PairActionCorners.lean
       - theory/lean/CompleteRepairFour.lean
+      - theory/lean/ProtectedRepairFour.lean
+      - theory/lean/KnownEdgeTwoSharper.lean
+      - theory/lean/StateLawTwoSharper.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
 jobs:
@@ -72,8 +75,14 @@ jobs:
           name = "PairActionCorners"
           [[lean_lib]]
           name = "CompleteRepairFour"
+          [[lean_lib]]
+          name = "ProtectedRepairFour"
+          [[lean_lib]]
+          name = "KnownEdgeTwoSharper"
+          [[lean_lib]]
+          name = "StateLawTwoSharper"
           EOF
       - name: Build new proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build CompleteRepairFour ProbeCompleteRepair
+          lake build StateLawTwoSharper ProbeCompleteRepair
