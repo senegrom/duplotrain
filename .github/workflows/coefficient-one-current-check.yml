@@ -7,6 +7,7 @@ on:
       - theory/lean/TripleSelfLinkSimpleCycleNoTail.lean
       - theory/lean/TraceRetainingFirstRevisit.lean
       - theory/lean/TraceRetainingBABASecondRepeat.lean
+      - theory/lean/PointwiseSimpleCycleTail.lean
       - theory/lean/CoefficientOneSeven.lean
       - theory/lean/ProbeSimpleCycleTail.lean
       - theory/lean/COEFFICIENT_ONE_STATUS.md
@@ -34,6 +35,9 @@ jobs:
 
           [[lean_lib]]
           name = "TraceRetainingBABASecondRepeat"
+
+          [[lean_lib]]
+          name = "PointwiseSimpleCycleTail"
           EOF
       - name: Build proof targets
         run: |
@@ -42,6 +46,7 @@ jobs:
           lake build SharpSixEventAssembly
           lake build TraceRetainingFirstRevisit
           lake build TraceRetainingBABASecondRepeat
+          lake build PointwiseSimpleCycleTail
           lake env lean CoefficientOneSeven.lean
           lake env lean ProbeSimpleCycleTail.lean
       - name: Publish proof checkpoint
@@ -59,6 +64,8 @@ jobs:
             echo "- PhysicalTrace.first_revisit_trace_or_activated_reflector"
             echo "- rawExactLobeWrite_second_repeat_cycle_traces_or_pair"
             echo "- ReachedStableSimpleCycle.one_vector_tail"
+            echo "- PhysicalTrace.simple_same_exit_cycle_all_positive"
+            echo "- PhysicalTrace.simple_same_exit_cycle_absolute_positive_vector"
             echo
             echo "Conditional quantitative bridge:"
             echo "- knownEdgeFiveRepeatedWriterNovelty_of_sharpSixEventResidueImpossible"
@@ -66,7 +73,7 @@ jobs:
             echo "- stateLawNAddSeven_of_sharpSixEventResidueImpossible"
             echo
             echo "The selected self-link raw-cycle residual is closed."
-            echo "The generic and BABA second-repeat APIs now retain the physical stable cycle lap needed for pointwise novelty accounting."
+            echo "The same-exit first-revisit cycle now has a single settled vector at every positive raw time, not only after a complete lap."
             echo "Closing the exact sharp six-event residue would yield N+7 globally (N+6 from a known incoming edge)."
             echo "The sharp N+6 StateLaw still requires the five-event/four-repeated-novelty closure."
           } >> "$GITHUB_STEP_SUMMARY"
