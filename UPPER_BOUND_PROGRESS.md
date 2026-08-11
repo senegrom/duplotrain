@@ -3,8 +3,9 @@
 Branch: `agent/upper-bound-current`
 
 This branch combines the strongest unconditional quantitative proof with the
-current coefficient-one programme. The merge commit retains both parent
-histories rather than copying only a status note.
+current coefficient-one programme. It contains the complete source artifacts
+from the active upper-bound branches, with a focused workflow checking their
+compatibility in one tree.
 
 ## Unconditional theorem on this branch
 
@@ -29,7 +30,7 @@ arbitrary start:       N + 6
 The exact residual is the raw theorem that at most four globally novel
 repeated-writer events occur after entering through a known physical edge.
 
-## New proof knowledge included here
+## Coefficient-one proof knowledge included here
 
 * `TripleSelfLinkSimpleCycleTail.lean` closes the stable-simple-cycle half of
   the selected self-link raw-cycle obstruction.
@@ -47,14 +48,39 @@ residue impossible => known-edge N+6 => arbitrary-start N+7
 * `ShrinkingCurveFinal.lean` proves well-founded termination of strict
   old-contact subcurve recursion.
 
+## Imported results from the other active agent branch
+
+The following unique files from `codex/first-repeated-edge-proof` are also
+preserved on this branch:
+
+* `EchoRawBridgeSharp.lean`: extends a finite valid echo prefix to an abstract
+  infinite echo run without assuming an infinite physical train trajectory,
+  and transfers registers, tokens and finite repertoire bounds exactly.
+* `EmptyCurvePotential.lean`: develops a global curve/stem potential; non-self
+  productive pivots strictly grow the train-curve stem set while self pivots
+  cannot increase it.
+* `MellitDynamicResidual.lean`: retains exact transient and stable traces for
+  the immediate two-phase simple-cycle branch instead of erasing them into a
+  bare eventual-periodicity statement.
+* `StateLawParametricAudit.lean`: symbolically rules out the naive direct
+  double-sweep counterfamily for arbitrary `N`; repeated productive pairs
+  force an intervening write.
+* `TwoHistoryUnionCharge.lean`: charges the two opposite construction
+  histories once and isolates the first concrete old-support contact when the
+  union cannot be paid from a single switch budget.
+
 The detailed proof map and correctness policy are in:
 
 ```text
 theory/lean/COEFFICIENT_ONE_STATUS.md
 ```
 
-The branch workflow `.github/workflows/upper-bound-current-check.yml` checks
-both the unconditional theorem and the coefficient-one frontier.
+The branch workflow `.github/workflows/upper-bound-current-check.yml` checks:
+
+1. the unconditional `2*N+7` endpoint;
+2. the selected-self-link simple-cycle closure and conditional coefficient-one
+   arithmetic; and
+3. all five imported proof-knowledge modules listed above.
 
 ## Remaining coefficient-one work
 
