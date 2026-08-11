@@ -16,6 +16,7 @@ on:
       - theory/lean/KnownEdgeThreeSharp.lean
       - theory/lean/KnownEdgeLift.lean
       - theory/lean/StateLawThreeSharp.lean
+      - theory/lean/SimpleTraceOneNetChange.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
 jobs:
@@ -60,6 +61,8 @@ jobs:
           name = "KnownEdgeLift"
           [[lean_lib]]
           name = "StateLawThreeSharp"
+          [[lean_lib]]
+          name = "SimpleTraceOneNetChange"
           EOF
       - name: Build proof targets
         run: |
@@ -68,6 +71,4 @@ jobs:
             FirstCycleCount ChangedFlipCountActual ProtectedRepairThree \
             KnownEdgeThree StateLawThree BoundaryOverlapTailCount \
             TwoJourneyBoundaryTailCount KnownEdgeThreeSharp KnownEdgeLift \
-            StateLawThreeSharp
-
-# Boundary-aware direct-tail transport rerun.
+            StateLawThreeSharp SimpleTraceOneNetChange
