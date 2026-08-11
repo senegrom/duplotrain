@@ -78,8 +78,10 @@ theorem ManufacturedReflector.repair_prefix_changes_only_protected_return
   intro j hchange
   obtain ⟨before, p, x, after, u, v,
       happSplit, hswitch, hbefore, harrive,
-      huStart, hcontactV, hvu⟩ :=
+      huStart, _hcontactV, hvu⟩ :=
     hprefix.changed_switch_has_changed_passage hsimple hchange
+  have huStart' : u j = B.activatedState j := by
+    simpa using huStart
   have hmemApproach : (p, x) ∈ approach := by
     rw [happSplit]
     exact List.mem_append_right before List.mem_cons_self
@@ -112,8 +114,10 @@ theorem ManufacturedReflector.repair_prefix_changes_only_protected_return
   have hrefNeState : reference j ≠ B.activatedState j := by
     intro heq
     apply hvu
-    rw [hvReference, huStart]
-    exact heq
+    calc
+      v j = reference j := hvReference
+      _ = B.activatedState j := heq
+      _ = u j := huStart'.symm
   have hrefBase : reference j = B.baseState j := by
     by_cases hbase : reference j = B.baseState j
     · exact hbase
@@ -122,7 +126,11 @@ theorem ManufacturedReflector.repair_prefix_changes_only_protected_return
       B.activatedState j ≠ B.baseState j := by
     intro heq
     apply hvu
-    rw [huStart, hvReference, hrefBase, heq]
+    calc
+      v j = reference j := hvReference
+      _ = B.baseState j := hrefBase
+      _ = B.activatedState j := heq.symm
+      _ = u j := huStart'.symm
   rcases B.activated_change_return_or_exploration hactivatedChange with
     hreturn | hexploration
   · exact hreturn.1
@@ -139,6 +147,7 @@ theorem ManufacturedReflector.repair_prefix_changes_only_protected_return
     have hagree := pathGrooves_agree_at_support_passage
       hBstart hBcontact hpath hpassage
     have hj : passageSwitch (bp, bx) = j := hBswitch
+    exfalso
     apply hchange
     simpa [hj] using hagree.symm
 
