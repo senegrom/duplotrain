@@ -40,10 +40,13 @@ theorem ManufacturedReflector.completed_repair_initial_action_relation
     B hA hB hrepair hsimple hroute hBfinal
   cases B with
   | stay R =>
+      change R.returnState = finalState ∨ R.returnState = finalState
       have hchanges' : ∀ j, finalState j ≠ R.returnState j →
           j = R.arm / 3 := by
         intro j hj
-        have h := hchanges j (by simpa using hj)
+        have h := hchanges j (by
+          change finalState j ≠ R.returnState j
+          exact hj)
         change j = R.arm / 3 at h
         exact h
       have hrelation :
@@ -53,7 +56,7 @@ theorem ManufacturedReflector.completed_repair_initial_action_relation
           (u := R.returnState) (v := finalState)
           (k := R.arm / 3) hchanges'
       rcases hrelation with heq | hflip
-      · exact Or.inl (by simpa using heq)
+      · exact Or.inl heq
       · have hcoreStart : arrive R.returnState R.arm =
             (R.mouth, R.returnState) :=
           passagesGrooved_singleton.mp (pathGrooves_pair.mp hB).2
@@ -68,24 +71,19 @@ theorem ManufacturedReflector.completed_repair_initial_action_relation
         cases hval : finalState (R.arm / 3) <;>
           simp [flipAt, hval] at hk
   | flip R =>
+      change R.afterReturn = finalState ∨
+        R.afterReturn = flipAt finalState R.actionSwitch
       have hchanges' : ∀ j, finalState j ≠ R.afterReturn j →
           j = R.actionSwitch := by
         intro j hj
-        have h := hchanges j (by simpa using hj)
+        have h := hchanges j (by
+          change finalState j ≠ R.afterReturn j
+          exact hj)
         change j = R.secondArm / 3 at h
         exact h.trans R.secondArm_switch
-      have hrelation :
-          R.afterReturn = finalState ∨
-            R.afterReturn = flipAt finalState R.actionSwitch :=
-        tongues_eq_or_eq_flipAt_of_changes_only
-          (u := R.afterReturn) (v := finalState)
-          (k := R.actionSwitch) hchanges'
-      rcases hrelation with heq | hflip
-      · exact Or.inl (by simpa using heq)
-      · exact Or.inr (by
-          simpa [ManufacturedReflector.toSupported,
-            ManufacturedFlipReflector.toSupported,
-            LocalAction.apply] using hflip)
+      exact tongues_eq_or_eq_flipAt_of_changes_only
+        (u := R.afterReturn) (v := finalState)
+        (k := R.actionSwitch) hchanges'
 
 /-- **Complete protected repair count:** at most four distinct restricted
 tongue vectors. -/
@@ -176,11 +174,11 @@ theorem ManufacturedReflector.completed_protected_route_with_pair_distinct_le_fo
         have hkLive := hlive k hk
         have htailLive : ∃ finish, stepN w d endpoint = some finish := by
           rw [hkEq, stepN_add, hrepairReach] at hkLive
+          simp only [Option.bind_some] at hkLive
           cases htail : stepN w d endpoint with
           | none =>
-              rw [htail] at hkLive
-              simp at hkLive
-          | some finish => exact ⟨finish, htail⟩
+              simp [htail] at hkLive
+          | some finish => exact ⟨finish, rfl⟩
         have hmem := manufactured_pair_reached_action_corners_tongues
           A B finalState hAfinal hBfinal hpairReach htailLive
         have hshift := tonguesAt_add_of_reaches hrepairReach htailLive
@@ -189,7 +187,7 @@ theorem ManufacturedReflector.completed_protected_route_with_pair_distinct_le_fo
         · simpa [corners] using hmem
         · unfold restrictedTonguesAt
           rw [hkEq]
-          exact congrArg (VectorCount.restrict N) hshift
+          exact (congrArg (VectorCount.restrict N) hshift).symm
   have hcount := noveltyCoverOn_distinct_count hcover hnd
   simpa using hcount
 
