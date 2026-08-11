@@ -55,8 +55,6 @@ jobs:
           name = "KnownEdgeTailCap"
           [[lean_lib]]
           name = "StateLawTwoSharp"
-          [[lean_lib]]
-          name = "ProbePairedPeriod"
           EOF
       - name: Build new proof targets
         run: |
