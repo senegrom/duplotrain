@@ -73,7 +73,9 @@ theorem PhysicalTrace.stable_simple_cycle_all_time
   let period := cycle.length
   have hperiodPositive : 0 < period := by
     dsimp [period]
-    exact List.length_pos.mpr hnonempty
+    cases cycle with
+    | nil => exact (hnonempty rfl).elim
+    | cons head tail => simp
   have hgrooved : PassagesGrooved v cycle :=
     hstable.grooved_of_switchSimple hsimple
   intro d
