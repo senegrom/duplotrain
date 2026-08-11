@@ -3,7 +3,6 @@ on:
   push:
     branches: [agent/coefficient-one-current]
     paths:
-      - theory/lean/ProbeSimpleCycleTail.lean
       - theory/lean/TripleSelfLinkSimpleCycleTail.lean
       - theory/lean/TripleSelfLinkSimpleCycleNoTail.lean
       - theory/lean/COEFFICIENT_ONE_STATUS.md
@@ -26,12 +25,12 @@ jobs:
           cat >> lakefile.toml <<'EOF'
 
           [[lean_lib]]
-          name = "ProbeSimpleCycleTail"
+          name = "TripleSelfLinkSimpleCycleTail"
           EOF
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build ProbeSimpleCycleTail
+          lake build TripleSelfLinkSimpleCycleTail
       - name: Publish proof checkpoint
         if: success()
         run: |
@@ -46,6 +45,6 @@ jobs:
             echo "- CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_is_early"
             echo
             echo "The selected self-link raw-cycle residual is closed."
-            echo "Verified global bound remains 2N+7 (2N+6 with a known incoming edge)."
+            echo "Verified global bound on the strongest quantitative branch remains 2N+7 (2N+6 with a known incoming edge)."
             echo "The N+6 target remains open at the early-self-link and serial-placement bridges."
           } >> "$GITHUB_STEP_SUMMARY"
