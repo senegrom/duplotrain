@@ -5,8 +5,8 @@ Branch: `agent/coefficient-one-current`
 Latest visible verified checkpoint:
 
 ```text
-commit: f3a9d1daf9955a236e4755b1d70c7d6d5ce9af9a
-workflow run: 31505493091
+commit: 786672497c2975c51166f66240ef26ef8ddc68ff
+workflow run: 31507568011
 conclusion: success
 ```
 
@@ -104,9 +104,9 @@ The branch ancestry already formalises the following facts.
    time; no recursive strict-nest residue survives once the selected-close
    provenance is retained.
 
-## Simple-cycle closure on this branch
+## Simple-cycle and trace-retention closure on this branch
 
-`TripleSelfLinkSimpleCycleTail.lean` closes the other first-revisit outcome of
+`TripleSelfLinkSimpleCycleTail.lean` closes the first-revisit cycle outcome of
 the selected self-link raw cycle. Its theorem chain is:
 
 ```lean
@@ -127,8 +127,26 @@ The argument is:
 * `five_close_noveltyCoverOn_four_of_two_vector_tail` gives the forbidden
   literal four-vector cover of the five selected post-close vectors.
 
+A second information-loss problem was then removed. `SettlesOnSimpleCycle`
+records only two period endpoint equations and does not retain the physical
+lap. The following additional theorems now kernel-check:
+
+```lean
+PhysicalTrace.first_revisit_trace_or_activated_reflector
+rawExactLobeWrite_second_repeat_cycle_traces_or_pair
+ReachedStableSimpleCycle
+reachedStableSimpleCycle_of_prefix
+ReachedStableSimpleCycle.one_vector_tail
+```
+
+The generic first-revisit theorem retains the transient and stable
+switch-simple traces. The BABA second-repeat theorem propagates those traces
+through the exact direct-lobe construction, while preserving the original
+opposite-reflector branch. `ReachedStableSimpleCycle.one_vector_tail` converts
+the absolute trace witness into an explicit all-time one-vector suffix.
+
 The focused workflow `.github/workflows/coefficient-one-current-check.yml`
-builds this theorem chain and directly checks `CoefficientOneSeven.lean`.
+builds these theorem chains and directly checks `CoefficientOneSeven.lean`.
 The GitHub Actions step summary displays the checked theorem names and the
 conditional quantitative payoff.
 
@@ -151,7 +169,8 @@ eliminator over those two top-level forms.
 
 The current physical leaves are:
 
-* a reached simple cycle;
+* a reached stable simple cycle, now with exact physical traces and an
+  all-time one-vector tail;
 * a direct opposite pair reached after the first selected close;
 * an early pure support crossing;
 * an interior direct lobe;
@@ -159,15 +178,17 @@ The current physical leaves are:
 * a quiet interval paid entirely by first writers; or
 * a least quiet replay frame.
 
-Several are already locally quantitative. The assembly task is to transport
-their covers to the literal list
+The assembly task is to transport their covers to the literal list
 
 ```lean
 [z1 + 1, z2 + 1, z3 + 1, z4 + 1, z5 + 1]
 ```
 
-and contradict `RawSharpSixEventResidue.noTailFourCover`. Escaping finite
-segments and productive outer gaps already come with strict recursion data.
+and contradict `RawSharpSixEventResidue.noTailFourCover`. For the cycle leaf,
+the remaining issue is now only timing: count how many selected post-close
+vectors precede the start of the stable lap. The tongue-state geometry itself
+is closed. Escaping finite segments and productive outer gaps already come
+with strict recursion data.
 
 ### Serial/serial leaf
 
