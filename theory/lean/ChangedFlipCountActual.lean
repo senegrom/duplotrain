@@ -53,7 +53,7 @@ theorem ManufacturedReflector.ChangedForwardMerge.actual_lead_le_switches
   have happroachOneLe : approach.length + 1 ≤ N := by
     have hlen := nodup_nat_lt_length hkeysNodup hkeysLt
     simpa using hlen
-  refine ⟨leadSteps, ?_, outside, flipAt state (mouth / 3), hreach⟩
+  refine ⟨leadSteps, ?_, (outside, flipAt state (mouth / 3)), hreach⟩
   rw [hleadLen]
   exact happroachOneLe
 
