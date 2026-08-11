@@ -2,7 +2,7 @@ name: Apply Lean patch
 
 on:
   push:
-    branches: [agent/linear-bound-current]
+    branches: [agent/push-below-5]
     paths:
       - .github/workflows/apply-lean-patch.yml
 
@@ -14,61 +14,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply Boolean filter partition patch
+      - name: Apply boundary-tail vector transport patch
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          path = Path('theory/lean/CanonicalProjectedEpochFrame.lean')
+          path = Path('theory/lean/BoundaryOverlapTailCount.lean')
           text = path.read_text()
-
-          old = '''private theorem filter_partition_length
-              (p : Nat → Prop) [DecidablePred p] :
-              ∀ xs : List Nat,
-                (xs.filter p).length +
-                  (xs.filter (fun x => ¬ p x)).length = xs.length := by
-            intro xs
-            induction xs with
-            | nil => rfl
-            | cons x rest ih =>
-                by_cases hx : p x
-                · simp [hx]
-                  omega
-                · simp [hx]
-                  omega
+          old = '''        have hshift := tonguesAt_add_of_reaches
+                    hreach ⟨finish, htailRun⟩
+                  simp only [Function.comp_apply]
+                  unfold restrictedTonguesAt
+                  rw [hkEq]
+                  exact congrArg (VectorCount.restrict N) hshift.symm
           '''
-          new = '''private theorem filter_partition_length
-              (p : Nat → Bool) :
-              ∀ xs : List Nat,
-                (xs.filter p).length +
-                  (xs.filter (fun x => ! p x)).length = xs.length := by
-            intro xs
-            induction xs with
-            | nil => rfl
-            | cons x rest ih =>
-                cases hpx : p x <;> simp [hpx] <;> omega
+          new = '''        have hshift := tonguesAt_add_of_reaches
+                    hreach ⟨finish, htailRun⟩
+                  have hstartEq :
+                      tonguesAt w start (lead + (k - lead)) =
+                        tonguesAt w start k := by
+                    rw [← hkEq]
+                  simp only [Function.comp_apply]
+                  unfold restrictedTonguesAt
+                  exact congrArg (VectorCount.restrict N)
+                    (hshift.symm.trans hstartEq)
           '''
           if old not in text:
-              raise SystemExit('partition theorem source block not found')
-          text = text.replace(old, new, 1)
-
-          old = '''  have hsplit := filter_partition_length
-              (fun c => c ∈ active) cells
-          '''
-          new = '''  have hsplit :
-              (cells.filter (fun c => c ∈ active)).length +
-                (cells.filter (fun c => c ∉ active)).length = cells.length := by
-            simpa using filter_partition_length
-              (fun c => decide (c ∈ active)) cells
-          '''
-          if old not in text:
-              raise SystemExit('partition call source block not found')
+              raise SystemExit('boundary transport block not found')
           path.write_text(text.replace(old, new, 1))
           PY
 
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add theory/lean/CanonicalProjectedEpochFrame.lean
+          git add theory/lean/BoundaryOverlapTailCount.lean
           git diff --cached --check
-          git commit -m "fix Boolean filter partition [skip ci]"
-          git push origin HEAD:agent/linear-bound-current
+          git commit -m "fix boundary-tail transport [skip ci]"
+          git push origin HEAD:agent/push-below-5
