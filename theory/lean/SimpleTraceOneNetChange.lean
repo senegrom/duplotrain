@@ -79,16 +79,12 @@ theorem PhysicalTrace.two_phase_of_net_changes_only
           by_cases hj : j = p / 3
           · subst j
             exact hfinishAt
-          · by_contra hne
-            have hvj : v j = u j :=
+          · have hvj : v j = u j :=
               arrive_preserves_other harrive hj
-            have hnetj : finish.2 j ≠ u j := by
-              intro heq
-              apply hne
-              rw [hvj]
-              exact heq
-            have hjkey : j = key := honly j hnetj
-            exact hj (hjkey.trans hkey.symm)
+            by_cases hfu : finish.2 j = u j
+            · exact hfu.trans hvj.symm
+            · have hjkey : j = key := honly j hfu
+              exact (hj (hjkey.trans hkey.symm)).elim
         have hgrooved : PassagesGrooved v rest := by
           have hg := tail.grooved_of_switchSimple htailSimple
           simpa [hfinishV] using hg
