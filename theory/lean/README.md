@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Three hundred and thirteen libraries, all self-contained (no
+Three hundred and twenty-five libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -430,10 +430,12 @@ identity-reflector case, or flip-reflector runway case.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
 now proves an unconditional general linear theorem.
-`GeneralN.state_law_linear_fourteen`
-(`StateLawFourteen.lean`) says that any one-train
-run on an `N`-switch wiring visits at most `14*N+9`
+`GeneralN.state_law_linear_five`
+(`StateLawFive.lean`) says that any one-train
+run on an `N`-switch wiring visits at most `5*N+9`
 pairwise-distinct tongue vectors, superseding the earlier
+`state_law_linear_eight` (`8*N+7`), `state_law_linear_eleven`
+(`11*N+8`), `state_law_linear_fourteen` (`14*N+9`),
 `state_law_linear_fifteen` (`15*N+7`), `state_law_linear_seventeen`
 (`17*N+5`), `state_law_linear_eighteen` (`18*N+3`),
 `state_law_linear_twenty_four` (`24*N+5`) and
@@ -480,22 +482,32 @@ or mutual), is live forever and visits only the four corners
 turns this into a liveness-free count of four.
 
 The counting assembly absorbs the phase laws in
-`PairTongueCountFour.lean` and `KnownEdgeFourteen.lean`: the
-reflector-pair count drops to `8*N+4` (avoiding and flip/flip pairs cost
-four flat; only the stay/flip contact geometries still pay `8*N+1`),
-complete repair to `9*N+4`, and the changed-forward flip splice to
-`2*N+5` (its four-novelty cover's lead hypothesis is discharged by
-position-counting the `2*N+1` lead window).  Protected repair fits in
-`12*N+5`, known-edge in `14*N+8`.  The remaining time-counted branches,
-in binding order, are: the periodic and facing outcomes of the repair
-dichotomy (`12*N` each; `FacingForwardNovelty.lean` already holds the
-facing pointwise tail awaiting the same lead-window discharge), the
-changed stay splice (`9*N`; needs the spliced-lobe analogue of the theta
-pointwise treatment), and the stay/flip contact pair (`8*N+1`,
-`manufactured_flip_then_stay_within_eight`).  Converting those turns
-every tail constant and drives the law toward the `≈7*N` set by the
-first-activated periodic outcome (`5*N+1`) plus the `2*N+3` journey
-histories.
+`PairTongueCountFour.lean` and `KnownEdgeFourteen.lean` (the
+reflector-pair count drops to `8*N+4`, complete repair to `9*N+4`, the
+changed flip splice to `2*N+5` by position-counting its lead window),
+which the stay-side program (`TrackStayContactAllTime.lean`,
+`TrackStaySpliceAllTime.lean`, `PairTongueCountAbsoluteFour.lean`,
+`TrackEarlyRepairSharp.lean`) then flattens completely: **every**
+manufactured reflector pair counts four tongue vectors, complete repair
+`N+4`, the changed stay splice `N+2`, and the early repair exits close
+within `6*N+3` — the coefficient-8 law of `KnownEdgeEight.lean`.
+
+`TrackEarlyRepairCount.lean` and `FacingMergeCount.lean` finish the
+protected-repair side: the early exits are not just short, they are
+vector-trivial.  A backward contact retraces and replays entirely at the
+post-contact state (its cycle carries **one** vector, so the exit counts
+its route window plus one, `N+2`); the final-mouth capture alternates
+between exactly **two** phases after its window (`N+2`); and the
+facing-forward merge is its route window plus the single alternate phase
+(`N+2`, replacing the `4*N+1` lead window).  Protected repair therefore
+counts `2*N+5` — bound by the changed flip splice — and the
+two-reflector component `4*N+8`.  The coefficient is now decided by the
+**first periodic outcome**, the settle-on-a-cycle exit of the first
+activation, still counted by its `5*N+1` time cap: known-edge is
+`5*N+8` (`known_edge_long_run_distinct_le_five`).  Converting that first
+exploration lasso to a vector count (its cycle grooves itself after one
+pass) and thinning the `2*N+3` journey histories are the two remaining
+frontiers on the way to `N+O(1)`.
 
 `TrackQuantitative.lean` completes the extraction with a checked bounded-lasso
 interface.  `EventuallyPeriodicWithin w c cap` retains `lead + period ≤ cap`;

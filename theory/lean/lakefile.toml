@@ -66,6 +66,7 @@ defaultTargets = [
   "ExternalLobeReflectionCore",
   "ExternalLobeRoundtrip",
   "FacingForwardNovelty",
+  "FacingMergeCount",
   "FibonacciCapacityMonotone",
   "FibonacciSparseBound",
   "FiniteFrameSwitchCorollary",
@@ -90,8 +91,11 @@ defaultTargets = [
   "HiddenAbsorb",
   "HiddenDichotomy",
   "HiddenFibre",
+  "KnownEdgeEight",
   "KnownEdgeEighteen",
+  "KnownEdgeEleven",
   "KnownEdgeFifteen",
+  "KnownEdgeFive",
   "KnownEdgeFourteen",
   "KnownEdgeNineteen",
   "KnownEdgeSeventeen",
@@ -166,6 +170,7 @@ defaultTargets = [
   "OverwriteLasso",
   "PairBound",
   "PairMultiplicity",
+  "PairTongueCountAbsoluteFour",
   "PairTongueCountFour",
   "PairTongueCountSharp",
   "PairedBlockEpochStrictBound",
@@ -229,8 +234,11 @@ defaultTargets = [
   "StarIndependent",
   "StarPairCountingCore",
   "StateLaw",
+  "StateLawEight",
   "StateLawEighteen",
+  "StateLawEleven",
   "StateLawFifteen",
+  "StateLawFive",
   "StateLawFourteen",
   "StateLawNineteen",
   "StateLawSeventeen",
@@ -256,6 +264,8 @@ defaultTargets = [
   "TokenState",
   "TrackCurveGrowth",
   "TrackCurveShrinkGlobal",
+  "TrackEarlyRepairCount",
+  "TrackEarlyRepairSharp",
   "TrackEdge",
   "TrackEndpointMatching",
   "TrackFiniteAlternation",
@@ -274,6 +284,8 @@ defaultTargets = [
   "TrackQuantitativeRouteSharp",
   "TrackQuantitativeTight",
   "TrackStationaryTail",
+  "TrackStayContactAllTime",
+  "TrackStaySpliceAllTime",
   "TrackStaySpliceSharp",
   "TrackTheta",
   "TrackThetaAllTime",
@@ -514,6 +526,9 @@ name = "ExternalLobeRoundtrip"
 name = "FacingForwardNovelty"
 
 [[lean_lib]]
+name = "FacingMergeCount"
+
+[[lean_lib]]
 name = "FibonacciCapacityMonotone"
 
 [[lean_lib]]
@@ -586,10 +601,19 @@ name = "HiddenDichotomy"
 name = "HiddenFibre"
 
 [[lean_lib]]
+name = "KnownEdgeEight"
+
+[[lean_lib]]
 name = "KnownEdgeEighteen"
 
 [[lean_lib]]
+name = "KnownEdgeEleven"
+
+[[lean_lib]]
 name = "KnownEdgeFifteen"
+
+[[lean_lib]]
+name = "KnownEdgeFive"
 
 [[lean_lib]]
 name = "KnownEdgeFourteen"
@@ -814,6 +838,9 @@ name = "PairBound"
 name = "PairMultiplicity"
 
 [[lean_lib]]
+name = "PairTongueCountAbsoluteFour"
+
+[[lean_lib]]
 name = "PairTongueCountFour"
 
 [[lean_lib]]
@@ -1003,10 +1030,19 @@ name = "StarPairCountingCore"
 name = "StateLaw"
 
 [[lean_lib]]
+name = "StateLawEight"
+
+[[lean_lib]]
 name = "StateLawEighteen"
 
 [[lean_lib]]
+name = "StateLawEleven"
+
+[[lean_lib]]
 name = "StateLawFifteen"
+
+[[lean_lib]]
+name = "StateLawFive"
 
 [[lean_lib]]
 name = "StateLawFourteen"
@@ -1084,6 +1120,12 @@ name = "TrackCurveGrowth"
 name = "TrackCurveShrinkGlobal"
 
 [[lean_lib]]
+name = "TrackEarlyRepairCount"
+
+[[lean_lib]]
+name = "TrackEarlyRepairSharp"
+
+[[lean_lib]]
 name = "TrackEdge"
 
 [[lean_lib]]
@@ -1136,6 +1178,12 @@ name = "TrackQuantitativeTight"
 
 [[lean_lib]]
 name = "TrackStationaryTail"
+
+[[lean_lib]]
+name = "TrackStayContactAllTime"
+
+[[lean_lib]]
+name = "TrackStaySpliceAllTime"
 
 [[lean_lib]]
 name = "TrackStaySpliceSharp"
