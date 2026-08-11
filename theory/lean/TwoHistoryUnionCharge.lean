@@ -877,6 +877,175 @@ theorem ManufacturedReflector.second_history_rebases_to_periodic_or_forward
       exact outward_fault_eventuallyPeriodic_or_forward
         A B houtward hbaseGrooves
 
+/-- If the fresh suffix stops inside the old selected-route tail, every
+remaining fresh passage is grooved in the post-contact state.  Hence the
+second construction reaches its pre-return port without another tongue
+change. -/
+theorem ManufacturedReflector.ForwardOrientedFault.preReturn_state_eq_contact
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    {approach : List Passage} {p x : Nat}
+    {suffix : List Passage} {u v : Tongues}
+    {oriented : Passage} {oldPrefix oldTail extra : List Passage}
+    (hsplit : B.exploration = approach ++ (p, x) :: suffix)
+    (happroach :
+      PhysicalTrace w (e, B.baseState) approach (p, u))
+    (hrouteSplit :
+      A.orientedRoute u = oldPrefix ++ oriented :: oldTail)
+    (hgrooves : PathGrooves A.toSupported.paths u)
+    (harrive : arrive u p = (x, v))
+    (hchanged : v (p / 3) ≠ u (p / 3))
+    (horientedSwitch : passageSwitch oriented = p / 3)
+    (htail : oldTail = suffix ++ extra) :
+    B.preReturn.2 = v := by
+  have hroute := A.orientedRoute_trace u hgrooves
+  have hrouteSimple := A.orientedRoute_simple u
+  have hrouteGrooved :=
+    hroute.grooved_of_switchSimple hrouteSimple
+  have hOldTailGrooved : PassagesGrooved u oldTail := by
+    intro passage hpassage
+    apply hrouteGrooved passage
+    rw [hrouteSplit]
+    exact List.mem_append_right oldPrefix
+      (List.mem_cons_of_mem oriented hpassage)
+  have hOldTailForeign :
+      ∀ passage ∈ oldTail, passageSwitch passage ≠ p / 3 := by
+    have hsimple := hrouteSimple
+    unfold SwitchSimple at hsimple
+    rw [hrouteSplit] at hsimple
+    simp only [List.map_append, List.map_cons] at hsimple
+    have htailSimple := (List.nodup_append.mp hsimple).2.1
+    rw [List.nodup_cons] at htailSimple
+    intro passage hpassage hEq
+    apply htailSimple.1
+    apply List.mem_map.mpr
+    exact ⟨passage, hpassage,
+      hEq.trans horientedSwitch.symm⟩
+  have hflip : v = flipAt u (p / 3) :=
+    changed_arrival_eq_flipAt harrive hchanged
+  have hOldTailGroovedV : PassagesGrooved v oldTail := by
+    rw [hflip]
+    exact grooved_after_flip_other
+      hOldTailGrooved hOldTailForeign
+  have hSuffixGroovedV : PassagesGrooved v suffix := by
+    intro passage hpassage
+    apply hOldTailGroovedV passage
+    rw [htail]
+    exact List.mem_append_left extra hpassage
+  have hnew := B.exploration_trace
+  rw [hsplit] at hnew
+  obtain ⟨middle, hbefore, hafter⟩ := hnew.split_append
+  have hmiddle : middle = (p, u) := by
+    have h₁ := hbefore.sound
+    have h₂ := happroach.sound
+    rw [h₂] at h₁
+    exact (Option.some.inj h₁).symm
+  subst middle
+  cases hafter with
+  | @cons _ _ q _ next _ _ hhead _ hrest =>
+      have hnext : next = v := by
+        rw [harrive] at hhead
+        exact (Prod.mk.inj hhead).2.symm
+      subst next
+      have hreplay :=
+        hrest.replay_grooved v hSuffixGroovedV
+      have hactual := hrest.sound
+      have hreplayed := hreplay.sound
+      rw [hactual] at hreplayed
+      exact congrArg Prod.snd (Option.some.inj hreplayed)
+
+/-- **Exact first-forward-contact rebase.**
+
+After the first changing forward merge, exactly one of two things remains.
+Either the fresh suffix extends beyond the old route and exposes the literal
+residual physical trace, or it stops inside the old route and the second
+pre-return state is already the contact state.  The proof retains the exact
+approach trace instead of reconstructing it from an erased endpoint theorem. -/
+theorem ManufacturedReflector.ForwardOrientedFault.residual_or_stable_preReturn
+    {w : Wiring} {g e : Nat}
+    {A : ManufacturedReflector w g e}
+    {B : ManufacturedReflector w e g}
+    (hfault : A.ForwardOrientedFault B) :
+    ∃ (approach : List Passage) (p x : Nat)
+        (suffix : List Passage) (u v : Tongues)
+        (oriented : Passage) (oldPrefix oldTail : List Passage),
+      B.exploration = approach ++ (p, x) :: suffix ∧
+      PhysicalTrace w (e, B.baseState) approach (p, u) ∧
+      A.orientedRoute u = oldPrefix ++ oriented :: oldTail ∧
+      PathGrooves A.toSupported.paths u ∧
+      arrive u p = (x, v) ∧
+      v (p / 3) ≠ u (p / 3) ∧
+      passageSwitch oriented = p / 3 ∧
+      x = oriented.2 ∧
+      ((∃ extra,
+          suffix = oldTail ++ extra ∧
+          PhysicalTrace w (A.orientedFinish u, v)
+            extra B.preReturn) ∨
+        (∃ extra,
+          oldTail = suffix ++ extra ∧
+          PhysicalTrace w B.preReturn extra
+            (A.orientedFinish u, v) ∧
+          B.preReturn.2 = v)) := by
+  obtain ⟨approach, p, x, suffix, u, v, oriented, repaired,
+      hsplit, happroach, hgrooves, harrive, hchanged,
+      horiented, horientedGroove, horientedSwitch,
+      hforward, _hrepair, _hrestored⟩ := hfault
+  obtain ⟨oldPrefix, oldTail, hrouteSplit⟩ :=
+    List.append_of_mem horiented
+  have hroute := A.orientedRoute_trace u hgrooves
+  have hrouteSimple := A.orientedRoute_simple u
+  have hroute' := hroute
+  rw [hrouteSplit] at hroute'
+  obtain ⟨oldMiddle, hOldPrefix, hOldAfter⟩ :=
+    hroute'.split_append
+  have hOldPrefixData := simple_grooved_trace_prefix_to_occurrence
+    hroute hrouteSplit
+      (hroute.grooved_of_switchSimple hrouteSimple) hrouteSimple
+  have hOldMiddle : oldMiddle = (oriented.1, u) := by
+    have h₁ := hOldPrefix.sound
+    have h₂ := hOldPrefixData.1.sound
+    rw [h₂] at h₁
+    exact (Option.some.inj h₁).symm
+  subst oldMiddle
+  have hOldSimple : SwitchSimple (oriented :: oldTail) := by
+    unfold SwitchSimple at hrouteSimple ⊢
+    rw [hrouteSplit] at hrouteSimple
+    simp only [List.map_append] at hrouteSimple
+    exact (List.nodup_append.mp hrouteSimple).2.1
+  have hnew := B.exploration_trace
+  rw [hsplit] at hnew
+  obtain ⟨newMiddle, hNewPrefix, hNewAfter⟩ :=
+    hnew.split_append
+  have hNewMiddle : newMiddle = (p, u) := by
+    have h₁ := hNewPrefix.sound
+    have h₂ := happroach.sound
+    rw [h₂] at h₁
+    exact (Option.some.inj h₁).symm
+  subst newMiddle
+  have hNewAfter' : PhysicalTrace w (p, u)
+      ((p, oriented.2) :: suffix) B.preReturn := by
+    simpa [hforward] using hNewAfter
+  have hendpoints := forward_merge_tails_endpoint_dichotomy
+    hOldAfter hNewAfter' hOldSimple
+    (groove_forward horientedGroove)
+    (by simpa [passageSwitch] using horientedSwitch)
+    (by simpa [hforward] using harrive) hchanged
+  have hflip : v = flipAt u (p / 3) :=
+    changed_arrival_eq_flipAt harrive hchanged
+  rw [← hflip] at hendpoints
+  refine ⟨approach, p, x, suffix, u, v, oriented,
+    oldPrefix, oldTail, hsplit, happroach, hrouteSplit,
+    hgrooves, harrive, hchanged, horientedSwitch,
+    hforward, ?_⟩
+  rcases hendpoints with hresidual | hcontained
+  · exact Or.inl hresidual
+  · obtain ⟨extra, htail, htrace⟩ := hcontained
+    have hpre : B.preReturn.2 = v :=
+      preReturn_state_eq_contact hsplit happroach hrouteSplit
+        hgrooves harrive hchanged horientedSwitch htail
+    exact Or.inr ⟨extra, htail, htrace, hpre⟩
+
 /-- **Coefficient-one union reduction after contact normalization.**
 
 For two exact opposite manufacturing journeys, a duplicate-free selection
