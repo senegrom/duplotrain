@@ -119,9 +119,10 @@ theorem PhysicalTrace.simple_same_exit_cycle_all_positive
       omega
     obtain ⟨port, htail⟩ :=
       hstable.stable_simple_cycle_all_time hnonempty hsimpleCycle tailTime
+    have hfirstLapRun : stepN w cycle.length (q, u) = some (q, v) := by
+      simpa [cycle] using htransient.sound
     refine ⟨port, ?_⟩
-    rw [hsum, stepN_add]
-    simpa [cycle] using htransient.sound
+    rw [hsum, stepN_add, hfirstLapRun]
     exact htail
 
 /-- Absolute-time transport of the previous theorem.  Every raw time strictly
