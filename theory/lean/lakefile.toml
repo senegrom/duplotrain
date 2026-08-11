@@ -250,6 +250,7 @@ defaultTargets = [
   "StarIndependent",
   "StarPairCountingCore",
   "StateLaw",
+  "StateLawCoefficientOneTop",
   "StateLawEight",
   "StateLawEighteen",
   "StateLawEleven",
@@ -360,6 +361,7 @@ defaultTargets = [
   "OldContactContinuation",
   "OneReflectorContinuation",
   "PairActionCorners",
+  "PartialSecondRunSharp",
   "PointwiseSimpleCycleTail",
   "ProtectedRepairFour",
   "RunwayHistoricalOne",
@@ -1127,6 +1129,9 @@ name = "StarPairCountingCore"
 name = "StateLaw"
 
 [[lean_lib]]
+name = "StateLawCoefficientOneTop"
+
+[[lean_lib]]
 name = "StateLawEight"
 
 [[lean_lib]]
@@ -1497,4 +1502,7 @@ name = "TraceRetainingFirstRevisit"
 
 [[lean_lib]]
 name = "TwoHistoryUnionCharge"
+
+[[lean_lib]]
+name = "PartialSecondRunSharp"
 

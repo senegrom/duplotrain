@@ -6,14 +6,14 @@ import VectorCount
 
 This file states the actual claim about trains, tracks and switches.
 **`StateLaw` is OPEN — its specific `N + 6` bound is not proved.**
-What is now proved is the unconditional raw general bound `2*N+5`
-(`state_law_linear_two_add_five` in `StateLawTwoFive.lean`), together with
-the stronger `2*N+4` bound after a known incoming track edge
-(`known_edge_all_run_distinct_le_two_mul_add_four`).  The proof combines the
-coefficient-one `N+6` count for a completed reflector pair with the existing
-dead- and simple-cycle branches, and uses the elementary `2 ^ N` theorem
-below only for `N = 0, 1`.  The coefficient-one improvement from `2*N+5` to
-`N+O(1)` remains open.
+What is now proved is the unconditional raw coefficient-one bound `N+7`
+(`state_law_linear_N_add_seven` in `StateLawCoefficientOneTop.lean`), together
+with the sharper `N+6` bound after a known incoming track edge
+(`known_edge_all_run_distinct_le_N_add_six`).  The proof is entirely symbolic
+in `N`: it combines the two-reflector count with coefficient-one histories for
+dead, stable-cycle, and first-support-damage continuations.  Thus `N+O(1)` is
+closed; the remaining gap to this file's exact target is one arbitrary-start
+boundary vector.
 
 The direct physical-track route in `TrackTrace`, `TrackLobe`, `TrackNormalForm`,
 `TrackTheta`, `TrackGlobalRepair`, `TrackQuantitative`, and
@@ -67,8 +67,8 @@ def StateLaw : Prop :=
       ks.length ≤ N + 6
 
 /-- The elementary exponential bound on exactly the same statement, **proved**.
-`GeneralN.state_law_linear_two_add_five` supersedes it asymptotically with
-`2*N+5`; the open gap is now `2*N+5` versus `N+6`. -/
+`GeneralN.state_law_linear_N_add_seven` supersedes it asymptotically with
+`N+7`; the open gap is now exactly one additive state, `N+7` versus `N+6`. -/
 theorem state_law_two_pow (w : Wiring) (N : Nat)
     (_hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (c0 : Nat × Tongues) (ks : List Nat)

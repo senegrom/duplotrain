@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Three hundred and forty-eight libraries, all self-contained (no
+Three hundred and fifty libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -428,16 +428,17 @@ identity-reflector case, or flip-reflector runway case.
   component certificate, both collapsed visible-chip geometries have at most
   four snapshots.
 
-The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
-now proves the unconditional raw bound `2*N+5`.
-`GeneralN.state_law_linear_two_add_five` (`StateLawTwoFive.lean`) is stated
-over raw `Wiring`/`stepN`, with no small-`N` enumeration and no conditional
-hypothesis.  Its known-incoming-edge core is the sharper `2*N+4` theorem.
-The improvement uses the exact `N+6` all-times charge for a completed pair of
-opposite manufactured reflectors; the remaining dead and simple-cycle
-branches cost at most `2*N+2` and `2*N+4`.  It supersedes the earlier
-`2*N+6`, `3*N+7`, `4*N+9`, and larger linear bounds.
-The repository does **not** claim the sharper `N+6` state law.
+The exact `N+6` `StateLaw` remains **OPEN**, but the direct-track argument now
+proves the unconditional raw coefficient-one bound `N+7`.
+`GeneralN.state_law_linear_N_add_seven`
+(`StateLawCoefficientOneTop.lean`) is stated over raw `Wiring`/`stepN`, with
+no small-`N` enumeration and no conditional hypothesis.  Its
+known-incoming-edge core is the sharper `N+6` theorem.  First death, stable
+cycle, completed opposite-reflector, and arbitrary first support-damage
+branches all share one `N`-coordinate history; the remaining arbitrary-start
+lift contributes at most the time-zero vector.  This supersedes the earlier
+`2*N+5`, `2*N+6`, `3*N+7`, `4*N+9`, and larger linear bounds.  The repository
+does **not** claim the final one-state saving needed for the raw `N+6` law.
 
 Four layers of improvement feed the current constant.  The novelty-aware
 lasso (`FirstActivatedExact.lean`, `NoveltyAwareLasso.lean`): the two
@@ -657,17 +658,15 @@ switches.**  `GeneralN.StateLaw` states the actual claim — a single
 train on any `N`-switch lazy-point layout ever sees at most `N + 6`
 distinct tongue vectors — directly over `Wiring`/`stepN`, decodable
 piece by piece as track, switches and the lazy-point rule.  **It is
-OPEN: nothing in this repository proves that coefficient-one bound.**
-`GeneralN.state_law_linear_seventeen` proves the identical
-raw-track statement with `17*N+5` in place of `N+6`
-(superseding the `18*N+3`, `24*N+5` and `26*N+3` predecessors);
-`state_law_two_pow` is the older elementary pigeonhole ceiling.  The
-remaining problem is the global assembly: every arbitrary repair branch must
-be covered by the `N+2` manufactured-prefix history plus at most four tail
-vectors without double-charging overlapping support.  The local runway and
-candy novelty branches are now discharged; the strict nested-restoration /
-raw repeated-writer decomposition is not yet connected to that sharp
-certificate.  Closing that assembly would
+OPEN by one additive state: the repository proves `N+7`, not `N+6`.**
+`GeneralN.state_law_linear_N_add_seven` proves the identical raw-track
+statement with `N+7` in place of `N+6`, and
+`known_edge_all_run_distinct_le_N_add_six` proves `N+6` once the starting port
+has a known incoming edge.  `state_law_two_pow` is the older elementary
+pigeonhole ceiling.  The remaining problem is now sharply isolated: absorb
+the arbitrary initial vector into the first coefficient-one construction
+history, or save one state in the known-edge theorem.  Closing that boundary
+charge would
 improve `17*N+5` to `N+6` (the conjectured sharp form remains `N+4`).
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real

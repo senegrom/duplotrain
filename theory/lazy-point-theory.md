@@ -16,13 +16,14 @@ an active switch flips both ways. Distinct tongue vectors on a cycle with
 > **Cycle theorem.** Every eventual cycle has at most 2 active switches,
 > hence at most 4 distinct tongue vectors.
 
-is reduced to bounding actives. Status: the specific coefficient-one
-`GeneralN.StateLaw` (`N+6`) is **OPEN**, but the unconditional raw general
-bound `f(N) ≤ 2N+5` is proved as
-`GeneralN.state_law_linear_two_add_five` in `lean/StateLawTwoFive.lean`; after
-a known incoming edge the proved bound is `2N+4`.  The proof is a direct
-physical-track lasso argument and does not assume the echo-machine Gray-tail
-properties.  The
+is reduced to bounding actives. Status: the specific
+`GeneralN.StateLaw` (`N+6`) is **OPEN**, but the unconditional raw
+coefficient-one bound `f(N) ≤ N+7` is proved as
+`GeneralN.state_law_linear_N_add_seven` in
+`lean/StateLawCoefficientOneTop.lean`; after a known incoming edge the proved
+bound is `N+6`.  The remaining gap is exactly the arbitrary time-zero vector.
+The proof is a direct physical-track lasso argument and does not assume the
+echo-machine Gray-tail properties.  The
 separate echo-machine route still reduces the sharper bound to the Gray tail
 (**B**) and one-alternation transient (**C**); those remain open.  Evidence:
 exhaustive for N ≤ 4 on wirings (140,152, in Lean), unbeaten by
