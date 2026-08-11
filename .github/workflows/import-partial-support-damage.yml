@@ -1,0 +1,37 @@
+name: Import partial support damage proofs
+
+on:
+  push:
+    branches: [agent/upper-bound-unified]
+    paths:
+      - .github/workflows/import-partial-support-damage.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Import latest Codex continuation modules
+        run: |
+          git fetch origin codex/first-repeated-edge-proof
+          for file in \
+            FirstChangedSupportTail.lean \
+            OldContactContinuation.lean \
+            PartialSupportDamage.lean
+          do
+            git show origin/codex/first-repeated-edge-proof:theory/lean/$file \
+              > theory/lean/$file
+          done
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add theory/lean/FirstChangedSupportTail.lean \
+            theory/lean/OldContactContinuation.lean \
+            theory/lean/PartialSupportDamage.lean
+          git diff --cached --check
+          git commit -m "import partial support damage continuation proofs"
+          git push origin HEAD:agent/upper-bound-unified
