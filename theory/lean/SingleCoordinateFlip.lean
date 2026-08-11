@@ -16,11 +16,13 @@ theorem tongues_eq_or_eq_flipAt_of_changes_only
     by_cases hj : j = k
     · subst j
       exact hkey
-    · by_contra hneq
-      have hvune : v j ≠ u j := by
-        intro heq
-        exact hneq heq.symm
-      exact hj (hchanges j hvune)
+    · cases hu : u j <;> cases hv : v j
+      · rfl
+      · have hne : v j ≠ u j := by simp [hu, hv]
+        exact (hj (hchanges j hne)).elim
+      · have hne : v j ≠ u j := by simp [hu, hv]
+        exact (hj (hchanges j hne)).elim
+      · rfl
   · right
     funext j
     by_cases hj : j = k
@@ -28,11 +30,13 @@ theorem tongues_eq_or_eq_flipAt_of_changes_only
       cases hu : u k <;> cases hv : v k <;>
         simp_all [flipAt]
     · have huv : u j = v j := by
-        by_contra hneq
-        have hvune : v j ≠ u j := by
-          intro heq
-          exact hneq heq.symm
-        exact hj (hchanges j hvune)
+        cases hu : u j <;> cases hv : v j
+        · rfl
+        · have hne : v j ≠ u j := by simp [hu, hv]
+          exact (hj (hchanges j hne)).elim
+        · have hne : v j ≠ u j := by simp [hu, hv]
+          exact (hj (hchanges j hne)).elim
+        · rfl
       simp [flipAt, hj, huv]
 
 end GeneralN
