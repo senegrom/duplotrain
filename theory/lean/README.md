@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Three hundred and forty-eight libraries, all self-contained (no
+Three hundred and fifty-two libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -430,10 +430,11 @@ identity-reflector case, or flip-reflector runway case.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
 now proves an unconditional general linear theorem.
-`GeneralN.state_law_linear_three_sharp`
-(`StateLawThreeSharp.lean`) says that any one-train
-run on an `N`-switch wiring visits at most `3*N+7`
+`GeneralN.state_law_linear_two`
+(`StateLawTwo.lean`) says that any one-train
+run on an `N`-switch wiring visits at most `2*N+9`
 pairwise-distinct tongue vectors, superseding the earlier
+`state_law_linear_three_sharp` (`3*N+7`),
 `state_law_linear_four` (`4*N+9`), `state_law_linear_five` (`5*N+9`),
 `state_law_linear_eight` (`8*N+7`), `state_law_linear_eleven`
 (`11*N+8`), `state_law_linear_fourteen` (`14*N+9`),
@@ -517,10 +518,26 @@ charged for its *actual* route lead, complete repair compresses to five
 vectors and the changed stay splice to three, so protected repair costs
 `N+4`; the journey boundaries are shared (`2*N+2` for two histories),
 giving `known_edge_long_run_distinct_le_three_sharp` at `3*N+6` and the
-entry-free `3*N+7`.  The remaining slack on the way to `N+O(1)` sits in
-the `N+2`-sized construction histories and first-cycle windows
-themselves — the sharp program's single-history `N+1` accounting is the
-endgame.
+entry-free `3*N+7`.
+
+The protected-repair side then goes fully constant
+(`FacingMergeConstant.lean`, `ProtectedRepairConstant.lean`): the facing
+merge's route-prefix lead is a protected repair prefix, hence two-phase
+(`repair_prefix_two_phase`), so the merge costs three vectors, and the
+early backward exits three (two-phase lead, then the retrace/replay
+cycle carries a single settled vector) — **protected repair exposes at
+most six tongue vectors, for every `N`**
+(`manufactured_pair_protected_repair_distinct_le_six`).  The known-edge
+count is rebuilt liveness-robustly (`KnownEdgeTwo.lean`): wherever the
+run dies, the samples so far are a position window no larger than the
+structural count they replace, so no `3*N+2` long-run hypothesis — and
+hence no dead-run window — survives into the final assembly.  Each
+first-activation attempt costs its `N+2` history or settle window and
+the constant-six tail follows: known-edge `2*N+8`
+(`known_edge_distinct_le_two_robust`), entry-free `2*N+9`
+(`state_law_linear_two`, `StateLawTwo.lean`).  The remaining slack on
+the way to `N+O(1)` sits in the two `N+2`-sized histories themselves —
+the sharp program's single-history `N+1` accounting is the endgame.
 
 `TrackQuantitative.lean` completes the extraction with a checked bounded-lasso
 interface.  `EventuallyPeriodicWithin w c cap` retains `lead + period ≤ cap`;

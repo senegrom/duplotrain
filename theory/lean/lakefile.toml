@@ -72,6 +72,7 @@ defaultTargets = [
   "ExternalLobeReflectionCore",
   "ExternalLobeRoundtrip",
   "FacingForwardNovelty",
+  "FacingMergeConstant",
   "FacingMergeCount",
   "FibonacciCapacityMonotone",
   "FibonacciSparseBound",
@@ -116,6 +117,7 @@ defaultTargets = [
   "KnownEdgeTwentyFourOverlap",
   "KnownEdgeTwentyOne",
   "KnownEdgeTwentyThree",
+  "KnownEdgeTwo",
   "KoizumiCurveInvariant",
   "KoizumiFramePersistence",
   "KoizumiRawExtraction",
@@ -197,6 +199,7 @@ defaultTargets = [
   "PhysicalPrefixFibre",
   "ProbePairedPeriod",
   "ProfileCodeBound",
+  "ProtectedRepairConstant",
   "ProtectedRepairThree",
   "RamanGapProductiveRefinement",
   "RamanInnerReplaySelectedTail",
@@ -266,6 +269,7 @@ defaultTargets = [
   "StateLawTwentyFourOverlap",
   "StateLawTwentyOne",
   "StateLawTwentyThree",
+  "StateLawTwo",
   "StationaryTail",
   "SteeringLaw",
   "SupportBound",
@@ -567,6 +571,9 @@ name = "ExternalLobeRoundtrip"
 name = "FacingForwardNovelty"
 
 [[lean_lib]]
+name = "FacingMergeConstant"
+
+[[lean_lib]]
 name = "FacingMergeCount"
 
 [[lean_lib]]
@@ -697,6 +704,9 @@ name = "KnownEdgeTwentyOne"
 
 [[lean_lib]]
 name = "KnownEdgeTwentyThree"
+
+[[lean_lib]]
+name = "KnownEdgeTwo"
 
 [[lean_lib]]
 name = "KoizumiCurveInvariant"
@@ -942,6 +952,9 @@ name = "ProbePairedPeriod"
 name = "ProfileCodeBound"
 
 [[lean_lib]]
+name = "ProtectedRepairConstant"
+
+[[lean_lib]]
 name = "ProtectedRepairThree"
 
 [[lean_lib]]
@@ -1147,6 +1160,9 @@ name = "StateLawTwentyOne"
 
 [[lean_lib]]
 name = "StateLawTwentyThree"
+
+[[lean_lib]]
+name = "StateLawTwo"
 
 [[lean_lib]]
 name = "StationaryTail"
