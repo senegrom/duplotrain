@@ -29,7 +29,7 @@ theorem grooved_states_agree_on_passage
       simpa [arrive, hx] using congrArg Prod.fst hv
     cases huval : u (x / 3) <;>
       cases hvval : v (x / 3) <;>
-      simp_all [branchPort]
+      simp_all [branchPort] <;> omega
   · have hpinu : pin u x = u := by
       simpa [arrive, hx] using congrArg Prod.snd hu
     have hpinv : pin v x = v := by
@@ -115,8 +115,9 @@ theorem ManufacturedReflector.repair_prefix_changes_only_protected_return
     rw [hvReference, huStart]
     exact heq
   have hrefBase : reference j = B.baseState j := by
-    by_contra hne
-    exact hrefNeState (hguard j hne)
+    by_cases hbase : reference j = B.baseState j
+    · exact hbase
+    · exact (hrefNeState (hguard j hbase)).elim
   have hactivatedChange :
       B.activatedState j ≠ B.baseState j := by
     intro heq
