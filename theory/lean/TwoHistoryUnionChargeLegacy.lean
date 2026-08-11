@@ -1,3 +1,5 @@
+import SharpCertificateClosure
+import NoveltyChargeBound
 import ProtectedRepairFour
 
 /-!
