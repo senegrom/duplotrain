@@ -69,3 +69,5 @@ jobs:
             KnownEdgeThree StateLawThree BoundaryOverlapTailCount \
             TwoJourneyBoundaryTailCount KnownEdgeThreeSharp KnownEdgeLift \
             StateLawThreeSharp
+
+# Boundary-aware direct-tail transport rerun.
