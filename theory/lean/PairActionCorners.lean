@@ -89,12 +89,21 @@ theorem manufactured_pair_all_time_action_corners_tongues
             have hmem' :
                 tonguesAt w (g, state) d = state ∨
                   tonguesAt w (g, state) d =
-                    flipAt state FA.actionSwitch := by
+                    flipAt state FA.actionSwitch ∨
+                  tonguesAt w (g, state) d = state := by
               simpa [ManufacturedReflector.toSupported,
                 ManufacturedStayReflector.toSupported,
                 ManufacturedFlipReflector.toSupported,
                 LocalAction.apply, flipAt_flipAt] using hmem
-            rcases hmem' with h | h
+            have htwo :
+                tonguesAt w (g, state) d = state ∨
+                  tonguesAt w (g, state) d =
+                    flipAt state FA.actionSwitch := by
+              rcases hmem' with h | h | h
+              · exact Or.inl h
+              · exact Or.inr h
+              · exact Or.inl h
+            rcases htwo with h | h
             · simp [manufacturedPairActionCorners,
                 ManufacturedReflector.toSupported,
                 ManufacturedStayReflector.toSupported,
