@@ -41,6 +41,9 @@ jobs:
             TraceRetainingFirstRevisit \
             TraceRetainingBABASecondRepeat \
             CodexStateLawTwoSharp \
+            MellitFiveNoveltyAssembly \
+            StateLawTwoFive \
+            OneReflectorContinuation \
             EchoRawBridgeSharp \
             EmptyCurvePotential \
             MellitDynamicResidual \
@@ -49,10 +52,14 @@ jobs:
           do
             register_target "$target"
           done
-      - name: Check unconditional bound endpoints
+      - name: Check strongest unconditional bound endpoints
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build StateLawTwoSharper CodexStateLawTwoSharp
+          lake build StateLawTwoSharper CodexStateLawTwoSharp MellitFiveNoveltyAssembly StateLawTwoFive
+      - name: Check continuation compression
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build OneReflectorContinuation
       - name: Check coefficient-one quantitative reductions
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
@@ -72,11 +79,11 @@ jobs:
             echo "## Unified upper-bound checkpoint"
             echo
             echo "Kernel-checked unconditional endpoint in this tree:"
-            echo "- known incoming edge: 2N+6"
-            echo "- arbitrary start: 2N+7"
+            echo "- known incoming edge: 2N+4"
+            echo "- arbitrary start: 2N+5"
             echo
-            echo "Additional imported endpoint:"
-            echo "- independent arbitrary-start 2N+8 proof retained as CodexStateLawTwoSharp"
+            echo "Continuation compression:"
+            echo "- one reflector plus a support-preserving continuation is checked"
             echo
             echo "Coefficient-one frontier:"
             echo "- conditional N+7 assembly checked"
