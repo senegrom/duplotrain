@@ -70,8 +70,10 @@ jobs:
           name = "ProbeCompleteRepair"
           [[lean_lib]]
           name = "PairActionCorners"
+          [[lean_lib]]
+          name = "CompleteRepairFour"
           EOF
       - name: Build new proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build PairActionCorners ProbeCompleteRepair
+          lake build CompleteRepairFour ProbeCompleteRepair
