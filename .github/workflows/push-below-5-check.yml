@@ -6,6 +6,8 @@ on:
       - theory/lean/FacingForwardConstant.lean
       - theory/lean/ProtectedRepairConstant.lean
       - theory/lean/KnownEdgeTwo.lean
+      - theory/lean/KnownEdgeTwoAll.lean
+      - theory/lean/KnownEdgeAllLift.lean
       - theory/lean/StateLawTwo.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
@@ -31,6 +33,10 @@ jobs:
           name = "ProtectedRepairConstant"
           [[lean_lib]]
           name = "KnownEdgeTwo"
+          [[lean_lib]]
+          name = "KnownEdgeTwoAll"
+          [[lean_lib]]
+          name = "KnownEdgeAllLift"
           [[lean_lib]]
           name = "StateLawTwo"
           EOF
