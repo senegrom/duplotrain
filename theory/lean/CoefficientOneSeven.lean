@@ -1,4 +1,4 @@
-import SelectedTripleSharpClosure
+import SharpSixEventAssembly
 import SharpStateLawAssembly
 
 /-!
