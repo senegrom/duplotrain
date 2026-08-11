@@ -38,7 +38,7 @@ jobs:
       - name: Check strongest unconditional bound endpoints
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build StateLawTwoSharper CodexStateLawTwoSharp MellitFiveNoveltyAssembly StateLawTwoFive
+          lake build StateLawTwoSharper CodexStateLawTwoSharp TwoHistoryUnionChargeLegacy MellitFiveNoveltyAssembly StateLawTwoFive
       - name: Check continuation compression
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
