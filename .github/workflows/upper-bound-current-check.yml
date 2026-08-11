@@ -7,6 +7,11 @@ on:
       - theory/lean/TripleSelfLinkSimpleCycleTail.lean
       - theory/lean/CoefficientOneSeven.lean
       - theory/lean/ProbeSimpleCycleTail.lean
+      - theory/lean/EchoRawBridgeSharp.lean
+      - theory/lean/EmptyCurvePotential.lean
+      - theory/lean/MellitDynamicResidual.lean
+      - theory/lean/StateLawParametricAudit.lean
+      - theory/lean/TwoHistoryUnionCharge.lean
       - theory/lean/COEFFICIENT_ONE_STATUS.md
       - UPPER_BOUND_PROGRESS.md
       - .github/workflows/upper-bound-current-check.yml
@@ -71,6 +76,16 @@ jobs:
           name = "CoefficientOneSeven"
           [[lean_lib]]
           name = "ProbeSimpleCycleTail"
+          [[lean_lib]]
+          name = "EchoRawBridgeSharp"
+          [[lean_lib]]
+          name = "EmptyCurvePotential"
+          [[lean_lib]]
+          name = "MellitDynamicResidual"
+          [[lean_lib]]
+          name = "StateLawParametricAudit"
+          [[lean_lib]]
+          name = "TwoHistoryUnionCharge"
           EOF
       - name: Check unconditional coefficient-two theorem
         run: |
@@ -80,6 +95,10 @@ jobs:
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build TripleSelfLinkSimpleCycleTail CoefficientOneSeven ProbeSimpleCycleTail
+      - name: Check imported proof knowledge
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build EchoRawBridgeSharp EmptyCurvePotential MellitDynamicResidual StateLawParametricAudit TwoHistoryUnionCharge
       - name: Publish consolidated checkpoint
         if: success()
         run: |
@@ -90,8 +109,9 @@ jobs:
             echo "- known incoming edge: 2N+6"
             echo "- arbitrary start: 2N+7"
             echo
-            echo "Coefficient-one source frontier:"
+            echo "Coefficient-one frontier:"
             echo "- selected self-link raw-cycle residual closed"
             echo "- exact six-event residue implies N+6 known-edge / N+7 arbitrary-start"
+            echo "- finite raw-to-echo bridge, curve potential, dynamic cycle, parametric audit, and two-history charge modules checked"
             echo "- N+6 arbitrary-start target still requires the five-event closure"
           } >> "$GITHUB_STEP_SUMMARY"
