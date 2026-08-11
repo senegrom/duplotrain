@@ -9,6 +9,8 @@ on:
       - theory/lean/KnownEdgeTwoAll.lean
       - theory/lean/KnownEdgeAllLift.lean
       - theory/lean/StateLawTwo.lean
+      - theory/lean/RunwayHistoricalTwo.lean
+      - theory/lean/ChangedFlipCountFive.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
 jobs:
@@ -39,8 +41,12 @@ jobs:
           name = "KnownEdgeAllLift"
           [[lean_lib]]
           name = "StateLawTwo"
+          [[lean_lib]]
+          name = "RunwayHistoricalTwo"
+          [[lean_lib]]
+          name = "ChangedFlipCountFive"
           EOF
       - name: Build new proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build StateLawTwo
+          lake build StateLawTwo ChangedFlipCountFive
