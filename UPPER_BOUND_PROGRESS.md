@@ -2,9 +2,9 @@
 
 Branch: `agent/coefficient-one-current`
 
-This is the visible coefficient-one working branch.  Its focused GitHub
+This is the visible coefficient-one working branch. Its focused GitHub
 Actions workflow is green at commit
-`f3a9d1daf9955a236e4755b1d70c7d6d5ce9af9a` (run `31505493091`).
+`786672497c2975c51166f66240ef26ef8ddc68ff` (run `31507568011`).
 
 ## Current unconditional bound
 
@@ -16,10 +16,12 @@ known incoming edge:  2*N + 6
 arbitrary start:       2*N + 7
 ```
 
-## Kernel-checked result on this branch
+## Kernel-checked results on this branch
+
+### Selected self-link cycle closure
 
 `theory/lean/TripleSelfLinkSimpleCycleTail.lean` closes the stable
-simple-cycle half of the selected self-link raw-cycle obstruction.  Together
+simple-cycle half of the selected self-link raw-cycle obstruction. Together
 with the already closed opposite-reflector half, this proves that the
 self-link forced by the selected `ABCABC` obstruction cannot first appear on
 a later periodic raw cycle: it must occur at an actual raw time inside the
@@ -35,9 +37,28 @@ RawSixEventReduction.tail_cycle_self_link_false
 CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_is_early
 ```
 
+### Trace-retaining first revisit and BABA second repeat
+
+The ordinary predicate `SettlesOnSimpleCycle` stores only period endpoints,
+which is too weak for pointwise novelty accounting. The branch now contains
+kernel-checked trace-valued replacements:
+
+```lean
+PhysicalTrace.first_revisit_trace_or_activated_reflector
+rawExactLobeWrite_second_repeat_cycle_traces_or_pair
+ReachedStableSimpleCycle
+reachedStableSimpleCycle_of_prefix
+ReachedStableSimpleCycle.one_vector_tail
+```
+
+These preserve the transient lap, the stable switch-simple lap and the exact
+absolute raw reach. Consequently the cycle leaf of a Mellit/BABA second
+repeat can be converted into an explicit all-time one-vector tail rather than
+an unqualified eventual-periodicity statement.
+
 ## Nearest coefficient-one bound: `N + 7`
 
-`theory/lean/CoefficientOneSeven.lean` now kernel-checks the exact quantitative
+`theory/lean/CoefficientOneSeven.lean` kernel-checks the exact quantitative
 payoff of the canonical six-event reduction:
 
 ```lean
@@ -69,7 +90,7 @@ It follows from `KnownEdgeFourRepeatedWriterNovelty`, the raw theorem that at
 most four globally novel repeated-writer events occur after entering through
 a known physical edge.
 
-The `N+7` milestone needs exclusion of six repeated novelties.  The sharper
+The `N+7` milestone needs exclusion of six repeated novelties. The sharper
 `N+6` milestone needs exclusion of five repeated novelties, so it cannot use
 the two overlapping five-event windows available in the six-event reduction.
 It requires one additional historical-vector overlap or a direct five-frame
@@ -78,18 +99,19 @@ runway extraction.
 ## Remaining geometry
 
 For the six-event route to `N+7`, strict nesting is already paid by
-well-founded descent through selected close times.  The remaining work is:
+well-founded descent through selected close times. The remaining work is:
 
-1. convert the finite list of overlap-minimal BABA leaves—cycle, late pair,
-   early pure crossing, direct lobe, first-writer charge and quiet replay—into
-   the existing forbidden four-vector tail cover or a strictly smaller raw
-   residue; and
-2. close the serial/serial branch by a well-founded suffix argument that
+1. transport the now trace-valued BABA cycle leaf to the literal five selected
+   post-close times, paying only those selected closes before the stable tail;
+2. convert the other overlap-minimal BABA leaves—late pair, early pure
+   crossing, direct lobe, first-writer charge and quiet replay—into the
+   existing forbidden four-vector cover or a strictly smaller raw residue;
+3. close the serial/serial branch by a well-founded suffix argument that
    preserves the consecutive selected-event window.
 
 For `N+6`, the preferred extra saving is the already visible Gray-corner
 identity: the first-turnaround contact vector is the initial corner of the
-following pair.  A complete five-frame proof must ensure that this overlap is
+following pair. A complete five-frame proof must ensure that this overlap is
 available in every global branch, not only the compatible/direct-lobe cases.
 
 Detailed proof map and verification policy:
