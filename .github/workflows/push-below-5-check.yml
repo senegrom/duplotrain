@@ -18,6 +18,8 @@ on:
       - theory/lean/RunwayHistoricalOne.lean
       - theory/lean/ChangedFlipCountFour.lean
       - theory/lean/ProbeCompleteRepair.lean
+      - theory/lean/PairActionCorners.lean
+      - theory/lean/CompleteRepairFour.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
 jobs:
@@ -66,8 +68,10 @@ jobs:
           name = "ChangedFlipCountFour"
           [[lean_lib]]
           name = "ProbeCompleteRepair"
+          [[lean_lib]]
+          name = "PairActionCorners"
           EOF
       - name: Build new proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build StateLawTwoSharp ChangedFlipCountFour ProbeCompleteRepair
+          lake build PairActionCorners ProbeCompleteRepair
