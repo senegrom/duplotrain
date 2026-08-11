@@ -1,5 +1,5 @@
 import MellitFiveNoveltyAssembly
-import StateLawTwoSharp
+import CodexStateLawTwoSharp
 
 /-!
 # Unconditional raw `2*N+5` state bound
