@@ -1,0 +1,33 @@
+name: Coefficient one current
+on:
+  push:
+    branches: [agent/coefficient-one-current]
+    paths:
+      - theory/lean/ProbeSimpleCycleTail.lean
+      - theory/lean/TripleSelfLinkSimpleCycleTail.lean
+      - theory/lean/TripleSelfLinkSimpleCycleNoTail.lean
+      - .github/workflows/coefficient-one-current-check.yml
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register proof targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "ProbeSimpleCycleTail"
+          EOF
+      - name: Build proof targets
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build ProbeSimpleCycleTail
