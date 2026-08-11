@@ -1,0 +1,50 @@
+name: Upper bound current
+on:
+  push:
+    branches: [agent/upper-bound-current]
+    paths:
+      - theory/lean/StateLawTwoSharper.lean
+      - theory/lean/TripleSelfLinkSimpleCycleTail.lean
+      - theory/lean/CoefficientOneSeven.lean
+      - theory/lean/ProbeSimpleCycleTail.lean
+      - theory/lean/COEFFICIENT_ONE_STATUS.md
+      - UPPER_BOUND_PROGRESS.md
+      - .github/workflows/upper-bound-current-check.yml
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Check unconditional coefficient-two theorem
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake env lean StateLawTwoSharper.lean
+      - name: Check coefficient-one local closure
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake env lean TripleSelfLinkSimpleCycleTail.lean
+          lake env lean CoefficientOneSeven.lean
+          lake env lean ProbeSimpleCycleTail.lean
+      - name: Publish consolidated checkpoint
+        if: success()
+        run: |
+          {
+            echo "## Consolidated upper-bound checkpoint"
+            echo
+            echo "Unconditional kernel-checked bound:"
+            echo "- known incoming edge: 2N+6"
+            echo "- arbitrary start: 2N+7"
+            echo
+            echo "Coefficient-one source frontier:"
+            echo "- selected self-link raw-cycle residual closed"
+            echo "- exact six-event residue implies N+6 known-edge / N+7 arbitrary-start"
+            echo "- N+6 arbitrary-start target still requires the five-event closure"
+          } >> "$GITHUB_STEP_SUMMARY"
