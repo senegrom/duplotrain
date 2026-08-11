@@ -1,4 +1,5 @@
 import TwoHistoryUnionCharge
+import NoveltyChargeBound
 import ShortSuffixCount
 import PointwiseSimpleCycleTail
 
