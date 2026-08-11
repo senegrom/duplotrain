@@ -2,43 +2,86 @@
 
 Branch: `agent/upper-bound-unified`
 
-This branch is the visible integration point for the active upper-bound
-programmes.  It is an octopus merge of:
+This branch is the visible integration point for all active upper-bound work.
+It now contains the coefficient-two proof, the coefficient-one obstruction
+programme, the trace-retaining self-link/cycle closures, and the latest Codex
+continuation lemmas in one repository tree.
 
-* `agent/upper-bound-current` at `dacb3110846c26043e85fd6c2f4e545bfd299168`;
-* `agent/coefficient-one-current` at `5fb946657966dc5d7f9d83cd2858c187b26651e2`;
-* `codex/first-repeated-edge-proof` at `d615f15a2249933dc27d528ac6b4c87b508a4f7e`.
+## Strongest kernel-checked unconditional bound
 
-The merge commit is `43a8ca081bfdb3fc20b4baa9ac2bd222ed6f0d0c`.
-The independent Codex module was retained under the nonconflicting name
-`theory/lean/CodexStateLawTwoSharp.lean`.
-
-## Strongest unconditional bound
-
-The strongest previously kernel-checked endpoint included in this tree is:
+The current verified endpoint is
 
 ```text
-known incoming edge:  2*N + 6
-arbitrary start:       2*N + 7
+known incoming edge:  2*N + 4
+arbitrary start:       2*N + 5
 ```
 
-Its public source endpoint is:
+The public theorems are:
+
+```lean
+GeneralN.known_edge_all_run_distinct_le_two_mul_add_four
+GeneralN.state_law_linear_two_add_five
+```
+
+in:
 
 ```text
-theory/lean/StateLawTwoSharper.lean
+theory/lean/StateLawTwoFive.lean
 ```
 
-The independently developed Codex proof of the weaker arbitrary-start bound
-`2*N + 8` is also preserved as `CodexStateLawTwoSharp.lean`.  It contributes
-additional two-history and two-reflector lemmas even though its final numeric
-endpoint is one larger.
+GitHub Actions run `31517925947` kernel-checked the complete endpoint chain,
+including:
+
+```text
+StateLawTwoSharper
+CodexStateLawTwoSharp
+TwoHistoryUnionChargeLegacy
+MellitFiveNoveltyAssembly
+StateLawTwoFive
+```
+
+The workflow later failed in a separate continuation target, after the
+`2*N+5` step had completed successfully.  That continuation import has since
+been repaired.
+
+## How the `2*N+5` theorem is assembled
+
+For a run starting beyond a known incoming edge, the first-repeat split has
+three substantive branches.
+
+1. A dead second suffix is bounded by `2*N+2`.
+2. A simple-cycle second suffix is bounded by `2*N+4`.
+3. Two completed manufactured journeys use the sharper joint-history theorem
+   `ManufacturedReflector.two_journeys_all_run_distinct_le_N_add_six`, giving
+   `N+6` rather than charging two independent `N`-sized histories.
+
+For `N >= 2`, all three branches are at most `2*N+4`; `N = 0,1` use the exact
+`2^N` finite-state theorem.  An arbitrary start contributes at most its
+unshifted time-zero vector, giving `2*N+5`.
+
+## Imported continuation compression
+
+`theory/lean/OneReflectorContinuation.lean` develops the next coefficient-one
+accounting step.  It charges an old reflector's reusable support coordinates
+and the productive first writers of a subsequent support-preserving
+switch-simple continuation to the same set of `N` switch coordinates.
+
+Its intended sharp endpoints are:
+
+```text
+one reflector + support-preserving fall:         N + 2
+one reflector + simple lead + one-vector cycle:  N + 3
+```
+
+The module's missing manufacturing-endpoint import has been fixed at commit
+`78e43524cc05966cf0c94576a840281910f6bed2`; the unified workflow is rerunning
+it together with the rest of the branch.
 
 ## Coefficient-one milestones
 
 ### Conditional `N + 7`
 
-`theory/lean/CoefficientOneSeven.lean` proves the exact payoff of the current
-six-event reduction:
+`theory/lean/CoefficientOneSeven.lean` proves:
 
 ```text
 sharp six-event residue impossible
@@ -46,87 +89,88 @@ sharp six-event residue impossible
   => arbitrary start:      N + 7
 ```
 
-The implication is kernel-checked; the raw geometric residue remains open.
+The implication is kernel-checked.  Its premise is the explicit remaining raw
+six-event geometric residue, not a counting or periodicity assumption.
 
 ### Target `N + 6`
 
-The sharp target is:
+The sharper target is:
 
 ```text
 known incoming edge:  N + 5
 arbitrary start:       N + 6
 ```
 
-It follows from the raw assertion that at most four globally novel
-repeated-writer events occur after entry through a known physical edge.
+It follows from proving that at most four globally novel repeated-writer
+post-vectors occur after entry through a known physical edge.
 
 ## Integrated coefficient-one progress
 
-### Pointwise simple-cycle tail
+### Pointwise simple-cycle and self-link tails
 
-The following green modules from `agent/coefficient-one-current` are present:
+The branch contains the green trace-retaining modules:
 
 ```text
 theory/lean/TraceRetainingFirstRevisit.lean
 theory/lean/TraceRetainingBABASecondRepeat.lean
 theory/lean/PointwiseSimpleCycleTail.lean
+theory/lean/TripleSelfLinkSimpleCycleTail.lean
 ```
 
-They retain the transient and stable switch-simple laps and prove that every
-positive raw time after the reached same-exit repeat has the single settled
-restricted tongue vector.  This removes the tongue-state uncertainty from the
-BABA simple-cycle leaf; only its placement relative to the selected closes
-remains.
+A reached same-exit simple cycle has one settled positive-time tongue vector.
+The selected self-link periodic branch, in both its opposite-reflector and
+stable-cycle outcomes, yields an explicit two-vector raw tail that rotates
+back to the selected close.
 
-### Selected self-link cycle closure
+### First old-support contact
 
-`theory/lean/TripleSelfLinkSimpleCycleTail.lean` closes both outcomes of the
-selected periodic self-link branch: the opposite-reflector outcome and the
-stable simple-cycle outcome each give an explicit two-vector tail which
-rotates back to the selected close.
-
-### Two-history contact reduction
-
-The integrated files
+The current contact calculus is in:
 
 ```text
 theory/lean/TwoHistoryUnionCharge.lean
 theory/lean/ContactHistorySharpBound.lean
 ```
 
-show that changing first old-support contacts, and unchanged contacts not
-following the old selected route forward, have a two-vector novelty cover over
-an exact history of length at most `N + 3`.  The sole local contact residue is:
+Changing first contacts, and unchanged contacts which do not continue along
+the old selected route, have a two-vector novelty cover over a history of
+length at most `N+3`.
 
-```lean
-FacingForwardContactTwoNoveltyLaw
+The unresolved aligned-forward branch has now been sharpened to an exact
+physical residual:
+
+```text
+C.suffix = oldTail ++ extra
 ```
 
-Proving that law gives the local `N + 5` count immediately.
-
-### Independent two-reflector assembly
-
-`theory/lean/CodexStateLawTwoSharp.lean` retains the other agent's complete
-source for an unconditional two-reflector assembly.  In particular it closes
-preserved-support and first-damaged-support branches without residual
-recursion, providing reusable history-overlap lemmas for the coefficient-one
-programme.
+or the reverse prefix relation, together with the corresponding physical
+trace and endpoint-state equality.  A fixed `N+3` contact history is probably
+too rigid for the first case because `extra` may contain genuinely new first
+writers.  The more robust route is to combine this residual with
+`OneReflectorContinuation`: absorb those first writers into a larger but still
+jointly charged history rather than incorrectly declaring them historical.
 
 ## Current proof frontier
 
-For the six-event route to `N + 7`, the remaining tasks are:
+The next local theorem should be a continuation-aware replacement for the
+open fixed-history law.  A suitable target is:
 
-1. transport the pointwise-constant BABA cycle leaf to the literal selected
-   post-close list and charge the at-most-three earlier closes;
-2. close the other overlap-minimal BABA leaves by a forbidden four-vector cover
-   or a strictly smaller residue;
-3. close the serial/serial branch by well-founded suffix descent while
-   preserving the consecutive-event window.
+```text
+unchanged aligned forward contact
+  => exists history, history.length <= N + 3 (or N + 4)
+     and the complete continuation has a constant-size novelty cover
+```
 
-For the sharper `N + 6` route, the most concentrated local target is the
-unchanged forward first-support contact.  A successful proof should reuse the
-existing facing-forward constant-tail geometry rather than introduce a new
-period-length count.
+The proof should use:
+
+1. the exact common-route decomposition from
+   `SecondHistorySupportContact.facing_forward_residual_or_stable`;
+2. the reusable-support/first-writer disjointness theorem from
+   `OneReflectorContinuation`;
+3. the pointwise constant or two-phase tail laws already proved for the
+   terminal first-revisit outcomes.
+
+Closing this local continuation charge would remove the most concentrated
+obstruction to the `N+5` known-edge / `N+6` arbitrary-start target.
 
 ## Verification
 
@@ -136,6 +180,7 @@ The branch-local workflow is:
 .github/workflows/upper-bound-unified-check.yml
 ```
 
-It checks the unconditional endpoint, both coefficient-one reductions, the
-trace-retaining cycle modules, the contact-history modules, and the renamed
-independent Codex endpoint in one repository tree.
+It registers every Lean source file and checks the unconditional endpoint,
+the continuation compression, the coefficient-one reductions, the
+trace-retaining cycle closures, and the imported structural modules in one
+repository tree.
