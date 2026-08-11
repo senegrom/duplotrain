@@ -34,7 +34,7 @@ theorem prefix_then_stable_simple_cycle_distinct_le_two_mul_succ
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ 2 * N + 1 := by
   have hcycleLe : cycle.length ≤ N :=
-    htransient.switchSimple_length_le_switches hN hsimple
+    htransient.simple_length_le hN hsimple
   have hpositive : 0 < cycle.length := by
     cases cycle with
     | nil => exact (hnonempty rfl).elim
@@ -72,7 +72,7 @@ theorem prefix_then_stable_simple_cycle_distinct_le_two_mul_succ
   have hcover : NoveltyCoverOn w N start times history 0 := by
     refine ⟨[], by simp, ?_⟩
     intro k hk
-    simp only [List.nil_append]
+    simp only [List.append_nil]
     by_cases hpre : k ≤ cutoff
     · exact List.mem_map.mpr
         ⟨k, List.mem_range.mpr (by omega), rfl⟩
