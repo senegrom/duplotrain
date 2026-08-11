@@ -29,8 +29,12 @@ jobs:
           name = "FacingForwardConstant"
           [[lean_lib]]
           name = "ProtectedRepairConstant"
+          [[lean_lib]]
+          name = "KnownEdgeTwo"
+          [[lean_lib]]
+          name = "StateLawTwo"
           EOF
       - name: Build new proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build ProtectedRepairConstant
+          lake build StateLawTwo
