@@ -27,6 +27,7 @@ jobs:
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build TripleSelfLinkSimpleCycleTail
+          lake build SharpSixEventAssembly
           lake env lean CoefficientOneSeven.lean
           lake env lean ProbeSimpleCycleTail.lean
       - name: Publish proof checkpoint
