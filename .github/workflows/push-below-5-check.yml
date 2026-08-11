@@ -27,8 +27,10 @@ jobs:
 
           [[lean_lib]]
           name = "FacingForwardConstant"
+          [[lean_lib]]
+          name = "ProtectedRepairConstant"
           EOF
       - name: Build new proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build FacingForwardConstant
+          lake build ProtectedRepairConstant
