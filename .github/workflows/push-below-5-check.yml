@@ -11,6 +11,11 @@ on:
       - theory/lean/ProtectedRepairThree.lean
       - theory/lean/KnownEdgeThree.lean
       - theory/lean/StateLawThree.lean
+      - theory/lean/BoundaryOverlapTailCount.lean
+      - theory/lean/TwoJourneyBoundaryTailCount.lean
+      - theory/lean/KnownEdgeThreeSharp.lean
+      - theory/lean/KnownEdgeLift.lean
+      - theory/lean/StateLawThreeSharp.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
 jobs:
@@ -45,10 +50,22 @@ jobs:
           name = "KnownEdgeThree"
           [[lean_lib]]
           name = "StateLawThree"
+          [[lean_lib]]
+          name = "BoundaryOverlapTailCount"
+          [[lean_lib]]
+          name = "TwoJourneyBoundaryTailCount"
+          [[lean_lib]]
+          name = "KnownEdgeThreeSharp"
+          [[lean_lib]]
+          name = "KnownEdgeLift"
+          [[lean_lib]]
+          name = "StateLawThreeSharp"
           EOF
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build OneJourneyTailCount KnownEdgeFour StateLawFour \
             FirstCycleCount ChangedFlipCountActual ProtectedRepairThree \
-            KnownEdgeThree StateLawThree
+            KnownEdgeThree StateLawThree BoundaryOverlapTailCount \
+            TwoJourneyBoundaryTailCount KnownEdgeThreeSharp KnownEdgeLift \
+            StateLawThreeSharp
