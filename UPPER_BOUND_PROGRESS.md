@@ -4,7 +4,7 @@ Branch: `agent/coefficient-one-current`
 
 This is the visible coefficient-one working branch. Its focused GitHub
 Actions workflow is green at commit
-`786672497c2975c51166f66240ef26ef8ddc68ff` (run `31507568011`).
+`382eb3ce3b3a901c0f9ec648f541fafe06c307c2` (run `31509055310`).
 
 ## Current unconditional bound
 
@@ -56,6 +56,26 @@ absolute raw reach. Consequently the cycle leaf of a Mellit/BABA second
 repeat can be converted into an explicit all-time one-vector tail rather than
 an unqualified eventual-periodicity statement.
 
+### Pointwise one-change cycle tail
+
+`theory/lean/PointwiseSimpleCycleTail.lean` strengthens that result. In the
+actual same-exit first-revisit construction, the first cycle passage performs
+the only possible tongue change; the remaining transient lap and every later
+lap are already grooved in the settled state. The following now
+kernel-checks:
+
+```lean
+PhysicalTrace.simple_same_exit_cycle_positive_prefix
+PhysicalTrace.stable_simple_cycle_all_time
+PhysicalTrace.simple_same_exit_cycle_all_positive
+PhysicalTrace.simple_same_exit_cycle_absolute_positive_vector
+```
+
+Thus every raw time strictly after the reached repeat has the single settled
+restricted tongue vector. For the selected BABA cycle leaf, the tongue-state
+part of the four-vector contradiction is now closed; only the selected-time
+placement must be transported through the BABA classifier.
+
 ## Nearest coefficient-one bound: `N + 7`
 
 `theory/lean/CoefficientOneSeven.lean` kernel-checks the exact quantitative
@@ -101,8 +121,9 @@ runway extraction.
 For the six-event route to `N+7`, strict nesting is already paid by
 well-founded descent through selected close times. The remaining work is:
 
-1. transport the now trace-valued BABA cycle leaf to the literal five selected
-   post-close times, paying only those selected closes before the stable tail;
+1. carry the trace-valued, pointwise-constant BABA cycle branch through the
+   endpoint-lobe classifier and show that at most three selected post-close
+   vectors precede its one-vector suffix;
 2. convert the other overlap-minimal BABA leaves—late pair, early pure
    crossing, direct lobe, first-writer charge and quiet replay—into the
    existing forbidden four-vector cover or a strictly smaller raw residue;
