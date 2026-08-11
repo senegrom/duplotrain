@@ -42,7 +42,7 @@ jobs:
       - name: Check continuation compression
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build OneReflectorContinuation
+          lake build OneReflectorContinuation FirstChangedSupportTail OldContactContinuation PartialSupportDamage
       - name: Check coefficient-one quantitative reductions
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
@@ -66,12 +66,14 @@ jobs:
             echo "- arbitrary start: 2N+5"
             echo
             echo "Continuation compression:"
-            echo "- one reflector plus a support-preserving continuation is checked"
+            echo "- support-preserving one-reflector continuation checked"
+            echo "- first changed support contact checked"
+            echo "- partial damaging continuation checked"
             echo
             echo "Coefficient-one frontier:"
             echo "- conditional N+7 assembly checked"
             echo "- pointwise simple-cycle tail checked"
-            echo "- first old-support contact reduced to the unchanged-forward two-novelty law"
+            echo "- unfinished continuation reduced to backward periodic or repaired-forward contact"
           } >> "$GITHUB_STEP_SUMMARY"
 # isolated legacy module intentionally coexists only at the module level
 # helper imports supplied by SharpCertificateClosure and NoveltyChargeBound
