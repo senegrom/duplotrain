@@ -628,6 +628,76 @@ theorem ManufacturedReflector.two_history_nodup_union_bound_or_first_contact
       touches := htouch
     }⟩
 
+/-- **Old-support contact rebase.**
+
+These are exactly the dynamic fields returned by two successive
+first-activation certificates.  If the first support is still grooved after
+the second activation, the complete two-reflector theta theorem is periodic.
+If it is broken, repeated-mouth and backward contacts are periodic and the
+orientation theorem leaves only one forward, self-repairing contact.  Thus no
+unclassified old-support contact remains. -/
+theorem ManufacturedReflector.second_history_rebases_to_periodic_or_forward
+    {w : Wiring} {g e travel : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (stateB : Tongues)
+    (hbase : B.baseState = A.activatedState)
+    (hactivated : stateB = B.activatedState)
+    (hreach : stepN w travel (e, B.baseState) = some (g, stateB))
+    (hA : PathGrooves A.toSupported.paths A.activatedState)
+    (hB : PathGrooves B.toSupported.paths stateB) :
+    EventuallyPeriodic w (e, B.baseState) ∨
+      A.ForwardOrientedFault B := by
+  by_cases hAafter : PathGrooves A.toSupported.paths stateB
+  · exact Or.inl
+      (activated_manufactured_pair_eventually_periodic
+        A B B.baseState stateB hreach hAafter hB)
+  · rcases damaged_support_periodic_or_outward_fault
+      A B A.activatedState stateB hbase hactivated
+        hA hB hAafter with hperiodic | houtward
+    · exact Or.inl (EventuallyPeriodic.prepend hreach hperiodic)
+    · have hbaseGrooves :
+          PathGrooves A.toSupported.paths B.baseState := by
+        simpa [hbase] using hA
+      exact outward_fault_eventuallyPeriodic_or_forward
+        A B houtward hbaseGrooves
+
+/-- **Coefficient-one union reduction after contact normalization.**
+
+For two exact opposite manufacturing journeys, a duplicate-free selection
+from both sharp histories has at most N+2 states unless the constructed run
+is already periodic or carries the single forward self-repair certificate.
+The previous broad first-contact residue has disappeared. -/
+theorem ManufacturedReflector.two_history_nodup_union_or_periodic_or_forward
+    {w : Wiring} {N g e travel : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (stateB : Tongues)
+    (hbase : B.baseState = A.activatedState)
+    (hactivated : stateB = B.activatedState)
+    (hreach : stepN w travel (e, B.baseState) = some (g, stateB))
+    (hA : PathGrooves A.toSupported.paths A.activatedState)
+    (hB : PathGrooves B.toSupported.paths stateB)
+    (pool : List (List Bool))
+    (hpool : ∀ x ∈ pool,
+      x ∈ A.sharpConstructionHistory N ∨
+        x ∈ B.sharpConstructionHistory N)
+    (hnd : pool.Nodup) :
+    pool.length ≤ N + 2 ∨
+      EventuallyPeriodic w (e, B.baseState) ∨
+        A.ForwardOrientedFault B := by
+  by_cases hAvoid : A.SupportAvoidsExploration B
+  · exact Or.inl
+      (A.two_sharp_histories_nodup_union_le_N_add_two
+        hN B hbase hAvoid pool hpool hnd)
+  · rcases A.second_history_rebases_to_periodic_or_forward
+      B stateB hbase hactivated hreach hA hB with
+        hperiodic | hforward
+    · exact Or.inr (Or.inl hperiodic)
+    · exact Or.inr (Or.inr hforward)
+
 /-- If the second activation actually damages the first support, the exact
 first-activation preservation certificate localizes the extra coefficient to
 one concrete turning event: either the final repeated mouth, or the unique
