@@ -1,6 +1,7 @@
 import RepeatedNoveltyDecomposition
 import ConcreteTreeRetrace
 import ReversalFacts
+import EmptyCurvePotential
 
 /-!
 # Parametric falsification audit for the state law
@@ -583,12 +584,40 @@ namespace Echo
 
 /-! The same obstruction at the compiled cell level. -/
 
-/-- **A live frame has only its mirror return.**
+/-- **A frame whose stored arrow is unchanged has only its mirror return.**
 
-After the transition at time `open`, the frame remains live while its arrival
-cell is not re-entered.  If the run later reaches that cell's mouth partner,
-the next cell is forced to be the mouth partner of the frame's source. -/
+The real liveness invariant is register equality, not absence of re-entry.
+After the transition at `openTime`, even arbitrary later traffic through the
+arrival cell is harmless provided that, at `closeTime`, its register has the
+same value it had immediately after opening.  A visit to the mirror of that
+cell must then leave through the mirror of the frame's source. -/
 theorem live_frame_mirror_return_is_forced
+    {m : Machine} {e r0 : Nat → Nat}
+    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    {openTime closeTime : Nat}
+    (hregister :
+      reg m e r0 closeTime (m.cellOf (e (openTime + 1))) =
+        reg m e r0 (openTime + 1) (m.cellOf (e (openTime + 1))))
+    (hmirror : m.cellOf (e closeTime) =
+      m.star (m.cellOf (e (openTime + 1)))) :
+    m.cellOf (e (closeTime + 1)) =
+      m.star (m.cellOf (e openTime)) := by
+  have hopenWrite :
+      reg m e r0 (openTime + 1) (m.cellOf (e (openTime + 1))) =
+        e (openTime + 1) :=
+    reg_write m e r0 rfl
+  have hnext : e (closeTime + 1) = m.bar (e (openTime + 1)) := by
+    rw [hrun closeTime, hmirror, m.star_invol, hregister, hopenWrite]
+  calc
+    m.cellOf (e (closeTime + 1)) =
+        m.cellOf (m.bar (e (openTime + 1))) := congrArg m.cellOf hnext
+    _ = m.star (m.cellOf (e openTime)) :=
+      (witness m e r0 hrun hr0 openTime).1
+
+/-- The older no-re-entry formulation is a direct corollary of register
+stability.  It is retained only as a convenient way to establish the stronger
+register invariant above. -/
+theorem no_reentry_live_frame_mirror_return_is_forced
     {m : Machine} {e r0 : Nat → Nat}
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     {openTime closeTime : Nat}
@@ -603,21 +632,22 @@ theorem live_frame_mirror_return_is_forced
   have hclose : openTime + 1 + d = closeTime := by
     dsimp [d]
     omega
-  have hforced := forced_mirror_return m e r0 hrun hr0 openTime d
-    (by
-      intro l hlo hhi
-      apply hlive l hlo
-      rwa [hclose] at hhi)
-    (by simpa [hclose] using hmirror)
-  simpa [hclose] using hforced
+  apply live_frame_mirror_return_is_forced hrun hr0
+  · rw [← hclose]
+    apply reg_stable
+    intro l hlo hhi
+    apply hlive l hlo
+    rwa [hclose] at hhi
+  · exact hmirror
 
 /-- **Non-LIFO routing must overwrite the open frame.**
 
-Contrapositive of the live-frame law: if a later visit to the mirror of the
-arrival cell does not return to the mirror of the source, then the arrival
-cell was necessarily re-entered in between.  Thus a nested construction may
-depart from stack order only by consuming an overwrite; it cannot permute
-live frames for free. -/
+Contrapositive of the register-level live-frame law: if a later visit to the
+mirror of the arrival cell does not return to the mirror of the source, then
+that arrival cell's register changed.  `change_has_productive_le` turns this
+into a *productive* write of precisely the open frame cell.  Thus a nested
+construction may depart from stack order only by spending a state-changing
+overwrite; a merely unproductive re-entry cannot pay for non-LIFO routing. -/
 theorem non_lifo_return_forces_frame_overwrite
     {m : Machine} {e r0 : Nat → Nat}
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
@@ -627,19 +657,19 @@ theorem non_lifo_return_forces_frame_overwrite
       m.star (m.cellOf (e (openTime + 1))))
     (hwrong : m.cellOf (e (closeTime + 1)) ≠
       m.star (m.cellOf (e openTime))) :
-    ∃ l, openTime + 1 < l ∧ l ≤ closeTime ∧
-      m.cellOf (e l) = m.cellOf (e (openTime + 1)) := by
-  apply Classical.byContradiction
-  intro hnone
-  have hlive : ∀ l, openTime + 1 < l → l ≤ closeTime →
-      m.cellOf (e l) ≠ m.cellOf (e (openTime + 1)) := by
-    intro l hlo hhi heq
-    exact hnone ⟨l, hlo, hhi, heq⟩
-  exact hwrong (live_frame_mirror_return_is_forced
-    hrun hr0 horder hlive hmirror)
+    ∃ t, openTime + 1 ≤ t ∧ t < closeTime ∧
+      ProductiveStep m e r0 t ∧
+      m.cellOf (e (t + 1)) = m.cellOf (e (openTime + 1)) := by
+  have hregister :
+      reg m e r0 closeTime (m.cellOf (e (openTime + 1))) ≠
+        reg m e r0 (openTime + 1) (m.cellOf (e (openTime + 1))) := by
+    intro heq
+    exact hwrong (live_frame_mirror_return_is_forced
+      hrun hr0 heq hmirror)
+  exact change_has_productive_le m e r0 horder hregister
 
 /-- Pointwise, arbitrary-depth version: every non-LIFO return in a family of
-open frames has a concrete re-entry witness which overwrote that frame. -/
+open frames has a concrete productive overwrite of that frame cell. -/
 theorem nested_non_lifo_returns_each_force_overwrite
     {m : Machine} {e r0 : Nat → Nat}
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
@@ -649,10 +679,182 @@ theorem nested_non_lifo_returns_each_force_overwrite
       m.star (m.cellOf (e (openTime n + 1))))
     (hwrong : ∀ n, m.cellOf (e (closeTime n + 1)) ≠
       m.star (m.cellOf (e (openTime n)))) :
-    ∀ n, ∃ l, openTime n + 1 < l ∧ l ≤ closeTime n ∧
-      m.cellOf (e l) = m.cellOf (e (openTime n + 1)) := by
+    ∀ n, ∃ t, openTime n + 1 ≤ t ∧ t < closeTime n ∧
+      ProductiveStep m e r0 t ∧
+      m.cellOf (e (t + 1)) = m.cellOf (e (openTime n + 1)) := by
   intro n
   exact non_lifo_return_forces_frame_overwrite
     hrun hr0 (horder n) (hmirror n) (hwrong n)
 
+/-- **Distinct non-LIFO live frames have distinct productive charges.**
+
+For an arbitrary family of wrong mirror returns, choose a productive overwrite
+supplied by `non_lifo_return_forces_frame_overwrite`.  If the open
+frame cells are pairwise distinct on `frames`, their chosen overwrite times
+are pairwise distinct as well: one productive step writes only one cell.
+
+This is the injective accounting statement needed by a global stack proof.
+It also exposes the remaining truth-audit risk precisely: a coefficient-two
+family would have to recycle the *same frame cell*, not merely branch among
+many distinct open frames. -/
+theorem distinct_non_lifo_frames_have_injective_productive_charge
+    {m : Machine} {e r0 : Nat → Nat}
+    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
+    (openTime closeTime : Nat → Nat)
+    (horder : ∀ n, openTime n + 1 ≤ closeTime n)
+    (hmirror : ∀ n, m.cellOf (e (closeTime n)) =
+      m.star (m.cellOf (e (openTime n + 1))))
+    (hwrong : ∀ n, m.cellOf (e (closeTime n + 1)) ≠
+      m.star (m.cellOf (e (openTime n))))
+    (frames : List Nat)
+    (hframeCells : ∀ i ∈ frames, ∀ j ∈ frames,
+      m.cellOf (e (openTime i + 1)) =
+        m.cellOf (e (openTime j + 1)) → i = j) :
+    ∃ charge : Nat → Nat,
+      (∀ n ∈ frames,
+        openTime n + 1 ≤ charge n ∧ charge n < closeTime n ∧
+        ProductiveStep m e r0 (charge n) ∧
+        m.cellOf (e (charge n + 1)) =
+          m.cellOf (e (openTime n + 1))) ∧
+      (∀ i ∈ frames, ∀ j ∈ frames, charge i = charge j → i = j) := by
+  have hwitness : ∀ n, ∃ t,
+      openTime n + 1 ≤ t ∧ t < closeTime n ∧
+      ProductiveStep m e r0 t ∧
+      m.cellOf (e (t + 1)) = m.cellOf (e (openTime n + 1)) :=
+    nested_non_lifo_returns_each_force_overwrite
+      hrun hr0 openTime closeTime horder hmirror hwrong
+  let charge : Nat → Nat := fun n => Classical.choose (hwitness n)
+  have hcharge : ∀ n,
+      openTime n + 1 ≤ charge n ∧ charge n < closeTime n ∧
+      ProductiveStep m e r0 (charge n) ∧
+      m.cellOf (e (charge n + 1)) =
+        m.cellOf (e (openTime n + 1)) := by
+    intro n
+    exact Classical.choose_spec (hwitness n)
+  refine ⟨charge, ?_, ?_⟩
+  · intro n _hn
+    exact hcharge n
+  · intro i hi j hj hij
+    apply hframeCells i hi j hj
+    calc
+      m.cellOf (e (openTime i + 1)) =
+          m.cellOf (e (charge i + 1)) := (hcharge i).2.2.2.symm
+      _ = m.cellOf (e (charge j + 1)) := by rw [hij]
+      _ = m.cellOf (e (openTime j + 1)) := (hcharge j).2.2.2
+
 end Echo
+
+namespace GeneralN
+
+/-! ## Coefficient-one state accounting before self-contact -/
+
+/-- The initial vector together with every post-productive vector in a raw
+prefix.  Quiet steps are omitted because they do not change the represented
+tongue vector. -/
+noncomputable def auditProductiveVectorCover
+    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) :
+    List (List Bool) :=
+  restrictedTonguesAt w N start 0 ::
+    (rawProductiveCurveTimes w N start K).map
+      (fun k => restrictedTonguesAt w N start (k + 1))
+
+/-- **Every raw-prefix vector is initial or follows a productive write.**
+
+This is the exact bridge from event accounting to state accounting.  It has
+no non-self hypothesis: nonproductive steps are collapsed using
+`restrictedTonguesAt_succ_eq_of_not_productive`. -/
+theorem raw_prefix_vector_mem_productive_cover
+    {w : Wiring} {N : Nat} {start : Nat × Tongues} {K : Nat}
+    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome) :
+    ∀ k, k ≤ K →
+      restrictedTonguesAt w N start k ∈
+        auditProductiveVectorCover w N start K := by
+  intro k hk
+  unfold auditProductiveVectorCover
+  induction k with
+  | zero =>
+      exact List.mem_cons_self
+  | succ j ih =>
+      by_cases hprod : RawProductiveAt w N start j
+      · apply List.mem_cons_of_mem _
+        apply List.mem_map.mpr
+        refine ⟨j, ?_, rfl⟩
+        exact mem_rawProductiveCurveTimes_iff.mpr ⟨by omega, hprod⟩
+      · have heq := restrictedTonguesAt_succ_eq_of_not_productive
+          (hlive (j + 1) hk) hprod
+        rw [heq]
+        exact ih (by omega)
+
+/-- **Unconditional state-to-event accounting.**
+
+Any noduplicated sample from a live prefix has at most one more vector than
+the number of productive writes in that prefix.  This is an actual bound on
+raw switch vectors, not a conditional replay interface. -/
+theorem raw_prefix_distinct_vectors_le_productive_succ
+    {w : Wiring} {N : Nat} {start : Nat × Tongues} {K : Nat}
+    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
+    (times : List Nat)
+    (htimes : ∀ k ∈ times, k ≤ K)
+    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
+    times.length ≤
+      (rawProductiveCurveTimes w N start K).length + 1 := by
+  have hsub : ∀ x ∈ times.map (restrictedTonguesAt w N start),
+      x ∈ auditProductiveVectorCover w N start K := by
+    intro x hx
+    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hx
+    exact raw_prefix_vector_mem_productive_cover
+      hlive k (htimes k hk)
+  have hle := audit_nodup_subset_length hnd hsub
+  simpa only [List.length_map, auditProductiveVectorCover,
+    List.length_cons] using hle
+
+/-- **Coefficient one for every all-non-self raw prefix.**
+
+If every productive contact in a live prefix grows the empty-curve carrier
+rather than hitting its own curve, then *all* distinct switch vectors in the
+prefix number at most `N+1`.  This combines the unconditional state cover
+above with `nonself_productive_times_le_N`. -/
+theorem nonself_prefix_distinct_vectors_le_N_succ
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    (start : Nat × Tongues) (K : Nat)
+    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
+    (hnonself : ∀ k, k < K → RawProductiveAt w N start k →
+      ¬ RawCurveSelfAt w start k)
+    (times : List Nat)
+    (htimes : ∀ k ∈ times, k ≤ K)
+    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
+    times.length ≤ N + 1 := by
+  have hstates := raw_prefix_distinct_vectors_le_productive_succ
+    hlive times htimes hnd
+  have hproductive := nonself_productive_times_le_N
+    hN start K hlive hnonself
+  omega
+
+/-- **Any super-`N+1` state family must use a raw self-contact.**
+
+This is the falsification-audit boundary.  A parametric branching construction
+with more than `N+1` distinct vectors cannot consist only of fresh/non-self
+pushes; it must exhibit a concrete productive pivot back into its currently
+selected curve.  Pure double sweeps and pure nested pops are therefore not
+counterfamilies. -/
+theorem more_than_N_succ_distinct_vectors_forces_self_contact
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    (start : Nat × Tongues) (K : Nat)
+    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
+    (times : List Nat)
+    (htimes : ∀ k ∈ times, k ≤ K)
+    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup)
+    (hmore : N + 1 < times.length) :
+    ∃ k, k < K ∧ RawProductiveAt w N start k ∧
+      RawCurveSelfAt w start k := by
+  have hstates := raw_prefix_distinct_vectors_le_productive_succ
+    hlive times htimes hnd
+  have hproductive :
+      N < (rawProductiveCurveTimes w N start K).length := by
+    omega
+  exact more_than_N_productive_forces_self_contact
+    hN start K hlive hproductive
+
+end GeneralN
