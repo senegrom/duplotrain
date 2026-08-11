@@ -139,7 +139,7 @@ theorem PhysicalTrace.simple_same_exit_cycle_traces_with_phase
               cases htransient with
               | @cons _ _ q' _ v' _ _ harrive hlink' htail =>
                   have hq' : q' = r := by
-                    have := Option.some.inj hlink'.symm.trans hlink
+                    have := Option.some.inj (hlink'.symm.trans hlink)
                     exact this
                   have hv' : v' = v := by
                     have hh := harrive.symm.trans hnext
@@ -422,7 +422,9 @@ theorem prefix_then_two_phase_cycle_distinct_le_succ_succ
         have hdEq : d = cycle.length + r := by dsimp [r]; omega
         obtain ⟨port, hrun⟩ := hsettledAll r
         have hglobal : stepN w k start = some (port, settled) := by
-          rw [hkEq, hdEq, stepN_add, hreach, htransient.sound]
+          rw [hkEq, hdEq, stepN_add, hreach]
+          simp only [Option.bind_some]
+          rw [stepN_add, htransient.sound]
           simpa using hrun
         have hvec : restrictedTonguesAt w N start k =
             VectorCount.restrict N settled := by

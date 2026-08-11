@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Three hundred and twenty-five libraries, all self-contained (no
+Three hundred and forty-eight libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -430,10 +430,11 @@ identity-reflector case, or flip-reflector runway case.
 
 The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
 now proves an unconditional general linear theorem.
-`GeneralN.state_law_linear_five`
-(`StateLawFive.lean`) says that any one-train
-run on an `N`-switch wiring visits at most `5*N+9`
+`GeneralN.state_law_linear_three_sharp`
+(`StateLawThreeSharp.lean`) says that any one-train
+run on an `N`-switch wiring visits at most `3*N+7`
 pairwise-distinct tongue vectors, superseding the earlier
+`state_law_linear_four` (`4*N+9`), `state_law_linear_five` (`5*N+9`),
 `state_law_linear_eight` (`8*N+7`), `state_law_linear_eleven`
 (`11*N+8`), `state_law_linear_fourteen` (`14*N+9`),
 `state_law_linear_fifteen` (`15*N+7`), `state_law_linear_seventeen`
@@ -501,13 +502,25 @@ between exactly **two** phases after its window (`N+2`); and the
 facing-forward merge is its route window plus the single alternate phase
 (`N+2`, replacing the `4*N+1` lead window).  Protected repair therefore
 counts `2*N+5` — bound by the changed flip splice — and the
-two-reflector component `4*N+8`.  The coefficient is now decided by the
-**first periodic outcome**, the settle-on-a-cycle exit of the first
-activation, still counted by its `5*N+1` time cap: known-edge is
-`5*N+8` (`known_edge_long_run_distinct_le_five`).  Converting that first
-exploration lasso to a vector count (its cycle grooves itself after one
-pass) and thinning the `2*N+3` journey histories are the two remaining
-frontiers on the way to `N+O(1)`.
+two-reflector component `4*N+8` (`known_edge_long_run_distinct_le_five`
+recorded the intermediate `5*N+8` stage, with the first periodic
+outcome still charged its `5*N+1` time cap).
+
+The constant-count program (`FirstCycleCount/Sharp.lean`,
+`TrackEarlyRepairConstant.lean`, `EarlyFacingConstant.lean`,
+`ChangedStayCountConstant.lean`, `ChangedFlipCountActual/Constant.lean`,
+`CompleteRepairConstant.lean`, `ProtectedRepairThree.lean`,
+`OneJourneyTailCount.lean`, `TwoJourneyBoundaryTailCount.lean`,
+`KnownEdgeLift.lean`) then removes the last window-shaped charges: the
+first simple-cycle settle counts `N+2`, the changed flip splice is
+charged for its *actual* route lead, complete repair compresses to five
+vectors and the changed stay splice to three, so protected repair costs
+`N+4`; the journey boundaries are shared (`2*N+2` for two histories),
+giving `known_edge_long_run_distinct_le_three_sharp` at `3*N+6` and the
+entry-free `3*N+7`.  The remaining slack on the way to `N+O(1)` sits in
+the `N+2`-sized construction histories and first-cycle windows
+themselves — the sharp program's single-history `N+1` accounting is the
+endgame.
 
 `TrackQuantitative.lean` completes the extraction with a checked bounded-lasso
 interface.  `EventuallyPeriodicWithin w c cap` retains `lead + period ≤ cap`;

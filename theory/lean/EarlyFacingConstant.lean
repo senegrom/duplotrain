@@ -163,15 +163,21 @@ theorem ManufacturedFlipReflector.facing_mouth_tail_two_phase
     exact hhalfAlternate
   have hwindow : ∀ d, d ≤ period → ∃ port phase,
       stepN w d (B.mouth, contact) = some (port, phase) ∧
-        (phase = alternate ∨ phase = contact) := by
+        (phase = contact ∨ phase = alternate) := by
     intro d hd
-    exact earlyfacing_twoPhase_concat hhalfContact hhalfContactPhase
-      hhalfAlternatePhase d (by simpa [period] using hd)
+    obtain ⟨port, phase, hrun, hphase⟩ :=
+      earlyfacing_twoPhase_concat hhalfContact hhalfContactPhase
+        hhalfAlternatePhase d (by simpa [period] using hd)
+    exact ⟨port, phase, hrun, hphase.symm⟩
   have hpositive : 0 < period := by
     dsimp [period, half, cap]
     omega
-  simpa [alternate] using
-    (periodic_two_phase_prefix_tongues hpositive hperiod hwindow)
+  intro d
+  obtain ⟨port, phase, hrun, hphase⟩ :=
+    periodic_two_phase_prefix_tongues hpositive hperiod hwindow d
+  refine ⟨port, phase, hrun, ?_⟩
+  have hphase' := hphase.symm
+  simpa [alternate] using hphase'
 
 /-- Protected final-return facing exit: at most three restricted tongue
 vectors. -/

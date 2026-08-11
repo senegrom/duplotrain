@@ -14,6 +14,7 @@ defaultTargets = [
   "BlockGlobalArithmetic",
   "BlockSparseBoundCore",
   "BlockSparseFixedCountCore",
+  "BoundaryOverlapTailCount",
   "BoundaryReplay",
   "CanonicalActiveLobeFrame",
   "CanonicalCertifiedEpochBound",
@@ -29,7 +30,11 @@ defaultTargets = [
   "CellHeat",
   "CertifiedEpochBound",
   "CertifiedLobeAbsorption",
+  "ChangedFlipCountActual",
+  "ChangedFlipCountConstant",
+  "ChangedStayCountConstant",
   "CollapsedChipDynamics",
+  "CompleteRepairConstant",
   "CompleteRepairTongueCountSharp",
   "ComponentCapacity",
   "ConcreteAscentTrace",
@@ -54,6 +59,7 @@ defaultTargets = [
   "DescentSimplicity",
   "DeterministicOverwriteReturn",
   "DuplotrainProofs",
+  "EarlyFacingConstant",
   "EchoConfigCount",
   "EchoConfiguration",
   "EchoMachine",
@@ -73,6 +79,8 @@ defaultTargets = [
   "FiniteFullyLobedComponentTrap",
   "FiniteListBounds",
   "FirstActivatedExact",
+  "FirstCycleCount",
+  "FirstCycleCountSharp",
   "FirstReflectorNovelty",
   "FirstRepeatedSwitchSharpOutcome",
   "FirstWriterRetraceFree",
@@ -96,9 +104,13 @@ defaultTargets = [
   "KnownEdgeEleven",
   "KnownEdgeFifteen",
   "KnownEdgeFive",
+  "KnownEdgeFour",
   "KnownEdgeFourteen",
+  "KnownEdgeLift",
   "KnownEdgeNineteen",
   "KnownEdgeSeventeen",
+  "KnownEdgeThree",
+  "KnownEdgeThreeSharp",
   "KnownEdgeTwenty",
   "KnownEdgeTwentyFour",
   "KnownEdgeTwentyFourOverlap",
@@ -161,6 +173,7 @@ defaultTargets = [
   "NoveltyAwareLassoTwentyOne",
   "NoveltyAwareLassoTwentyThree",
   "ObservedConfigurationFibre",
+  "OneJourneyTailCount",
   "OneReserveCoordinateFrame",
   "OneReserveFromNoTail",
   "OneReserveListAssemblyV2",
@@ -184,6 +197,7 @@ defaultTargets = [
   "PhysicalPrefixFibre",
   "ProbePairedPeriod",
   "ProfileCodeBound",
+  "ProtectedRepairThree",
   "RamanGapProductiveRefinement",
   "RamanInnerReplaySelectedTail",
   "RamanOuterGapStrictDescent",
@@ -202,6 +216,7 @@ defaultTargets = [
   "RelevantFibonacciNBound",
   "RelevantFibonacciPhysicalBound",
   "RelevantFiniteFrame",
+  "RepairLeadTwoPhase",
   "RepeatedNoveltyDecomposition",
   "RepeatedNoveltySelfAnchors",
   "ReplayFacts",
@@ -227,6 +242,7 @@ defaultTargets = [
   "SharpCertificateClosure",
   "SharpSixEventAssembly",
   "SharpStateLawAssembly",
+  "SimpleTraceOneNetChange",
   "SixEventReduction",
   "SixEventSharpClosure",
   "SkewWalk",
@@ -239,9 +255,12 @@ defaultTargets = [
   "StateLawEleven",
   "StateLawFifteen",
   "StateLawFive",
+  "StateLawFour",
   "StateLawFourteen",
   "StateLawNineteen",
   "StateLawSeventeen",
+  "StateLawThree",
+  "StateLawThreeSharp",
   "StateLawTwenty",
   "StateLawTwentyFour",
   "StateLawTwentyFourOverlap",
@@ -264,12 +283,14 @@ defaultTargets = [
   "TokenState",
   "TrackCurveGrowth",
   "TrackCurveShrinkGlobal",
+  "TrackEarlyRepairConstant",
   "TrackEarlyRepairCount",
   "TrackEarlyRepairSharp",
   "TrackEdge",
   "TrackEndpointMatching",
   "TrackFiniteAlternation",
   "TrackGlobalRepair",
+  "TrackGlobalRepairActiveLead",
   "TrackGlobalRepairSimple",
   "TrackLobe",
   "TrackNormalForm",
@@ -315,7 +336,9 @@ defaultTargets = [
   "TripleSelfLinkSelectedClosure",
   "TripleSelfLinkSimpleCycleClosure",
   "TripleSelfLinkSimpleCycleTail",
+  "TwoJourneyBoundaryTailCount",
   "TwoJourneyTailCountSharp",
+  "TwoPhasePrefixTailCount",
   "TwoReflectorEdgeTrap",
   "TwoReflectorFiniteTrap",
   "TwoStateConfigurationFibre",
@@ -370,6 +393,9 @@ name = "BlockSparseBoundCore"
 name = "BlockSparseFixedCountCore"
 
 [[lean_lib]]
+name = "BoundaryOverlapTailCount"
+
+[[lean_lib]]
 name = "BoundaryReplay"
 
 [[lean_lib]]
@@ -415,7 +441,19 @@ name = "CertifiedEpochBound"
 name = "CertifiedLobeAbsorption"
 
 [[lean_lib]]
+name = "ChangedFlipCountActual"
+
+[[lean_lib]]
+name = "ChangedFlipCountConstant"
+
+[[lean_lib]]
+name = "ChangedStayCountConstant"
+
+[[lean_lib]]
 name = "CollapsedChipDynamics"
+
+[[lean_lib]]
+name = "CompleteRepairConstant"
 
 [[lean_lib]]
 name = "CompleteRepairTongueCountSharp"
@@ -490,6 +528,9 @@ name = "DeterministicOverwriteReturn"
 name = "DuplotrainProofs"
 
 [[lean_lib]]
+name = "EarlyFacingConstant"
+
+[[lean_lib]]
 name = "EchoConfigCount"
 
 [[lean_lib]]
@@ -545,6 +586,12 @@ name = "FiniteListBounds"
 
 [[lean_lib]]
 name = "FirstActivatedExact"
+
+[[lean_lib]]
+name = "FirstCycleCount"
+
+[[lean_lib]]
+name = "FirstCycleCountSharp"
 
 [[lean_lib]]
 name = "FirstReflectorNovelty"
@@ -616,13 +663,25 @@ name = "KnownEdgeFifteen"
 name = "KnownEdgeFive"
 
 [[lean_lib]]
+name = "KnownEdgeFour"
+
+[[lean_lib]]
 name = "KnownEdgeFourteen"
+
+[[lean_lib]]
+name = "KnownEdgeLift"
 
 [[lean_lib]]
 name = "KnownEdgeNineteen"
 
 [[lean_lib]]
 name = "KnownEdgeSeventeen"
+
+[[lean_lib]]
+name = "KnownEdgeThree"
+
+[[lean_lib]]
+name = "KnownEdgeThreeSharp"
 
 [[lean_lib]]
 name = "KnownEdgeTwenty"
@@ -811,6 +870,9 @@ name = "NoveltyAwareLassoTwentyThree"
 name = "ObservedConfigurationFibre"
 
 [[lean_lib]]
+name = "OneJourneyTailCount"
+
+[[lean_lib]]
 name = "OneReserveCoordinateFrame"
 
 [[lean_lib]]
@@ -880,6 +942,9 @@ name = "ProbePairedPeriod"
 name = "ProfileCodeBound"
 
 [[lean_lib]]
+name = "ProtectedRepairThree"
+
+[[lean_lib]]
 name = "RamanGapProductiveRefinement"
 
 [[lean_lib]]
@@ -932,6 +997,9 @@ name = "RelevantFibonacciPhysicalBound"
 
 [[lean_lib]]
 name = "RelevantFiniteFrame"
+
+[[lean_lib]]
+name = "RepairLeadTwoPhase"
 
 [[lean_lib]]
 name = "RepeatedNoveltyDecomposition"
@@ -1009,6 +1077,9 @@ name = "SharpSixEventAssembly"
 name = "SharpStateLawAssembly"
 
 [[lean_lib]]
+name = "SimpleTraceOneNetChange"
+
+[[lean_lib]]
 name = "SixEventReduction"
 
 [[lean_lib]]
@@ -1045,6 +1116,9 @@ name = "StateLawFifteen"
 name = "StateLawFive"
 
 [[lean_lib]]
+name = "StateLawFour"
+
+[[lean_lib]]
 name = "StateLawFourteen"
 
 [[lean_lib]]
@@ -1052,6 +1126,12 @@ name = "StateLawNineteen"
 
 [[lean_lib]]
 name = "StateLawSeventeen"
+
+[[lean_lib]]
+name = "StateLawThree"
+
+[[lean_lib]]
+name = "StateLawThreeSharp"
 
 [[lean_lib]]
 name = "StateLawTwenty"
@@ -1120,6 +1200,9 @@ name = "TrackCurveGrowth"
 name = "TrackCurveShrinkGlobal"
 
 [[lean_lib]]
+name = "TrackEarlyRepairConstant"
+
+[[lean_lib]]
 name = "TrackEarlyRepairCount"
 
 [[lean_lib]]
@@ -1136,6 +1219,9 @@ name = "TrackFiniteAlternation"
 
 [[lean_lib]]
 name = "TrackGlobalRepair"
+
+[[lean_lib]]
+name = "TrackGlobalRepairActiveLead"
 
 [[lean_lib]]
 name = "TrackGlobalRepairSimple"
@@ -1273,7 +1359,13 @@ name = "TripleSelfLinkSimpleCycleClosure"
 name = "TripleSelfLinkSimpleCycleTail"
 
 [[lean_lib]]
+name = "TwoJourneyBoundaryTailCount"
+
+[[lean_lib]]
 name = "TwoJourneyTailCountSharp"
+
+[[lean_lib]]
+name = "TwoPhasePrefixTailCount"
 
 [[lean_lib]]
 name = "TwoReflectorEdgeTrap"

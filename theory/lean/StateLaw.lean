@@ -6,15 +6,15 @@ import VectorCount
 
 This file states the actual claim about trains, tracks and switches.
 **`StateLaw` is OPEN — its specific `N + 6` bound is not proved.**
-What is now proved is the unconditional general linear bound `5*N+9`
-(`state_law_linear_five` in `StateLawFive.lean`: every protected-repair
-branch is vector-counted — pairs cost four flat, early exits and the
-facing merge their route window plus one — leaving the first periodic
-outcome's `5*N+1` time cap as the binding term; it supersedes the
+What is now proved is the unconditional general linear bound `3*N+7`
+(`state_law_linear_three_sharp` in `StateLawThreeSharp.lean`: every
+branch of the analysis is vector-counted — pairs cost four flat, the
+first simple-cycle settle `N+2`, protected repair `N+4` — and the
+journey boundaries are shared; it supersedes the `4*N+9`, `5*N+9`,
 `8*N+7`, `11*N+8`, `14*N+9`, `15*N+7`, `17*N+5`, `18*N+3`, `24*N+5` and
 `26*N+3` predecessors), as well as the elementary
 `2 ^ N` bound (`state_law_two_pow` below).  The coefficient-one improvement
-from `5*N+9` to `N+O(1)` is the remaining problem.
+from `3*N+7` to `N+O(1)` is the remaining problem.
 
 The direct physical-track route in `TrackTrace`, `TrackLobe`, `TrackNormalForm`,
 `TrackTheta`, `TrackGlobalRepair`, `TrackQuantitative`, and
@@ -68,8 +68,8 @@ def StateLaw : Prop :=
       ks.length ≤ N + 6
 
 /-- The elementary exponential bound on exactly the same statement, **proved**.
-`GeneralN.state_law_linear_five` supersedes it
-asymptotically with `5*N+9`; the open gap is now `5*N+9` versus
+`GeneralN.state_law_linear_three_sharp` supersedes it
+asymptotically with `3*N+7`; the open gap is now `3*N+7` versus
 `N+6`. -/
 theorem state_law_two_pow (w : Wiring) (N : Nat)
     (_hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
