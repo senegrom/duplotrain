@@ -20,6 +20,7 @@ on:
       - theory/lean/RepairLeadTwoPhase.lean
       - theory/lean/TwoPhasePrefixTailCount.lean
       - theory/lean/TrackEarlyRepairConstant.lean
+      - theory/lean/TrackGlobalRepairActiveLead.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
 jobs:
@@ -72,6 +73,8 @@ jobs:
           name = "TwoPhasePrefixTailCount"
           [[lean_lib]]
           name = "TrackEarlyRepairConstant"
+          [[lean_lib]]
+          name = "TrackGlobalRepairActiveLead"
           EOF
       - name: Build proof targets
         run: |
@@ -81,4 +84,5 @@ jobs:
             KnownEdgeThree StateLawThree BoundaryOverlapTailCount \
             TwoJourneyBoundaryTailCount KnownEdgeThreeSharp KnownEdgeLift \
             StateLawThreeSharp SimpleTraceOneNetChange RepairLeadTwoPhase \
-            TwoPhasePrefixTailCount TrackEarlyRepairConstant
+            TwoPhasePrefixTailCount TrackEarlyRepairConstant \
+            TrackGlobalRepairActiveLead
