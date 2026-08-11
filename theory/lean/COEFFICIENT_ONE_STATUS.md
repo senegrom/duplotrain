@@ -1,36 +1,24 @@
-# Upper-bound proof frontier
+# Coefficient-one proof frontier
 
-Branch: `agent/coefficient-one-current`
+Branch: `agent/upper-bound-current`
 
-This is the visible working branch for the coefficient-one programme. It
-preserves source-level proof knowledge even when a theorem has not yet been
-assembled into the public `GeneralN.StateLaw` endpoint.
+This branch contains both the strongest unconditional bound and the current
+coefficient-one source programme.
 
-## Verified quantitative baseline
+## Unconditional kernel-checked baseline
 
-The strongest unconditional theorem currently kernel-checked in the
-repository is on branch `agent/push-below-5`:
-
-```lean
-GeneralN.known_edge_long_run_distinct_le_two_sharp
-GeneralN.state_law_linear_two_sharp
-```
-
-with bounds
+The source endpoint `StateLawTwoSharper.lean` proves:
 
 ```text
 known incoming edge:  f_edge(N) <= 2*N + 6
 arbitrary start:       f(N)      <= 2*N + 7
 ```
 
-The independent branch `codex/first-repeated-edge-proof` contains another
-unconditional coefficient-two proof, ending in `StateLawTwoSharp.lean`, with
-bound `2*N + 8`. Its local novelty lemmas remain useful for the
-coefficient-one programme even though its final additive constant is weaker.
+The consolidated workflow recompiles that endpoint on this branch.
 
-## Coefficient-one target
+## Final coefficient-one target
 
-The target raw novelty statement is:
+The preferred raw statement is:
 
 ```lean
 def KnownEdgeFourRepeatedWriterNovelty : Prop :=
@@ -41,18 +29,37 @@ def KnownEdgeFourRepeatedWriterNovelty : Prop :=
       (rawRepeatedWriterNovelTimes w N start K).length <= 4
 ```
 
-The existing counting bridge turns this into
+The existing counting bridge would then give:
 
 ```text
 known incoming edge:  N + 5
 arbitrary start:       N + 6
 ```
 
-without any further asymptotic loss.
+## Intermediate coefficient-one theorem
+
+`CoefficientOneSeven.lean` isolates the exact payoff of the canonical
+six-event reduction. It defines `IncomingSharpSixEventResidueImpossible` as
+the sole open geometric premise and proves:
+
+```lean
+knownEdgeFiveRepeatedWriterNovelty_of_sharpSixEventResidueImpossible
+knownEdge_distinct_le_N_add_six_of_fiveRepeatedWriterNovelty
+stateLawNAddSeven_of_sharpSixEventResidueImpossible
+```
+
+Therefore, once the displayed sharp six-event residue is impossible:
+
+```text
+known incoming edge:  N + 6
+arbitrary start:       N + 7
+```
+
+This is conditional, not an unconditional replacement for `2*N + 7`.
 
 ## Closed local mechanisms
 
-The branch ancestry already formalises the following facts.
+The branch ancestry formalises the following facts.
 
 1. A compatible manufactured-reflector pair has a four-corner Gray cover.
 2. The initial Gray corner is historical at the completed first turnaround,
@@ -64,11 +71,13 @@ The branch ancestry already formalises the following facts.
    two-vector tongue cover.
 6. The selected `ABCABC` fixed-entry alternative is placed inside the raw
    selected window, rather than merely somewhere in the certified run.
+7. Strict old-contact recursion terminates because both residual supports are
+   strict tracked subcurves.
 
-## Simple-cycle closure on this branch
+## Stable simple-cycle closure
 
-`TripleSelfLinkSimpleCycleTail.lean` closes the other first-revisit outcome of
-the selected self-link raw cycle. Its theorem chain is:
+`TripleSelfLinkSimpleCycleTail.lean` closes the stable-simple-cycle half of
+the selected self-link raw-cycle branch. Its theorem chain is:
 
 ```lean
 rawTwoVectorTail_of_stable_simple_cycle_exact
@@ -78,55 +87,46 @@ RawSixEventReduction.tail_cycle_self_link_false
 CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_is_early
 ```
 
-The argument is:
+The proof packages a grooved stable cycle as an all-time one-vector tail,
+uses `RawTwoVectorTail.rotate_back_to_period_base_exact` to rotate it to the
+selected raw close, and invokes the literal five-close four-cover theorem.
+Thus the later raw-cycle self-link alternative is impossible; any selected
+self-link must occur at an actual early raw time inside the endpoint window.
 
-* a stable switch-simple cycle is grooved and therefore carries one tongue
-  vector throughout each lap;
-* periodic extension packages it as a `RawTwoVectorTail`;
-* `RawTwoVectorTail.rotate_back_to_period_base_exact` moves the tail back to
-  the selected raw closing configuration;
-* `five_close_noveltyCoverOn_four_of_two_vector_tail` gives the forbidden
-  literal four-vector cover of the five selected post-close vectors.
+## Six-event residue reductions already completed
 
-The focused workflow `.github/workflows/coefficient-one-current-check.yml`
-builds this theorem chain directly. A green run is the verification marker;
-source presence alone is not treated as kernel verification.
+`SharpSixFinal.lean` eliminates the direct-lobe pure-support-crossing leaf.
+`MellitDirectSharpAssembly.lean` retains exact first-revisit and old-contact
+geometry. `ShrinkingCurveFinal.lean` proves the well-founded rank decrease of
+old-contact subcurves. These are structural reductions, not a hidden claim
+that the remaining residue is empty.
 
 ## Remaining global bridges
 
-After the simple-cycle closure, the coefficient-one proof is concentrated in
-three global placement problems.
-
 ### Early self-link
 
-The certified triple obstruction can now only expose a self-link at an actual
-raw time between the third selected opening and the first selected close.
-This early bounce must be turned directly into either a complete-state replay
-or a manufactured two-/four-vector tail before enough later novelty closes
-occur.
+Convert the forced early self-link into either a complete-state replay or a
+manufactured two-/four-vector tail before the later selected closes.
 
 ### Serial five-frame case
 
-A serial break gives an exact completed caller retrace and a rebased later
-novel last-writer frame. The missing theorem must prevent indefinite serial
-iteration while retaining the remaining consecutive novelty events. The
-preferred invariant is a well-founded decrease in the earliest outstanding
-closing time together with preservation of the no-gap event window.
+A serial break yields an exact completed caller retrace and a rebased later
+novel frame. The missing well-founded argument must preserve the no-gap
+consecutive-event window while decreasing the earliest outstanding close.
 
-### Strict-nest or residual support contact
+### Strict nest or residual support contact
 
-The `ABCABC` branch has been reduced to the self-link endpoint above. Any
-remaining strict nest or changed-forward support contact must be converted to
-the already proved three-/four-vector tail rather than charged by physical
-path length.
+Any remaining strict nest or changed-forward support contact must be routed
+to the existing finite Gray/tail laws rather than charged by physical path
+length.
 
-## Correctness rules
+## Correctness policy
 
-* No theorem is described as verified until its focused Lean workflow is
-  green for the commit containing it.
-* Conditional certificate theorems are labelled conditional.
-* Physical travel bounds and tongue-vector novelty bounds are kept separate.
-* Self-linked external ports are handled explicitly; no hidden
-  `IrreflexiveLinks` assumption is permitted.
-* Every global tail claim must cover the literal selected raw post-close
-  times, not merely macro endpoints or an eventual period.
+* A theorem is called kernel-checked only after the branch workflow is green
+  for a commit containing it.
+* Conditional residue implications remain labelled conditional.
+* Physical travel length and tongue-vector novelty are never interchanged.
+* Self-linked ports are handled explicitly; no hidden `IrreflexiveLinks`
+  assumption is used.
+* A global tail theorem must cover the literal selected raw post-close times,
+  not merely macro endpoints or eventual periods.
