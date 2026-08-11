@@ -45,15 +45,16 @@ private theorem live_distinct_le_of_stepN_none
       (restrictedTonguesAt w N start) hnd
   apply nodup_nat_lt_length htimesNodup
   intro k hk
-  by_contra hnot
-  have hge : L ≤ k := by omega
-  have hkEq : k = L + (k - L) := by omega
-  have hnoneK : stepN w k start = none := by
-    rw [hkEq, stepN_add, hnone]
-    simp
-  have hkLive := hlive k hk
-  rw [hnoneK] at hkLive
-  simp at hkLive
+  by_cases hlt : k < L
+  · exact hlt
+  · have hge : L ≤ k := by omega
+    have hkEq : k = L + (k - L) := by omega
+    have hnoneK : stepN w k start = none := by
+      rw [hkEq, stepN_add, hnone]
+      simp
+    have hkLive := hlive k hk
+    rw [hnoneK] at hkLive
+    simp at hkLive
 
 /-- **All-run known-edge coefficient-two bound.**  No horizon witness is
 required: every finite live sample list has at most `2*N+8` distinct
