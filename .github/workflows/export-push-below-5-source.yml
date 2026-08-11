@@ -1,0 +1,20 @@
+name: Export coefficient-five proof source
+on:
+  push:
+    branches: [agent/push-below-5]
+    paths:
+      - .github/workflows/export-push-below-5-source.yml
+  workflow_dispatch:
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive source
+        run: tar --exclude='.git' -czf /tmp/duplotrain-source.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: push-below-5-source
+          path: /tmp/duplotrain-source.tar.gz
+          compression-level: 0
+          retention-days: 1
