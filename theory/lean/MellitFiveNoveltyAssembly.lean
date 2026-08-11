@@ -1,6 +1,7 @@
 import MellitDynamicResidual
 import NoveltyChargeBound
 import TwoHistoryUnionCharge
+import TwoHistoryUnionChargeLegacy
 import BoundaryOverlapTailCount
 import ProtectedRepairFour
 
@@ -1002,11 +1003,11 @@ theorem ManufacturedReflector.union_first_contact_runway_or_postRunway_or_bounde
 across the first manufactured journey.  The charged contact history already
 contains every vector of that first journey, so no additional novelty is paid
 before the second exploration. -/
-theorem SecondHistoryContactData.global_changed_contact_two_novelty
+theorem Legacy.SecondHistoryContactData.global_changed_contact_two_novelty
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistoryContactData w A B)
+    (C : Legacy.SecondHistoryContactData w A B)
     (hbase : B.baseState = A.activatedState)
     (hApaths : PathGrooves A.toSupported.paths A.activatedState)
     {next : Tongues}
@@ -1034,7 +1035,7 @@ theorem SecondHistoryContactData.global_changed_contact_two_novelty
   intro k hk
   by_cases hkTravel : k < travel
   · apply List.mem_append_left
-    unfold SecondHistoryContactData.damageContactHistory
+    unfold Legacy.SecondHistoryContactData.damageContactHistory
     apply List.mem_append_left
     apply A.mem_sharpHistoryCore_of_mem
     exact A.manufacturing_journey_mem_sharpHistory
@@ -1075,13 +1076,13 @@ theorem SecondHistoryContactData.global_changed_contact_two_novelty
 /-- A changing old-support contact closes the complete raw trajectory with
 the sharper `N+5` bound.  The coefficient-one history costs at most `N+3`
 and the contact tail contributes at most two genuinely new vectors. -/
-theorem SecondHistoryContactData.changed_contact_all_run_distinct_le_N_add_five
+theorem Legacy.SecondHistoryContactData.changed_contact_all_run_distinct_le_N_add_five
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →
       p < 3 * N ∧ q < 3 * N)
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
-    (C : SecondHistoryContactData w A B)
+    (C : Legacy.SecondHistoryContactData w A B)
     (hbase : B.baseState = A.activatedState)
     (hApaths : PathGrooves A.toSupported.paths A.activatedState)
     {next : Tongues}
@@ -1107,7 +1108,7 @@ theorem SecondHistoryContactData.changed_contact_all_run_distinct_le_N_add_five
   omega
 
 /-- If the first support is damaged during the second simple exploration,
-its earliest damaging passage supplies `SecondHistoryContactData`; harmless
+its earliest damaging passage supplies `Legacy.SecondHistoryContactData`; harmless
 earlier old-support overlaps are retained and charged only when productive.
 No old-contact recursion remains. -/
 theorem ManufacturedReflector.preReturn_broken_all_run_distinct_le_N_add_five
@@ -1143,7 +1144,7 @@ theorem ManufacturedReflector.preReturn_broken_all_run_distinct_le_N_add_five
     rw [hgiven] at hactual
     exact (Option.some.inj hactual).symm
   subst middle
-  let C : SecondHistoryContactData w A B := {
+  let C : Legacy.SecondHistoryContactData w A B := {
     approach := approach
     fresh := (p, x)
     suffix := suffix
