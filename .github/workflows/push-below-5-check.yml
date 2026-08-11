@@ -14,6 +14,7 @@ on:
       - theory/lean/ProtectedRepairFive.lean
       - theory/lean/KnownEdgeTailCap.lean
       - theory/lean/StateLawTwoSharp.lean
+      - theory/lean/ProbePairedPeriod.lean
       - .github/workflows/push-below-5-check.yml
   workflow_dispatch:
 jobs:
@@ -54,8 +55,10 @@ jobs:
           name = "KnownEdgeTailCap"
           [[lean_lib]]
           name = "StateLawTwoSharp"
+          [[lean_lib]]
+          name = "ProbePairedPeriod"
           EOF
       - name: Build new proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build StateLawTwoSharp
+          lake build StateLawTwoSharp ProbePairedPeriod
