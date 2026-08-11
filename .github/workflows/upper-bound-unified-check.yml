@@ -1,0 +1,87 @@
+name: Upper bound unified
+on:
+  push:
+    branches: [agent/upper-bound-unified]
+    paths:
+      - theory/lean/**
+      - UPPER_BOUND_PROGRESS.md
+      - .github/workflows/upper-bound-unified-check.yml
+  workflow_dispatch:
+
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register unified proof targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "StateLawTwoSharper"
+          [[lean_lib]]
+          name = "ContactHistorySharpBound"
+          [[lean_lib]]
+          name = "CoefficientOneSeven"
+          [[lean_lib]]
+          name = "TripleSelfLinkSimpleCycleTail"
+          [[lean_lib]]
+          name = "PointwiseSimpleCycleTail"
+          [[lean_lib]]
+          name = "TraceRetainingFirstRevisit"
+          [[lean_lib]]
+          name = "TraceRetainingBABASecondRepeat"
+          [[lean_lib]]
+          name = "CodexStateLawTwoSharp"
+          [[lean_lib]]
+          name = "EchoRawBridgeSharp"
+          [[lean_lib]]
+          name = "EmptyCurvePotential"
+          [[lean_lib]]
+          name = "MellitDynamicResidual"
+          [[lean_lib]]
+          name = "StateLawParametricAudit"
+          [[lean_lib]]
+          name = "TwoHistoryUnionCharge"
+          EOF
+      - name: Check unconditional bound endpoints
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build StateLawTwoSharper CodexStateLawTwoSharp
+      - name: Check coefficient-one quantitative reductions
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build ContactHistorySharpBound CoefficientOneSeven
+      - name: Check trace-retaining cycle closures
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build TripleSelfLinkSimpleCycleTail PointwiseSimpleCycleTail TraceRetainingFirstRevisit TraceRetainingBABASecondRepeat
+      - name: Check imported structural modules
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build EchoRawBridgeSharp EmptyCurvePotential MellitDynamicResidual StateLawParametricAudit TwoHistoryUnionCharge
+      - name: Publish proof checkpoint
+        if: success()
+        run: |
+          {
+            echo "## Unified upper-bound checkpoint"
+            echo
+            echo "Kernel-checked unconditional endpoint in this tree:"
+            echo "- known incoming edge: 2N+6"
+            echo "- arbitrary start: 2N+7"
+            echo
+            echo "Additional imported endpoint:"
+            echo "- independent arbitrary-start 2N+8 proof retained as CodexStateLawTwoSharp"
+            echo
+            echo "Coefficient-one frontier:"
+            echo "- conditional N+7 assembly checked"
+            echo "- pointwise simple-cycle tail checked"
+            echo "- first old-support contact reduced to the unchanged-forward two-novelty law"
+          } >> "$GITHUB_STEP_SUMMARY"
