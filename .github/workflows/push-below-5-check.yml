@@ -12,6 +12,7 @@ on:
       - theory/lean/ChangedStayCountConstant.lean
       - theory/lean/CompleteRepairConstant.lean
       - theory/lean/EarlyFacingConstant.lean
+      - theory/lean/FacingForwardConstant.lean
       - theory/lean/ProtectedRepairThree.lean
       - theory/lean/KnownEdgeThree.lean
       - theory/lean/StateLawThree.lean
@@ -62,6 +63,8 @@ jobs:
           [[lean_lib]]
           name = "EarlyFacingConstant"
           [[lean_lib]]
+          name = "FacingForwardConstant"
+          [[lean_lib]]
           name = "ProtectedRepairThree"
           [[lean_lib]]
           name = "KnownEdgeThree"
@@ -94,7 +97,7 @@ jobs:
           lake build OneJourneyTailCount KnownEdgeFour StateLawFour \
             FirstCycleCount ChangedFlipCountActual ChangedFlipCountConstant \
             ChangedStayCountConstant CompleteRepairConstant EarlyFacingConstant \
-            ProtectedRepairThree KnownEdgeThree StateLawThree \
+            FacingForwardConstant ProtectedRepairThree KnownEdgeThree StateLawThree \
             BoundaryOverlapTailCount TwoJourneyBoundaryTailCount \
             KnownEdgeThreeSharp KnownEdgeLift StateLawThreeSharp \
             SimpleTraceOneNetChange RepairLeadTwoPhase \
