@@ -6,6 +6,7 @@ on:
       - theory/lean/ProbeSimpleCycleTail.lean
       - theory/lean/TripleSelfLinkSimpleCycleTail.lean
       - theory/lean/TripleSelfLinkSimpleCycleNoTail.lean
+      - theory/lean/COEFFICIENT_ONE_STATUS.md
       - .github/workflows/coefficient-one-current-check.yml
   workflow_dispatch:
 jobs:
@@ -31,3 +32,20 @@ jobs:
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
           lake build ProbeSimpleCycleTail
+      - name: Publish proof checkpoint
+        if: success()
+        run: |
+          {
+            echo "## Coefficient-one proof checkpoint"
+            echo
+            echo "Kernel-checked theorem chain:"
+            echo "- rawTwoVectorTail_of_stable_simple_cycle_exact"
+            echo "- RawCycleThroughSelfLink.close_tail_of_simple_cycle_trace_exact"
+            echo "- RawSixEventReduction.tail_simple_cycle_false"
+            echo "- RawSixEventReduction.tail_cycle_self_link_false"
+            echo "- CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_is_early"
+            echo
+            echo "The selected self-link raw-cycle residual is closed."
+            echo "Verified global bound remains 2N+7 (2N+6 with a known incoming edge)."
+            echo "The N+6 target remains open at the early-self-link and serial-placement bridges."
+          } >> "$GITHUB_STEP_SUMMARY"
