@@ -102,10 +102,14 @@ theorem boundary_history_then_direct_tail_distinct_le
     | some finish =>
         have hshift := tonguesAt_add_of_reaches
           hreach ⟨finish, htailRun⟩
+        have hstartEq :
+            tonguesAt w start (lead + (k - lead)) =
+              tonguesAt w start k := by
+          rw [← hkEq]
         simp only [Function.comp_apply]
         unfold restrictedTonguesAt
-        rw [hkEq]
-        exact congrArg (VectorCount.restrict N) hshift.symm
+        exact congrArg (VectorCount.restrict N)
+          (hshift.symm.trans hstartEq)
   have hlateNodup :
       (late.map (restrictedTonguesAt w N start)).Nodup := by
     dsimp [late]
