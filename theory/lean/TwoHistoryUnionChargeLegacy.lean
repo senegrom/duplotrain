@@ -18,7 +18,7 @@ All statements are over `Wiring`, `PhysicalTrace`, and `stepN`, for arbitrary
 `N`.  No overlap of the two histories is assumed.
 -/
 
-namespace GeneralN.Legacy
+namespace GeneralN
 
 private theorem nodup_subset_length_two_history
     {α : Type} [BEq α] [LawfulBEq α] :
@@ -3666,4 +3666,4 @@ theorem ManufacturedReflector.two_reflector_all_run_distinct_le_N_add_six
         hN B C hbase hA harrive hchanged times hlive hnd
     omega
 
-end GeneralN.Legacy
+end GeneralN
