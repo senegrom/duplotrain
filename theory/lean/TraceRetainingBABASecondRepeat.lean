@@ -1,5 +1,6 @@
 import TraceRetainingFirstRevisit
 import MinimalBABASecondRepeat
+import TripleSelfLinkSimpleCycleTail
 
 /-!
 # Trace-retaining Mellit second repeat
@@ -125,8 +126,8 @@ structure ReachedStableSimpleCycle
 /-- Transport a locally reached stable cycle into absolute raw time. -/
 theorem reachedStableSimpleCycle_of_prefix
     {w : Wiring} {start next : Nat × Tongues}
-    {prefix visited : Nat}
-    (hprefix : stepN w prefix start = some next)
+    {baseShift visited : Nat}
+    (hbaseShift : stepN w baseShift start = some next)
     {atRepeat : Nat × Tongues} {cycle : List Passage}
     {settled : Tongues}
     (hvisited : stepN w visited next = some atRepeat)
@@ -138,12 +139,12 @@ theorem reachedStableSimpleCycle_of_prefix
     (hsimple : SwitchSimple cycle) :
     Nonempty (ReachedStableSimpleCycle w start) := by
   refine ⟨{
-    shift := prefix + visited
+    shift := baseShift + visited
     atRepeat := atRepeat
     cycle := cycle
     settled := settled
     reached := by
-      rw [stepN_add, hprefix]
+      rw [stepN_add, hbaseShift]
       exact hvisited
     nonempty := hnonempty
     transient := htransient
