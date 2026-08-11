@@ -1,10 +1,11 @@
-import TripleSelfLinkFinalAssembly
+import TripleSelfLinkSimpleCycleTail
 
 namespace GeneralN
 
-#print RawTwoVectorTail
-#check five_close_noveltyCoverOn_four_of_two_vector_tail
-#check RawTwoVectorTail.rotate_back_to_period_base_exact
-#check RawCycleThroughSelfLink.outside_first_revisit_trace_or_reflector
+#check rawTwoVectorTail_of_stable_simple_cycle_exact
+#check RawCycleThroughSelfLink.close_tail_of_simple_cycle_trace_exact
+#check RawSixEventReduction.tail_simple_cycle_false
+#check RawSixEventReduction.tail_cycle_self_link_false
+#check CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_is_early
 
 end GeneralN
