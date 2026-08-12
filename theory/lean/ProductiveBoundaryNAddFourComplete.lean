@@ -1042,6 +1042,159 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_unchanged_stay_protect
   have hsaturated := S.source.saturated
   dsimp [history] at hcount hlength
   omega
+/-- A first stay reflector lowers every fully protected repair tail to one
+fresh vector over any history representing both manufacturing journeys.
+The only two-vector branch in the generic repair theorem is a completed
+repair; for a stay action its extra action-applied pre-return corner is
+literally the already historical pre-return vector. -/
+theorem ManufacturedStayReflector.protected_repair_one_novelty_over_history
+    {w : Wiring} {N g e : Nat}
+    (hN : forall p q, w.link p = some q ->
+      p < 3 * N /\ q < 3 * N)
+    (R : ManufacturedStayReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hA : PathGrooves
+      (ManufacturedReflector.stay R).toSupported.paths B.baseState)
+    (hB : PathGrooves B.toSupported.paths B.activatedState)
+    (hpre : PathGrooves
+      (ManufacturedReflector.stay R).toSupported.paths B.preReturn.2)
+    (history : List (List Bool))
+    (hhistory : forall x,
+      List.Mem x (ManufacturedReflector.stay R).sharpConstructionHistory N \/
+        List.Mem x B.sharpConstructionHistory N -> List.Mem x history)
+    (times : List Nat)
+    (hlive : forall k, List.Mem k times ->
+      (stepN w k (g, B.activatedState)).isSome)
+    (hnd : (times.map
+      (restrictedTonguesAt w N (g, B.activatedState))).Nodup) :
+    NoveltyCoverOn w N (g, B.activatedState) times history 1 := by
+  have hinitialHistorical :
+      List.Mem (VectorCount.restrict N B.activatedState) history := by
+    apply hhistory
+    right
+    simp [ManufacturedReflector.sharpConstructionHistory]
+  have hpreHistorical :
+      List.Mem (VectorCount.restrict N B.preReturn.2) history := by
+    apply hhistory
+    right
+    unfold ManufacturedReflector.sharpConstructionHistory
+    apply List.mem_append_left
+    apply List.mem_map.mpr
+    refine Exists.intro B.exploration.length ?_
+    constructor
+    case left =>
+      apply List.mem_range.mpr
+      omega
+    case right =>
+      simp [restrictedTonguesAt, tonguesAt,
+        B.exploration_trace.sound]
+  rcases manufactured_pair_protected_repair_novelty_outcomes
+      (ManufacturedReflector.stay R) B hA hB history
+        hinitialHistorical hpreHistorical with
+    hone | hfacing | hchanged | hcomplete
+  case inl =>
+    exact hone times hlive hnd
+  case inr.inl =>
+    exact hfacing.one_novelty_of_preReturn
+      hN hA hB history hinitialHistorical hpreHistorical times hlive
+  case inr.inr.inl =>
+    exact (hchanged.impossible_of_preReturn_grooved hB hpre).elim
+  case inr.inr.inr =>
+    obtain Exists.intro finalState hcompleteData := hcomplete
+    obtain And.intro hrepair hfinalData := hcompleteData
+    obtain And.intro hAfinal hBfinal := hfinalData
+    have haPreHistorical : List.Mem
+        (VectorCount.restrict N
+          ((ManufacturedReflector.stay R).toSupported.action.apply
+            B.preReturn.2)) history := by
+      simpa [ManufacturedReflector.toSupported,
+        ManufacturedStayReflector.toSupported, LocalAction.apply] using
+          hpreHistorical
+    exact (ManufacturedReflector.stay R).completed_protected_route_one_novelty_of_action_preReturn
+      B hA hB hrepair hAfinal hBfinal history
+        hinitialHistorical hpreHistorical haPreHistorical times hlive
+
+/-- A fully protected opposite pair whose first reflector is a stay
+reflector cannot saturate the productive boundary.  The two construction
+histories cost at most `N+2`; adjoining the arbitrary boundary vector costs
+one; and the specialized repair tail above costs one. -/
+theorem ProductiveBoundaryNAddFourSavingResidual.false_of_first_stay_protected_pair
+    {w : Wiring} {N : Nat}
+    (S : ProductiveBoundaryNAddFourSavingResidual w N)
+    (hN : forall p q, w.link p = some q ->
+      p < 3 * N /\ q < 3 * N)
+    (R : ManufacturedStayReflector w S.source.g S.source.e)
+    (hAeq : S.A = ManufacturedReflector.stay R)
+    (B : ManufacturedReflector w S.source.e S.source.g)
+    (hbase : B.baseState =
+      (ManufacturedReflector.stay R).activatedState)
+    (hBpaths : PathGrooves B.toSupported.paths B.activatedState)
+    (hpre : PathGrooves
+      (ManufacturedReflector.stay R).toSupported.paths B.preReturn.2) :
+    False := by
+  let A : ManufacturedReflector w S.source.g S.source.e :=
+    ManufacturedReflector.stay R
+  let history := VectorCount.restrict N S.source.original ::
+    A.preservedTwoHistoryCore B N
+  have hApathsS : PathGrooves S.A.toSupported.paths
+      S.A.activatedState := by
+    rw [<- S.activated]
+    exact S.grooves
+  have hApaths : PathGrooves A.toSupported.paths A.activatedState := by
+    simpa [A, hAeq] using hApathsS
+  have hAbase : A.baseState = S.source.base := by
+    simpa [A, hAeq] using S.reflector_base
+  have hbaseA : B.baseState = A.activatedState := by
+    simpa [A] using hbase
+  have hAatBase : PathGrooves A.toSupported.paths B.baseState := by
+    rw [hbaseA]
+    exact hApaths
+  have hpreA : PathGrooves A.toSupported.paths B.preReturn.2 := by
+    simpa [A] using hpre
+  have hhistory : forall x,
+      List.Mem x (A.sharpConstructionHistory N) \/
+        List.Mem x (B.sharpConstructionHistory N) ->
+      List.Mem x history := by
+    intro x hx
+    apply List.mem_cons_of_mem
+    exact A.mem_preservedTwoHistoryCore B hx
+  have hextra : List.Mem
+      (VectorCount.restrict N S.source.original) history := by
+    dsimp [history]
+    exact List.mem_cons_self
+  have htail : forall tailTimes : List Nat,
+      (forall k, List.Mem k tailTimes ->
+        (stepN w k (S.source.g, B.activatedState)).isSome) ->
+      (tailTimes.map
+        (restrictedTonguesAt w N
+          (S.source.g, B.activatedState))).Nodup ->
+      NoveltyCoverOn w N (S.source.g, B.activatedState)
+        tailTimes history 1 := by
+    intro tailTimes htailLive htailNodup
+    exact R.protected_repair_one_novelty_over_history
+      hN B (by simpa [A] using hAatBase) hBpaths hpre
+        history (by simpa [A] using hhistory)
+          tailTimes htailLive htailNodup
+  have hlive : forall k, List.Mem k S.source.times ->
+      (stepN w k (S.source.g, A.baseState)).isSome := by
+    intro k hk
+    simpa [hAbase] using S.source.live k hk
+  have hnd : (VectorCount.restrict N S.source.original ::
+      S.source.times.map
+        (restrictedTonguesAt w N
+          (S.source.g, A.baseState))).Nodup := by
+    simpa [hAbase] using S.source.distinct
+  have hcount :=
+    A.two_journeys_then_shared_history_novelty_count_with_extra
+      B hbaseA hApaths hBpaths history hhistory 1 htail
+        (VectorCount.restrict N S.source.original) hextra
+          S.source.times hlive hnd
+  have hcore := R.protectedHistory_length_le_N_add_two
+    hN B hbase (by simpa [A] using hAatBase) hpre
+  have hsaturated := S.source.saturated
+  dsimp [history] at hcount
+  omega
+
 /-- The exact physical obstructions still left after the committed N+4
 closures.  Each constructor stores raw trace data rather than a black-box
 counting assumption. -/
@@ -1059,6 +1212,8 @@ inductive ProductiveBoundaryNAddFourExactResidual
         (PathGrooves S.A.toSupported.paths
           P.reflector.preReturn.2))
   | absentPresentWriter
+      (R : ManufacturedFlipReflector w S.source.g S.source.e)
+      (kind : S.A = ManufacturedReflector.flip R)
       (absentA : Not (Membership.mem
         (S.A.exploration.map passageSwitch) S.source.k0))
       (P : PartialSecondReflectorCompletion S.A N)
@@ -1136,10 +1291,17 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_exact_residual
             by_cases hpresent : Membership.mem
                 (B.constructionFirstWriterSwitches N) S.source.k0
             case pos =>
-              exact Nonempty.intro
-                (ProductiveBoundaryNAddFourExactResidual.absentPresentWriter
-                  habsent.1 P (by simpa [P] using hpre)
-                    (by simpa [P] using hpresent))
+              cases hkind : S.A with
+              | stay R =>
+                  exact (S.false_of_first_stay_protected_pair
+                    hN R hkind B
+                      (by simpa [hkind] using hbase)
+                      hBpaths (by simpa [hkind] using hpre)).elim
+              | flip R =>
+                  exact Nonempty.intro
+                    (ProductiveBoundaryNAddFourExactResidual.absentPresentWriter
+                      R hkind habsent.1 P (by simpa [P] using hpre)
+                        (by simpa [P] using hpresent))
             case neg =>
               exact (S.false_of_absent_protected_pair_of_second_writer_absent
                 hN habsent.1 B hbase hBpaths hpre hpresent).elim

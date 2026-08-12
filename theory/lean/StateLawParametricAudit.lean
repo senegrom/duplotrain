@@ -1,7 +1,9 @@
 import RepeatedNoveltyDecomposition
 import ConcreteTreeRetrace
 import ReversalFacts
-import EmptyCurvePotential
+import KoizumiFramePersistence
+import TrackCurveShrinkGlobal
+import UnlinkedCounterObstruction
 
 /-!
 # Parametric falsification audit for the state law
@@ -21,6 +23,14 @@ third `B` in the gap.
 
 This is a symbolic theorem for arbitrary `N`; it is not a finite search and it
 does not assert the still-open `GeneralN.StateLaw`.
+
+The second audit target is the standard sequential distributor.  Its apparent
+one-switch-per-stage implementation uses sprung/stateless merging junctions.
+Those are absent from raw `Wiring`: at a lazy switch exactly one branch is the
+quiet return branch, while the opposite branch changes the tongue.  A
+switch-simple same-mouth implementation therefore becomes idempotent after its
+first call; a changing second call must break an old groove and pay the
+productive overwrite isolated below.
 -/
 
 namespace GeneralN
@@ -142,6 +152,153 @@ private theorem audit_nodup_subset_length
       simp only [List.length_cons]
       omega
 
+/-! ## The distributor audit: there is no free sprung merge -/
+
+private theorem audit_flipAt_ne_state (u : Tongues) (C : Nat) :
+    flipAt u C ≠ u := by
+  intro h
+  have hC := congrArg (fun state : Tongues => state C) h
+  cases hbit : u C <;> simp [flipAt, hbit] at hC
+
+/-- The opposite arm of a lazy switch is necessarily state-changing.  Thus a
+stateless/sprung merge cannot be smuggled into the raw model as an uncounted
+track junction. -/
+theorem unmatched_branch_merge_changes_state (u : Tongues) (C : Nat) :
+    (arrive u (unmatchedBranch u C)).2 ≠ u := by
+  rw [arrive_unmatched_pivots]
+  exact audit_flipAt_ne_state u C
+
+/-- The two arms of one Y cannot both merge into its stem without changing
+the tongue.  This is the exact local obstruction to the apparent
+one-switch-per-stage sequential distributor. -/
+theorem no_free_stateless_two_arm_merge (u : Tongues) (C : Nat) :
+    ¬ (arrive u (selectedBranch u C) = (3 * C, u) ∧
+       arrive u (unmatchedBranch u C) = (3 * C, u)) := by
+  intro hboth
+  apply unmatched_branch_merge_changes_state u C
+  have hsnd := congrArg Prod.snd hboth.2
+  simpa using hsnd
+
+/-- A switch-simple same-mouth module has only one distinct vector over an
+arbitrary number of complete invocations.  A genuine distributor must
+therefore revisit and repair its old support; its apparent static merge is not
+free in the raw lazy-switch model. -/
+theorem simple_same_mouth_distinct_invocations_le_one
+    {w : Wiring} {p x : Nat} {u v : Tongues} {body : List Passage}
+    (htrace : PhysicalTrace w (p, u) ((p, x) :: body) (p, v))
+    (hsimple : SwitchSimple ((p, x) :: body))
+    (N : Nat) (invocations : List Nat)
+    (hnd : (invocations.map (fun n =>
+      restrictedTonguesAt w N (p, v)
+        (n * ((p, x) :: body).length))).Nodup) :
+    invocations.length ≤ 1 := by
+  have hconst : ∀ state ∈ invocations.map (fun n =>
+      restrictedTonguesAt w N (p, v)
+        (n * ((p, x) :: body).length)),
+      state = VectorCount.restrict N v := by
+    intro state hstate
+    obtain ⟨n, _hn, rfl⟩ := List.mem_map.mp hstate
+    have hfixed := simple_same_mouth_call_all_iterates_fixed
+      htrace hsimple n
+    unfold restrictedTonguesAt tonguesAt
+    rw [hfixed]
+    rfl
+  have hle := audit_nodup_constant_length_le_one hnd hconst
+  simpa only [List.length_map] using hle
+
+
+/-! ## A physical three-port bound for branching distributors -/
+
+private theorem audit_nodup_map_of_map_nodup
+    {alpha beta gamma : Type}
+    [BEq alpha] [LawfulBEq alpha]
+    [BEq beta] [LawfulBEq beta]
+    [BEq gamma] [LawfulBEq gamma]
+    {xs : List alpha} {f : alpha → beta} {g : alpha → gamma}
+    (hf : (xs.map f).Nodup)
+    (hreflect : ∀ x ∈ xs, ∀ y ∈ xs, g x = g y → f x = f y) :
+    (xs.map g).Nodup := by
+  induction xs with
+  | nil => simp
+  | cons x rest ih =>
+      simp only [List.map_cons, List.nodup_cons] at hf ⊢
+      constructor
+      · intro hx
+        obtain ⟨y, hy, hgy⟩ := List.mem_map.mp hx
+        apply hf.1
+        apply List.mem_map.mpr
+        refine ⟨y, hy, ?_⟩
+        exact (hreflect x List.mem_cons_self y
+          (List.mem_cons_of_mem _ hy) hgy.symm).symm
+      · exact ih hf.2 (fun a ha b hb hab =>
+          hreflect a (List.mem_cons_of_mem _ ha)
+            b (List.mem_cons_of_mem _ hb) hab)
+
+/-- A productive writer is connected by its stem to its actual post-write
+entry port.  This form removes the existential configuration from
+`rawProductiveAt_fixed_stem_successor`. -/
+theorem raw_productive_writer_links_post_entry
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues} {k : Nat}
+    (hprod : RawProductiveAt w N start k) :
+    w.link (3 * rawWriterAt w start k) =
+      some (rawEntryAt w start (k + 1)) := by
+  obtain ⟨next, hnext, hlink⟩ :=
+    rawProductiveAt_fixed_stem_successor hN hprod
+  simpa [rawEntryAt, hnext] using hlink
+
+/-- **At most three distinct productive writers can feed one successor
+switch.**
+
+Suppose every event in `times` is productive, the writer names are pairwise
+distinct, and every post-write entry belongs to one fixed switch `C`.  Each
+writer stem is paired with its post-write port.  Pairing injectivity makes
+those ports distinct, while switch `C` has exactly the three ports
+`3*C`, `3*C+1`, and `3*C+2`.  Hence the family has size at most three.
+
+This rules out an asymptotic branching distributor built by sending
+arbitrarily many fresh writers through one central overwrite/successor
+switch. -/
+theorem distinct_productive_writers_same_successor_cell_le_three
+    {w : Wiring} {N C : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues} (times : List Nat)
+    (hprod : ∀ k ∈ times, RawProductiveAt w N start k)
+    (hwriters : (times.map (rawWriterAt w start)).Nodup)
+    (hsuccessor : ∀ k ∈ times,
+      rawEntryAt w start (k + 1) / 3 = C) :
+    times.length ≤ 3 := by
+  let postEntry : Nat → Nat := fun k => rawEntryAt w start (k + 1)
+  have hpostNodup : (times.map postEntry).Nodup := by
+    apply audit_nodup_map_of_map_nodup hwriters
+    intro i hi j hj hentry
+    have hili := raw_productive_writer_links_post_entry
+      hN (hprod i hi)
+    have hilj := raw_productive_writer_links_post_entry
+      hN (hprod j hj)
+    change w.link (3 * rawWriterAt w start i) = some (postEntry i) at hili
+    change w.link (3 * rawWriterAt w start j) = some (postEntry j) at hilj
+    rw [hentry] at hili
+    have hstems := Wiring.link_injective hili hilj
+    omega
+  have hcover : ∀ q ∈ times.map postEntry,
+      q ∈ [3 * C, 3 * C + 1, 3 * C + 2] := by
+    intro q hq
+    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hq
+    have hquot : postEntry k / 3 = C := by
+      exact hsuccessor k hk
+    have hrem : postEntry k % 3 < 3 := Nat.mod_lt _ (by omega)
+    have hdecomp := Nat.mod_add_div (postEntry k) 3
+    have hcases : postEntry k = 3 * C ∨
+        postEntry k = 3 * C + 1 ∨ postEntry k = 3 * C + 2 := by
+      omega
+    rcases hcases with hzero | hone | htwo
+    · simp [hzero]
+    · simp [hone]
+    · simp [htwo]
+  have hle := audit_nodup_subset_length hpostNodup hcover
+  simpa only [List.length_map, List.length_cons, List.length_nil] using hle
 /-- **Repeated productive pairs need a third write.**
 
 Suppose productive writer `A` is followed immediately by productive writer
@@ -808,53 +965,122 @@ theorem raw_prefix_distinct_vectors_le_productive_succ
   simpa only [List.length_map, auditProductiveVectorCover,
     List.length_cons] using hle
 
-/-- **Coefficient one for every all-non-self raw prefix.**
+/-! ## Coefficient-one accounting before a train-curve self-pivot -/
 
-If every productive contact in a live prefix grows the empty-curve carrier
-rather than hitting its own curve, then *all* distinct switch vectors in the
-prefix number at most `N+1`.  This combines the unconditional state cover
-above with `nonself_productive_times_le_N`. -/
+/-- **Coefficient one for every train-curve-self-free raw prefix.**
+
+If no productive contact in the prefix pivots back into the train's currently
+selected curve, then every productive writer is globally first.  Hence all
+distinct switch vectors number at most `N+1`. -/
 theorem nonself_prefix_distinct_vectors_le_N_succ
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (start : Nat × Tongues) (K : Nat)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
+    (_hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
     (hnonself : ∀ k, k < K → RawProductiveAt w N start k →
-      ¬ RawCurveSelfAt w start k)
+      ¬ RawTrainCurveSelfAt w start k)
     (times : List Nat)
     (htimes : ∀ k ∈ times, k ≤ K)
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ N + 1 := by
-  have hstates := raw_prefix_distinct_vectors_le_productive_succ
-    hlive times htimes hnd
-  have hproductive := nonself_productive_times_le_N
-    hN start K hlive hnonself
-  omega
+  exact distinct_samples_le_N_add_one_without_self
+    hN start hnonself times htimes hnd
 
-/-- **Any super-`N+1` state family must use a raw self-contact.**
+/-- **Any super-`N+1` state family must use a physical train-curve
+self-pivot.**
 
 This is the falsification-audit boundary.  A parametric branching construction
 with more than `N+1` distinct vectors cannot consist only of fresh/non-self
-pushes; it must exhibit a concrete productive pivot back into its currently
-selected curve.  Pure double sweeps and pure nested pops are therefore not
-counterfamilies. -/
+pushes.  It must exhibit a concrete productive writer whose stem was already
+on the train's selected curve. -/
 theorem more_than_N_succ_distinct_vectors_forces_self_contact
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (start : Nat × Tongues) (K : Nat)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
+    (_hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
     (times : List Nat)
     (htimes : ∀ k ∈ times, k ≤ K)
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup)
     (hmore : N + 1 < times.length) :
     ∃ k, k < K ∧ RawProductiveAt w N start k ∧
-      RawCurveSelfAt w start k := by
-  have hstates := raw_prefix_distinct_vectors_le_productive_succ
-    hlive times htimes hnd
-  have hproductive :
-      N < (rawProductiveCurveTimes w N start K).length := by
+      RawTrainCurveSelfAt w start k := by
+  apply Classical.byContradiction
+  intro hnone
+  have havoid : ∀ k, k < K → RawProductiveAt w N start k →
+      ¬ RawTrainCurveSelfAt w start k := by
+    intro k hk hprod hself
+    exact hnone ⟨k, hk, hprod, hself⟩
+  have hbound := distinct_samples_le_N_add_one_without_self
+    hN start havoid times htimes hnd
+  omega
+
+/-- Every novel repeated-writer frame contains a productive train-curve
+self-pivot, either at its close or strictly inside.  This is stronger than
+merely naming a repeated coordinate: it identifies the physical shrinking
+event that any branching/non-LIFO construction must spend. -/
+theorem RawRepeatedWriterNovelAt.contains_productive_train_self_pivot
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start : Nat × Tongues} {right : Nat}
+    (h : RawRepeatedWriterNovelAt w N start right) :
+    ∃ left j,
+      RawLastWriterFrame w N start left right ∧
+      left < j ∧ j ≤ right ∧
+      RawProductiveAt w N start j ∧
+      RawTrainCurveSelfAt w start j := by
+  obtain ⟨left, F⟩ := h.last_writer_frame
+  rcases repeated_writer_close_self_or_interior_self
+      hN F.order F.open_productive F.close_productive F.same_writer with
+    hclose | ⟨j, hleft, hright, hprod, hself⟩
+  · exact ⟨left, right, F, F.order, Nat.le_refl _, F.close_productive,
+      hclose⟩
+  · exact ⟨left, j, F, hleft, Nat.le_of_lt hright, hprod, hself⟩
+
+/-- **Exact falsification certificate for the proposed `N+6` law.**
+
+If a live raw prefix really contains more than `N+6` pairwise-distinct
+tongue vectors, then it contains at least six distinct novel
+repeated-writer events.  Every one of their last-writer frames encloses a
+productive train-curve self-pivot.
+
+The six pivots are not claimed distinct: proving that they can be charged
+injectively, or that reuse enters the four-vector repaired tail, is precisely
+the remaining global gap.  Conversely, any parametric counterexample must
+realize this repeated-self-contact residue; a direct sweep, pure LIFO nesting,
+or a distributor with free sprung merges cannot do so. -/
+theorem more_than_N_add_six_requires_six_repeated_self_frames
+    {w : Wiring} {N : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    (start : Nat × Tongues) (K : Nat)
+    (_hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
+    (times : List Nat)
+    (htimes : ∀ k ∈ times, k ≤ K)
+    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup)
+    (hmore : N + 6 < times.length) :
+    ∃ events : List Nat,
+      events.Nodup ∧ 6 ≤ events.length ∧
+      ∀ right ∈ events,
+        RawRepeatedWriterNovelAt w N start right ∧
+        ∃ left j,
+          RawLastWriterFrame w N start left right ∧
+          left < j ∧ j ≤ right ∧
+          RawProductiveAt w N start j ∧
+          RawTrainCurveSelfAt w start j := by
+  let events := rawRepeatedWriterNovelTimes w N start K
+  have heventsNodup : events.Nodup := by
+    dsimp [events]
+    exact rawRepeatedWriterNovelTimes_nodup w N start K
+  have haccount := distinct_samples_le_of_repeated_writer_novelty
+    w N hN start K events.length (Nat.le_refl _)
+      times htimes hnd
+  have hsix : 6 ≤ events.length := by
     omega
-  exact more_than_N_productive_forces_self_contact
-    hN start K hlive hproductive
+  refine ⟨events, heventsNodup, hsix, ?_⟩
+  intro right hright
+  have hdata := mem_rawRepeatedWriterNovelTimes_iff.mp (by
+    simpa [events] using hright)
+  exact ⟨hdata.2,
+    RawRepeatedWriterNovelAt.contains_productive_train_self_pivot
+      hN hdata.2⟩
 
 end GeneralN
