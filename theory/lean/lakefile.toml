@@ -54,6 +54,7 @@ defaultTargets = [
   "ExternalLobeRoundtrip",
   "FacingForwardNovelty",
   "FacingMergeCount",
+  "FamilyLowerBound",
   "FirstActivatedExact",
   "FirstCycleCount",
   "FirstCycleCountSharp",
@@ -387,6 +388,9 @@ name = "FacingForwardNovelty"
 
 [[lean_lib]]
 name = "FacingMergeCount"
+
+[[lean_lib]]
+name = "FamilyLowerBound"
 
 [[lean_lib]]
 name = "FirstActivatedExact"

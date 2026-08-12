@@ -78,15 +78,26 @@ assemblies that share one `N`-coordinate budget across branches
   state counts `f(1) = 2`, `f(2) = 4`, `f(3) = 7`, `f(4) = 8`, the
   perfect-layout classification, and the ≥3-switch imperfection sweep.
   These are the empirical anchors of the remaining conjecture.
+* `FamilyLowerBound.lean` — the explicit `N+4` lower-bound family: a
+  teardrop, a stem-to-branch chain, and a doubly-linked end pair (the
+  four-vector Gray oscillator).  Machine-checked to realize exactly
+  `N+4` distinct vectors for every `N = 3 … 8` — in particular
+  `f(5) ≥ 9`, beyond the exhaustive range.  Discovered and
+  cross-checked by `../tools/bstates.py`; a 60,000-wiring random probe
+  at `N = 5` found nothing above `N+4`.
 * `StateLawAxiomAudit.lean` — the permanent axiom check described above.
 
 ## What remains open
 
 The conjectured sharp form is `f(N) = min(2^N, N + 4)`; the proved
-constant is `N + 6`.  The gap is purely additive: one candidate vector in
-the arbitrary-start lift and one in the protected-repair tail.  A
-matching parametric lower-bound family achieving `N + 4` (the small-`N`
-witnesses above realize it for `N = 3, 4`) is the other half.
+constant is `N + 6` from above and `N + 4` from below (family instances
+to `N = 8`; exhaustively sharp for `N ≤ 4`).  The remaining gap is
+purely additive, and the extremal family explains where it must close:
+the optimal runs spend exactly `N` vectors on chain exploration and
+four on the terminal Gray oscillation, so the two candidate savings in
+the upper bound are the arbitrary-start lift's time-zero vector and the
+slack pair in the protected-repair tail.  A symbolic (all-`N`) version
+of the lower-bound family is the natural companion theorem.
 
 ## History
 
