@@ -79,6 +79,7 @@ defaultTargets = [
   "FirstWriterRetraceFree",
   "FiveFrameObstruction",
   "FixedSupportBound",
+  "FlipHistoryActionCharge",
   "ForeignSpliceNovelty",
   "FullReachPersistencePaired",
   "FullyLobedComponentTrap",
@@ -255,7 +256,9 @@ defaultTargets = [
   "TripleSelfLinkSimpleCycleClosure",
   "TripleSelfLinkSimpleCycleTail",
   "TwoHistoryUnionCharge",
+  "TwoHistoryUnionChargeSharp",
   "TwoJourneyBoundaryTailCount",
+  "TwoJourneyNoveltySharp",
   "TwoJourneyTailCountSharp",
   "TwoPhasePrefixTailCount",
   "TwoReflectorEdgeTrap",
@@ -500,6 +503,9 @@ name = "FiveFrameObstruction"
 
 [[lean_lib]]
 name = "FixedSupportBound"
+
+[[lean_lib]]
+name = "FlipHistoryActionCharge"
 
 [[lean_lib]]
 name = "ForeignSpliceNovelty"
@@ -1030,7 +1036,13 @@ name = "TripleSelfLinkSimpleCycleTail"
 name = "TwoHistoryUnionCharge"
 
 [[lean_lib]]
+name = "TwoHistoryUnionChargeSharp"
+
+[[lean_lib]]
 name = "TwoJourneyBoundaryTailCount"
+
+[[lean_lib]]
+name = "TwoJourneyNoveltySharp"
 
 [[lean_lib]]
 name = "TwoJourneyTailCountSharp"
