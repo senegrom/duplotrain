@@ -10,9 +10,9 @@ defaultTargets = [
   "BlockEpochAggregation",
   "BlockSparseBoundCore",
   "BlockSparseFixedCountCore",
+  "BoundaryAbsentPresentWriterElimination",
   "BoundaryAbsentProtectedPair",
   "BoundaryAbsentSecondWriter",
-  "BoundaryAbsentPresentWriterElimination",
   "BoundaryApproachActionElimination",
   "BoundaryApproachWrittenElimination",
   "BoundaryCanonicalGeometry",
@@ -78,7 +78,6 @@ defaultTargets = [
   "FirstWriterRetraceFree",
   "FiveFrameObstruction",
   "FixedSupportBound",
-  "FlipHistoryActionCharge",
   "ForeignSpliceNovelty",
   "FullReachPersistencePaired",
   "FullyLobedComponentTrap",
@@ -253,9 +252,7 @@ defaultTargets = [
   "TripleSelfLinkSimpleCycleClosure",
   "TripleSelfLinkSimpleCycleTail",
   "TwoHistoryUnionCharge",
-  "TwoHistoryUnionChargeSharp",
   "TwoJourneyBoundaryTailCount",
-  "TwoJourneyNoveltySharp",
   "TwoJourneyTailCountSharp",
   "TwoPhasePrefixTailCount",
   "TwoReflectorEdgeTrap",
@@ -295,13 +292,13 @@ name = "BlockSparseBoundCore"
 name = "BlockSparseFixedCountCore"
 
 [[lean_lib]]
+name = "BoundaryAbsentPresentWriterElimination"
+
+[[lean_lib]]
 name = "BoundaryAbsentProtectedPair"
 
 [[lean_lib]]
 name = "BoundaryAbsentSecondWriter"
-
-[[lean_lib]]
-name = "BoundaryAbsentPresentWriterElimination"
 
 [[lean_lib]]
 name = "BoundaryApproachActionElimination"
@@ -497,9 +494,6 @@ name = "FiveFrameObstruction"
 
 [[lean_lib]]
 name = "FixedSupportBound"
-
-[[lean_lib]]
-name = "FlipHistoryActionCharge"
 
 [[lean_lib]]
 name = "ForeignSpliceNovelty"
@@ -1024,13 +1018,7 @@ name = "TripleSelfLinkSimpleCycleTail"
 name = "TwoHistoryUnionCharge"
 
 [[lean_lib]]
-name = "TwoHistoryUnionChargeSharp"
-
-[[lean_lib]]
 name = "TwoJourneyBoundaryTailCount"
-
-[[lean_lib]]
-name = "TwoJourneyNoveltySharp"
 
 [[lean_lib]]
 name = "TwoJourneyTailCountSharp"
