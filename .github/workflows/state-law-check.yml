@@ -1,4 +1,4 @@
-name: State law N+6
+name: State law N+4
 on:
   push:
     branches: [main]
@@ -20,10 +20,10 @@ jobs:
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Build every library
         run: lake build
-      - name: Audit the axioms of the state law
+      - name: Audit the axioms of the sharp state law
         run: |
           lake build StateLawAxiomAudit 2>&1 | tee audit.log
-          grep "'GeneralN.stateLaw' depends on axioms" audit.log
+          grep "'GeneralN.state_law_N_add_four' depends on axioms" audit.log
           if grep -q "sorryAx" audit.log; then
             echo "sorryAx detected" && exit 1
           fi

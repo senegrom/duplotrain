@@ -12,11 +12,15 @@ defaultTargets = [
   "BlockSparseFixedCountCore",
   "BoundaryAbsentProtectedPair",
   "BoundaryAbsentSecondWriter",
+  "BoundaryAbsentPresentWriterElimination",
+  "BoundaryApproachActionElimination",
+  "BoundaryApproachWrittenElimination",
   "BoundaryCanonicalGeometry",
   "BoundaryCanonicalOriginalOverlap",
   "BoundaryChangedContactSaving",
   "BoundaryDoubleDuplicate",
   "BoundaryNAddFourSaturation",
+  "BoundaryOccurrenceDamageElimination",
   "BoundaryOverlapTailCount",
   "BoundaryPresentSecondWriter",
   "BoundaryResidualCharge",
@@ -183,6 +187,7 @@ defaultTargets = [
   "StateLawLowerBound",
   "StateLawNAddFive",
   "StateLawNAddFour",
+  "StateLawNAddFourSharp",
   "StateLawNAddFourTop",
   "StateLawThreeSharp",
   "StateLawTwoCandidate",
@@ -296,6 +301,15 @@ name = "BoundaryAbsentProtectedPair"
 name = "BoundaryAbsentSecondWriter"
 
 [[lean_lib]]
+name = "BoundaryAbsentPresentWriterElimination"
+
+[[lean_lib]]
+name = "BoundaryApproachActionElimination"
+
+[[lean_lib]]
+name = "BoundaryApproachWrittenElimination"
+
+[[lean_lib]]
 name = "BoundaryCanonicalGeometry"
 
 [[lean_lib]]
@@ -309,6 +323,9 @@ name = "BoundaryDoubleDuplicate"
 
 [[lean_lib]]
 name = "BoundaryNAddFourSaturation"
+
+[[lean_lib]]
+name = "BoundaryOccurrenceDamageElimination"
 
 [[lean_lib]]
 name = "BoundaryOverlapTailCount"
@@ -807,6 +824,9 @@ name = "StateLawNAddFive"
 
 [[lean_lib]]
 name = "StateLawNAddFour"
+
+[[lean_lib]]
+name = "StateLawNAddFourSharp"
 
 [[lean_lib]]
 name = "StateLawNAddFourTop"
