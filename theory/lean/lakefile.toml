@@ -1596,3 +1596,9 @@ name = "ProductiveBoundarySupportContact"
 [[lean_lib]]
 name = "BoundaryDoubleDuplicate"
 
+[[lean_lib]]
+name = "ProtectedPairNAddFour"
+
+[[lean_lib]]
+name = "KnownEdgeNAddFourComplete"
+
