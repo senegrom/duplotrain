@@ -156,6 +156,7 @@ defaultTargets = [
   "StateLaw",
   "StateLawAxiomAudit",
   "StateLawCoefficientOneTop",
+  "StateLawLowerBound",
   "StateLawThreeSharp",
   "StateLawTwoCandidate",
   "StateLawTwoSharp",
@@ -694,6 +695,9 @@ name = "StateLawAxiomAudit"
 
 [[lean_lib]]
 name = "StateLawCoefficientOneTop"
+
+[[lean_lib]]
+name = "StateLawLowerBound"
 
 [[lean_lib]]
 name = "StateLawThreeSharp"
