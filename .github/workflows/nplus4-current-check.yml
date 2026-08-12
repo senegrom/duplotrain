@@ -24,8 +24,11 @@ jobs:
 
           [[lean_lib]]
           name = "TwoJourneyNoveltySharp"
+
+          [[lean_lib]]
+          name = "FlipHistoryActionCharge"
           EOF
       - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TwoHistoryUnionChargeSharp TwoJourneyNoveltySharp
+          lake build TwoHistoryUnionChargeSharp TwoJourneyNoveltySharp FlipHistoryActionCharge
