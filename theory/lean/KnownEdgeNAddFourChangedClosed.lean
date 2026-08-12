@@ -13,8 +13,9 @@ namespace GeneralN
 
 /-- Lift a local novelty cover after the first manufacturing journey to the
 complete run.  Kept here so this closure does not depend on the still-moving
-partial-second-run frontier file. -/
-private theorem changedContact_local_novelty_count
+partial-second-run frontier file.  Public: the boundary-saving layer reuses
+it from a separate file. -/
+theorem changedContact_local_novelty_count
     {w : Wiring} {N g e budget : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)

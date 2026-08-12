@@ -128,14 +128,28 @@ a switch on its very first step) cannot add a genuinely new vector
 beyond the shifted known-edge budget.  `StateLawNAddFour.lean` states
 the sharp target as a `def`; `StateLawNAddFourTop.lean` proves it from
 the single residual obligation `ProductiveInitialBoundaryNAddFour`;
-and `ProductiveBoundaryNAddFourComplete.lean` proves that obligation
-**equivalent** to eliminating three concrete residual geometries
-(`productiveInitialBoundaryNAddFour_iff_no_exact_residual`): a
-support-damaging stable cycle after the first reflector, a completed
-opposite reflector whose pre-return state damages the first support,
-and a flip-first pair whose action switch reappears among the second
-construction's first writers.  Killing those three constructors is the
-entire remaining distance to `f(N) = N + 4`.
+`ProductiveBoundaryNAddFourComplete.lean` proves that obligation
+equivalent to eliminating three concrete residual geometries; and
+`BoundaryChangedContactSaving.lean` /
+`BoundaryResidualSharpening.lean` sharpen the frontier further
+(`productiveInitialBoundaryNAddFour_iff_no_sharp_residual`).  The
+keystone: reserving both the flip action switch and the
+exploration-absent boundary switch lowers a changed contact's budget to
+`N+3`, so under the absent saving both support-damage residuals
+collapse into one geometry.  What remains is exactly four constructors:
+
+1. an **approach-written flip contact** — a flip first reflector whose
+   changed contact productively first-writes its action switch or the
+   boundary switch during the strict approach;
+2. / 3. **support damage under the occurrence saving** (the boundary
+   switch is stay-crossed inside the first exploration) — the cycle and
+   opposite-reflector damage cases;
+4. the **absent-present writer** — a flip-first protected pair whose
+   boundary switch reappears among the second construction's first
+   writers.
+
+Killing those four constructors is the entire remaining distance to
+`f(N) = N + 4`.
 
 ## History
 

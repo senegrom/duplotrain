@@ -18,12 +18,14 @@ defaultTargets = [
   "BoundaryCanonicalGeometry",
   "BoundaryCanonicalOriginalOverlap",
   "BoundaryCanonicalSaturation",
+  "BoundaryChangedContactSaving",
   "BoundaryDoubleDuplicate",
   "BoundaryNAddFourSaturation",
   "BoundaryOverlapTailCount",
   "BoundaryPresentSecondWriter",
   "BoundaryResidualCharge",
   "BoundaryResidualNovelty",
+  "BoundaryResidualSharpening",
   "BoundarySaturationContradiction",
   "CanonicalActiveLobeFrame",
   "CanonicalEdgeRepsCore",
@@ -323,6 +325,9 @@ name = "BoundaryCanonicalOriginalOverlap"
 name = "BoundaryCanonicalSaturation"
 
 [[lean_lib]]
+name = "BoundaryChangedContactSaving"
+
+[[lean_lib]]
 name = "BoundaryDoubleDuplicate"
 
 [[lean_lib]]
@@ -339,6 +344,9 @@ name = "BoundaryResidualCharge"
 
 [[lean_lib]]
 name = "BoundaryResidualNovelty"
+
+[[lean_lib]]
+name = "BoundaryResidualSharpening"
 
 [[lean_lib]]
 name = "BoundarySaturationContradiction"
