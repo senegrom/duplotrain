@@ -150,8 +150,7 @@ def build_index() -> None:
         "<title>duplotrain editor</title>",
         "<title>duplotrain — DUPLO track designer</title>\n"
         '<meta name="description" content="Design LEGO DUPLO train track layouts and '
-        'let an exact-arithmetic solver close the loop. Runs entirely in your browser."/>'
-        '\n<link rel="canonical" href="https://carlgeorgheise.com/app/duplotrain/"/>',
+        'let an exact-arithmetic solver close the loop. Runs entirely in your browser."/>',
         1,
     )
     (DIST / "index.html").write_text(html, encoding="utf-8", newline="\n")
