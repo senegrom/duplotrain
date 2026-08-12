@@ -3,8 +3,9 @@
 Model LEGO® DUPLO® train track and find every layout that **loops nicely** — given the
 pieces you actually own.
 
-The mathematics that grew out of it — the lazy-point switch theorems, the
-Lean 4 proofs, and the open state law — lives in [`theory/`](theory/README.md).
+The mathematics that grew out of it — the lazy-point switch theorems and the
+Lean 4 proofs of the state law (`N+4 ≤ f(N) ≤ N+5`, sharp constant one unit
+from closed) — lives in [`theory/`](theory/README.md).
 
 ```
 duplotrain solve --curve 12 --straight 4 --use-all -o out

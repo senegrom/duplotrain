@@ -24,11 +24,11 @@ enumeration, no conditional hypothesis, no Mathlib, no `native_decide`,
 no `sorry`.  (The lower bound's `N = 3` base case is checked by kernel
 `decide`; `N ≥ 4` is the symbolic trajectory.)
 
-Two hundred and sixty-two libraries, all self-contained.  To check
+Two hundred and fifty-seven libraries, all self-contained.  To check
 everything:
 
 ```
-lake build                      # builds all 262 libraries
+lake build                      # builds all 257 libraries
 lake build StateLawAxiomAudit   # prints the axioms of the headline theorems
 ```
 

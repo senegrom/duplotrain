@@ -1,15 +1,14 @@
-import KnownEdgeNAddFiveAlt
-import StateLawLowerBound
 import StateLawNAddFive
+import StateLawLowerBound
 
 /-!
-# Axiom audit for the coefficient-one state law
+# Axiom audit for the state law
 
-`#print axioms` on the canonical theorems — the `N + 5` upper bound
-(via the unconditional known-edge `N + 4`), the historical `N + 6`
-form, and the `N + 4` lower bound.  The expected output is at most the
-three standard Lean axioms (`propext`, `Classical.choice`,
-`Quot.sound`) — in particular **no** `sorryAx`.
+`#print axioms` on the headline theorems — the `N + 5` upper bound, its
+known-incoming-edge `N + 4` core, the historical `StateLaw` target, and
+the `N + 4` lower bound.  The expected output is at most the three
+standard Lean axioms (`propext`, `Classical.choice`, `Quot.sound`) — in
+particular **no** `sorryAx`.
 -/
 
 namespace GeneralN
@@ -18,11 +17,7 @@ namespace GeneralN
 
 #print axioms knownIncomingEdgeNAddFour
 
-#print axioms stateLaw
-
-#print axioms stateLaw_N_add_six_alt
-
-#print axioms known_edge_all_run_distinct_le_N_add_five
+#print axioms stateLaw_via_N_add_five
 
 #print axioms state_law_lower_bound
 

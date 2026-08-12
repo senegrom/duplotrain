@@ -4,8 +4,6 @@ defaultTargets = [
   "ActiveLobes",
   "Alternation",
   "AlternationBound",
-  "AmortizedNoveltyCharge",
-  "ArbitraryStartCoefficientOneBoundary",
   "ArbitraryStartDirectLift",
   "BABAInterlacementTail",
   "BlockAbstractEpochBoundCore",
@@ -14,10 +12,8 @@ defaultTargets = [
   "BlockSparseFixedCountCore",
   "BoundaryAbsentProtectedPair",
   "BoundaryAbsentSecondWriter",
-  "BoundaryCanonicalActionPartition",
   "BoundaryCanonicalGeometry",
   "BoundaryCanonicalOriginalOverlap",
-  "BoundaryCanonicalSaturation",
   "BoundaryChangedContactSaving",
   "BoundaryDoubleDuplicate",
   "BoundaryNAddFourSaturation",
@@ -26,7 +22,6 @@ defaultTargets = [
   "BoundaryResidualCharge",
   "BoundaryResidualNovelty",
   "BoundaryResidualSharpening",
-  "BoundarySaturationContradiction",
   "CanonicalActiveLobeFrame",
   "CanonicalEdgeRepsCore",
   "CanonicalProjectedEpochFrame",
@@ -64,7 +59,6 @@ defaultTargets = [
   "EchoConfiguration",
   "EchoMachine",
   "EdgeReversal",
-  "EmptyCurvePotential",
   "EndpointAccountingStandalone",
   "EndpointEpochExtraction",
   "EpochAggregation",
@@ -74,7 +68,6 @@ defaultTargets = [
   "FacingMergeCount",
   "FamilyLowerBound",
   "FirstActivatedExact",
-  "FirstChangedSupportTail",
   "FirstCycleCount",
   "FirstCycleCountSharp",
   "FirstReflectorNovelty",
@@ -147,11 +140,9 @@ defaultTargets = [
   "PairedPointwiseReplayCore",
   "PairedReachReplay",
   "PairedRouterRoundtrip",
-  "PartialForwardReflectorAlt",
   "PartialJourneyDichotomy",
   "PartialSecondRunNAddFour",
   "PartialSecondRunSharp",
-  "PartialSupportDamage",
   "Periodicity",
   "PersistentLobeSeparationStandalone",
   "PointwiseSimpleCycleTail",
@@ -175,7 +166,6 @@ defaultTargets = [
   "SelfEpochAmortization",
   "SelfEpochFour",
   "SelfPivotStrictShrink",
-  "SelfShrinkChargeClosure",
   "SharpCertificateClosure",
   "SharpStateLawAssembly",
   "ShortSuffixCount",
@@ -194,7 +184,6 @@ defaultTargets = [
   "StateLawNAddFive",
   "StateLawNAddFour",
   "StateLawNAddFourTop",
-  "StateLawParametricAudit",
   "StateLawThreeSharp",
   "StateLawTwoCandidate",
   "StateLawTwoSharp",
@@ -283,12 +272,6 @@ name = "Alternation"
 name = "AlternationBound"
 
 [[lean_lib]]
-name = "AmortizedNoveltyCharge"
-
-[[lean_lib]]
-name = "ArbitraryStartCoefficientOneBoundary"
-
-[[lean_lib]]
 name = "ArbitraryStartDirectLift"
 
 [[lean_lib]]
@@ -313,16 +296,10 @@ name = "BoundaryAbsentProtectedPair"
 name = "BoundaryAbsentSecondWriter"
 
 [[lean_lib]]
-name = "BoundaryCanonicalActionPartition"
-
-[[lean_lib]]
 name = "BoundaryCanonicalGeometry"
 
 [[lean_lib]]
 name = "BoundaryCanonicalOriginalOverlap"
-
-[[lean_lib]]
-name = "BoundaryCanonicalSaturation"
 
 [[lean_lib]]
 name = "BoundaryChangedContactSaving"
@@ -347,9 +324,6 @@ name = "BoundaryResidualNovelty"
 
 [[lean_lib]]
 name = "BoundaryResidualSharpening"
-
-[[lean_lib]]
-name = "BoundarySaturationContradiction"
 
 [[lean_lib]]
 name = "CanonicalActiveLobeFrame"
@@ -463,9 +437,6 @@ name = "EchoMachine"
 name = "EdgeReversal"
 
 [[lean_lib]]
-name = "EmptyCurvePotential"
-
-[[lean_lib]]
 name = "EndpointAccountingStandalone"
 
 [[lean_lib]]
@@ -491,9 +462,6 @@ name = "FamilyLowerBound"
 
 [[lean_lib]]
 name = "FirstActivatedExact"
-
-[[lean_lib]]
-name = "FirstChangedSupportTail"
 
 [[lean_lib]]
 name = "FirstCycleCount"
@@ -712,9 +680,6 @@ name = "PairedReachReplay"
 name = "PairedRouterRoundtrip"
 
 [[lean_lib]]
-name = "PartialForwardReflectorAlt"
-
-[[lean_lib]]
 name = "PartialJourneyDichotomy"
 
 [[lean_lib]]
@@ -722,9 +687,6 @@ name = "PartialSecondRunNAddFour"
 
 [[lean_lib]]
 name = "PartialSecondRunSharp"
-
-[[lean_lib]]
-name = "PartialSupportDamage"
 
 [[lean_lib]]
 name = "Periodicity"
@@ -796,9 +758,6 @@ name = "SelfEpochFour"
 name = "SelfPivotStrictShrink"
 
 [[lean_lib]]
-name = "SelfShrinkChargeClosure"
-
-[[lean_lib]]
 name = "SharpCertificateClosure"
 
 [[lean_lib]]
@@ -851,9 +810,6 @@ name = "StateLawNAddFour"
 
 [[lean_lib]]
 name = "StateLawNAddFourTop"
-
-[[lean_lib]]
-name = "StateLawParametricAudit"
 
 [[lean_lib]]
 name = "StateLawThreeSharp"
