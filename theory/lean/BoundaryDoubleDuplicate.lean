@@ -1,5 +1,6 @@
 import StateLawTwoSixUltra
 import TwoHistoryUnionCharge
+import BoundaryAbsentSecondWriter
 
 /-!
 # Two independent repetitions at the productive boundary
@@ -339,5 +340,87 @@ theorem InitialEntryWriterOccurrence.doubleReducedTwoHistory_length_le_N_add_thr
     O.doubleReducedBoundaryHistory_length original hdifferent,
     B.writerConstructionHistory_length]
   omega
+
+/-- If the unchanged occurrence is at the canonical duplicate position,
+then it is literally the flip reflector's facing mouth.  Hence its switch is
+the omitted action switch. -/
+theorem InitialEntryWriterOccurrence.switch_eq_action_of_before_length_eq_runway
+    {w : Wiring} {g e k0 : Nat}
+    {R : ManufacturedFlipReflector w g e}
+    (O : InitialEntryWriterOccurrence w g e k0
+      (ManufacturedReflector.flip R))
+    (hsame : O.before.length = R.runway.length) :
+    k0 = R.actionSwitch := by
+  have hsplit := O.split
+  change R.runway ++ (R.mouth, R.firstArm) :: R.candy =
+      O.before ++ (O.p, O.x) :: O.after at hsplit
+  have hdrop := congrArg (List.drop R.runway.length) hsplit
+  have hhead : (R.mouth, R.firstArm) = (O.p, O.x) := by
+    simpa [hsame] using congrArg List.head? hdrop
+  have hp : O.p = R.mouth := (Prod.mk.inj hhead).1.symm
+  calc
+    k0 = passageSwitch (O.p, O.x) := O.switch_eq.symm
+    _ = O.p / 3 := rfl
+    _ = R.mouth / 3 := by rw [hp]
+    _ = R.actionSwitch := by
+      rfl
+
+/-- The facing action mouth of a flip reflector is not part of its reusable
+support. -/
+theorem ManufacturedFlipReflector.action_not_mem_reusable
+    {w : Wiring} {g e : Nat}
+    (R : ManufacturedFlipReflector w g e) :
+    R.actionSwitch ∉
+      (ManufacturedReflector.flip R).reusableSwitches := by
+  intro hmem
+  change R.actionSwitch ∈
+    ((R.runway ++ R.candy).map passageSwitch) at hmem
+  obtain ⟨passage, hpassage, hswitch⟩ := List.mem_map.mp hmem
+  rcases List.mem_append.mp hpassage with hrunway | hcandy
+  · exact (R.support_foreign R.runway (by simp)
+      passage hrunway) hswitch
+  · exact (R.support_foreign R.candy (by simp)
+      passage hcandy) hswitch
+
+/-- The omitted action mouth is one of the counted finite switches. -/
+theorem ManufacturedFlipReflector.action_lt
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (R : ManufacturedFlipReflector w g e) :
+    R.actionSwitch < N := by
+  have hlt :=
+    (ManufacturedReflector.flip R).exploration_trace.switch_lt
+      hN (R.mouth, R.firstArm) (by
+        simp [ManufacturedReflector.exploration])
+  simpa [passageSwitch,
+    ManufacturedFlipReflector.actionSwitch] using hlt
+
+/-- Equality in the reusable/second-first-writer coordinate charge forces
+the omitted action mouth to be a productive first writer of the second
+construction. -/
+theorem ManufacturedFlipReflector.action_mem_second_writers_of_full_charge
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (R : ManufacturedFlipReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbaseGrooves : PathGrooves
+      (ManufacturedReflector.flip R).toSupported.paths B.baseState)
+    (hpreGrooves : PathGrooves
+      (ManufacturedReflector.flip R).toSupported.paths B.preReturn.2)
+    (hfull :
+      (ManufacturedReflector.flip R).reusableSwitches.length +
+        (rawFirstWriterTimes w N (e, B.baseState)
+          B.exploration.length).length = N) :
+    R.actionSwitch ∈ B.constructionFirstWriterSwitches N := by
+  by_cases hmem :
+      R.actionSwitch ∈ B.constructionFirstWriterSwitches N
+  · exact hmem
+  · have hsave :=
+      (ManufacturedReflector.flip R).reusable_add_second_first_writers_add_reserved_le
+        hN B hbaseGrooves hpreGrooves
+          (R.action_lt hN) R.action_not_mem_reusable hmem
+    omega
 
 end GeneralN
