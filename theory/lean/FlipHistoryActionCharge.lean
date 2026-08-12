@@ -142,7 +142,9 @@ theorem ManufacturedFlipReflector.reusable_add_second_first_writers_le_pred
       1 + A.reusableSwitches.length + times.length := by
     simp [switches, writers]
   rw [hlen] at hbound
-  simpa [A, times, Nat.add_assoc, Nat.add_left_comm, Nat.add_comm] using hbound
+  have hchargeA : A.reusableSwitches.length + times.length + 1 ≤ N := by
+    omega
+  simpa [A, times] using hchargeA
 
 /-- Consequently the flip-first preserved two-history core also has size
 `N+2` unless the second exploration has a first-writer event at the old action
@@ -171,9 +173,13 @@ theorem ManufacturedFlipReflector.preservedTwoHistoryCore_length_le_N_add_two_of
       tonguesAt, stepN, hbase, A]
   have hcharge := R.reusable_add_second_first_writers_le_pred
     hN B hbaseGrooves hpreGrooves hactionUnused
+  have hchargeA : A.reusableSwitches.length +
+      (rawFirstWriterTimes w N (e, B.baseState)
+        B.exploration.length).length + 1 ≤ N := by
+    simpa [A] using hcharge
   have hexploration : A.exploration.length = A.reusableSwitches.length + 1 := by
     simp [A, ManufacturedReflector.exploration,
-      ManufacturedReflector.reusableSwitches]
+      ManufacturedReflector.reusableSwitches, Nat.add_assoc]
   unfold ManufacturedReflector.preservedTwoHistoryCore
   rw [List.length_append, List.length_erase_of_mem hboundary,
     A.sharpHistoryCore_length,
