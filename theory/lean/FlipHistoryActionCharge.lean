@@ -139,12 +139,10 @@ theorem ManufacturedFlipReflector.reusable_add_second_first_writers_le_pred
         exact rawProductiveAt_writer_lt hN hkData.2.1
   have hbound := nodup_nat_lt_length hnd hlt
   have hlen : switches.length =
-      1 + A.reusableSwitches.length + times.length := by
+      A.reusableSwitches.length + times.length + 1 := by
     simp [switches, writers]
   rw [hlen] at hbound
-  have hchargeA : A.reusableSwitches.length + times.length + 1 ≤ N := by
-    omega
-  simpa [A, times] using hchargeA
+  simpa [A, times] using hbound
 
 /-- Consequently the flip-first preserved two-history core also has size
 `N+2` unless the second exploration has a first-writer event at the old action
