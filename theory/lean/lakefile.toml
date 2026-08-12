@@ -390,7 +390,13 @@ defaultTargets = [
   "TwoToOneConfigurationCount",
   "UnlinkedCounterObstruction",
   "VectorCount",
-  "VisibleChipReduction"
+  "VisibleChipReduction",
+  "KnownEdgeNAddFourFrontier",
+  "KnownEdgeNAddFourChangedClosed",
+  "PartialSecondRunNAddFour",
+  "ProductiveBoundaryNAddFour",
+  "StateLawNAddFour",
+  "StateLawNAddFourTop"
 ]
 
 [[lean_lib]]
@@ -1565,4 +1571,22 @@ name = "VectorCount"
 
 [[lean_lib]]
 name = "VisibleChipReduction"
+
+[[lean_lib]]
+name = "KnownEdgeNAddFourFrontier"
+
+[[lean_lib]]
+name = "KnownEdgeNAddFourChangedClosed"
+
+[[lean_lib]]
+name = "PartialSecondRunNAddFour"
+
+[[lean_lib]]
+name = "ProductiveBoundaryNAddFour"
+
+[[lean_lib]]
+name = "StateLawNAddFour"
+
+[[lean_lib]]
+name = "StateLawNAddFourTop"
 
