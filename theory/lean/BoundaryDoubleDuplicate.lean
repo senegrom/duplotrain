@@ -341,6 +341,68 @@ theorem InitialEntryWriterOccurrence.doubleReducedTwoHistory_length_le_N_add_thr
     B.writerConstructionHistory_length]
   omega
 
+/-- If the flip reflector's omitted action mouth is not a productive first
+writer of the second construction, that unused coordinate removes the final
+surcharge.  Thus the history containing the arbitrary boundary vector and
+both complete constructions has size at most `N + 2`. -/
+theorem InitialEntryWriterOccurrence.doubleReducedTwoHistory_length_le_N_add_two_of_action_absent
+    {w : Wiring} {N g e k0 : Nat}
+    (hN : forall p q, w.link p = some q ->
+      p < 3 * N /\ q < 3 * N)
+    {R : ManufacturedFlipReflector w g e}
+    (O : InitialEntryWriterOccurrence w g e k0
+      (ManufacturedReflector.flip R))
+    (B : ManufacturedReflector w e g)
+    (original : Tongues)
+    (hdifferent : O.before.length ≠ R.runway.length)
+    (hbase : B.baseState =
+      (ManufacturedReflector.flip R).activatedState)
+    (hbaseGrooves : PathGrooves
+      (ManufacturedReflector.flip R).toSupported.paths B.baseState)
+    (hpreGrooves : PathGrooves
+      (ManufacturedReflector.flip R).toSupported.paths B.preReturn.2)
+    (haction : R.actionSwitch ∉ B.constructionFirstWriterSwitches N) :
+    (O.doubleReducedTwoHistory B N original).length ≤ N + 2 := by
+  have hboundary : VectorCount.restrict N
+      (ManufacturedReflector.flip R).activatedState ∈
+      B.writerConstructionHistory N := by
+    apply List.mem_append_left
+    simp [rawFirstWriterHistory, restrictedTonguesAt,
+      tonguesAt, stepN, hbase]
+  have hactionLt : R.actionSwitch < N := by
+    have hlt :=
+      (ManufacturedReflector.flip R).exploration_trace.switch_lt
+        hN (R.mouth, R.firstArm) (by
+          simp [ManufacturedReflector.exploration])
+    simpa [passageSwitch,
+      ManufacturedFlipReflector.actionSwitch] using hlt
+  have hactionNot : R.actionSwitch ∉
+      (ManufacturedReflector.flip R).reusableSwitches := by
+    intro hmem
+    change R.actionSwitch ∈
+      ((R.runway ++ R.candy).map passageSwitch) at hmem
+    obtain ⟨passage, hpassage, hswitch⟩ := List.mem_map.mp hmem
+    rcases List.mem_append.mp hpassage with hrunway | hcandy
+    · exact (R.support_foreign R.runway (by simp)
+        passage hrunway) hswitch
+    · exact (R.support_foreign R.candy (by simp)
+        passage hcandy) hswitch
+  have hcharge :=
+    (ManufacturedReflector.flip R).reusable_add_second_first_writers_add_reserved_le
+      hN B hbaseGrooves hpreGrooves
+        hactionLt hactionNot haction
+  have hexploration :
+      (ManufacturedReflector.flip R).exploration.length =
+        (ManufacturedReflector.flip R).reusableSwitches.length + 1 := by
+    simp [ManufacturedReflector.exploration,
+      ManufacturedReflector.reusableSwitches]
+    omega
+  unfold InitialEntryWriterOccurrence.doubleReducedTwoHistory
+  rw [List.length_append, List.length_erase_of_mem hboundary,
+    O.doubleReducedBoundaryHistory_length original hdifferent,
+    B.writerConstructionHistory_length]
+  omega
+
 /-- If the unchanged occurrence is at the canonical duplicate position,
 then it is literally the flip reflector's facing mouth.  Hence its switch is
 the omitted action switch. -/
