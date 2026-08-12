@@ -64,22 +64,6 @@ theorem arrive_stem_selected (u : Tongues) (C : Nat) :
     arrive u (3*C) = (selectedBranch u C, u) := by
   simp [arrive, selectedBranch]
 
-/-- Entering the selected branch traverses the matching edge backwards and
-does not write. -/
-theorem arrive_selected_stem (u : Tongues) (C : Nat) :
-    arrive u (selectedBranch u C) = (3*C, u) := by
-  have hbranch := selectedBranch_is_branch u C
-  have hswitch := selectedBranch_switch u C
-  have hvalue : bval (selectedBranch u C) = u C := by
-    cases h : u C <;>
-      simp [selectedBranch, branchPort, bval, h] <;> omega
-  have hpin : pin u (selectedBranch u C) = u := by
-    apply pin_of_agrees
-    rw [hswitch, hvalue]
-  simp [arrive, hbranch, hswitch, hpin]
-
-/-- **Local endpoint pivot.** Entering the unmatched branch flips exactly
-this switch and exits through the stem. -/
 theorem arrive_unmatched_pivots (u : Tongues) (C : Nat) :
     arrive u (unmatchedBranch u C) = (3*C, flipAt u C) := by
   have hbranch := unmatchedBranch_is_branch u C
@@ -368,18 +352,6 @@ theorem fiveRepeatedWriterNovelty_of_cover
     (repeatedWriterPostTimes_avoid_firstHistory hN start K) hnd
   simpa [rawRepeatedWriterPostTimes] using hcount
 
-/-- Closing the finite endpoint-cover theorem closes the user-facing raw
-`N+6` state law. -/
-theorem stateLaw_of_fiveRepeatedWriterNoveltyCover
-    (hcover : FiveRepeatedWriterNoveltyCover) : StateLaw :=
-  stateLaw_of_fiveRepeatedWriterNovelty
-    (fiveRepeatedWriterNovelty_of_cover hcover)
-
-/-- **Raw productive event = endpoint pivot.**
-
-The counted writer is the unique switch whose unmatched branch the train
-enters. The old selected edge is replaced, the endpoint moves to the other
-branch, and the just-used edge is ready for exact reverse traversal. -/
 theorem rawProductiveAt_is_endpoint_pivot
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)

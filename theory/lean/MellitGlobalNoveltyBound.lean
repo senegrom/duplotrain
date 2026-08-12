@@ -64,68 +64,6 @@ theorem rawRepeatedWriterNovelTimes_length_mono
     exact mem_rawRepeatedWriterNovelTimes_iff.mpr
       ⟨Nat.lt_of_lt_of_le hkData.1 hHK, hkData.2⟩
 
-/-- Every prefix of the canonical first-turnaround journey contains at most
-one globally novel repeated-writer post-state. The complete journey theorem
-comes from pointwise retrace; horizon monotonicity gives every shorter prefix.
--/
-theorem ManufacturedReflector.first_turnaround_repeatedWriterNovelty_le_one
-    {w : Wiring} {N g e H : Nat}
-    (A : ManufacturedReflector w g e)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hpaths : PathGrooves A.toSupported.paths A.activatedState)
-    (hH : H ≤ A.exploration.length + A.runway.length + 1) :
-    (rawRepeatedWriterNovelTimes w N (g, A.baseState) H).length ≤ 1 := by
-  have hmono := rawRepeatedWriterNovelTimes_length_mono
-    (w := w) (N := N) (start := (g, A.baseState)) hH
-  have hfull := A.manufacturing_repeatedWriterNovelty_le_one hN hpaths
-  omega
-
-/-- The raw first-repeat theorem, strengthened with its exact novelty charge.
-Either the first repeated switch already gives a bounded lasso, or the actual
-manufactured first reflector has at most one repeated-writer novelty through
-its complete pop/retrace journey. -/
-theorem first_repeat_turnaround_novelty_outcome
-    {w : Wiring} {N e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start finish : Nat × Tongues}
-    (hlive : stepN w (N + 1) start = some finish)
-    (hentry : w.link e = some start.1) :
-    EventuallyPeriodicWithin w start (3 * N) ∨
-      ∃ (A : ManufacturedReflector w start.1 e)
-          (state : Tongues) (travel : Nat),
-        travel ≤ 2 * N + 1 ∧
-        PathGrooves A.toSupported.paths state ∧
-        A.baseState = start.2 ∧
-        state = A.activatedState ∧
-        stepN w travel start = some (e, state) ∧
-        (∀ j, j ∉ A.exploration.map passageSwitch →
-          state j = start.2 j) ∧
-        (rawRepeatedWriterNovelTimes w N start
-          (A.exploration.length + A.runway.length + 1)).length ≤ 1 := by
-  rcases first_activated_quantitative_outcome hN hlive hentry with
-    hperiodic | hreflector
-  · exact Or.inl hperiodic
-  · right
-    obtain ⟨A, state, travel, htravel, hpaths, hbase, hactivated,
-      hreach, hpreserves⟩ := hreflector
-    have hactivatedPaths :
-        PathGrooves A.toSupported.paths A.activatedState := by
-      simpa [hactivated] using hpaths
-    have hbound :=
-      A.manufacturing_repeatedWriterNovelty_le_one hN hactivatedPaths
-    have hstart : (start.1, A.baseState) = start := by
-      apply Prod.ext
-      · rfl
-      · exact hbase
-    rw [hstart] at hbound
-    exact ⟨A, state, travel, htravel, hpaths, hbase,
-      hactivated, hreach, hpreserves, hbound⟩
-
-/-- Mellit's literal second-repeat dichotomy, retaining the sharp charge for
-the entire first turnaround. The second branch is an actual opposite
-reflector, not a conditional certificate. -/
 theorem mellit_second_repeat_with_first_turnaround_bound
     {w : Wiring} {N g e : Nat}
     (A : ManufacturedReflector w g e)

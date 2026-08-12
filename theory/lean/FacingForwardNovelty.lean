@@ -780,40 +780,4 @@ theorem FacingForwardPointwiseTail.one_novelty_charge
     · exact List.mem_append_left _ halternateHistorical
     · exact List.mem_append_right _ (by simp)
 
-/-- Distinct-vector form of the charge theorem, ready for the final StateLaw
-bookkeeping: samples taken anywhere in the facing-forward future contribute at
-most one vector beyond the supplied construction history. -/
-theorem FacingForwardPointwiseTail.distinct_samples_le_history_add_one
-    {w : Wiring} {g e N : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (S : FacingForwardPointwiseTail A B)
-    (history : List (List Bool))
-    (hleadHistorical : ∀ j, j ≤ S.leadSteps →
-      restrictedTonguesAt w N (g, B.activatedState) j ∈ history)
-    (times : List Nat)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, B.activatedState))).Nodup) :
-    times.length ≤ history.length + 1 := by
-  exact noveltyCoverOn_distinct_count
-    (S.one_novelty_charge history hleadHistorical times) hnd
-
-/-- Direct public extraction: every facing-forward merge supplies both the
-bounded pointwise tail and its one-vector charge law.  There is no residual
-eventual-periodicity or novelty hypothesis in this theorem. -/
-theorem ManufacturedReflector.FacingForwardMerge.bounded_pointwise_charge
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (hmerge : A.FacingForwardMerge B) :
-    ∃ S : FacingForwardPointwiseTail A B,
-      ∀ (N : Nat) (history : List (List Bool)),
-        (∀ j, j ≤ S.leadSteps →
-          restrictedTonguesAt w N (g, B.activatedState) j ∈ history) →
-        ∀ times : List Nat,
-          NoveltyCoverOn w N (g, B.activatedState) times history 1 := by
-  obtain ⟨S⟩ := hmerge.has_pointwiseTail
-  exact ⟨S, fun _N history hlead times =>
-    S.one_novelty_charge history hlead times⟩
-
 end GeneralN

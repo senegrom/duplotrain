@@ -536,26 +536,6 @@ theorem RawCycleThroughSelfLink.outside_period
   rw [hsplit', stepN_add, hreturn]
   exact hout
 
-/-- The self-link on the periodic orbit is an actual empty-runway identity
-reflector, based at the state in which the raw orbit reaches it. -/
-theorem RawCycleThroughSelfLink.stay_reflector
-    {w : Wiring} {start : Nat × Tongues} {close : Nat}
-    (R : RawCycleThroughSelfLink w start close) :
-    ∃ outside,
-      w.link (3 * (R.branch / 3)) = some outside ∧
-      Nonempty (ManufacturedStayReflector w
-        (3 * (R.branch / 3)) outside) := by
-  obtain ⟨outside, hmouth, _hstep⟩ := R.branch_step
-  exact ⟨outside, hmouth,
-    self_link_core_stay_reflector
-      R.branch_port R.self_link hmouth R.self_selected⟩
-
-/-- Honest raw-time outcome of the certified placement theorem.  It does not
-claim that the certified witness is in the image of `clock`.  Instead,
-starting at the represented third opening, the independently certified raw
-journey either encounters the self-link by the represented first closing, or
-the closing configuration lies on a raw cycle which encounters that
-self-link strictly inside one period. -/
 def CertifiedSelfLinkRawEndpointOutcome
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     {z0 z1 z2 z3 z4 : Nat}

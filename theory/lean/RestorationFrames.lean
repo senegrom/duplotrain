@@ -77,24 +77,6 @@ structure CompatibleTwoReflectorTail (k x a b : Nat) : Prop where
   distinct : ReflectorCellsDistinct
     (m.cellOf a) (m.cellOf x) (m.cellOf (m.bar x)) (m.cellOf b)
 
-/-- The compatible alternative is genuinely terminal: it has at most four
-register snapshots after its initialization block. -/
-theorem CompatibleTwoReflectorTail.snapshots_four
-    (hrun : IsRun m e r0)
-    (cells : List Nat)
-    (hcells : ∀ t, m.star (m.cellOf (e t)) ∈ cells)
-    {k x a b : Nat}
-    (htrap : CompatibleTwoReflectorTail m e r0 k x a b)
-    (ks : List Nat)
-    (hks : ∀ j ∈ ks, k+4 ≤ j)
-    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
-    ks.length ≤ 4 := by
-  exact two_reflector_edge_snapshots_four m e r0 hrun cells hcells
-    htrap.start htrap.aLobe htrap.aPartner htrap.bLobe htrap.bPartner
-    htrap.aOccupied htrap.bOccupied htrap.distinct ks hks hnd
-
-/-- A returned root replays a certified component when endpoint support and
-the old edge's one-step preservation are supplied directly. -/
 theorem returned_root_replays_component_of_support
     (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c)
@@ -148,24 +130,6 @@ theorem returned_root_replays_component
   exact returned_root_replays_component_of_support m e r0 hrun hr0 cells
     hpk hpl hsupport hpres hdiffk hdiffl hreturn hroot
 
-/-- A foreign first-restoration frame packages exactly the hypotheses needed
-for returned-root replay, except for fixed support and the rooted component
-certificate. -/
-theorem foreign_restoration_replays_rooted_component
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells : List Nat) {t u : Nat}
-    (hframe : ForeignRestorationFrame m e r0 t u)
-    (hfixed : PairedSupportFixed m e r0 t (u+1))
-    (hroot : RootedCells m e r0 t (oldSlot m e r0 t) cells) :
-    snap m e r0 cells (u+1) = snap m e r0 cells t := by
-  rcases hframe with ⟨⟨hrestore, _hfirst⟩, hdiffT, hdiffU⟩
-  exact returned_root_replays_component m e r0 hrun hr0 cells
-    hrestore.2.1 hfixed hrestore.1 hrestore.2.2.1
-    hdiffT hdiffU hrestore.2.2.2.2 hroot
-
-/-- A bounded true predicate with a false left endpoint has a first true
-point. This elementary form avoids importing a choice/minimum API. -/
 private theorem exists_first_after {P : Nat → Prop} :
     ∀ d a, ¬ P a → P (a+d+1) →
       ∃ s, a < s ∧ s ≤ a+d+1 ∧ P s ∧
@@ -254,27 +218,6 @@ theorem change_has_last_productive_write
   apply hlast s hts hsj
   exact ⟨hprod, hsame.trans hp.2⟩
 
-/-- A last productive write controls its register until the endpoint: other
-productive writes and all unproductive steps cannot change that cell. -/
-theorem last_productive_write_controls_register
-    {t j : Nat} (htj : t < j)
-    (hlast : ∀ s, t < s → s < j → ProductiveStep m e r0 s →
-      writerAt m e s ≠ writerAt m e t) :
-    reg m e r0 j (writerAt m e t) = e (t+1) := by
-  have hwrite : reg m e r0 (t+1) (writerAt m e t) = e (t+1) :=
-    reg_write m e r0 rfl
-  by_cases heq : reg m e r0 j (writerAt m e t) =
-      reg m e r0 (t+1) (writerAt m e t)
-  · exact heq.trans hwrite
-  · obtain ⟨s, hs0, hs1, hp, hc⟩ :=
-      change_has_productive_le m e r0 (by omega) heq
-    have hne := hlast s (by omega) hs1 hp
-    exfalso
-    apply hne
-    simpa [writerAt] using hc
-
-/-- If a productive write's register later contains its evicted slot again,
-there is a first restoration frame ending before that later state. -/
 theorem exists_first_restoration_frame_of_register_return
     (hr0 : ∀ c, m.cellOf (r0 c) = c)
     {t j : Nat}
@@ -502,25 +445,5 @@ theorem bar_retrace_or_first_overwrite
         · simpa [writerAt] using hc
         · intro s hts hsj hprod
           exact hlast s hts (by simpa using hsj) hprod
-
-/-- Projection of `bar_retrace_or_first_overwrite` retaining only the exact
-retrace or the named overwrite witness. -/
-theorem bar_retrace_or_overwrite
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    {i j d : Nat}
-    (hij : i + d ≤ j)
-    (hstart : e j = m.bar (e (i+d))) :
-    (∀ q, q ≤ d →
-      e (j+q) = m.bar (e (i + (d-q)))) ∨
-    ∃ q t, q < d ∧
-      i + (d-q-1) ≤ t ∧ t < j+q ∧
-      ProductiveStep m e r0 t ∧
-      writerAt m e t = m.cellOf (e (i + (d-q-1))) := by
-  rcases bar_retrace_or_first_overwrite m e r0 hrun hr0 hij hstart with
-    htrace | ⟨q, t, hq, _hprefix, _hfail, hlow, hhigh,
-      hp, hc, _hlast⟩
-  · exact Or.inl htrace
-  · exact Or.inr ⟨q, t, hq, hlow, hhigh, hp, hc⟩
 
 end Echo

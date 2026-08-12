@@ -11,28 +11,6 @@ literal five-close accounting theorem.
 
 namespace GeneralN
 
-/-- The opposite-reflector branch selects the self-linked arm automatically. -/
-theorem RawCycleThroughSelfLink.close_tail_of_opposite_reflector_selected
-    {w : Wiring} {N : Nat} {start : Nat × Tongues} {close : Nat}
-    (R : RawCycleThroughSelfLink w start close)
-    {outside : Nat} {atRepeat : Nat × Tongues} {visited : Nat}
-    (A : ManufacturedReflector w outside (3 * (R.branch / 3)))
-    (state : Tongues) (backSteps : Nat)
-    (hmouth : w.link (3 * (R.branch / 3)) = some outside)
-    (hvisited : stepN w visited (outside, R.state) = some atRepeat)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hbase : A.baseState = R.state)
-    (hstate : state = A.activatedState)
-    (hback : stepN w backSteps atRepeat =
-      some (3 * (R.branch / 3), state)) :
-    Nonempty (RawTwoVectorTail w N start) := by
-  have hselected : state (R.branch / 3) = bval R.branch :=
-    R.opposite_reflector_state_selected A state hbase hstate
-  exact R.close_tail_of_opposite_reflector A state backSteps
-    hmouth hvisited hA hback hselected
-
-/-- Exact-shift version of period-base rotation.  The constructed tail starts
-at base; unlike the older Nonempty interface, this fact remains visible. -/
 theorem RawTwoVectorTail.rotate_back_to_period_base_exact
     {w : Wiring} {N : Nat} {start cycleStart : Nat × Tongues}
     {base period offset : Nat}

@@ -35,22 +35,6 @@ private theorem tailsharp_nodup_of_map_nodup
         exact List.mem_map.mpr ⟨x, hx, rfl⟩
       · exact ih hnd.2
 
-private theorem tailsharp_nodup_filter_nat (p : Nat → Bool) :
-    ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hm => hnd.1 (List.mem_filter.mp hm).1, ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
 private theorem tailsharp_nodup_map_filter
     {α : Type} [BEq α] [LawfulBEq α]
     {f : Nat → α} (p : Nat → Bool) :

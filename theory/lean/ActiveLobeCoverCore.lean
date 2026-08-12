@@ -62,22 +62,4 @@ theorem pairedPointFrozen_of_noWrite
     rw [hnorm] at hstable
     exact hstable
 
-/-- **Active-lobe completeness yields the full pointwise replay cover.** -/
-theorem pairedReplayCover_of_active_complete
-    (lo hi : Nat) (cells lobes : List Nat)
-    (hstructure : ∀ c ∈ cells,
-      CoreNoLobe m c ∨
-        ∃ a, m.cellOf a = c ∧ m.cellOf (m.bar a) = c)
-    (hcomplete : ActiveLobesComplete m e r0
-      lo hi cells lobes) :
-    PairedReplayCover m e r0 lo hi cells lobes := by
-  intro c hc
-  rcases hstructure c hc with hnon | hlobe
-  · exact Or.inr (Or.inl hnon)
-  · by_cases hw : CellWrittenIn m e r0 lo hi c
-    · rcases hcomplete c hc hlobe hw with ⟨a, ha, hac⟩
-      exact Or.inl ⟨a, ha, hac⟩
-    · exact Or.inr (Or.inr
-        (pairedPointFrozen_of_noWrite m e r0 hw))
-
 end Echo

@@ -309,43 +309,6 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three
         hN hA haction hk0 hreservedExploration hreservedApproach
         times hlive hnd
 
-/-- Sharpened keystone: the only approach-written geometry that can survive
-an exploration-absent boundary saving is a productive first write of the
-boundary switch itself. -/
-theorem PartialSecondRunSharp.ChangedContact.flip_saving_le_N_add_three_or_boundary_written
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (D : PartialSecondRunSharp.ChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (hk0 : k0 < N)
-    (hreservedExploration : Not (k0 ∈
-      (ManufacturedReflector.flip R).exploration.map passageSwitch))
-    (times : List Nat)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
-    times.length <= N + 3 \/
-      k0 ∈ D.toSimpleContinuationChangedContact.approachFirstWriterSwitches N := by
-  by_cases hk0Written :
-      k0 ∈ D.toSimpleContinuationChangedContact.approachFirstWriterSwitches N
-  · exact Or.inr hk0Written
-  · exact Or.inl
-      (D.toSimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three_of_reserved_absent
-        hN hA hk0 hreservedExploration hk0Written times hlive hnd)
-
-
-/-- A switch-simple changed-contact approach cannot productively first-write
-its starting switch when the start port is that switch's stem.  Time zero is
-a quiet facing passage; any later occurrence would repeat the first passage's
-switch. -/
 theorem SimpleContinuationChangedContact.stem_switch_not_mem_approachFirstWriterSwitches
     {w : Wiring} {N g e k0 : Nat}
     {R : ManufacturedFlipReflector w g e}

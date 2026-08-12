@@ -243,17 +243,4 @@ theorem linear_accounting_bound
   simp only [List.length_cons, List.length_append, List.length_map] at hle
   omega
 
-/-- If there are no alternations at all before `K`, the bound is exactly
-`#cells + 1`. -/
-theorem linear_no_alternation_bound
-    (cells : List Nat) (hcells : ∀ k, m.cellOf (e k) ∈ cells)
-    (K : Nat)
-    (hfirst : ∀ i, i < K → ProductiveStep m e r0 i → FirstStep m e i)
-    (ks : List Nat) (hks : ∀ k ∈ ks, k ≤ K)
-    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
-    ks.length ≤ cells.length + 1 := by
-  have h := linear_accounting_bound m e r0 cells hcells K []
-    (fun i hi hp => Or.inl (hfirst i hi hp)) ks hks hnd
-  simpa using h
-
 end Echo

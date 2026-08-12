@@ -375,42 +375,6 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_four_
   have hlength := C.compressedLead_length_le hN hA
   omega
 
-/-- First exact frontier: every changed-contact run is already `N+4`, unless
-the strict approach productively first-writes the flip reflector's omitted
-facing-action coordinate. -/
-theorem SimpleContinuationChangedContact.changed_N_add_four_or_action_first_written
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (times : List Nat)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
-    times.length <= N + 4 ∨
-      R.actionSwitch ∈ C.approachFirstWriterSwitches N := by
-  by_cases haction :
-      R.actionSwitch ∈ C.approachFirstWriterSwitches N
-  · exact Or.inr haction
-  · exact Or.inl
-      (C.changed_all_run_distinct_le_N_add_four_of_action_absent
-        hN hA haction times hlive hnd)
-
-/-- The exact unresolved geometry after all presently available `N+4`
-savings.  The contact is forward, the old facing-action coordinate has
-already been productively first-written in the approach, and the contact
-enters an old runway suffix.  From the post-contact configuration onward the
-run has the displayed two-coordinate Gray-square alphabet.  The old-action
-corner is not historical; otherwise only the double-flipped corner would be
-new and the branch would already be `N+4`. -/
 structure SimpleContinuationChangedContact.RunwayNAddFourResidual
     {w : Wiring} {N g e : Nat}
     (R : ManufacturedFlipReflector w g e)
@@ -1023,59 +987,5 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_four
   · exact hbound
   · obtain ⟨F⟩ := hresidual
     exact (F.impossible hN hA).elim
-
-/-- A finite continuation which actually falls off cannot realize the runway
-residual, because that residual is live at every later depth.  Thus the
-changed-contact fall branch is unconditionally `N+4` for an old flip
-reflector. -/
-theorem SimpleContinuationChangedContact.changed_fall_distinct_le_N_add_four
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (hfall : step w C.finish = none)
-    (times : List Nat)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
-    times.length <= N + 4 := by
-  rcases C.changed_N_add_four_or_runway_residual
-      hN hA times hlive hnd with hsmall | hresidual
-  · exact hsmall
-  · obtain ⟨F⟩ := hresidual
-    let K := C.approach.length + 1
-    let d := C.suffix.length + 1
-    obtain ⟨tailFinish, htailLive⟩ := F.tail_live d
-    have hlength : C.full.length + 1 = K + d := by
-      rw [C.split]
-      simp [K, d]
-      omega
-    have hlocalLive : stepN w (C.full.length + 1)
-        (e, (ManufacturedReflector.flip R).activatedState) =
-          some tailFinish := by
-      rw [hlength, stepN_add]
-      change stepN w K
-        (e, (ManufacturedReflector.flip R).activatedState) >>= _ = _
-      rw [show stepN w K
-          (e, (ManufacturedReflector.flip R).activatedState) =
-            some (F.outside,
-              flipAt C.contactState (F.mouth / 3)) by
-        simpa [K] using F.post_reach]
-      exact htailLive
-    have hlocalDead : stepN w (C.full.length + 1)
-        (e, (ManufacturedReflector.flip R).activatedState) = none := by
-      rw [show C.full.length + 1 = C.full.length + 1 by rfl,
-        stepN_add, C.full_trace.sound]
-      simpa [stepN] using hfall
-    rw [hlocalLive] at hlocalDead
-    cases hlocalDead
 
 end GeneralN

@@ -11,21 +11,6 @@ vector exactly compared with naïvely adding the two cardinality bounds.
 
 namespace GeneralN
 
-private theorem bot_nodup_of_map_nodup
-    {α β : Type} [BEq α] [LawfulBEq α]
-    [BEq β] [LawfulBEq β]
-    (f : α → β) :
-    ∀ {xs : List α}, (xs.map f).Nodup → xs.Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      rw [List.nodup_cons]
-      exact ⟨fun hx => hnd.1 (List.mem_map.mpr ⟨x, hx, rfl⟩),
-        ih hnd.2⟩
-
 private theorem bot_nodup_map_filter
     {α : Type} [BEq α] [LawfulBEq α]
     {f : Nat → α} (p : Nat → Bool) :

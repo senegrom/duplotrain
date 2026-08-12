@@ -145,32 +145,4 @@ private theorem nodup_subset_length_nat {l S : List Nat}
       simp only [List.length_cons]
       omega
 
-/-- **Slot-linear bound.** Under the single replay lemma, any pairwise-
-distinct family of snapshots whose productive arrivals lie in `slots` has
-size at most `slots.length + 1`. -/
-theorem slot_linear_bound
-    (cells slots : List Nat) (hslots : ∀ k, e k ∈ slots)
-    (hreplay : ProductiveSlotReplay m e r0 cells)
-    (ks : List Nat)
-    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
-    ks.length ≤ slots.length + 1 := by
-  have hcodes : (ks.map (slotCode m e r0)).Nodup :=
-    nodup_transfer_slot
-      (fun x _ y _ hc => slotCode_eq_snap_eq m e r0 cells hreplay hc)
-      hnd
-  have hmem : ∀ v ∈ ks.map (slotCode m e r0),
-      v ∈ 0 :: slots.map (fun s => s + 1) := by
-    intro v hv
-    obtain ⟨k, _, rfl⟩ := List.mem_map.mp hv
-    rcases slotCode_spec m e r0 cells k with ⟨hc0, _⟩ |
-        ⟨j, _, _, hc, _⟩
-    · rw [hc0]; exact List.mem_cons_self
-    · rw [hc]
-      exact List.mem_cons_of_mem _
-        (List.mem_map.mpr ⟨e (j+1), hslots (j+1), rfl⟩)
-  have hle := nodup_subset_length_nat hcodes hmem
-  rw [List.length_map] at hle
-  simp only [List.length_cons, List.length_map] at hle
-  exact hle
-
 end Echo

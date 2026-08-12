@@ -237,30 +237,6 @@ theorem reg_foreign (cells : List Nat) (hallcells : ∀ s, m.cellOf s ∈ cells)
         (fun h : m.cellOf (e (n+1)) = c => hc (h ▸ hallcells (e (n+1))))]
       exact ih
 
-/-- **Every run is a rho.**  There are a pre-period `K` and a period
-`p ≥ 1`, with `K + p ≤ |slots|^(|cells|+1) + 1`, such that from time `K`
-on the entries repeat with period `p`. -/
-theorem run_eventually_periodic (hrun : IsRun m e r0)
-    (cells slots : List Nat)
-    (hcells : ∀ k, m.star (m.cellOf (e k)) ∈ cells)
-    (hregslots : ∀ j c, reg m e r0 j c ∈ slots) :
-    ∃ K p, 0 < p ∧ K + p ≤ slots.length ^ (cells.length + 1) + 1 ∧
-      ∀ t, K ≤ t → e (t + p) = e t := by
-  obtain ⟨i, j, hij, hjle, hF⟩ := state_repeat m e r0 cells slots hregslots
-  have hreplay := state_replay m e r0 hrun cells hcells hF
-  refine ⟨i, j - i, by omega, by omega, ?_⟩
-  intro t ht
-  obtain ⟨s, rfl⟩ : ∃ s, t = i + s := ⟨t - i, by omega⟩
-  have h := stateCode_entry_eq m e r0 cells (hreplay s)
-  have harith : i + s + (j - i) = j + s := by omega
-  rw [harith]
-  exact h.symm
-
-/-- **The rho theorem with conservation.**  Every run enters a cycle:
-beyond the pre-period the entries and all registers repeat with period
-`p`, and every productive step re-emits a token — the cycle's token
-population is conserved.  The pre-period and period are explicitly
-bounded by the state-space size. -/
 theorem run_rho (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (cells slots : List Nat) (hnd : slots.Nodup)
     (hallcells : ∀ s, m.cellOf s ∈ cells)

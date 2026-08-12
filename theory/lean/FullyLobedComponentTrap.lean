@@ -89,20 +89,4 @@ theorem fully_lobed_component_orbit
       rw [← hidx, hround.2]
       exact ih
 
-/-- A convenient contradiction form: a trajectory which never returns to its
-starting entry cannot be visiting a fully externally lobed closed component. -/
-theorem not_fully_lobed_of_no_four_return
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells : List Nat) {lo k : Nat}
-    (hclosed : SelectedClosedFrom m e r0 cells lo)
-    (hk : lo ≤ k)
-    (hentry : m.cellOf (e k) ∈ cells)
-    (hnoReturn : e (k+4) ≠ e k) :
-    ¬ FullyExternallyLobedFrom m e r0 cells lo := by
-  intro hlubed
-  exact hnoReturn
-    (fully_lobed_component_roundtrip m e r0 hrun hr0
-      cells hclosed hlubed hk hentry).2
-
 end Echo

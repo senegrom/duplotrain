@@ -413,17 +413,4 @@ theorem RawConsecutiveSixEvents.overlapping_windows
     tail_shape := tailShape
   }⟩
 
-/-- Any six-event failure of `FiveRepeatedWriterNovelty` supplies both
-overlapping five-frame outcomes over the same canonical six raw events, with
-the five consecutive-event facts retained. -/
-theorem six_repeated_novelties_reduce_to_overlapping_windows
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hsix : 6 ≤ (rawRepeatedWriterNovelTimes w N start K).length) :
-    Nonempty (RawOverlappingFiveWindowReduction w N start) := by
-  obtain ⟨C⟩ :=
-    six_repeated_novelties_have_consecutive_first_six start K hsix
-  exact C.overlapping_windows hN
-
 end GeneralN

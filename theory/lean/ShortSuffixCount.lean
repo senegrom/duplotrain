@@ -136,27 +136,6 @@ theorem boundary_history_covered_journey_then_dead_suffix_distinct_le
     hreach history hprefixCover hboundary htail hhorizon
       times hlive hnd
 
-/-- `N+2` history vectors followed by death at `N+1` steps give the raw
-two-stage bound `2*N+3`, without assuming boundary overlap. -/
-theorem short_suffix_after_history_distinct_le_two_mul_add_three
-    {w : Wiring} {N lead : Nat}
-    {start endpoint : Nat × Tongues}
-    (hreach : stepN w lead start = some endpoint)
-    (history : List (List Bool))
-    (hprefixCover : ∀ d, d ≤ lead →
-      restrictedTonguesAt w N start d ∈ history)
-    (hhistory : history.length ≤ N + 2)
-    (hdead : stepN w (N + 1) endpoint = none)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ 2 * N + 3 := by
-  have hcount := history_covered_journey_then_dead_suffix_distinct_le
-    hreach history hprefixCover hdead (by omega) times hlive hnd
-  omega
-
-/-- With the journey endpoint already represented in its `N+2` history, the
-same short suffix costs one fewer vector: at most `2*N+2` in total. -/
 theorem short_suffix_after_boundary_history_distinct_le_two_mul_add_two
     {w : Wiring} {N lead : Nat}
     {start endpoint : Nat × Tongues}

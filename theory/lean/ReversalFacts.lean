@@ -57,39 +57,6 @@ theorem mirror_arrow_stable
     _ = m.star (m.cellOf (e k)) :=
       reversed_arrow m e r0 hrun hr0 k
 
-/-- **Forced mirror return.**  If no `b`-entry occurs after a transition
-`a -> b`, then a later visit to `star b` must immediately go to `star a`. -/
-theorem forced_mirror_return
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (k d : Nat)
-    (hno : ∀ l, k+1 < l → l ≤ k+1+d →
-      m.cellOf (e l) ≠ m.cellOf (e (k+1)))
-    (hcur : m.cellOf (e (k+1+d)) =
-      m.star (m.cellOf (e (k+1)))) :
-    m.cellOf (e (k+1+d+1)) = m.star (m.cellOf (e k)) := by
-  calc
-    m.cellOf (e (k+1+d+1))
-        = nextCell m e r0 (k+1+d) (m.cellOf (e (k+1+d))) :=
-            (cell_step m e r0 hrun (k+1+d)).symm
-    _ = nextCell m e r0 (k+1+d)
-          (m.star (m.cellOf (e (k+1)))) := by rw [hcur]
-    _ = m.star (m.cellOf (e k)) :=
-      mirror_arrow_stable m e r0 hrun hr0 k d hno
-
-/-- The only source whose cell-level arrow can change at step `k` is the
-mirror of the arrival cell. -/
-theorem nextCell_changed_source
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    {k c : Nat}
-    (hchg : nextCell m e r0 (k+1) c ≠ nextCell m e r0 k c) :
-    c = m.star (m.cellOf (e (k+1))) := by
-  by_cases h : c = m.star (m.cellOf (e (k+1)))
-  · exact h
-  · exact absurd (nextCell_skip m e r0 h) hchg
-
-/-- If the mirror arrow already points backwards, the step makes no change at
-all to the cell-level arrow function.  Such a step may still change a slot
-inside one cell; this is exactly the hidden lobe/parallel-edge fibre. -/
 theorem nextCell_stall_of_mirror_present
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (k : Nat)
@@ -102,17 +69,5 @@ theorem nextCell_stall_of_mirror_present
   · rw [if_pos hc, hc]
     exact hpresent.symm
   · rw [if_neg hc]
-
-/-- The finite cell projection is unchanged in the hidden-fibre case. -/
-theorem cellSnap_stall_of_mirror_present
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells : List Nat) (k : Nat)
-    (hpresent : nextCell m e r0 k
-      (m.star (m.cellOf (e (k+1)))) = m.star (m.cellOf (e k))) :
-    cellSnap m e r0 cells (k+1) = cellSnap m e r0 cells k := by
-  unfold cellSnap
-  apply List.map_congr_left
-  intro c _
-  exact nextCell_stall_of_mirror_present m e r0 hrun hr0 k hpresent c
 
 end Echo

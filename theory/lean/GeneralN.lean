@@ -95,14 +95,6 @@ theorem trailing_route (w : Wiring) (p : Nat) (t : Tongues)
     (step w (p, t)).map Prod.fst = w.link (3 * (p / 3)) := by
   cases h : w.link (3 * (p / 3)) <;> simp [step, arrive, hp, h]
 
-/-- Hence it is independent of the tongues. -/
-theorem trailing_route_independent (w : Wiring) (p : Nat) (t u : Tongues)
-    (hp : p % 3 ≠ 0) :
-    (step w (p, t)).map Prod.fst = (step w (p, u)).map Prod.fst := by
-  rw [trailing_route w p t hp, trailing_route w p u hp]
-
-/-! ## Descents: trailing cascades carrying their wiring facts -/
-
 inductive Descent (w : Wiring) :
     Tongues → Nat → List Nat → Nat → Tongues → Prop
   | last {t : Tongues} {p s : Nat} :
@@ -129,15 +121,6 @@ theorem descent_sound {w : Wiring} {t : Tongues} {p s : Nat}
     rw [h1]
     simpa using ih
 
-theorem descent_pins {w : Wiring} {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') :
-    t' = (p :: ps).foldl pin t := by
-  induction h with
-  | last hp hlink hs => rfl
-  | cons hp hlink hp' _ ih => simpa using ih
-
-/-- `u` agrees with the pins of every branch in `l`. -/
 def Agrees (u : Tongues) (l : List Nat) : Prop :=
   ∀ b ∈ l, u (b / 3) = bval b
 
@@ -442,52 +425,6 @@ theorem dogbone_halfPeriod
   rw [stepN_add, hop2]
   simpa using back
 
-/-- Full period: two half-periods restore the tongues exactly.  The bounce
-is a genuine cycle, and its tongue states are precisely the Gray square
-`{u, flip a u, flip a (flip b u), flip b u}` at the phase boundaries. -/
-theorem dogbone_period
-    (w : Wiring) (a b p : Nat) (ps : List Nat) (t₀ t₁ : Tongues) (u : Tongues)
-    (ha_lobe : w.link (3 * a + 1) = some (3 * a + 2))
-    (hb_lobe : w.link (3 * b + 1) = some (3 * b + 2))
-    (ha_stem : w.link (3 * a) = some p)
-    (hD : Descent w t₀ p ps (3 * b) t₁)
-    (hagree : Agrees u (p :: ps))
-    (hnota : ∀ q ∈ p :: ps, q / 3 ≠ a)
-    (hnotb : ∀ q ∈ p :: ps, q / 3 ≠ b)
-    (hab : a ≠ b) :
-    stepN w (2 * (2 * ps.length + 6)) (3 * a, u) = some (3 * a, u) := by
-  have h1 := dogbone_halfPeriod w a b p ps t₀ t₁ u
-    ha_lobe hb_lobe ha_stem hD hagree hnota hnotb
-  have hagree' : Agrees (flipAt (flipAt u a) b) (p :: ps) :=
-    agrees_flip (agrees_flip hagree hnota) hnotb
-  have h2 := dogbone_halfPeriod w a b p ps t₀ t₁
-    (flipAt (flipAt u a) b)
-    ha_lobe hb_lobe ha_stem hD hagree' hnota hnotb
-  have hflip : flipAt (flipAt (flipAt (flipAt u a) b) a) b = u := by
-    rw [flipAt_comm (Ne.symm hab), flipAt_flipAt, flipAt_flipAt]
-  have hlen : 2 * (2 * ps.length + 6)
-      = (2 * ps.length + 6) + (2 * ps.length + 6) := by omega
-  rw [hlen, stepN_add, h1]
-  show stepN w (2 * ps.length + 6) (3 * a, flipAt (flipAt u a) b) = _
-  rw [h2, hflip]
-
-/-! ## Reflector gadgets: the bounce beyond lobes
-
-A *reflector* is a one-port gadget: a train facing its mouth stem wanders
-inside and, a fixed number of steps later, emerges over the mouth's own
-edge, with the tongues transformed by a fixed map `τ` on an invariant state
-class.  A lobed switch is the smallest reflector (`lobe_isReflector`, with
-`τ = flipAt a`); the compound rotators observed in the exhaustive winners
-are two-switch reflectors.  The bounce theorem below shows that ANY two
-reflectors joined by ANY trailing cascade trap the train forever in a
-four-phase cycle whose tongue states are the orbit of the group generated
-by `τA, τB` -- for involutions with disjoint support, the Gray square.
-This reduces the general cycle theorem to the single remaining claim that
-every maximal active cluster implements a reflector interface (C* of
-../lazy-point-theory.md). -/
-
-/-- A reflector with mouth `g`, exit port `e` (the far end of `g`'s own
-edge), period `k`, invariant state class `S` and state map `τ`. -/
 def IsReflector (w : Wiring) (g e k : Nat)
     (S : Tongues → Prop) (τ : Tongues → Tongues) : Prop :=
   ∀ u, S u → stepN w k (g, u) = some (e, τ u) ∧ S (τ u)

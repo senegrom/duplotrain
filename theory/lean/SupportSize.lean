@@ -113,26 +113,4 @@ private theorem nodup_subset_length_nat {l S : List Nat}
       simp only [List.length_cons]
       omega
 
-/-- **Support-size bound.**  A finite list of occupied, nonduplicated physical
-jump edges injects into any cell universe containing both endpoints. -/
-theorem occupied_edges_le_cells
-    (edges cells : List Nat) (k : Nat)
-    (hreps : EdgeRepresentatives m edges)
-    (hocc : ∀ s ∈ edges, Occupied m e r0 k s)
-    (hcells : ∀ s ∈ edges,
-      m.cellOf s ∈ cells ∧ m.cellOf (m.bar s) ∈ cells) :
-    edges.length ≤ cells.length := by
-  classical
-  have hnd := nodup_map_selected m e r0 edges k hreps hocc
-  have hsub : ∀ c ∈ edges.map
-      (fun s => m.cellOf (chosenEndpoint m e r0 k s)), c ∈ cells := by
-    intro c hc
-    obtain ⟨s, hs, rfl⟩ := List.mem_map.mp hc
-    unfold chosenEndpoint
-    split
-    · exact (hcells s hs).1
-    · exact (hcells s hs).2
-  have hle := nodup_subset_length_nat hnd hsub
-  simpa only [List.length_map] using hle
-
 end Echo

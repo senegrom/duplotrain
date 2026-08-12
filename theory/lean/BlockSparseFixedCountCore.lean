@@ -87,26 +87,4 @@ theorem blockCoreSeparate_map_nodup {codes : List (List Bool)}
         exact hnd.1 (hxy ▸ hy)
       · exact ih hnd.2
 
-/-- **Fixed-cardinality indicator capacity.** -/
-theorem blockCore_fixed_code_count
-    (E F : Nat) (codes : List (List Bool))
-    (hnd : codes.Nodup)
-    (hlen : ∀ bits ∈ codes, bits.length = E)
-    (htrue : ∀ bits ∈ codes, blockCoreTrueCount bits = F) :
-    codes.length ≤ (blockUniverseCore (E+F)).length := by
-  have hsep := blockCoreSeparate_map_nodup hnd
-  have hlenSep : ∀ z ∈ codes.map blockCoreSeparate,
-      z.length = E+F := by
-    intro z hz
-    obtain ⟨bits, hb, rfl⟩ := List.mem_map.mp hz
-    rw [blockCoreSeparate_length, hlen bits hb, htrue bits hb]
-  have hsparse : ∀ z ∈ codes.map blockCoreSeparate,
-      BlockNoAdjacent z := by
-    intro z hz
-    obtain ⟨bits, _, rfl⟩ := List.mem_map.mp hz
-    exact blockCoreSeparate_noAdjacent bits
-  have hcount := blockCore_code_count (E+F)
-    (codes.map blockCoreSeparate) hsep hlenSep hsparse
-  simpa only [List.length_map] using hcount
-
 end Echo

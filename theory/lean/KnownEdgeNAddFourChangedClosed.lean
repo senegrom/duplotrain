@@ -226,29 +226,6 @@ theorem KnownEdgeProtectedPair.N_add_four_or_fully_protected
     exact C.all_run_distinct_le_N_add_four
       hN D.A_grooves times hliveA hndA
 
-/-- After changed-contact closure, the known-edge theorem has exactly one
-residual: a fully protected opposite-reflector pair. -/
-theorem known_edge_N_add_four_or_fully_protected_pair
-    {w : Wiring} {N e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {start : Nat × Tongues}
-    (hentry : w.link e = some start.1)
-    (times : List Nat)
-    (hlive : forall k, k ∈ times -> (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length <= N + 4 ∨
-      Nonempty (KnownEdgeFullyProtectedPair w e start) := by
-  rcases known_edge_N_add_four_or_protected_pair
-      hN hentry times hlive hnd with hsmall | hpair
-  · exact Or.inl hsmall
-  · obtain ⟨D⟩ := hpair
-    exact D.N_add_four_or_fully_protected hN times hlive hnd
-
-/-- The one remaining law needed to close the known-incoming-edge theorem:
-every literal protected opposite-reflector pair exposed by the probe
-decomposition obeys the same `N+4` bound. -/
 def KnownEdgeProtectedPairNAddFourLaw : Prop :=
   forall {w : Wiring} {N e : Nat},
     (forall p q, w.link p = some q ->

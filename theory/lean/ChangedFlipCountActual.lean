@@ -14,50 +14,6 @@ steps.  Charging precisely that lead and then the three Gray/candy phases gives
 
 namespace GeneralN
 
-/-- The actual lead of a changed-forward splice contains at most `N` steps. -/
-theorem ManufacturedReflector.ChangedForwardMerge.actual_lead_le_switches
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (hmerge : A.ChangedForwardMerge B) :
-    ∃ lead : Nat,
-      lead ≤ N ∧
-      ∃ finish, stepN w lead (g, B.activatedState) = some finish := by
-  obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
-      approach, candy, state, leadSteps, tailSteps, horiented,
-      hrouteSplit, hOldTail, hApproach, hApproachSimple,
-      hApproachGrooved, hApproachForeign, hCandyEq, hentryBranch,
-      hmouthStem, hmouthLink, harms, hfullGrooved, hfullTrace,
-      hcrossed, hBpaths, hCandy, hCandyForeign, hLobe, hreach,
-      hcomplete, hleadLen, htailLen, happroachLe⟩ :=
-    hmerge.spliced_lobe_reflector_simple
-  have hmouthLt : mouth / 3 < N := by
-    have hports := hN mouth outside hmouthLink
-    omega
-  have hmouthNotMem : mouth / 3 ∉
-      approach.map passageSwitch := by
-    intro hm
-    obtain ⟨passage, hp, hEq⟩ := List.mem_map.mp hm
-    exact hApproachForeign passage hp hEq
-  have hkeysNodup :
-      (mouth / 3 :: approach.map passageSwitch).Nodup :=
-    List.nodup_cons.mpr ⟨hmouthNotMem, hApproachSimple⟩
-  have hkeysLt : ∀ s ∈ mouth / 3 :: approach.map passageSwitch,
-      s < N := by
-    intro s hs
-    rcases List.mem_cons.mp hs with rfl | hs
-    · exact hmouthLt
-    · exact hApproach.passage_switches_lt hN s hs
-  have happroachOneLe : approach.length + 1 ≤ N := by
-    have hlen := nodup_nat_lt_length hkeysNodup hkeysLt
-    simpa using hlen
-  refine ⟨leadSteps, ?_, (outside, flipAt state (mouth / 3)), hreach⟩
-  rw [hleadLen]
-  exact happroachOneLe
-
-/-- Pointwise novelty cover using only the actual splice lead. -/
 theorem ManufacturedReflector.ChangedForwardMerge.actual_lead_three_novelty
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →

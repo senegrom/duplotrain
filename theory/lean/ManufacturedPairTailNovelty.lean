@@ -51,35 +51,6 @@ theorem manufactured_pair_stepN_some
     omega
   exact stepN_prefix_some hbound hfar
 
-/-- Reaching the start of a compatible manufactured pair makes every later
-absolute time live.  No separate all-future liveness hypothesis is used. -/
-theorem manufactured_pair_absolute_stepN_some
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hB : PathGrooves B.toSupported.paths state)
-    (hAB : A.toSupported.action.Avoids B.toSupported.paths)
-    (hBA : B.toSupported.action.Avoids A.toSupported.paths)
-    {start : Nat × Tongues} {K j : Nat}
-    (hreach : stepN w K start = some (g, state))
-    (hj : K ≤ j) :
-    ∃ finish, stepN w j start = some finish := by
-  let d := j - K
-  have hjEq : j = K + d := by
-    dsimp [d]
-    omega
-  obtain ⟨finish, hfinish⟩ := manufactured_pair_stepN_some
-    A B state hA hB hAB hBA d
-  refine ⟨finish, ?_⟩
-  rw [hjEq, stepN_add, hreach]
-  exact hfinish
-
-/-- **Absolute-time four-phase law.**
-
-After an arbitrary successful prefix reaches a compatible manufactured pair,
-every later raw tongue vector is one of the same four local Gray corners. -/
 theorem manufactured_pair_absolute_four_phase_tongues
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
@@ -265,56 +236,5 @@ theorem manufactured_pair_reached_distinct_le_N_add_six
   exact manufactured_pair_reached_with_history_distinct_le_N_add_six
     A B state hA hB hAB hBA hreach times history
     hhistoryLength hhistory hnd
-
-/-- **First manufactured journey followed by a compatible pair.**
-
-The earlier `N+2` bound is discharged here by
-`ManufacturedReflector.manufacturing_journey_distinct_le_N_add_two`; the
-future `+4` is discharged by the reached-pair theorem above.  The sole reach
-premise is the literal raw `stepN` statement joining the two phases.
--/
-theorem manufacturing_journey_then_pair_distinct_le_N_add_six
-    {w : Wiring} {h g e N : Nat}
-    (P : ManufacturedReflector w h g)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (state : Tongues)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hPpaths : PathGrooves P.toSupported.paths P.activatedState)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hB : PathGrooves B.toSupported.paths state)
-    (hAB : A.toSupported.action.Avoids B.toSupported.paths)
-    (hBA : B.toSupported.action.Avoids A.toSupported.paths)
-    (hreach : stepN w
-      (P.exploration.length + P.runway.length + 1)
-      (h, P.baseState) = some (g, state))
-    (times : List Nat)
-    (hnd : (times.map (restrictedTonguesAt w N
-      (h, P.baseState))).Nodup) :
-    times.length ≤ N + 6 := by
-  let K := P.exploration.length + P.runway.length + 1
-  let before := times.filter (fun j => decide (j < K))
-  have hbeforeTimes : ∀ j ∈ before,
-      j ≤ P.exploration.length + P.runway.length + 1 := by
-    intro j hj
-    have hjK : j < K :=
-      of_decide_eq_true (List.mem_filter.mp hj).2
-    dsimp [K] at hjK
-    omega
-  have hbeforeNodup :
-      (before.map (restrictedTonguesAt w N
-        (h, P.baseState))).Nodup := by
-    dsimp [before]
-    exact nodup_map_filter_pair_tail hnd
-  have hprefix : before.length ≤ N + 2 :=
-    P.manufacturing_journey_distinct_le_N_add_two
-      hN hPpaths before hbeforeTimes hbeforeNodup
-  apply manufactured_pair_reached_distinct_le_N_add_six
-    A B state hA hB hAB hBA (K := K)
-      (start := (h, P.baseState))
-  · simpa [K] using hreach
-  · simpa [before] using hprefix
-  · exact hnd
 
 end GeneralN

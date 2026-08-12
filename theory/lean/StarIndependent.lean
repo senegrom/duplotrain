@@ -96,36 +96,4 @@ private theorem nodup_subset_length_nat {l S : List Nat}
       simp only [List.length_cons]
       omega
 
-/-- **Half-universe bound.**  A `star`-independent finite set occupies at most
-one endpoint of each mouth-partner pair. -/
-theorem star_independent_length
-    (cells active : List Nat)
-    (hnd : active.Nodup)
-    (hsub : ∀ c ∈ active, c ∈ cells)
-    (hclosed : StarClosed m cells)
-    (hind : StarIndependent m active) :
-    2 * active.length ≤ cells.length := by
-  have hstarnd : (active.map m.star).Nodup :=
-    nodup_map_of_injective_on
-      (fun x _ y _ hxy => star_injective m hxy) hnd
-  have hdis : ∀ c ∈ active, c ∉ active.map m.star := by
-    intro c hc hmem
-    obtain ⟨d, hd, hdc⟩ := List.mem_map.mp hmem
-    have h := congrArg m.star hdc
-    rw [m.star_invol] at h
-    apply hind c hc
-    rw [← h]
-    exact hd
-  have hdoubled : (active ++ active.map m.star).Nodup :=
-    nodup_append_of_disjoint hnd hstarnd hdis
-  have hsubset : ∀ c ∈ active ++ active.map m.star, c ∈ cells := by
-    intro c hc
-    simp only [List.mem_append] at hc
-    rcases hc with hc | hc
-    · exact hsub c hc
-    · obtain ⟨d, hd, rfl⟩ := List.mem_map.mp hc
-      exact hclosed d (hsub d hd)
-  have hle := nodup_subset_length_nat hdoubled hsubset
-  simpa only [List.length_append, List.length_map, Nat.two_mul] using hle
-
 end Echo

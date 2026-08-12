@@ -209,39 +209,6 @@ theorem stem_lobe_two_state_reflector_foreign
     exact hfinishBack
   exact ⟨hfirst, hsecond⟩
 
-/-- The switch-simple form of `stem_lobe_two_state_reflector_foreign`. -/
-theorem stem_lobe_two_state_reflector
-    (w : Wiring) {p x q outside : Nat} {u : Tongues}
-    (path : List Passage)
-    (hpstem : p % 3 = 0)
-    (hxbranch : x % 3 ≠ 0) (hqbranch : q % 3 ≠ 0)
-    (hpx : p / 3 = x / 3) (hpq : p / 3 = q / 3)
-    (hsimple : SwitchSimple ((p, x) :: path))
-    (hlinked : LinkedPassages w ((p, x) :: path))
-    (hgrooved : PassagesGrooved u ((p, x) :: path))
-    (hfinal : w.link (lastPassageExit x path) = some q)
-    (hmouth : w.link p = some outside) :
-    let u' := pin u q
-    stepN w (path.length + 2) (p, u) = some (outside, u') ∧
-      stepN w (path.length + 2) (p, u') = some (outside, u) := by
-  have hpathForeign : ∀ passage ∈ path,
-      passageSwitch passage ≠ q / 3 := by
-    unfold SwitchSimple at hsimple
-    simp only [List.map_cons, List.nodup_cons] at hsimple
-    intro passage hp hEq
-    apply hsimple.1
-    apply List.mem_map.mpr
-    refine ⟨passage, hp, ?_⟩
-    change passageSwitch passage = p / 3
-    exact hEq.trans hpq.symm
-  exact stem_lobe_two_state_reflector_foreign w path
-    hpstem hxbranch hqbranch hpx hpq hpathForeign
-    hlinked hgrooved hfinal hmouth
-
-/-- **Universal mouth-avoiding lobe reflector.**  If the two candy arms are
-distinct and the interior avoids the mouth switch, the arbitrary-path lobe
-implements `flipAt` at its mouth switch for every tongue vector under which
-the interior path remains grooved. -/
 theorem stem_lobe_isReflector_foreign
     (w : Wiring) {p x q outside : Nat}
     (path : List Passage)
@@ -653,30 +620,6 @@ switch. -/
 def IsLocalSwitchMap (τ : Tongues → Tongues) : Prop :=
   (∀ u, τ u = u) ∨ ∃ k, ∀ u, τ u = flipAt u k
 
-theorem local_switch_map_involutive {τ : Tongues → Tongues}
-    (hτ : IsLocalSwitchMap τ) : ∀ u, τ (τ u) = u := by
-  intro u
-  rcases hτ with hid | ⟨k, hflip⟩
-  · rw [hid, hid]
-  · rw [hflip, hflip, flipAt_flipAt]
-
-theorem local_switch_maps_commute {τA τB : Tongues → Tongues}
-    (hA : IsLocalSwitchMap τA) (hB : IsLocalSwitchMap τB) :
-    ∀ u, τA (τB u) = τB (τA u) := by
-  intro u
-  rcases hA with hAid | ⟨a, hAflip⟩
-  · rw [hAid, hAid]
-  rcases hB with hBid | ⟨b, hBflip⟩
-  · rw [hBid, hBid]
-  · rw [hAflip, hBflip, hAflip, hBflip]
-    by_cases hab : a = b
-    · rw [hab]
-    · exact flipAt_comm (Ne.symm hab)
-
-/-- **First revisit, strengthened to a reusable normal-form component.**
-Given the edge on the far side of the runway start, the first revisit either
-settles on a simple cycle or manufactures a complete reflector whose state
-map is identity/one-switch-flip. -/
 theorem first_revisit_cycle_or_reflector
     (w : Wiring) {start : Nat × Tongues}
     {runway path : List Passage}

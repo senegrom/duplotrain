@@ -756,31 +756,6 @@ theorem known_edge_N_add_five_or_exact_one_reflector_outcome_alt
     · exact Or.inl (by omega)
     · exact Or.inr (Or.inr hforward)
 
-/-- The early-death classifier also preserves `N+5`; the sole remaining
-certificate is the already-closed partial forward contact. -/
-theorem known_edge_N_add_five_or_forward_contact_alt
-    {w : Wiring} {N e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues}
-    (hentry : w.link e = some start.1)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 5 ∨
-      Nonempty (OneReflectorForwardContact w N e start) := by
-  rcases known_edge_N_add_five_or_exact_one_reflector_outcome_alt
-      hN hentry times hlive hnd with hclosed | hdead | hcycle
-  · exact Or.inl hclosed
-  · obtain ⟨D⟩ := hdead
-    rcases D.N_add_three_or_forward hN times hlive hnd with
-      hsmall | hforward
-    · exact Or.inl (by omega)
-    · exact Or.inr hforward
-  · obtain ⟨D⟩ := hcycle
-    exact Or.inr ⟨D.toForwardContact⟩
-
-/-- **Known-edge coefficient-one `N+5` theorem.** -/
 theorem ManufacturedReflector.partial_second_run_distinct_le_N_add_five_alt
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
@@ -872,33 +847,6 @@ theorem stateLaw_N_add_six_alt : StateLaw := by
   exact state_law_linear_N_add_six_alt
     w N hN start times hlive hnd
 
-/-- Canonical name for the sharpened known-incoming-edge theorem. -/
-theorem known_edge_all_run_distinct_le_N_add_five
-    {w : Wiring} {N e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues}
-    (hentry : w.link e = some start.1)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 5 :=
-  known_edge_all_run_distinct_le_N_add_five_alt
-    hN hentry times hlive hnd
-
-/-- Canonical raw arbitrary-start form of the proved `N+6` bound. -/
-theorem state_law_linear_N_add_six
-    (w : Wiring) (N : Nat)
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 6 :=
-  state_law_linear_N_add_six_alt w N hN start times hlive hnd
-
-/-- **The general state law.**  One train on any finite `N`-switch lazy-point
-track visits at most `N+6` pairwise-distinct restricted tongue vectors. -/
 theorem stateLaw : StateLaw := stateLaw_N_add_six_alt
 
 end GeneralN

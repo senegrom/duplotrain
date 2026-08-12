@@ -26,18 +26,6 @@ def CoreNoOccupiedLobe (k c : Nat) : Prop :=
 def PairedNoOccupiedLobe (lo hi c : Nat) : Prop :=
   ∀ k, lo ≤ k → k ≤ hi → CoreNoOccupiedLobe m e r0 k c
 
-/-- Support equality transports the support-relative non-lobe property. -/
-theorem coreNoOccupiedLobe_congr
-    {i j c : Nat}
-    (hsupport : ∀ s,
-      Occupied m e r0 i s ↔ Occupied m e r0 j s)
-    (hno : CoreNoOccupiedLobe m e r0 i c) :
-    CoreNoOccupiedLobe m e r0 j c := by
-  intro s hs hbar hocc
-  exact hno s hs hbar ((hsupport s).mpr hocc)
-
-/-- **One support-preserving step freezes a no-full cell with no occupied
-lobe.**  Dormant lobe edges are irrelevant. -/
 theorem reg_step_eq_of_coreNoFull_coreNoOccupiedLobe
     (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c)

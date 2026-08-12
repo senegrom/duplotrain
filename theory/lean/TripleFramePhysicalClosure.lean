@@ -476,33 +476,6 @@ theorem CertifiedEndpointEmptyABCABC.forces_identity_reflector
         (fun state => state) :=
   certified_used_self_link_has_identity_reflector C.forces_used_self_link
 
-/-- Instance-level physical reduction.  Once each selected increasing triple
-has been certified, a five-frame triple case is either a selected strict nest
-or it exposes an explicit two-step identity reflector. -/
-theorem FiveFrameTripleCase.certified_reflector_or_strict_nest
-    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    (T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4)
-    (hcompile : forall S : SelectedFiveFrameABCABC T,
-      Nonempty (CertifiedEndpointEmptyABCABC S)) :
-    Or (Nonempty (SelectedFiveFrameStrictNest T))
-      (exists (S : SelectedFiveFrameABCABC T),
-        exists (C : CertifiedEndpointEmptyABCABC S),
-          exists q, exists outside,
-            And (w.link (C.run.entry q) = some (C.run.entry q))
-              (IsReflector w (3 * (C.run.entry q / 3)) outside 2
-                (fun state => state (C.run.entry q / 3) = bval (C.run.entry q))
-                (fun state => state))) := by
-  rcases T.select_endpoint_triple with habc | hstrict
-  · obtain ⟨S⟩ := habc
-    obtain ⟨C⟩ := hcompile S
-    obtain ⟨q, outside, hlink, hreflector⟩ :=
-      C.forces_identity_reflector
-    exact Or.inr ⟨S, C, q, outside, hlink, hreflector⟩
-  · exact Or.inl hstrict
-
-/-- Under genuine physical irreflexivity, certified `ABCABC` selection and
-strict-nest exclusion already contradict the grouped five-frame outcome. -/
 theorem FiveFrameTripleCase.impossible_of_irreflexive
     {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
     {z0 z1 z2 z3 z4 : Nat}
@@ -561,20 +534,6 @@ def KnownEdgeABCABCUsedSelfLinkExclusion : Prop :=
             forall C : CertifiedEndpointEmptyABCABC S,
               Not (CertifiedRunUsesSelfLink C.run)
 
-/-- The two formulations of the non-irreflexive residual are equivalent:
-one speaks the echo language, the other the raw physical-link language. -/
-theorem knownEdgeABCABCFixedEscapeExclusion_iff_usedSelfLinkExclusion :
-    KnownEdgeABCABCFixedEscapeExclusion ↔
-      KnownEdgeABCABCUsedSelfLinkExclusion := by
-  constructor
-  · intro hfixed w N e hN start hentry F T S C huse
-    exact hfixed w N e hN start hentry F T S C
-      (C.fixed_escape_iff_used_self_link.mpr huse)
-  · intro hself w N e hN start hentry F T S C hfixed
-    exact hself w N e hN start hentry F T S C
-      (C.fixed_escape_iff_used_self_link.mp hfixed)
-
-/-- Exact strict-nest residue left by selecting the grouped triple outcome. -/
 def KnownEdgeSelectedStrictNestObstruction : Prop :=
   forall (w : Wiring) (N e : Nat),
     (forall p q, w.link p = some q -> p < 3 * N ∧ q < 3 * N) ->
@@ -584,39 +543,5 @@ def KnownEdgeSelectedStrictNestObstruction : Prop :=
         forall T : FiveFrameTripleCase w N start
           F.z₀ F.z₁ F.z₂ F.z₃ F.z₄,
           forall _S : SelectedFiveFrameStrictNest T, False
-
-/-- **Exact physical closure reduction.**  The three named obligations are
-sufficient for the raw `KnownEdgeTripleFrameObstruction`.  In particular,
-the self-linked branch is not hidden inside an irreflexivity assumption. -/
-theorem knownEdgeTripleFrameObstruction_of_physical_closure
-    (hcompile : KnownEdgeABCABCPhysicalCertification)
-    (hself : KnownEdgeABCABCUsedSelfLinkExclusion)
-    (hnest : KnownEdgeSelectedStrictNestObstruction) :
-    KnownEdgeTripleFrameObstruction := by
-  intro w N e hN start hentry F T
-  rcases T.select_endpoint_triple with habc | hstrict
-  · obtain ⟨S⟩ := habc
-    obtain ⟨C⟩ := hcompile w N e hN start hentry F T S
-    exact (hself w N e hN start hentry F T S C)
-      C.forces_used_self_link
-  · obtain ⟨S⟩ := hstrict
-    exact hnest w N e hN start hentry F T S
-
-/-- The logically closest assembly to the abstract physical theorem: exclude
-its fixed-entry branch directly, rather than first forgetting the witness down
-to a raw self-link. -/
-theorem knownEdgeTripleFrameObstruction_of_fixed_escape_closure
-    (hcompile : KnownEdgeABCABCPhysicalCertification)
-    (hfixed : KnownEdgeABCABCFixedEscapeExclusion)
-    (hnest : KnownEdgeSelectedStrictNestObstruction) :
-    KnownEdgeTripleFrameObstruction := by
-  intro w N e hN start hentry F T
-  rcases T.select_endpoint_triple with habc | hstrict
-  · obtain ⟨S⟩ := habc
-    obtain ⟨C⟩ := hcompile w N e hN start hentry F T S
-    exact (hfixed w N e hN start hentry F T S C)
-      C.forces_fixed_escape
-  · obtain ⟨S⟩ := hstrict
-    exact hnest w N e hN start hentry F T S
 
 end GeneralN

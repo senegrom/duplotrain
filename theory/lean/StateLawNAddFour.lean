@@ -69,34 +69,4 @@ theorem distinct_samples_le_of_amortized_novelty
   have hcount := noveltyCoverOn_distinct_count hcover hnd
   omega
 
-/-- The amortized novelty law proves the exact raw `N+4` statement, for
-arbitrary starts and without a known-incoming-edge assumption. -/
-theorem stateLawNAddFour_of_amortizedNovelty
-    (hamortized : AmortizedNoveltyNAddThree) : StateLawNAddFour := by
-  intro w N hN start times _hlive hnd
-  let K := maxRawTime times
-  have htimes : forall k, k ∈ times -> k <= K := by
-    intro k hk
-    exact le_maxRawTime_of_mem hk
-  have hnd' : (times.map
-      (restrictedTonguesAt w N start)).Nodup := by
-    change (times.map (fun k => VectorCount.restrict N
-      ((stepN w k start).getD start).2)).Nodup
-    exact hnd
-  exact distinct_samples_le_of_amortized_novelty
-    w N hN start K (hamortized w N hN start K)
-      times htimes hnd'
-
-/-- The sharp target strictly strengthens the already proved `N+6`
-`StateLaw`. -/
-theorem stateLaw_of_stateLawNAddFour
-    (hsharp : StateLawNAddFour) : StateLaw := by
-  intro w N hN start times hlive hnd
-  have hnd' : (times.map (fun k => VectorCount.restrict N
-      ((stepN w k start).getD start).2)).Nodup := by
-    change (times.map (restrictedTonguesAt w N start)).Nodup
-    exact hnd
-  have hbound := hsharp w N hN start times hlive hnd'
-  omega
-
 end GeneralN

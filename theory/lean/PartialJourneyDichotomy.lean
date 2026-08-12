@@ -89,60 +89,6 @@ theorem ManufacturedReflector.partial_second_probe_outcome
           preserves := hpreserves
         }⟩)
 
-/-- If the literal opposite-reflector payload is impossible, only death or
-a reached stable simple cycle remains. -/
-theorem ManufacturedReflector.partial_second_probe_dead_or_cycle
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N ∧ q < 3 * N)
-    (hnoSecond : Not (Nonempty
-      (PartialSecondReflectorCompletion A N))) :
-    stepN w (N + 1) (e, A.activatedState) = none ∨
-      Nonempty (ReachedStableSimpleCycle w (e, A.activatedState)) := by
-  rcases A.partial_second_probe_outcome hN with
-      hdead | hcycle | hreflector
-  · exact Or.inl hdead
-  · exact Or.inr hcycle
-  · exact (hnoSecond hreflector).elim
-
-/-- Independent trace-level form of the same structural fact.  Any
-nonsimple continuation from a known entry edge either exposes a manufactured
-reflector or reaches a stable switch-simple cycle.  Excluding the former
-therefore gives the latter without mentioning a probe horizon. -/
-theorem PhysicalTrace.nonsimple_no_reflector_reaches_stable_cycle
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage} {entryEdge : Nat}
-    (htrace : PhysicalTrace w start passages finish)
-    (hnonsimple : Not (SwitchSimple passages))
-    (hentry : w.link entryEdge = some start.1)
-    (hnoReflector : forall
-      (B : ManufacturedReflector w start.1 entryEdge)
-      (state : Tongues) (backSteps : Nat),
-      PathGrooves B.toSupported.paths state ->
-      B.baseState = start.2 ->
-      state = B.activatedState ->
-      (exists atRepeat visited,
-        stepN w visited start = some atRepeat ∧
-        stepN w backSteps atRepeat = some (entryEdge, state)) ->
-      False) :
-    Nonempty (ReachedStableSimpleCycle w start) := by
-  obtain ⟨atRepeat, visited, hvisited, houtcome⟩ :=
-    htrace.first_revisit_trace_or_activated_reflector
-      hnonsimple hentry
-  rcases houtcome with hcycle | hreflector
-  · obtain ⟨cycle, settled, hnonempty, htransient,
-        hstable, hsimple⟩ := hcycle
-    exact reachedStableSimpleCycle_of_prefix
-      (baseShift := 0) (visited := visited)
-      (by simp [stepN]) hvisited hnonempty
-      htransient hstable hsimple
-  · obtain ⟨B, state, backSteps, hpaths, hbase,
-        hactivated, hback, _hpreserves⟩ := hreflector
-    exact (hnoReflector B state backSteps hpaths hbase hactivated
-      ⟨atRepeat, visited, hvisited, hback⟩).elim
-
-/-- Exact absolute one-vector tail of a reached stable simple cycle. -/
 theorem ReachedStableSimpleCycle.absolute_settled_vector
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     (C : ReachedStableSimpleCycle w start) :
@@ -167,32 +113,5 @@ theorem ReachedStableSimpleCycle.absolute_settled_vector
     rw [htEq, stepN_add, hstableReach]
     exact hlocal
   simp [restrictedTonguesAt, tonguesAt, hglobal]
-
-/-- Consequently any duplicate-free sample lying wholly in that stable tail
-contains at most one restricted tongue vector. -/
-theorem ReachedStableSimpleCycle.stable_tail_distinct_le_one
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    (C : ReachedStableSimpleCycle w start)
-    (times : List Nat)
-    (htail : forall t, t ∈ times ->
-      C.shift + C.cycle.length <= t)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length <= 1 := by
-  cases times with
-  | nil => simp
-  | cons t rest =>
-      cases rest with
-      | nil => simp
-      | cons s tail =>
-          have hnotmem := (List.nodup_cons.mp hnd).1
-          exfalso
-          apply hnotmem
-          apply List.mem_map.mpr
-          refine ⟨s, List.mem_cons_self, ?_⟩
-          exact (C.absolute_settled_vector s
-              (htail s (by simp))).trans
-            (C.absolute_settled_vector t
-              (htail t (by simp))).symm
 
 end GeneralN

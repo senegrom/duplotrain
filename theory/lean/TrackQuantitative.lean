@@ -27,13 +27,6 @@ def EventuallyPeriodicWithin
     stepN w lead start = some settled ∧
     stepN w period settled = some settled
 
-theorem EventuallyPeriodicWithin.toEventuallyPeriodic
-    {w : Wiring} {start : Nat × Tongues} {cap : Nat}
-    (h : EventuallyPeriodicWithin w start cap) :
-    EventuallyPeriodic w start := by
-  obtain ⟨lead, period, settled, hpos, _hcap, hlead, hperiod⟩ := h
-  exact ⟨lead, period, settled, hpos, hlead, hperiod⟩
-
 theorem EventuallyPeriodicWithin.weaken
     {w : Wiring} {start : Nat × Tongues} {small large : Nat}
     (h : EventuallyPeriodicWithin w start small)
@@ -1993,19 +1986,6 @@ theorem ManufacturedReflector.ChangedForwardMerge.flip_within_twenty_six
           omega, by omega, hcycleLead', hcyclePeriod'⟩
       exact (hlocal.prepend hreach).weaken (by omega)
 
-/-- Backward-compatible weakening of `flip_within_twenty_six`. -/
-theorem ManufacturedReflector.ChangedForwardMerge.flip_within_thirty
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {A : ManufacturedReflector w g e}
-    {R : ManufacturedFlipReflector w e g}
-    (hmerge : A.ChangedForwardMerge (.flip R)) :
-    EventuallyPeriodicWithin w
-      (g, (ManufacturedReflector.flip R).activatedState) (30 * N) :=
-  (hmerge.flip_within_twenty_six hN).weaken (by omega)
-
-/-- Uniform wrapper for the two possible old-reflector actions. -/
 theorem ManufacturedReflector.ChangedForwardMerge.within_twenty_six
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →
@@ -2018,20 +1998,6 @@ theorem ManufacturedReflector.ChangedForwardMerge.within_twenty_six
   | stay R => exact (hmerge.stay_within_sixteen hN).weaken (by omega)
   | flip R => exact hmerge.flip_within_twenty_six hN
 
-/-- Backward-compatible weakening of `within_twenty_six`. -/
-theorem ManufacturedReflector.ChangedForwardMerge.within_thirty
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (hmerge : A.ChangedForwardMerge B) :
-    EventuallyPeriodicWithin w (g, B.activatedState) (30 * N) :=
-  (hmerge.within_twenty_six hN).weaken (by omega)
-
-/-- Quantitative form of a backward contact.  If both the protected prefix
-and the fresh approach have length at most `2*N`, the approach followed by
-the exact retrace/replay cycle gives a lasso of size at most `12*N`. -/
 theorem backward_contact_within_twelve
     {w : Wiring} {N g e p oldEntry : Nat}
     {oldBase oldEnd base u v : Tongues}
@@ -2496,21 +2462,6 @@ theorem manufactured_pair_protected_repair_within_twenty_six
           B.baseState B.activatedState finalState hA hrepair
           hAfinal hBfinal).weaken (by omega)
 
-/-- Backward-compatible weakening of the `26*N` repair theorem. -/
-theorem manufactured_pair_protected_repair_within_thirty
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hB : PathGrooves B.toSupported.paths B.activatedState) :
-    EventuallyPeriodicWithin w (g, B.activatedState) (30 * N) :=
-  (manufactured_pair_protected_repair_within_twenty_six
-    hN A B hA hB).weaken (by omega)
-
-/-- **Tightened global quantitative lasso with a known incoming edge.**
-A run live for `3*N+2` steps has lead plus period at most `30*N+2`. -/
 theorem long_run_eventually_periodic_within_thirty
     {w : Wiring} {N e : Nat}
     (hN : ∀ p q, w.link p = some q →
@@ -2540,20 +2491,6 @@ theorem long_run_eventually_periodic_within_thirty
       simpa [hactivatedB] using hreachB
     exact (hlocal.prepend hreach).weaken (by omega)
 
-/-- Backward-compatible weakening of the tightened known-entry lasso. -/
-theorem long_run_eventually_periodic_within
-    {w : Wiring} {N e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start finish : Nat × Tongues}
-    (hlive : stepN w (3 * N + 2) start = some finish)
-    (hentry : w.link e = some start.1) :
-    EventuallyPeriodicWithin w start (34 * N + 2) :=
-  (long_run_eventually_periodic_within_thirty hN hlive hentry).weaken
-    (by omega)
-
-/-- Tightened entry-free global lasso.  The first live step supplies the
-incoming edge, so `3*N+3` live steps imply a `30*N+3` lasso. -/
 theorem long_run_eventually_periodic_within_thirty_without_entry
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q →
@@ -2586,21 +2523,6 @@ theorem long_run_eventually_periodic_within_thirty_without_entry
             hN hlive hlink
           exact (hlocal.prepend honeStep).weaken (by omega)
 
-/-- Backward-compatible weakening of the tightened entry-free lasso. -/
-theorem long_run_eventually_periodic_within_without_entry
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start finish : Nat × Tongues}
-    (hlive : stepN w (3 * N + 3) start = some finish) :
-    EventuallyPeriodicWithin w start (34 * N + 3) :=
-  (long_run_eventually_periodic_within_thirty_without_entry hN hlive).weaken
-    (by omega)
-
-/-- **TIGHTENED GENERAL LINEAR STATE LAW (proved).**  In the raw language of
-tracks, switches, train steps, and sampled tongue vectors, any `N`-switch
-lazy-point layout exposes at most `30*N+3` distinct switch settings to one
-train. -/
 theorem state_law_linear_thirty
     (w : Wiring) (N : Nat)
     (hN : ∀ p q, w.link p = some q →
@@ -2640,22 +2562,5 @@ theorem state_law_linear_thirty
           simp [hnone] at hkLive
       have hshort := nodup_nat_lt_length hksNodup hlt
       omega
-
-/-- **GENERAL LINEAR STATE LAW (proved).**  Compatibility form of
-`state_law_linear_thirty`, with the former `34*N+3` conclusion.
-
-This is the requested unconditional `O(N)` theorem.  It does not assert the
-still-open sharper `N+6` bound of `StateLaw`. -/
-theorem state_law_linear
-    (w : Wiring) (N : Nat)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (c0 : Nat × Tongues) (ks : List Nat)
-    (hlive : ∀ k ∈ ks, (stepN w k c0).isSome)
-    (hnd : (ks.map fun k =>
-      VectorCount.restrict N (tonguesAt w c0 k)).Nodup) :
-    ks.length ≤ 34 * N + 3 := by
-  exact Nat.le_trans (state_law_linear_thirty w N hN c0 ks hlive hnd)
-    (by omega)
 
 end GeneralN

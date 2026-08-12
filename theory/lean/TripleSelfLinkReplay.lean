@@ -93,69 +93,6 @@ theorem self_link_core_stay_reflector
   }
   exact Nonempty.intro R
 
-/-- Sandwiching the local bounce behind an arbitrary switch-simple runway
-gives an exact identity reflector: the train traverses the runway, bounces on
-the self-link, retraces every runway passage, and returns across the incoming
-edge with the identical tongue vector. -/
-theorem self_link_retraces_switch_simple_runway
-    {w : Wiring} {start : Prod Nat Tongues}
-    {runway : List Passage} {branch incoming : Nat}
-    {state : Tongues}
-    (hrunway : PhysicalTrace w start runway
-      (3 * (branch / 3), state))
-    (hsimple : SwitchSimple
-      (runway ++ [(3 * (branch / 3), branch)]))
-    (hbranch : branch % 3 ≠ 0)
-    (hself : w.link branch = some branch)
-    (hentry : w.link incoming = some start.1)
-    (hselected : state (branch / 3) = bval branch) :
-    IsReflector w start.1 incoming (2 * runway.length + 2)
-      (fun u => PassagesGrooved u runway /\
-        arrive u branch = (3 * (branch / 3), u))
-      (fun u => u) := by
-  have hstemMod : (3 * (branch / 3)) % 3 = 0 := by omega
-  have hstemDiv : (3 * (branch / 3)) / 3 = branch / 3 := by omega
-  have hforward :
-      arrive state (3 * (branch / 3)) = (branch, state) := by
-    simp [arrive, hstemMod, hstemDiv, hselected,
-      branchPort_bval hbranch]
-  have hcore : PhysicalTrace w (3 * (branch / 3), state)
-      [(3 * (branch / 3), branch)] (branch, state) :=
-    PhysicalTrace.cons hforward hself (PhysicalTrace.nil _)
-  exact same_exit_revisit_full_reflector w hrunway hcore
-    hsimple hentry
-
-/-! ## Extraction from the certified fixed-entry branch -/
-
-/-- An encountered self-link in a certified run carries an exact raw
-two-passage bounce, not merely an abstract fixed point of `bar`. -/
-theorem certified_used_self_link_has_exact_bounce
-    {w : Wiring} {run : CertifiedConcreteEchoRun w}
-    (huse : CertifiedRunUsesSelfLink run) :
-    exists q outside,
-      w.link (run.entry q) = some (run.entry q) /\
-      forall state,
-        state (run.entry q / 3) = bval (run.entry q) ->
-        PhysicalTrace w (3 * (run.entry q / 3), state)
-          [(3 * (run.entry q / 3), run.entry q),
-           (run.entry q, 3 * (run.entry q / 3))]
-          (outside, state) := by
-  obtain ⟨q, hself⟩ := huse
-  have hslot := run.toConcreteAscentTrace.freeSlot q
-  rcases hslot.1 with ⟨initial, tail, landing, finish, hd⟩
-  cases hd with
-  | last hbranch hmouth _ =>
-      exact ⟨q, landing, hself, fun state hselected =>
-        self_link_exact_two_passage_trace
-          hbranch hself hmouth hselected⟩
-  | @cons _ p next landing tail _ hbranch hmouth _ _ =>
-      exact ⟨q, next, hself, fun state hselected =>
-        self_link_exact_two_passage_trace
-          hbranch hself hmouth hselected⟩
-
-/-- The same encountered self-link is an actual degenerate manufactured
-reflector in the raw wiring.  The selected state is chosen explicitly by
-pinning the encountered branch. -/
 theorem certified_used_self_link_has_stay_reflector
     {w : Wiring} {run : CertifiedConcreteEchoRun w}
     (huse : CertifiedRunUsesSelfLink run) :
@@ -179,54 +116,6 @@ theorem certified_used_self_link_has_stay_reflector
         self_link_core_stay_reflector
           hbranch hself hmouth hselected⟩
 
-/-- Concrete certificate form: the non-irreflexive escape selected by the
-triple obstruction always supplies a raw stay reflector. -/
-theorem CertifiedEndpointEmptyABCABC.forces_stay_reflector
-    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    {S : SelectedFiveFrameABCABC T}
-    (C : CertifiedEndpointEmptyABCABC S) :
-    exists q outside : Nat, exists state : Tongues,
-      state (C.run.entry q / 3) = bval (C.run.entry q) /\
-      Nonempty (ManufacturedStayReflector w
-        (3 * (C.run.entry q / 3)) outside) :=
-  certified_used_self_link_has_stay_reflector C.forces_used_self_link
-
-/-! ## Exact periodic closure once global repair reaches the self-link -/
-
-/-- If global repair reaches a changed-forward splice into the extracted
-identity reflector, the existing raw theta theorem gives a genuine periodic
-tail.  No irreflexivity premise is used. -/
-theorem changed_forward_into_self_link_is_periodic
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {R : ManufacturedStayReflector w e g}
-    (hmerge : A.ChangedForwardMerge (.stay R)) :
-    EventuallyPeriodic w
-      (g, (ManufacturedReflector.stay R).activatedState) :=
-  hmerge.eventuallyPeriodic_of_stay
-
-/-- In the compatible opposite-pair case, the self-link gives an exact
-complete raw-configuration replay after the standard two-reflector period. -/
-theorem flip_then_self_link_exact_period
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (R : ManufacturedStayReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves (ManufacturedReflector.flip A).toSupported.paths state)
-    (hR : PathGrooves (ManufacturedReflector.stay R).toSupported.paths state)
-    (hAR : (ManufacturedReflector.flip A).toSupported.action.Avoids
-      (ManufacturedReflector.stay R).toSupported.paths) :
-    stepN w (2 * ((ManufacturedReflector.flip A).toSupported.travel +
-        (ManufacturedReflector.stay R).toSupported.travel))
-      (g, state) = some (g, state) := by
-  exact (ManufacturedReflector.flip A).toSupported.paired_period
-    (ManufacturedReflector.stay R).toSupported hAR (by trivial)
-      state hA hR
-
-/-- The compatible flip/self-link pair has only two tongue vectors at every
-raw time, not merely at its macro endpoints. -/
 theorem flip_then_self_link_all_time_two_phase_tongues
     {w : Wiring} {g e : Nat}
     (A : ManufacturedFlipReflector w g e)
@@ -434,24 +323,5 @@ def KnownEdgeABCABCSelfLinkReplayOrTailClosure : Prop :=
             forall C : CertifiedEndpointEmptyABCABC S,
               CertifiedRunUsesSelfLink C.run ->
               CertifiedSelfLinkReplayOrTail F C
-
-/-- **Self-link-aware triple closure.**  Physical compilation, the explicit
-self-link replay/runway placement law, and strict-nest exclusion suffice for
-the raw triple obstruction.  This removes both global `IrreflexiveLinks` and
-the former premise that simply declared every encountered self-link
-impossible. -/
-theorem knownEdgeTripleFrameObstruction_of_selfLinkReplayOrTail
-    (hcompile : KnownEdgeABCABCPhysicalCertification)
-    (hself : KnownEdgeABCABCSelfLinkReplayOrTailClosure)
-    (hnest : KnownEdgeSelectedStrictNestObstruction) :
-    KnownEdgeTripleFrameObstruction := by
-  intro w N e hN start hentry F T
-  rcases T.select_endpoint_triple with habc | hstrict
-  · obtain ⟨S⟩ := habc
-    obtain ⟨C⟩ := hcompile w N e hN start hentry F T S
-    exact C.impossible_of_self_link_resolution F
-      (hself w N e hN start hentry F T S C C.forces_used_self_link)
-  · obtain ⟨S⟩ := hstrict
-    exact hnest w N e hN start hentry F T S
 
 end GeneralN

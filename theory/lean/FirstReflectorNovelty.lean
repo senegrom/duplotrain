@@ -69,31 +69,6 @@ theorem ManufacturedReflector.activation_one_novelty_cover
     A.return_arrive_mouth
     N history hpre times htimes
 
-/-- Absolute-time version for an activation embedded in the original train
-run.  The one-vector budget is unchanged by the preceding journey. -/
-theorem ManufacturedReflector.activation_at_one_novelty_cover
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hpaths : PathGrooves A.toSupported.paths A.activatedState)
-    {start : Nat × Tongues} {K : Nat}
-    (hreach : stepN w K start = some A.preReturn)
-    (N : Nat) (history : List (List Bool))
-    (hpre : VectorCount.restrict N A.preReturn.2 ∈ history)
-    (times : List Nat)
-    (htimes : ∀ j ∈ times,
-      K ≤ j ∧ j ≤ K + A.runway.length + 1) :
-    NoveltyCoverOn w N start times history 1 := by
-  exact completed_retrace_at_one_novelty_cover
-    A.runway_trace
-    (A.runway_grooved hpaths)
-    A.entryEdge
-    A.return_arrive_mouth
-    hreach N history hpre times htimes
-
-/-- **A manufactured first reflector costs only one state beyond its outward
-prefix.**  If the train reaches the pre-return configuration by time `K`, all
-vectors through the complete activation lie among the `K+1` prefix vectors
-and the single activated vector. -/
 theorem ManufacturedReflector.prefix_and_activation_one_novelty_cover
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
@@ -166,27 +141,5 @@ theorem ManufacturedReflector.manufacturing_journey_distinct_le_N_add_two
     A.exploration_trace.simple_length_le hN A.exploration_simple
   exact A.prefix_and_activation_distinct_le_N_add_two
     hpaths A.exploration_trace.sound hlength times htimes hnd
-
-/-- Literal distinct-vector form of `activation_one_novelty_cover`: sampled
-vectors absent from the supplied history number at most one. -/
-theorem ManufacturedReflector.activation_novel_vectors_le_one
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hpaths : PathGrooves A.toSupported.paths A.activatedState)
-    (N : Nat) (history : List (List Bool))
-    (hpre : VectorCount.restrict N A.preReturn.2 ∈ history)
-    (times : List Nat)
-    (htimes : ∀ d ∈ times, d ≤ A.runway.length + 1)
-    (hnovel : ∀ d ∈ times,
-      restrictedTonguesAt w N A.preReturn d ∉ history)
-    (hnd : (times.map
-      (restrictedTonguesAt w N A.preReturn)).Nodup) :
-    times.length ≤ 1 := by
-  exact completed_retrace_novel_vectors_le_one
-    A.runway_trace
-    (A.runway_grooved hpaths)
-    A.entryEdge
-    A.return_arrive_mouth
-    N history hpre times htimes hnovel hnd
 
 end GeneralN

@@ -57,59 +57,6 @@ theorem fiveNoveltyCover_to_N_add_six
   have hcount := noveltyCoverOn_distinct_count hcover hnd
   omega
 
-/-- The concrete final assembly used by the global-repair proof.  The sample
-times are partitioned into the four-corner manufactured-pair phase and the
-one-vector strict-candy residual. -/
-theorem pair_and_splice_distinct_le_N_add_six
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {pairTimes spliceTimes : List Nat}
-    {history : List (List Bool)}
-    (hhistory : history.length ≤ N + 1)
-    (hpair : FourNoveltyCover w N start pairTimes history)
-    (hsplice : NoveltyCoverOn w N start spliceTimes history 1)
-    (hnd : ((pairTimes ++ spliceTimes).map
-      (restrictedTonguesAt w N start)).Nodup) :
-    (pairTimes ++ spliceTimes).length ≤ N + 6 := by
-  apply fiveNoveltyCover_to_N_add_six hhistory
-  · exact four_pair_then_one_splice_five hpair hsplice
-  · exact hnd
-
-/-- Novelty-annotated form of the last changed-forward flip case.
-
-The strict-candy branch is completely discharged: it composes with an
-existing four-corner cover to give the sharp five-vector exceptional cover.
-The disjunction retains the *only* branch not covered by the candy theorem,
-namely that the touched selected passage lies on the old runway. -/
-theorem four_pair_then_changed_flip_five_or_runway
-    {w : Wiring} {g e N : Nat}
-    {A : ManufacturedReflector w g e}
-    {R : ManufacturedFlipReflector w e g}
-    (hmerge : A.ChangedForwardMerge (.flip R))
-    (history : List (List Bool))
-    (hleadHistorical : ∀ j, j ≤ A.toSupported.travel →
-      restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).activatedState) j ∈ history)
-    (pairTimes spliceTimes : List Nat)
-    (hpair : FourNoveltyCover w N
-      (g, (ManufacturedReflector.flip R).activatedState)
-      pairTimes history) :
-    (∃ entry mouth state,
-      (entry, mouth) ∈
-        (ManufacturedReflector.flip R).orientedRoute state ∧
-      (entry, mouth) ∈ R.runway) ∨
-    FiveNoveltyCover w N
-      (g, (ManufacturedReflector.flip R).activatedState)
-      (pairTimes ++ spliceTimes) history := by
-  rcases hmerge.runway_or_candy_absolute_one_novelty
-      N history hleadHistorical spliceTimes with hrunway | hcandy
-  · exact Or.inl hrunway
-  · exact Or.inr (four_pair_then_one_splice_five hpair hcandy)
-
-/-- The changed-forward branch no longer has a runway residual.  The
-pointwise runway/candy theorem covers every selected raw time by four vectors
-above the supplied construction history.  Consequently an `N+1` known-edge
-history gives the sharp `N+5` bound directly, without a route-length or
-eventual-periodicity argument. -/
 theorem ManufacturedReflector.ChangedForwardMerge.distinct_le_N_add_five
     {w : Wiring} {g e N : Nat}
     {A : ManufacturedReflector w g e}
@@ -129,43 +76,6 @@ theorem ManufacturedReflector.ChangedForwardMerge.distinct_le_N_add_five
   have hcount := fourNoveltyCover_distinct_count hcover hnd
   omega
 
-/-- A compatible pair needs only three *new* vectors when its starting
-corner is already historical.  This is useful in the alternative
-`N+2 + 3 + 1 = N+6` accounting. -/
-theorem manufactured_pair_three_novelty_cover_of_start_mem
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hB : PathGrooves B.toSupported.paths state)
-    (hAB : A.toSupported.action.Avoids B.toSupported.paths)
-    (hBA : B.toSupported.action.Avoids A.toSupported.paths)
-    (times : List Nat) (history : List (List Bool))
-    (hstart : VectorCount.restrict N state ∈ history) :
-    NoveltyCoverOn w N (g, state) times history 3 := by
-  let aState := A.toSupported.action.apply state
-  let baState := B.toSupported.action.apply aState
-  let abaState := A.toSupported.action.apply baState
-  refine ⟨[VectorCount.restrict N aState,
-      VectorCount.restrict N baState,
-      VectorCount.restrict N abaState], by simp, ?_⟩
-  intro k _hk
-  have hphase := manufactured_pair_all_time_four_phase_tongues
-    A B state hA hB hAB hBA k
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at hphase
-  rcases hphase with hstate | ha | hba | haba
-  · apply List.mem_append_left
-    simpa [restrictedTonguesAt, hstate] using hstart
-  · apply List.mem_append_right history
-    simp [restrictedTonguesAt, aState, ha]
-  · apply List.mem_append_right history
-    simp [restrictedTonguesAt, hba, baState, aState]
-  · apply List.mem_append_right history
-    simp [restrictedTonguesAt, haba, abaState, baState, aState]
-
-/-- Three new manufactured-pair corners plus the one candy-splice vector are
-a four-vector tail above an `N+2` history. -/
 theorem three_pair_then_one_splice_four
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     {pairTimes spliceTimes : List Nat}
@@ -252,50 +162,6 @@ theorem ManufacturedReflector.manufacturing_journey_mem_sharpHistory
     · apply List.mem_append_right prefixHistory
       exact List.mem_singleton.mpr hactivated
 
-/-- **Concrete sharp raw-track assembly.**
-
-The first manufactured journey is charged to its canonical `N+2` history.
-The continuation is partitioned into at most three new compatible-pair
-corners and the one strict-candy vector.  Therefore all selected vectors in
-the complete raw trajectory number at most `N+6`. -/
-theorem manufacturing_then_pair_and_splice_distinct_le_N_add_six
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hpaths : PathGrooves A.toSupported.paths A.activatedState)
-    (constructionTimes pairTimes spliceTimes : List Nat)
-    (hconstruction : ∀ j ∈ constructionTimes,
-      j ≤ A.exploration.length + A.runway.length + 1)
-    (hpair : NoveltyCoverOn w N (g, A.baseState)
-      pairTimes (A.sharpConstructionHistory N) 3)
-    (hsplice : NoveltyCoverOn w N (g, A.baseState)
-      spliceTimes (A.sharpConstructionHistory N) 1)
-    (hnd : (((constructionTimes ++ pairTimes) ++ spliceTimes).map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    ((constructionTimes ++ pairTimes) ++ spliceTimes).length ≤ N + 6 := by
-  have hfirst : NoveltyCoverOn w N (g, A.baseState)
-      constructionTimes (A.sharpConstructionHistory N) 0 := by
-    refine ⟨[], by simp, ?_⟩
-    intro j hj
-    simpa using A.manufacturing_journey_mem_sharpHistory
-      hpaths (hconstruction j hj)
-  have hfirstPair := noveltyCoverOn_append hfirst hpair
-  have hall := noveltyCoverOn_append hfirstPair hsplice
-  have hfour : FourNoveltyCover w N (g, A.baseState)
-      ((constructionTimes ++ pairTimes) ++ spliceTimes)
-      (A.sharpConstructionHistory N) := by
-    simpa [FourNoveltyCover] using hall
-  exact fourNoveltyCover_to_N_add_six
-    (A.sharpConstructionHistory_length hN) hfour hnd
-
-/-- A fully explicit certificate for the sharp global-repair accounting.
-
-`history` contains the construction vectors.  `pairTimes` are covered by at
-most three new manufactured-pair corners because the entering corner is
-historical.  `spliceTimes` are covered by the one strict-candy vector.  The
-time-list equation makes this a statement about every selected raw time,
-not merely about endpoints or periods. -/
 structure SharpGlobalRepairCertificate
     (w : Wiring) (N : Nat) (start : Nat × Tongues)
     (times : List Nat) where
@@ -307,22 +173,6 @@ structure SharpGlobalRepairCertificate
   pair_cover : NoveltyCoverOn w N start pairTimes history 3
   splice_cover : NoveltyCoverOn w N start spliceTimes history 1
 
-/-- Every sharp global-repair certificate proves the target count for its
-raw sample list. -/
-theorem SharpGlobalRepairCertificate.distinct_le_N_add_six
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {times : List Nat}
-    (C : SharpGlobalRepairCertificate w N start times)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 6 := by
-  rw [C.times_eq] at hnd ⊢
-  exact historical_start_pair_and_splice_distinct_le_N_add_six
-    C.history_length C.pair_cover C.splice_cover hnd
-
-/-- Known-edge version of the certificate.  Because the global physical
-construction starts on the near side of an actual track edge, its history
-budget is `N+1`; the four continuation slots then give the stronger `N+5`
-bound. -/
 structure KnownEdgeSharpRepairCertificate
     (w : Wiring) (N : Nat) (start : Nat × Tongues)
     (times : List Nat) where
@@ -608,90 +458,5 @@ def KnownEdgeSharpRepairCertificateLaw : Prop :=
       w.link e = some start.1 →
       (∀ k ∈ times, (stepN w k start).isSome) →
       Nonempty (KnownEdgeSharpRepairCertificate w N start times)
-
-/-- Closing the known-edge certificate law closes the actual raw-track
-`StateLaw`.  An arbitrary start either falls off immediately, or its first
-successful step supplies the required known edge.  The former contributes
-one vector; in the latter case time zero is the sole vector not represented
-in the shifted known-edge sample, hence `N+5+1 = N+6`. -/
-theorem stateLaw_of_knownEdgeSharpRepairCertificateLaw
-    (hsharp : KnownEdgeSharpRepairCertificateLaw) : StateLaw := by
-  intro w N hN start times hlive hnd
-  have htimesNodup : times.Nodup :=
-    sharp_nodup_of_map_nodup
-      (restrictedTonguesAt w N start) hnd
-  cases hstep : step w start with
-  | none =>
-      have hlt : ∀ k ∈ times, k < 1 := by
-        intro k hk
-        cases k with
-        | zero => omega
-        | succ k =>
-            have hkLive := hlive (k+1) hk
-            simp [stepN, hstep] at hkLive
-      have hsmall := nodup_nat_lt_length htimesNodup hlt
-      omega
-  | some next =>
-      have hstepOne : stepN w 1 start = some next := by
-        simpa [stepN] using hstep
-      let positive := times.filter (fun k => decide (0 < k))
-      let shifted := positive.map (fun k => k - 1)
-      have hshiftVector : shifted.map
-          (restrictedTonguesAt w N next) =
-          positive.map (restrictedTonguesAt w N start) := by
-        dsimp [shifted]
-        rw [List.map_map]
-        apply List.map_congr_left
-        intro k hk
-        have hkPos : 0 < k :=
-          of_decide_eq_true (List.mem_filter.mp hk).2
-        have hkTimes : k ∈ times := (List.mem_filter.mp hk).1
-        have hkEq : k = 1 + (k - 1) := by omega
-        have hrun : stepN w k start = stepN w (k - 1) next := by
-          rw [hkEq, stepN_add, hstepOne]
-          simp
-        have hkLive := hlive k hkTimes
-        cases htail : stepN w (k - 1) next with
-        | none =>
-            rw [hrun, htail] at hkLive
-            simp at hkLive
-        | some finish =>
-            have hglobal : stepN w k start = some finish := by
-              rw [hrun, htail]
-            simp [Function.comp_apply, restrictedTonguesAt, tonguesAt,
-              hglobal, htail]
-      have hpositiveNodup :
-          (positive.map (restrictedTonguesAt w N start)).Nodup := by
-        dsimp [positive]
-        exact sharp_nodup_map_filter _ hnd
-      have hshiftedNodup :
-          (shifted.map (restrictedTonguesAt w N next)).Nodup := by
-        rw [hshiftVector]
-        exact hpositiveNodup
-      have hshiftedLive : ∀ d ∈ shifted,
-          (stepN w d next).isSome := by
-        intro d hd
-        obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hd
-        have hkTimes : k ∈ times := (List.mem_filter.mp hk).1
-        have hkPos : 0 < k :=
-          of_decide_eq_true (List.mem_filter.mp hk).2
-        have hkEq : k = 1 + (k - 1) := by omega
-        have hkLive := hlive k hkTimes
-        rw [hkEq, stepN_add, hstepOne] at hkLive
-        exact hkLive
-      have hentry : w.link (exitPort start) = some next.1 :=
-        (step_some_parts hstep).1
-      obtain ⟨C⟩ := hsharp w N (exitPort start) hN next shifted
-        hentry hshiftedLive
-      have hshiftedBound : shifted.length ≤ N + 5 :=
-        C.distinct_le_N_add_five hshiftedNodup
-      have hpositiveLength : positive.length = shifted.length := by
-        simp [shifted]
-      have hzeroBound :
-          (times.filter (fun k => decide (k = 0))).length ≤ 1 :=
-        sharp_zero_filter_length_le_one htimesNodup
-      have hpartition := sharp_zero_positive_partition times
-      dsimp [positive] at hpositiveLength
-      omega
 
 end GeneralN

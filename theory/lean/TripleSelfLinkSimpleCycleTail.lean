@@ -169,26 +169,4 @@ theorem RawSixEventReduction.tail_cycle_self_link_false
     exact R.tail_opposite_reflector_false hN htriple S Cyc
       A state backSteps hmouth hvisited hA hbase hstate hback
 
-/-- Final endpoint refinement for the raw-cycle half: the cycle-through-
-self-link branch is impossible, so certified endpoint transport must expose
-the self-link at an actual raw time no later than the selected first close. -/
-theorem CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_is_early
-    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
-    (R : RawSixEventReduction w N start)
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    (htriple : FiveFrameTripleOutcome
-      R.a1 R.z1 R.a2 R.z2 R.a3 R.z3 R.a4 R.z4 R.a5 R.z5)
-    (S : SelectedFiveFrameABCABC (R.tailTripleCase htriple))
-    (C : CertifiedEndpointEmptyABCABC S) :
-    exists q shift,
-      (R.tailTripleCase htriple).frames.openingAt S.i2 < shift /\
-      shift <= (R.tailTripleCase htriple).frames.closingAt S.i0 /\
-      stepN w shift start = some (C.run.entry q, C.run.boundary q) /\
-      w.link (C.run.entry q) = some (C.run.entry q) := by
-  rcases C.self_link_raw_endpoint_outcome with hearly | hcycle
-  · exact hearly
-  · obtain ⟨Cyc⟩ := hcycle
-    exact (R.tail_cycle_self_link_false hN htriple S Cyc).elim
-
 end GeneralN

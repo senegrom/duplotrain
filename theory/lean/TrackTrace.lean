@@ -1174,17 +1174,4 @@ theorem retrace_linked_passages
     rw [hlen, stepN_add, htail']
     simpa [stepN] using hhead
 
-/-- A switch-simple physical trace can be traversed backwards from its final
-exit port, provided the plain-track edge before its first entry is known. -/
-theorem PhysicalTrace.retrace_simple {w : Wiring}
-    {p x ell : Nat} {u : Tongues} {rest : List Passage}
-    {finish : Nat × Tongues}
-    (htrace : PhysicalTrace w (p, u) ((p, x) :: rest) finish)
-    (hsimple : SwitchSimple ((p, x) :: rest))
-    (hentry : w.link ell = some p) :
-    stepN w ((p, x) :: rest).length
-      (lastPassageExit x rest, finish.2) = some (ell, finish.2) := by
-  exact retrace_linked_passages w finish.2 p x ell rest
-    htrace.linked (htrace.grooved_of_switchSimple hsimple) hentry
-
 end GeneralN

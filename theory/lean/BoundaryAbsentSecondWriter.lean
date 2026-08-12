@@ -324,43 +324,4 @@ theorem ManufacturedReflector.preservedTwoHistoryCore_length_le_N_add_one_of_two
     B.writerConstructionHistory_length]
   omega
 
-/-- Reusable absorbed-or-saved interface for the boundary proof.
-
-The only first-reflector input is the local dichotomy that the original
-restricted vector is already represented by `A` or the productive initial
-coordinate is absent from `A`'s reusable support.  If `k0` is also absent
-from `B`'s productive first-writer switch list, then either the original
-vector is in the combined core, or that core has the improved `N+2` size.
--/
-theorem ManufacturedReflector.boundary_absorbed_or_combined_history_saves_one_of_second_writer_absent
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (original : Tongues)
-    (hbase : B.baseState = A.activatedState)
-    (hbaseGrooves :
-      PathGrooves A.toSupported.paths B.baseState)
-    (hpreGrooves :
-      PathGrooves A.toSupported.paths B.preReturn.2)
-    (hk0 : k0 < N)
-    (habsentB : Not (List.Mem k0
-      (B.constructionFirstWriterSwitches N)))
-    (hfirst :
-      List.Mem (VectorCount.restrict N original)
-          (A.sharpHistoryCore N) \/
-        Not (List.Mem k0 A.reusableSwitches)) :
-    List.Mem (VectorCount.restrict N original)
-        (A.preservedTwoHistoryCore B N) \/
-      (A.preservedTwoHistoryCore B N).length <= N + 2 := by
-  rcases hfirst with habsorbed | habsentA
-  · apply Or.inl
-    apply List.mem_append_left
-    exact habsorbed
-  · apply Or.inr
-    exact A.preservedTwoHistoryCore_length_le_N_add_two_of_reserved
-      hN B hbase hbaseGrooves hpreGrooves
-        hk0 habsentA habsentB
-
 end GeneralN

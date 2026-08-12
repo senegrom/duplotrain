@@ -114,32 +114,4 @@ theorem concrete_echo_step
   rw [hlanding]
   exact hret
 
-/-- The successor physical entry in the preceding theorem is exactly the
-canonical echo jump of the stored slot. -/
-theorem concrete_echo_step_encoded
-    {w : Wiring}
-    {tF tP : Tongues} {f p sF sP : Nat}
-    {fs ps : List Nat} {uF uP : Tongues}
-    (hdF : Descent w tF f fs sF uF)
-    (hdP : Descent w tP p ps sP uP)
-    (hfSlot : IsCanonicalEchoSlot w f)
-    (middle : List Nat)
-    (hmiddle : ∀ q ∈ middle, IsDescentEntry w q)
-    (hmiddleRoots : ∀ q ∈ middle,
-      entryRoot w f ≠ entryRoot w q)
-    (hcurrentDifferent : entryRoot w f ≠ entryRoot w p)
-    (hcurrentLandsAtF : entryLanding w p / 3 = entryRoot w f) :
-    (canonicalEchoMachine w).bar (encodeSlot f) =
-      encodeSlot (wireBar w f) ∧
-    stepN w (f :: fs).length
-      (entryLanding w p,
-        runEntryActions w (middle ++ [p]) uF) =
-      some (wireBar w f,
-        runEntryActions w (middle ++ [p]) uF) := by
-  constructor
-  · simp [canonicalEchoMachine]
-  · exact concrete_echo_step
-      hdF hdP hfSlot middle hmiddle hmiddleRoots
-      hcurrentDifferent hcurrentLandsAtF
-
 end GeneralN

@@ -73,27 +73,6 @@ theorem RawNovelAt.not_after_completed_period
     (N := N) hbase hperiod hafter
   exact (H.post_ne_earlier (by omega)) heq
 
-/-- Every novel close after the endpoint of a `RawCycleThroughSelfLink` lies
-strictly inside its first recorded lap.  This consumes the late half of the
-raw-cycle branch; no property of the certified clock is involved. -/
-theorem RawCycleThroughSelfLink.novel_close_inside_first_lap
-    {w : Wiring} {N : Nat} {start : Nat × Tongues} {close k : Nat}
-    (R : RawCycleThroughSelfLink w start close)
-    (H : RawNovelAt w N start k) :
-    k + 1 < close + R.period := by
-  by_cases hinside : k + 1 < close + R.period
-  · exact hinside
-  · have hafter : close + R.period ≤ k + 1 :=
-      Nat.le_of_not_gt hinside
-    exact (H.not_after_completed_period R.close_at R.cycle
-      R.period_positive hafter).elim
-
-/-! ## The physical first lap -/
-
-/-- The period based at the self-linked branch is necessarily
-switch-nonsimple.  The first passage starts at that branch, while the final
-passage exits through the same branch (injectivity against the self-link).
-A switch-simple trace cannot have equal first entry and final exit. -/
 theorem RawCycleThroughSelfLink.self_period_has_first_revisit
     {w : Wiring} {start : Nat × Tongues} {close : Nat}
     (R : RawCycleThroughSelfLink w start close) :

@@ -168,41 +168,6 @@ noncomputable def rawStrictSelfShrinkTimes
   exact (List.range K).filter
     (fun k => decide (RawStrictSelfShrinkAt w N start k))
 
-theorem mem_rawStrictSelfShrinkTimes_iff
-    {w : Wiring} {N K k : Nat} {start : Nat × Tongues} :
-    k ∈ rawStrictSelfShrinkTimes w N start K ↔
-      k < K ∧ RawStrictSelfShrinkAt w N start k := by
-  classical
-  simp [rawStrictSelfShrinkTimes]
-
-/-- Every strict self-shrink contributes at least one unit to drop mass. -/
-theorem raw_strict_self_shrinks_le_drop_mass
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) :
-    (rawStrictSelfShrinkTimes w N start K).length ≤
-      rawCurveDropMass w N start K := by
-  induction K with
-  | zero => simp [rawStrictSelfShrinkTimes]
-  | succ K ih =>
-      by_cases hshrink : RawStrictSelfShrinkAt w N start K
-      · have hdrop : 0 < rawCurveDropAt w N start K := by
-          have hlt := hshrink.2.2
-          unfold rawCurveDropAt
-          omega
-        have hcount :
-            (rawStrictSelfShrinkTimes w N start (K + 1)).length =
-              (rawStrictSelfShrinkTimes w N start K).length + 1 := by
-          simp [rawStrictSelfShrinkTimes, List.range_succ, hshrink]
-        rw [hcount, rawCurveDropMass_succ]
-        omega
-      · have hcount :
-            (rawStrictSelfShrinkTimes w N start (K + 1)).length =
-              (rawStrictSelfShrinkTimes w N start K).length := by
-          simp [rawStrictSelfShrinkTimes, List.range_succ, hshrink]
-        rw [hcount, rawCurveDropMass_succ]
-        omega
-
-/-- The represented carrier ports discarded by the step at `k`.  On a
-strict self-shrink this list has exactly `rawCurveDropAt ... k` elements. -/
 noncomputable def rawDroppedCurvePortsAt
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) : List Nat :=
   (rawFiniteCurvePortsAt w N start k).filter (fun p =>
@@ -690,27 +655,6 @@ theorem distinct_samples_le_four_mul_nonself_epochs
     rank 4 tags times hcap hmem
   simpa [tags] using hbound
 
-/-- **Unconditional global amortized state bound.**  The total number of
-distinct vectors in a live prefix is controlled by `12 * N` plus four times
-the actual downward variation of the finite train curve. -/
-theorem distinct_samples_le_twelve_mul_add_four_drop
-    {w : Wiring} {N K : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (times : List Nat) (htimes : ∀ k, k ∈ times → k ≤ K)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤
-      12 * N + 4 * rawCurveDropMass w N start K + 4 := by
-  have hepoch := distinct_samples_le_four_mul_nonself_epochs
-    hN start hlive times htimes hnd
-  have hgrowth := raw_nonself_growth_le_three_mul_add_drop
-    hN start K hlive
-  omega
-
-
-/-- A productive self-pivot makes the next represented carrier a subset of
-the preceding carrier. -/
 theorem raw_self_pivot_curve_ports_subset
     {w : Wiring} {N k : Nat} {start : Nat × Tongues}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
@@ -887,34 +831,6 @@ theorem raw_nonself_growth_le_six_mul_of_lost_ports_nodup
     hN start K hlive hcharge
   omega
 
-/-- Concrete conditional improvement over the existing uniform coefficient:
-if no physical carrier port is discarded twice, a live prefix exposes at
-most `24 * N + 4` distinct vectors. -/
-theorem distinct_samples_le_twenty_four_mul_of_lost_ports_nodup
-    {w : Wiring} {N K : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (times : List Nat) (htimes : ∀ k, k ∈ times → k ≤ K)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup)
-    (hcharge : (rawDroppedCurvePortUnits w N start K).Nodup) :
-    times.length ≤ 24 * N + 4 := by
-  have hepoch := distinct_samples_le_four_mul_nonself_epochs
-    hN start hlive times htimes hnd
-  have hgrowth := raw_nonself_growth_le_six_mul_of_lost_ports_nodup
-    hN start K hlive hcharge
-  omega
-
-/-! ## Interface to the nested-restoration charge -/
-
-/-- If the raw lost-port mass has been compiled into a finite strictly
-nested first-restoration family, the existing two-slots-per-switch theorem
-bounds total drop by `2 * N`.
-
-`hcompile` is the exact remaining raw-to-echo premise: every unit of physical
-curve drop must be represented by a distinct frame of this one nested family.
-It is kept explicit; this theorem does not claim that extraction has already
-been proved. -/
 theorem rawCurveDropMass_le_two_mul_of_nested_restoration_charge
     {w : Wiring} {N K : Nat} {start : Nat × Tongues}
     {m : Echo.Machine} {e r0 : Nat → Nat}
@@ -956,85 +872,6 @@ theorem raw_nonself_growth_le_five_mul_of_nested_restoration_charge
     hN hlive A slots hroot hslots hcompile
   omega
 
-/-- Combining automatic four-state epoch aggregation with one nested
-restoration charge gives the conditional `20 * N + 4` state bound.  The sole
-nonlocal premise is `hcompile` above. -/
-theorem distinct_samples_le_twenty_mul_of_nested_restoration_charge
-    {w : Wiring} {N K : Nat} {start : Nat × Tongues}
-    {m : Echo.Machine} {e r0 : Nat → Nat}
-    {depth : Nat} {opening closing : Nat → Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (A : Echo.FiniteStrictNestedRestorationFamily
-      m e r0 depth opening closing)
-    (slots : List Nat)
-    (hroot : ∀ i, i < depth → Echo.oldSlot m e r0 (opening i) ∈ slots)
-    (hslots : slots.length ≤ 2 * N)
-    (hcompile : rawCurveDropMass w N start K ≤ depth)
-    (times : List Nat) (htimes : ∀ k, k ∈ times → k ≤ K)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ 20 * N + 4 := by
-  have hepoch := distinct_samples_le_four_mul_nonself_epochs
-    hN start hlive times htimes hnd
-  have hgrowth :=
-    raw_nonself_growth_le_five_mul_of_nested_restoration_charge
-      hN hlive A slots hroot hslots hcompile
-  omega
-
-/-- If the still-missing global lost-port injection bounds total drop mass by
-the physical `3 * N` ports, non-self growth is at most `6 * N`.  The premise
-is explicit because proving it is exactly the restoration-charge bridge. -/
-theorem raw_nonself_growth_le_six_mul_of_drop_charge
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (hcharge : rawCurveDropMass w N start K ≤ 3 * N) :
-    (rawNonselfProductiveTimes w N start K).length ≤ 6 * N := by
-  have h := raw_nonself_growth_le_three_mul_add_drop hN start K hlive
-  omega
-
-/-! ## Every strict shrink either settles into four states or is regrown -/
-
-/-- A strict self-shrink supplies a concrete lost carrier port and, on every
-finite live continuation after that step, either leaves a self-only tail or
-is followed by a productive non-self pivot which strictly regrows the finite
-carrier.  This is the unconditional local shrink-or-Gray dichotomy.
-
-The continuation is stated from an explicit reached configuration `after`;
-this avoids any hidden default-state reasoning after a fall-off. -/
-theorem strict_self_shrink_lost_port_and_tail_or_regrowth
-    {w : Wiring} {N k K : Nat} {start after : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hshrink : RawStrictSelfShrinkAt w N start k)
-    (_hafter : stepN w (k + 1) start = some after)
-    (hlive : ∀ d, d ≤ K → (stepN w d after).isSome) :
-    ∃ p,
-      p ∈ rawFiniteCurvePortsAt w N start k ∧
-      p ∉ rawFiniteCurvePortsAt w N start (k + 1) ∧
-      (RawSelfTailCertificate w N after K ∨
-        ∃ d, d < K ∧ RawProductiveAt w N after d ∧
-          ¬ RawCurveSelfAt w after d ∧
-          rawFiniteCurveSizeAt w N after d <
-            rawFiniteCurveSizeAt w N after (d + 1)) := by
-  obtain ⟨p, hpOld, hpNew⟩ := hshrink.dropped_carrier_port
-  refine ⟨p, hpOld, hpNew, ?_⟩
-  exact self_tail_or_strict_carrier_change after hN hlive
-
-/-- In the settling branch of the preceding dichotomy, every duplicate-free
-sample from the continuation has at most four visible tongue vectors. -/
-theorem strict_self_shrink_settling_tail_le_four
-    {w : Wiring} {N K : Nat} {after : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (T : RawSelfTailCertificate w N after K)
-    (times : List Nat) (htimes : ∀ d, d ∈ times → d ≤ K)
-    (hnd : (times.map (restrictedTonguesAt w N after)).Nodup) :
-    times.length ≤ 4 := by
-  exact T.distinct_snapshots_le_four hN times htimes hnd
-
-/-! ## Permanent form of the four-state alternative -/
-
-/-- A live continuation in which every productive pivot is a self-pivot. -/
 structure RawPermanentSelfTail
     (w : Wiring) (N : Nat) (start : Nat × Tongues) : Prop where
   live : ∀ k, (stepN w k start).isSome
@@ -1060,48 +897,5 @@ theorem RawPermanentSelfTail.distinct_snapshots_le_four
   · intro k hk
     exact le_maxRawTime_of_mem hk
   · exact hnd
-
-/-- **Permanent shrink-or-regrow dichotomy.**  After a strict self-shrink in
-an infinite live run, one concrete port has been lost and exactly one of the
-following alternatives is available constructively at the proposition
-level:
-
-* all future productive events are self-pivots, yielding the permanent
-  four-state tail above; or
-* some later productive non-self pivot strictly regrows the finite curve.
-
-This is the strongest unconditional per-shrink statement.  The remaining
-global theorem must show that repeated regrowths restore lost ports in one
-injectively charged nested family; otherwise one of these tails becomes
-permanent. -/
-theorem strict_self_shrink_lost_port_and_permanent_tail_or_regrowth
-    {w : Wiring} {N k : Nat} {start after : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hshrink : RawStrictSelfShrinkAt w N start k)
-    (_hafter : stepN w (k + 1) start = some after)
-    (hlive : ∀ d, (stepN w d after).isSome) :
-    ∃ p,
-      p ∈ rawFiniteCurvePortsAt w N start k ∧
-      p ∉ rawFiniteCurvePortsAt w N start (k + 1) ∧
-      (RawPermanentSelfTail w N after ∨
-        ∃ d, RawProductiveAt w N after d ∧
-          ¬ RawCurveSelfAt w after d ∧
-          rawFiniteCurveSizeAt w N after d <
-            rawFiniteCurveSizeAt w N after (d + 1)) := by
-  obtain ⟨p, hpOld, hpNew⟩ := hshrink.dropped_carrier_port
-  refine ⟨p, hpOld, hpNew, ?_⟩
-  by_cases hself : ∀ d, RawProductiveAt w N after d →
-      RawCurveSelfAt w after d
-  · exact Or.inl ⟨hlive, hself⟩
-  · right
-    apply Classical.byContradiction
-    intro hnone
-    apply hself
-    intro d hprod
-    apply Classical.byContradiction
-    intro hnonself
-    apply hnone
-    exact ⟨d, hprod, hnonself,
-      rawProductiveAt_nonself_curve_growth hN hprod hnonself⟩
 
 end GeneralN

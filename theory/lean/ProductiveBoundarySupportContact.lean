@@ -93,32 +93,6 @@ theorem PhysicalTrace.no_strict_return_to_start_port_public
   apply hne
   simpa [hzero, hreturned] using hwriters
 
-/-- Two traces with the same nonempty passage word have the same finish
-port.  For the empty word this is also true when their start ports agree. -/
-theorem PhysicalTrace.finish_port_eq_of_same_passages
-    {w : Wiring} {startA startB finishA finishB : Nat × Tongues}
-    {passages : List Passage}
-    (hstart : startA.1 = startB.1)
-    (hA : PhysicalTrace w startA passages finishA)
-    (hB : PhysicalTrace w startB passages finishB) :
-    finishA.1 = finishB.1 := by
-  cases passages with
-  | nil =>
-      have hAs : startA = finishA := by
-        simpa [stepN] using hA.sound
-      have hBs : startB = finishB := by
-        simpa [stepN] using hB.sound
-      calc
-        finishA.1 = startA.1 := congrArg Prod.fst hAs.symm
-        _ = startB.1 := hstart
-        _ = finishB.1 := congrArg Prod.fst hBs
-  | cons passage rest =>
-      have hAlink := hA.last_link
-      have hBlink := hB.last_link
-      exact Option.some.inj (hAlink.symm.trans hBlink)
-
-/-- A returned passage touches the old lead when both passages name the same
-switch. -/
 def TouchesLead (lead : List Passage) (fresh : Passage) : Prop :=
   ∃ old ∈ lead, passageSwitch old = passageSwitch fresh
 

@@ -63,20 +63,4 @@ theorem reg_step_eq_of_coreNoFull_coreNoLobe
         exact absurd hfull (hnfull old holdCell)
   · exact reg_skip m e r0 (k := k) (c := c) hdest
 
-/-- Pointwise lifting to a finite cell block. -/
-theorem snap_step_eq_of_coreNoFull_coreNoLobe
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (k : Nat) (cells : List Nat)
-    (hsupport : ∀ s,
-      Occupied m e r0 k s ↔ Occupied m e r0 (k+1) s)
-    (hnfull : ∀ c ∈ cells, CoreNoFull m e r0 k c)
-    (hnlobe : ∀ c ∈ cells, CoreNoLobe m c) :
-    snap m e r0 cells (k+1) = snap m e r0 cells k := by
-  unfold snap
-  apply List.map_congr_left
-  intro c hc
-  exact reg_step_eq_of_coreNoFull_coreNoLobe m e r0
-    hrun hr0 k c hsupport (hnfull c hc) (hnlobe c hc)
-
 end Echo

@@ -30,22 +30,6 @@ def trueCount : List Bool → Nat
   | [] => 0
   | b :: bs => (if b then 1 else 0) + trueCount bs
 
-theorem boolBelow_length {lo hi : List Bool}
-    (h : BoolBelow lo hi) : lo.length = hi.length := by
-  induction lo generalizing hi with
-  | nil =>
-      cases hi with
-      | nil => rfl
-      | cons _ _ => cases h
-  | cons a as ih =>
-      cases hi with
-      | nil => cases h
-      | cons b bs =>
-          have ht : BoolBelow as bs := (show
-            (a = true → b = true) ∧ BoolBelow as bs from h).2
-          simp only [List.length_cons]
-          exact congrArg Nat.succ (ih ht)
-
 theorem trueCount_le_of_below {lo hi : List Bool}
     (h : BoolBelow lo hi) : trueCount lo ≤ trueCount hi := by
   induction lo generalizing hi with
@@ -233,23 +217,5 @@ private theorem support_descending
           simp only [List.map_cons, Descending]
           exact ⟨support_later_below m e r0 hrun hr0 edges
               (Nat.le_of_lt hp.1), ih hp.2⟩
-
-/-- **Linear number of support epochs.**  Along increasing times, if the
-support vectors are pairwise distinct, there are at most `#edges + 1` of
-them. -/
-theorem support_epoch_bound
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (edges ks : List Nat)
-    (hinc : Increasing ks)
-    (hnd : (ks.map (supportSnap m e r0 edges)).Nodup) :
-    ks.length ≤ edges.length + 1 := by
-  have hdesc := support_descending m e r0 hrun hr0 edges ks hinc
-  have h := descending_chain_bound edges.length
-    (ks.map (supportSnap m e r0 edges))
-    (fun v hv => by
-      obtain ⟨k, _, rfl⟩ := List.mem_map.mp hv
-      exact supportSnap_length m e r0 edges k)
-    hnd hdesc
-  simpa only [List.length_map] using h
 
 end Echo

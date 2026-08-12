@@ -107,21 +107,4 @@ theorem retrace_after_other_roots
   exact descent_result_survives_other_roots
     hd entries hentries hroots
 
-/-- Retracing after other-root traffic changes no tongue. -/
-theorem retrace_after_other_roots_tongues
-    {w : Wiring} {t : Tongues} {p s ℓ : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (hd : Descent w t p ps s t')
-    (hentry : w.link ℓ = some p)
-    (entries : List Nat)
-    (hentries : ∀ q ∈ entries, IsDescentEntry w q)
-    (hroots : ∀ q ∈ entries,
-      entryRoot w p ≠ entryRoot w q) :
-    (stepN w (p :: ps).length
-      (3 * (lastOf p ps / 3), runEntryActions w entries t')).map
-        (fun c => c.2) =
-      some (runEntryActions w entries t') := by
-  rw [retrace_after_other_roots hd hentry entries hentries hroots]
-  rfl
-
 end GeneralN

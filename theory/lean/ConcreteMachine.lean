@@ -136,31 +136,11 @@ def encodedMachine (w : Wiring)
       syntheticSlot c :=
   encodedBar_syntheticSlot w c
 
-/-- Encoding a finite physical slot list preserves both length and
-Nodupness. -/
-theorem encodeSlot_list_length (slots : List Nat) :
-    (slots.map encodeSlot).length = slots.length := by simp
-
 theorem encodeSlot_injective : Function.Injective encodeSlot := by
   intro p q h
   unfold encodeSlot at h
   omega
 
-theorem encodeSlot_list_nodup {slots : List Nat}
-    (h : slots.Nodup) : (slots.map encodeSlot).Nodup := by
-  induction slots with
-  | nil => simp
-  | cons x rest ih =>
-      rw [List.nodup_cons] at h
-      simp only [List.map_cons, List.nodup_cons]
-      refine ⟨?_, ih h.2⟩
-      intro hmem
-      obtain ⟨y, hy, hxy⟩ := List.mem_map.mp hmem
-      have hyx : y = x := encodeSlot_injective hxy
-      rw [hyx] at hy
-      exact h.1 hy
-
-/-- The concrete `2*N` slot bound survives the even-slot encoding. -/
 theorem encoded_descent_entry_list_length_le_two_mul
     {w : Wiring} {N : Nat} {slots : List Nat}
     (hN : ∀ a b, w.link a = some b →

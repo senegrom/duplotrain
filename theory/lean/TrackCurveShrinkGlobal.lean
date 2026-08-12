@@ -944,35 +944,6 @@ theorem rawSelfOnlyEpoch_productive_writer_mem_initial
     hN start K hlive hself k (by omega)
     (rawWriterAt w start k) hmem
 
-/-- **Two-writer bound for a self-only epoch.** Any duplicate-free sample of
-productive writer IDs from the epoch has length at most two. -/
-theorem rawSelfOnlyEpoch_productive_writers_le_two
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (hself : ∀ k, k < K → RawProductiveAt w N start k →
-      RawCurveSelfAt w start k)
-    (times : List Nat)
-    (htimes : ∀ k, k ∈ times →
-      k < K ∧ RawProductiveAt w N start k)
-    (hnd : (times.map (rawWriterAt w start)).Nodup) :
-    times.length ≤ 2 := by
-  have hsubset : ∀ C ∈ times.map (rawWriterAt w start),
-      C ∈ rawFiniteCurveEndpointWritersAt w N start 0 := by
-    intro C hC
-    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hC
-    have hdata := htimes k hk
-    exact rawSelfOnlyEpoch_productive_writer_mem_initial
-      hN start K hlive hself hdata.1 hdata.2
-  have hle := nodup_subset_length_curve hnd hsubset
-  have hcap := rawFiniteCurveEndpointWritersAt_length_le_two
-    w N start 0
-  simp only [List.length_map] at hle
-  omega
-
-/-- Any represented tongue outside the two initial endpoint writers is frozen
-for the whole self-only epoch. -/
 theorem rawSelfOnlyEpoch_tongue_stable_outside
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
@@ -1232,13 +1203,6 @@ noncomputable def rawProductiveCurveTimes
   exact (List.range K).filter
     (fun k => decide (RawProductiveAt w N start k))
 
-theorem mem_rawProductiveCurveTimes_iff
-    {w : Wiring} {N K k : Nat} {start : Nat × Tongues} :
-    k ∈ rawProductiveCurveTimes w N start K ↔
-      k < K ∧ RawProductiveAt w N start k := by
-  classical
-  simp [rawProductiveCurveTimes]
-
 private theorem rawProductiveCurveTimes_length_succ_of_productive
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) :
     RawProductiveAt w N start K →
@@ -1256,96 +1220,5 @@ private theorem rawProductiveCurveTimes_length_succ_of_nonproductive
   classical
   intro hnot
   simp [rawProductiveCurveTimes, List.range_succ, hnot]
-
-/-- **Global finite growth bound for a merge-only raw prefix.**
-
-If every step of a consecutive prefix is a productive endpoint pivot and no
-such pivot is a self-join, the prefix contains at most `3*N` steps.  This is
-the finite port-count form of the curve-shrinking invariant on one merge
-epoch. -/
-theorem nonself_productive_prefix_le_three_mul_N
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hprod : ∀ k, k < K → RawProductiveAt w N start k)
-    (hnonself : ∀ k, k < K → ¬ RawCurveSelfAt w start k) :
-    K ≤ 3 * N := by
-  let sizeAt := rawFiniteCurveSizeAt w N start
-  have hgrow : ∀ k, k < K → sizeAt k < sizeAt (k+1) := by
-    intro k hk
-    exact rawProductiveAt_nonself_curve_growth hN
-      (hprod k hk) (hnonself k hk)
-  have hacc : ∀ j, j ≤ K → sizeAt 0 + j ≤ sizeAt j := by
-    intro j hj
-    induction j with
-    | zero => simp
-    | succ j ih =>
-        have hjK : j < K := by omega
-        have hprev := ih (by omega)
-        have hstep := hgrow j hjK
-        omega
-  have hfinal := hacc K (Nat.le_refl _)
-  have hbound : sizeAt K ≤ 3 * N := by
-    unfold sizeAt rawFiniteCurveSizeAt
-    exact finiteCurvePorts_length_le w N
-      ((stepN w K start).getD start).2
-      ((stepN w K start).getD start).1
-  omega
-
-/-- **No-op-insensitive curve-growth bound.**
-
-In an arbitrary live prefix, suppose every productive pivot is non-self.
-Facing moves and already-grooved trailing moves may occur in between.  There
-are nevertheless at most `3*N` productive pivots, because no-op steps keep
-the finite train curve fixed while every productive pivot strictly enlarges
-it. -/
-theorem nonself_productive_times_le_three_mul_N
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (hnonself : ∀ k, k < K → RawProductiveAt w N start k →
-      ¬ RawCurveSelfAt w start k) :
-    (rawProductiveCurveTimes w N start K).length ≤ 3 * N := by
-  let sizeAt := rawFiniteCurveSizeAt w N start
-  let countAt := fun k => (rawProductiveCurveTimes w N start k).length
-  have hacc : ∀ j, j ≤ K → sizeAt 0 + countAt j ≤ sizeAt j := by
-    intro j hj
-    induction j with
-    | zero => simp [countAt, rawProductiveCurveTimes]
-    | succ j ih =>
-        have hjK : j < K := by omega
-        have hprev := ih (by omega)
-        by_cases hprod : RawProductiveAt w N start j
-        · have hgrow : sizeAt j < sizeAt (j+1) :=
-            rawProductiveAt_nonself_curve_growth hN hprod
-              (hnonself j hjK hprod)
-          have hcount := rawProductiveCurveTimes_length_succ_of_productive
-            w N start j hprod
-          change sizeAt 0 +
-            (rawProductiveCurveTimes w N start j).length ≤ sizeAt j at hprev
-          change sizeAt 0 +
-            (rawProductiveCurveTimes w N start (j+1)).length ≤ sizeAt (j+1)
-          rw [hcount]
-          omega
-        · have heq : sizeAt (j+1) = sizeAt j :=
-            rawNonproductiveAt_curve_size_eq hN (hlive (j+1) (by omega)) hprod
-          have hcount := rawProductiveCurveTimes_length_succ_of_nonproductive
-            w N start j hprod
-          change sizeAt 0 +
-            (rawProductiveCurveTimes w N start j).length ≤ sizeAt j at hprev
-          change sizeAt 0 +
-            (rawProductiveCurveTimes w N start (j+1)).length ≤ sizeAt (j+1)
-          rw [hcount, heq]
-          exact hprev
-  have hfinal := hacc K (Nat.le_refl _)
-  change sizeAt 0 +
-    (rawProductiveCurveTimes w N start K).length ≤ sizeAt K at hfinal
-  have hbound : sizeAt K ≤ 3 * N := by
-    unfold sizeAt rawFiniteCurveSizeAt
-    exact finiteCurvePorts_length_le w N
-      ((stepN w K start).getD start).2
-      ((stepN w K start).getD start).1
-  omega
 
 end GeneralN

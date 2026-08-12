@@ -27,41 +27,6 @@ not a conditional repair certificate.
 
 namespace GeneralN
 
-/-- A globally novel repeated close after a completed turning contact
-cannot have the contact vector as its post-vector.  The completed reverse is
-constant after its turn; the later close still needs a tail argument.
-
-The hypotheses expose the physical retrace because this is the exact point
-at which the tempting coefficient-one shortcut arises. -/
-theorem repeated_novel_post_ne_completed_retrace_contact
-    {w : Wiring} {N K g e p oldEntry close : Nat}
-    {start : Nat × Tongues}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (hreach : stepN w K start = some (p, u))
-    (Hclose : RawRepeatedWriterNovelAt w N start close)
-    (hbefore : K < close) :
-    restrictedTonguesAt w N start (close + 1) ≠
-      VectorCount.restrict N v := by
-  have hcontactVector :
-      restrictedTonguesAt w N start (K + 1) =
-        VectorCount.restrict N v :=
-    completed_retrace_at_positive_vector_eq_contact
-      hrecorded hgrooved hentry hcontact hreach
-        (N := N) (j := K + 1) (by omega) (by omega)
-  intro heq
-  apply Hclose.2.2
-  apply List.mem_map.mpr
-  refine ⟨K + 1, List.mem_range.mpr (by omega), ?_⟩
-  exact hcontactVector.trans heq.symm
-
-/-- Independently of any retrace, a globally novel repeated close cannot
-have a zero-exception cover over canonical first-writer history. -/
 theorem repeated_novel_close_not_zero_first_writer_cover
     {w : Wiring} {N horizon close : Nat}
     {start : Nat × Tongues}
@@ -89,46 +54,6 @@ theorem repeated_novel_close_not_zero_first_writer_cover
   exact repeatedWriterPost_not_mem_firstHistory
     hN hcloseMem hhistory
 
-/-- **Exact composition of the first-writer retrace theorem.**  Every
-positive sample on the completed retrace is covered with zero exceptions,
-but a later globally novel repeated close is not covered by that same
-first-writer history.  Thus reverse cancellation makes the retrace free; it
-does not, by itself, make a later escape close free. -/
-theorem first_writer_retrace_free_but_later_close_not_free
-    {w : Wiring} {N horizon K g e p oldEntry close : Nat}
-    {start : Nat × Tongues}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (hreach : stepN w K start = some (p, u))
-    (hfirst : RawFirstWriterAt w N start K)
-    (hK : K < horizon)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (Hclose : RawRepeatedWriterNovelAt w N start close)
-    (hcloseHorizon : close < horizon)
-    (times : List Nat)
-    (htimes : ∀ j, j ∈ times →
-      K < j ∧ j ≤ K + recorded.length + 1) :
-    NoveltyCoverOn w N start times
-        (rawFirstWriterHistory w N start horizon) 0 ∧
-      ¬ NoveltyCoverOn w N start [close + 1]
-        (rawFirstWriterHistory w N start horizon) 0 := by
-  constructor
-  · exact first_writer_completed_retrace_zero_novelty_cover
-      hrecorded hgrooved hentry hcontact hreach hfirst hK times htimes
-  · exact repeated_novel_close_not_zero_first_writer_cover
-      hN Hclose hcloseHorizon
-
-/-- Up to the second canonical repeated novelty, every state is either in
-first-writer history or is the first repeated-novel post-vector.  The proof
-uses the selected-event eliminator: any repeated novelty contributing to the
-finite writer cover is one of the six canonical endpoints, and novelty rules
-out endpoints at or after `z1` from representing an earlier state. -/
 private theorem RawOverlappingFiveWindowReduction.prefix_through_second_mem
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     (R : RawOverlappingFiveWindowReduction w N start)
@@ -321,45 +246,6 @@ theorem RawOverlappingFiveWindowReduction.tail_serial_escape_sharp_outcome
       rw [← hvector]
       exact hjHistory
 
-/-- **Sharp residual for the canonical six-event tail window.**  The serial
-branch has been reduced to a history-covered escape or a selected endpoint
-with a strict old-side interlacement.  The only other branch is the actual
-`ABCABC`/strict-nest endpoint outcome of the five-frame theorem. -/
-theorem RawOverlappingFiveWindowReduction.tail_sharp_residual
-    {w : Wiring} {N initialEdge : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues}
-    (hentry : w.link initialEdge = some start.1)
-    (R : RawOverlappingFiveWindowReduction w N start) :
-    (∃ escape,
-      escape ≤ R.z1 ∧
-      RawProductiveAt w N start escape ∧
-      (restrictedTonguesAt w N start (escape + 1) ∈
-          rawFirstWriterHistory w N start (R.z5 + 1) ++
-            [restrictedTonguesAt w N start (R.z0 + 1)] ∨
-        ((escape = R.z0 ∨ escape = R.z1) ∧
-          ∃ left reroute,
-            RawLastWriterFrame w N start left escape ∧
-            left < reroute ∧
-            reroute < escape ∧
-            RawProductiveAt w N start reroute ∧
-            rawWriterAt w start reroute ≠ rawWriterAt w start escape ∧
-            (RawFirstWriterAt w N start reroute ∨
-              ∃ prior,
-                RawLastWriterFrame w N start prior reroute ∧
-                prior < left)))) ∨
-      FiveFrameTripleOutcome
-        R.a1 R.z1 R.a2 R.z2 R.a3 R.z3 R.a4 R.z4 R.a5 R.z5 := by
-  rcases R.tail_shape with hserial | htriple
-  · exact Or.inl (R.tail_serial_escape_sharp_outcome
-      hN hentry hserial)
-  · exact Or.inr htriple
-
-/-- **Five samples need only one paid vector.**  If any one of five sampled
-vectors is already in the supplied history, the other four vectors form a
-literal `NoveltyCoverOn` witness of budget four.  No distinctness or dynamic
-hypothesis is required. -/
 theorem noveltyCoverOn_five_of_one_paid
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     {t1 t2 t3 t4 t5 : Nat} {history : List (List Bool)}
@@ -857,50 +743,5 @@ theorem RawSixEventReduction.serial_tail_strict_suffix
       hframeLocal, heventLocal, ?_⟩
     exact Nat.sub_lt_of_pos_le hpositive
       (Nat.le_trans hshift (Nat.le_of_lt R.frame5.outer.order))
-
-/-- **The exact unresolved boundary of the raw six-event reduction.**
-
-The serial alternative produces an actually reached, positive, strictly
-shorter suffix carrying one fully rebased framed repeated novelty.  This is
-not yet a minimal-counterexample contradiction: a recursive argument still
-has to preserve the rest of the six-event counter, or construct the
-four-vector tail cover ruled out by `no_tail_four_cover`.
-
-In particular, `RawSixEventReduction` records only that `z0` is the first
-repeated novelty.  It does not record that `z1` through `z5` are consecutive
-members of the global repeated-novelty list.  Therefore no proof from this
-structure alone may silently charge every state before `z1` to first-writer
-history plus event zero; that adjacency must be preserved by the reduction
-or avoided by a direct tail argument.
-
-The other alternative is the concrete five-frame endpoint order returned by
-the obstruction theorem.  It remains to turn that `ABCABC`/strict-nest
-outcome into an actual bounded tail or an impossibility.  No certificate or
-conditional closure hypothesis is hidden in this statement. -/
-theorem RawSixEventReduction.strict_suffix_or_triple
-    {w : Wiring} {N initialEdge : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues}
-    (hentry : w.link initialEdge = some start.1)
-    (R : RawSixEventReduction w N start) :
-    (∃ edge settled returnTime laterOpen laterClose,
-      stepN w returnTime start = some (edge, settled) ∧
-      0 < returnTime ∧
-      returnTime ≤ R.z1 ∧
-      R.z1 ≤ laterOpen ∧
-      laterOpen < laterClose ∧
-      RawLastWriterFrame w N start laterOpen laterClose ∧
-      RawRepeatedWriterNovelAt w N start laterClose ∧
-      RawLastWriterFrame w N (edge, settled)
-        (laterOpen - returnTime) (laterClose - returnTime) ∧
-      RawRepeatedWriterNovelAt w N (edge, settled)
-        (laterClose - returnTime) ∧
-      laterClose - returnTime < laterClose) ∨
-    FiveFrameTripleOutcome
-      R.a1 R.z1 R.a2 R.z2 R.a3 R.z3 R.a4 R.z4 R.a5 R.z5 := by
-  rcases R.tail_shape with hserial | htriple
-  · exact Or.inl (R.serial_tail_strict_suffix hN hentry hserial)
-  · exact Or.inr htriple
 
 end GeneralN

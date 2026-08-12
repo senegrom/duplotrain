@@ -94,45 +94,6 @@ theorem stored_partner_root_eq_landing
   unfold physicalCell at hfCell
   exact hfCell.trans hpartner
 
-/-- A stored entry in the partner cell has a different root from the current
-ascent. -/
-theorem stored_partner_root_ne_current
-    {w : Wiring} (trace : ConcreteAscentTrace w) (k f : Nat)
-    (hfCell : physicalCell w f = tracePartnerCell trace k) :
-    entryRoot w f ≠ entryRoot w (trace.entry k) := by
-  intro hroot
-  have hsameCell : physicalCell w f =
-      physicalCell w (trace.entry k) := by
-    unfold physicalCell
-    rw [hroot]
-  have hmate : tracePartnerCell trace k =
-      physicalCell w (trace.entry k) :=
-    hfCell.symm.trans hsameCell
-  exact mateNat_ne (physicalCell w (trace.entry k))
-    (by simpa [tracePartnerCell] using hmate)
-
-/-- No later write to a partner cell implies no later ascent of the stored
-root. -/
-theorem no_later_partner_cell_no_later_root
-    {w : Wiring} (trace : ConcreteAscentTrace w)
-    {start current f : Nat}
-    (hfRoot : entryRoot w f = entryRoot w (trace.entry start))
-    (hcell : physicalCell w (trace.entry start) =
-      tracePartnerCell trace current)
-    (hno : ∀ i, start < i → i ≤ current →
-      physicalCell w (trace.entry i) ≠
-        tracePartnerCell trace current) :
-    ∀ i, start < i → i ≤ current →
-      entryRoot w (trace.entry start) ≠
-        entryRoot w (trace.entry i) := by
-  intro i hiLo hiHi hroot
-  apply hno i hiLo hiHi
-  unfold physicalCell
-  rw [← hroot]
-  exact hcell
-
-/-- Retrace an untouched physical initial register at the current partner
-root. -/
 theorem initial_writer_retrace
     {w : Wiring} (trace : ConcreteAscentTrace w)
     (k f : Nat)

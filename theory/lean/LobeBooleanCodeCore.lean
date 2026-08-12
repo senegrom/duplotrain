@@ -106,22 +106,4 @@ theorem coreLobeBits_eq_regs
   exact core_lobe_reg_eq_of_bit_eq m e r0
     (hloop a ha) (hiOcc a ha) (hjOcc a ha) hbit
 
-/-- Snapshot form. -/
-theorem coreLobeBits_eq_snap
-    (lobes : List Nat) {i j : Nat}
-    (hloop : ∀ a ∈ lobes,
-      m.cellOf (m.bar a) = m.cellOf a)
-    (hiOcc : ∀ a ∈ lobes, Occupied m e r0 i a)
-    (hjOcc : ∀ a ∈ lobes, Occupied m e r0 j a)
-    (hcode : coreLobeBits m e r0 lobes i =
-      coreLobeBits m e r0 lobes j) :
-    snap m e r0 (coreLobeCells m lobes) i =
-      snap m e r0 (coreLobeCells m lobes) j := by
-  unfold snap coreLobeCells
-  simp only [List.map_map]
-  apply List.map_congr_left
-  intro a ha
-  exact coreLobeBits_eq_regs m e r0 lobes
-    hloop hiOcc hjOcc hcode a ha
-
 end Echo

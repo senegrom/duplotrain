@@ -304,29 +304,4 @@ theorem rawRepeatedWriterNovelTimes_eq_nil_of_no_self
         hN hkData.1 havoid hkData.2.1
       exact hkData.2.2.1 hkFirst
 
-/-- **Sharp merge-only state bound.**
-
-Any finite raw prefix with no productive self-pivot has at most `N+1`
-distinct restricted tongue vectors: the initial vector and at most one first
-write per physical switch.  This improves the port-count `3*N` growth bound
-to the switch-count relevant to the requested state law. -/
-theorem distinct_samples_le_N_add_one_without_self
-    {w : Wiring} {N K : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues)
-    (havoid : ∀ j, j < K → RawProductiveAt w N start j →
-      ¬ RawTrainCurveSelfAt w start j)
-    (times : List Nat)
-    (htimes : ∀ k, k ∈ times → k ≤ K)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 1 := by
-  have hempty := rawRepeatedWriterNovelTimes_eq_nil_of_no_self
-    hN start havoid
-  have hbudget :
-      (rawRepeatedWriterNovelTimes w N start K).length ≤ 0 := by
-    rw [hempty]
-    simp
-  simpa using distinct_samples_le_of_repeated_writer_novelty
-    w N hN start K 0 hbudget times htimes hnd
-
 end GeneralN

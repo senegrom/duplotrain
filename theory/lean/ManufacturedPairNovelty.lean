@@ -449,23 +449,4 @@ theorem manufactured_pair_four_novelty_cover
     exact manufactured_pair_all_time_four_phase_tongues
       A B state hA hB hAB hBA k
 
-/-- Quantitative form: any pairwise-distinct sample from the entire paired
-tail contains at most four vectors beyond an arbitrary supplied history. -/
-theorem manufactured_pair_distinct_count
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hB : PathGrooves B.toSupported.paths state)
-    (hAB : A.toSupported.action.Avoids B.toSupported.paths)
-    (hBA : B.toSupported.action.Avoids A.toSupported.paths)
-    (times : List Nat) (history : List (List Bool))
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, state))).Nodup) :
-    times.length ≤ history.length + 4 := by
-  exact fourNoveltyCover_distinct_count
-    (manufactured_pair_four_novelty_cover
-      A B state hA hB hAB hBA times history) hnd
-
 end GeneralN

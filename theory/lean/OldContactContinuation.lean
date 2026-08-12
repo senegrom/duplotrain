@@ -218,51 +218,6 @@ structure UnionOldFlipMouthReach
   hit_eq : C.raw.split.hit =
     (reflector.mouth, reflector.firstArm)
 
-/-- Exact support-versus-mouth classification of an old contact. -/
-theorem UnionOldTrackedShrink.support_or_flip_mouth
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {fresh : List Passage} {finish : Nat × Tongues}
-    (C : UnionOldTrackedShrink w N A fresh finish) :
-    Nonempty (UnionOldSupportReach C) ∨
-      Nonempty (UnionOldFlipMouthReach C) := by
-  rcases A.exploration_support_or_flip_mouth
-      C.hit_mem_exploration with hsupport | hmouth
-  · left
-    obtain ⟨path, hpath, hhit⟩ := hsupport
-    exact ⟨{ path := path, path_mem := hpath, hit_mem := hhit }⟩
-  · right
-    obtain ⟨R, hA, hhit⟩ := hmouth
-    exact ⟨{ reflector := R, reflector_eq := hA, hit_eq := hhit }⟩
-
-/-- At a genuine support contact the physical exit itself selects one of the
-two strict residual sides.  The theorem retains the exact post-contact state
-and assumes neither a side nor an orientation. -/
-theorem UnionOldSupportReach.contact_selects_endpoint
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {fresh : List Passage} {finish : Nat × Tongues}
-    {C : UnionOldTrackedShrink w N A fresh finish}
-    (D : UnionOldSupportReach C)
-    (hApaths : PathGrooves A.toSupported.paths A.activatedState) :
-    ∃ next,
-      arrive C.raw.atContact.2 C.selection.repeated.1 =
-        (C.selection.repeated.2, next) ∧
-      (C.selection.repeated.2 = C.raw.split.hit.1 ∨
-        C.selection.repeated.2 = C.raw.split.hit.2) := by
-  obtain ⟨next, harrive⟩ := C.contact_arrival
-  have hpaths := C.atContact_support_grooves hApaths
-  have hgroove := hpaths D.path D.path_mem
-    C.raw.split.hit D.hit_mem
-  have hswitch : C.raw.split.hit.1 / 3 =
-      C.selection.repeated.1 / 3 := by
-    simpa [passageSwitch] using C.raw.split.sameSwitch
-  have hexit := grooved_contact_exits_on_old_passage
-    hgroove harrive hswitch
-  exact ⟨next, harrive, hexit⟩
-
-/-- Two no-change passages through one switch use the same physical edge.
-Their recorded orientations are therefore equal or reversed. -/
 theorem grooved_same_switch_passages_eq_or_reverse
     {state : Tongues} {old new : Passage}
     (hold : arrive state old.2 = (old.1, state))
@@ -333,94 +288,6 @@ theorem UnionOldSupportReach.changed_periodic_or_forward
     (by simp) C.before_contact_simple happroach hpaths harrive
     D.path_mem D.hit_mem hswitch hchanged
 
-/-- A no-change support contact is either the exact backward retrace/replay
-lasso or is already the forward passage on the old reflector's selected
-route.  This is the facing counterpart of
-`changed_periodic_or_forward`, stated directly for the raw union contact. -/
-theorem UnionOldSupportReach.facing_periodic_or_forward
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {fresh : List Passage} {finish : Nat × Tongues}
-    {C : UnionOldTrackedShrink w N A fresh finish}
-    (D : UnionOldSupportReach C)
-    (hApaths : PathGrooves A.toSupported.paths A.activatedState)
-    (harrive :
-      arrive C.raw.atContact.2 C.selection.repeated.1 =
-        (C.selection.repeated.2, C.raw.atContact.2)) :
-    EventuallyPeriodic w (e, A.activatedState) ∨
-      C.selection.repeated ∈ A.orientedRoute C.raw.atContact.2 := by
-  let state := C.raw.atContact.2
-  have hpaths : PathGrooves A.toSupported.paths state := by
-    simpa [state] using C.atContact_support_grooves hApaths
-  have hgroove :
-      arrive state C.raw.split.hit.2 =
-        (C.raw.split.hit.1, state) :=
-    hpaths D.path D.path_mem C.raw.split.hit D.hit_mem
-  have hsameSwitch : passageSwitch C.raw.split.hit =
-      passageSwitch C.selection.repeated :=
-    C.raw.split.sameSwitch
-  have hpassage : C.selection.repeated = C.raw.split.hit ∨
-      C.selection.repeated =
-        (C.raw.split.hit.2, C.raw.split.hit.1) := by
-    apply grooved_same_switch_passages_eq_or_reverse hgroove
-    · simpa [state] using harrive
-    · exact hsameSwitch
-  obtain ⟨oriented, horiented, horientation⟩ :=
-    A.support_passage_on_orientedRoute state D.path_mem D.hit_mem
-  have hbackward :
-      C.selection.repeated = (oriented.2, oriented.1) →
-        EventuallyPeriodic w (e, A.activatedState) := by
-    intro hreverse
-    obtain ⟨recorded, tail, hsplit⟩ := List.append_of_mem horiented
-    have hroute := A.orientedRoute_trace state hpaths
-    have hsimple := A.orientedRoute_simple state
-    have hrouteGrooved := hroute.grooved_of_switchSimple hsimple
-    have hprefixData := simple_grooved_trace_prefix_to_occurrence
-      hroute hsplit hrouteGrooved hsimple
-    have hrecorded := hprefixData.1
-    have hrecordedSimple : SwitchSimple recorded := by
-      unfold SwitchSimple at hsimple ⊢
-      rw [hsplit] at hsimple
-      simp only [List.map_append, List.map_cons] at hsimple
-      exact (List.nodup_append.mp hsimple).1
-    have hrecordedGrooved : PassagesGrooved state recorded :=
-      hrecorded.grooved_of_switchSimple hrecordedSimple
-    have happroach := C.beforeTrace_to_contact
-    have happroachSimple : SwitchSimple C.selection.before := by
-      have hs := C.before_contact_simple
-      unfold SwitchSimple at hs ⊢
-      rw [List.map_append] at hs
-      exact (List.nodup_append.mp hs).1
-    have happroachGrooved :
-        PassagesGrooved state C.selection.before := by
-      exact happroach.grooved_of_switchSimple happroachSimple
-    have hcontact : arrive state C.selection.repeated.1 =
-        (oriented.1, state) := by
-      simpa [hreverse, state] using harrive
-    have hsettles := backward_contact_settles_grooved_cycle
-      hrecorded hrecordedGrooved A.entryEdge hcontact
-      happroach happroachGrooved
-    exact eventuallyPeriodic_of_reaches_simple_cycle
-      happroach.sound hsettles
-  rcases hpassage with hsame | hreverse <;>
-    rcases horientation with horientedSame | horientedReverse
-  · right
-    simpa [hsame, horientedSame] using horiented
-  · left
-    apply hbackward
-    rw [hsame, horientedReverse]
-  · left
-    apply hbackward
-    rw [hreverse, horientedSame]
-  · right
-    simpa [hreverse, horientedReverse] using horiented
-
-/-- A changed passage in a switch-simple trace survives to the endpoint.
-
-This is the converse accounting bridge to
-`PhysicalTrace.changed_switch_has_changed_passage`: simplicity excludes the
-changed switch from both sides of the displayed split, so the prefix and
-suffix preserve that coordinate. -/
 theorem PhysicalTrace.simple_changed_passage_survives_explicit_switch
     {w : Wiring} {start finish : Prod Nat Tongues}
     {passages before after : List Passage}
@@ -509,43 +376,6 @@ theorem PhysicalTrace.simple_passage_quiet_of_endpoint_eq
   exact (htrace.simple_changed_passage_survives_explicit_switch hsimple hsplit hbefore
     harrive hswitch hchanged) hsame
 
-/-- If the old support is grooved both before and after a switch-simple
-manufacturing exploration, every exploration passage on an old reusable
-switch is locally unproductive.  Therefore all productive construction
-writes are outside the reusable old support. -/
-theorem ManufacturedReflector.exploration_support_passage_quiet
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbase : PathGrooves A.toSupported.paths B.baseState)
-    (hfinish : PathGrooves A.toSupported.paths B.preReturn.2)
-    {before after : List Passage} {p x : Nat} {u v : Tongues}
-    (hsplit : B.exploration = before ++ (p, x) :: after)
-    (hbefore : PhysicalTrace w (e, B.baseState) before (p, u))
-    (harrive : arrive u p = (x, v))
-    (htouch : A.TouchesSupport (p, x)) :
-    v (passageSwitch (p, x)) = u (passageSwitch (p, x)) := by
-  classical
-  let path := Classical.choose htouch
-  have hpathData := Classical.choose_spec htouch
-  have hpathMem : List.Mem path A.toSupported.paths := hpathData.1
-  let old := Classical.choose hpathData.2
-  have holdData := Classical.choose_spec hpathData.2
-  have holdMem : List.Mem old path := holdData.1
-  have holdSwitch : passageSwitch old = passageSwitch (p, x) :=
-    holdData.2
-  have hsameOld := same_groove_same_tongue
-    (hbase path hpathMem old holdMem)
-    (hfinish path hpathMem old holdMem)
-  have hsame : B.preReturn.2 (passageSwitch (p, x)) =
-      B.baseState (passageSwitch (p, x)) := by
-    simpa [holdSwitch] using hsameOld.symm
-  exact B.exploration_trace.simple_passage_quiet_of_endpoint_eq
-    B.exploration_simple hsplit hbefore harrive rfl hsame
-
-/-- In the endpoint-groove-preserved branch the two complete manufacturing
-journeys have coefficient one, and the uniform protected-repair theorem
-supplies the constant four-state tail. -/
 theorem two_manufacturing_journeys_preserved_support_known_edge_le_N_add_six
     {w : Wiring} {N e : Nat}
     (hN : forall p q, w.link p = some q ->
@@ -740,59 +570,5 @@ theorem ManufacturedReflector.first_damaging_support_all_run_distinct_le_N_add_f
     exact C.damageContactHistory_length_le_N_add_three
       hN hbase hbaseGrooves v
   exact Nat.le_trans hcount (by omega)
-
-/-- Exact all-time old-contact continuation for two opposite manufactured
-reflectors.  Harmless old-support overlaps are free: either all old grooves
-survive to pre-return and the verified four-state protected tail applies, or
-the first damaging passage invokes the coefficient-one `N+5` theorem above.
-No residual-support recursion or selector is assumed. -/
-theorem two_manufacturing_journeys_first_damage_or_preserved_support_known_edge_le_N_add_six
-    {w : Wiring} {N e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      And (p < 3 * N) (q < 3 * N))
-    {start : Prod Nat Tongues}
-    (A : ManufacturedReflector w start.1 e)
-    (B : ManufacturedReflector w e start.1)
-    (stateA stateB : Tongues)
-    (hbaseA : A.baseState = start.2)
-    (hactivatedA : stateA = A.activatedState)
-    (hreachA : stepN w
-      (A.exploration.length + A.runway.length + 1) start =
-        some (e, stateA))
-    (hgroovesA : PathGrooves A.toSupported.paths stateA)
-    (hbaseB : B.baseState = stateA)
-    (hactivatedB : stateB = B.activatedState)
-    (hreachB : stepN w
-      (B.exploration.length + B.runway.length + 1)
-        (e, stateA) = some (start.1, stateB))
-    (hgroovesB : PathGrooves B.toSupported.paths stateB)
-    (times : List Nat)
-    (hlive : forall k, Membership.mem times k ->
-      (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    Nat.le times.length (N + 6) := by
-  by_cases hpreGrooves :
-      PathGrooves A.toSupported.paths B.preReturn.2
-  · exact
-      two_manufacturing_journeys_preserved_support_known_edge_le_N_add_six
-        hN A B stateA stateB hbaseA hactivatedA hreachA hgroovesA
-          hbaseB hactivatedB hreachB hgroovesB hpreGrooves
-          times hlive hnd
-  · have hbase : B.baseState = A.activatedState :=
-      hbaseB.trans hactivatedA
-    have hA : PathGrooves A.toSupported.paths A.activatedState := by
-      simpa [hactivatedA] using hgroovesA
-    have hlive' : forall k, Membership.mem times k ->
-        (stepN w k (start.1, A.baseState)).isSome := by
-      simpa [hbaseA] using hlive
-    have hnd' :
-        (times.map (restrictedTonguesAt w N
-          (start.1, A.baseState))).Nodup := by
-      simpa [hbaseA] using hnd
-    have hdamaged :=
-      A.first_damaging_support_all_run_distinct_le_N_add_five
-        hN B hbase hA hpreGrooves times hlive' hnd'
-    exact Nat.le_trans hdamaged (by omega)
 
 end GeneralN

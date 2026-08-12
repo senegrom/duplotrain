@@ -98,26 +98,4 @@ theorem ManufacturedReflector.completed_route_with_pair_support_within_twenty_on
       (A.orientedRoute_simple state)
   exact (hend.prepend hrepair.sound).weaken (by omega)
 
-/-- Damaged support is repaired or absorbed within `21*N`. -/
-theorem manufactured_pair_protected_repair_within_twenty_one
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hB : PathGrooves B.toSupported.paths B.activatedState) :
-    EventuallyPeriodicWithin w (g, B.activatedState) (21 * N) := by
-  rcases manufactured_pair_protected_repair_quantitative_outcomes
-      hN A B hA hB with hperiodic | hrest
-  · exact hperiodic.weaken (by omega)
-  · rcases hrest with hfacing | hrest
-    · exact (hfacing.within_twelve hN).weaken (by omega)
-    · rcases hrest with hchanged | hcomplete
-      · exact (hchanged.within_eighteen hN).weaken (by omega)
-      · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
-        exact A.completed_route_with_pair_support_within_twenty_one
-          hN B B.baseState B.activatedState finalState hA hrepair
-          hAfinal hBfinal
-
 end GeneralN

@@ -654,45 +654,6 @@ theorem manufactured_pair_protected_repair_constant_outcomes
             hrepair, hgroove⟩))
     · exact Or.inr (Or.inr (Or.inr hcomplete))
 
-/-- **Uniform protected-repair bound:** at most six distinct restricted tongue
-vectors, independently of the number of switches. -/
-theorem manufactured_pair_protected_repair_distinct_le_six
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hB : PathGrooves B.toSupported.paths B.activatedState)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, B.activatedState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, B.activatedState))).Nodup) :
-    times.length ≤ 6 := by
-  rcases manufactured_pair_protected_repair_constant_outcomes
-      A B hA hB with hcount | hrest
-  · have hc := hcount times hlive hnd
-    omega
-  · rcases hrest with hfacing | hrest
-    · have hc := hfacing.distinct_le_three hA hB times hlive hnd
-      omega
-    · rcases hrest with hchanged | hcomplete
-      · cases B with
-        | stay R =>
-            have hc := hchanged.stay_distinct_le_three
-              hA hB times hlive hnd
-            omega
-        | flip R =>
-            have hc := hchanged.flip_distinct_le_six
-              hA hB times hnd
-            omega
-      · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
-        have hc := A.completed_protected_route_with_pair_distinct_le_five
-          B hA hB hrepair hAfinal hBfinal times hlive hnd
-        omega
-
-
-
-/-- **Uniform five-vector protected-repair bound.** -/
 theorem manufactured_pair_protected_repair_distinct_le_five
     {w : Wiring} {N g e : Nat}
     (A : ManufacturedReflector w g e)
@@ -723,35 +684,6 @@ theorem manufactured_pair_protected_repair_distinct_le_five
       · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
         exact A.completed_protected_route_with_pair_distinct_le_five
           B hA hB hrepair hAfinal hBfinal times hlive hnd
-
-/-- In the compatible-pair branch, the reached Gray square contributes only
-three vectors beyond an already-covered history: its initial corner is the
-journey boundary and is not charged again. -/
-theorem compatible_pair_history_tail_distinct_le_history_add_three_sharp
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hB : PathGrooves B.toSupported.paths state)
-    (hAB : A.toSupported.action.Avoids B.toSupported.paths)
-    (hBA : B.toSupported.action.Avoids A.toSupported.paths)
-    {start : Nat × Tongues} {K : Nat}
-    (hreach : stepN w K start = some (g, state))
-    (times : List Nat) (history : List (List Bool))
-    (hhistory : ∀ j, j ∈ times → j < K →
-      restrictedTonguesAt w N start j ∈ history)
-    (hstart : VectorCount.restrict N state ∈ history)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ history.length + 3 := by
-  have hcover :=
-    manufactured_pair_history_and_tail_three_novelty_cover_of_start_mem
-      A B state hA hB hAB hBA hreach times history hhistory hstart
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  omega
-
-
 
 private theorem ketc_nodup_of_map_nodup
     {α β : Type} [BEq α] [LawfulBEq α]
@@ -978,21 +910,5 @@ theorem state_law_linear_two_add_eight_sharp
       hN hentry localTimes hlocalLive hlocalNodup
   · exact hlive
   · exact hnd
-
-/-- Pointwise best verified linear bound: the new 2*N+8 theorem and the
-independent 3*N+7 theorem are both retained. -/
-theorem state_law_linear_two_sharp
-    (w : Wiring) (N : Nat)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ Nat.min (2 * N + 8) (3 * N + 7) := by
-  exact Nat.le_min.mpr ⟨
-    state_law_linear_two_add_eight_sharp
-      w N hN start times hlive hnd,
-    state_law_linear_three_sharp
-      w N hN start times hlive hnd⟩
 
 end GeneralN

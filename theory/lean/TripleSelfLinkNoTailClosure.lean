@@ -128,32 +128,4 @@ theorem RawSixEventReduction.tail_cycle_first_revisit_simple
     exact (R.tail_opposite_reflector_false hN htriple S Cyc
       A state backSteps hmouth hvisited hA hbase hstate hback).elim
 
-/-- Refined certified endpoint outcome: the opposite-reflector fork has been
-removed. The early-self-link and simple-cycle branches remain explicit. -/
-theorem CertifiedEndpointEmptyABCABC.tail_self_link_endpoint_refined
-    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
-    (R : RawSixEventReduction w N start)
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    (htriple : FiveFrameTripleOutcome
-      R.a1 R.z1 R.a2 R.z2 R.a3 R.z3 R.a4 R.z4 R.a5 R.z5)
-    (S : SelectedFiveFrameABCABC (R.tailTripleCase htriple))
-    (C : CertifiedEndpointEmptyABCABC S) :
-    (exists q shift,
-      (R.tailTripleCase htriple).frames.openingAt S.i2 < shift /\
-      shift <= (R.tailTripleCase htriple).frames.closingAt S.i0 /\
-      stepN w shift start = some (C.run.entry q, C.run.boundary q) /\
-      w.link (C.run.entry q) = some (C.run.entry q)) \/
-    (exists Cyc : RawCycleThroughSelfLink w start
-        ((R.tailTripleCase htriple).frames.closingAt S.i0),
-      exists outside atRepeat visited,
-        w.link (3 * (Cyc.branch / 3)) = some outside /\
-        stepN w visited (outside, Cyc.state) = some atRepeat /\
-        SettlesOnSimpleCycle w atRepeat) := by
-  rcases C.self_link_raw_endpoint_outcome with hearly | hcycle
-  · exact Or.inl hearly
-  · obtain ⟨Cyc⟩ := hcycle
-    exact Or.inr ⟨Cyc,
-      R.tail_cycle_first_revisit_simple hN htriple S Cyc⟩
-
 end GeneralN

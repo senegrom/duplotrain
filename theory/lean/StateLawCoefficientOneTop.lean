@@ -2162,95 +2162,6 @@ theorem ManufacturedReflector.simple_partial_distinct_le_N_add_five
     exact C.changed_all_run_distinct_le_N_add_five
       hN hA times hlive hnd
 
-/-- Unconditional fall-off branch after one reflector.  The final simple
-continuation may damage the old support; no support-disjointness or completed
-second reflector is assumed. -/
-theorem ManufacturedReflector.simple_fall_distinct_le_N_add_five
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    {finish : Nat × Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w (e, A.activatedState) passages finish)
-    (hsimple : SwitchSimple passages)
-    (hfall : step w finish = none)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    times.length ≤ N + 5 := by
-  let lastLive := A.exploration.length + A.runway.length + 1 +
-    passages.length
-  have hreachA : stepN w
-      (A.exploration.length + A.runway.length + 1)
-      (g, A.baseState) = some (e, A.activatedState) :=
-    A.manufacturing_journey_reaches_activated hA
-  have hlocalDead : stepN w (passages.length + 1)
-      (e, A.activatedState) = none := by
-    rw [stepN_add, htrace.sound]
-    simpa [stepN] using hfall
-  have hglobalDead : stepN w (lastLive + 1)
-      (g, A.baseState) = none := by
-    dsimp [lastLive]
-    rw [show A.exploration.length + A.runway.length + 1 +
-        passages.length + 1 =
-      (A.exploration.length + A.runway.length + 1) +
-        (passages.length + 1) by omega,
-      stepN_add, hreachA]
-    exact hlocalDead
-  have htimes : ∀ k ∈ times, k ≤ lastLive := by
-    intro k hk
-    by_cases hle : k ≤ lastLive
-    · exact hle
-    · have hnone : stepN w k (g, A.baseState) = none :=
-        stepN_none_of_none_at_le hglobalDead (by omega)
-      have hsome := hlive k hk
-      rw [hnone] at hsome
-      simp at hsome
-  exact A.simple_partial_distinct_le_N_add_five
-    hN hA htrace hsimple times (by
-      intro k hk
-      simpa [lastLive] using htimes k hk)
-    hlive hnd
-
-/-- One-reflector simple lead followed by a one-vector settled tail, without
-assuming that the lead preserved the old support. -/
-theorem ManufacturedReflector.simple_one_vector_cycle_distinct_le_N_add_five
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    {atRepeat : Nat × Tongues} {lead : List Passage}
-    (hlead : PhysicalTrace w (e, A.activatedState) lead atRepeat)
-    (hleadSimple : SwitchSimple lead)
-    {settled : Tongues}
-    (htail : ∀ d, 0 < d → ∃ port,
-      stepN w d atRepeat = some (port, settled))
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    times.length ≤ N + 5 := by
-  by_cases hend : PathGrooves A.toSupported.paths atRepeat.2
-  · have hsharp := simple_lead_one_vector_tail_distinct_le_N_add_three
-      hN A hA hlead hleadSimple hend htail times hlive hnd
-    omega
-  · obtain ⟨C⟩ := A.simpleContinuationChangedContact
-      hA hlead hleadSimple hend
-    exact C.changed_all_run_distinct_le_N_add_five
-      hN hA times hlive hnd
-
-/-! ## Closed coefficient-one assemblies -/
-
-/-- **Known-edge coefficient-one bound.**  If the starting track port has a
-known incoming physical edge, every duplicate-free list of live restricted
-tongue states has length at most `N + 6`.
-
-The only residual of the structural assembly was a forward first damage in
-an arbitrary switch-simple continuation.  The generic partial-contact theorem
-above bounds that entire raw run by the sharper `N + 5`. -/
 theorem known_edge_all_run_distinct_le_N_add_six
     {w : Wiring} {N e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
@@ -2276,24 +2187,5 @@ theorem known_edge_all_run_distinct_le_N_add_six
       F.contact.changed_all_run_distinct_le_N_add_five
         hN F.grooves times hliveA hndA
     omega
-
-/-- **Unconditional raw coefficient-one bound, first direct corollary.**
-Dropping the known incoming edge costs at most the time-zero vector, hence an
-arbitrary start has at most `N + 7` distinct live tongue states. -/
-theorem state_law_linear_N_add_seven
-    (w : Wiring) (N : Nat)
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 7 := by
-  have hbound := arbitrary_start_distinct_le_succ_of_all_known_edge
-    (w := w) (N := N) (cap := N + 6)
-    (fun hentry localTimes hlocalLive hlocalNodup =>
-      known_edge_all_run_distinct_le_N_add_six
-        hN hentry localTimes hlocalLive hlocalNodup)
-    start times hlive hnd
-  omega
 
 end GeneralN

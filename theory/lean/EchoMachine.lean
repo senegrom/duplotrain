@@ -230,24 +230,6 @@ private theorem twoStep (P : Nat → Prop) (h0 : P 0) (h1 : P 1)
   | 1 => h1
   | n+2 => hs n (twoStep P h0 h1 hs n)
 
-/-- **The Gray square, for all N.**  Every entry of a partner-alternating
-run lies in `{e 0, bar (e 0), e 1, bar (e 1)}`: a dogbone-pattern orbit
-visits at most four distinct entries, no matter how many switches the
-wiring has. -/
-theorem bounce_orbit (hrun : IsRun m e r0) (halt : Alternating m e) :
-    ∀ k, e k = e 0 ∨ e k = m.bar (e 0) ∨ e k = e 1 ∨ e k = m.bar (e 1) := by
-  refine twoStep _ (Or.inl rfl) (Or.inr (Or.inr (Or.inl rfl))) ?_
-  intro n ih
-  have hb := bounce_step m e r0 hrun halt n
-  rcases ih with h | h | h | h
-  · rw [hb, h]; exact Or.inr (Or.inl rfl)
-  · rw [hb, h, m.bar_invol]; exact Or.inl rfl
-  · rw [hb, h]; exact Or.inr (Or.inr (Or.inr rfl))
-  · rw [hb, h, m.bar_invol]; exact Or.inr (Or.inr (Or.inl rfl))
-
-/-- An unproductive write — one that rewrites the value already stored —
-changes **no** register at all: the machine state can only move through
-productive writes. -/
 theorem unproductive_stall (k : Nat)
     (h : e (k+1) = reg m e r0 k (m.cellOf (e (k+1)))) :
     ∀ c, reg m e r0 (k+1) c = reg m e r0 k c := by
@@ -1222,77 +1204,6 @@ theorem future_register_le (hrun : IsRun m e r0)
   obtain ⟨d, rfl⟩ : ∃ d, j = K + d := ⟨j - K, by omega⟩
   exact future_register m e r0 hrun hr0 d
 
-/-- **The register repertoire, counted**: any duplicate-free list of
-values that cell `C`'s register takes at or after time `K` has length
-at most `#tokens of C at K` + 1 — σ(C) ≤ 1 + tokens(C).  With zero
-tokens this is freeze-out; with one it is the singleton lock. -/
-theorem repertoire_count (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (slots : List Nat) {K C : Nat}
-    (hCslots : ∀ v, m.cellOf v = C → v ∈ slots)
-    (vs : List Nat) (hnd : vs.Nodup)
-    (hvs : ∀ v ∈ vs, ∃ j, K ≤ j ∧ reg m e r0 j C = v) :
-    vs.length ≤ (cellTokens m e r0 slots C K).length + 1 := by
-  have hsub : ∀ v ∈ vs,
-      v ∈ reg m e r0 K C :: cellTokens m e r0 slots C K := by
-    intro v hv
-    obtain ⟨j, hj, hval⟩ := hvs v hv
-    rcases future_register_le m e r0 hrun hr0 (C := C) hj with h | h
-    · rw [hval] at h
-      rw [h]
-      exact List.mem_cons_self
-    · rw [hval] at h
-      refine List.mem_cons_of_mem _ ?_
-      rw [cellTokens, List.mem_filter]
-      have hcell : m.cellOf v = C := by
-        rw [← hval]
-        exact reg_cell m e r0 hr0 j C
-      exact ⟨hCslots v hcell, decide_eq_true ⟨h, hcell⟩⟩
-  have hle := nodup_subset_length hnd hsub
-  rw [List.length_cons] at hle
-  exact hle
-
-/-- **The fresh-value budget.**  Values that some cell's register takes
-at or after `K`, other than that cell's own `K`-value, are paid for
-one-for-one by tokens alive at `K`: any duplicate-free list of them
-has length at most the `K`-token count — so with `tokens_le_cells`,
-the whole run exhibits at most `#cells` fresh values, in total, across
-all cells and all future time.  Σ(σ − 1) ≤ #cells, unconditional. -/
-theorem fresh_values_le_tokens (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (slots : List Nat)
-    (hregslots : ∀ j c, reg m e r0 j c ∈ slots)
-    {K : Nat} (vs : List Nat) (hnd : vs.Nodup)
-    (hvs : ∀ v ∈ vs, ∃ j C, K ≤ j ∧ reg m e r0 j C = v ∧
-      reg m e r0 K C ≠ v) :
-    vs.length ≤ (tokenEnds m e r0 slots K).length := by
-  have hsub : ∀ v ∈ vs, v ∈ tokenEnds m e r0 slots K := by
-    intro v hv
-    obtain ⟨j, C, hj, hval, hne⟩ := hvs v hv
-    rcases future_register_le m e r0 hrun hr0 (C := C) hj with h | h
-    · rw [hval] at h
-      exact absurd h.symm hne
-    · rw [hval] at h
-      rw [tokenEnds, List.mem_filter]
-      refine ⟨?_, decide_eq_true h⟩
-      rw [← hval]
-      exact hregslots j C
-  exact nodup_subset_length hnd hsub
-
-/-! ### Conservation on cycles: recurrences cannot annihilate tokens
-
-Token count is non-increasing (`tokens_nonincreasing`), so across any
-register recurrence — the walk's eventual cycle — it is exactly
-conserved.  A productive step that fails to re-emit (its evicted slot
-does not become a token) strictly cools the machine
-(`no_emission_drop`); hence inside a recurrence every productive step
-DOES re-emit (`recurrence_emission`): the cycle's tokens form a
-conserved population, handed from evicted slot to evicted slot.  With
-`future_register`, the cycle's entire value repertoire is spanned by
-that fixed population — lemma B is exactly the claim that its
-effective size is at most 2. -/
-
-/-- Token count is antitone: heat only ever decreases. -/
 theorem tokens_antitone (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (slots : List Nat) (hnd : slots.Nodup)
@@ -1386,42 +1297,6 @@ theorem recurrence_emission (hrun : IsRun m e r0)
     rw [List.filter_congr hcong]
   omega
 
-/-- **The cycle dichotomy.**  Inside a register recurrence, every
-productive step either flips its own edge — the evicted slot is the
-arrival's jump partner: the Gray move — or hands off through a foreign
-edge that was already fully confirmed before the step. -/
-theorem recurrence_dichotomy (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (slots : List Nat) (hnd : slots.Nodup)
-    (hslots : ∀ j, e j ∈ slots) {k1 k2 j : Nat}
-    (hrec : ∀ c, reg m e r0 k1 c = reg m e r0 k2 c)
-    (hj1 : k1 ≤ j) (hj2 : j < k2)
-    (hp : ProductiveStep m e r0 j) :
-    reg m e r0 j (m.cellOf (e (j+1))) = m.bar (e (j+1)) ∨
-      (m.cellOf (m.bar (reg m e r0 j (m.cellOf (e (j+1)))))
-          ≠ m.cellOf (e (j+1)) ∧
-       Confirmed m e r0 j (m.bar (reg m e r0 j (m.cellOf (e (j+1)))))) := by
-  obtain ⟨_, hbo⟩ := recurrence_emission m e r0 hrun hr0 slots hnd hslots
-    hrec hj1 hj2 hp
-  rcases (confirmed_step m e r0 j
-      (m.bar (reg m e r0 j (m.cellOf (e (j+1)))))).mp hbo with hbe | ⟨hcne, hcj⟩
-  · left
-    have hb := congrArg m.bar hbe
-    rw [m.bar_invol] at hb
-    exact hb
-  · exact Or.inr ⟨hcne, hcj⟩
-
-/-! ### The steering seed: variation needs variation
-
-Registers move only through productive writes of their own cell
-(`change_has_productive`).  Combined with the witness identity this
-yields the first formal brick of the T10 delivery-chain argument:
-two different deliveries with a common witness cell force a productive
-write of that witness cell strictly between them.  A cell's variation
-must be steered by somebody's variation — the recursion whose LIFO
-closure is the nesting argument. -/
-
-/-- Registers move only through productive writes of their own cell. -/
 theorem change_has_productive {c i : Nat} :
     ∀ d, reg m e r0 (i+d) c ≠ reg m e r0 i c →
       ∃ t, i ≤ t ∧ t < i + d ∧ ProductiveStep m e r0 t ∧
@@ -1457,62 +1332,6 @@ theorem change_has_productive_le {c i j : Nat} (hij : i ≤ j)
   obtain ⟨d, rfl⟩ : ∃ d, j = i + d := ⟨j - i, by omega⟩
   exact change_has_productive m e r0 d h
 
-/-- **Variation needs variation.**  Two different deliveries whose
-witness cells coincide force a productive write of that witness cell
-strictly between them: reading the same cell twice can only hand out
-different slots if somebody productively rewrote it in the meantime.
-The steering recursion of T10, as a theorem. -/
-theorem variation_needs_variation (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c) {j1 j2 : Nat}
-    (h12 : j1 < j2)
-    (hQ : m.cellOf (m.bar (e (j1+1))) = m.cellOf (m.bar (e (j2+1))))
-    (hne : e (j1+1) ≠ e (j2+1)) :
-    ∃ t, j1 ≤ t ∧ t < j2 ∧ ProductiveStep m e r0 t ∧
-      m.cellOf (e (t+1)) = m.cellOf (m.bar (e (j1+1))) := by
-  have h1 : reg m e r0 j1 (m.cellOf (m.bar (e (j1+1))))
-      = m.bar (e (j1+1)) := head_confirmed m e r0 hrun hr0 j1
-  have h2 : reg m e r0 j2 (m.cellOf (m.bar (e (j2+1))))
-      = m.bar (e (j2+1)) := head_confirmed m e r0 hrun hr0 j2
-  rw [← hQ] at h2
-  have hbar : m.bar (e (j1+1)) ≠ m.bar (e (j2+1)) := by
-    intro hb
-    have := congrArg m.bar hb
-    rw [m.bar_invol, m.bar_invol] at this
-    exact hne this
-  have hchange : reg m e r0 j2 (m.cellOf (m.bar (e (j1+1))))
-      ≠ reg m e r0 j1 (m.cellOf (m.bar (e (j1+1)))) := by
-    rw [h1, h2]
-    exact fun hh => hbar hh.symm
-  exact change_has_productive_le m e r0 (Nat.le_of_lt h12) hchange
-
-/-- **Trajectory determinism.**  Two moments at the same cell whose
-subsequent reads all agree produce identical entry sequences: the walk
-can only branch where some read differs — variation in the route must
-be fed by variation in a register somewhere along it. -/
-theorem trajectory_merge (hrun : IsRun m e r0) {i j : Nat}
-    (hcell : m.cellOf (e i) = m.cellOf (e j)) :
-    ∀ d, (∀ l, l ≤ d → reg m e r0 (i+l) (m.star (m.cellOf (e (i+l))))
-        = reg m e r0 (j+l) (m.star (m.cellOf (e (j+l))))) →
-      e (i+d+1) = e (j+d+1) := by
-  intro d
-  induction d with
-  | zero =>
-      intro h
-      exact succ_of_reg_eq m e r0 hrun hcell (h 0 (Nat.le_refl _))
-  | succ n ih =>
-      intro h
-      have hprev := ih (fun l hl => h l (by omega))
-      have hcell' : m.cellOf (e (i+n+1)) = m.cellOf (e (j+n+1)) :=
-        congrArg m.cellOf hprev
-      exact succ_of_reg_eq m e r0 hrun hcell' (h (n+1) (Nat.le_refl _))
-
-/-- **The steering locator.**  If an entry recurs but the trajectories
-afterwards diverge, some visited cell's mouth partner was productively
-rewritten strictly between the two visits — and the theorem names it:
-divergence within `n` steps locates a moment `l < n` where the entries
-still agree and a productive write of `star (cellOf (e (i+l)))` lands
-in `[i+l, j+l)`.  Steering is never anonymous: every branch of the
-walk is paid for by a named productive write of a read cell. -/
 theorem divergence_names_steer (hrun : IsRun m e r0) {i j : Nat}
     (hij : i ≤ j) :
     ∀ n, e i = e j → e (i+n) ≠ e (j+n) →
@@ -1539,36 +1358,6 @@ theorem divergence_names_steer (hrun : IsRun m e r0) {i j : Nat}
       · obtain ⟨l, hl, hel, ht⟩ := ih h0 hn
         exact ⟨l, Nat.lt_succ_of_lt hl, hel, ht⟩
 
-/-- **Mouth entries are hot.**  Whenever the walk steps into the mouth
-partner of its current cell, the step is productive (provided the read
-register is not a `bar`-fixed point, which no physical wiring has): an
-unproductive mouth crossing would need `bar r = r`.  Consequently a
-productive-free stretch can never cross a mouth — frozen interludes
-move only along non-mouth jumps. -/
-theorem mouth_entry_productive (hrun : IsRun m e r0) {t : Nat}
-    (hfix : m.bar (reg m e r0 t (m.star (m.cellOf (e t))))
-      ≠ reg m e r0 t (m.star (m.cellOf (e t))))
-    (hmouth : m.cellOf (e (t+1)) = m.star (m.cellOf (e t))) :
-    ProductiveStep m e r0 t := by
-  intro hun
-  apply hfix
-  rw [← hrun t, hun, hmouth]
-
-/-- **Mouth deliveries are lobe deliveries.**  A delivery whose
-predecessor sits at the entered cell's mouth partner has its
-`bar`-partner inside the entered cell itself: reading a cell from its
-own mouth can only hand out that cell's lobe slots.  (The witness
-identity plus the `star` involution — the "forced lobe" step of the
-nesting argument.) -/
-theorem mouth_delivery_lobe (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c) {k C : Nat}
-    (hpred : m.cellOf (e k) = m.star C)
-    (_harr : m.cellOf (e (k+1)) = C) :
-    m.cellOf (m.bar (e (k+1))) = C := by
-  have hw := (witness m e r0 hrun hr0 k).1
-  rw [hw, hpred, m.star_invol]
-
-/-- Registers are constant across a productive-free stretch. -/
 theorem quiet_reg {i : Nat} :
     ∀ d, (∀ t, i ≤ t → t < i + d → ¬ ProductiveStep m e r0 t) →
       ∀ c, reg m e r0 (i + d) c = reg m e r0 i c := by
@@ -1809,58 +1598,5 @@ theorem gray_tail (hrun : IsRun m e r0)
         cells j (hks j hjks))
   rw [List.length_map] at hle
   exact hle
-
-/-- The conditional scaffold, re-based onto the token shape: IF from
-some `K` the token population has the observed shape AND at most one
-alternation occurs before `K`, THEN at most `#cells + 6` distinct
-snapshots occur, ever.  The open core is now exactly: every run
-reaches the (≤1, ≤1, 0, …) token shape within one alternation. -/
-theorem state_law_of_token_shape (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (slots : List Nat) (hslots : ∀ j, e j ∈ slots)
-    (cells : List Nat) (hcells : ∀ k, m.cellOf (e k) ∈ cells)
-    {K C1 C2 t1 t2 : Nat}
-    (h1 : ∀ s ∈ cellTokens m e r0 slots C1 K, s = t1)
-    (h2 : ∀ s ∈ cellTokens m e r0 slots C2 K, s = t2)
-    (h0 : ∀ C, C ≠ C1 → C ≠ C2 → ∀ s, s ∉ cellTokens m e r0 slots C K)
-    (alts : List Nat) (halts : alts.length ≤ 1)
-    (hcover : ∀ i, i < K → ProductiveStep m e r0 i →
-      FirstStep m e i ∨ i ∈ alts)
-    (ks : List Nat)
-    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
-    ks.length ≤ cells.length + 6 := by
-  refine state_law m e r0 hrun cells hcells K _ ?_
-    (fun j hj => token_shape_tail m e r0 hrun hr0 slots hslots
-      h1 h2 h0 cells j hj)
-    alts halts hcover ks hnd
-  exact Nat.le_refl 4
-
-/-- **At most one token per cell, at every moment**: `bar` maps tokens
-injectively to confirmed slots, and each cell confirms exactly one
-slot.  So the machine's alternation capacity is bounded by the number
-of cells, for all time. -/
-theorem tokens_le_cells (slots : List Nat) (hnd : slots.Nodup)
-    (cells : List Nat) (hcells : ∀ s, m.cellOf s ∈ cells) (k : Nat) :
-    (tokenEnds m e r0 slots k).length ≤ cells.length := by
-  have hinj : ∀ x ∈ tokenEnds m e r0 slots k,
-      ∀ y ∈ tokenEnds m e r0 slots k,
-      m.cellOf (m.bar x) = m.cellOf (m.bar y) → x = y := by
-    intro x hx y hy hc
-    rw [tokenEnds, List.mem_filter] at hx hy
-    have hxT := (of_decide_eq_true hx.2).2
-    have hyT := (of_decide_eq_true hy.2).2
-    unfold Confirmed at hxT hyT
-    rw [hc] at hxT
-    have hbar : m.bar x = m.bar y := by rw [hxT] at hyT; exact hyT
-    have := congrArg m.bar hbar
-    rwa [m.bar_invol, m.bar_invol] at this
-  have hndm := nodup_map_on hinj (nodup_filter _ hnd)
-  have hmem : ∀ v ∈ (tokenEnds m e r0 slots k).map
-      (fun s => m.cellOf (m.bar s)), v ∈ cells := by
-    intro v hv
-    obtain ⟨s, _, rfl⟩ := List.mem_map.mp hv
-    exact hcells _
-  have hle := nodup_subset_length hndm hmem
-  rwa [List.length_map] at hle
 
 end Echo

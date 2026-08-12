@@ -134,23 +134,4 @@ theorem entry_periodic_of_config_repeat
     hrepeat r
   exact (congrArg Prod.fst hcfg).symm
 
-/-- If a concrete cascade word is determined by the current echo entry, a
-repeated finite configuration makes those overwrite words periodic. -/
-theorem entryActions_periodic_of_config_repeat
-    (hrun : IsRun m e r0) (cells : List Nat)
-    (hcover : ∀ k, m.star (m.cellOf (e k)) ∈ cells)
-    (actionOf : Nat → List Nat)
-    (start period : Nat)
-    (hrepeat : configSnap m e r0 cells start =
-      configSnap m e r0 cells (start + period)) :
-    ∀ k, start ≤ k →
-      actionOf (e (k + period)) = actionOf (e k) := by
-  intro k hk
-  obtain ⟨r, rfl⟩ : ∃ r, k = start + r :=
-    ⟨k - start, by omega⟩
-  congr 1
-  have hentry := entry_periodic_of_config_repeat
-    m e r0 hrun cells hcover start period hrepeat r
-  simpa [Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hentry
-
 end Echo

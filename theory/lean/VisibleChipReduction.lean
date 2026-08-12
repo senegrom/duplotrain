@@ -174,36 +174,6 @@ theorem stationary_recurrent_four
     m e r0 hrun hr0 hrec.1 hrec.2.1 hrec.2.2
       hstationary cells ks hks hnd
 
-/-- **Returned full edge replays its rooted component.**
-
-The first visible move certifies that its evicted edge is full.  If a later
-visible move installs the same physical edge and support agrees at the two
-states, `TreeReplay` restores every register in the rooted component. -/
-theorem returned_visible_chip_replays_component
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells : List Nat) {i j : Nat}
-    (hi : VisibleFullEdgeChipMove m e r0 i)
-    (hj : VisibleFullEdgeChipMove m e r0 j)
-    (hsupport : ∀ s,
-      Occupied m e r0 i s ↔ Occupied m e r0 (j+1) s)
-    (hreturn : SameEdge m (oldSlot m e r0 i) (e (j+1)))
-    (hroot : RootedCells m e r0 i (oldSlot m e r0 i) cells) :
-    snap m e r0 cells (j+1) = snap m e r0 cells i := by
-  exact rootedCells_sameEdge_replay m e r0 hr0 cells hsupport
-    hi.oldFull hj.newFull hreturn hroot
-
-/-! ## Reflector-or-reserve consequences
-
-The imported reflector theorems give an exact component-level dichotomy.  It
-is deliberately weaker than `VisibleRecurrentChipClosure`: a repeated entry
-is not yet a repeated complete register snapshot, and merely possessing a
-reserved cell does not yet serialize all later chip transfers.
--/
-
-/-- Exact recurrence makes occupied support constant between any two tail
-times.  This is the persistence bridge needed to turn the lobe witnesses at
-one component visit into the persistent witnesses required by
-`CompatibleTwoReflectorTail`. -/
 theorem recurrent_occupied_iff
     (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c)
@@ -336,60 +306,6 @@ def CompatibleExternalReflectorComponent
   FullyExternallyLobedFrom m e r0 cells lo ∧
   ComponentVisitedFrom m e cells lo
 
-/-- A compatible fully-lobed component contains a visit whose support entry
-returns every four steps. -/
-theorem compatible_external_reflector_four_return
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells : List Nat) (lo : Nat)
-    (hcompat : CompatibleExternalReflectorComponent
-      m e r0 cells lo) :
-    ∃ k, lo ≤ k ∧ m.cellOf (e k) ∈ cells ∧
-      FourReturnOrbitAt e k := by
-  rcases hcompat.2.2 with ⟨k, hk, hentry⟩
-  exact ⟨k, hk, hentry,
-    fully_lobed_component_orbit m e r0 hrun hr0 cells
-      hcompat.1 hcompat.2.1 hk hentry⟩
-
-/-- **Closed component: four-return orbit or reserved cell.**
-
-For a selected-edge-closed visited component and a named list of persistent
-active lobe roots, either some component visit already lies on a four-return
-entry orbit, or the component contains a cell whose mouth partner is not one
-of those active roots.  No seriality or crossing premise occurs here. -/
-theorem closed_component_four_return_or_reserve
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells roots : List Nat) (lo : Nat)
-    (hclosed : SelectedClosedFrom m e r0 cells lo)
-    (hvisit : ComponentVisitedFrom m e cells lo)
-    (hactive : PersistentActiveLobeRoots m e r0 roots lo) :
-    (∃ k, lo ≤ k ∧ m.cellOf (e k) ∈ cells ∧
-      FourReturnOrbitAt e k) ∨
-    ∃ c, c ∈ cells ∧ m.star c ∉ roots := by
-  by_cases hreturn : ∃ k, lo ≤ k ∧ m.cellOf (e k) ∈ cells ∧
-      FourReturnOrbitAt e k
-  · exact Or.inl hreturn
-  · apply Or.inr
-    exact exists_component_reserve_against_active_lobes
-      m e r0 hrun hr0 cells roots lo hclosed hvisit
-        (fun k hk hentry horbit =>
-          hreturn ⟨k, hk, hentry, horbit⟩)
-        hactive
-
-/-- **Recurrent component trichotomy.**
-
-For a closed visited component on an exact recurrent tail, either:
-
-1. the component exposes a persistent separated two-reflector tail;
-2. the corresponding reflector geometry is one of the two explicit two-cell
-   collapses; or
-3. the component has a cell reserved against every named persistent active
-   lobe root.
-
-This is the strongest consequence currently available from the imported
-fully-lobed and reserve theorems.  In particular, the reserve branch is not
-silently promoted to serial chip motion. -/
 theorem closed_component_reflector_or_collapsed_or_reserve
     (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c)
@@ -511,38 +427,6 @@ def VisibleChipComponentExtraction : Prop :=
     ∃ lo k cells roots,
       VisibleChipComponentFrame m e r0 K lo k cells roots
 
-/-- Assuming exactly the finite component-extraction statement above, every
-visible recurrent chip yields the proved separated-reflector / two-cell-
-collapse / genuinely-unlobed-reserve trichotomy. -/
-theorem visible_chip_component_trichotomy
-    (hextract : VisibleChipComponentExtraction)
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    {K q : Nat}
-    (hrec : ExactRecurrentTail m e r0 K q)
-    (hvisible : ∃ k, K ≤ k ∧
-      VisibleFullEdgeChipMove m e r0 k) :
-    ∃ lo k cells roots,
-      VisibleChipComponentFrame m e r0 K lo k cells roots ∧
-      ((∃ t x a b, lo ≤ t ∧ e t = x ∧
-          CompatibleTwoReflectorTail m e r0 t x a b) ∨
-       (∃ t x, lo ≤ t ∧ e t = x ∧
-          CollapsedReflectorGeometry m x) ∨
-       ∃ c, c ∈ cells ∧
-          ¬ PersistentLobeRootAt m e r0 (m.star c) lo) := by
-  rcases hextract m e r0 K q hrun hr0 hrec hvisible with
-    ⟨lo, k, cells, roots, hframe⟩
-  have hlok : lo ≤ k := hframe.moveTime
-  have hvisit : ComponentVisitedFrom m e cells lo :=
-    ⟨k+1, by omega, hframe.newCell⟩
-  have hcases :=
-    closed_component_reflector_or_collapsed_or_unlobed_reserve
-      m e r0 hrun hr0 hrec hframe.tailStart cells roots
-        hframe.selectedClosed hvisit hframe.rootsComplete
-  exact ⟨lo, k, cells, roots, hframe, hcases⟩
-
-/-- Exact local premises of the paired-router theorem, with the partner
-register left unnamed. -/
 def CompatiblePairedRouterAt (k : Nat) : Prop :=
   ∃ s,
     e k = s ∧
@@ -551,30 +435,6 @@ def CompatiblePairedRouterAt (k : Nat) : Prop :=
     ∀ i, k < i → i ≤ k+3 →
       m.cellOf (e i) ≠ m.cellOf s
 
-/-- A compatible paired router returns to its starting support entry after
-six steps.  This is an entry theorem, not a complete-snapshot theorem. -/
-theorem compatible_paired_router_six_return
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    {k : Nat}
-    (hrouter : CompatiblePairedRouterAt m e k) :
-    e (k+6) = e k := by
-  rcases hrouter with ⟨s, hstart, hreflectB, hreflectA, hnoU⟩
-  have hround := paired_router_roundtrip_current
-    m e r0 hrun hr0 hstart hreflectB hreflectA hnoU
-  dsimp at hround
-  exact hround.2.2.2.trans hstart.symm
-
-/-- **The first missing implication.**
-
-On an exact recurrent tail, if the cell projection really moves, the visible
-full-edge chip must be serial: its recurrent motion has at most four complete
-register snapshots.  Proving this proposition requires the unresolved
-foreign/foreign crossing argument.  The component theorem above supplies only
-an entry orbit or a reserve; the remaining proof must upgrade the entry orbit
-to the compatible full-snapshot reflector trap, or use the reserve to control
-all later visible chip transfers.  This file deliberately does not assume
-either implication silently and does not claim to prove it. -/
 def VisibleRecurrentChipClosure : Prop :=
   ∀ (m : Machine) (e r0 : Nat → Nat) (K q : Nat),
     IsRun m e r0 →
@@ -582,20 +442,5 @@ def VisibleRecurrentChipClosure : Prop :=
     ExactRecurrentTail m e r0 K q →
     (∃ k, K ≤ k ∧ VisibleFullEdgeChipMove m e r0 k) →
     FourSnapshotTail m e r0 K
-
-/-- Closing precisely `VisibleRecurrentChipClosure` closes the complete
-four-snapshot recurrent-tail theorem.  The stationary branch is discharged by
-`StationaryTail`; the visible branch is passed explicitly to `hclosure`. -/
-theorem recurrent_tail_four_of_visible_chip_closure
-    (hclosure : VisibleRecurrentChipClosure)
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    {K q : Nat}
-    (hrec : ExactRecurrentTail m e r0 K q) :
-    FourSnapshotTail m e r0 K := by
-  rcases recurrent_stationary_or_visible_chip
-      m e r0 hrun hr0 hrec with hstationary | hvisible
-  · exact stationary_recurrent_four m e r0 hrun hr0 hrec hstationary
-  · exact hclosure m e r0 K q hrun hr0 hrec hvisible
 
 end Echo

@@ -130,45 +130,4 @@ theorem backward_contact_tail_distinct_le_two
   have hcount := noveltyCoverOn_distinct_count hcover hnd
   simpa using hcount
 
-/-- A protected backward-contact branch has at most three vectors: the
-repair prefix's initial/contact phases and one settled post-contact phase. -/
-theorem ManufacturedReflector.protected_backward_contact_distinct_le_three
-    {w : Wiring} {N g e p oldEntry : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hBstart : PathGrooves B.toSupported.paths B.activatedState)
-    {oldBase oldEnd u v : Tongues}
-    {recorded approach : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, oldBase) recorded (oldEntry, oldEnd))
-    (hrecordedGrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (happroach : PhysicalTrace w (g, B.activatedState) approach (p, u))
-    (happroachSimple : SwitchSimple approach)
-    (happroachRoute : ∀ passage ∈ approach,
-      passage ∈ A.orientedRoute B.activatedState)
-    (hBcontact : PathGrooves B.toSupported.paths u)
-    (happroachReplay : PhysicalTrace w (e, u) approach (p, u))
-    (happroachGroovedV : PassagesGrooved v approach)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, B.activatedState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, B.activatedState))).Nodup) :
-    times.length ≤ 3 := by
-  have hphase := A.repair_prefix_two_phase B hA hBstart
-    happroach happroachSimple happroachRoute hBcontact
-  have htail : ∀ tailTimes : List Nat,
-      (∀ k ∈ tailTimes, (stepN w k (p, u)).isSome) →
-      (tailTimes.map (restrictedTonguesAt w N (p, u))).Nodup →
-      tailTimes.length ≤ 2 := by
-    intro tailTimes _htailLive htailNodup
-    exact backward_contact_tail_distinct_le_two
-      hrecorded hrecordedGrooved hentry hcontact
-      happroachReplay happroachGroovedV tailTimes htailNodup
-  exact two_phase_prefix_then_direct_tail_distinct_le_succ
-    happroach.sound hphase htail (by omega) times hlive hnd
-
 end GeneralN

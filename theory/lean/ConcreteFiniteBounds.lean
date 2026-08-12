@@ -240,17 +240,4 @@ theorem isDescentRoot_bounded
   rcases hc with ⟨t, p, ps, s, t', h, rfl⟩
   exact descent_root_bounded hN h
 
-/-- **Concrete root-cell bound.**  A duplicate-free finite list of realised
-cascade roots has at most one entry per switch. -/
-theorem descent_root_list_length_le
-    {w : Wiring} {N : Nat} {cells : List Nat}
-    (hN : ∀ a b, w.link a = some b →
-      a < 3 * N ∧ b < 3 * N)
-    (hnd : cells.Nodup)
-    (hroots : ∀ c ∈ cells, IsDescentRoot w c) :
-    cells.length ≤ N := by
-  apply bounded_cell_list_length_le hnd
-  intro c hc
-  exact isDescentRoot_bounded hN (hroots c hc)
-
 end GeneralN

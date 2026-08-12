@@ -62,15 +62,4 @@ def StateLaw : Prop :=
       (ks.map fun k => VectorCount.restrict N (tonguesAt w c0 k)).Nodup →
       ks.length ≤ N + 6
 
-/-- The elementary exponential bound on exactly the same statement.  The
-proved coefficient-one theorem `GeneralN.stateLaw` supersedes it with `N+6`. -/
-theorem state_law_two_pow (w : Wiring) (N : Nat)
-    (_hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (c0 : Nat × Tongues) (ks : List Nat)
-    (_hlive : ∀ k ∈ ks, (stepN w k c0).isSome)
-    (hnd : (ks.map fun k =>
-      VectorCount.restrict N (tonguesAt w c0 k)).Nodup) :
-    ks.length ≤ 2 ^ N :=
-  VectorCount.trajectory_count_le N (tonguesAt w c0) ks hnd
-
 end GeneralN

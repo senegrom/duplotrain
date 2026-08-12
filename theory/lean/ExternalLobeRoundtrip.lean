@@ -111,27 +111,4 @@ theorem external_lobe_register_cases
   have hcases := standalone_occupied_lobe_cases m e r0 haLobe hocc
   simpa [haCell] using hcases
 
-/-- Occupied lobe partners at the two relevant read times give the fully
-geometric roundtrip certificate. -/
-theorem external_lobe_roundtrip_of_occupied
-    (hrun : IsRun m e r0)
-    {k s a b : Nat}
-    (hstart : e k = s)
-    (haCell : m.cellOf a = m.star (m.cellOf s))
-    (haLobe : m.cellOf (m.bar a) = m.cellOf a)
-    (hbCell : m.cellOf b = m.star (m.cellOf (m.bar s)))
-    (hbLobe : m.cellOf (m.bar b) = m.cellOf b)
-    (haOcc : Occupied m e r0 k a)
-    (hbOcc : Occupied m e r0 (k+2) b) :
-    (e (k+1) = m.bar a ∨ e (k+1) = a) ∧
-    e (k+2) = m.bar s ∧
-    (e (k+3) = m.bar b ∨ e (k+3) = b) ∧
-    e (k+4) = s := by
-  apply external_lobe_roundtrip m e r0 hrun
-    hstart haCell haLobe hbCell hbLobe
-  · exact external_lobe_register_cases m e r0
-      haCell haLobe haOcc
-  · exact external_lobe_register_cases m e r0
-      hbCell hbLobe hbOcc
-
 end Echo

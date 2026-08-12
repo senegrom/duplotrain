@@ -552,39 +552,6 @@ theorem support_fixed_of_register_period (hrun : IsRun m e r0)
   intro s
   exact (hpaired t (Nat.le_refl _) (by omega) s).symm
 
-/-- Recurrent-tail wrapper: exact entry/register recurrence, a primitive cell
-period, and a stationary projection imply the four-snapshot theorem when the
-cycle is based at a productive step. -/
-theorem stationary_recurrent_tail_four (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c) {K q : Nat}
-    (hq : 0 < q)
-    (hentryperiod : ∀ t, K ≤ t → e (t+q) = e t)
-    (hregperiod : ∀ t c, K ≤ t →
-      reg m e r0 (t+q) c = reg m e r0 t c)
-    (hprimitive : ∀ i, i < q → ∀ j, j < q →
-      tailCell m e K i = tailCell m e K j → i = j)
-    (hstationary : ∀ t, K ≤ t → ∀ c,
-      nextCell m e r0 (t+1) c = nextCell m e r0 t c)
-    (hanchor : ProductiveStep m e r0 K)
-    (cells ks : List Nat)
-    (hks : ∀ j ∈ ks, K ≤ j)
-    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
-    ks.length ≤ 4 := by
-  have hcellperiod : ∀ n,
-      tailCell m e K (n+q) = tailCell m e K n := by
-    intro n
-    unfold tailCell
-    have h := congrArg m.cellOf
-      (hentryperiod (K+n) (Nat.le_add_right _ _))
-    simpa only [Nat.add_assoc] using h
-  exact stationary_primitive_tail_four m e r0 hrun hr0
-    ⟨hq, hcellperiod, hprimitive⟩ hstationary
-    (support_fixed_of_register_period m e r0 hrun hr0 hq hregperiod)
-    hanchor cells ks hks hnd
-
-/-- **Stationary recurrent tail: four snapshots, without a supplied primitive
-period.**  Exact entry/register recurrence supplies a positive cell period;
-`exists_primitive_cell_period` minimizes it internally. -/
 theorem stationary_recurrent_tail_four_unconditional
     (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c) {K q : Nat}

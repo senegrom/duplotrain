@@ -378,40 +378,4 @@ theorem post_restoration_replay_or_named_writer
     exact ⟨C, t, hC, htlo, by simpa [hspan] using hthi,
       htprod, htwriter, hbit⟩
 
-/-- For the two strict-shrink novelty frames themselves, failed global
-replay therefore exposes both the first non-self restoration and a concrete
-post-restoration writer accounting for the global difference. -/
-theorem reused_novel_strict_shrink_requires_restoration_and_writer
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {i j p : Nat}
-    (hij : i < j)
-    (hi : RawNovelRepeatedStrictShrinkAt w N start i)
-    (hj : RawNovelRepeatedStrictShrinkAt w N start j)
-    (hpOldI : p ∈ rawFiniteCurvePortsAt w N start i)
-    (hpLostI : p ∉ rawFiniteCurvePortsAt w N start (i + 1))
-    (hpOldJ : p ∈ rawFiniteCurvePortsAt w N start j)
-    (hpLostJ : p ∉ rawFiniteCurvePortsAt w N start (j + 1)) :
-    ∃ restore C t,
-      i < restore ∧ restore < j ∧
-      RawFirstPortRestoration w N start (i + 1) restore p ∧
-      RawFirstPortRestorationOutcome w N start restore ∧
-      C < N ∧ restore + 1 ≤ t ∧ t < j + 1 ∧
-      RawProductiveAt w N start t ∧ rawWriterAt w start t = C ∧
-      (tonguesAt w start (j + 1)) C ≠
-        (tonguesAt w start (restore + 1)) C := by
-  obtain ⟨restore, hiRestore, hrestoreJ, F, houtcome⟩ :=
-    reused_novel_strict_shrink_port_restoration_trichotomy
-      hN hij hi hj hpOldI hpLostI hpOldJ hpLostJ
-  have hnoreplay : restrictedTonguesAt w N start (j + 1) ∉
-      (List.range (j + 1)).map
-        (restrictedTonguesAt w N start) := hj.1.2.2
-  rcases post_restoration_replay_or_named_writer F hrestoreJ
-      hj.1.1.1 with hreplay | hwritten
-  · exact (hnoreplay hreplay).elim
-  · obtain ⟨C, t, hC, htlo, hthi, htprod, htwriter, hbit⟩ :=
-      hwritten
-    exact ⟨restore, C, t, hiRestore, hrestoreJ, F, houtcome,
-      hC, htlo, hthi, htprod, htwriter, hbit⟩
-
 end GeneralN

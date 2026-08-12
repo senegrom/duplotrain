@@ -65,22 +65,6 @@ theorem hidden_lobe_or_support_drop
   · exact Or.inr
       (hidden_different_empties_old m e r0 hrun hr0 k hp hpar hs)
 
-/-- A support drop caused by a hidden move is permanent. -/
-theorem hidden_drop_forever
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (k : Nat) (hp : ProductiveStep m e r0 k)
-    (hstall : ∀ c, nextCell m e r0 (k+1) c = nextCell m e r0 k c)
-    (hnlobe : ¬(e (k+1) = m.bar (oldSlot m e r0 k) ∧
-      m.cellOf (m.bar (e (k+1))) = m.cellOf (e (k+1)) ∧
-      m.cellOf (e (k+1)) = m.star (m.cellOf (e k)))) :
-    ∀ j, k+1 ≤ j → ¬ Occupied m e r0 j (oldSlot m e r0 k) := by
-  have hd := hidden_lobe_or_support_drop m e r0 hrun hr0 k hp hstall
-  have hempty : ¬ Occupied m e r0 (k+1) (oldSlot m e r0 k) :=
-    hd.resolve_left hnlobe
-  intro j hj
-  exact empty_forever m e r0 hrun hr0 hj hempty
-
-/-- Pointwise equality of occupied support across one step. -/
 def SupportFixedStep (k : Nat) : Prop :=
   ∀ s, Occupied m e r0 (k+1) s ↔ Occupied m e r0 k s
 

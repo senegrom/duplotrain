@@ -74,23 +74,6 @@ theorem rootCode_mouth_partner
       rootCode_left_of_mouth hsymm hba,
       mateNat_two_mul_add_one]
 
-/-- The physical mouth partner of a proper root is proper and the partner
-operation returns the original root. -/
-theorem properMouthRoot_partner
-    {w : Wiring} {r : Nat} (hr : ProperMouthRoot w r) :
-    ProperMouthRoot w (mouthPartner w r) ∧
-      mouthPartner w (mouthPartner w r) = r := by
-  rcases hr with ⟨s, hrs, hrsne⟩
-  have hpartner : mouthPartner w r = s :=
-    mouthPartner_eq_of_paired hrs
-  rw [hpartner]
-  constructor
-  · exact ⟨r, mouthPaired_symm hrs, hrsne.symm⟩
-  · have h := mouthPartner_invol_of_paired hrs
-    rw [hpartner] at h
-    exact h
-
-/-- Root coding is injective on proper mouth roots. -/
 theorem rootCode_injective_on_proper
     {w : Wiring} {a b : Nat}
     (ha : ProperMouthRoot w a)
@@ -153,20 +136,6 @@ theorem entryRoot_eq_of_mem_entryAction
     entryRoot_eq_of_descent hd]
   exact descent_same_landing_same_root hsuffix hd
 
-/-- Every branch in one realised cascade has the same canonical landing. -/
-theorem entryLanding_eq_of_mem_entryAction
-    {w : Wiring} {p b : Nat}
-    (hp : IsDescentEntry w p)
-    (hb : b ∈ entryAction w p) :
-    entryLanding w b = entryLanding w p := by
-  rcases hp with ⟨t, ps, s, t', hd⟩
-  have haction := entryAction_eq_of_descent hd
-  rw [haction] at hb
-  obtain ⟨u, qs, hsuffix, hlen⟩ := descent_suffix hd hb
-  rw [entryLanding_eq_of_descent hsuffix,
-    entryLanding_eq_of_descent hd]
-
-/-- Hence every branch in a canonical cascade has one root-cell code. -/
 theorem rootCode_eq_of_mem_entryAction
     {w : Wiring} {p b : Nat}
     (hp : IsDescentEntry w p)

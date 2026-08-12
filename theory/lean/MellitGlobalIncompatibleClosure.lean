@@ -492,52 +492,6 @@ theorem manufactured_pair_compatible_or_support_intersection
   · exact Or.inr ⟨Or.inl
       (action_contact_of_not_avoids hAB)⟩
 
-/-- The literal second-repeat theorem, with the non-cycle branch split into
-the compatible case and a concrete support intersection.  All reach,
-groove, periodicity, and first-turnaround charge data from Mellit's theorem
-are retained. -/
-theorem mellit_second_repeat_cycle_compatible_or_support_intersection
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {state : Tongues} {finish : Nat × Tongues}
-    {passages : List Passage}
-    (hstate : state = A.activatedState)
-    (hA : PathGrooves A.toSupported.paths state)
-    (htrace : PhysicalTrace w (e, state) passages finish)
-    (hnonsimple : ¬ SwitchSimple passages) :
-    (∃ atRepeat visited,
-        stepN w visited (e, state) = some atRepeat ∧
-        SettlesOnSimpleCycle w atRepeat) ∨
-      ∃ (B : ManufacturedReflector w e g)
-          (atRepeat : Nat × Tongues) (visited backSteps : Nat),
-        stepN w visited (e, state) = some atRepeat ∧
-        stepN w (visited + backSteps) (e, state) =
-          some (g, B.activatedState) ∧
-        PathGrooves A.toSupported.paths B.baseState ∧
-        PathGrooves B.toSupported.paths B.activatedState ∧
-        EventuallyPeriodic w (g, B.activatedState) ∧
-        (rawRepeatedWriterNovelTimes w N (g, A.baseState)
-          (A.exploration.length + A.runway.length + 1)).length ≤ 1 ∧
-        (MellitPairCompatible A B ∨
-          MellitGlobalSupportIntersection A B) := by
-  rcases mellit_second_repeat_with_first_turnaround_bound
-      A hN hstate hA htrace hnonsimple with hcycle | hpair
-  · exact Or.inl hcycle
-  · obtain ⟨B, atRepeat, visited, backSteps, hvisited, hreach,
-      hAbase, hBactivated, hperiodic, hfirst⟩ := hpair
-    exact Or.inr ⟨B, atRepeat, visited, backSteps, hvisited,
-      hreach, hAbase, hBactivated, hperiodic, hfirst,
-      manufactured_pair_compatible_or_support_intersection A B⟩
-
-/-- **Global direct-lobe closure.**
-
-The direct lobe has empty support, so the opposite action automatically
-avoids it.  Direct-lobe saturation proves the converse avoidance, so the
-global five-novelty theorem applies.  The disjunctive result is retained as a
-compatibility API for existing callers; its right alternative is uninhabited.
--/
 theorem RawOverlappingFiveWindowReduction.first_turnaround_then_direct_pair_le_five_or_pure_support_crossing
     {w : Wiring} {N h g e K : Nat}
     {start : Nat × Tongues}
@@ -573,37 +527,5 @@ theorem RawOverlappingFiveWindowReduction.first_turnaround_then_direct_pair_le_f
     (first_turnaround_then_compatible_pair_repeatedWriterNovelty_le_five
       P (.flip D) B B.activatedState hN hPpaths hDpaths hBpaths
       hcompatible.1 hcompatible.2 hJourney)
-
-/-- The direct second-repeat branch has the sharp all-horizon bound five,
-unconditionally.  The former pure-support-crossing hypothesis has disappeared
-because `early_direct_lobe_pure_crossing_false` proves that predicate empty. -/
-theorem RawOverlappingFiveWindowReduction.first_turnaround_then_direct_pair_repeatedWriterNovelty_le_five
-    {w : Wiring} {N h g e K : Nat}
-    {start : Nat × Tongues}
-    (C : RawOverlappingFiveWindowReduction w N start)
-    (P : ManufacturedReflector w h g)
-    (D : ManufacturedFlipReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hPpaths : PathGrooves P.toSupported.paths P.activatedState)
-    (hRunway : D.runway = [])
-    (hCandy : D.candy = [])
-    (hBpaths : PathGrooves
-      B.toSupported.paths B.activatedState)
-    (hJourney : stepN w
-      (P.exploration.length + P.runway.length + 1)
-      (h, P.baseState) = some (g, B.activatedState))
-    (hreach : stepN w K start =
-      some (g, B.activatedState)) :
-    ∀ H,
-      (rawRepeatedWriterNovelTimes w N
-        (h, P.baseState) H).length ≤ 5 := by
-  rcases C.first_turnaround_then_direct_pair_le_five_or_pure_support_crossing
-      P D B hN hPpaths hRunway hCandy hBpaths hJourney hreach with
-    hbound | hpure
-  · exact hbound
-  · exact (C.early_direct_lobe_pure_crossing_false
-      D B hRunway hCandy hpure).elim
 
 end GeneralN

@@ -283,34 +283,6 @@ theorem repeatedWriterAt_novel_of_distinct_prefix
     (k+1) (List.mem_range.mpr (by omega)) hvector
   omega
 
-/-- **Literal distinct-prefix form requested by the endpoint argument.**
-Assuming the stronger global constant-five target, a prefix with no repeated
-restricted tongue vector contains at most five productive occurrences of an
-already productive writer. -/
-theorem distinct_prefix_repeated_writers_le_five
-    (hfive : FiveRepeatedWriterNovelty)
-    {w : Wiring} {N K : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    (start : Nat × Tongues)
-    (hnd : ((List.range (K+1)).map
-      (restrictedTonguesAt w N start)).Nodup) :
-    (rawRepeatedWriterTimes w N start K).length ≤ 5 := by
-  classical
-  have htimesNodup : (rawRepeatedWriterTimes w N start K).Nodup := by
-    unfold rawRepeatedWriterTimes
-    exact nodup_filter_nat _ List.nodup_range
-  have hsubset : ∀ k, k ∈ rawRepeatedWriterTimes w N start K →
-      k ∈ rawRepeatedWriterNovelTimes w N start K := by
-    intro k hk
-    have hdata := mem_rawRepeatedWriterTimes_iff.mp hk
-    apply mem_rawRepeatedWriterNovelTimes_iff.mpr
-    exact ⟨hdata.1,
-      repeatedWriterAt_novel_of_distinct_prefix hdata.1 hnd
-        ⟨hdata.2.1, hdata.2.2⟩⟩
-  have hle := nodup_subset_length_raw htimesNodup hsubset
-  exact Nat.le_trans hle (hfive w N hN start K)
-
-/-- A productive raw writer belongs to one of the `N` physical switches. -/
 theorem rawProductiveAt_writer_lt
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)

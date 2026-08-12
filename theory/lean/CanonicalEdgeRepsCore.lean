@@ -128,19 +128,6 @@ theorem orderedEdgeEndsCore_nodup :
           apply hnd.1
           simpa [heq] using ht
 
-/-- Canonical endpoint expansion is duplicate-free. -/
-theorem canonicalEdgeEndsCore_nodup {slots : List Nat}
-    (hnd : slots.Nodup) :
-    (standaloneEdgeEnds m (canonicalEdgesCore m slots)).Nodup := by
-  apply orderedEdgeEndsCore_nodup m
-    (canonicalEdgesCore m slots)
-    (canonicalEdgesCore_nodup m hnd)
-  intro s hs
-  have hs' : s ∈ slots ∧ s < m.bar s := by
-    simpa [canonicalEdgesCore] using hs
-  exact hs'.2
-
-/-- Every original slot has a canonical same-edge representative. -/
 theorem slot_has_canonicalEdgeCore
     {slots : List Nat}
     (hclosed : ∀ s ∈ slots, m.bar s ∈ slots)
@@ -159,36 +146,5 @@ theorem slot_has_canonicalEdgeCore
       simpa [m.bar_invol] using hbarLt
     refine ⟨m.bar s, ?_, Or.inr rfl⟩
     simpa [canonicalEdgesCore, hbarMem, hbarOrdered]
-
-/-- Every original slot occurs in the endpoint expansion. -/
-theorem slot_mem_canonicalEdgeEndsCore
-    {slots : List Nat}
-    (hclosed : ∀ s ∈ slots, m.bar s ∈ slots)
-    (hfixed : ∀ s ∈ slots, m.bar s ≠ s)
-    {s : Nat} (hs : s ∈ slots) :
-    s ∈ standaloneEdgeEnds m (canonicalEdgesCore m slots) := by
-  rcases slot_has_canonicalEdgeCore m hclosed hfixed hs with
-    ⟨g, hg, hsg⟩
-  have hends := core_rep_endpoints_mem m hg
-  rcases hsg with hsg | hsg
-  · simpa [hsg] using hends.1
-  · have hb := hends.2
-    simpa [hsg, m.bar_invol] using hb
-
-/-- Every canonical endpoint lies in the original bar-closed list. -/
-theorem canonicalEdgeEndsCore_mem_slots
-    {slots : List Nat}
-    (hclosed : ∀ s ∈ slots, m.bar s ∈ slots)
-    {x : Nat}
-    (hx : x ∈ standaloneEdgeEnds m (canonicalEdgesCore m slots)) :
-    x ∈ slots := by
-  rcases core_mem_edgeEnds_cases m hx with ⟨s, hs, hcase⟩
-  have hs' : s ∈ slots ∧ s < m.bar s := by
-    simpa [canonicalEdgesCore] using hs
-  rcases hcase with hxs | hxs
-  · rw [hxs]
-    exact hs'.1
-  · rw [hxs]
-    exact hclosed s hs'.1
 
 end Echo

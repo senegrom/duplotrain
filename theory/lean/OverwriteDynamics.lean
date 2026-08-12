@@ -89,20 +89,6 @@ theorem pinList_append (xs ys : List Nat) (t : Tongues) :
 def runPinWords (words : List (List Nat)) (t : Tongues) : Tongues :=
   pinList words.flatten t
 
-/-- Repeating an entire finite block of cascades is idempotent. -/
-theorem runPinWords_idempotent
-    (words : List (List Nat)) (t : Tongues) :
-    runPinWords words (runPinWords words t) = runPinWords words t := by
-  exact pinList_idempotent words.flatten t
-
-/-- Splitting a list of cascade words is sequential composition. -/
-theorem runPinWords_append
-    (xs ys : List (List Nat)) (t : Tongues) :
-    runPinWords (xs ++ ys) t = runPinWords ys (runPinWords xs t) := by
-  unfold runPinWords
-  rw [List.flatten_append, pinList_append]
-
-/-- A concrete descent writes exactly its recorded branch word. -/
 theorem descent_result_eq_pinList
     {w : Wiring} {t : Tongues} {p s : Nat}
     {ps : List Nat} {t' : Tongues}
@@ -113,15 +99,5 @@ theorem descent_result_eq_pinList
   | cons hp hlink hp' hrest ih =>
       simp only [pinList]
       exact ih
-
-/-- Re-running the same recorded descent after it has just run changes no
-full tongue vector, now as a direct corollary of overwrite idempotence. -/
-theorem descent_pinList_noop
-    {w : Wiring} {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') :
-    pinList (p :: ps) t' = t' := by
-  rw [descent_result_eq_pinList h]
-  exact pinList_idempotent (p :: ps) t
 
 end GeneralN

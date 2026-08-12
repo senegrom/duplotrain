@@ -127,31 +127,4 @@ theorem PhysicalTrace.simple_same_exit_cycle_all_positive
     rw [hsum, stepN_add, hfirstLapRun]
     exact htail
 
-/-- Absolute-time transport of the previous theorem.  Every raw time strictly
-after the reached same-exit repeat has the single settled restricted vector. -/
-theorem PhysicalTrace.simple_same_exit_cycle_absolute_positive_vector
-    {w : Wiring} {N shift p x q : Nat}
-    {start : Nat × Tongues} {u₀ u v : Tongues}
-    {rest : List Passage}
-    (hreach : stepN w shift start = some (q, u))
-    (htrace : PhysicalTrace w (p, u₀) ((p, x) :: rest) (q, u))
-    (hsimple : SwitchSimple ((p, x) :: rest))
-    (hnext : arrive u q = (x, v)) :
-    ∀ t, shift < t →
-      restrictedTonguesAt w N start t = VectorCount.restrict N v := by
-  intro t ht
-  let d := t - shift
-  have hdPositive : 0 < d := by
-    dsimp [d]
-    omega
-  obtain ⟨port, hlocal⟩ :=
-    htrace.simple_same_exit_cycle_all_positive hsimple hnext d hdPositive
-  have htime : t = shift + d := by
-    dsimp [d]
-    omega
-  have hglobal : stepN w t start = some (port, v) := by
-    rw [htime, stepN_add, hreach]
-    exact hlocal
-  simp [restrictedTonguesAt, tonguesAt, hglobal]
-
 end GeneralN

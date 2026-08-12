@@ -128,23 +128,4 @@ theorem pinTrajectory_eventually_periodic
   rw [hstart] at hblock
   rw [hblock, hstab]
 
-/-- Facing-only movement between abstract cascade steps does not affect the
-lasso argument: any observation function of the current tongue vector also
-repeats after the warm-up period. -/
-theorem observe_pinTrajectory_eventually_periodic
-    {α : Type} (observe : Tongues → α)
-    (actions : Nat → List Nat) (t0 : Tongues)
-    (start period : Nat)
-    (hperiod : ∀ k, start ≤ k →
-      actions (k + period) = actions k) :
-    ∀ r,
-      observe (pinTrajectory actions t0
-        (start + 2 * period + r)) =
-      observe (pinTrajectory actions t0
-        (start + period + r)) := by
-  intro r
-  exact congrArg observe
-    (pinTrajectory_eventually_periodic
-      actions t0 start period hperiod r)
-
 end GeneralN

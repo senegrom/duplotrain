@@ -165,15 +165,4 @@ theorem entryAction_length_le
   rw [entryAction_eq_of_descent hd]
   exact descent_path_length_le hN hd
 
-/-- Canonical roots of bounded realised entries are below `N`. -/
-theorem entryRoot_lt
-    {w : Wiring} {N p : Nat}
-    (hN : ∀ a b, w.link a = some b →
-      a < 3*N ∧ b < 3*N)
-    (hp : IsDescentEntry w p) :
-    entryRoot w p < N := by
-  rcases hp with ⟨t, ps, s, t', hd⟩
-  rw [entryRoot_eq_of_descent hd]
-  exact descent_root_bounded hN hd
-
 end GeneralN

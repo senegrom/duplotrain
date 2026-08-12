@@ -76,17 +76,4 @@ theorem nextCell_update
   · rw [if_neg h]
     exact nextCell_skip m e r0 h
 
-/-- Slot-level form of the same reversal: after step `k`, the register of the
-arrival cell is precisely the arrival slot. -/
-theorem reversed_register (k : Nat) :
-    reg m e r0 (k+1) (m.cellOf (e (k+1))) = e (k+1) := by
-  exact reg_write m e r0 rfl
-
-/-- The reversed arrow is involutively paired with the traversed arrow: taking
-`star` of both endpoints recovers the original endpoints. -/
-theorem reversed_arrow_endpoints (hrun : IsRun m e r0) (k : Nat) :
-    m.star (nextCell m e r0 k (m.cellOf (e k))) =
-      m.star (m.cellOf (e (k+1))) := by
-  rw [cell_step m e r0 hrun k]
-
 end Echo

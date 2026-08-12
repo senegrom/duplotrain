@@ -412,55 +412,6 @@ theorem manufactured_flip_candy_splice_approach_foreign_two_phases
           omega)
       simpa [newState, bothState] using hphase
 
-/-- The approach-foreign splice contributes at most one restricted tongue
-vector beyond its initial vector, regardless of route length. -/
-theorem manufactured_flip_candy_splice_approach_foreign_one_novelty
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
-    (hentryBranch : entry % 3 ≠ 0)
-    {old : Passage} (hold : old ∈ R.candy)
-    (horientation : (entry, mouth) = old ∨
-      (entry, mouth) = (old.2, old.1))
-    (hentryGrooved : arrive state entry = (mouth, state))
-    (happroach : PhysicalTrace w (g, state) approach
-      (returnPort, state))
-    (happroachGrooved : PassagesGrooved state approach)
-    (happroachForeignNew : ∀ passage ∈ approach,
-      passageSwitch passage ≠ mouth / 3)
-    (happroachForeignOld : ∀ passage ∈ approach,
-      passageSwitch passage ≠ R.actionSwitch)
-    (hcrossed : arrive state returnPort =
-      (mouth, flipAt state (mouth / 3)))
-    (hmouthLink : w.link mouth = some outside)
-    (N : Nat) (history : List (List Bool))
-    (hinitial : VectorCount.restrict N
-      (flipAt state (mouth / 3)) ∈ history)
-    (times : List Nat)
-    (htimes : ∀ d ∈ times,
-      d <= oldTail.length + R.runway.length + approach.length + 2) :
-    NoveltyCoverOn w N (outside, flipAt state (mouth / 3))
-      times history 1 := by
-  apply noveltyCoverOn_one_fresh_of_two_phases
-    (v := flipAt (flipAt state (mouth / 3)) R.actionSwitch)
-  · intro d hd
-    exact manufactured_flip_candy_splice_approach_foreign_two_phases
-      R state hpaths hsplit htail hnotRunway hentryBranch hold
-      horientation hentryGrooved happroach happroachGrooved
-      happroachForeignNew happroachForeignOld hcrossed hmouthLink
-      (htimes d hd)
-  · exact hinitial
-
-/-- Once the approach-foreign splice has latched the old reflector action,
-one complete macro loop is pointwise constant in the doubly-latched tongue
-vector.  This is stronger than merely returning to the same endpoint. -/
 theorem manufactured_flip_candy_splice_approach_foreign_settled_tongues
     {w : Wiring} {g e outside entry mouth returnPort : Nat}
     (R : ManufacturedFlipReflector w e g)
@@ -867,58 +818,6 @@ theorem manufactured_flip_candy_splice_approach_foreign_all_two_phases
       exact hrun
     · rfl
 
-/-- Unrestricted-time novelty cover for the approach-foreign orbit. -/
-theorem manufactured_flip_candy_splice_approach_foreign_all_one_novelty
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
-    (hentryBranch : entry % 3 ≠ 0)
-    {old : Passage} (hold : old ∈ R.candy)
-    (horientation : (entry, mouth) = old ∨
-      (entry, mouth) = (old.2, old.1))
-    (hentryGrooved : arrive state entry = (mouth, state))
-    (happroach : PhysicalTrace w (g, state) approach
-      (returnPort, state))
-    (happroachGrooved : PassagesGrooved state approach)
-    (happroachForeignNew : ∀ passage ∈ approach,
-      passageSwitch passage ≠ mouth / 3)
-    (happroachForeignOld : ∀ passage ∈ approach,
-      passageSwitch passage ≠ R.actionSwitch)
-    (hcrossed : arrive state returnPort =
-      (mouth, flipAt state (mouth / 3)))
-    (hmouthLink : w.link mouth = some outside)
-    (N : Nat) (history : List (List Bool))
-    (hinitial : VectorCount.restrict N
-      (flipAt state (mouth / 3)) ∈ history)
-    (times : List Nat) :
-    NoveltyCoverOn w N (outside, flipAt state (mouth / 3))
-      times history 1 := by
-  apply noveltyCoverOn_one_fresh_of_two_phases
-    (v := flipAt (flipAt state (mouth / 3)) R.actionSwitch)
-  · intro d _hd
-    exact manufactured_flip_candy_splice_approach_foreign_all_two_phases
-      R state hpaths hsplit htail hnotRunway hentryBranch hold
-      horientation hentryGrooved happroach happroachGrooved
-      happroachForeignNew happroachForeignOld hcrossed hmouthLink d
-  · exact hinitial
-
-/-! ## The approach-contact candy splice -/
-
-/-- **Pointwise phase law for the approach-contact candy splice.**
-
-The completion latches the old reflector action.  The fresh approach then
-reaches its first trailing visit to that action, which repairs it.  Before and
-after those two events every traversed passage is grooved.  Consequently the
-entire explicit period uses only the initial newly-spliced vector and the
-doubly-latched vector, even though the completion and approach may be
-arbitrarily long. -/
 theorem manufactured_flip_candy_splice_approach_contact_two_phases
     {w : Wiring} {g e outside entry mouth returnPort : Nat}
     (R : ManufacturedFlipReflector w e g)
@@ -1211,57 +1110,6 @@ theorem manufactured_flip_candy_splice_approach_contact_two_phases
               omega)
           simpa [newState, bothState] using hphase
 
-/-- The approach-contact splice likewise contributes at most one restricted
-tongue vector beyond its initial vector.  The long damaged repair is therefore
-novelty-constant, not merely eventually periodic. -/
-theorem manufactured_flip_candy_splice_approach_contact_one_novelty
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
-    (hentryBranch : entry % 3 ≠ 0)
-    {old : Passage} (hold : old ∈ R.candy)
-    (horientation : (entry, mouth) = old ∨
-      (entry, mouth) = (old.2, old.1))
-    (hentryGrooved : arrive state entry = (mouth, state))
-    (happroach : PhysicalTrace w (g, state) approach
-      (returnPort, state))
-    (happroachGrooved : PassagesGrooved state approach)
-    (happroachForeignNew : ∀ passage ∈ approach,
-      passageSwitch passage ≠ mouth / 3)
-    (hcrossed : arrive state returnPort =
-      (mouth, flipAt state (mouth / 3)))
-    (hmouthLink : w.link mouth = some outside)
-    (harms : entry ≠ returnPort)
-    (hcontact : ∃ passage ∈ approach,
-      passageSwitch passage = R.actionSwitch)
-    (N : Nat) (history : List (List Bool))
-    (hinitial : VectorCount.restrict N
-      (flipAt state (mouth / 3)) ∈ history)
-    (times : List Nat)
-    (htimes : ∀ d ∈ times,
-      d <= oldTail.length + R.runway.length + approach.length + 2) :
-    NoveltyCoverOn w N (outside, flipAt state (mouth / 3))
-      times history 1 := by
-  apply noveltyCoverOn_one_fresh_of_two_phases
-    (v := flipAt (flipAt state (mouth / 3)) R.actionSwitch)
-  · intro d hd
-    exact manufactured_flip_candy_splice_approach_contact_two_phases
-      R state hpaths hsplit htail hnotRunway hentryBranch hold
-      horientation hentryGrooved happroach happroachGrooved
-      happroachForeignNew hcrossed hmouthLink harms hcontact
-      (htimes d hd)
-  · exact hinitial
-
-/-- The contact-repair period returns to its initial configuration, so the
-two-vector phase law holds at every future time, not just in the first macro
-traversal. -/
 theorem manufactured_flip_candy_splice_approach_contact_all_two_phases
     {w : Wiring} {g e outside entry mouth returnPort : Nat}
     (R : ManufacturedFlipReflector w e g)
@@ -1317,56 +1165,6 @@ theorem manufactured_flip_candy_splice_approach_contact_all_two_phases
     happroachForeignNew hcrossed hmouthLink harms hcontact
     (by simpa [period] using hd)
 
-/-- Unrestricted-time novelty cover for the contact-repair orbit.  Every
-sampled future vector is historical or the one doubly-latched vector. -/
-theorem manufactured_flip_candy_splice_approach_contact_all_one_novelty
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
-    (hentryBranch : entry % 3 ≠ 0)
-    {old : Passage} (hold : old ∈ R.candy)
-    (horientation : (entry, mouth) = old ∨
-      (entry, mouth) = (old.2, old.1))
-    (hentryGrooved : arrive state entry = (mouth, state))
-    (happroach : PhysicalTrace w (g, state) approach
-      (returnPort, state))
-    (happroachGrooved : PassagesGrooved state approach)
-    (happroachForeignNew : ∀ passage ∈ approach,
-      passageSwitch passage ≠ mouth / 3)
-    (hcrossed : arrive state returnPort =
-      (mouth, flipAt state (mouth / 3)))
-    (hmouthLink : w.link mouth = some outside)
-    (harms : entry ≠ returnPort)
-    (hcontact : ∃ passage ∈ approach,
-      passageSwitch passage = R.actionSwitch)
-    (N : Nat) (history : List (List Bool))
-    (hinitial : VectorCount.restrict N
-      (flipAt state (mouth / 3)) ∈ history)
-    (times : List Nat) :
-    NoveltyCoverOn w N (outside, flipAt state (mouth / 3))
-      times history 1 := by
-  apply noveltyCoverOn_one_fresh_of_two_phases
-    (v := flipAt (flipAt state (mouth / 3)) R.actionSwitch)
-  · intro d _hd
-    exact manufactured_flip_candy_splice_approach_contact_all_two_phases
-      R state hpaths hsplit htail hnotRunway hentryBranch hold
-      horientation hentryGrooved happroach happroachGrooved
-      happroachForeignNew hcrossed hmouthLink harms hcontact d
-  · exact hinitial
-
-/-! ## Absolute-time changed-forward lift -/
-
-/-- Shift a relative two-phase law into an arbitrary ambient trajectory.
-All times before the splice are required to be historical; from the splice
-time onward the local initial phase is historical and only the second phase
-can be fresh. -/
 theorem noveltyCoverOn_absolute_of_relative_two_phases
     {w : Wiring} {N K localPort : Nat}
     {start : Nat × Tongues} {u v : Tongues}

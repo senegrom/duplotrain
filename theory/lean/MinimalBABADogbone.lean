@@ -112,42 +112,6 @@ theorem rawExactLobeWrite_normalized_link
       simpa [C, selectedBranch, unmatchedBranch, branchPort, hstate]
         using hback
 
-/-- The normalized raw branch edge is the genuine two-step lobe hop. -/
-theorem rawExactLobeWrite_lobe_hop
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {k outside : Nat}
-    (hprod : RawProductiveAt w N start k)
-    (hlobe : Echo.ExactLobeWrite
-      (rawOverwriteMachine w) (rawOverwriteEntry w N start)
-      (rawOverwriteInitial start) k)
-    (hstem : w.link (3 * rawWriterAt w start k) = some outside)
-    (u : Tongues) :
-    stepN w 2 (3 * rawWriterAt w start k, u) =
-      some (outside, flipAt u (rawWriterAt w start k)) := by
-  exact lobe_hop w (rawWriterAt w start k) outside u
-    (rawExactLobeWrite_normalized_link hN hprod hlobe) hstem
-
-/-- Reflector-interface form of the direct raw lobe bridge. -/
-theorem rawExactLobeWrite_isReflector
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {k outside : Nat}
-    (hprod : RawProductiveAt w N start k)
-    (hlobe : Echo.ExactLobeWrite
-      (rawOverwriteMachine w) (rawOverwriteEntry w N start)
-      (rawOverwriteInitial start) k)
-    (hstem : w.link (3 * rawWriterAt w start k) = some outside) :
-    IsReflector w (3 * rawWriterAt w start k) outside 2
-      (fun _ => True) (fun u => flipAt u (rawWriterAt w start k)) := by
-  exact lobe_isReflector w (rawWriterAt w start k) outside
-    (rawExactLobeWrite_normalized_link hN hprod hlobe) hstem
-
-/-- A literal lobe edge, oriented by the current tongue, is already the
-nondegenerate manufactured reflector expected by the first-revisit theory.
-There is no hidden echo-machine step here: the runway and candy tail are
-empty, and the sole recorded passage is the physical selected-to-unmatched
-branch edge. -/
 def manufacturedFlipReflectorOfSelectedLobe
     {w : Wiring} (C outside : Nat) (u : Tongues)
     (hbranch :
@@ -173,35 +137,6 @@ def manufacturedFlipReflectorOfSelectedLobe
   arms_ne := selected_unmatched_ne u C
   entryEdge := w.symm _ _ hstem
 
-/-- The exact raw endpoint lobe, together with the actual external stem edge
-used by its productive step, packages as a `ManufacturedFlipReflector`.
-The returned endpoint is also the configuration reached at raw time `k+1`.
--/
-theorem rawExactLobeWrite_manufacturedFlipReflector
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {k : Nat}
-    (hprod : RawProductiveAt w N start k)
-    (hlobe : Echo.ExactLobeWrite
-      (rawOverwriteMachine w) (rawOverwriteEntry w N start)
-      (rawOverwriteInitial start) k) :
-    ∃ next : Nat × Tongues,
-      stepN w (k + 1) start = some next ∧
-      w.link (3 * rawWriterAt w start k) = some next.1 ∧
-      Nonempty (ManufacturedFlipReflector w
-        (3 * rawWriterAt w start k) next.1) := by
-  obtain ⟨next, hnext, hstem⟩ :=
-    rawProductiveAt_fixed_stem_successor hN hprod
-  have hbranch := rawExactLobeWrite_selected_to_unmatched hN hprod hlobe
-  refine ⟨next, hnext, hstem, ⟨?_⟩⟩
-  exact manufacturedFlipReflectorOfSelectedLobe
-    (rawWriterAt w start k) next.1 (tonguesAt w start k)
-    hbranch hstem
-
-/-- A positive raw exact-lobe event is not merely a static edge certificate:
-the two actual raw steps ending at `k` are the lobe reflection.  Immediately
-before them the train faces the lobe stem; immediately afterwards it is back
-across that stem's external edge with exactly that tongue flipped. -/
 theorem rawExactLobeWrite_observed_reflection
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)

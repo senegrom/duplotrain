@@ -109,29 +109,4 @@ theorem rawProductiveAt_self_or_strict_curve_growth
         simpa [P.entered_endpoint] using hstem
       · exact hself
 
-/-- Non-self productive pivots are strict growth, in a convenient form for
-the future raw history extraction. -/
-theorem rawProductiveAt_strict_curve_growth_of_nonself
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {k : Nat}
-    (hprod : RawProductiveAt w N start k)
-    (hnonself : ∀ before, stepN w k start = some before →
-      ¬ CurveReach w before.2 before.1
-        (3 * rawWriterAt w start k)) :
-    ∃ before after C,
-      C = rawWriterAt w start k ∧
-      stepN w k start = some before ∧
-      stepN w (k + 1) start = some after ∧
-      (∀ p, CurveReach w before.2 before.1 p →
-        CurveReach w after.2 before.1 p) ∧
-      CurveReach w after.2 before.1 (3 * C) ∧
-      ¬ CurveReach w before.2 before.1 (3 * C) := by
-  obtain ⟨before, after, C, hC, hbefore, hafter, _hstep,
-      _hentry, _hflip, hself | hgrowth⟩ :=
-    rawProductiveAt_self_or_strict_curve_growth hN hprod
-  · exact (hnonself before hbefore (hC ▸ hself)).elim
-  · exact ⟨before, after, C, hC, hbefore, hafter,
-      hgrowth.1, hgrowth.2.1, hgrowth.2.2⟩
-
 end GeneralN

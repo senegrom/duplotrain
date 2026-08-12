@@ -72,35 +72,4 @@ theorem hidden_preserved_lobe
       _ = m.star (m.cellOf (e k)) := new_far_cell m e r0 hrun hr0 k
   exact ⟨hnew, hlobe, hpartner⟩
 
-/-- **Two hidden fixed-support flips force the Gray trap.**  If two
-consecutive productive moves leave the cell projection unchanged and each old
-edge remains occupied, every subsequent entry lies in the four lobe slots of
-those two moves. -/
-theorem two_hidden_preserved_absorb
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (k : Nat)
-    (hp0 : ProductiveStep m e r0 k)
-    (hs0 : ∀ c, nextCell m e r0 (k+1) c = nextCell m e r0 k c)
-    (ho0 : Occupied m e r0 (k+1) (oldSlot m e r0 k))
-    (hp1 : ProductiveStep m e r0 (k+1))
-    (hs1 : ∀ c, nextCell m e r0 (k+2) c = nextCell m e r0 (k+1) c)
-    (ho1 : Occupied m e r0 (k+2) (oldSlot m e r0 (k+1))) :
-    ∀ j, k+1 ≤ j →
-      e j = e (k+1) ∨
-      e j = m.bar (e (k+1)) ∨
-      e j = e (k+2) ∨
-      e j = m.bar (e (k+2)) := by
-  have h0 := hidden_preserved_lobe m e r0 hrun hr0 k hp0 hs0 ho0
-  have h1 := hidden_preserved_lobe m e r0 hrun hr0 (k+1) hp1 hs1 ho1
-  have hAB : m.star (m.cellOf (e (k+1))) = m.cellOf (e (k+2)) :=
-    h1.2.2.symm
-  have hstep := hrun (k+1)
-  rw [hAB] at hstep
-  have hreg : reg m e r0 (k+1) (m.cellOf (e (k+2))) =
-      m.bar (e (k+2)) := by
-    have h := congrArg m.bar hstep
-    rw [m.bar_invol] at h
-    exact h.symm
-  exact absorb_entries m e r0 hrun h0.2.1 h1.2.1 hAB rfl (Or.inr hreg)
-
 end Echo

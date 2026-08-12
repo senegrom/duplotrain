@@ -101,32 +101,6 @@ theorem mouthPartner_invol_of_paired {w : Wiring} {a b : Nat}
   rw [mouthPartner_eq_of_paired h]
   exact mouthPartner_eq_of_paired (mouthPaired_symm h)
 
-/-- The root of a descent is sent to its landing switch. -/
-theorem descent_mouthPartner {w : Wiring} {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') :
-    mouthPartner w (descentRoot p ps) = s / 3 :=
-  mouthPartner_eq_of_paired (descent_mouthPaired h)
-
-/-- Two descents with the same concrete root land at the same stem. -/
-theorem descent_same_root_same_landing
-    {w : Wiring} {t₁ t₂ : Tongues}
-    {p₁ p₂ s₁ s₂ : Nat} {ps₁ ps₂ : List Nat}
-    {t₁' t₂' : Tongues}
-    (h₁ : Descent w t₁ p₁ ps₁ s₁ t₁')
-    (h₂ : Descent w t₂ p₂ ps₂ s₂ t₂')
-    (hroot : descentRoot p₁ ps₁ = descentRoot p₂ ps₂) :
-    s₁ = s₂ := by
-  have hlink₁ := descent_last_link h₁
-  have hlink₂ := descent_last_link h₂
-  have hstem : 3 * descentRoot p₁ ps₁ =
-      3 * descentRoot p₂ ps₂ := congrArg (fun c => 3 * c) hroot
-  unfold descentRoot at hstem
-  rw [hstem, hlink₂] at hlink₁
-  injection hlink₁ with h
-  exact h.symm
-
-/-- Two descents landing at the same stem have the same concrete root. -/
 theorem descent_same_landing_same_root
     {w : Wiring} {t₁ t₂ : Tongues}
     {p₁ p₂ s : Nat} {ps₁ ps₂ : List Nat}
@@ -137,34 +111,5 @@ theorem descent_same_landing_same_root
   have hlast := land_last_unique h₁ h₂
   unfold descentRoot
   omega
-
-/-- If a second descent lands on the first descent's root stem, then its root
-is exactly the first descent's landing switch.  This is the concrete
-`star (star c) = c` calculation behind the echo compilation. -/
-theorem descent_reverse_root
-    {w : Wiring} {t₁ t₂ : Tongues}
-    {p₁ p₂ s : Nat} {ps₁ ps₂ : List Nat}
-    {t₁' t₂' : Tongues}
-    (h₁ : Descent w t₁ p₁ ps₁ s t₁')
-    (h₂ : Descent w t₂ p₂ ps₂
-      (3 * descentRoot p₁ ps₁) t₂') :
-    descentRoot p₂ ps₂ = s / 3 := by
-  have hforward := descent_last_link h₁
-  have hreverse := w.symm _ _ (descent_last_link h₂)
-  have hs := descent_landing_stem h₁
-  unfold descentRoot at hforward hreverse ⊢
-  rw [hforward] at hreverse
-  injection hreverse with heq
-  omega
-
-/-- Crossing the root stem follows the totalised concrete edge involution to
-exactly the landing stem. -/
-theorem wireBar_descent_root
-    {w : Wiring} {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') :
-    wireBar w (3 * descentRoot p ps) = s := by
-  apply wireBar_of_link
-  simpa [descentRoot] using descent_last_link h
 
 end GeneralN

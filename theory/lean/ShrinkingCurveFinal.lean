@@ -113,25 +113,6 @@ theorem UnionOldContactShrink.exact_support_split
   rw [T.left_switches, T.right_switches, T.outer_switches]
   simpa only [List.length_map] using S.exact_length_split
 
-theorem UnionOldContactShrink.left_rank_lt
-    {N : Nat} {old fresh : List Passage}
-    {R : UnionFirstRepeat old fresh}
-    {S : UnionOldContactSplit old fresh R}
-    (T : UnionOldContactShrink N S) :
-    T.left.supportContactRank < T.outer.supportContactRank :=
-  T.left_strict.2
-
-theorem UnionOldContactShrink.right_rank_lt
-    {N : Nat} {old fresh : List Passage}
-    {R : UnionFirstRepeat old fresh}
-    {S : UnionOldContactSplit old fresh R}
-    (T : UnionOldContactShrink N S) :
-    T.right.supportContactRank < T.outer.supportContactRank :=
-  T.right_strict.2
-
-/-- **Exact old-contact shrink.** The range certificate is the only premise
-beyond first-contact data: simplicity of the old support is already contained
-in `R.combinedSimple`. -/
 theorem UnionOldContactSplit.toTrackedShrink
     {N : Nat} {old fresh : List Passage}
     {R : UnionFirstRepeat old fresh}
@@ -258,50 +239,5 @@ theorem PhysicalTrace.union_old_contact_shrink
 def CurveContactDescends {N : Nat}
     (inner outer : TrackedEndpointCurve N) : Prop :=
   StrictTrackedSubcurve inner outer
-
-/-- Strict tracked-subcurve descent is well-founded. -/
-theorem curveContactDescends_wellFounded (N : Nat) :
-    WellFounded (@CurveContactDescends N) := by
-  constructor
-  intro outer
-  refine Nat.strongRecOn
-    (motive := fun n => ∀ D : TrackedEndpointCurve N,
-      D.switches.length = n → Acc CurveContactDescends D)
-    outer.switches.length ?_ outer rfl
-  intro n ih D hlen
-  constructor
-  intro inner hinner
-  have hlt : inner.switches.length < n := by
-    have hltD := hinner.2
-    rw [hlen] at hltD
-    exact hltD
-  exact ih inner.switches.length hlt inner rfl
-
-/-- **Strong-recursion eliminator.** Any recursive proof whose recursive
-calls use strict old-contact residual supports terminates. -/
-theorem trackedEndpointCurve_strongRec
-    {N : Nat} (P : TrackedEndpointCurve N → Prop)
-    (step : ∀ outer,
-      (∀ inner, CurveContactDescends inner outer → P inner) → P outer) :
-    ∀ outer, P outer := by
-  intro outer
-  refine Nat.strongRecOn
-    (motive := fun n => ∀ D : TrackedEndpointCurve N,
-      D.switches.length = n → P D)
-    outer.switches.length ?_ outer rfl
-  intro n ih D hlen
-  apply step D
-  intro inner hinner
-  have hlt : inner.switches.length < n := by
-    have hltD := hinner.2
-    rw [hlen] at hltD
-    exact hltD
-  exact ih inner.switches.length hlt inner rfl
-
-/-- Infinite old-contact nesting is impossible. -/
-theorem no_infinite_curveContact_descent
-    {N : Nat} (curve : Nat → TrackedEndpointCurve N)
-    (hdesc : ∀ k, CurveContactDescends (curve (k + 1)) (curve k)) : False :=
-  no_infinite_trainFreeCurve_shrink curve hdesc
 
 end GeneralN

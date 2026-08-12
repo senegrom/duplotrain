@@ -88,33 +88,6 @@ structure ProductiveBoundaryNAddFourSavingResidual
           restrictedTonguesAt w N (source.g, A.baseState)
               (O.before.length + 1))
 
-/-- The first saving is not merely a cardinality statement.  In either
-branch it gives a concrete `N+2` history which contains the arbitrary
-pre-passage vector and covers the complete first manufacture. -/
-theorem ProductiveBoundaryNAddFourSavingResidual.boundaryHistory
-    {w : Wiring} {N : Nat}
-    (R : ProductiveBoundaryNAddFourSavingResidual w N)
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N) :
-    Nonempty (InitialBoundaryHistory w N
-      R.source.g R.source.e R.A R.source.original) := by
-  have hpaths :
-      PathGrooves R.A.toSupported.paths R.A.activatedState := by
-    rw [R.activated.symm]
-    exact R.grooves
-  rcases R.saving with habsent | hstay
-  · exact boundary_history_of_entry_writer_absent
-      R.A hN R.source.switch_lt habsent.1
-        R.source.original hpaths
-  · obtain ⟨O, hsame, _hduplicate⟩ := hstay
-    exact boundary_history_of_entry_writer_stay
-      R.A hN R.source.original hpaths O hsame
-
-/-- A saturated family cannot fit into an `N+4` global history which also
-contains the pre-passage vector.  The proof deliberately uses both global
-saturation facts: `covers_live` puts every live shifted state into the
-history, while `avoids_original` proves that the additional boundary vector
-is genuinely new. -/
 theorem ProductiveBoundaryNAddFourSaturation.false_of_global_history
     {w : Wiring} {N : Nat}
     (S : ProductiveBoundaryNAddFourSaturation w N)
@@ -150,21 +123,6 @@ theorem ProductiveBoundaryNAddFourSaturation.false_of_global_history
       haugmentedNodup
   have hsaturated := S.saturated
   omega
-
-/-- It is enough to cover the selected saturated family: `covers_live`
-upgrades that finite inclusion to a cover of the complete shifted run. -/
-theorem ProductiveBoundaryNAddFourSaturation.false_of_selected_history
-    {w : Wiring} {N : Nat}
-    (S : ProductiveBoundaryNAddFourSaturation w N)
-    (history : List (List Bool))
-    (hlength : history.length <= N + 4)
-    (horiginal : VectorCount.restrict N S.original ∈ history)
-    (hselected : forall v,
-      v ∈ S.times.map
-        (restrictedTonguesAt w N (S.g, S.base)) -> v ∈ history) : False := by
-  apply S.false_of_global_history history hlength horiginal
-  intro d hd
-  exact hselected _ (S.covers_live d hd)
 
 private theorem saturation_nodup_of_map_nodup
     {alpha beta : Type} [BEq alpha] [LawfulBEq alpha]
@@ -369,63 +327,6 @@ theorem productive_boundary_N_add_four_or_saturation
       avoids_original := havoid
     }⟩
 
-/-- If the initially flipped coordinate has been restored at any live time
-of a saturated counterexample, then some *other* counted coordinate must
-still differ from the pre-passage state.  Otherwise the restricted vector
-would be the globally forbidden original vector.  This is the pointwise
-coordinate form of the saturation obstruction. -/
-theorem ProductiveBoundaryNAddFourSaturation.restored_has_foreign_difference
-    {w : Wiring} {N : Nat}
-    (S : ProductiveBoundaryNAddFourSaturation w N)
-    (d : Nat)
-    (hlive : (stepN w d (S.g, S.base)).isSome)
-    (hrestored :
-      tonguesAt w (S.g, S.base) d S.k0 = S.original S.k0) :
-    Exists fun C : Nat =>
-      C < N ∧ C ≠ S.k0 ∧
-        tonguesAt w (S.g, S.base) d C ≠ S.original C := by
-  by_cases hexists : Exists fun C : Nat =>
-      C < N ∧ C ≠ S.k0 ∧
-        tonguesAt w (S.g, S.base) d C ≠ S.original C
-  · exact hexists
-  · exfalso
-    apply S.avoids_original d hlive
-    unfold restrictedTonguesAt
-    unfold VectorCount.restrict
-    apply List.map_congr_left
-    intro C hCmem
-    have hC : C < N := List.mem_range.mp hCmem
-    by_cases hEq : C = S.k0
-    · subst C
-      exact hrestored
-    · have hnot : ¬(
-          C < N ∧ C ≠ S.k0 ∧
-            tonguesAt w (S.g, S.base) d C ≠ S.original C) := by
-        intro hdata
-        exact hexists ⟨C, hdata⟩
-      have hsame :
-          ¬ tonguesAt w (S.g, S.base) d C ≠ S.original C := by
-        intro hne
-        exact hnot ⟨hC, hEq, hne⟩
-      exact Classical.not_not.mp hsame
-
-/-- **Exact independent saturation reduction.**
-
-Assume the hypothetical known-incoming-edge `N+4` theorem.  For a productive
-initial boundary, either the desired `N+4` estimate already holds, or the
-shifted run is globally saturated and its first reflector has one of two
-literal savings:
-
-1. the initial coordinate is absent from the switch-simple exploration; or
-2. its unique occurrence leaves the tongue state unchanged, producing two
-   consecutive equal restricted vectors.
-
-All other first-probe outcomes are eliminated here.  Death has at most
-`N+1` live times, the first-cycle alternative has at most `N+2` vectors,
-and a productive occurrence of `k0` is a transient/stable simple cycle with
-at most `N+1` vectors.  The surviving right-hand side is therefore strictly
-smaller than `ProductiveInitialBoundaryNAddFour`; it is not claimed to be
-impossible in this file. -/
 theorem productive_initial_boundary_N_add_four_or_saving_saturation
     {w : Wiring} {N g e k0 : Nat}
     (hN : forall p q, w.link p = some q ->

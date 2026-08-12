@@ -55,25 +55,6 @@ def manufacturedFlipReflectorOfLobe
   arms_ne := by omega
   entryEdge := w.symm _ _ hstem
 
-/-- Coercion of the literal lobe package to the orientation-free
-manufactured-reflector interface. -/
-def manufacturedReflectorOfLobe
-    {w : Wiring} (C outside : Nat) (base : Tongues)
-    (hbase : base C = false)
-    (hbranch : w.link (3 * C + 1) = some (3 * C + 2))
-    (hstem : w.link (3 * C) = some outside) :
-    ManufacturedReflector w (3 * C) outside :=
-  .flip (manufacturedFlipReflectorOfLobe
-    C outside base hbase hbranch hstem)
-
-/-- Result of applying the first-repeat theorem a second time, starting on the
-far side of an already manufactured reflector.  In the non-cycle branch the
-new reflector has the opposite orientation, both support-groove hypotheses
-are available, and the train actually reaches the start configuration of the
-protected pair.
-
-This is the raw track-and-switch form of the first/second-repeat step in
-Mellit's argument. -/
 theorem mellit_second_repeat_cycle_or_pair
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
@@ -247,43 +228,5 @@ theorem RawSixEventReduction.early_compatible_second_repeat_false
       A B state hA hB hAB hBA hreach times history htimes
   exact R.no_tail_four_cover hN (by
     simpa [FourNoveltyCover, times, history] using hcover)
-
-/-- Payment-shaped interface for the six-event closure.  In the early
-compatible-pair branch the raw obstruction is impossible, so in particular
-the exact disjunction consumed by `no_selected_tail_close_paid` follows.
-The theorem is intentionally stated with that literal target to make later
-branch assembly type-check against the final accounting interface. -/
-theorem RawSixEventReduction.early_compatible_second_repeat_pays
-    {w : Wiring} {N g e K : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues}
-    (R : RawSixEventReduction w N start)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hB : PathGrooves B.toSupported.paths state)
-    (hAB : A.toSupported.action.Avoids B.toSupported.paths)
-    (hBA : B.toSupported.action.Avoids A.toSupported.paths)
-    (hreach : stepN w K start = some (g, state))
-    (hK : K ≤ R.z1 + 1) :
-    restrictedTonguesAt w N start (R.z1 + 1) ∈
-        rawFirstWriterHistory w N start (R.z5 + 1) ++
-          [restrictedTonguesAt w N start (R.z0 + 1)] ∨
-    restrictedTonguesAt w N start (R.z2 + 1) ∈
-        rawFirstWriterHistory w N start (R.z5 + 1) ++
-          [restrictedTonguesAt w N start (R.z0 + 1)] ∨
-    restrictedTonguesAt w N start (R.z3 + 1) ∈
-        rawFirstWriterHistory w N start (R.z5 + 1) ++
-          [restrictedTonguesAt w N start (R.z0 + 1)] ∨
-    restrictedTonguesAt w N start (R.z4 + 1) ∈
-        rawFirstWriterHistory w N start (R.z5 + 1) ++
-          [restrictedTonguesAt w N start (R.z0 + 1)] ∨
-    restrictedTonguesAt w N start (R.z5 + 1) ∈
-        rawFirstWriterHistory w N start (R.z5 + 1) ++
-          [restrictedTonguesAt w N start (R.z0 + 1)] := by
-  exact (R.early_compatible_second_repeat_false
-    hN A B state hA hB hAB hBA hreach hK).elim
 
 end GeneralN

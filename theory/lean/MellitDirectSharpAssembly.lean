@@ -519,37 +519,6 @@ theorem ManufacturedReflector.union_first_contact_cycle_or_compatible
 
 /-! ## Sharp accounting on the compatible branch -/
 
-/-- Once the union-selected internal repeat has manufactured its compatible
-opposite reflector, the existing first-turnaround plus Gray-square theorem
-gives the literal all-horizon bound five.  This theorem makes no claim about
-the old-support-contact or simple-cycle branches of the trichotomy above. -/
-theorem UnionFreshCompatiblePair.first_turnaround_repeatedWriterNovelty_le_five
-    {w : Wiring} {h g e N : Nat}
-    {A : ManufacturedReflector w g e}
-    {fresh : List Passage}
-    (C : UnionFreshCompatiblePair A fresh)
-    (P : ManufacturedReflector w h g)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hPpaths :
-      PathGrooves P.toSupported.paths P.activatedState)
-    (hJourney : stepN w
-      (P.exploration.length + P.runway.length + 1)
-      (h, P.baseState) = some (g, C.result.state)) :
-    ∀ H,
-      (rawRepeatedWriterNovelTimes w N
-        (h, P.baseState) H).length ≤ 5 := by
-  exact first_turnaround_then_compatible_pair_repeatedWriterNovelty_le_five
-    P A C.result.reflector C.result.state hN hPpaths
-    C.oldPaths C.result.paths C.compatible.1 C.compatible.2 hJourney
-
-/-! ## Strict data in the remaining old-contact branch -/
-
-/-- A canonical old-contact outcome exposes a genuinely shorter prefix of
-the old exploration ending immediately before the contacted passage.  This
-is the well-founded list measure needed by a shrinking recursion.  It does
-not by itself assert that the shortened prefix is already a manufactured
-reflector. -/
 structure StrictUnionOldPrefix
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
@@ -566,34 +535,6 @@ structure StrictUnionOldPrefix
   proper :
     oldBefore.length < A.exploration.length
 
-/-- Every remaining old-contact branch carries an explicit strict prefix.
-The selected fresh prefix is still retained in `C.selection`, together with
-its exact trace split and combined simplicity. -/
-theorem UnionOldSupportContact.strict_old_prefix
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {fresh : List Passage}
-    (C : UnionOldSupportContact A fresh) :
-    Nonempty (StrictUnionOldPrefix C) := by
-  obtain ⟨oldPassage, hold, hsame⟩ :=
-    List.mem_map.mp C.hitsOld
-  obtain ⟨oldBefore, oldAfter, hsplit⟩ :=
-    List.append_of_mem hold
-  refine ⟨{
-    oldBefore := oldBefore
-    oldPassage := oldPassage
-    oldAfter := oldAfter
-    split := hsplit
-    sameSwitch := hsame
-    proper := ?_
-  }⟩
-  rw [hsplit]
-  simp
-
-/-! ## Quantitative old-contact shrink in the direct trichotomy -/
-
-/-- The old-contact branch, upgraded with the physical trace split and both
-strict tracked residual supports from `ShrinkingCurveFinal`. -/
 structure UnionOldTrackedShrink
     (w : Wiring) (N : Nat)
     {g e : Nat} (A : ManufacturedReflector w g e)
@@ -602,57 +543,5 @@ structure UnionOldTrackedShrink
   raw :
     RawUnionOldContactShrink w N A.exploration fresh selection
       (e, A.activatedState) finish
-
-/-- **Sharp direct Mellit reduction with well-founded old contact.** Under
-the ambient `N`-switch range hypothesis, the direct union-first-repeat
-trichotomy has only these outcomes:
-
-* a raw old-contact trace split whose two residual tracked supports both have
-  strictly smaller support/contact rank;
-* a reached simple cycle; or
-* a compatible opposite-reflector pair, whose branch has the all-horizon
-  repeated-writer novelty bound five above.
-
-Thus abstract incompatibility and non-well-founded old-contact nesting are
-both eliminated.  The remaining proof obligation for
-`FiveRepeatedWriterNovelty` is dynamic: identify which strict residual
-support represents the continuation, and attach sharp novelty accounting to
-the simple-cycle branch. -/
-theorem ManufacturedReflector.union_first_contact_shrinks_or_cycle_or_compatible
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    {fresh : List Passage}
-    {finish : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hApaths :
-      PathGrooves A.toSupported.paths A.activatedState)
-    (htrace :
-      PhysicalTrace w (e, A.activatedState) fresh finish)
-    (hnonsimple :
-      ¬ SwitchSimple (A.exploration ++ fresh)) :
-    Nonempty (UnionOldTrackedShrink w N A fresh finish) ∨
-      Nonempty (UnionFreshSimpleCycle A fresh) ∨
-      Nonempty (UnionFreshCompatiblePair A fresh) := by
-  have hbase :=
-    A.union_first_contact_cycle_or_compatible
-      hApaths htrace hnonsimple
-  rcases hbase with hold | hcycle | hpair
-  · left
-    obtain ⟨C⟩ := hold
-    have hRange :
-        ∀ passage, passage ∈ A.exploration →
-          passageSwitch passage < N := by
-      intro passage hpassage
-      exact A.exploration_trace.switch_lt
-        hN passage hpassage
-    obtain ⟨S⟩ := htrace.union_old_contact_shrink
-      C.selection hRange C.hitsOld
-    exact ⟨{
-      selection := C.selection
-      raw := S
-    }⟩
-  · exact Or.inr (Or.inl hcycle)
-  · exact Or.inr (Or.inr hpair)
 
 end GeneralN

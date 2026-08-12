@@ -108,22 +108,4 @@ theorem productive_parallel_ne {k : Nat}
   apply hp
   exact h.symm
 
-/-- Every productive step has the promised dichotomy: either the cell-level
-projection changes, or it changes exact slots inside one parallel-edge fibre. -/
-theorem productive_reversal_or_parallel
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (k : Nat) (hp : ProductiveStep m e r0 k) :
-    (∃ c, nextCell m e r0 (k+1) c ≠ nextCell m e r0 k c) ∨
-    (ParallelEdge m (oldSlot m e r0 k) (e (k+1)) ∧
-      oldSlot m e r0 k ≠ e (k+1)) := by
-  by_cases hs : ∀ c, nextCell m e r0 (k+1) c = nextCell m e r0 k c
-  · exact Or.inr ⟨(cell_projection_stall_iff_parallel m e r0 hrun hr0 k).mp hs,
-        productive_parallel_ne m e r0 hp⟩
-  · apply Or.inl
-    apply Classical.byContradiction
-    intro hnone
-    apply hs
-    intro c
-    exact Classical.byContradiction (fun hne => hnone ⟨c, hne⟩)
-
 end Echo
