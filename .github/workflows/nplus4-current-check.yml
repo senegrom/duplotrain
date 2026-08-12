@@ -15,14 +15,17 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-      - name: Register proof target
+      - name: Register proof targets
         run: |
           cat >> lakefile.toml <<'EOF'
 
           [[lean_lib]]
           name = "TwoHistoryUnionChargeSharp"
+
+          [[lean_lib]]
+          name = "TwoJourneyNoveltySharp"
           EOF
-      - name: Build proof target
+      - name: Build proof targets
         run: |
           export PATH="$HOME/.elan/bin:$PATH"
-          lake build TwoHistoryUnionChargeSharp
+          lake build TwoHistoryUnionChargeSharp TwoJourneyNoveltySharp
