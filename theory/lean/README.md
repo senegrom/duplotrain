@@ -27,7 +27,7 @@ symbolic in `N`: no finite-instance argument, no Mathlib, no `native_decide`,
 and no `sorry`. The lower bound is also symbolic for `N ≥ 4`; its `N = 3`
 base case is checked by kernel `decide`.
 
-There are 259 self-contained Lean libraries. To check everything:
+There are 230 self-contained Lean libraries. To check everything:
 
 ```
 lake build
@@ -112,8 +112,11 @@ exact arbitrary-start wrapper from `StateLawNAddFourTop.lean`.
 * `FamilyLowerBound.lean` checks instances of the extremal family for
   `N = 3 … 8`; the general construction is proved in
   `StateLawLowerBound.lean`.
-* The older `N+5` and `N+6` routes remain in the tree as independently
-  checked historical proofs.
+* The `N+6` assembly (`GeneralN.stateLaw`, `KnownEdgeNAddFiveAlt.lean`)
+  remains in the tree — not for history, but because the sharp
+  protected-pair closure genuinely builds on it.  The intermediate
+  `N+5` assembly was dropped: it is a strictly weaker corollary of the
+  sharp theorem.
 
 ## Independent open directions
 

@@ -1,4 +1,4 @@
-import PairBound
+import SlotBound
 
 /-!
 # Monotone jump-edge support

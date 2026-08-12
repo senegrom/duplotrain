@@ -221,7 +221,7 @@ alone*:
 > tree's previous ascent) before entering its cycle.  Observed: never
 > more than **one**.
 
-Machine exhaustion (`echo_machine.py` + the structured hunt): all
+Machine exhaustion (the echo-machine simulator, kept in git history, + the structured hunt): all
 machines with 2 cells (≤ 6 slots) and 4 cells (≤ 8 slots), **all
 machines with 6 cells and up to 10 slots (10.4 million runs — every
 composition, every jump matching, every initial register, every

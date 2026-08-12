@@ -1,4 +1,4 @@
-import LobeAbsorption
+import SupportSize
 
 /-!
 # At most one active cell per mouth-partner pair

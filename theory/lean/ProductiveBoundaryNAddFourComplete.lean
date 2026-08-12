@@ -7,7 +7,6 @@ import ProductiveBoundarySupportContact
 import BoundaryDoubleDuplicate
 import BoundaryResidualNovelty
 import BoundaryAbsentProtectedPair
-import BoundaryCanonicalOriginalOverlap
 import BoundaryResidualCharge
 import KnownEdgeNAddFourComplete
 

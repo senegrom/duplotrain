@@ -1,5 +1,9 @@
-import CompleteRepairTongueCountSharp
-import NoveltyAwareLassoOverlap
+import PairTongueCountSharp
+import TrackStaySpliceSharp
+import TrackThetaTighter
+import TrackQuantitativeRouteSharp
+import TrackGlobalRepairSimple
+import NoveltyAwareLasso
 
 /-!
 # Two manufacturing journeys followed by a directly counted tail

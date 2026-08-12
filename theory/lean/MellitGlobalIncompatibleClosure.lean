@@ -1,6 +1,6 @@
 import MellitGlobalNoveltyBound
 import MellitEarlySecondRepeatAssembly
-import CrossingCallerWindowExtraction
+import MellitSupportInteraction
 
 /-!
 # Global closure of the incompatible Mellit pair

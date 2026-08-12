@@ -1,13 +1,11 @@
 name = "duplotrain"
 defaultTargets = [
   "ActiveLobeCoverCore",
-  "ActiveLobes",
   "Alternation",
   "AlternationBound",
   "ArbitraryStartDirectLift",
   "BABAInterlacementTail",
   "BlockAbstractEpochBoundCore",
-  "BlockEpochAggregation",
   "BlockSparseBoundCore",
   "BlockSparseFixedCountCore",
   "BoundaryAbsentPresentWriterElimination",
@@ -16,7 +14,6 @@ defaultTargets = [
   "BoundaryApproachActionElimination",
   "BoundaryApproachWrittenElimination",
   "BoundaryCanonicalGeometry",
-  "BoundaryCanonicalOriginalOverlap",
   "BoundaryChangedContactSaving",
   "BoundaryDoubleDuplicate",
   "BoundaryNAddFourSaturation",
@@ -30,7 +27,6 @@ defaultTargets = [
   "CanonicalEdgeRepsCore",
   "CanonicalProjectedEpochFrame",
   "CanonicalSupportFrame",
-  "CertifiedLobeAbsorption",
   "ChangedContactNAddFour",
   "ChangedFlipCountActual",
   "ChangedFlipCountConstant",
@@ -38,8 +34,6 @@ defaultTargets = [
   "ChangedStayCountConstant",
   "CompleteRepairConstant",
   "CompleteRepairFour",
-  "CompleteRepairTongueCountSharp",
-  "ComponentCapacity",
   "ConcreteAscentTrace",
   "ConcreteCascadeFacts",
   "ConcreteCertifiedEchoRun",
@@ -52,12 +46,8 @@ defaultTargets = [
   "ConcreteTreeCodes",
   "ConcreteTreeDisjoint",
   "ConcreteTreeRetrace",
-  "CrossingCallerSerialAssembly",
-  "CrossingCallerSharpTail",
-  "CrossingCallerWindowExtraction",
   "DescentRouteCatalogue",
   "DescentSimplicity",
-  "DeterministicOverwriteReturn",
   "DuplotrainProofs",
   "EarlyFacingConstant",
   "EchoConfiguration",
@@ -65,7 +55,6 @@ defaultTargets = [
   "EdgeReversal",
   "EndpointAccountingStandalone",
   "EndpointEpochExtraction",
-  "EpochAggregation",
   "ExternalLobeReflectionCore",
   "ExternalLobeRoundtrip",
   "FacingForwardNovelty",
@@ -77,18 +66,14 @@ defaultTargets = [
   "FirstReflectorNovelty",
   "FirstWriterRetraceFree",
   "FiveFrameObstruction",
-  "FixedSupportBound",
   "ForeignSpliceNovelty",
   "FullReachPersistencePaired",
   "FullyLobedComponentTrap",
   "GeneralN",
   "GlobalSerialContinuation",
-  "GrayTailCount",
   "HiddenAbsorb",
   "HiddenDichotomy",
   "HiddenFibre",
-  "KnownEdgeEight",
-  "KnownEdgeEleven",
   "KnownEdgeFive",
   "KnownEdgeFourteen",
   "KnownEdgeLift",
@@ -96,13 +81,11 @@ defaultTargets = [
   "KnownEdgeNAddFourChangedClosed",
   "KnownEdgeNAddFourComplete",
   "KnownEdgeNAddFourFrontier",
-  "KnownEdgeThree",
   "KnownEdgeThreeSharp",
   "KoizumiCurveInvariant",
   "KoizumiFramePersistence",
   "KoizumiRawExtraction",
   "LinearBound",
-  "LobeAbsorption",
   "LobeBooleanCodeCore",
   "LobePartnerBounce",
   "LobeToggle",
@@ -125,7 +108,6 @@ defaultTargets = [
   "NestedRestorationElimination",
   "NoFullFreezeCore",
   "NoveltyAwareLasso",
-  "NoveltyAwareLassoOverlap",
   "NoveltyChargeBound",
   "OldContactContinuation",
   "OneJourneyTailCount",
@@ -135,7 +117,6 @@ defaultTargets = [
   "OverwriteDynamics",
   "OverwriteLasso",
   "PairActionCorners",
-  "PairBound",
   "PairTongueCountAbsoluteFour",
   "PairTongueCountFour",
   "PairTongueCountSharp",
@@ -152,13 +133,11 @@ defaultTargets = [
   "ProductiveBoundaryNAddFour",
   "ProductiveBoundaryNAddFourComplete",
   "ProductiveBoundarySupportContact",
-  "ProfileCodeBound",
   "ProtectedPairNAddFour",
   "ProtectedRepairFour",
   "ProtectedRepairThree",
   "RepairLeadTwoPhase",
   "RepeatedNoveltyDecomposition",
-  "ReplayFacts",
   "RestorationFrameOrdering",
   "RestorationFrames",
   "ReuseForcesReplayClosure",
@@ -184,7 +163,6 @@ defaultTargets = [
   "StateLawAxiomAudit",
   "StateLawCoefficientOneTop",
   "StateLawLowerBound",
-  "StateLawNAddFive",
   "StateLawNAddFour",
   "StateLawNAddFourSharp",
   "StateLawNAddFourTop",
@@ -210,8 +188,6 @@ defaultTargets = [
   "TrackCurveShrinkGlobal",
   "TrackEarlyRepairConstant",
   "TrackEarlyRepairCount",
-  "TrackEarlyRepairSharp",
-  "TrackEdge",
   "TrackEndpointMatching",
   "TrackFiniteAlternation",
   "TrackGlobalRepair",
@@ -222,9 +198,6 @@ defaultTargets = [
   "TrackNovelReplay",
   "TrackNoveltyCover",
   "TrackQuantitative",
-  "TrackQuantitativeRepairEighteen",
-  "TrackQuantitativeRepairFifteen",
-  "TrackQuantitativeRepairSeventeen",
   "TrackQuantitativeRouteSharp",
   "TrackQuantitativeTight",
   "TrackStayContactAllTime",
@@ -232,10 +205,8 @@ defaultTargets = [
   "TrackStaySpliceSharp",
   "TrackTheta",
   "TrackThetaAllTime",
-  "TrackThetaCaptureSharp",
   "TrackThetaCaptureTighter",
   "TrackThetaPointwiseCore",
-  "TrackThetaSharper",
   "TrackThetaTighter",
   "TrackTrace",
   "TreeReplay",
@@ -265,9 +236,6 @@ defaultTargets = [
 name = "ActiveLobeCoverCore"
 
 [[lean_lib]]
-name = "ActiveLobes"
-
-[[lean_lib]]
 name = "Alternation"
 
 [[lean_lib]]
@@ -281,9 +249,6 @@ name = "BABAInterlacementTail"
 
 [[lean_lib]]
 name = "BlockAbstractEpochBoundCore"
-
-[[lean_lib]]
-name = "BlockEpochAggregation"
 
 [[lean_lib]]
 name = "BlockSparseBoundCore"
@@ -308,9 +273,6 @@ name = "BoundaryApproachWrittenElimination"
 
 [[lean_lib]]
 name = "BoundaryCanonicalGeometry"
-
-[[lean_lib]]
-name = "BoundaryCanonicalOriginalOverlap"
 
 [[lean_lib]]
 name = "BoundaryChangedContactSaving"
@@ -352,9 +314,6 @@ name = "CanonicalProjectedEpochFrame"
 name = "CanonicalSupportFrame"
 
 [[lean_lib]]
-name = "CertifiedLobeAbsorption"
-
-[[lean_lib]]
 name = "ChangedContactNAddFour"
 
 [[lean_lib]]
@@ -374,12 +333,6 @@ name = "CompleteRepairConstant"
 
 [[lean_lib]]
 name = "CompleteRepairFour"
-
-[[lean_lib]]
-name = "CompleteRepairTongueCountSharp"
-
-[[lean_lib]]
-name = "ComponentCapacity"
 
 [[lean_lib]]
 name = "ConcreteAscentTrace"
@@ -418,22 +371,10 @@ name = "ConcreteTreeDisjoint"
 name = "ConcreteTreeRetrace"
 
 [[lean_lib]]
-name = "CrossingCallerSerialAssembly"
-
-[[lean_lib]]
-name = "CrossingCallerSharpTail"
-
-[[lean_lib]]
-name = "CrossingCallerWindowExtraction"
-
-[[lean_lib]]
 name = "DescentRouteCatalogue"
 
 [[lean_lib]]
 name = "DescentSimplicity"
-
-[[lean_lib]]
-name = "DeterministicOverwriteReturn"
 
 [[lean_lib]]
 name = "DuplotrainProofs"
@@ -455,9 +396,6 @@ name = "EndpointAccountingStandalone"
 
 [[lean_lib]]
 name = "EndpointEpochExtraction"
-
-[[lean_lib]]
-name = "EpochAggregation"
 
 [[lean_lib]]
 name = "ExternalLobeReflectionCore"
@@ -493,9 +431,6 @@ name = "FirstWriterRetraceFree"
 name = "FiveFrameObstruction"
 
 [[lean_lib]]
-name = "FixedSupportBound"
-
-[[lean_lib]]
 name = "ForeignSpliceNovelty"
 
 [[lean_lib]]
@@ -511,9 +446,6 @@ name = "GeneralN"
 name = "GlobalSerialContinuation"
 
 [[lean_lib]]
-name = "GrayTailCount"
-
-[[lean_lib]]
 name = "HiddenAbsorb"
 
 [[lean_lib]]
@@ -521,12 +453,6 @@ name = "HiddenDichotomy"
 
 [[lean_lib]]
 name = "HiddenFibre"
-
-[[lean_lib]]
-name = "KnownEdgeEight"
-
-[[lean_lib]]
-name = "KnownEdgeEleven"
 
 [[lean_lib]]
 name = "KnownEdgeFive"
@@ -550,9 +476,6 @@ name = "KnownEdgeNAddFourComplete"
 name = "KnownEdgeNAddFourFrontier"
 
 [[lean_lib]]
-name = "KnownEdgeThree"
-
-[[lean_lib]]
 name = "KnownEdgeThreeSharp"
 
 [[lean_lib]]
@@ -566,9 +489,6 @@ name = "KoizumiRawExtraction"
 
 [[lean_lib]]
 name = "LinearBound"
-
-[[lean_lib]]
-name = "LobeAbsorption"
 
 [[lean_lib]]
 name = "LobeBooleanCodeCore"
@@ -637,9 +557,6 @@ name = "NoFullFreezeCore"
 name = "NoveltyAwareLasso"
 
 [[lean_lib]]
-name = "NoveltyAwareLassoOverlap"
-
-[[lean_lib]]
 name = "NoveltyChargeBound"
 
 [[lean_lib]]
@@ -665,9 +582,6 @@ name = "OverwriteLasso"
 
 [[lean_lib]]
 name = "PairActionCorners"
-
-[[lean_lib]]
-name = "PairBound"
 
 [[lean_lib]]
 name = "PairTongueCountAbsoluteFour"
@@ -718,9 +632,6 @@ name = "ProductiveBoundaryNAddFourComplete"
 name = "ProductiveBoundarySupportContact"
 
 [[lean_lib]]
-name = "ProfileCodeBound"
-
-[[lean_lib]]
 name = "ProtectedPairNAddFour"
 
 [[lean_lib]]
@@ -734,9 +645,6 @@ name = "RepairLeadTwoPhase"
 
 [[lean_lib]]
 name = "RepeatedNoveltyDecomposition"
-
-[[lean_lib]]
-name = "ReplayFacts"
 
 [[lean_lib]]
 name = "RestorationFrameOrdering"
@@ -814,9 +722,6 @@ name = "StateLawCoefficientOneTop"
 name = "StateLawLowerBound"
 
 [[lean_lib]]
-name = "StateLawNAddFive"
-
-[[lean_lib]]
 name = "StateLawNAddFour"
 
 [[lean_lib]]
@@ -892,12 +797,6 @@ name = "TrackEarlyRepairConstant"
 name = "TrackEarlyRepairCount"
 
 [[lean_lib]]
-name = "TrackEarlyRepairSharp"
-
-[[lean_lib]]
-name = "TrackEdge"
-
-[[lean_lib]]
 name = "TrackEndpointMatching"
 
 [[lean_lib]]
@@ -928,15 +827,6 @@ name = "TrackNoveltyCover"
 name = "TrackQuantitative"
 
 [[lean_lib]]
-name = "TrackQuantitativeRepairEighteen"
-
-[[lean_lib]]
-name = "TrackQuantitativeRepairFifteen"
-
-[[lean_lib]]
-name = "TrackQuantitativeRepairSeventeen"
-
-[[lean_lib]]
 name = "TrackQuantitativeRouteSharp"
 
 [[lean_lib]]
@@ -958,16 +848,10 @@ name = "TrackTheta"
 name = "TrackThetaAllTime"
 
 [[lean_lib]]
-name = "TrackThetaCaptureSharp"
-
-[[lean_lib]]
 name = "TrackThetaCaptureTighter"
 
 [[lean_lib]]
 name = "TrackThetaPointwiseCore"
-
-[[lean_lib]]
-name = "TrackThetaSharper"
 
 [[lean_lib]]
 name = "TrackThetaTighter"

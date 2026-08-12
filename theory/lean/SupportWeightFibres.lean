@@ -1,5 +1,5 @@
 import CanonicalProjectedEpochFrame
-import BlockEpochAggregation
+import BlockSparseBoundCore
 
 /-!
 # Support-weight fibres

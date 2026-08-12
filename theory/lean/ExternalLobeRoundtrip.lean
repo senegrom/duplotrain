@@ -1,4 +1,5 @@
-import CertifiedLobeAbsorption
+import PersistentLobeSeparationStandalone
+import StarIndependent
 
 /-!
 # External-lobe reflector roundtrip

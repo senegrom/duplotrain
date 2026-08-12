@@ -1,4 +1,6 @@
-import BoundaryCanonicalOriginalOverlap
+import BoundaryDoubleDuplicate
+import ProtectedPairNAddFour
+import BoundaryNAddFourSaturation
 
 /-!
 # Geometry of the canonical productive boundary

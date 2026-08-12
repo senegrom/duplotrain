@@ -1,4 +1,4 @@
-import EpochAggregation
+import SupportSize
 
 /-!
 # Tree-component replay from a rooted certificate

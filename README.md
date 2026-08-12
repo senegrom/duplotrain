@@ -315,6 +315,15 @@ regressions, the CLI, the GUI's HTTP API, completion mode, and solver ground tru
 curves + 6 straights make exactly 18; a deliberately stretched piece closes only as a
 forced fit reporting exactly its 2 mm gap).
 
+## Result galleries
+
+Rendered output of the exhaustive searches, in [`docs/`](docs/):
+`perfect-gallery.png`, `perfect-gallery-2.png`, `perfect-gallery-switches.png` and
+`perfect-gallery-wild.png` (every perfect layout the classification admits),
+`topology-gallery.png` and `crossing-gallery.png` (crossing topologies),
+`figure-eight.png` (the minimal exact eight through crossing 6376) and
+`flyover-eight.png` (the bridge flyover eight, closed exactly from one owned set).
+
 ---
 
 *Not affiliated with the LEGO Group. LEGO and DUPLO are trademarks of the LEGO Group.*
