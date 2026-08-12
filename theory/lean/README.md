@@ -1,6 +1,6 @@
 # Formal proofs (Lean 4)
 
-Three hundred and fifty-two libraries, all self-contained (no
+Three hundred and ninety-one libraries, all self-contained (no
 Mathlib), all sorry-free, honestly conditional where marked.  Core
 five below, then the satellites:
 
@@ -428,23 +428,19 @@ identity-reflector case, or flip-reflector runway case.
   component certificate, both collapsed visible-chip geometries have at most
   four snapshots.
 
-The coefficient-one `StateLaw` remains **OPEN**, but the direct-track argument
-now proves an unconditional general linear theorem.
-`GeneralN.state_law_linear_two`
-(`StateLawTwo.lean`) says that any one-train
-run on an `N`-switch wiring visits at most `2*N+9`
-pairwise-distinct tongue vectors, superseding the earlier
-`state_law_linear_three_sharp` (`3*N+7`),
-`state_law_linear_four` (`4*N+9`), `state_law_linear_five` (`5*N+9`),
-`state_law_linear_eight` (`8*N+7`), `state_law_linear_eleven`
-(`11*N+8`), `state_law_linear_fourteen` (`14*N+9`),
-`state_law_linear_fifteen` (`15*N+7`), `state_law_linear_seventeen`
-(`17*N+5`), `state_law_linear_eighteen` (`18*N+3`),
-`state_law_linear_twenty_four` (`24*N+5`) and
-`state_law_linear_twenty_six` (`26*N+3`).  The theorem is
-stated over raw `Wiring`/`stepN`, with no small-`N` enumeration and no
-conditional hypothesis.
-The repository does **not** claim the sharper `N+6` state law.
+The exact `N+6` `StateLaw` is now **PROVED**.  The canonical theorem is
+`GeneralN.stateLaw : StateLaw` in `KnownEdgeNAddFiveAlt.lean`, stated over raw
+`Wiring`/`stepN`, with no small-`N` enumeration and no conditional hypothesis.
+The proof first sharpens every known-incoming-edge run to `N+5`.  First death,
+stable cycle, completed opposite-reflector, and arbitrary first
+support-damage branches share one `N`-coordinate history.  In the formerly
+limiting protected-pair branch, both the activated state and the pre-return
+state are historical, so the four-state repair tail contributes at most two
+fresh vectors.  Shifting an arbitrary start past its first successful step
+then contributes at most the time-zero vector, yielding `N+6`.  This
+supersedes the earlier `N+7` and `2*N+9` stages and every larger linear
+bound (`3*N+7`, `4*N+9`, `5*N+9`, `8*N+7`, `11*N+8`, `14*N+9`, `15*N+7`,
+`17*N+5`, `18*N+3`, `24*N+5`, `26*N+3`).
 
 Four layers of improvement feed the current constant.  The novelty-aware
 lasso (`FirstActivatedExact.lean`, `NoveltyAwareLasso.lean`): the two
@@ -675,23 +671,16 @@ updates used by exponential cooperative-point layouts.  The general
 `26*N+3` theorem also rules out a reusable binary counter above that capacity;
 this audit does not by itself prove the sharper `N+6` law.
 
-**`StateLaw.lean` — the target theorem, in the language of tracks and
-switches.**  `GeneralN.StateLaw` states the actual claim — a single
-train on any `N`-switch lazy-point layout ever sees at most `N + 6`
-distinct tongue vectors — directly over `Wiring`/`stepN`, decodable
-piece by piece as track, switches and the lazy-point rule.  **It is
-OPEN: nothing in this repository proves that coefficient-one bound.**
-`GeneralN.state_law_linear_seventeen` proves the identical
-raw-track statement with `17*N+5` in place of `N+6`
-(superseding the `18*N+3`, `24*N+5` and `26*N+3` predecessors);
-`state_law_two_pow` is the older elementary pigeonhole ceiling.  The
-remaining problem is the global assembly: every arbitrary repair branch must
-be covered by the `N+2` manufactured-prefix history plus at most four tail
-vectors without double-charging overlapping support.  The local runway and
-candy novelty branches are now discharged; the strict nested-restoration /
-raw repeated-writer decomposition is not yet connected to that sharp
-certificate.  Closing that assembly would
-improve `17*N+5` to `N+6` (the conjectured sharp form remains `N+4`).
+**`StateLaw.lean` / `KnownEdgeNAddFiveAlt.lean` — the theorem in the language
+of tracks and switches.**  `GeneralN.StateLaw` states the actual claim — a
+single train on any `N`-switch lazy-point layout ever sees at most `N+6`
+distinct tongue vectors — directly over `Wiring`/`stepN`, decodable piece by
+piece as track, switches and the lazy-point rule.  It is proved by
+`GeneralN.stateLaw`.  The stronger theorem
+`known_edge_all_run_distinct_le_N_add_five` gives `N+5` once the starting port
+has a known incoming edge; `state_law_linear_N_add_six` is the expanded raw
+arbitrary-start statement.  `state_law_two_pow` is the older elementary
+pigeonhole ceiling.  The conjectured sharp form remains `N+4`.
 
 **`VectorCount.lean` — the unconditional ceiling, f(N) ≤ 2^N**: a real
 pigeonhole proof (induction on N, splitting on the first coordinate),

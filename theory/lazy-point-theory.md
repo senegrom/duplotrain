@@ -16,11 +16,12 @@ an active switch flips both ways. Distinct tongue vectors on a cycle with
 > **Cycle theorem.** Every eventual cycle has at most 2 active switches,
 > hence at most 4 distinct tongue vectors.
 
-is reduced to bounding actives. Status: the specific coefficient-one
-`GeneralN.StateLaw` (`N+6`) is **OPEN**, but the unconditional general bound
-`f(N) ≤ 30N+3` is proved as `GeneralN.state_law_linear_thirty` in
-`lean/TrackQuantitative.lean`.  The proof is a direct physical-track lasso
-argument and does not assume the echo-machine Gray-tail properties.  The
+is reduced to bounding actives. Status: the general raw bound
+`GeneralN.StateLaw`, namely `f(N) ≤ N+6`, is **proved** by
+`GeneralN.stateLaw` in `lean/KnownEdgeNAddFiveAlt.lean`.  Its stronger
+known-incoming-edge core is `N+5`; an arbitrary start costs at most its
+time-zero vector.  The proof is a direct physical-track lasso argument and
+does not assume the echo-machine Gray-tail properties.  The
 separate echo-machine route still reduces the sharper bound to the Gray tail
 (**B**) and one-alternation transient (**C**); those remain open.  Evidence:
 exhaustive for N ≤ 4 on wirings (140,152, in Lean), unbeaten by

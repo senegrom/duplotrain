@@ -5,24 +5,18 @@ import VectorCount
 # The state law — the target theorem, in the language of tracks and switches
 
 This file states the actual claim about trains, tracks and switches.
-**`StateLaw` is OPEN — its specific `N + 6` bound is not proved.**
-What is now proved is the unconditional general linear bound `2*N+9`
-(`state_law_linear_two` in `StateLawTwo.lean`: every
-branch of the analysis is vector-counted — pairs cost four flat, the
-first simple-cycle settle `N+2`, protected repair `N+4` — and the
-protected repair is a constant six and the known-edge count is
-liveness-robust; it supersedes the `3*N+7`, `4*N+9`, `5*N+9`,
-`8*N+7`, `11*N+8`, `14*N+9`, `15*N+7`, `17*N+5`, `18*N+3`, `24*N+5` and
-`26*N+3` predecessors), as well as the elementary
-`2 ^ N` bound (`state_law_two_pow` below).  The coefficient-one improvement
-from `2*N+9` to `N+O(1)` is the remaining problem.
+**`StateLaw` is proved.**  The downstream theorem
+`GeneralN.stateLaw` in `KnownEdgeNAddFiveAlt.lean` has exactly this type.
+Its stronger known-incoming-edge core bounds the run by `N+5`; shifting an
+arbitrary start past its first successful physical step costs at most the
+time-zero vector, giving the raw `N+6` result.  The proof is entirely symbolic
+in `N`, with no fixed-`N` enumeration.
 
 The direct physical-track route in `TrackTrace`, `TrackLobe`, `TrackNormalForm`,
 `TrackTheta`, `TrackGlobalRepair`, `TrackQuantitative`, and
-`TrackQuantitativeTight` close the global
-two-component assembly, retains explicit lasso lengths, and proves the final
-`26*N+3` tongue-vector count.  `StateLaw` stays explicitly open because it asks
-for the much sharper `N+6` count.
+`TrackQuantitativeTight` close the global two-component assembly, retain
+explicit lasso lengths, and prove the older `26*N+3` tongue-vector count.  The
+coefficient-one proof in `KnownEdgeNAddFiveAlt.lean` supersedes that bound.
 
 ## How to read the statement
 
@@ -58,7 +52,7 @@ namespace GeneralN
 def tonguesAt (w : Wiring) (c0 : Nat × Tongues) (k : Nat) : Tongues :=
   ((stepN w k c0).getD c0).2
 
-/-- **THE STATE LAW.  OPEN.**  A single train on any `N`-switch
+/-- **THE STATE LAW.**  A single train on any `N`-switch
 lazy-point layout visits at most `N + 6` distinct tongue vectors. -/
 def StateLaw : Prop :=
   ∀ (w : Wiring) (N : Nat),
@@ -68,10 +62,8 @@ def StateLaw : Prop :=
       (ks.map fun k => VectorCount.restrict N (tonguesAt w c0 k)).Nodup →
       ks.length ≤ N + 6
 
-/-- The elementary exponential bound on exactly the same statement, **proved**.
-`GeneralN.state_law_linear_two` supersedes it
-asymptotically with `2*N+9`; the open gap is now `2*N+9` versus
-`N+6`. -/
+/-- The elementary exponential bound on exactly the same statement.  The
+proved coefficient-one theorem `GeneralN.stateLaw` supersedes it with `N+6`. -/
 theorem state_law_two_pow (w : Wiring) (N : Nat)
     (_hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (c0 : Nat × Tongues) (ks : List Nat)

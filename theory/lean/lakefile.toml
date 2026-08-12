@@ -4,6 +4,8 @@ defaultTargets = [
   "ActiveLobes",
   "Alternation",
   "AlternationBound",
+  "ArbitraryStartCoefficientOneBoundary",
+  "ArbitraryStartDirectLift",
   "AutomaticCycleFixed",
   "AutomaticEpochBound",
   "AutomaticTreeBlock",
@@ -14,7 +16,9 @@ defaultTargets = [
   "BlockGlobalArithmetic",
   "BlockSparseBoundCore",
   "BlockSparseFixedCountCore",
+  "BoundaryAbsentSecondWriter",
   "BoundaryOverlapTailCount",
+  "BoundaryPresentSecondWriter",
   "BoundaryReplay",
   "CanonicalActiveLobeFrame",
   "CanonicalCertifiedEpochBound",
@@ -30,11 +34,14 @@ defaultTargets = [
   "CellHeat",
   "CertifiedEpochBound",
   "CertifiedLobeAbsorption",
+  "ChangedContactNAddFour",
   "ChangedFlipCountActual",
   "ChangedFlipCountConstant",
+  "ChangedFlipCountFour",
   "ChangedStayCountConstant",
   "CollapsedChipDynamics",
   "CompleteRepairConstant",
+  "CompleteRepairFour",
   "CompleteRepairTongueCountSharp",
   "ComponentCapacity",
   "ConcreteAscentTrace",
@@ -64,7 +71,9 @@ defaultTargets = [
   "EchoConfiguration",
   "EchoMachine",
   "EchoOverwriteFibre",
+  "EchoRawBridgeSharp",
   "EdgeReversal",
+  "EmptyCurvePotential",
   "EndpointAccountingStandalone",
   "EndpointEpochExtraction",
   "EpochAggregation",
@@ -80,6 +89,8 @@ defaultTargets = [
   "FiniteFullyLobedComponentTrap",
   "FiniteListBounds",
   "FirstActivatedExact",
+  "FirstChangedSupportTail",
+  "FirstContactGrayTail",
   "FirstCycleCount",
   "FirstCycleCountSharp",
   "FirstReflectorNovelty",
@@ -108,6 +119,7 @@ defaultTargets = [
   "KnownEdgeFour",
   "KnownEdgeFourteen",
   "KnownEdgeLift",
+  "KnownEdgeNAddFiveAlt",
   "KnownEdgeNineteen",
   "KnownEdgeSeventeen",
   "KnownEdgeThree",
@@ -139,8 +151,11 @@ defaultTargets = [
   "ManufacturedPairNovelty",
   "ManufacturedPairTailNovelty",
   "MellitABCABCRecursionBase",
+  "MellitDirectSharpAssembly",
   "MellitDirectStateBound",
+  "MellitDynamicResidual",
   "MellitEarlySecondRepeatAssembly",
+  "MellitFiveNoveltyAssembly",
   "MellitGlobalIncompatibleClosure",
   "MellitGlobalNoveltyBound",
   "MellitNoncompatibleSecondRepeat",
@@ -174,8 +189,11 @@ defaultTargets = [
   "NoveltyAwareLassoTwenty",
   "NoveltyAwareLassoTwentyOne",
   "NoveltyAwareLassoTwentyThree",
+  "NoveltyChargeBound",
   "ObservedConfigurationFibre",
+  "OldContactContinuation",
   "OneJourneyTailCount",
+  "OneReflectorContinuation",
   "OneReserveCoordinateFrame",
   "OneReserveFromNoTail",
   "OneReserveListAssemblyV2",
@@ -183,6 +201,7 @@ defaultTargets = [
   "OverlappingSerialWindows",
   "OverwriteDynamics",
   "OverwriteLasso",
+  "PairActionCorners",
   "PairBound",
   "PairMultiplicity",
   "PairTongueCountAbsoluteFour",
@@ -193,13 +212,17 @@ defaultTargets = [
   "PairedPointwiseReplayCore",
   "PairedReachReplay",
   "PairedRouterRoundtrip",
+  "PartialSecondRunSharp",
+  "PartialSupportDamage",
   "Periodicity",
   "PersistentLobeSeparationStandalone",
   "PhysicalPrefixCount",
   "PhysicalPrefixFibre",
+  "PointwiseSimpleCycleTail",
   "ProbePairedPeriod",
   "ProfileCodeBound",
   "ProtectedRepairConstant",
+  "ProtectedRepairFour",
   "ProtectedRepairThree",
   "RamanGapProductiveRefinement",
   "RamanInnerReplaySelectedTail",
@@ -230,6 +253,7 @@ defaultTargets = [
   "ReuseForcesReplayClosure",
   "ReversalFacts",
   "RootRank",
+  "RunwayHistoricalOne",
   "RunwayHistoricalThree",
   "RunwaySpliceNovelty",
   "SelectedSupportContactClosure",
@@ -244,8 +268,12 @@ defaultTargets = [
   "SevenTenthsAggregation",
   "SharpCertificateClosure",
   "SharpSixEventAssembly",
+  "SharpSixFinal",
   "SharpStateLawAssembly",
+  "ShortSuffixCount",
+  "ShrinkingCurveFinal",
   "SimpleTraceOneNetChange",
+  "SingleCoordinateFlip",
   "SixEventReduction",
   "SixEventSharpClosure",
   "SkewWalk",
@@ -253,6 +281,8 @@ defaultTargets = [
   "StarIndependent",
   "StarPairCountingCore",
   "StateLaw",
+  "StateLawAxiomAudit",
+  "StateLawCoefficientOneTop",
   "StateLawEight",
   "StateLawEighteen",
   "StateLawEleven",
@@ -261,6 +291,7 @@ defaultTargets = [
   "StateLawFour",
   "StateLawFourteen",
   "StateLawNineteen",
+  "StateLawParametricAudit",
   "StateLawSeventeen",
   "StateLawThree",
   "StateLawThreeSharp",
@@ -270,6 +301,11 @@ defaultTargets = [
   "StateLawTwentyOne",
   "StateLawTwentyThree",
   "StateLawTwo",
+  "StateLawTwoCandidate",
+  "StateLawTwoFive",
+  "StateLawTwoSharp",
+  "StateLawTwoSharper",
+  "StateLawTwoSixUltra",
   "StationaryTail",
   "SteeringLaw",
   "SupportBound",
@@ -285,6 +321,8 @@ defaultTargets = [
   "ThirdWriterTail",
   "ThreeQuarterArithmetic",
   "TokenState",
+  "TraceRetainingBABASecondRepeat",
+  "TraceRetainingFirstRevisit",
   "TrackCurveGrowth",
   "TrackCurveShrinkGlobal",
   "TrackEarlyRepairConstant",
@@ -340,6 +378,7 @@ defaultTargets = [
   "TripleSelfLinkSelectedClosure",
   "TripleSelfLinkSimpleCycleClosure",
   "TripleSelfLinkSimpleCycleTail",
+  "TwoHistoryUnionCharge",
   "TwoJourneyBoundaryTailCount",
   "TwoJourneyTailCountSharp",
   "TwoPhasePrefixTailCount",
@@ -365,6 +404,12 @@ name = "Alternation"
 
 [[lean_lib]]
 name = "AlternationBound"
+
+[[lean_lib]]
+name = "ArbitraryStartCoefficientOneBoundary"
+
+[[lean_lib]]
+name = "ArbitraryStartDirectLift"
 
 [[lean_lib]]
 name = "AutomaticCycleFixed"
@@ -397,7 +442,13 @@ name = "BlockSparseBoundCore"
 name = "BlockSparseFixedCountCore"
 
 [[lean_lib]]
+name = "BoundaryAbsentSecondWriter"
+
+[[lean_lib]]
 name = "BoundaryOverlapTailCount"
+
+[[lean_lib]]
+name = "BoundaryPresentSecondWriter"
 
 [[lean_lib]]
 name = "BoundaryReplay"
@@ -445,10 +496,16 @@ name = "CertifiedEpochBound"
 name = "CertifiedLobeAbsorption"
 
 [[lean_lib]]
+name = "ChangedContactNAddFour"
+
+[[lean_lib]]
 name = "ChangedFlipCountActual"
 
 [[lean_lib]]
 name = "ChangedFlipCountConstant"
+
+[[lean_lib]]
+name = "ChangedFlipCountFour"
 
 [[lean_lib]]
 name = "ChangedStayCountConstant"
@@ -458,6 +515,9 @@ name = "CollapsedChipDynamics"
 
 [[lean_lib]]
 name = "CompleteRepairConstant"
+
+[[lean_lib]]
+name = "CompleteRepairFour"
 
 [[lean_lib]]
 name = "CompleteRepairTongueCountSharp"
@@ -547,7 +607,13 @@ name = "EchoMachine"
 name = "EchoOverwriteFibre"
 
 [[lean_lib]]
+name = "EchoRawBridgeSharp"
+
+[[lean_lib]]
 name = "EdgeReversal"
+
+[[lean_lib]]
+name = "EmptyCurvePotential"
 
 [[lean_lib]]
 name = "EndpointAccountingStandalone"
@@ -593,6 +659,12 @@ name = "FiniteListBounds"
 
 [[lean_lib]]
 name = "FirstActivatedExact"
+
+[[lean_lib]]
+name = "FirstChangedSupportTail"
+
+[[lean_lib]]
+name = "FirstContactGrayTail"
 
 [[lean_lib]]
 name = "FirstCycleCount"
@@ -677,6 +749,9 @@ name = "KnownEdgeFourteen"
 
 [[lean_lib]]
 name = "KnownEdgeLift"
+
+[[lean_lib]]
+name = "KnownEdgeNAddFiveAlt"
 
 [[lean_lib]]
 name = "KnownEdgeNineteen"
@@ -772,10 +847,19 @@ name = "ManufacturedPairTailNovelty"
 name = "MellitABCABCRecursionBase"
 
 [[lean_lib]]
+name = "MellitDirectSharpAssembly"
+
+[[lean_lib]]
 name = "MellitDirectStateBound"
 
 [[lean_lib]]
+name = "MellitDynamicResidual"
+
+[[lean_lib]]
 name = "MellitEarlySecondRepeatAssembly"
+
+[[lean_lib]]
+name = "MellitFiveNoveltyAssembly"
 
 [[lean_lib]]
 name = "MellitGlobalIncompatibleClosure"
@@ -877,10 +961,19 @@ name = "NoveltyAwareLassoTwentyOne"
 name = "NoveltyAwareLassoTwentyThree"
 
 [[lean_lib]]
+name = "NoveltyChargeBound"
+
+[[lean_lib]]
 name = "ObservedConfigurationFibre"
 
 [[lean_lib]]
+name = "OldContactContinuation"
+
+[[lean_lib]]
 name = "OneJourneyTailCount"
+
+[[lean_lib]]
+name = "OneReflectorContinuation"
 
 [[lean_lib]]
 name = "OneReserveCoordinateFrame"
@@ -902,6 +995,9 @@ name = "OverwriteDynamics"
 
 [[lean_lib]]
 name = "OverwriteLasso"
+
+[[lean_lib]]
+name = "PairActionCorners"
 
 [[lean_lib]]
 name = "PairBound"
@@ -934,6 +1030,12 @@ name = "PairedReachReplay"
 name = "PairedRouterRoundtrip"
 
 [[lean_lib]]
+name = "PartialSecondRunSharp"
+
+[[lean_lib]]
+name = "PartialSupportDamage"
+
+[[lean_lib]]
 name = "Periodicity"
 
 [[lean_lib]]
@@ -946,6 +1048,9 @@ name = "PhysicalPrefixCount"
 name = "PhysicalPrefixFibre"
 
 [[lean_lib]]
+name = "PointwiseSimpleCycleTail"
+
+[[lean_lib]]
 name = "ProbePairedPeriod"
 
 [[lean_lib]]
@@ -953,6 +1058,9 @@ name = "ProfileCodeBound"
 
 [[lean_lib]]
 name = "ProtectedRepairConstant"
+
+[[lean_lib]]
+name = "ProtectedRepairFour"
 
 [[lean_lib]]
 name = "ProtectedRepairThree"
@@ -1045,6 +1153,9 @@ name = "ReversalFacts"
 name = "RootRank"
 
 [[lean_lib]]
+name = "RunwayHistoricalOne"
+
+[[lean_lib]]
 name = "RunwayHistoricalThree"
 
 [[lean_lib]]
@@ -1087,10 +1198,22 @@ name = "SharpCertificateClosure"
 name = "SharpSixEventAssembly"
 
 [[lean_lib]]
+name = "SharpSixFinal"
+
+[[lean_lib]]
 name = "SharpStateLawAssembly"
 
 [[lean_lib]]
+name = "ShortSuffixCount"
+
+[[lean_lib]]
+name = "ShrinkingCurveFinal"
+
+[[lean_lib]]
 name = "SimpleTraceOneNetChange"
+
+[[lean_lib]]
+name = "SingleCoordinateFlip"
 
 [[lean_lib]]
 name = "SixEventReduction"
@@ -1112,6 +1235,12 @@ name = "StarPairCountingCore"
 
 [[lean_lib]]
 name = "StateLaw"
+
+[[lean_lib]]
+name = "StateLawAxiomAudit"
+
+[[lean_lib]]
+name = "StateLawCoefficientOneTop"
 
 [[lean_lib]]
 name = "StateLawEight"
@@ -1136,6 +1265,9 @@ name = "StateLawFourteen"
 
 [[lean_lib]]
 name = "StateLawNineteen"
+
+[[lean_lib]]
+name = "StateLawParametricAudit"
 
 [[lean_lib]]
 name = "StateLawSeventeen"
@@ -1163,6 +1295,21 @@ name = "StateLawTwentyThree"
 
 [[lean_lib]]
 name = "StateLawTwo"
+
+[[lean_lib]]
+name = "StateLawTwoCandidate"
+
+[[lean_lib]]
+name = "StateLawTwoFive"
+
+[[lean_lib]]
+name = "StateLawTwoSharp"
+
+[[lean_lib]]
+name = "StateLawTwoSharper"
+
+[[lean_lib]]
+name = "StateLawTwoSixUltra"
 
 [[lean_lib]]
 name = "StationaryTail"
@@ -1208,6 +1355,12 @@ name = "ThreeQuarterArithmetic"
 
 [[lean_lib]]
 name = "TokenState"
+
+[[lean_lib]]
+name = "TraceRetainingBABASecondRepeat"
+
+[[lean_lib]]
+name = "TraceRetainingFirstRevisit"
 
 [[lean_lib]]
 name = "TrackCurveGrowth"
@@ -1373,6 +1526,9 @@ name = "TripleSelfLinkSimpleCycleClosure"
 
 [[lean_lib]]
 name = "TripleSelfLinkSimpleCycleTail"
+
+[[lean_lib]]
+name = "TwoHistoryUnionCharge"
 
 [[lean_lib]]
 name = "TwoJourneyBoundaryTailCount"
