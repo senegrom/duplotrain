@@ -882,8 +882,9 @@ private theorem ManufacturedReflector.protected_facing_contact_one_or_forward
     simpa [hreverse] using horiented
 
 /-- Protected-repair classification with every early exit already charged
-by one vector over a history containing the activated and pre-return states. -/
-private theorem manufactured_pair_protected_repair_novelty_outcomes
+by one vector over a history containing the activated and pre-return states.
+Public: the productive-boundary closure consumes it from a separate file. -/
+theorem manufactured_pair_protected_repair_novelty_outcomes
     {w : Wiring} {N g e : Nat}
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -955,7 +956,7 @@ private theorem manufactured_pair_protected_repair_novelty_outcomes
 and pre-return history.  Its eventual two-phase tail consists exactly of
 those two protected states; the direct three-state theorem supplies the
 finite-sample formulation. -/
-private theorem ManufacturedReflector.FacingForwardMerge.one_novelty_of_preReturn
+theorem ManufacturedReflector.FacingForwardMerge.one_novelty_of_preReturn
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}
@@ -1171,7 +1172,7 @@ is impossible.  The changed route passage is a reusable passage of `A`, so
 `B`'s support.  That support is grooved both at the contact state and at
 `B.preReturn`, forcing the two tongue values to agree, while the changed
 trailing arrival forces them to be opposite. -/
-private theorem ManufacturedReflector.ChangedForwardMerge.impossible_of_preReturn_grooved
+theorem ManufacturedReflector.ChangedForwardMerge.impossible_of_preReturn_grooved
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     {B : ManufacturedReflector w e g}

@@ -154,6 +154,7 @@ defaultTargets = [
   "PersistentLobeSeparationStandalone",
   "PointwiseSimpleCycleTail",
   "ProductiveBoundaryNAddFour",
+  "ProductiveBoundaryNAddFourComplete",
   "ProductiveBoundarySupportContact",
   "ProfileCodeBound",
   "ProtectedPairNAddFour",
@@ -728,6 +729,9 @@ name = "PointwiseSimpleCycleTail"
 
 [[lean_lib]]
 name = "ProductiveBoundaryNAddFour"
+
+[[lean_lib]]
+name = "ProductiveBoundaryNAddFourComplete"
 
 [[lean_lib]]
 name = "ProductiveBoundarySupportContact"

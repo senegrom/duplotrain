@@ -126,11 +126,16 @@ Since the known-edge bound is already `N + 4`, the sharp law is
 equivalent to showing that a *productive* first passage (one that flips
 a switch on its very first step) cannot add a genuinely new vector
 beyond the shifted known-edge budget.  `StateLawNAddFour.lean` states
-the sharp target as a `def`, and `StateLawNAddFourTop.lean` proves it
-conditional on exactly that residual obligation
-(`ProductiveInitialBoundaryNAddFour`); the in-flight closure attempt
-lives on the `codex/first-repeated-edge-proof` branch
-(`ProductiveBoundaryNAddFourComplete.lean`, currently broken there).
+the sharp target as a `def`; `StateLawNAddFourTop.lean` proves it from
+the single residual obligation `ProductiveInitialBoundaryNAddFour`;
+and `ProductiveBoundaryNAddFourComplete.lean` proves that obligation
+**equivalent** to eliminating three concrete residual geometries
+(`productiveInitialBoundaryNAddFour_iff_no_exact_residual`): a
+support-damaging stable cycle after the first reflector, a completed
+opposite reflector whose pre-return state damages the first support,
+and a flip-first pair whose action switch reappears among the second
+construction's first writers.  Killing those three constructors is the
+entire remaining distance to `f(N) = N + 4`.
 
 ## History
 
