@@ -137,7 +137,6 @@ theorem ManufacturedReflector.two_journeys_then_novelty_le
       rw [hvector]
       exact hlocalMem d hdMem
   have hcount := noveltyCoverOn_distinct_count hglobalCover hnd
-  dsimp [history] at hhistory
   omega
 
 /-- Stay-first specialisation: two fresh tail vectors give `N+4`. -/
