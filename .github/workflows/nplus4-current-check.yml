@@ -1,0 +1,34 @@
+name: N+4 frontier Lean check
+on:
+  push:
+    branches: [agent/nplus4-current]
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Register proof targets
+        run: |
+          cat >> lakefile.toml <<'EOF'
+
+          [[lean_lib]]
+          name = "TwoHistoryUnionChargeSharp"
+
+          [[lean_lib]]
+          name = "TwoJourneyNoveltySharp"
+
+          [[lean_lib]]
+          name = "FlipHistoryActionCharge"
+          EOF
+      - name: Build proof targets
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build TwoHistoryUnionChargeSharp TwoJourneyNoveltySharp FlipHistoryActionCharge
