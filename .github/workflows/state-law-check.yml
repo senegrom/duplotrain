@@ -1,0 +1,29 @@
+name: State law N+6
+on:
+  push:
+    branches: [main]
+    paths:
+      - theory/lean/**
+      - .github/workflows/state-law-check.yml
+  workflow_dispatch:
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: theory/lean
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build every library
+        run: lake build
+      - name: Audit the axioms of the state law
+        run: |
+          lake build StateLawAxiomAudit 2>&1 | tee audit.log
+          grep "'GeneralN.stateLaw' depends on axioms" audit.log
+          if grep -q "sorryAx" audit.log; then
+            echo "sorryAx detected" && exit 1
+          fi
