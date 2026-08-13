@@ -27,7 +27,7 @@ symbolic in `N`: no finite-instance argument, no Mathlib, no `native_decide`,
 and no `sorry`. The lower bound is also symbolic for `N ≥ 4`; its `N = 3`
 base case is checked by kernel `decide`.
 
-There are 215 self-contained Lean libraries. To check everything:
+There are 214 self-contained Lean libraries. To check everything:
 
 ```
 lake build
@@ -105,18 +105,15 @@ exact arbitrary-start wrapper from `StateLawNAddFourTop.lean`.
 
 ## Auxiliary files
 
-* `DuplotrainProofs.lean` exhaustively checks the small values
-  `f(1) = 2`, `f(2) = 4`, `f(3) = 7`, and `f(4) = 8`, as well as the
-  perfect-layout classification. These finite results deliberately use
-  `native_decide`; they are separate from the symbolic upper bound.
-* `FamilyLowerBound.lean` checks instances of the extremal family for
-  `N = 3 … 8`; the general construction is proved in
-  `StateLawLowerBound.lean`.
+* `DuplotrainProofs.lean` exhaustively checks `f(1) = 2` and
+  `f(2) = 4` — the two legs of `min(2^N, N + 4)` below the symbolic
+  family's reach.  These finite results deliberately use
+  `native_decide`; they are separate from the symbolic proofs.
+  (`f(3) = 7` and `f(4) = 8` follow from the symbolic bounds and need
+  no exhaustion.)
 * The `N+6` assembly (`GeneralN.stateLaw`, `KnownEdgeNAddFiveAlt.lean`)
   remains in the tree — not for history, but because the sharp
-  protected-pair closure genuinely builds on it.  The intermediate
-  `N+5` assembly was dropped: it is a strictly weaker corollary of the
-  sharp theorem.
+  protected-pair closure genuinely builds on it.
 
 ## Independent open directions
 

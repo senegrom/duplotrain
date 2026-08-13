@@ -25,6 +25,6 @@ Contents:
   (no perfect layout has ≥ 3 switches), used by
   `tests/test_switch_ceiling.py`.
 * **`tools/bstates.py`** — the Python state-count prober that discovered the
-  extremal `N+4` family and cross-checks `lean/FamilyLowerBound.lean`.
+  extremal `N+4` family behind `lean/StateLawLowerBound.lean`.
 
 Build the Lean proofs: `cd lean && lake build` (elan; toolchain pinned).
