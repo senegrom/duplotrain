@@ -156,7 +156,8 @@ class Session:
         if self.unlimited:
             return {sid: UNLIMITED_COUNT for sid in ACCESSORIES}
         placed: dict[str, int] = {}
-        for _idx, sid in self.layout.accessories:
+        for entry in self.layout.accessories:
+            sid = entry[1]
             placed[sid] = placed.get(sid, 0) + 1
         return {
             sid: max(0, self.stones.get(sid, 0) - placed.get(sid, 0))

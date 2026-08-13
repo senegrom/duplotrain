@@ -111,7 +111,15 @@ class Pose:
         object.__setattr__(self, "x", alg(self.x))
         object.__setattr__(self, "y", alg(self.y))
         object.__setattr__(self, "z", alg(self.z))
-        object.__setattr__(self, "heading", self.heading % HEADING_STEPS)
+        heading = self.heading
+        if not isinstance(heading, int):
+            if isinstance(heading, float) and heading.is_integer():
+                heading = int(heading)
+            else:
+                raise TypeError(
+                    f"heading must be a whole number of 15-degree steps, got {heading!r}"
+                )
+        object.__setattr__(self, "heading", heading % HEADING_STEPS)
 
     @staticmethod
     def make(
@@ -139,10 +147,6 @@ class Pose:
     def reversed(self) -> Pose:
         """The same point, facing the opposite way."""
         return Pose(self.x, self.y, self.z, self.heading + HEADING_STEPS // 2)
-
-    def translated(self, dx: AlgLike, dy: AlgLike, dz: AlgLike = 0) -> Pose:
-        """Translate in *world* axes, leaving the heading alone."""
-        return Pose(self.x + alg(dx), self.y + alg(dy), self.z + alg(dz), self.heading)
 
     def rotated_about_origin(self, steps: int) -> Pose:
         """Rotate the whole pose about the world origin."""

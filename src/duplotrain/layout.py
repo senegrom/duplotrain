@@ -12,7 +12,6 @@ for speed and only builds a ``Layout`` once a candidate is worth keeping.
 
 from __future__ import annotations
 
-import json
 import math
 from dataclasses import dataclass
 from fractions import Fraction
@@ -53,9 +52,6 @@ class Placement:
         """World pose of one of this piece's connectors (heading points outward)."""
         local = self.piece.ports[port].pose
         return self.frame.then(local.x, local.y, local.z, local.heading)
-
-    def port_poses(self) -> list[Pose]:
-        return [self.port_pose(i) for i in range(len(self.piece.ports))]
 
     def centrelines(self, spacing: float = 8.0) -> list[list[tuple[float, float, float]]]:
         """Every route through the piece, sampled in world coordinates."""
@@ -460,14 +456,6 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
     return Layout(tuple(placements), links, accessories)
 
 
-def save_layout(layout: Layout, path: str) -> None:
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump(layout_to_dict(layout), fh, indent=2)
-
-
-def load_layout(path: str, pieces: Mapping[str, PieceType]) -> Layout:
-    with open(path, encoding="utf-8") as fh:
-        return layout_from_dict(json.load(fh), pieces)
 
 
 def build_chain(

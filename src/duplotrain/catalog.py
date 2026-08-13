@@ -308,7 +308,12 @@ def load_catalog(*paths: str | Path, include_default: bool = True) -> dict[str, 
     for path in paths:
         with open(path, encoding="utf-8") as fh:
             data = json.load(fh)
-        entries = data["pieces"] if isinstance(data, dict) else data
+        if isinstance(data, dict):
+            if "pieces" not in data:
+                raise ValueError(f"catalogue {path} has no 'pieces' key")
+            entries = data["pieces"]
+        else:
+            entries = data
         for spec in entries:
             if "id" not in spec:
                 raise ValueError(f"piece spec without an id in {path}")

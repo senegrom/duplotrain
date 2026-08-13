@@ -18,8 +18,7 @@ We enumerate every wiring for n = 1..4 and report the perfect ones.
 """
 
 import itertools
-import sys
-from functools import lru_cache
+import os
 
 S, L, R = "S", "L", "R"
 
@@ -182,7 +181,9 @@ def core_wirings(n):
     N switches is perfect, every perfect layout with at most N non-lobe
     switches has all-lobe switches, of which a 1-D structure (a path) carries
     at most two.  Machine result: 0 perfect cores for n = 2..6 (24,140,800
-    wirings at n=6 alone).
+    wirings at n=6 alone, ~10 min).  The default sweep in ``__main__``
+    reproduces n = 2..5; pass ``CORE_MAX_N=6`` in the environment to rerun
+    the n=6 leg.
     """
     ports = [(k, a) for k in range(n) for a in (S, L, R)]
 
@@ -222,7 +223,8 @@ if __name__ == "__main__":
             print(f"    edges: {e_str}   guarded stubs: {c_str}")
         if len(perfect) > 8:
             print(f"    ... and {len(perfect) - 8} more")
-    for n in (2, 3, 4, 5):
+    core_max = int(os.environ.get("CORE_MAX_N", "5"))
+    for n in range(2, core_max + 1):
         total = sum(
             1
             for edges, caps in core_wirings(n)

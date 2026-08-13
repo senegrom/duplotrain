@@ -34,6 +34,18 @@ __all__ = ["Alg", "ZERO", "ONE", "SQRT2", "SQRT3", "SQRT6", "alg", "AlgLike"]
 AlgLike = Union["Alg", int, Fraction]
 
 
+def _exact_fraction(value) -> Fraction:
+    """Coerce a coefficient exactly.
+
+    Floats are routed through their decimal literal (``str``), matching
+    ``parse_length``: ``152.4`` means ``762/5``, never the binary expansion
+    ``Fraction(152.4)`` would inject into the exact field.
+    """
+    if isinstance(value, float):
+        return Fraction(str(value))
+    return Fraction(value)
+
+
 class Alg:
     """An exact element ``a + b*sqrt2 + c*sqrt3 + d*sqrt6`` of ``Q(sqrt2, sqrt3)``.
 
@@ -61,10 +73,10 @@ class Alg:
                 raise TypeError("cannot combine an Alg with extra radical coefficients")
             self.a, self.b, self.c, self.d = a.a, a.b, a.c, a.d
             return
-        self.a = Fraction(a)
-        self.b = Fraction(b)
-        self.c = Fraction(c)
-        self.d = Fraction(d)
+        self.a = _exact_fraction(a)
+        self.b = _exact_fraction(b)
+        self.c = _exact_fraction(c)
+        self.d = _exact_fraction(d)
 
     # -- construction ----------------------------------------------------------
 

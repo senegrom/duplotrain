@@ -64,6 +64,16 @@ def writes_on_cycle(cellOf, star, bar, r0, e0, stats, max_steps=6000):
             print(f"  cellOf={list(cellOf)} star={list(star)} "
                   f"bar={list(bar)} r0={list(r0)} e0={e0}")
     stats['wlens'][len(wcells)] = stats['wlens'].get(len(wcells), 0) + 1
+    # the two-cell alternation law needs MORE than "never the same cell
+    # twice in a row": an a,b,c rotation also passes that test.  Count
+    # periods whose writes touch more than two distinct cells separately.
+    ncellsw = len(set(wcells))
+    if ncellsw > 2:
+        stats['many'] = stats.get('many', 0) + 1
+        if stats['many'] <= 3:
+            print("WRITES ACROSS >2 DISTINCT CELLS:", wcells)
+            print(f"  cellOf={list(cellOf)} star={list(star)} "
+                  f"bar={list(bar)} r0={list(r0)} e0={e0}")
 
 def run_exhaustive(ncells, S, stats):
     star = [c ^ 1 for c in range(ncells)]
@@ -117,7 +127,8 @@ def main():
     run_random(8, 14, 30000, stats, seed=7)
     print("[random done]")
     print(f"active cycles: {stats['active']}   "
-          f"with consecutive same-cell writes: {stats['consec']}")
+          f"with consecutive same-cell writes: {stats['consec']}   "
+          f"with writes across >2 cells: {stats.get('many', 0)}")
     print("writes-per-period histogram:",
           dict(sorted(stats['wlens'].items())))
 

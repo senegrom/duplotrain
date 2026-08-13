@@ -74,9 +74,9 @@ class CollisionField:
     clearance: float = DEFAULT_CLEARANCE
     cell: float = 96.0
     _clouds: list[_Cloud] = field(default_factory=list)
-    _grid: dict[tuple[int, int], list[tuple[float, float, float, float, int]]] = field(
-        default_factory=dict
-    )
+    _grid: dict[
+        tuple[int, int], list[tuple[float, float, float, float, int, bool]]
+    ] = field(default_factory=dict)
     _max_half_width: float = 0.0
 
     def clashes(

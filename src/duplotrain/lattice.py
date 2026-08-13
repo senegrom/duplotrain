@@ -83,6 +83,14 @@ class LatticePoint:
     def key(self) -> tuple[int, int, int, int]:
         return (self.a, self.b, self.c, self.d)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, LatticePoint):
+            return NotImplemented
+        return self.key() == other.key()
+
+    def __hash__(self) -> int:
+        return hash(self.key())
+
     def xy(self) -> tuple[float, float]:
         """Floating-point millimetres."""
         x = self.a + (self.b * _SQRT3 + self.c) / 2.0
@@ -117,8 +125,13 @@ class LatticePose:
     def key(self) -> tuple:
         return (*self.p.key(), self.z, self.heading)
 
-    def position_key(self) -> tuple:
-        return (*self.p.key(), self.z)
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, LatticePose):
+            return NotImplemented
+        return self.key() == other.key()
+
+    def __hash__(self) -> int:
+        return hash(self.key())
 
     def distance_to(self, other: "LatticePose") -> float:
         ax, ay = self.p.xy()

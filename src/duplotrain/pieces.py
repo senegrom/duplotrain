@@ -439,6 +439,13 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
             f"piece {piece_id!r} collapsed to {len(ports)} port(s); its paths must have "
             "distinct endpoints"
         )
+    sealed = frozenset(int(i) for i in spec.get("sealed_ports", ()))
+    bad_sealed = sorted(i for i in sealed if not 0 <= i < len(ports))
+    if bad_sealed:
+        raise ValueError(
+            f"piece {piece_id!r} seals nonexistent port(s) {bad_sealed}; "
+            f"it has ports 0..{len(ports) - 1}"
+        )
 
     return PieceType(
         id=spec["id"],
@@ -449,7 +456,7 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         routes=routes,
         width=float(spec.get("width", 40.0)),
         end_overhang=float(spec.get("end_overhang", 0.0)),
-        sealed=frozenset(int(i) for i in spec.get("sealed_ports", ())),
+        sealed=sealed,
         underpass=bool(spec.get("underpass", False)),
         part_numbers=tuple(spec.get("part_numbers", ())),
         notes=spec.get("notes", ""),

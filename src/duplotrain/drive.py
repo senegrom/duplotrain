@@ -26,7 +26,7 @@ provably periodic.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Iterable, Mapping
 
 from .layout import End, Layout
@@ -374,9 +374,9 @@ def classify(layout: Layout) -> LoopClassification:
 
     return LoopClassification(
         locally_looping=locally,
-        looping=looping,
-        completely_looping=looping and completely,
-        perfectly_looping=looping and completely and perfectly,
+        looping=locally and looping,
+        completely_looping=locally and looping and completely,
+        perfectly_looping=locally and looping and completely and perfectly,
         runs=runs,
         witness=witness,
         counterexample=counterexample,

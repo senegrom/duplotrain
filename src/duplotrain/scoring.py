@@ -31,7 +31,7 @@ weight can be overridden.  The components:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Mapping
 
 from .solver import Solution

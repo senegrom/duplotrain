@@ -14,7 +14,6 @@ to the min(2^N, N+4) conjecture.
 
 import sys
 import random
-from itertools import combinations
 
 
 def arrive(t, p):
@@ -61,8 +60,10 @@ def max_states(edges, n, tongue_subset=None):
         edge_of[b] = a
     tongues = range(1 << n) if tongue_subset is None else tongue_subset
     best = 0
-    ports = set(edge_of)
-    for p in ports:
+    # Arrival starts range over ALL 3n ports: in the matchings-with-caps
+    # model every port exists, and a run may begin by arriving into a
+    # capped branch (mirrors maxStates' port-entry layer in Lean).
+    for p in range(3 * n):
         for t in tongues:
             vecs = run_vectors(edge_of, n, p, t, {t})
             if vecs > best:
