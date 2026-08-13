@@ -3,7 +3,7 @@ import RunwayHistoricalOne
 import StateLawCoefficientOneTop
 import RepeatedNoveltyDecomposition
 import ReuseForcesReplayClosure
-import GlobalSerialContinuation
+import PointwiseRetraceSeparation
 
 /-!
 # The changed-contact `N+4` frontier

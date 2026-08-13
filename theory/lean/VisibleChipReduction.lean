@@ -2,7 +2,7 @@ import StationaryTail
 import TreeReplay
 import RestorationFrames
 import OneReserveFromNoTail
-import PairedRouterRoundtrip
+import ExternalLobeReflectionCore
 
 /-!
 # Reduction of the visible recurrent branch

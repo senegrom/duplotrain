@@ -3,7 +3,7 @@ import KnownEdgeNAddFourChangedClosed
 import BoundaryAbsentSecondWriter
 import RepeatedNoveltyDecomposition
 import TrackNovelReplay
-import GlobalSerialContinuation
+import PointwiseRetraceSeparation
 import ReuseForcesReplayClosure
 
 /-!

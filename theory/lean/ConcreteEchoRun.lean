@@ -1,5 +1,6 @@
 import ConcreteEchoStep
-import EchoConfiguration
+import EchoMachine
+import OverwriteDynamics
 
 /-!
 # From the physical last-writer register to an echo run

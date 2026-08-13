@@ -1068,13 +1068,20 @@ def solve(
             stats.pruned_turn += 1
             return True
         # IDA* contour (completion mode): at least this many more pieces are needed.
+        # Transits through open stubs advance the walk without costing a piece, so
+        # the admissible estimate must discount what the stubs could contribute
+        # (mirroring the plain reach/turn prunes above).
         slack_left = max(0.0, cfg.slop - slack_used)
-        h_dist = int((max(0.0, home - slack_left) + max_span_any - 1e-6) // max_span_any)
-        if need > 0:
+        h_dist = int(
+            (max(0.0, home - slack_left - stub_reach) + max_span_any - 1e-6)
+            // max_span_any
+        )
+        need_beyond_stubs = max(0, need - stub_turns)
+        if need_beyond_stubs > 0:
             if max_turn_any == 0:
                 stats.pruned_turn += 1
                 return True
-            h_turn = -(-need // max_turn_any)
+            h_turn = -(-need_beyond_stubs // max_turn_any)
         else:
             h_turn = 0
         if used + max(h_dist, h_turn) > f_limit:

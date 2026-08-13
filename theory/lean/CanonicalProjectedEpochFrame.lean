@@ -1,5 +1,6 @@
 import CanonicalActiveLobeFrame
-import SupportRelativeEpochStrictBound
+import SupportRelativePointwiseReplay
+import PersistentLobeSeparationStandalone
 
 /-!
 # Canonical projected cells and edges

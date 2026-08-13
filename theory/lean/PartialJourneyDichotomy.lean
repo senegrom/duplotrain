@@ -1,6 +1,5 @@
 import PartialSecondRunSharp
-import TraceRetainingFirstRevisit
-import TraceRetainingBABASecondRepeat
+import StableSimpleCycleRecord
 import PointwiseSimpleCycleTail
 
 /-!

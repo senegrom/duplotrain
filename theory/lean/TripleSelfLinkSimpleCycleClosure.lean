@@ -1,4 +1,4 @@
-import TripleSelfLinkNoTailClosure
+import TripleSelfLinkRawTail
 
 /-!
 # Retaining and closing the simple-cycle self-link branch

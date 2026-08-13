@@ -1,5 +1,8 @@
 import MellitNoncompatibleSecondRepeat
-import MinimalBABASecondRepeat
+import BABAInterlacementTail
+import TrackLobe
+import SharpCertificateClosure
+import ManufacturedPairTailNovelty
 
 /-!
 # Assembly of the early Mellit second-repeat branch

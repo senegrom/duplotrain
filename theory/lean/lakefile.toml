@@ -50,7 +50,6 @@ defaultTargets = [
   "DescentSimplicity",
   "DuplotrainProofs",
   "EarlyFacingConstant",
-  "EchoConfiguration",
   "EchoMachine",
   "EdgeReversal",
   "EndpointAccountingStandalone",
@@ -64,13 +63,11 @@ defaultTargets = [
   "FirstCycleCount",
   "FirstCycleCountSharp",
   "FirstReflectorNovelty",
-  "FirstWriterRetraceFree",
   "FiveFrameObstruction",
   "ForeignSpliceNovelty",
   "FullReachPersistencePaired",
   "FullyLobedComponentTrap",
   "GeneralN",
-  "GlobalSerialContinuation",
   "HiddenAbsorb",
   "HiddenDichotomy",
   "HiddenFibre",
@@ -101,8 +98,6 @@ defaultTargets = [
   "MellitNoncompatibleSecondRepeat",
   "MellitSharpTail",
   "MellitSupportInteraction",
-  "MinimalBABADogbone",
-  "MinimalBABASecondRepeat",
   "MonotoneSupport",
   "NestedRestorationCharge",
   "NestedRestorationElimination",
@@ -115,7 +110,6 @@ defaultTargets = [
   "OneReserveFromNoTail",
   "OverlappingFiveWindowReduction",
   "OverwriteDynamics",
-  "OverwriteLasso",
   "PairActionCorners",
   "PairTongueCountAbsoluteFour",
   "PairTongueCountFour",
@@ -123,12 +117,12 @@ defaultTargets = [
   "PairedNoFullReachFreeze",
   "PairedPointwiseReplayCore",
   "PairedReachReplay",
-  "PairedRouterRoundtrip",
   "PartialJourneyDichotomy",
   "PartialSecondRunNAddFour",
   "PartialSecondRunSharp",
   "Periodicity",
   "PersistentLobeSeparationStandalone",
+  "PointwiseRetraceSeparation",
   "PointwiseSimpleCycleTail",
   "ProductiveBoundaryNAddFour",
   "ProductiveBoundaryNAddFourComplete",
@@ -157,6 +151,7 @@ defaultTargets = [
   "SixEventReduction",
   "SixEventSharpClosure",
   "SlotBound",
+  "StableSimpleCycleRecord",
   "StarIndependent",
   "StarPairCountingCore",
   "StateLaw",
@@ -175,14 +170,12 @@ defaultTargets = [
   "SteeringLaw",
   "SupportBound",
   "SupportMove",
-  "SupportRelativeEpochStrictBound",
   "SupportRelativeNoLobe",
   "SupportRelativePointwiseReplay",
   "SupportSize",
   "SupportWeightFibres",
   "ThirdWriterTail",
   "ThreeQuarterArithmetic",
-  "TraceRetainingBABASecondRepeat",
   "TraceRetainingFirstRevisit",
   "TrackCurveGrowth",
   "TrackCurveShrinkGlobal",
@@ -205,23 +198,15 @@ defaultTargets = [
   "TrackStaySpliceSharp",
   "TrackTheta",
   "TrackThetaAllTime",
-  "TrackThetaCaptureTighter",
   "TrackThetaPointwiseCore",
-  "TrackThetaTighter",
   "TrackTrace",
   "TreeReplay",
   "TripleFramePhysicalClosure",
   "TripleInterlacementObstruction",
-  "TripleSelfLinkCycleClosure",
-  "TripleSelfLinkFinalAssembly",
-  "TripleSelfLinkFirstLap",
-  "TripleSelfLinkNoTailClosure",
   "TripleSelfLinkPlacement",
   "TripleSelfLinkRawTail",
   "TripleSelfLinkReplay",
-  "TripleSelfLinkSelectedClosure",
   "TripleSelfLinkSimpleCycleClosure",
-  "TripleSelfLinkSimpleCycleTail",
   "TwoHistoryUnionCharge",
   "TwoJourneyBoundaryTailCount",
   "TwoJourneyTailCountSharp",
@@ -383,9 +368,6 @@ name = "DuplotrainProofs"
 name = "EarlyFacingConstant"
 
 [[lean_lib]]
-name = "EchoConfiguration"
-
-[[lean_lib]]
 name = "EchoMachine"
 
 [[lean_lib]]
@@ -425,9 +407,6 @@ name = "FirstCycleCountSharp"
 name = "FirstReflectorNovelty"
 
 [[lean_lib]]
-name = "FirstWriterRetraceFree"
-
-[[lean_lib]]
 name = "FiveFrameObstruction"
 
 [[lean_lib]]
@@ -441,9 +420,6 @@ name = "FullyLobedComponentTrap"
 
 [[lean_lib]]
 name = "GeneralN"
-
-[[lean_lib]]
-name = "GlobalSerialContinuation"
 
 [[lean_lib]]
 name = "HiddenAbsorb"
@@ -536,12 +512,6 @@ name = "MellitSharpTail"
 name = "MellitSupportInteraction"
 
 [[lean_lib]]
-name = "MinimalBABADogbone"
-
-[[lean_lib]]
-name = "MinimalBABASecondRepeat"
-
-[[lean_lib]]
 name = "MonotoneSupport"
 
 [[lean_lib]]
@@ -578,9 +548,6 @@ name = "OverlappingFiveWindowReduction"
 name = "OverwriteDynamics"
 
 [[lean_lib]]
-name = "OverwriteLasso"
-
-[[lean_lib]]
 name = "PairActionCorners"
 
 [[lean_lib]]
@@ -602,9 +569,6 @@ name = "PairedPointwiseReplayCore"
 name = "PairedReachReplay"
 
 [[lean_lib]]
-name = "PairedRouterRoundtrip"
-
-[[lean_lib]]
 name = "PartialJourneyDichotomy"
 
 [[lean_lib]]
@@ -618,6 +582,9 @@ name = "Periodicity"
 
 [[lean_lib]]
 name = "PersistentLobeSeparationStandalone"
+
+[[lean_lib]]
+name = "PointwiseRetraceSeparation"
 
 [[lean_lib]]
 name = "PointwiseSimpleCycleTail"
@@ -704,6 +671,9 @@ name = "SixEventSharpClosure"
 name = "SlotBound"
 
 [[lean_lib]]
+name = "StableSimpleCycleRecord"
+
+[[lean_lib]]
 name = "StarIndependent"
 
 [[lean_lib]]
@@ -758,9 +728,6 @@ name = "SupportBound"
 name = "SupportMove"
 
 [[lean_lib]]
-name = "SupportRelativeEpochStrictBound"
-
-[[lean_lib]]
 name = "SupportRelativeNoLobe"
 
 [[lean_lib]]
@@ -777,9 +744,6 @@ name = "ThirdWriterTail"
 
 [[lean_lib]]
 name = "ThreeQuarterArithmetic"
-
-[[lean_lib]]
-name = "TraceRetainingBABASecondRepeat"
 
 [[lean_lib]]
 name = "TraceRetainingFirstRevisit"
@@ -848,13 +812,7 @@ name = "TrackTheta"
 name = "TrackThetaAllTime"
 
 [[lean_lib]]
-name = "TrackThetaCaptureTighter"
-
-[[lean_lib]]
 name = "TrackThetaPointwiseCore"
-
-[[lean_lib]]
-name = "TrackThetaTighter"
 
 [[lean_lib]]
 name = "TrackTrace"
@@ -869,18 +827,6 @@ name = "TripleFramePhysicalClosure"
 name = "TripleInterlacementObstruction"
 
 [[lean_lib]]
-name = "TripleSelfLinkCycleClosure"
-
-[[lean_lib]]
-name = "TripleSelfLinkFinalAssembly"
-
-[[lean_lib]]
-name = "TripleSelfLinkFirstLap"
-
-[[lean_lib]]
-name = "TripleSelfLinkNoTailClosure"
-
-[[lean_lib]]
 name = "TripleSelfLinkPlacement"
 
 [[lean_lib]]
@@ -890,13 +836,7 @@ name = "TripleSelfLinkRawTail"
 name = "TripleSelfLinkReplay"
 
 [[lean_lib]]
-name = "TripleSelfLinkSelectedClosure"
-
-[[lean_lib]]
 name = "TripleSelfLinkSimpleCycleClosure"
-
-[[lean_lib]]
-name = "TripleSelfLinkSimpleCycleTail"
 
 [[lean_lib]]
 name = "TwoHistoryUnionCharge"
