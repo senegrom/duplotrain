@@ -890,24 +890,4 @@ theorem known_edge_all_run_distinct_le_two_add_seven
   omega
 
 
-/-- Unconditional raw general-N 2*N+8 state bound.
-
-The known-edge run costs 2*N+7; an arbitrary start contributes at most
-its time-zero vector. This does not prove the open N+6 state law. -/
-theorem state_law_linear_two_add_eight_sharp
-    (w : Wiring) (N : Nat)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ 2 * N + 8 := by
-  apply arbitrary_start_distinct_le_succ_of_all_known_edge
-    (cap := 2 * N + 7)
-  · intro e localStart hentry localTimes hlocalLive hlocalNodup
-    exact known_edge_all_run_distinct_le_two_add_seven
-      hN hentry localTimes hlocalLive hlocalNodup
-  · exact hlive
-  · exact hnd
-
 end GeneralN

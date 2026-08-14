@@ -39,31 +39,6 @@ theorem hidden_different_empties_old
   intro hpres
   exact hdiff (parallel_preserved_sameEdge m e r0 hrun hr0 k hp hpar hpres)
 
-/-- If the complete cell projection stalls, a productive move is either a lobe
-flip or deletes its old support edge. -/
-theorem hidden_lobe_or_support_drop
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (k : Nat) (hp : ProductiveStep m e r0 k)
-    (hstall : ∀ c, nextCell m e r0 (k+1) c = nextCell m e r0 k c) :
-    (e (k+1) = m.bar (oldSlot m e r0 k) ∧
-      m.cellOf (m.bar (e (k+1))) = m.cellOf (e (k+1)) ∧
-      m.cellOf (e (k+1)) = m.star (m.cellOf (e k))) ∨
-    ¬ Occupied m e r0 (k+1) (oldSlot m e r0 k) := by
-  have hpar := (cell_projection_stall_iff_parallel m e r0 hrun hr0 k).mp hstall
-  by_cases hs : SameEdge m (oldSlot m e r0 k) (e (k+1))
-  · have hnew := productive_sameEdge_bar m e r0 hp hs
-    have hback : m.bar (e (k+1)) = oldSlot m e r0 k := by
-      rw [hnew, m.bar_invol]
-    have hlobe : m.cellOf (m.bar (e (k+1))) = m.cellOf (e (k+1)) := by
-      rw [hback]
-      exact old_new_cell m e r0 hr0 k
-    have hpartner : m.cellOf (e (k+1)) = m.star (m.cellOf (e k)) := by
-      calc
-        m.cellOf (e (k+1)) = m.cellOf (m.bar (e (k+1))) := hlobe.symm
-        _ = m.star (m.cellOf (e k)) := new_far_cell m e r0 hrun hr0 k
-    exact Or.inl ⟨hnew, hlobe, hpartner⟩
-  · exact Or.inr
-      (hidden_different_empties_old m e r0 hrun hr0 k hp hpar hs)
 
 def SupportFixedStep (k : Nat) : Prop :=
   ∀ s, Occupied m e r0 (k+1) s ↔ Occupied m e r0 k s

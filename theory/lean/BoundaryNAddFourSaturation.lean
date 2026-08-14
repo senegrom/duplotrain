@@ -1,6 +1,4 @@
 import StateLawNAddFourTop
-import ProductiveBoundarySupportContact
-import ProtectedPairNAddFour
 import BoundaryDoubleDuplicate
 
 /-!

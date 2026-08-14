@@ -1122,40 +1122,4 @@ theorem productive_initial_boundary_N_add_four_or_support_contact_closed
     exact D.all_run_distinct_le_N_add_four
       hN A original hbase hA hB hpre hlead hleadSimple
         hentry times hliveA hndA
-/-- Reusable name for the now-unconditional present-second-writer closure. -/
-theorem productive_initial_boundary_N_add_four_of_present_writer
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hentry : w.link e = some g)
-    (hstem : e = 3 * k0)
-    (hk0 : k0 < N)
-    (original base : Tongues)
-    (hbaseFlip : base = flipAt original k0)
-    (A : ManufacturedReflector w g e)
-    (hAbase : A.baseState = base)
-    (B : ManufacturedReflector w e g)
-    (hbase : B.baseState = A.activatedState)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    (hB : PathGrooves B.toSupported.paths B.activatedState)
-    (hpre : PathGrooves A.toSupported.paths B.preReturn.2)
-    (hpresent : k0 ∈ B.constructionFirstWriterSwitches N)
-    (lead : List Passage)
-    (hlead : PhysicalTrace w (g, B.baseState) lead
-      (e, B.baseState))
-    (hleadSimple : SwitchSimple lead)
-    (times : List Nat)
-    (hlive : ∀ k, k ∈ times →
-      (stepN w k (g, base)).isSome)
-    (hnd : (VectorCount.restrict N original ::
-      times.map
-        (restrictedTonguesAt w N (g, base))).Nodup) :
-    times.length + 1 ≤ N + 4 :=
-  productive_initial_boundary_N_add_four_or_support_contact_closed
-    hN hentry hstem hk0 original base hbaseFlip A hAbase B
-      hbase hA hB hpre hpresent lead hlead hleadSimple
-        times hlive hnd
-
-
-
 end GeneralN

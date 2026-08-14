@@ -140,14 +140,4 @@ theorem encodeSlot_injective : Function.Injective encodeSlot := by
   intro p q h
   unfold encodeSlot at h
   omega
-
-theorem encoded_descent_entry_list_length_le_two_mul
-    {w : Wiring} {N : Nat} {slots : List Nat}
-    (hN : ∀ a b, w.link a = some b →
-      a < 3 * N ∧ b < 3 * N)
-    (hnd : slots.Nodup)
-    (hentries : ∀ p ∈ slots, IsDescentEntry w p) :
-    (slots.map encodeSlot).length ≤ 2 * N := by
-  simpa using descent_entry_list_length_le_two_mul hN hnd hentries
-
 end GeneralN

@@ -83,45 +83,6 @@ def ProductiveSlotReplay (cells : List Nat) : Prop :=
     e (i+1) = e (j+1) →
     snap m e r0 cells (i+1) = snap m e r0 cells (j+1)
 
-private theorem slotCode_eq_snap_eq (cells : List Nat)
-    (hreplay : ProductiveSlotReplay m e r0 cells)
-    {k1 k2 : Nat} (hc : slotCode m e r0 k1 = slotCode m e r0 k2) :
-    snap m e r0 cells k1 = snap m e r0 cells k2 := by
-  rcases slotCode_spec m e r0 cells k1 with ⟨c1, s1⟩ |
-      ⟨j1, _, hp1, c1, s1⟩
-  · rcases slotCode_spec m e r0 cells k2 with ⟨c2, s2⟩ |
-        ⟨j2, _, hp2, c2, s2⟩
-    · rw [s1, s2]
-    · rw [c1, c2] at hc
-      omega
-  · rcases slotCode_spec m e r0 cells k2 with ⟨c2, s2⟩ |
-        ⟨j2, _, hp2, c2, s2⟩
-    · rw [c1, c2] at hc
-      omega
-    · have he : e (j1+1) = e (j2+1) := by
-        rw [c1, c2] at hc
-        omega
-      rw [s1, s2]
-      exact hreplay j1 j2 hp1 hp2 he
-
-private theorem nodup_transfer_slot
-    {f : Nat → List Nat} {g : Nat → Nat} {l : List Nat}
-    (hinj : ∀ x, x ∈ l → ∀ y, y ∈ l → g x = g y → f x = f y)
-    (hnd : (l.map f).Nodup) : (l.map g).Nodup := by
-  induction l with
-  | nil => simp
-  | cons x t ih =>
-      simp only [List.map_cons, List.nodup_cons] at hnd ⊢
-      constructor
-      · intro hm
-        obtain ⟨y, hy, hgy⟩ := List.mem_map.mp hm
-        have hfy := hinj x List.mem_cons_self y
-          (List.mem_cons_of_mem _ hy) hgy.symm
-        exact hnd.1 (List.mem_map.mpr ⟨y, hy, hfy.symm⟩)
-      · exact ih
-          (fun a ha b hb => hinj a (List.mem_cons_of_mem _ ha)
-            b (List.mem_cons_of_mem _ hb)) hnd.2
-
 private theorem nodup_subset_length_nat {l S : List Nat}
     (hnd : l.Nodup) (hsub : ∀ x ∈ l, x ∈ S) : l.length ≤ S.length := by
   induction l generalizing S with

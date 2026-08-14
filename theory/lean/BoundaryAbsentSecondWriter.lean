@@ -1,4 +1,3 @@
-import StateLawTwoSixUltra
 import TwoHistoryUnionCharge
 
 /-!

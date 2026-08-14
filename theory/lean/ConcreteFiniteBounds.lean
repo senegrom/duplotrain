@@ -231,13 +231,4 @@ theorem bounded_cell_list_length_le
 def IsDescentRoot (w : Wiring) (c : Nat) : Prop :=
   ∃ t p ps s t', Descent w t p ps s t' ∧ descentRoot p ps = c
 
-/-- Realised cascade roots in a bounded wiring are below `N`. -/
-theorem isDescentRoot_bounded
-    {w : Wiring} {N c : Nat}
-    (hN : ∀ a b, w.link a = some b →
-      a < 3 * N ∧ b < 3 * N)
-    (hc : IsDescentRoot w c) : c < N := by
-  rcases hc with ⟨t, p, ps, s, t', h, rfl⟩
-  exact descent_root_bounded hN h
-
 end GeneralN

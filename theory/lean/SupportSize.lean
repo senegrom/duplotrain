@@ -1,4 +1,5 @@
 import ThreeQuarterArithmetic
+import SupportMove
 
 /-!
 # Occupied support has at most as many edges as cells
@@ -57,40 +58,6 @@ theorem sameEdge_trans {a b c : Nat}
   · subst b
     rw [m.bar_invol] at hbc
     exact Or.inl hbc
-
-private theorem nodup_map_selected
-    (edges : List Nat) (k : Nat)
-    (hreps : EdgeRepresentatives m edges)
-    (hocc : ∀ s ∈ edges, Occupied m e r0 k s) :
-    (edges.map (fun s => m.cellOf (chosenEndpoint m e r0 k s))).Nodup := by
-  induction edges with
-  | nil => simp
-  | cons s rest ih =>
-      have hnd := List.nodup_cons.mp hreps.1
-      simp only [List.map_cons, List.nodup_cons]
-      constructor
-      · intro hmem
-        obtain ⟨t, ht, hcell⟩ := List.mem_map.mp hmem
-        have hsconf := chosenEndpoint_confirmed m e r0
-          (hocc s List.mem_cons_self)
-        have htconf := chosenEndpoint_confirmed m e r0
-          (hocc t (List.mem_cons_of_mem _ ht))
-        have hchosen : chosenEndpoint m e r0 k s =
-            chosenEndpoint m e r0 k t :=
-          confirmed_same_cell_eq m e r0 hsconf htconf hcell.symm
-        have hst : SameEdge m s t := by
-          apply sameEdge_trans m (chosenEndpoint_sameEdge m e r0 k s)
-          rw [hchosen]
-          exact sameEdge_symm m (chosenEndpoint_sameEdge m e r0 k t)
-        have heq : s = t :=
-          hreps.2 s List.mem_cons_self t (List.mem_cons_of_mem _ ht) hst
-        exact hnd.1 (heq ▸ ht)
-      · apply ih
-        · exact ⟨hnd.2, fun a ha b hb =>
-            hreps.2 a (List.mem_cons_of_mem _ ha)
-              b (List.mem_cons_of_mem _ hb)⟩
-        · intro a ha
-          exact hocc a (List.mem_cons_of_mem _ ha)
 
 private theorem nodup_subset_length_nat {l S : List Nat}
     (hnd : l.Nodup) (hsub : ∀ x ∈ l, x ∈ S) : l.length ≤ S.length := by

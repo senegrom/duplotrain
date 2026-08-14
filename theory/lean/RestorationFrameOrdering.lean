@@ -437,17 +437,6 @@ theorem foreignRestorationFrame_periodic
       fun h => hopen ((sameEdgeWrite_periodic m e r0 hper ht).mp h),
       fun h => hclose ((sameEdgeWrite_periodic m e r0 hper hut).mp h)⟩
 
-/-- The overlap measure is unchanged by changing the lift by one period. -/
-theorem crossingOverlap_periodic
-    (p t0 u0 t1 u1 : Nat) :
-    crossingOverlap (t0+p) (u0+p) (t1+p) (u1+p) =
-      crossingOverlap t0 u0 t1 u1 := by
-  unfold crossingOverlap
-  omega
-
-/-- Period-sized foreign crossings are invariant under a simultaneous shift
-of all four endpoints.  This is the formal modulo-`p` justification for using
-canonical lifts in cyclic overlap minimality. -/
 theorem periodLiftedForeignRestorationCrossing_periodic
     {K p t0 u0 t1 u1 : Nat}
     (hper : RestorationPeriodicTail m e r0 K p)
@@ -559,25 +548,6 @@ decreasing_by
   have hp := hper.positive
   omega
 
-/-- Any period-sized foreign crossing on the recurrent tail therefore yields
-a canonical cyclic-overlap-minimal crossing. -/
-theorem periodLifted_crossing_has_cyclic_minimal
-    {K p t0 u0 t1 u1 : Nat}
-    (hper : RestorationPeriodicTail m e r0 K p)
-    (hKt0 : K <= t0)
-    (hlift : PeriodLiftedForeignRestorationCrossing
-      m e r0 p t0 u0 t1 u1) :
-    exists a0 b0 a1 b1,
-      CyclicOverlapMinimalForeignRestorationCrossing
-        m e r0 K p a0 b0 a1 b1 := by
-  obtain ⟨a0, b0, a1, b1, hnorm, _hover⟩ :=
-    periodLifted_crossing_has_normalized_lift m e r0 hper hKt0 hlift
-  exact exists_cyclic_overlap_minimal m e r0
-    ⟨a0, b0, a1, b1, hnorm⟩
-
-/-- If a foreign exit frame can be shifted back inside the recurrent tail,
-minimality forces the shifted frame to avoid both original crossing windows.
-If it cannot, the blocker lies in the first tail period. -/
 theorem exit_frame_shift_reduction
     {K p t0 u0 t1 u1 b r : Nat}
     (hper : RestorationPeriodicTail m e r0 K p)
@@ -596,63 +566,6 @@ theorem exit_frame_shift_reduction
     · omega
     · exact foreign_frame_avoids_original_crossing_windows m e r0 hmin hshift
 
-/-- **Blocker-order reduction.**  This theorem states all hypotheses used by
-the remaining obstruction in track language: an inclusion-minimal foreign
-crossing, a stable blocker between the second opening and first closing, an
-exact periodic tail, and a failed read still inside `u1`.
-
-Its conclusion is exhaustive.  A first restoration occurs before one period;
-it cannot precede the failed read; and it is either same-edge at one endpoint,
-nested by `u0`, or exits beyond `u1`.  In the exit case, a legal one-period
-back-shift exists unless the blocker lies in the first tail period, and every
-such shifted frame is constrained by the two explicit non-crossing formulas
-in `AvoidsOriginalCrossingWindows`. -/
-theorem minimal_crossing_stable_blocker_order
-    (hr0 : forall c, m.cellOf (r0 c) = c)
-    {K p t0 u0 t1 u1 b j : Nat}
-    (hper : RestorationPeriodicTail m e r0 K p)
-    (hmin : MinimalForeignRestorationCrossing m e r0 t0 u0 t1 u1)
-    (hKb : K <= b)
-    (ht1b : t1 < b) (hbu0 : b < u0)
-    (hstable : StableBlockerUntil m e r0 b j)
-    (hju1 : j <= u1) :
-    exists r,
-      b < r ∧ r < b+p ∧
-      FirstRestorationFrame m e r0 b r ∧
-      j <= r ∧
-      MiddleBlockerResidual m e r0 K p t0 u0 t1 u1 b j r := by
-  obtain ⟨r, hbr, hrperiod, hfirst⟩ :=
-    productive_has_first_restoration_before_period m e r0 hr0
-      hper.positive hKb hper.register hstable.productive
-  have hjr := stable_blocker_restoration_after_read m e r0 hstable hfirst.1
-  refine ⟨r, hbr, hrperiod, hfirst, hjr, ?_⟩
-  by_cases hopen : SameEdgeWrite m e r0 b
-  · exact Or.inl hopen
-  · by_cases hclose : SameEdgeWrite m e r0 r
-    · exact Or.inr (Or.inl hclose)
-    · have hforeign : ForeignRestorationFrame m e r0 b r :=
-        ⟨hfirst, hopen, hclose⟩
-      by_cases hnested : r <= u0
-      · exact Or.inr (Or.inr (Or.inl hnested))
-      · have hexit : u1 <= r := by
-          by_cases hru1 : r < u1
-          · exfalso
-            have ht0b : t0 < b := by
-              rcases hmin.1.2.2 with ⟨ht0t1, _ht1u0, _hu0u1⟩
-              omega
-            exact minimal_crossing_excludes_first_window m e r0 hmin hforeign
-              ht0b hbu0 (by omega) hru1
-          · omega
-        exact Or.inr (Or.inr (Or.inr
-          ⟨hju1, hexit,
-            exit_frame_shift_reduction m e r0 hper hmin
-              hforeign hrperiod⟩))
-
-/-- **Cyclic blocker-order theorem.**  Replacing linear hull minimality by
-period-normalized overlap minimality removes the exit branch completely.
-Every stable middle blocker has a first restoration before one period; that
-restoration is no earlier than the failed read, and it is either same-edge at
-one endpoint or nested by `u0`. -/
 theorem cyclic_minimal_stable_blocker_order
     (hr0 : forall c, m.cellOf (r0 c) = c)
     {K p t0 u0 t1 u1 b j : Nat}
@@ -684,67 +597,6 @@ theorem cyclic_minimal_stable_blocker_order
         (cyclic_minimal_middle_foreign_restoration_nested
           m e r0 hmin hforeign ht1b hbu0 hrperiod))
 
-/-- Structural form of the cyclic blocker-order theorem: the same-edge
-alternatives are genuine lobe-reflector flips. -/
-theorem cyclic_minimal_stable_blocker_lobe_or_nested
-    (hr0 : forall c, m.cellOf (r0 c) = c)
-    {K p t0 u0 t1 u1 b j : Nat}
-    (hper : RestorationPeriodicTail m e r0 K p)
-    (hmin : CyclicOverlapMinimalForeignRestorationCrossing
-      m e r0 K p t0 u0 t1 u1)
-    (hKb : K <= b)
-    (ht1b : t1 < b) (hbu0 : b < u0)
-    (hstable : StableBlockerUntil m e r0 b j) :
-    exists r,
-      b < r ∧ r < b+p ∧
-      FirstRestorationFrame m e r0 b r ∧
-      j <= r ∧
-      (ExactLobeWrite m e r0 b ∨
-       ExactLobeWrite m e r0 r ∨
-       r <= u0) := by
-  obtain ⟨r, hbr, hrperiod, hfirst, hjr, hout⟩ :=
-    cyclic_minimal_stable_blocker_order m e r0 hr0 hper hmin hKb
-      ht1b hbu0 hstable
-  refine ⟨r, hbr, hrperiod, hfirst, hjr, ?_⟩
-  rcases hout with hopen | hclose | hnested
-  · exact Or.inl
-      (productive_sameEdgeWrite_exact_lobe
-        m e r0 hr0 hstable.productive hopen)
-  · exact Or.inr (Or.inl
-      (productive_sameEdgeWrite_exact_lobe
-        m e r0 hr0 hfirst.1.2.2.1 hclose))
-  · exact Or.inr (Or.inr hnested)
-
-/-- If the failed read is strictly after the first closing time, cyclic
-minimality rules out a foreign blocker restoration altogether.  One endpoint
-of the first restoration must already be same-edge. -/
-theorem cyclic_minimal_blocker_after_close_same_edge
-    (hr0 : forall c, m.cellOf (r0 c) = c)
-    {K p t0 u0 t1 u1 b j : Nat}
-    (hper : RestorationPeriodicTail m e r0 K p)
-    (hmin : CyclicOverlapMinimalForeignRestorationCrossing
-      m e r0 K p t0 u0 t1 u1)
-    (hKb : K <= b)
-    (ht1b : t1 < b) (hbu0 : b < u0)
-    (hstable : StableBlockerUntil m e r0 b j)
-    (hu0j : u0 < j) :
-    exists r,
-      b < r ∧ r < b+p ∧
-      FirstRestorationFrame m e r0 b r ∧
-      (SameEdgeWrite m e r0 b ∨ SameEdgeWrite m e r0 r) := by
-  obtain ⟨r, hbr, hrperiod, hfirst, hjr, hout⟩ :=
-    cyclic_minimal_stable_blocker_order m e r0 hr0 hper hmin hKb
-      ht1b hbu0 hstable
-  refine ⟨r, hbr, hrperiod, hfirst, ?_⟩
-  rcases hout with hopen | hclose | hnested
-  · exact Or.inl hopen
-  · exact Or.inr hclose
-  · exfalso
-    omega
-
-/-- The only foreign boundary case left when the failed read is at or after
-`u0` is exact shared closure at `u0`.  Both the written cell and the evicted
-slot then agree with those of the first original frame. -/
 theorem cyclic_minimal_foreign_blocker_shared_close
     {K p t0 u0 t1 u1 b j r : Nat}
     (hmin : CyclicOverlapMinimalForeignRestorationCrossing
@@ -821,38 +673,5 @@ theorem cyclic_minimal_foreign_blocker_at_or_after_close_impossible
     m e r0 hr0 hframe0.1 (by omega) hbu0
   · exact hwriter
   · exact hold
-
-/-- **Closed blocker-order implication.**  If the failed read is at or after
-the first closing time, cyclic overlap descent eliminates every foreign
-restoration.  The first blocker restoration must contain an exact lobe flip
-at its opening or closing endpoint. -/
-theorem cyclic_minimal_blocker_at_or_after_close_lobe
-    (hr0 : forall c, m.cellOf (r0 c) = c)
-    {K p t0 u0 t1 u1 b j : Nat}
-    (hper : RestorationPeriodicTail m e r0 K p)
-    (hmin : CyclicOverlapMinimalForeignRestorationCrossing
-      m e r0 K p t0 u0 t1 u1)
-    (hKb : K <= b)
-    (ht1b : t1 < b) (hbu0 : b < u0)
-    (hstable : StableBlockerUntil m e r0 b j)
-    (hu0j : u0 <= j) :
-    exists r,
-      b < r ∧ r < b+p ∧
-      FirstRestorationFrame m e r0 b r ∧
-      (ExactLobeWrite m e r0 b ∨ ExactLobeWrite m e r0 r) := by
-  obtain ⟨r, hbr, hrperiod, hfirst⟩ :=
-    productive_has_first_restoration_before_period m e r0 hr0
-      hper.positive hKb hper.register hstable.productive
-  refine ⟨r, hbr, hrperiod, hfirst, ?_⟩
-  by_cases hopen : SameEdgeWrite m e r0 b
-  · exact Or.inl (productive_sameEdgeWrite_exact_lobe
-      m e r0 hr0 hstable.productive hopen)
-  · by_cases hclose : SameEdgeWrite m e r0 r
-    · exact Or.inr (productive_sameEdgeWrite_exact_lobe
-        m e r0 hr0 hfirst.1.2.2.1 hclose)
-    · have hforeign : ForeignRestorationFrame m e r0 b r :=
-        ⟨hfirst, hopen, hclose⟩
-      exact (cyclic_minimal_foreign_blocker_at_or_after_close_impossible
-        m e r0 hr0 hmin hforeign ht1b hbu0 hrperiod hstable hu0j).elim
 
 end Echo

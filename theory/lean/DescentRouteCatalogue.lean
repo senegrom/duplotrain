@@ -154,15 +154,4 @@ theorem descent_result_eq_entryAction
   rw [entryAction_eq_of_descent h]
   exact descent_result_eq_pinList h
 
-/-- Canonical actions of bounded realised entries have length at most `N`. -/
-theorem entryAction_length_le
-    {w : Wiring} {N p : Nat}
-    (hN : ∀ a b, w.link a = some b →
-      a < 3*N ∧ b < 3*N)
-    (hp : IsDescentEntry w p) :
-    (entryAction w p).length ≤ N := by
-  rcases hp with ⟨t, ps, s, t', hd⟩
-  rw [entryAction_eq_of_descent hd]
-  exact descent_path_length_le hN hd
-
 end GeneralN

@@ -3,7 +3,6 @@ import EndpointEpochExtraction
 import SelfPivotStrictShrink
 import NestedRestorationCharge
 import NestedRestorationElimination
-import TrackQuantitative
 
 /-!
 # Global amortization of train-curve growth and self epochs
@@ -621,39 +620,6 @@ private theorem bounded_multiplicity_length_amortization
       simp only [List.length_cons, Nat.mul_add, Nat.mul_one]
       omega
 
-/-- **Automatic epoch aggregation.**  An arbitrary duplicate-free sample
-from a live raw prefix has at most four vectors per non-self epoch.  No epoch
-partition is supplied by the caller: `rawNonselfRank` constructs it from the
-raw trajectory. -/
-theorem distinct_samples_le_four_mul_nonself_epochs
-    {w : Wiring} {N K : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (times : List Nat) (htimes : ∀ k, k ∈ times → k ≤ K)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤
-      4 * ((rawNonselfProductiveTimes w N start K).length + 1) := by
-  let rank := rawNonselfRank w N start
-  let tags := List.range
-    ((rawNonselfProductiveTimes w N start K).length + 1)
-  have hcap : ∀ r,
-      (times.filter (fun k => decide (rank k = r))).length ≤ 4 := by
-    intro r
-    exact rawNonselfRank_fibre_le_four
-      hN start hlive times htimes hnd
-  have hmem : ∀ k, k ∈ times → rank k ∈ tags := by
-    intro k hk
-    apply List.mem_range.mpr
-    have hmono := rawNonselfRank_mono
-      (w := w) (N := N) (start := start) (htimes k hk)
-    change (rawNonselfProductiveTimes w N start k).length <
-      (rawNonselfProductiveTimes w N start K).length + 1
-    exact Nat.lt_succ_of_le (by
-      simpa [rawNonselfRank] using hmono)
-  have hbound := bounded_multiplicity_length_amortization
-    rank 4 tags times hcap hmem
-  simpa [tags] using hbound
 
 theorem raw_self_pivot_curve_ports_subset
     {w : Wiring} {N k : Nat} {start : Nat × Tongues}
@@ -816,20 +782,6 @@ theorem rawCurveDropMass_le_three_mul_of_lost_ports_nodup
     at hports
   exact hports
 
-/-- Under the concrete no-reused-lost-port charge, all non-self growth events
-in the raw prefix are bounded by `6 * N`. -/
-theorem raw_nonself_growth_le_six_mul_of_lost_ports_nodup
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (hcharge : (rawDroppedCurvePortUnits w N start K).Nodup) :
-    (rawNonselfProductiveTimes w N start K).length ≤ 6 * N := by
-  have hgrowth := raw_nonself_growth_le_three_mul_add_drop
-    hN start K hlive
-  have hdrop := rawCurveDropMass_le_three_mul_of_lost_ports_nodup
-    hN start K hlive hcharge
-  omega
 
 theorem rawCurveDropMass_le_two_mul_of_nested_restoration_charge
     {w : Wiring} {N K : Nat} {start : Nat × Tongues}
@@ -851,26 +803,6 @@ theorem rawCurveDropMass_le_two_mul_of_nested_restoration_charge
       m e r0 A slots hroot hslots
   exact Nat.le_trans hcompile hdepth
 
-/-- The nested restoration compiler premise lowers the global non-self
-growth budget from `6 * N` to `5 * N`. -/
-theorem raw_nonself_growth_le_five_mul_of_nested_restoration_charge
-    {w : Wiring} {N K : Nat} {start : Nat × Tongues}
-    {m : Echo.Machine} {e r0 : Nat → Nat}
-    {depth : Nat} {opening closing : Nat → Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (A : Echo.FiniteStrictNestedRestorationFamily
-      m e r0 depth opening closing)
-    (slots : List Nat)
-    (hroot : ∀ i, i < depth → Echo.oldSlot m e r0 (opening i) ∈ slots)
-    (hslots : slots.length ≤ 2 * N)
-    (hcompile : rawCurveDropMass w N start K ≤ depth) :
-    (rawNonselfProductiveTimes w N start K).length ≤ 5 * N := by
-  have hgrowth := raw_nonself_growth_le_three_mul_add_drop
-    hN start K hlive
-  have hdrop := rawCurveDropMass_le_two_mul_of_nested_restoration_charge
-    hN hlive A slots hroot hslots hcompile
-  omega
 
 structure RawPermanentSelfTail
     (w : Wiring) (N : Nat) (start : Nat × Tongues) : Prop where

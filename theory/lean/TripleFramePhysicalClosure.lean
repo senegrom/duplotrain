@@ -446,35 +446,6 @@ theorem CertifiedEndpointEmptyABCABC.forces_used_self_link
   obtain ⟨q, hq⟩ := C.forces_fixed_escape
   exact ⟨q, certified_fixed_encoded_entry_has_self_link C.run hq⟩
 
-/-- For the canonical physical compiler, the abstract fixed-entry escape and
-the concrete used-self-link escape are exactly equivalent. -/
-theorem CertifiedEndpointEmptyABCABC.fixed_escape_iff_used_self_link
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    {S : SelectedFiveFrameABCABC T}
-    (C : CertifiedEndpointEmptyABCABC S) :
-    C.HasFixedEscape ↔ CertifiedRunUsesSelfLink C.run := by
-  constructor
-  · rintro ⟨q, hq⟩
-    exact ⟨q, certified_fixed_encoded_entry_has_self_link C.run hq⟩
-  · rintro ⟨q, hq⟩
-    exact ⟨q, certified_self_linked_entry_has_fixed_bar C.run hq⟩
-
-/-- Therefore the non-irreflexive escape from a certified selected triple is
-an explicit local two-step reflector. -/
-theorem CertifiedEndpointEmptyABCABC.forces_identity_reflector
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    {S : SelectedFiveFrameABCABC T}
-    (C : CertifiedEndpointEmptyABCABC S) :
-    exists q outside,
-      w.link (C.run.entry q) = some (C.run.entry q) ∧
-      IsReflector w (3 * (C.run.entry q / 3)) outside 2
-        (fun state => state (C.run.entry q / 3) = bval (C.run.entry q))
-        (fun state => state) :=
-  certified_used_self_link_has_identity_reflector C.forces_used_self_link
 
 theorem FiveFrameTripleCase.impossible_of_irreflexive
     {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
@@ -491,57 +462,5 @@ theorem FiveFrameTripleCase.impossible_of_irreflexive
   · exact hnoNest hstrict
 
 /-! ## Exact decomposition of the raw target -/
-
-/-- Raw-to-certified extraction obligation for each selected increasing
-triple.  This is the compiler/restoration part of the remaining proof. -/
-def KnownEdgeABCABCPhysicalCertification : Prop :=
-  forall (w : Wiring) (N e : Nat),
-    (forall p q, w.link p = some q -> p < 3 * N ∧ q < 3 * N) ->
-    forall (start : Nat × Tongues),
-      w.link e = some start.1 ->
-      forall F : FiveFixedStemNovelFrames w N start,
-        forall T : FiveFrameTripleCase w N start
-          F.z₀ F.z₁ F.z₂ F.z₃ F.z₄,
-          forall S : SelectedFiveFrameABCABC T,
-            Nonempty (CertifiedEndpointEmptyABCABC S)
-
-/-- Exact third-branch residue of the abstract obstruction.  Unlike global
-irreflexivity, this asks only for contradiction of the fixed entry produced
-inside the selected certificate. -/
-def KnownEdgeABCABCFixedEscapeExclusion : Prop :=
-  forall (w : Wiring) (N e : Nat),
-    (forall p q, w.link p = some q -> p < 3 * N ∧ q < 3 * N) ->
-    forall (start : Nat × Tongues),
-      w.link e = some start.1 ->
-      forall F : FiveFixedStemNovelFrames w N start,
-        forall T : FiveFrameTripleCase w N start
-          F.z₀ F.z₁ F.z₂ F.z₃ F.z₄,
-          forall S : SelectedFiveFrameABCABC T,
-            forall C : CertifiedEndpointEmptyABCABC S,
-              Not C.HasFixedEscape
-
-/-- Exact self-link residue.  Only a self-link encountered by the certificate
-must be excluded; unrelated self-links are allowed. -/
-def KnownEdgeABCABCUsedSelfLinkExclusion : Prop :=
-  forall (w : Wiring) (N e : Nat),
-    (forall p q, w.link p = some q -> p < 3 * N ∧ q < 3 * N) ->
-    forall (start : Nat × Tongues),
-      w.link e = some start.1 ->
-      forall F : FiveFixedStemNovelFrames w N start,
-        forall T : FiveFrameTripleCase w N start
-          F.z₀ F.z₁ F.z₂ F.z₃ F.z₄,
-          forall S : SelectedFiveFrameABCABC T,
-            forall C : CertifiedEndpointEmptyABCABC S,
-              Not (CertifiedRunUsesSelfLink C.run)
-
-def KnownEdgeSelectedStrictNestObstruction : Prop :=
-  forall (w : Wiring) (N e : Nat),
-    (forall p q, w.link p = some q -> p < 3 * N ∧ q < 3 * N) ->
-    forall (start : Nat × Tongues),
-      w.link e = some start.1 ->
-      forall F : FiveFixedStemNovelFrames w N start,
-        forall T : FiveFrameTripleCase w N start
-          F.z₀ F.z₁ F.z₂ F.z₃ F.z₄,
-          forall _S : SelectedFiveFrameStrictNest T, False
 
 end GeneralN

@@ -69,25 +69,6 @@ theorem pinList_apply : ∀ ps t k,
             unfold pin
             rw [if_neg (fun hk : k = p / 3 => hpk hk.symm)]
 
-/-- Repeating a fixed cascade-assignment word is idempotent. -/
-theorem pinList_idempotent (ps : List Nat) (t : Tongues) :
-    pinList ps (pinList ps t) = pinList ps t := by
-  funext k
-  rw [pinList_apply, pinList_apply]
-  cases hlast : finalPinValue ps k <;> simp [hlast]
-
-/-- Concatenating pin words is sequential composition. -/
-theorem pinList_append (xs ys : List Nat) (t : Tongues) :
-    pinList (xs ++ ys) t = pinList ys (pinList xs t) := by
-  induction xs generalizing t with
-  | nil => rfl
-  | cons x rest ih =>
-      simp only [List.cons_append, pinList]
-      exact ih (pin t x)
-
-/-- Execute a finite list of cascade words. -/
-def runPinWords (words : List (List Nat)) (t : Tongues) : Tongues :=
-  pinList words.flatten t
 
 theorem descent_result_eq_pinList
     {w : Wiring} {t : Tongues} {p s : Nat}

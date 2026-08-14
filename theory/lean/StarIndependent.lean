@@ -22,19 +22,9 @@ namespace Echo
 
 variable (m : Machine)
 
-/-- A cell list contains the mouth partner of each of its members. -/
-def StarClosed (cells : List Nat) : Prop :=
-  ∀ c, c ∈ cells → m.star c ∈ cells
-
-/-- No two listed cells are mouth partners. -/
 def StarIndependent (active : List Nat) : Prop :=
   ∀ c, c ∈ active → m.star c ∉ active
 
-/-- The mouth involution is injective. -/
-theorem star_injective : Function.Injective m.star := by
-  intro a b h
-  have h' := congrArg m.star h
-  simpa only [m.star_invol] using h'
 
 private theorem nodup_map_of_injective_on
     {f : Nat → Nat} {l : List Nat}
@@ -54,25 +44,6 @@ private theorem nodup_map_of_injective_on
       · exact ih
           (fun a ha b hb => hinj a (List.mem_cons_of_mem _ ha)
             b (List.mem_cons_of_mem _ hb)) hnd.2
-
-private theorem nodup_append_of_disjoint
-    {l r : List Nat}
-    (hl : l.Nodup) (hr : r.Nodup)
-    (hdis : ∀ x ∈ l, x ∉ r) :
-    (l ++ r).Nodup := by
-  induction l with
-  | nil => simpa using hr
-  | cons x rest ih =>
-      simp only [List.nodup_cons] at hl
-      simp only [List.cons_append, List.nodup_cons]
-      constructor
-      · intro hm
-        simp only [List.mem_append] at hm
-        rcases hm with hm | hm
-        · exact hl.1 hm
-        · exact hdis x List.mem_cons_self hm
-      · exact ih hl.2
-          (fun y hy => hdis y (List.mem_cons_of_mem _ hy))
 
 private theorem nodup_subset_length_nat {l S : List Nat}
     (hnd : l.Nodup) (hsub : ∀ x ∈ l, x ∈ S) :

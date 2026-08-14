@@ -193,29 +193,4 @@ theorem no_stand_quiet (hrun : IsRun m e r0)
     t (m.cellOf (e (t+1))) ht
   exact hw.symm.trans (h1.trans h2.symm)
 
-/-- **The steering law.**  On a periodic tail whose productive steps all
-write into cells of `S`: either there is no productive step at all, or
-the walk stands at the mouth partner of some cell of `S`. -/
-theorem active_tail_stands_at_mouth (hrun : IsRun m e r0)
-    {S : List Nat} {K p : Nat} (hp : 0 < p)
-    (hper : ∀ t, K ≤ t → e (t + p) = e t)
-    (hregper : ∀ t c, K ≤ t → reg m e r0 (t + p) c = reg m e r0 t c)
-    (hS : ∀ t, K ≤ t → ProductiveStep m e r0 t →
-      m.cellOf (e (t+1)) ∈ S) :
-    (∀ t, K ≤ t → ¬ ProductiveStep m e r0 t) ∨
-    (∃ v C, K ≤ v ∧ C ∈ S ∧ m.cellOf (e v) = m.star C) := by
-  by_cases hstand : ∃ v C, K ≤ v ∧ C ∈ S ∧ m.cellOf (e v) = m.star C
-  · exact Or.inr hstand
-  · refine Or.inl (no_stand_quiet m e r0 hrun hp hper hregper hS ?_)
-    intro v hv C hC h
-    exact hstand ⟨v, C, hv, hC, h⟩
-
-/-- **The stand delivery.**  Standing at `star C`, the walk reads `C`
-itself and jumps to the bar of its register: stands are exactly the
-moments a writer cell's variation is fetched. -/
-theorem stand_delivery (hrun : IsRun m e r0) {C v : Nat}
-    (hstand : m.cellOf (e v) = m.star C) :
-    e (v+1) = m.bar (reg m e r0 v C) := by
-  rw [hrun v, hstand, m.star_invol]
-
 end Echo

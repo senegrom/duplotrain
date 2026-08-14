@@ -132,23 +132,6 @@ private theorem descending_length_le_head :
       simp only [List.length_cons] at htail ⊢
       omega
 
-/-- A duplicate-free descending chain of length-`N` Boolean vectors has at
-most `N+1` members. -/
-theorem descending_chain_bound (N : Nat) (vs : List (List Bool))
-    (hlen : ∀ v ∈ vs, v.length = N)
-    (hnd : vs.Nodup) (hdesc : Descending vs) :
-    vs.length ≤ N + 1 := by
-  cases vs with
-  | nil => exact Nat.zero_le _
-  | cons x rest =>
-      have hhead := descending_length_le_head x rest hnd hdesc
-      have hcount := trueCount_le_length x
-      have hxlen := hlen x List.mem_cons_self
-      omega
-
-/-- Support vector on a chosen list of jump-edge representatives.  It is safe
-if the list contains both endpoints too; that only duplicates coordinates and
-weakens the numerical bound. -/
 noncomputable def supportSnap (edges : List Nat) (k : Nat) : List Bool :=
   edges.map (fun s => decide (Occupied m e r0 k s))
 
@@ -194,28 +177,4 @@ def Increasing : List Nat → Prop
   | [] => True
   | [_] => True
   | i :: j :: rest => i < j ∧ Increasing (j :: rest)
-
-private theorem support_descending
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (edges : List Nat) :
-    ∀ ks, Increasing ks →
-      Descending (ks.map (supportSnap m e r0 edges)) := by
-  intro ks
-  induction ks with
-  | nil =>
-      intro _
-      exact True.intro
-  | cons i rest ih =>
-      cases rest with
-      | nil =>
-          intro _
-          exact True.intro
-      | cons j tail =>
-          intro hinc
-          have hp : i < j ∧ Increasing (j :: tail) := by
-            simpa only [Increasing] using hinc
-          simp only [List.map_cons, Descending]
-          exact ⟨support_later_below m e r0 hrun hr0 edges
-              (Nat.le_of_lt hp.1), ih hp.2⟩
-
 end Echo

@@ -5,7 +5,6 @@ import StateLawTwoSixUltra
 import PointwiseSimpleCycleTail
 import OneReflectorContinuation
 import TraceRetainingFirstRevisit
-import OldContactContinuation
 
 /-!
 # Coefficient-one top-level assembly
@@ -2135,33 +2134,6 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_five
   have hlength := C.compressedLead_length_le hN hA
   omega
 
-/-- Any simple partial continuation whose final configuration is included in
-the finite lead costs at most `N+5`, whether or not it preserved the first
-reflector support. -/
-theorem ManufacturedReflector.simple_partial_distinct_le_N_add_five
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    {finish : Nat × Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w (e, A.activatedState) passages finish)
-    (hsimple : SwitchSimple passages)
-    (times : List Nat)
-    (htimes : ∀ k ∈ times,
-      k ≤ A.exploration.length + A.runway.length + 1 + passages.length)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    times.length ≤ N + 5 := by
-  by_cases hend : PathGrooves A.toSupported.paths finish.2
-  · have hsharp := A.journey_then_preserved_simple_distinct_le_N_add_two
-      hN hA htrace hsimple hend times htimes hnd
-    omega
-  · obtain ⟨C⟩ := A.simpleContinuationChangedContact
-      hA htrace hsimple hend
-    exact C.changed_all_run_distinct_le_N_add_five
-      hN hA times hlive hnd
 
 theorem known_edge_all_run_distinct_le_N_add_six
     {w : Wiring} {N e : Nat}

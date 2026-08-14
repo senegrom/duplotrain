@@ -24,12 +24,6 @@ namespace Echo
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-/-- The finite projection of the arrow function onto a list of cells. -/
-def cellSnap (cells : List Nat) (k : Nat) : List Nat :=
-  cells.map (nextCell m e r0 k)
-
-/-- A cell-level arrow is stable over an interval containing no write to its
-underlying register cell. -/
 theorem nextCell_stable {i c : Nat} :
     ∀ d, (∀ l, i < l → l ≤ i + d →
       m.cellOf (e l) ≠ m.star c) →
@@ -38,24 +32,6 @@ theorem nextCell_stable {i c : Nat} :
   unfold nextCell
   rw [reg_stable m e r0 d hno]
 
-/-- After `a -> b`, the installed arrow `star b -> star a` survives every
-later step until the next entry into cell `b`. -/
-theorem mirror_arrow_stable
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (k d : Nat)
-    (hno : ∀ l, k+1 < l → l ≤ k+1+d →
-      m.cellOf (e l) ≠ m.cellOf (e (k+1))) :
-    nextCell m e r0 (k+1+d) (m.star (m.cellOf (e (k+1)))) =
-      m.star (m.cellOf (e k)) := by
-  calc
-    nextCell m e r0 (k+1+d) (m.star (m.cellOf (e (k+1))))
-        = nextCell m e r0 (k+1) (m.star (m.cellOf (e (k+1)))) := by
-            apply nextCell_stable m e r0 d
-            intro l hl1 hl2
-            rw [m.star_invol]
-            exact hno l hl1 hl2
-    _ = m.star (m.cellOf (e k)) :=
-      reversed_arrow m e r0 hrun hr0 k
 
 theorem nextCell_stall_of_mirror_present
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)

@@ -25,48 +25,4 @@ def StateLawNAddFour : Prop :=
         ((stepN w k start).getD start).2)).Nodup ->
       times.length <= N + 4
 
-/-- The amortized novelty formulation of the sharp target.  First productive
-writers and globally novel repeated writers share one budget: every repeated
-novelty beyond the first three must be paid for by an ambient switch which
-has not occurred as a first writer. -/
-def AmortizedNoveltyNAddThree : Prop :=
-  forall (w : Wiring) (N : Nat),
-    (forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N) ->
-    forall (start : Nat × Tongues) (K : Nat),
-      (rawFirstWriterTimes w N start K).length +
-          (rawRepeatedWriterNovelTimes w N start K).length <= N + 3
-
-/-- Exact finite bookkeeping for the amortized budget.  Unlike the older
-`N + B + 1` theorem, this keeps the actual number of first writers instead
-of replacing it by the coarse upper bound `N`. -/
-theorem distinct_samples_le_of_amortized_novelty
-    (w : Wiring) (N : Nat)
-    (_hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hbudget :
-      (rawFirstWriterTimes w N start K).length +
-          (rawRepeatedWriterNovelTimes w N start K).length <= N + 3)
-    (times : List Nat)
-    (htimes : forall k, k ∈ times -> k <= K)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length <= N + 4 := by
-  let history := rawFirstWriterHistory w N start K
-  let fresh := rawRepeatedWriterFresh w N start K
-  have hhistory : history.length =
-      (rawFirstWriterTimes w N start K).length + 1 := by
-    simp [history, rawFirstWriterHistory]
-  have hfresh : fresh.length =
-      (rawRepeatedWriterNovelTimes w N start K).length := by
-    simp [fresh, rawRepeatedWriterFresh]
-  have hcover : NoveltyCoverOn w N start times history fresh.length := by
-    refine ⟨fresh, Nat.le_refl _, ?_⟩
-    intro k hk
-    exact restrictedTonguesAt_mem_finite_writer_cover
-      w N start K k (htimes k hk)
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  omega
-
 end GeneralN

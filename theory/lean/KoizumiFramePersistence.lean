@@ -283,25 +283,4 @@ theorem rawProductiveAt_first_of_no_self_prefix
   · obtain ⟨t, _hjt, htk, htprod, htself⟩ := hinterior
     exact (havoid t (by omega) htprod htself).elim
 
-/-- A self-pivot-free prefix has no repeated-writer novelty events at all. -/
-theorem rawRepeatedWriterNovelTimes_eq_nil_of_no_self
-    {w : Wiring} {N K : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues)
-    (havoid : ∀ j, j < K → RawProductiveAt w N start j →
-      ¬ RawTrainCurveSelfAt w start j) :
-    rawRepeatedWriterNovelTimes w N start K = [] := by
-  classical
-  cases htimes : rawRepeatedWriterNovelTimes w N start K with
-  | nil => rfl
-  | cons k rest =>
-      exfalso
-      have hkMem : k ∈ rawRepeatedWriterNovelTimes w N start K := by
-        rw [htimes]
-        exact List.mem_cons_self
-      have hkData := mem_rawRepeatedWriterNovelTimes_iff.mp hkMem
-      have hkFirst := rawProductiveAt_first_of_no_self_prefix
-        hN hkData.1 havoid hkData.2.1
-      exact hkData.2.2.1 hkFirst
-
 end GeneralN

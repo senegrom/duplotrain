@@ -34,28 +34,6 @@ def FiveNoveltyCover (w : Wiring) (N : Nat)
     (history : List (List Bool)) : Prop :=
   NoveltyCoverOn w N start times history 5
 
-/-- Four pair-orbit vectors followed by the single strict-candy vector use
-exactly the five exceptional slots available in the sharp accounting. -/
-theorem four_pair_then_one_splice_five
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {pairTimes spliceTimes : List Nat}
-    {history : List (List Bool)}
-    (hpair : FourNoveltyCover w N start pairTimes history)
-    (hsplice : NoveltyCoverOn w N start spliceTimes history 1) :
-    FiveNoveltyCover w N start (pairTimes ++ spliceTimes) history := by
-  exact four_cover_then_candy_splice_five hpair hsplice
-
-/-- A history of size at most `N+1` and a five-vector novelty cover imply the
-requested `N+6` count. -/
-theorem fiveNoveltyCover_to_N_add_six
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {times : List Nat} {history : List (List Bool)}
-    (hhistory : history.length ≤ N + 1)
-    (hcover : FiveNoveltyCover w N start times history)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 6 := by
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  omega
 
 theorem ManufacturedReflector.ChangedForwardMerge.distinct_le_N_add_five
     {w : Wiring} {g e N : Nat}
@@ -86,25 +64,6 @@ theorem three_pair_then_one_splice_four
   have hcombined := noveltyCoverOn_append hpair hsplice
   simpa [FourNoveltyCover] using hcombined
 
-/-- Alternative exact arithmetic: an `N+2` construction history, three new
-pair corners, and one splice vector also give `N+6`. -/
-theorem historical_start_pair_and_splice_distinct_le_N_add_six
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {pairTimes spliceTimes : List Nat}
-    {history : List (List Bool)}
-    (hhistory : history.length ≤ N + 2)
-    (hpair : NoveltyCoverOn w N start pairTimes history 3)
-    (hsplice : NoveltyCoverOn w N start spliceTimes history 1)
-    (hnd : ((pairTimes ++ spliceTimes).map
-      (restrictedTonguesAt w N start)).Nodup) :
-    (pairTimes ++ spliceTimes).length ≤ N + 6 := by
-  apply fourNoveltyCover_to_N_add_six hhistory
-  · exact three_pair_then_one_splice_four hpair hsplice
-  · exact hnd
-
-/-- Canonical history for the first manufactured reflector: every outward
-exploration vector, followed by the single activated vector carried by the
-completed reverse runway. -/
 def ManufacturedReflector.sharpConstructionHistory
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e) (N : Nat) : List (List Bool) :=
@@ -184,20 +143,6 @@ structure KnownEdgeSharpRepairCertificate
   pair_cover : NoveltyCoverOn w N start pairTimes history 3
   splice_cover : NoveltyCoverOn w N start spliceTimes history 1
 
-/-- A known-edge certificate gives the sharp `N+5` count needed before the
-single possible initial dangling-edge state is restored. -/
-theorem KnownEdgeSharpRepairCertificate.distinct_le_N_add_five
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {times : List Nat}
-    (C : KnownEdgeSharpRepairCertificate w N start times)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 5 := by
-  rw [C.times_eq] at hnd ⊢
-  have hfour := three_pair_then_one_splice_four
-    C.pair_cover C.splice_cover
-  have hcount := fourNoveltyCover_distinct_count hfour hnd
-  have hhistory := C.history_length
-  omega
 
 private theorem sharp_nodup_of_map_nodup
     {α β : Type} [BEq α] [LawfulBEq α]
@@ -436,27 +381,5 @@ theorem stateLaw_of_knownEdgeFourRepeatedWriterNovelty
       have hpartition := sharp_zero_positive_partition times
       dsimp [positive] at hpositiveLength
       omega
-
-/-- **STRONGER STRUCTURAL CERTIFICATE LAW.  OPEN.**
-
-Start the train on the near side of a known physical edge.  For every finite
-selection of live raw times, the physical global-repair construction must
-produce an `N+1` construction history, a three-corner manufactured-pair
-part, and a one-vector splice part.
-
-This certificate decomposition is stronger than the exact event bound above
-and is no longer the preferred statement of the residual.  In particular,
-`ChangedForwardMerge.runway_or_candy_absolute_four_novelty` has eliminated
-the old runway/candy case completely.  What remains is the global bridge from
-the fixed-stem open frames of arbitrary raw repeated novelties to at most four
-tail vectors; that bridge is stated exactly by
-`KnownEdgeFourRepeatedWriterNovelty`. -/
-def KnownEdgeSharpRepairCertificateLaw : Prop :=
-  ∀ (w : Wiring) (N e : Nat),
-    (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
-    ∀ (start : Nat × Tongues) (times : List Nat),
-      w.link e = some start.1 →
-      (∀ k ∈ times, (stepN w k start).isSome) →
-      Nonempty (KnownEdgeSharpRepairCertificate w N start times)
 
 end GeneralN

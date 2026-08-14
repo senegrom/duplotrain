@@ -58,38 +58,6 @@ def selectedInternalMate (u : Tongues) (p : Nat) : Option Nat :=
     simp [selectedInternalMate, curveEndpointBranch, branchPort, bval, h,
       hdiv]
 
-/-- The selected internal relation really is an undirected matching. -/
-theorem selectedInternalMate_symm (u : Tongues) {p q : Nat}
-    (h : selectedInternalMate u p = some q) :
-    selectedInternalMate u q = some p := by
-  by_cases hp : p % 3 = 0
-  · have hpform : p = 3 * (p / 3) := by omega
-    have hq : q = curveSelectedBranch u (p / 3) := by
-      have hsome : some (curveSelectedBranch u (p / 3)) = some q := by
-        simpa [selectedInternalMate, hp] using h
-      exact (Option.some.inj hsome).symm
-    rw [hq, selectedInternalMate_selected]
-    exact congrArg some hpform.symm
-  · by_cases hselected : bval p = u (p / 3)
-    · have hq : q = 3 * (p / 3) := by
-        have hsome : some (3 * (p / 3)) = some q := by
-          simpa [selectedInternalMate, hp, hselected] using h
-        exact (Option.some.inj hsome).symm
-      have hrecover : curveSelectedBranch u (p / 3) = p := by
-        unfold curveSelectedBranch
-        rw [← hselected]
-        exact branchPort_bval hp
-      rw [hq, selectedInternalMate_stem, hrecover]
-    · simp [selectedInternalMate, hp, hselected] at h
-
-/-- Adjacency in the union of the external track matching and the selected
-internal matching. -/
-def CurveAdjacent (w : Wiring) (u : Tongues) (p q : Nat) : Prop :=
-  w.link p = some q ∨ selectedInternalMate u p = some q
-
-private theorem same_some {a b : Nat} {x : Option Nat}
-    (ha : x = some a) (hb : x = some b) : a = b := by
-  exact Option.some.inj (ha.symm.trans hb)
 
 structure CurveEndpointPivot (u : Tongues) (C : Nat) : Prop where
   oldStem : selectedInternalMate u (3 * C) =
@@ -174,18 +142,4 @@ theorem trainFreeCurve_affects_le_initial_length
         omega
   have hfinal := hmeasure affects (Nat.le_refl _)
   omega
-
-theorem no_infinite_trainFreeCurve_shrink
-    (curve : Nat → TrackedEndpointCurve N)
-    (h : ∀ k, StrictTrackedSubcurve (curve (k+1)) (curve k)) : False := by
-  let affects := (curve 0).switches.length + 1
-  let H : TrainFreeCurveShrinkHistory N affects := {
-    curve := curve
-    shrinks := fun k _ => h k
-  }
-  have hbound := trainFreeCurve_affects_le_initial_length H
-  change affects ≤ (curve 0).switches.length at hbound
-  unfold affects at hbound
-  omega
-
 end GeneralN

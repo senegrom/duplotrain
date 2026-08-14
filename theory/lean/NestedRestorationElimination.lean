@@ -305,36 +305,4 @@ theorem cyclic_minimal_stable_blocker_lobe_or_strict_three_root_nest
       exact Or.inr (Or.inr (nested_foreign_case_classified
         m e r0 hr0 hmin hforeign ht1b hstable.before hjr hru0))
 
-/-- Recurrent-tail form of the classification.  The non-lobe residue is not
-an unstructured nested inequality: it is a strict three-root nest carrying
-six certified visible full-edge chip moves. -/
-theorem cyclic_minimal_stable_blocker_lobe_or_recurrent_six_chip_nest
-    (hrun : IsRun m e r0)
-    (hr0 : forall c, m.cellOf (r0 c) = c)
-    {K p t0 u0 t1 u1 b j : Nat}
-    (hper : RestorationPeriodicTail m e r0 K p)
-    (hmin : CyclicOverlapMinimalForeignRestorationCrossing
-      m e r0 K p t0 u0 t1 u1)
-    (hKb : K <= b)
-    (ht1b : t1 < b)
-    (hbu0 : b < u0)
-    (hstable : StableBlockerUntil m e r0 b j) :
-    exists r,
-      b < r /\ r < b+p /\
-      FirstRestorationFrame m e r0 b r /\
-      j <= r /\
-      (ExactLobeWrite m e r0 b \/
-       ExactLobeWrite m e r0 r \/
-       RecurrentStrictNestedForeignRestoration
-         m e r0 t0 u0 t1 u1 b j r) := by
-  obtain ⟨r, hbr, hrperiod, hfirst, hjr, hout⟩ :=
-    cyclic_minimal_stable_blocker_lobe_or_strict_three_root_nest
-      m e r0 hr0 hper hmin hKb ht1b hbu0 hstable
-  refine ⟨r, hbr, hrperiod, hfirst, hjr, ?_⟩
-  rcases hout with hlobe | hlobe | hcore
-  · exact Or.inl hlobe
-  · exact Or.inr (Or.inl hlobe)
-  · exact Or.inr (Or.inr (strict_nested_foreign_is_six_chip
-      m e r0 hrun hr0 hper hmin hcore))
-
 end Echo

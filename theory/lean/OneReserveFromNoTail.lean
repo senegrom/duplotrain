@@ -87,22 +87,4 @@ theorem unreflected_not_active_partner
   apply hunreflected
   exact ⟨a, haCell, haLobe, haOcc j hj⟩
 
-/-- **One-reserve semantic theorem.**  Every visited pre-tail component has a
-cell which is not the mouth partner of any persistent active lobe root. -/
-theorem exists_component_reserve_against_active_lobes
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells roots : List Nat) (lo : Nat)
-    (hclosed : SelectedClosedFrom m e r0 cells lo)
-    (hvisit : ComponentVisitedFrom m e cells lo)
-    (hnoTail : NoFourReturnComponentTailFrom m e cells lo)
-    (hactive : PersistentActiveLobeRoots m e r0 roots lo) :
-    ∃ c, c ∈ cells ∧ m.star c ∉ roots := by
-  rcases exists_unreflected_component_cell m e r0
-      hrun hr0 cells lo hclosed hvisit hnoTail with
-    ⟨c, hc, j, hj, hunreflected⟩
-  exact ⟨c, hc,
-    unreflected_not_active_partner m e r0 roots lo c j
-      hactive hj hunreflected⟩
-
 end Echo

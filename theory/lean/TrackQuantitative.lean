@@ -2522,45 +2522,4 @@ theorem long_run_eventually_periodic_within_thirty_without_entry
           have hlocal := long_run_eventually_periodic_within_thirty
             hN hlive hlink
           exact (hlocal.prepend honeStep).weaken (by omega)
-
-theorem state_law_linear_thirty
-    (w : Wiring) (N : Nat)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (c0 : Nat × Tongues) (ks : List Nat)
-    (hlive : ∀ k ∈ ks, (stepN w k c0).isSome)
-    (hnd : (ks.map fun k =>
-      VectorCount.restrict N (tonguesAt w c0 k)).Nodup) :
-    ks.length ≤ 30 * N + 3 := by
-  cases hlong : stepN w (3 * N + 3) c0 with
-  | some finish =>
-      have hperiodic :=
-        long_run_eventually_periodic_within_thirty_without_entry hN hlong
-      exact hperiodic.tongue_vector_count ks hlive hnd
-  | none =>
-      have hksNodup : ks.Nodup := by
-        have hmapped : (ks.map id).Nodup := by
-          apply nodup_map_fibre ks id
-            (fun k => VectorCount.restrict N (tonguesAt w c0 k))
-          · intro i _hi j _hj hij
-            have hij' : i = j := by simpa using hij
-            rw [hij']
-          · exact hnd
-        simpa using hmapped
-      have hlt : ∀ k ∈ ks, k < 3 * N + 3 := by
-        intro k hk
-        by_cases hsmall : k < 3 * N + 3
-        · exact hsmall
-        · exfalso
-          have hkge : 3 * N + 3 ≤ k := by omega
-          have hkEq : k = (3 * N + 3) + (k - (3 * N + 3)) := by
-            omega
-          have hnone : stepN w k c0 = none := by
-            rw [hkEq, stepN_add, hlong]
-            simp
-          have hkLive := hlive k hk
-          simp [hnone] at hkLive
-      have hshort := nodup_nat_lt_length hksNodup hlt
-      omega
-
 end GeneralN

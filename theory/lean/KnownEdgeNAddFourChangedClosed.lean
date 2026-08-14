@@ -193,38 +193,6 @@ structure KnownEdgeFullyProtectedPair
   pair : KnownEdgeProtectedPair w e start
   preGrooves : PathGrooves pair.A.toSupported.paths pair.B.preReturn.2
 
-/-- A nominal protected pair whose first support is actually damaged is
-already a changed-contact run, hence is bounded by `N+4`. -/
-theorem KnownEdgeProtectedPair.N_add_four_or_fully_protected
-    {w : Wiring} {N e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {start : Nat × Tongues}
-    (D : KnownEdgeProtectedPair w e start)
-    (times : List Nat)
-    (hlive : forall k, k ∈ times -> (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length <= N + 4 ∨
-      Nonempty (KnownEdgeFullyProtectedPair w e start) := by
-  by_cases hpre : PathGrooves D.A.toSupported.paths D.B.preReturn.2
-  · exact Or.inr ⟨{ pair := D, preGrooves := hpre }⟩
-  · left
-    have htrace : PhysicalTrace w (e, D.A.activatedState)
-        D.B.exploration D.B.preReturn := by
-      simpa [D.B_base] using D.B.exploration_trace
-    obtain ⟨S⟩ := D.A.simpleContinuationChangedContact
-      D.A_grooves htrace D.B.exploration_simple hpre
-    let C := S.toSharpChangedContact
-    have hliveA : forall k, k ∈ times ->
-        (stepN w k (start.1, D.A.baseState)).isSome := by
-      simpa [D.A_base] using hlive
-    have hndA : (times.map
-        (restrictedTonguesAt w N
-          (start.1, D.A.baseState))).Nodup := by
-      simpa [D.A_base] using hnd
-    exact C.all_run_distinct_le_N_add_four
-      hN D.A_grooves times hliveA hndA
 
 def KnownEdgeProtectedPairNAddFourLaw : Prop :=
   forall {w : Wiring} {N e : Nat},

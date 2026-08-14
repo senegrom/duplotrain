@@ -139,26 +139,6 @@ theorem PhysicalTrace.two_change_prefix_tongues
     rw [hdecomp, stepN_add, hfirstRun]
     exact hrest
 
-/-- Any pointwise two-phase description gives a one-vector novelty cover
-once the first phase is already historical. -/
-theorem noveltyCoverOn_one_fresh_of_two_phases
-    {w : Wiring} {N : Nat} {startPort : Nat} {u v : Tongues}
-    {times : List Nat} {history : List (List Bool)}
-    (hphase : ∀ d, d ∈ times → ∃ port phase,
-      stepN w d (startPort, u) = some (port, phase) /\
-        (phase = u \/ phase = v))
-    (hu : VectorCount.restrict N u ∈ history) :
-    NoveltyCoverOn w N (startPort, u) times history 1 := by
-  refine ⟨[VectorCount.restrict N v], by simp, ?_⟩
-  intro d hd
-  obtain ⟨port, phase, hrun, hphaseEq⟩ := hphase d hd
-  have hvector : restrictedTonguesAt w N (startPort, u) d =
-      VectorCount.restrict N phase := by
-    simp [restrictedTonguesAt, tonguesAt, hrun]
-  rw [hvector]
-  rcases hphaseEq with rfl | rfl
-  · exact List.mem_append_left _ hu
-  · exact List.mem_append_right _ (by simp)
 
 private theorem stepN_mul_period_foreign
     {w : Wiring} {start : Nat × Tongues} {period : Nat}

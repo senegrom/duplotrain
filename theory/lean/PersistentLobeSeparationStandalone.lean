@@ -110,27 +110,4 @@ theorem standaloneActiveLobes_starSeparated
         (hocc k hkLo hkHi b hb)
       exact (hno k hkLo hkHi) htail
 
-/-- Quantitative half-density in a finite star-closed universe. -/
-theorem standaloneActiveLobes_half
-    (hrun : IsRun m e r0)
-    (lo hi : Nat) (lobes cells : List Nat)
-    (hnd : (standaloneActiveLobeCells m lobes).Nodup)
-    (hcells : cells.Nodup)
-    (hclosed : ∀ c ∈ standaloneActiveLobeCells m lobes,
-      c ∈ cells ∧ m.star c ∈ cells)
-    (hloop : ∀ a ∈ lobes,
-      m.cellOf (m.bar a) = m.cellOf a)
-    (hocc : ∀ k, lo ≤ k → k ≤ hi → ∀ a ∈ lobes,
-      Occupied m e r0 k a)
-    (hvisit : ∀ a ∈ lobes,
-      StandaloneLobeVisited m e r0 lo hi a)
-    (hno : StandaloneNoFourTailIn m e r0 lo hi) :
-    2 * lobes.length ≤ cells.length := by
-  have hsep := standaloneActiveLobes_starSeparated m e r0 hrun
-    lo hi lobes hnd hloop hocc hvisit hno
-  have hhalf := starSeparatedCore_count m
-    (standaloneActiveLobeCells m lobes) cells
-    hsep hcells hclosed
-  simpa [standaloneActiveLobeCells] using hhalf
-
 end Echo

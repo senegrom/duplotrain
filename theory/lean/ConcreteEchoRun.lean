@@ -44,32 +44,4 @@ def encodedInitial (initial : Nat → Nat) : Nat → Nat :=
       physicalCell w (entry k) := by
   simp [encodedEntries, physicalCell, canonicalPhysicalCellOf]
 
-/-- Encoding commutes with the complete register recursion. -/
-theorem encoded_reg_eq
-    (w : Wiring) (entry initial : Nat → Nat) :
-    ∀ k c,
-      Echo.reg (canonicalEchoMachine w)
-        (encodedEntries entry) (encodedInitial initial) k c =
-      encodeSlot (physicalReg w entry initial k c) := by
-  intro k
-  induction k with
-  | zero =>
-      intro c
-      simp [Echo.reg, physicalReg, encodedEntries, encodedInitial,
-        physicalCell, canonicalPhysicalCellOf]
-      split <;> rfl
-  | succ n ih =>
-      intro c
-      simp [Echo.reg, physicalReg, encodedEntries, encodedInitial,
-        physicalCell, canonicalPhysicalCellOf, ih]
-      split <;> rfl
-
-def IsPhysicalEchoRun (w : Wiring)
-    (entry initial : Nat → Nat) : Prop :=
-  ∀ k,
-    entry (k + 1) =
-      wireBar w
-        (physicalReg w entry initial k
-          (mateNat (physicalCell w (entry k))))
-
 end GeneralN

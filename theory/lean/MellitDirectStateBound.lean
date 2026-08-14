@@ -31,16 +31,6 @@ structure UnionFirstRepeat (old fresh : List Passage) : Type where
   repeats : passageSwitch repeated ∈
     (old ++ before).map passageSwitch
 
-/-- The source of a first union repetition is exact: it either hits the old
-exploration or repeats a switch already used in the fresh prefix. -/
-theorem UnionFirstRepeat.old_or_internal
-    {old fresh : List Passage}
-    (R : UnionFirstRepeat old fresh) :
-      passageSwitch R.repeated ∈ old.map passageSwitch ∨
-      passageSwitch R.repeated ∈ R.before.map passageSwitch := by
-  have h := R.repeats
-  rw [List.map_append] at h
-  exact List.mem_append.mp h
 
 private theorem simple_append_singleton
     {old : List Passage} {fresh : Passage}
@@ -95,19 +85,6 @@ private theorem union_first_repeat_aux :
             simpa [List.append_assoc] using R.repeats
         }⟩
 
-/-- Every nonsimple union with a simple old prefix has a canonical first
-repetition in the fresh suffix. -/
-theorem first_repeat_against_union
-    (old fresh : List Passage)
-    (hold : SwitchSimple old)
-    (hbad : ¬ SwitchSimple (old ++ fresh)) :
-    Nonempty (UnionFirstRepeat old fresh) :=
-  union_first_repeat_aux old fresh hold hbad
-
-/-! ## Switch-disjoint explorations force reflector compatibility -/
-
-/-- Every retained support passage of a manufactured reflector occurs in
-its outward exploration. -/
 theorem ManufacturedReflector.support_switch_mem_exploration
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
@@ -152,39 +129,5 @@ theorem ManufacturedFlipReflector.actionSwitch_mem_exploration
       (ManufacturedReflector.flip A).exploration.map passageSwitch := by
   simp [ManufacturedReflector.exploration,
     ManufacturedFlipReflector.actionSwitch, passageSwitch]
-
-/-- **Compatibility from combined first-contact minimality.**  If the two
-outward explorations are switch-simple as one concatenated list, then each
-reflector's local action avoids every retained support passage of the other.
--/
-theorem manufactured_pair_compatible_of_explorations_simple
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hsimple : SwitchSimple (A.exploration ++ B.exploration)) :
-    A.toSupported.action.Avoids B.toSupported.paths ∧
-      B.toSupported.action.Avoids A.toSupported.paths := by
-  unfold SwitchSimple at hsimple
-  rw [List.map_append] at hsimple
-  have hcross := (List.nodup_append.mp hsimple).2.2
-  constructor
-  · cases A with
-    | stay A => trivial
-    | flip A =>
-        intro path hpath passage hpassage
-        have haction := A.actionSwitch_mem_exploration
-        have hsupport := B.support_switch_mem_exploration
-          hpath hpassage
-        exact (hcross A.actionSwitch haction
-          (passageSwitch passage) hsupport).symm
-  · cases B with
-    | stay B => trivial
-    | flip B =>
-        intro path hpath passage hpassage
-        have hsupport := A.support_switch_mem_exploration
-          hpath hpassage
-        have haction := B.actionSwitch_mem_exploration
-        exact hcross (passageSwitch passage) hsupport
-          B.actionSwitch haction
 
 end GeneralN

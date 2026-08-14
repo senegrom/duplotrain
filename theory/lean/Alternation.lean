@@ -332,81 +332,6 @@ theorem consecutive_avoid_loop (hrun : IsRun m e r0)
       intro hp
       exact hp hwrapstep
 
-/-- **The alternation seed.**  On a periodic tail, two consecutive
-productive steps can write the same cell only if the walk stands in
-that cell or at its mouth partner strictly between the two arrivals.
-In particular, two adjacent productive steps never write the same
-cell: the four-beat alternation begins here. -/
-theorem consecutive_same_write_visits (hrun : IsRun m e r0)
-    (cells : List Nat)
-    (hcells : ∀ k, m.star (m.cellOf (e k)) ∈ cells)
-    (hallcells : ∀ s, m.cellOf s ∈ cells)
-    {K p : Nat} (hp : 0 < p)
-    (hper : ∀ t, K ≤ t → e (t + p) = e t)
-    (hregper : ∀ t c, K ≤ t → reg m e r0 (t + p) c = reg m e r0 t c)
-    {C t1 t2 : Nat} (hK : K ≤ t1) (h12 : t1 < t2)
-    (hq : ∀ s, t1 < s → s < t2 → ¬ ProductiveStep m e r0 s)
-    (hp1 : ProductiveStep m e r0 t1)
-    (hp2 : ProductiveStep m e r0 t2)
-    (hc1 : m.cellOf (e (t1 + 1)) = C)
-    (hc2 : m.cellOf (e (t2 + 1)) = C) :
-    ∃ l, 1 ≤ l ∧ l ≤ t2 - t1 - 1 ∧
-      (m.cellOf (e (t1 + 1 + l)) = C ∨
-       m.cellOf (e (t1 + 1 + l)) = m.star C) := by
-  by_cases hex : ∃ l, 1 ≤ l ∧ l ≤ t2 - t1 - 1 ∧
-      (m.cellOf (e (t1 + 1 + l)) = C ∨
-       m.cellOf (e (t1 + 1 + l)) = m.star C)
-  · exact hex
-  · exfalso
-    have havoid : ∀ l, 1 ≤ l → l ≤ t2 - t1 - 1 →
-        m.cellOf (e (t1 + 1 + l)) ≠ C ∧
-        m.cellOf (e (t1 + 1 + l)) ≠ m.star C := by
-      intro l h1 h2
-      constructor
-      · intro h
-        exact hex ⟨l, h1, h2, Or.inl h⟩
-      · intro h
-        exact hex ⟨l, h1, h2, Or.inr h⟩
-    obtain ⟨hmatch, hquiet⟩ := consecutive_avoid_loop m e r0 hrun cells
-      h12 hq hc1 hc2 havoid
-    -- the tail from t2+1 is (t2-t1)-periodic and quiet on one period,
-    -- hence quiet forever
-    have hnoprod : ∀ n, ¬ ProductiveStep m e r0 (t2 + 1 + n) := by
-      intro n
-      have hmod := Nat.div_add_mod n (t2 - t1)
-      have hrlt : n % (t2 - t1) < t2 - t1 :=
-        Nat.mod_lt _ (by omega)
-      have hiter := state_replay_iter m e r0 hrun cells hcells hmatch
-        (n / (t2 - t1)) (n % (t2 - t1))
-      have harith : t2 + 1 + n / (t2 - t1) * (t2 - t1) + n % (t2 - t1)
-          = t2 + 1 + n := by
-        have hc : (t2 - t1) * (n / (t2 - t1))
-            = n / (t2 - t1) * (t2 - t1) := Nat.mul_comm _ _
-        omega
-      rw [harith] at hiter
-      have hiff := productive_iff_of_state_eq m e r0 hrun cells hcells
-        hallcells hiter
-      intro hprod
-      exact hquiet (n % (t2 - t1)) hrlt (hiff.mpr hprod)
-    -- but the second write recurs one period later
-    have hrec : ProductiveStep m e r0 (t2 + p) :=
-      (productive_periodic m e r0 hper hregper (by omega)).mpr hp2
-    have harith : t2 + p = t2 + 1 + (p - 1) := by omega
-    rw [harith] at hrec
-    exact hnoprod (p - 1) hrec
-
-/-! ## Consecutive productive writers are different
-
-The preceding theorem leaves two possible visits between consecutive
-productive writes of one cell: the cell itself or its mouth partner.  Both
-are impossible on an active periodic tail.  A quiet visit to the mouth is
-excluded by `quiet_mouth_unreachable`.  A quiet return to the same cell has
-the same entry and the same registers, so determinism repeats that quiet loop
-forever and contradicts the later productive write.
--/
-
-/-- A productive-free return to the same cell returns to the complete same
-machine state. -/
 theorem quiet_return_same_cell_state
     (cells : List Nat) {i q : Nat}
     (hquiet : forall t, i <= t -> t < i + q ->
@@ -430,30 +355,5 @@ theorem quiet_return_same_cell_state
     intro c _
     exact (hregs c).symm
   rw [hentry, hmap]
-
-/-- A nonempty quiet state loop is quiet forever. -/
-theorem quiet_state_loop_forever (hrun : IsRun m e r0)
-    (cells : List Nat)
-    (hcells : forall k, m.star (m.cellOf (e k)) ∈ cells)
-    (hallcells : forall s, m.cellOf s ∈ cells)
-    {i q : Nat} (hqpos : 0 < q)
-    (hstate : stateCode m e r0 cells i =
-      stateCode m e r0 cells (i + q))
-    (hquiet : forall s, s < q ->
-      Not (ProductiveStep m e r0 (i + s))) :
-    forall n, Not (ProductiveStep m e r0 (i + n)) := by
-  intro n
-  have hmod := Nat.div_add_mod n q
-  have hrlt : n % q < q := Nat.mod_lt _ hqpos
-  have hiter := state_replay_iter m e r0 hrun cells hcells hstate
-    (n / q) (n % q)
-  have harith : i + n / q * q + n % q = i + n := by
-    have hcomm : q * (n / q) = (n / q) * q := Nat.mul_comm _ _
-    omega
-  rw [harith] at hiter
-  have hiff := productive_iff_of_state_eq m e r0 hrun cells hcells
-    hallcells hiter
-  intro hprod
-  exact hquiet (n % q) hrlt (hiff.mpr hprod)
 
 end Echo

@@ -46,10 +46,6 @@ theorem unmatchedBranch_switch (u : Tongues) (C : Nat) :
     unmatchedBranch u C / 3 = C := by
   cases h : u C <;> simp [unmatchedBranch, branchPort, h] <;> omega
 
-theorem selectedBranch_is_branch (u : Tongues) (C : Nat) :
-    selectedBranch u C % 3 ≠ 0 := by
-  cases h : u C <;> simp [selectedBranch, branchPort, h] <;> omega
-
 theorem unmatchedBranch_is_branch (u : Tongues) (C : Nat) :
     unmatchedBranch u C % 3 ≠ 0 := by
   cases h : u C <;> simp [unmatchedBranch, branchPort, h] <;> omega
@@ -336,21 +332,6 @@ def FiveRepeatedWriterNoveltyCover : Prop :=
         (rawRepeatedWriterPostTimes w N start K)
         (rawFirstWriterHistory w N start K) 5
 
-/-- The cover interface is exactly strong enough to discharge the finite
-constant-five target: its sampled vectors are fresh and duplicate-free by
-construction. -/
-theorem fiveRepeatedWriterNovelty_of_cover
-    (hcover : FiveRepeatedWriterNoveltyCover) :
-    FiveRepeatedWriterNovelty := by
-  intro w N hN start K
-  have hnd : ((rawRepeatedWriterPostTimes w N start K).map
-      (restrictedTonguesAt w N start)).Nodup := by
-    rw [map_repeatedWriterPostTimes_eq_fresh]
-    exact rawRepeatedWriterFresh_nodup w N start K
-  have hcount := noveltyCoverOn_fresh_distinct_count
-    (hcover w N hN start K)
-    (repeatedWriterPostTimes_avoid_firstHistory hN start K) hnd
-  simpa [rawRepeatedWriterPostTimes] using hcount
 
 theorem rawProductiveAt_is_endpoint_pivot
     {w : Wiring} {N : Nat}

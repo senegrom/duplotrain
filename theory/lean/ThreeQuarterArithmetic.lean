@@ -1,4 +1,3 @@
-import HiddenDichotomy
 
 /-!
 # Arithmetic for a strict-base exponential bound
@@ -37,28 +36,6 @@ private theorem fourth_two_pow (A : Nat) :
   unfold fourth
   simp [Nat.pow_add, Nat.mul_assoc, Nat.mul_left_comm, Nat.mul_comm]
 
-/-- The fourth-power form of the `3/4` exponent bound. -/
-theorem three_quarter_fourth_bound
-    (C L M A P : Nat)
-    (hC : C = L + M)
-    (hAL : A ≤ L) (hAM : A ≤ M)
-    (hP : P * P ≤ 2^M) :
-    fourth (2^A * P) ≤ 2^(3*C) := by
-  have hP4 : fourth P ≤ 2^(M+M) := by
-    unfold fourth
-    calc
-      (P*P)*(P*P) ≤ (2^M)*(2^M) := Nat.mul_le_mul hP hP
-      _ = 2^(M+M) := (Nat.pow_add 2 M M).symm
-  have hmul : fourth (2^A) * fourth P ≤
-      2^(A+A+A+A) * 2^(M+M) := by
-    exact Nat.mul_le_mul (Nat.le_of_eq (fourth_two_pow A)) hP4
-  have hexp : (A+A+A+A) + (M+M) ≤ 3*C := by
-    omega
-  calc
-    fourth (2^A * P) = fourth (2^A) * fourth P := fourth_mul _ _
-    _ ≤ 2^(A+A+A+A) * 2^(M+M) := hmul
-    _ = 2^((A+A+A+A)+(M+M)) := (Nat.pow_add 2 _ _).symm
-    _ ≤ 2^(3*C) := Nat.pow_le_pow_right (by omega) hexp
 
 def profileCells : List (Nat × Nat) → Nat
   | [] => 0

@@ -18,16 +18,6 @@ namespace GeneralN
 /-- Totalise the partial track pairing by fixing an unlinked port. -/
 def wireBar (w : Wiring) (p : Nat) : Nat :=
   (w.link p).getD p
-
-theorem wireBar_of_link {w : Wiring} {p q : Nat}
-    (h : w.link p = some q) : wireBar w p = q := by
-  simp [wireBar, h]
-
-theorem wireBar_of_unlinked {w : Wiring} {p : Nat}
-    (h : w.link p = none) : wireBar w p = p := by
-  simp [wireBar, h]
-
-/-- The totalised concrete track pairing is an involution. -/
 theorem wireBar_invol (w : Wiring) (p : Nat) :
     wireBar w (wireBar w p) = p := by
   cases h : w.link p with

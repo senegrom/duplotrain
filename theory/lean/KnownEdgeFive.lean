@@ -1,7 +1,9 @@
 import TrackEarlyRepairCount
 import FacingMergeCount
-import KnownEdgeFourteen
+import PairTongueCountFour
+import TrackGlobalRepairSimple
 import TrackQuantitativeRouteSharp
+import TwoJourneyTailCountSharp
 import FacingForwardNovelty
 import PairTongueCountAbsoluteFour
 import TrackStaySpliceAllTime
@@ -247,43 +249,5 @@ theorem manufactured_pair_protected_repair_quantitative_outcomes_count
             horientedGroove, horientedSwitch, hforwardExit,
             hrepair, hgroove⟩))
     · exact Or.inr (Or.inr (Or.inr hcomplete))
-
-/-- Protected repair exposes at most `2*N+5` distinct restricted tongue
-vectors. -/
-theorem manufactured_pair_protected_repair_distinct_le_two_mul_add_five
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hB : PathGrooves B.toSupported.paths B.activatedState)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, B.activatedState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, B.activatedState))).Nodup) :
-    times.length ≤ 2 * N + 5 := by
-  rcases manufactured_pair_protected_repair_quantitative_outcomes_count
-      hN A B hA hB with hcount | hrest
-  · have hc := hcount times hnd
-    omega
-  · rcases hrest with hfacing | hrest
-    · have hc := hfacing.distinct_le_succ_succ hN times hnd
-      omega
-    · rcases hrest with hchanged | hcomplete
-      · cases B with
-        | stay R =>
-            have hc := hchanged.stay_distinct_le_n_succ_two hN times hnd
-            omega
-        | flip R =>
-            have hc := hchanged.flip_distinct_le_two_mul_add_five
-              hN times hnd
-            omega
-      · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
-        have hc := A.completed_route_with_pair_support_distinct_le_n_succ_four
-          hN B B.baseState B.activatedState finalState hA hrepair
-          hAfinal hBfinal times hlive hnd
-        omega
 
 end GeneralN

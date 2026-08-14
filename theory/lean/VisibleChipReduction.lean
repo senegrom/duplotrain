@@ -139,40 +139,6 @@ theorem recurrent_projection_change_is_chip_move
       (by simpa [oldSlot] using hdiff)
   exact ⟨hchange, hprod, hfixed, hdiff, hold, hnew⟩
 
-/-- Exact recurrence has only two cell-projection cases: the projection is
-stationary, or some tail step is a visible full-edge-chip move. -/
-theorem recurrent_stationary_or_visible_chip
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    {K q : Nat}
-    (hrec : ExactRecurrentTail m e r0 K q) :
-    ProjectionStationary m e r0 K ∨
-      ∃ k, K ≤ k ∧ VisibleFullEdgeChipMove m e r0 k := by
-  by_cases hchange : ∃ k, K ≤ k ∧ ProjectionChanges m e r0 k
-  · right
-    obtain ⟨k, hk, hvis⟩ := hchange
-    exact ⟨k, hk,
-      recurrent_projection_change_is_chip_move
-        m e r0 hrun hr0 hrec hk hvis⟩
-  · left
-    intro k hk c
-    apply Classical.byContradiction
-    intro hne
-    exact hchange ⟨k, hk, c, hne⟩
-
-/-- The stationary side of the recurrent dichotomy is already closed by
-`StationaryTail`. -/
-theorem stationary_recurrent_four
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    {K q : Nat}
-    (hrec : ExactRecurrentTail m e r0 K q)
-    (hstationary : ProjectionStationary m e r0 K) :
-    FourSnapshotTail m e r0 K := by
-  intro cells ks hks hnd
-  exact stationary_recurrent_tail_four_complete
-    m e r0 hrun hr0 hrec.1 hrec.2.1 hrec.2.2
-      hstationary cells ks hks hnd
 
 theorem recurrent_occupied_iff
     (hrun : IsRun m e r0)
@@ -297,14 +263,6 @@ theorem compatible_external_reflector_trap_or_collapsed
     exact hdistinct
   · exact Or.inr hcollapsed
 
-/-- A closed, visited component whose every cell has an occupied external
-lobe partner.  These are exactly the component hypotheses under which
-`FullyLobedComponentTrap` produces a four-return entry orbit. -/
-def CompatibleExternalReflectorComponent
-    (cells : List Nat) (lo : Nat) : Prop :=
-  SelectedClosedFrom m e r0 cells lo ∧
-  FullyExternallyLobedFrom m e r0 cells lo ∧
-  ComponentVisitedFrom m e cells lo
 
 theorem closed_component_reflector_or_collapsed_or_reserve
     (hrun : IsRun m e r0)
@@ -366,42 +324,6 @@ def CompletePersistentLobeRoots
     PersistentLobeRootAt m e r0 r lo ∧
       ∃ c, c ∈ cells ∧ r = m.star c
 
-/-- The complete-root version of the component trichotomy gives a genuine
-unlobed reserve, rather than a cell merely absent from an arbitrary list. -/
-theorem closed_component_reflector_or_collapsed_or_unlobed_reserve
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    {K q lo : Nat}
-    (hrec : ExactRecurrentTail m e r0 K q)
-    (hKlo : K ≤ lo)
-    (cells roots : List Nat)
-    (hclosed : SelectedClosedFrom m e r0 cells lo)
-    (hvisit : ComponentVisitedFrom m e cells lo)
-    (hroots : CompletePersistentLobeRoots m e r0 cells roots lo) :
-    (∃ k x a b, lo ≤ k ∧ e k = x ∧
-      CompatibleTwoReflectorTail m e r0 k x a b) ∨
-    (∃ k x, lo ≤ k ∧ e k = x ∧
-      CollapsedReflectorGeometry m x) ∨
-    ∃ c, c ∈ cells ∧
-      ¬ PersistentLobeRootAt m e r0 (m.star c) lo := by
-  have hactive : PersistentActiveLobeRoots m e r0 roots lo := by
-    intro c hc
-    exact ((hroots c).mp hc).1
-  rcases closed_component_reflector_or_collapsed_or_reserve
-      m e r0 hrun hr0 hrec hKlo cells roots hclosed hvisit hactive with
-    htrap | hcollapsed | ⟨c, hc, hreserve⟩
-  · exact Or.inl htrap
-  · exact Or.inr (Or.inl hcollapsed)
-  · apply Or.inr
-    apply Or.inr
-    refine ⟨c, hc, ?_⟩
-    intro hpersistent
-    exact hreserve ((hroots (m.star c)).mpr
-      ⟨hpersistent, c, hc, rfl⟩)
-
-/-- A finite component certificate tied to one actual visible full-edge-chip
-move.  Both physical endpoint cells belong to the component, selected edges
-stay inside it, and `roots` lists *all* persistent occupied lobe roots. -/
 structure VisibleChipComponentFrame
     (K lo k : Nat) (cells roots : List Nat) : Prop where
   tailStart : K ≤ lo
@@ -411,36 +333,5 @@ structure VisibleChipComponentFrame
   newCell : m.cellOf (e (k+1)) ∈ cells
   selectedClosed : SelectedClosedFrom m e r0 cells lo
   rootsComplete : CompletePersistentLobeRoots m e r0 cells roots lo
-
-/-- **The exact component-extraction gap.**
-
-Every nonstationary exact recurrent tail is expected to furnish a finite
-complete-root component frame anchored at one of its visible chip moves.  No crossing,
-seriality, reflector, or snapshot conclusion is included in this proposition.
--/
-def VisibleChipComponentExtraction : Prop :=
-  ∀ (m : Machine) (e r0 : Nat → Nat) (K q : Nat),
-    IsRun m e r0 →
-    (∀ c, m.cellOf (r0 c) = c) →
-    ExactRecurrentTail m e r0 K q →
-    (∃ k, K ≤ k ∧ VisibleFullEdgeChipMove m e r0 k) →
-    ∃ lo k cells roots,
-      VisibleChipComponentFrame m e r0 K lo k cells roots
-
-def CompatiblePairedRouterAt (k : Nat) : Prop :=
-  ∃ s,
-    e k = s ∧
-    LobeEntryAt m e (k+2) ∧
-    LobeEntryAt m e (k+5) ∧
-    ∀ i, k < i → i ≤ k+3 →
-      m.cellOf (e i) ≠ m.cellOf s
-
-def VisibleRecurrentChipClosure : Prop :=
-  ∀ (m : Machine) (e r0 : Nat → Nat) (K q : Nat),
-    IsRun m e r0 →
-    (∀ c, m.cellOf (r0 c) = c) →
-    ExactRecurrentTail m e r0 K q →
-    (∃ k, K ≤ k ∧ VisibleFullEdgeChipMove m e r0 k) →
-    FourSnapshotTail m e r0 K
 
 end Echo

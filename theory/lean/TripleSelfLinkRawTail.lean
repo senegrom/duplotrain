@@ -60,19 +60,6 @@ theorem restrictedTonguesAt_eq_one_period_earlier
   simp only [restrictedTonguesAt, tonguesAt]
   rw [hstep]
 
-/-- A globally novel post-vector cannot be sampled after a complete raw lap
-from an earlier periodic configuration. -/
-theorem RawNovelAt.not_after_completed_period
-    {w : Wiring} {N : Nat} {start cycleStart : Nat × Tongues}
-    {base period k : Nat}
-    (H : RawNovelAt w N start k)
-    (hbase : stepN w base start = some cycleStart)
-    (hperiod : stepN w period cycleStart = some cycleStart)
-    (hperiodPositive : 0 < period)
-    (hafter : base + period ≤ k + 1) : False := by
-  have heq := restrictedTonguesAt_eq_one_period_earlier
-    (N := N) hbase hperiod hafter
-  exact (H.post_ne_earlier (by omega)) heq
 
 theorem RawCycleThroughSelfLink.self_period_has_first_revisit
     {w : Wiring} {start : Nat × Tongues} {close : Nat}
@@ -226,31 +213,5 @@ theorem RawCycleThroughSelfLink.outside_period_has_first_revisit
       have hne := hparts.2.2 (R.branch / 3) hleft
         (R.branch / 3) hright
       exact hne rfl
-
-/-- The outside-oriented first revisit either enters a simple cycle or
-manufactures the reflector opposite the self-link stem.  This is the exact
-physical fork needed for the subsequent pair/tail argument. -/
-theorem RawCycleThroughSelfLink.outside_first_revisit_cycle_or_reflector
-    {w : Wiring} {start : Nat × Tongues} {close : Nat}
-    (R : RawCycleThroughSelfLink w start close) :
-    ∃ outside atRepeat visited,
-      w.link (3 * (R.branch / 3)) = some outside ∧
-      stepN w visited (outside, R.state) = some atRepeat ∧
-      (SettlesOnSimpleCycle w atRepeat ∨
-        ∃ (A : ManufacturedReflector w outside
-              (3 * (R.branch / 3)))
-            (state : Tongues) (backSteps : Nat),
-          PathGrooves A.toSupported.paths state ∧
-          A.baseState = R.state ∧
-          state = A.activatedState ∧
-          stepN w backSteps atRepeat =
-            some (3 * (R.branch / 3), state) ∧
-          (∀ j, j ∉ A.exploration.map passageSwitch →
-            state j = R.state j)) := by
-  obtain ⟨outside, passages, hmouth, _hlength, htrace,
-      hnonsimple⟩ := R.outside_period_has_first_revisit
-  obtain ⟨atRepeat, visited, hvisited, houtcome⟩ :=
-    htrace.first_revisit_activated_outcome hnonsimple hmouth
-  exact ⟨outside, atRepeat, visited, hmouth, hvisited, houtcome⟩
 
 end GeneralN

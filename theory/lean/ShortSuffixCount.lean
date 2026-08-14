@@ -70,47 +70,6 @@ theorem dead_horizon_live_distinct_le
       simp [hnone] at hkLive
   exact nodup_nat_lt_length htimesNodup hlt
 
-/-- A history-covered journey followed by a suffix dead at `horizon` exposes
-at most `history.length + horizon` distinct restricted tongue vectors.
-
-This version does not assume that the journey's endpoint vector was already
-listed in `history`; it adjoins that boundary explicitly. -/
-theorem history_covered_journey_then_dead_suffix_distinct_le
-    {w : Wiring} {N lead horizon : Nat}
-    {start endpoint : Nat × Tongues}
-    (hreach : stepN w lead start = some endpoint)
-    (history : List (List Bool))
-    (hprefixCover : ∀ d, d ≤ lead →
-      restrictedTonguesAt w N start d ∈ history)
-    (hdead : stepN w horizon endpoint = none)
-    (hhorizon : 0 < horizon)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ history.length + horizon := by
-  let boundary := VectorCount.restrict N endpoint.2
-  let augmented := boundary :: history
-  have hprefixAugmented : ∀ d, d ≤ lead →
-      restrictedTonguesAt w N start d ∈ augmented := by
-    intro d hd
-    exact List.mem_cons_of_mem _ (hprefixCover d hd)
-  have hboundary : VectorCount.restrict N endpoint.2 ∈ augmented := by
-    simp [augmented, boundary]
-  have htail : ∀ tailTimes : List Nat,
-      (∀ k ∈ tailTimes, (stepN w k endpoint).isSome) →
-      (tailTimes.map (restrictedTonguesAt w N endpoint)).Nodup →
-      tailTimes.length ≤ horizon := by
-    intro tailTimes htailLive htailNodup
-    exact dead_horizon_live_distinct_le hdead tailTimes
-      htailLive htailNodup
-  have hcount := boundary_history_then_direct_tail_distinct_le
-    hreach augmented hprefixAugmented hboundary htail hhorizon
-      times hlive hnd
-  simp only [augmented, List.length_cons] at hcount
-  omega
-
-/-- Boundary-aware form of the preceding theorem.  When the endpoint vector
-already belongs to `history`, the common boundary is counted only once. -/
 theorem boundary_history_covered_journey_then_dead_suffix_distinct_le
     {w : Wiring} {N lead horizon : Nat}
     {start endpoint : Nat × Tongues}

@@ -1,5 +1,7 @@
-import CanonicalProjectedEpochFrame
+import PairedNoFullReachFreeze
+import SupportMove
 import BlockSparseBoundCore
+import PersistentLobeSeparationStandalone
 
 /-!
 # Support-weight fibres
@@ -94,42 +96,6 @@ private theorem sum_map_zero_nat {α : Type}
   | nil => rfl
   | cons _ rest ih => simp [ih]
 
-/-- Integer fibres below `K` partition the list exactly. -/
-theorem supportFibreSizes_sum {α : Type}
-    (K : Nat) (f : α → Nat) :
-    ∀ xs : List α,
-      (∀ x ∈ xs, f x < K) →
-      (supportFibreSizes K f xs).sum = xs.length := by
-  intro xs
-  induction xs with
-  | nil =>
-    intro _
-    unfold supportFibreSizes
-    simpa [supportFibreSize] using
-      (sum_map_zero_nat (List.range K))
-  | cons x rest ih =>
-      intro hbound
-      have hx : f x < K := hbound x List.mem_cons_self
-      have hrest : ∀ y ∈ rest, f y < K := by
-        intro y hy
-        exact hbound y (List.mem_cons_of_mem _ hy)
-      have hpoint :
-          supportFibreSizes K f (x :: rest) =
-            (List.range K).map (fun q =>
-              (if f x = q then 1 else 0) +
-                supportFibreSize f q rest) := by
-        unfold supportFibreSizes
-        apply List.map_congr_left
-        intro q _
-        exact supportFibreSize_cons f q x rest
-      rw [hpoint, sum_map_add_nat,
-        range_indicator_one K (f x) hx]
-      change 1 + (supportFibreSizes K f rest).sum =
-        (x :: rest).length
-      rw [ih hrest]
-      simp [Nat.add_comm]
-
-/-- A canonical minimum of one distinguished element and a tail. -/
 def fibreMinFrom : Nat → List Nat → Nat
   | x, [] => x
   | x, y :: ys => Nat.min x (fibreMinFrom y ys)
@@ -138,40 +104,6 @@ def fibreMinFrom : Nat → List Nat → Nat
 def fibreMaxFrom : Nat → List Nat → Nat
   | x, [] => x
   | x, y :: ys => Nat.max x (fibreMaxFrom y ys)
-
-theorem fibreMinFrom_mem : ∀ x xs,
-    fibreMinFrom x xs ∈ x :: xs := by
-  intro x xs
-  induction xs generalizing x with
-  | nil =>
-      simp [fibreMinFrom]
-  | cons y ys ih =>
-      change x.min (fibreMinFrom y ys) ∈ x :: y :: ys
-      by_cases h : x ≤ fibreMinFrom y ys
-      · have hmin : x.min (fibreMinFrom y ys) = x :=
-          Nat.min_eq_left h
-        exact hmin.symm ▸ List.mem_cons_self
-      · have hle : fibreMinFrom y ys ≤ x := by omega
-        have hmin : x.min (fibreMinFrom y ys) =
-            fibreMinFrom y ys := Nat.min_eq_right hle
-        exact hmin.symm ▸ List.mem_cons_of_mem _ (ih y)
-
-theorem fibreMaxFrom_mem : ∀ x xs,
-    fibreMaxFrom x xs ∈ x :: xs := by
-  intro x xs
-  induction xs generalizing x with
-  | nil =>
-      simp [fibreMaxFrom]
-  | cons y ys ih =>
-      change x.max (fibreMaxFrom y ys) ∈ x :: y :: ys
-      by_cases h : x ≤ fibreMaxFrom y ys
-      · have hmax : x.max (fibreMaxFrom y ys) =
-            fibreMaxFrom y ys := Nat.max_eq_right h
-        exact hmax.symm ▸ List.mem_cons_of_mem _ (ih y)
-      · have hle : fibreMaxFrom y ys ≤ x := by omega
-        have hmax : x.max (fibreMaxFrom y ys) = x :=
-          Nat.max_eq_left hle
-        exact hmax.symm ▸ List.mem_cons_self
 
 theorem fibreMinFrom_le_mem : ∀ x xs y,
     y ∈ x :: xs → fibreMinFrom x xs ≤ y := by
@@ -208,15 +140,6 @@ theorem mem_le_fibreMaxFrom : ∀ x xs y,
         exact Nat.le_max_left _ _
       · exact Nat.le_trans (ih z y hyTail)
           (Nat.le_max_right _ _)
-
-theorem fibreMinFrom_le_fibreMaxFrom (x : Nat) (xs : List Nat) :
-    fibreMinFrom x xs ≤ fibreMaxFrom x xs := by
-  have hmin := fibreMinFrom_le_mem x xs x List.mem_cons_self
-  have hmax := mem_le_fibreMaxFrom x xs x List.mem_cons_self
-  exact Nat.le_trans hmin hmax
-
-/-- Filtering a time list preserves duplicate-freeness of any mapped state
-list. -/
 theorem map_filter_nodup {α β : Type}
     (f : α → β) (p : α → Prop) [DecidablePred p] :
     ∀ {xs : List α},
@@ -249,31 +172,6 @@ variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 /-- Number of occupied coordinates in a finite slot frame. -/
 noncomputable def supportWeight (slots : List Nat) (k : Nat) : Nat :=
   trueCount (supportSnap m e r0 slots k)
-
-theorem supportWeight_lt (slots : List Nat) (k : Nat) :
-    supportWeight m e r0 slots k < slots.length + 1 := by
-  unfold supportWeight
-  have h := trueCount_le_length
-    (supportSnap m e r0 slots k)
-  rw [supportSnap_length m e r0 slots k] at h
-  omega
-
-/-- Equal support weights force equal support vectors along one monotone run. -/
-theorem supportSnap_eq_of_weight_eq
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (slots : List Nat) {i j : Nat}
-    (hweight : supportWeight m e r0 slots i =
-      supportWeight m e r0 slots j) :
-    supportSnap m e r0 slots i = supportSnap m e r0 slots j := by
-  unfold supportWeight at hweight
-  by_cases hij : i ≤ j
-  · have hb := support_later_below m e r0 hrun hr0 slots hij
-    have heq := eq_of_below_trueCount_eq hb hweight.symm
-    exact heq.symm
-  · have hji : j ≤ i := by omega
-    have hb := support_later_below m e r0 hrun hr0 slots hji
-    exact eq_of_below_trueCount_eq hb hweight
 
 private theorem support_map_eq_at_mem {α β : Type}
     {xs : List α} {p q : α → β}
@@ -319,42 +217,6 @@ theorem occupied_iff_of_supportSnap_eq_on_slots
       exact hjt
     exact of_decide_eq_true hit
 
-/-- In a complete finite frame, equality of finite support snapshots is equality
-of the entire occupied support. -/
-theorem completeFrame_global_support_eq
-    {globalLo globalHi i j : Nat}
-    {cells slots : List Nat}
-    (frame : CompleteFiniteEpochFrame m e r0
-      globalLo globalHi cells slots)
-    (hiLo : globalLo ≤ i) (hiHi : i ≤ globalHi)
-    (hjLo : globalLo ≤ j) (hjHi : j ≤ globalHi)
-    (hsnap : supportSnap m e r0 slots i =
-      supportSnap m e r0 slots j) :
-    ∀ s, Occupied m e r0 i s ↔ Occupied m e r0 j s := by
-  have hslots := occupied_iff_of_supportSnap_eq_on_slots
-    m e r0 slots hsnap
-  intro s
-  constructor
-  · intro hocc
-    rcases hocc with hs | hb
-    · have hmem := completeFrame_confirmed_slot m e r0 frame
-        hiLo hiHi hs
-      exact (hslots s hmem).mp (Or.inl hs)
-    · have hmem := completeFrame_confirmed_slot m e r0 frame
-        hiLo hiHi hb
-      have hbar := (hslots (m.bar s) hmem).mp (Or.inl hb)
-      exact (occupied_bar m e r0 j s).mp hbar
-  · intro hocc
-    rcases hocc with hs | hb
-    · have hmem := completeFrame_confirmed_slot m e r0 frame
-        hjLo hjHi hs
-      exact (hslots s hmem).mpr (Or.inl hs)
-    · have hmem := completeFrame_confirmed_slot m e r0 frame
-        hjLo hjHi hb
-      have hbar := (hslots (m.bar s) hmem).mpr (Or.inl hb)
-      exact (occupied_bar m e r0 i s).mp hbar
-
-/-- Equal endpoint support makes every step of the interval support-preserving. -/
 theorem pairedSupportFixed_of_endpoint_eq
     (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c)
@@ -373,36 +235,5 @@ theorem pairedSupportFixed_of_endpoint_eq
   · intro hk1
     exact occupied_later_earlier m e r0 hrun hr0
       (Nat.le_succ k) hk1
-
-/-- Restrict a complete finite frame to a subinterval. -/
-def restrictCompleteFiniteEpochFrame
-    {globalLo globalHi lo hi : Nat}
-    {cells slots : List Nat}
-    (frame : CompleteFiniteEpochFrame m e r0
-      globalLo globalHi cells slots)
-    (hLo : globalLo ≤ lo) (hHi : hi ≤ globalHi) :
-    CompleteFiniteEpochFrame m e r0 lo hi cells slots where
-  cells_nodup := frame.cells_nodup
-  slots_nodup := frame.slots_nodup
-  star_closed := frame.star_closed
-  bar_closed := frame.bar_closed
-  bar_ne := frame.bar_ne
-  slot_cell := frame.slot_cell
-  selected := fun k hkLo hkHi c hc =>
-    frame.selected k (Nat.le_trans hLo hkLo)
-      (Nat.le_trans hkHi hHi) c hc
-  confirmed_cell := fun k hkLo hkHi x hx =>
-    frame.confirmed_cell k (Nat.le_trans hLo hkLo)
-      (Nat.le_trans hkHi hHi) x hx
-
-/-- Restrict absence of a four-slot tail to a subinterval. -/
-theorem noFourTail_restrict
-    {globalLo globalHi lo hi : Nat}
-    (hno : StandaloneNoFourTailIn m e r0 globalLo globalHi)
-    (hLo : globalLo ≤ lo) (hHi : hi ≤ globalHi) :
-    StandaloneNoFourTailIn m e r0 lo hi := by
-  intro k hkLo hkHi htail
-  exact hno k (Nat.le_trans hLo hkLo)
-    (Nat.le_trans hkHi hHi) htail
 
 end Echo

@@ -420,33 +420,4 @@ theorem manufactured_pair_all_time_four_phase_tongues
   exact manufactured_pair_four_phase_tongues
     A B state hA hB hAB hBA (Nat.le_of_lt hr)
 
-/-- A compatible manufactured pair supplies the exact four-vector novelty
-cover required by the sharp global accounting interface. -/
-theorem manufactured_pair_four_novelty_cover
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hB : PathGrooves B.toSupported.paths state)
-    (hAB : A.toSupported.action.Avoids B.toSupported.paths)
-    (hBA : B.toSupported.action.Avoids A.toSupported.paths)
-    (times : List Nat) (history : List (List Bool)) :
-    FourNoveltyCover w N (g, state) times history := by
-  let corners : List Tongues :=
-    [state,
-     A.toSupported.action.apply state,
-     B.toSupported.action.apply (A.toSupported.action.apply state),
-     A.toSupported.action.apply
-       (B.toSupported.action.apply
-         (A.toSupported.action.apply state))]
-  refine ⟨corners.map (VectorCount.restrict N), ?_, ?_⟩
-  · simp [corners]
-  · intro k _hk
-    apply List.mem_append_right history
-    apply List.mem_map.mpr
-    refine ⟨tonguesAt w (g, state) k, ?_, rfl⟩
-    exact manufactured_pair_all_time_four_phase_tongues
-      A B state hA hB hAB hBA k
-
 end GeneralN

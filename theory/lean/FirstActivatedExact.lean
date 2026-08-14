@@ -1,4 +1,4 @@
-import TrackQuantitativeTight
+import TrackQuantitative
 import FirstReflectorNovelty
 
 /-! Exact-length manufactured-reflector extraction. -/
@@ -92,62 +92,5 @@ theorem first_activated_quantitative_outcome_exact
     refine ⟨A, state, ?_, hgrooves, hbase, hactivated, ?_, hpreserves⟩
     · omega
     · simpa [hbase, hactivated] using hreachBase
-
-/-- Exact-length two-component extraction. -/
-theorem two_component_quantitative_outcome_exact
-    {w : Wiring} {N e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start finish : Nat × Tongues}
-    (hlive : stepN w (3 * N + 2) start = some finish)
-    (hentry : w.link e = some start.1) :
-    EventuallyPeriodicWithin w start (5 * N + 1) ∨
-      ∃ (A : ManufacturedReflector w start.1 e)
-          (B : ManufacturedReflector w e start.1)
-          (stateA stateB : Tongues),
-        A.exploration.length + A.runway.length + 1 ≤ 2 * N + 1 ∧
-        B.exploration.length + B.runway.length + 1 ≤ 2 * N + 1 ∧
-        A.baseState = start.2 ∧
-        stateA = A.activatedState ∧
-        stepN w (A.exploration.length + A.runway.length + 1) start =
-          some (e, stateA) ∧
-        PathGrooves A.toSupported.paths stateA ∧
-        B.baseState = stateA ∧
-        stateB = B.activatedState ∧
-        stepN w (B.exploration.length + B.runway.length + 1)
-          (e, stateA) = some (start.1, stateB) ∧
-        PathGrooves B.toSupported.paths stateB ∧
-        (∀ j, j ∉ B.exploration.map passageSwitch →
-          stateB j = stateA j) := by
-  have hsplit :
-      stepN w ((N + 1) + (2 * N + 1)) start = some finish := by
-    have hlen : (N + 1) + (2 * N + 1) = 3 * N + 2 := by omega
-    rw [hlen]
-    exact hlive
-  obtain ⟨firstFinish, hliveA, _⟩ := stepN_split_some hsplit
-  rcases first_activated_quantitative_outcome_exact hN hliveA hentry with
-    hperiodicA | hreflectorA
-  · exact Or.inl (hperiodicA.weaken (by omega))
-  · obtain ⟨A, stateA, hfirstLe, hgroovesA,
-      hbaseA, hactivatedA, hreachA, _hpreservesA⟩ := hreflectorA
-    let firstTravel := A.exploration.length + A.runway.length + 1
-    obtain ⟨secondFinish, hliveB⟩ :=
-      stepN_live_after_reached hreachA hlive (by
-        dsimp [firstTravel]
-        omega : firstTravel + (N + 1) ≤ 3 * N + 2)
-    have hentryB : w.link start.1 = some e :=
-      w.symm _ _ A.entryEdge
-    rcases first_activated_quantitative_outcome_exact
-        (w := w) (N := N) (e := start.1)
-        hN hliveB hentryB with hperiodicB | hreflectorB
-    · left
-      exact (hperiodicB.prepend hreachA).weaken (by omega)
-    · right
-      obtain ⟨B, stateB, hsecondLe, hgroovesB,
-        hbaseB, hactivatedB, hreachB, hpreservesB⟩ := hreflectorB
-      exact ⟨A, B, stateA, stateB,
-        hfirstLe, hsecondLe, hbaseA, hactivatedA,
-        hreachA, hgroovesA, hbaseB, hactivatedB,
-        hreachB, hgroovesB, hpreservesB⟩
 
 end GeneralN

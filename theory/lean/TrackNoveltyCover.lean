@@ -315,75 +315,6 @@ theorem completed_retrace_at_one_novelty_cover
   · apply List.mem_append_right history
     simp [hcontactVector]
 
-/-- Absolute-time four-cover interface.  As in the relative theorem, only one
-exception slot is actually used by this completed frame. -/
-theorem completed_retrace_at_four_novelty_cover
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    {start : Nat × Tongues} {K : Nat}
-    (hreach : stepN w K start = some (p, u))
-    (N : Nat) (history : List (List Bool))
-    (hu : VectorCount.restrict N u ∈ history)
-    (times : List Nat)
-    (htimes : ∀ j ∈ times,
-      K ≤ j ∧ j ≤ K + recorded.length + 1) :
-    FourNoveltyCover w N start times history := by
-  obtain ⟨fresh, hfresh, hmem⟩ :=
-    completed_retrace_at_one_novelty_cover hrecorded hgrooved hentry
-      hcontact hreach N history hu times htimes
-  exact ⟨fresh, by omega, hmem⟩
-
-/-- The same local result in the four-candidate interface expected by the
-global sharp proof.  It actually uses only one of the four slots. -/
-theorem completed_retrace_four_novelty_cover
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (N : Nat) (history : List (List Bool))
-    (hu : VectorCount.restrict N u ∈ history)
-    (times : List Nat)
-    (htimes : ∀ d ∈ times, d ≤ recorded.length + 1) :
-    FourNoveltyCover w N (p, u) times history := by
-  obtain ⟨fresh, hfresh, hmem⟩ :=
-    completed_retrace_one_novelty_cover hrecorded hgrooved hentry
-      hcontact N history hu times htimes
-  exact ⟨fresh, by omega, hmem⟩
-
-/-- Distinct vectors sampled anywhere in a completed retrace number at most
-the size of the supplied history plus one.  The path length is irrelevant. -/
-theorem completed_retrace_distinct_vectors_le_history_succ
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (N : Nat) (history : List (List Bool))
-    (hu : VectorCount.restrict N u ∈ history)
-    (times : List Nat)
-    (htimes : ∀ d ∈ times, d ≤ recorded.length + 1)
-    (hnd : (times.map (restrictedTonguesAt w N (p, u))).Nodup) :
-    times.length ≤ history.length + 1 :=
-  noveltyCoverOn_distinct_count
-    (completed_retrace_one_novelty_cover hrecorded hgrooved hentry
-      hcontact N history hu times htimes) hnd
-
-/-- If every sampled vector is genuinely absent from `history`, a completed
-retrace contributes at most one distinct sample.  This is the literal
-"adds at most one new tongue vector" statement. -/
 theorem completed_retrace_novel_vectors_le_one
     {w : Wiring} {g e p oldEntry : Nat}
     {base mouthState u v : Tongues}
@@ -413,27 +344,5 @@ theorem completed_retrace_novel_vectors_le_one
     · simp [hcontactVector]
   have hbound := nodup_subset_length_novelty hnd hsubset
   simpa using hbound
-
-/-- Natural switch-simple corollary of the literal novelty bound.  Here the
-old trace ends in the contact vector `v`, so switch simplicity proves the
-necessary grooving premise rather than assuming it separately. -/
-theorem completed_switchSimple_retrace_novel_vectors_le_one
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base u v : Tongues} {recorded : List Passage}
-    (hrecorded : PhysicalTrace w (g, base) recorded (oldEntry, v))
-    (hsimple : SwitchSimple recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (N : Nat) (history : List (List Bool))
-    (hu : VectorCount.restrict N u ∈ history)
-    (times : List Nat)
-    (htimes : ∀ d ∈ times, d ≤ recorded.length + 1)
-    (hnovel : ∀ d ∈ times,
-      restrictedTonguesAt w N (p, u) d ∉ history)
-    (hnd : (times.map (restrictedTonguesAt w N (p, u))).Nodup) :
-    times.length ≤ 1 :=
-  completed_retrace_novel_vectors_le_one hrecorded
-    (hrecorded.grooved_of_switchSimple hsimple) hentry hcontact
-    N history hu times htimes hnovel hnd
 
 end GeneralN

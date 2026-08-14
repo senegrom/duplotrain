@@ -1,12 +1,9 @@
 name = "duplotrain"
 defaultTargets = [
-  "ActiveLobeCoverCore",
   "Alternation",
   "AlternationBound",
   "ArbitraryStartDirectLift",
-  "BlockAbstractEpochBoundCore",
   "BlockSparseBoundCore",
-  "BlockSparseFixedCountCore",
   "BoundaryAbsentPresentWriterElimination",
   "BoundaryAbsentProtectedPair",
   "BoundaryAbsentSecondWriter",
@@ -22,10 +19,6 @@ defaultTargets = [
   "BoundaryResidualCharge",
   "BoundaryResidualNovelty",
   "BoundaryResidualSharpening",
-  "CanonicalActiveLobeFrame",
-  "CanonicalEdgeRepsCore",
-  "CanonicalProjectedEpochFrame",
-  "CanonicalSupportFrame",
   "ChangedContactNAddFour",
   "ChangedFlipCountActual",
   "ChangedFlipCountConstant",
@@ -51,7 +44,6 @@ defaultTargets = [
   "EarlyFacingConstant",
   "EchoMachine",
   "EdgeReversal",
-  "EndpointAccountingStandalone",
   "EndpointEpochExtraction",
   "EventuallyPeriodicPrefixes",
   "ExternalLobeReflectionCore",
@@ -73,7 +65,6 @@ defaultTargets = [
   "HiddenFibre",
   "JourneyReachesActivated",
   "KnownEdgeFive",
-  "KnownEdgeFourteen",
   "KnownEdgeLift",
   "KnownEdgeNAddFourChangedClosed",
   "KnownEdgeNAddFourComplete",
@@ -83,7 +74,6 @@ defaultTargets = [
   "KoizumiFramePersistence",
   "KoizumiRawExtraction",
   "LinearBound",
-  "LobeBooleanCodeCore",
   "LobePartnerBounce",
   "LobeToggle",
   "ManufacturedPairNovelty",
@@ -103,7 +93,6 @@ defaultTargets = [
   "PairTongueCountFour",
   "PairTongueCountSharp",
   "PairedNoFullReachFreeze",
-  "PairedPointwiseReplayCore",
   "PairedReachReplay",
   "PartialJourneyDichotomy",
   "PartialSecondRunNAddFour",
@@ -137,7 +126,6 @@ defaultTargets = [
   "ShrinkingCurveFinal",
   "SimpleTraceOneNetChange",
   "SingleCoordinateFlip",
-  "SixEventReduction",
   "SlotBound",
   "StableSimpleCycleRecord",
   "StarIndependent",
@@ -158,8 +146,6 @@ defaultTargets = [
   "SteeringLaw",
   "SupportBound",
   "SupportMove",
-  "SupportRelativeNoLobe",
-  "SupportRelativePointwiseReplay",
   "SupportSize",
   "SupportWeightFibres",
   "ThreeQuarterArithmetic",
@@ -179,10 +165,8 @@ defaultTargets = [
   "TrackNoveltyCover",
   "TrackQuantitative",
   "TrackQuantitativeRouteSharp",
-  "TrackQuantitativeTight",
   "TrackStayContactAllTime",
   "TrackStaySpliceAllTime",
-  "TrackStaySpliceSharp",
   "TrackTheta",
   "TrackThetaAllTime",
   "TrackThetaPointwiseCore",
@@ -199,13 +183,9 @@ defaultTargets = [
   "TwoJourneyTailCountSharp",
   "TwoPhasePrefixTailCount",
   "TwoReflectorEdgeTrap",
-  "UnlinkedCounterObstruction",
   "VectorCount",
   "VisibleChipReduction"
 ]
-
-[[lean_lib]]
-name = "ActiveLobeCoverCore"
 
 [[lean_lib]]
 name = "Alternation"
@@ -217,13 +197,7 @@ name = "AlternationBound"
 name = "ArbitraryStartDirectLift"
 
 [[lean_lib]]
-name = "BlockAbstractEpochBoundCore"
-
-[[lean_lib]]
 name = "BlockSparseBoundCore"
-
-[[lean_lib]]
-name = "BlockSparseFixedCountCore"
 
 [[lean_lib]]
 name = "BoundaryAbsentPresentWriterElimination"
@@ -269,18 +243,6 @@ name = "BoundaryResidualNovelty"
 
 [[lean_lib]]
 name = "BoundaryResidualSharpening"
-
-[[lean_lib]]
-name = "CanonicalActiveLobeFrame"
-
-[[lean_lib]]
-name = "CanonicalEdgeRepsCore"
-
-[[lean_lib]]
-name = "CanonicalProjectedEpochFrame"
-
-[[lean_lib]]
-name = "CanonicalSupportFrame"
 
 [[lean_lib]]
 name = "ChangedContactNAddFour"
@@ -358,9 +320,6 @@ name = "EchoMachine"
 name = "EdgeReversal"
 
 [[lean_lib]]
-name = "EndpointAccountingStandalone"
-
-[[lean_lib]]
 name = "EndpointEpochExtraction"
 
 [[lean_lib]]
@@ -424,9 +383,6 @@ name = "JourneyReachesActivated"
 name = "KnownEdgeFive"
 
 [[lean_lib]]
-name = "KnownEdgeFourteen"
-
-[[lean_lib]]
 name = "KnownEdgeLift"
 
 [[lean_lib]]
@@ -452,9 +408,6 @@ name = "KoizumiRawExtraction"
 
 [[lean_lib]]
 name = "LinearBound"
-
-[[lean_lib]]
-name = "LobeBooleanCodeCore"
 
 [[lean_lib]]
 name = "LobePartnerBounce"
@@ -512,9 +465,6 @@ name = "PairTongueCountSharp"
 
 [[lean_lib]]
 name = "PairedNoFullReachFreeze"
-
-[[lean_lib]]
-name = "PairedPointwiseReplayCore"
 
 [[lean_lib]]
 name = "PairedReachReplay"
@@ -616,9 +566,6 @@ name = "SimpleTraceOneNetChange"
 name = "SingleCoordinateFlip"
 
 [[lean_lib]]
-name = "SixEventReduction"
-
-[[lean_lib]]
 name = "SlotBound"
 
 [[lean_lib]]
@@ -679,12 +626,6 @@ name = "SupportBound"
 name = "SupportMove"
 
 [[lean_lib]]
-name = "SupportRelativeNoLobe"
-
-[[lean_lib]]
-name = "SupportRelativePointwiseReplay"
-
-[[lean_lib]]
 name = "SupportSize"
 
 [[lean_lib]]
@@ -742,16 +683,10 @@ name = "TrackQuantitative"
 name = "TrackQuantitativeRouteSharp"
 
 [[lean_lib]]
-name = "TrackQuantitativeTight"
-
-[[lean_lib]]
 name = "TrackStayContactAllTime"
 
 [[lean_lib]]
 name = "TrackStaySpliceAllTime"
-
-[[lean_lib]]
-name = "TrackStaySpliceSharp"
 
 [[lean_lib]]
 name = "TrackTheta"
@@ -800,9 +735,6 @@ name = "TwoPhasePrefixTailCount"
 
 [[lean_lib]]
 name = "TwoReflectorEdgeTrap"
-
-[[lean_lib]]
-name = "UnlinkedCounterObstruction"
 
 [[lean_lib]]
 name = "VectorCount"

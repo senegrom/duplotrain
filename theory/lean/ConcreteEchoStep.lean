@@ -82,36 +82,4 @@ theorem later_append_current_avoids_root
       subst q
       exact hfp
 
-/-- **Concrete physical echo step.**  Suppose `f` is the last ascent of the
-tree now faced after current entry `p` ascends its mouth partner.  If no
-intervening ascent has `f`'s root, the facing phase exits at `wireBar f`. -/
-theorem concrete_echo_step
-    {w : Wiring}
-    {tF tP : Tongues} {f p sF sP : Nat}
-    {fs ps : List Nat} {uF uP : Tongues}
-    (hdF : Descent w tF f fs sF uF)
-    (hdP : Descent w tP p ps sP uP)
-    (hfSlot : IsCanonicalEchoSlot w f)
-    (middle : List Nat)
-    (hmiddle : ∀ q ∈ middle, IsDescentEntry w q)
-    (hmiddleRoots : ∀ q ∈ middle,
-      entryRoot w f ≠ entryRoot w q)
-    (hcurrentDifferent : entryRoot w f ≠ entryRoot w p)
-    (hcurrentLandsAtF : entryLanding w p / 3 = entryRoot w f) :
-    stepN w (f :: fs).length
-      (entryLanding w p,
-        runEntryActions w (middle ++ [p]) uF) =
-      some (wireBar w f,
-        runEntryActions w (middle ++ [p]) uF) := by
-  have hp : IsDescentEntry w p :=
-    ⟨tP, ps, sP, uP, hdP⟩
-  have hlater := later_append_current_avoids_root
-    middle hmiddle hmiddleRoots hp hcurrentDifferent
-  have hret := last_writer_retrace_exit
-    hdF hfSlot (middle ++ [p]) hlater.1 hlater.2
-  have hlanding := entryLanding_eq_three_mul hdP
-  rw [hcurrentLandsAtF] at hlanding
-  rw [hlanding]
-  exact hret
-
 end GeneralN

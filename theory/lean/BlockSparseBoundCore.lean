@@ -135,19 +135,6 @@ private theorem blockCore_nodup_subset_length
       simp only [List.length_cons]
       omega
 
-/-- Count duplicate-free no-adjacent strings of fixed length. -/
-theorem blockCore_code_count
-    (M : Nat) (codes : List (List Bool))
-    (hnd : codes.Nodup)
-    (hlen : ∀ bits ∈ codes, bits.length = M)
-    (hsparse : ∀ bits ∈ codes, BlockNoAdjacent bits) :
-    codes.length ≤ (blockUniverseCore M).length := by
-  apply blockCore_nodup_subset_length hnd
-  intro bits hb
-  rw [← hlen bits hb]
-  exact blockNoAdjacent_mem_universe bits (hsparse bits hb)
-
-/-- Fourth-power monotonicity. -/
 theorem blockCoreFourth_mono {x y : Nat} (h : x ≤ y) :
     fourth x ≤ fourth y := by
   unfold fourth

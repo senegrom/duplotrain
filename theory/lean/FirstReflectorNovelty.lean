@@ -47,27 +47,6 @@ theorem ManufacturedReflector.runway_grooved
     PassagesGrooved state A.runway :=
   hpaths A.runway A.runway_mem_support
 
-/-- **One activation, one novelty.**
-
-At depth zero the pre-return vector is still present.  Every positive depth
-through the contact and complete reverse runway has exactly the activated
-vector.  If the pre-return vector is historical, the whole activation
-therefore has a one-vector novelty cover. -/
-theorem ManufacturedReflector.activation_one_novelty_cover
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hpaths : PathGrooves A.toSupported.paths A.activatedState)
-    (N : Nat) (history : List (List Bool))
-    (hpre : VectorCount.restrict N A.preReturn.2 ∈ history)
-    (times : List Nat)
-    (htimes : ∀ d ∈ times, d ≤ A.runway.length + 1) :
-    NoveltyCoverOn w N A.preReturn times history 1 := by
-  exact completed_retrace_one_novelty_cover
-    A.runway_trace
-    (A.runway_grooved hpaths)
-    A.entryEdge
-    A.return_arrive_mouth
-    N history hpre times htimes
 
 theorem ManufacturedReflector.prefix_and_activation_one_novelty_cover
     {w : Wiring} {g e : Nat}

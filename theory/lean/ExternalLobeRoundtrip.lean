@@ -71,37 +71,6 @@ theorem external_lobe_reflects
             rw [hnextCell, m.star_invol]
       _ = m.bar s := by rw [hkeep]
 
-/-- **External-reflector roundtrip.**  If both endpoints of a support edge
-have lobe mouth partners, the walk returns to its original support endpoint
-in four steps.  The two intervening lobe entries lie on the corresponding
-lobe edges. -/
-theorem external_lobe_roundtrip
-    (hrun : IsRun m e r0)
-    {k s a b : Nat}
-    (hstart : e k = s)
-    (haCell : m.cellOf a = m.star (m.cellOf s))
-    (haLobe : m.cellOf (m.bar a) = m.cellOf a)
-    (hbCell : m.cellOf b = m.star (m.cellOf (m.bar s)))
-    (hbLobe : m.cellOf (m.bar b) = m.cellOf b)
-    (hregA : reg m e r0 k (m.star (m.cellOf s)) = a ∨
-      reg m e r0 k (m.star (m.cellOf s)) = m.bar a)
-    (hregB : reg m e r0 (k+2)
-        (m.star (m.cellOf (m.bar s))) = b ∨
-      reg m e r0 (k+2)
-        (m.star (m.cellOf (m.bar s))) = m.bar b) :
-    (e (k+1) = m.bar a ∨ e (k+1) = a) ∧
-    e (k+2) = m.bar s ∧
-    (e (k+3) = m.bar b ∨ e (k+3) = b) ∧
-    e (k+4) = s := by
-  have hfirst := external_lobe_reflects m e r0 hrun
-    hstart haCell haLobe hregA
-  have hsecond := external_lobe_reflects m e r0 hrun
-    hfirst.2 hbCell hbLobe hregB
-  exact ⟨hfirst.1, hfirst.2, hsecond.1, by
-    simpa only [m.bar_invol] using hsecond.2⟩
-
-/-- Occupancy of a lobe edge supplies exactly the register disjunction needed
-by the reflector theorem. -/
 theorem external_lobe_register_cases
     {k a c : Nat}
     (haCell : m.cellOf a = c)

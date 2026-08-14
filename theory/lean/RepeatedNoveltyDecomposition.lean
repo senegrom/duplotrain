@@ -646,34 +646,6 @@ theorem RawRepeatedWriterNovelAt.has_interior_rerouter
     have horder := F.order
     omega), hrepeat.symm⟩
 
-/-- The interior rerouter can be chosen last. -/
-theorem RawRepeatedWriterNovelAt.has_last_rerouter
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    {start : Nat × Tongues} {right left : Nat}
-    (h : RawRepeatedWriterNovelAt w N start right)
-    (F : RawLastWriterFrame w N start left right) :
-    ∃ reroute,
-      RawLastRerouter w N start left reroute right ∧
-      rawWriterAt w start reroute ≠ rawWriterAt w start right := by
-  classical
-  obtain ⟨j, hoj, hjc, hjprod, hjdiff⟩ :=
-    h.has_interior_rerouter hN F
-  let P : Nat → Prop := fun t =>
-    left < t ∧ RawProductiveAt w N start t
-  have hP : ∃ t, t < right ∧ P t :=
-    ⟨j, hjc, hoj, hjprod⟩
-  obtain ⟨reroute, hrclose, hrP, hlast⟩ :=
-    exists_last_lt_of_exists P hP
-  have hdiff := F.no_same_writer_between reroute
-    hrP.1 hrclose hrP.2
-  exact ⟨reroute, {
-    inside_left := hrP.1
-    inside_right := hrclose
-    productive := hrP.2
-    quiet_after := fun t hrt htc htprod =>
-      hlast t hrt htc ⟨by omega, htprod⟩
-  }, hdiff⟩
 
 def SelectedInternalEdge (u : Tongues) (p q : Nat) : Prop :=
   ∃ C,
@@ -770,87 +742,13 @@ structure RawProductiveCurvePivot
   immediate_reverse : arrive after.2 (3*switch) =
     (before.1, after.2)
 
-/-- **Raw productive pass = endpoint-curve surgery.**
-
-Before the pass, the entered branch is an unmatched curve endpoint and the
-stem is joined to the old selected branch.  Afterwards the entered endpoint
-is joined to the stem, the old selected branch is the new endpoint, and the
-train continues over the switch's immutable stem edge. -/
-theorem rawProductiveAt_curve_pivot
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    {start : Nat × Tongues} {k : Nat}
-    (hprod : RawProductiveAt w N start k) :
-    ∃ before after C,
-      RawProductiveCurvePivot w N start k before after C := by
-  obtain ⟨cur, next, C, hC, hcur, hnext, hstep,
-      hentry, hexit, hflip, hback⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN hprod
-  have hparts := step_some_parts hstep
-  refine ⟨cur, next, C, {
-    writer_eq := hC
-    before_at := hcur
-    after_at := hnext
-    physical_step := hstep
-    entered_old_endpoint := hentry
-    exited_stem := hexit
-    fixed_stem_edge := by simpa [hexit] using hparts.1
-    state_flip := hflip
-    old_through_edge := selectedInternalEdge_stem_selected cur.2 C
-    old_endpoint_closed := ?_
-    new_through_edge := ?_
-    new_endpoint_closed := ?_
-    immediate_reverse := hback
-  }⟩
-  · intro q
-    rw [hentry]
-    exact selectedInternalEdge_unmatched_none_left cur.2 C q
-  · rw [hentry, hflip]
-    exact selectedInternalEdge_after_flip_new cur.2 C
-  · intro q
-    rw [hflip]
-    exact selectedInternalEdge_after_flip_old_none cur.2 C q
-
-/-- The pre-pivot endpoint and stem are on one curve exactly in the
-self-pivot case. -/
 def RawCurveSelfJoin (w : Wiring)
     (before : Nat × Tongues) (C : Nat) : Prop :=
   DecompCurveConnected w before.2 before.1 (3*C)
 
-/-- In the non-self case the pivot installs a connection between two ports
-which were on different old curves.  This is the exact local component-merge
-half of Koizumi's invariant; the simultaneous removal of the old through
-edge leaves the complementary strict subcurve. -/
-theorem RawProductiveCurvePivot.self_or_connects_distinct_curves
-    {w : Wiring} {N : Nat} {start : Nat × Tongues} {k : Nat}
-    {before after : Nat × Tongues} {C : Nat}
-    (P : RawProductiveCurvePivot w N start k before after C) :
-    RawCurveSelfJoin w before C ∨
-      (¬ DecompCurveConnected w before.2 before.1 (3*C) ∧
-       DecompCurveConnected w after.2 before.1 (3*C)) := by
-  by_cases hself : RawCurveSelfJoin w before C
-  · exact Or.inl hself
-  · right
-    refine ⟨hself, ?_⟩
-    apply DecompCurveConnected.of_edge
-    exact Or.inr (selectedInternalEdge_symm P.new_through_edge)
 
 def StrictSubarc {α : Type} (small big : List α) : Prop :=
   ∃ pre : List α, ∃ pivot : α, ∃ post : List α,
     big = pre ++ pivot :: post ∧
     (small = pre ∨ small = post)
-
-theorem strictSubarc_length_lt
-    {α : Type} {small big : List α}
-    (h : StrictSubarc small big) : small.length < big.length := by
-  obtain ⟨pre, pivot, post, hbig, hsmall | hsmall⟩ := h
-  · subst big
-    subst small
-    simp only [List.length_append, List.length_cons]
-    omega
-  · subst big
-    subst small
-    simp only [List.length_append, List.length_cons]
-    omega
-
 end GeneralN

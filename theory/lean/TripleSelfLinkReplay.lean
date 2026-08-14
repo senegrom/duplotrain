@@ -46,20 +46,6 @@ theorem self_link_exact_two_passage_trace
   exact PhysicalTrace.cons hforward hself
     (PhysicalTrace.cons hback hmouth (PhysicalTrace.nil _))
 
-/-- Step-count form of `self_link_exact_two_passage_trace`. -/
-theorem self_link_exact_two_step_bounce
-    {w : Wiring} {branch outside : Nat} {state : Tongues}
-    (hbranch : branch % 3 ≠ 0)
-    (hself : w.link branch = some branch)
-    (hmouth : w.link (3 * (branch / 3)) = some outside)
-    (hselected : state (branch / 3) = bval branch) :
-    stepN w 2 (3 * (branch / 3), state) = some (outside, state) := by
-  simpa using
-    (self_link_exact_two_passage_trace hbranch hself hmouth hselected).sound
-
-/-- Package the local self-link as the degenerate manufactured reflector used
-by the global repair theory.  Its runway is empty and its only support passage
-is the selected self-linked arm. -/
 theorem self_link_core_stay_reflector
     {w : Wiring} {branch outside : Nat} {state : Tongues}
     (hbranch : branch % 3 ≠ 0)
@@ -92,29 +78,6 @@ theorem self_link_core_stay_reflector
     entryEdge := hentry
   }
   exact Nonempty.intro R
-
-theorem certified_used_self_link_has_stay_reflector
-    {w : Wiring} {run : CertifiedConcreteEchoRun w}
-    (huse : CertifiedRunUsesSelfLink run) :
-    exists q outside : Nat, exists state : Tongues,
-      state (run.entry q / 3) = bval (run.entry q) /\
-      Nonempty (ManufacturedStayReflector w
-        (3 * (run.entry q / 3)) outside) := by
-  obtain ⟨q, hself⟩ := huse
-  have hslot := run.toConcreteAscentTrace.freeSlot q
-  let state := pin (run.boundary q) (run.entry q)
-  have hselected : state (run.entry q / 3) = bval (run.entry q) := by
-    simp [state, pin]
-  rcases hslot.1 with ⟨initial, tail, landing, finish, hd⟩
-  cases hd with
-  | last hbranch hmouth _ =>
-      exact ⟨q, landing, state, hselected,
-        self_link_core_stay_reflector
-          hbranch hself hmouth hselected⟩
-  | @cons _ p next landing tail _ hbranch hmouth _ _ =>
-      exact ⟨q, next, state, hselected,
-        self_link_core_stay_reflector
-          hbranch hself hmouth hselected⟩
 
 theorem flip_then_self_link_all_time_two_phase_tongues
     {w : Wiring} {g e : Nat}
@@ -291,26 +254,6 @@ def CertifiedSelfLinkReplayOrTail
     Nonempty (RunwayTailBeforeSecond w N start F.z₁) \/
     Nonempty (SelfLinkPairTailBeforeSecond w N start F.z₁)
 
-/-- Either resolution branch is incompatible with the five fixed-stem
-novelties and the certified no-replay condition. -/
-theorem CertifiedEndpointEmptyABCABC.impossible_of_self_link_resolution
-    {w : Wiring} {N : Nat} {start : Prod Nat Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    {S : SelectedFiveFrameABCABC T}
-    (F : FiveFixedStemNovelFrames w N start)
-    (C : CertifiedEndpointEmptyABCABC S)
-    (hresolve : CertifiedSelfLinkReplayOrTail F C) : False := by
-  rcases hresolve with hreplay | hrunway | hpair
-  · exact C.no_replay hreplay
-  · obtain ⟨tail⟩ := hrunway
-    exact no_five_fixed_stem_novelties_of_runway_tail F tail
-  · obtain ⟨tail⟩ := hpair
-    exact no_five_fixed_stem_novelties_of_self_link_pair_tail F tail
-
-/-- The exact remaining global placement law for the non-irreflexive branch.
-It asks only that an encountered self-link be placed by the raw compiler into
-the complete-replay or early-runway alternatives above. -/
 def KnownEdgeABCABCSelfLinkReplayOrTailClosure : Prop :=
   forall (w : Wiring) (N e : Nat),
     (forall p q, w.link p = some q -> p < 3 * N /\ q < 3 * N) ->

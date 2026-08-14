@@ -63,24 +63,4 @@ theorem occupied_lobe_partner_toggle
       reg_write m e r0 hnextCell
     _ = m.bar (reg m e r0 k (m.cellOf a)) := hstep
 
-/-- Entering either endpoint of a lobe identifies the preceding cell as its
-mouth partner. -/
-theorem lobe_endpoint_predecessor_partner
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    {k a : Nat}
-    (hlobe : m.cellOf (m.bar a) = m.cellOf a)
-    (hnext : e (k+1) = a ∨ e (k+1) = m.bar a) :
-    m.cellOf (e k) = m.star (m.cellOf a) := by
-  have hfar := new_far_cell m e r0 hrun hr0 k
-  have hstar : m.star (m.cellOf (e k)) = m.cellOf a := by
-    rcases hnext with h | h
-    · rw [h, hlobe] at hfar
-      exact hfar.symm
-    · rw [h, m.bar_invol] at hfar
-      exact hfar.symm
-  have hs := congrArg m.star hstar
-  rw [m.star_invol] at hs
-  exact hs
-
 end Echo

@@ -5,7 +5,6 @@ import OneReflectorContinuation
 import PointwiseSimpleCycleTail
 import TraceRetainingFirstRevisit
 import TwoHistoryUnionCharge
-import StateLawTwoSixUltra
 
 /-!
 # Sharp partial second-run accounting

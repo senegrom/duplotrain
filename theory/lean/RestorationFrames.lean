@@ -1,4 +1,3 @@
-import PairedNoFullReachFreeze
 import ReversalFacts
 import TreeReplay
 import TwoReflectorEdgeTrap
@@ -100,35 +99,6 @@ theorem returned_root_replays_component_of_support
   exact rootedCells_sameEdge_replay m e r0 hr0 cells hsupport
     hfullK hfullL (Or.inl hreturn) hroot
 
-/-- **Returned-root component replay.** During a fixed-support interval, a
-foreign productive write makes its evicted edge full. If a later foreign
-productive write returns that root, the whole rooted component has its old
-snapshot. -/
-theorem returned_root_replays_component
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells : List Nat) {k l : Nat}
-    (hkl : k < l)
-    (hfixed : PairedSupportFixed m e r0 k (l+1))
-    (hpk : ProductiveStep m e r0 k)
-    (hpl : ProductiveStep m e r0 l)
-    (hdiffk : ¬ SameEdge m (oldSlot m e r0 k) (e (k+1)))
-    (hdiffl : ¬ SameEdge m (oldSlot m e r0 l) (e (l+1)))
-    (hreturn : e (l+1) = oldSlot m e r0 k)
-    (hroot : RootedCells m e r0 k (oldSlot m e r0 k) cells) :
-    snap m e r0 cells (l+1) = snap m e r0 cells k := by
-  have holdOccupied : Occupied m e r0 k (oldSlot m e r0 k) := by
-    left
-    unfold oldSlot
-    exact old_register_confirmed m e r0 hr0 k _
-  have hpres : Occupied m e r0 (k+1) (oldSlot m e r0 k) :=
-    (hfixed k (Nat.le_refl _) (by omega) _).mp holdOccupied
-  have hsupport : ∀ s,
-      Occupied m e r0 k s ↔ Occupied m e r0 (l+1) s :=
-    pairedSupportFixed_between_of_le m e r0 hfixed
-      (Nat.le_refl _) (by omega) (Nat.le_refl _)
-  exact returned_root_replays_component_of_support m e r0 hrun hr0 cells
-    hpk hpl hsupport hpres hdiffk hdiffl hreturn hroot
 
 private theorem exists_first_after {P : Nat → Prop} :
     ∀ d a, ¬ P a → P (a+d+1) →

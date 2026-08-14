@@ -180,17 +180,4 @@ theorem vector_count_le (N : Nat) (us : List Tongues)
     hnd
   simpa only [List.length_map] using h
 
-/-- The trajectory form: along any `seq : Nat → Tongues` — e.g. the
-tongue component of any run of any wiring — any list of times whose
-vectors differ pairwise on the first `N` switches has length at most
-`2^N`. -/
-theorem trajectory_count_le (N : Nat) (seq : Nat → Tongues)
-    (ks : List Nat)
-    (hnd : (ks.map (fun k => restrict N (seq k))).Nodup) :
-    ks.length ≤ 2 ^ N := by
-  have h := vector_count_le N (ks.map seq) (by
-    rw [List.map_map]
-    exact hnd)
-  simpa only [List.length_map] using h
-
 end VectorCount

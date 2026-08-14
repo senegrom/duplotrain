@@ -89,11 +89,6 @@ theorem branchPort_bval {p : Nat} (hp : p % 3 ≠ 0) :
 
 /-! ## Trailing routes ignore the tongues (T1/T2) -/
 
-/-- The exit route of a trailing pass is a pure wiring fact. -/
-theorem trailing_route (w : Wiring) (p : Nat) (t : Tongues)
-    (hp : p % 3 ≠ 0) :
-    (step w (p, t)).map Prod.fst = w.link (3 * (p / 3)) := by
-  cases h : w.link (3 * (p / 3)) <;> simp [step, arrive, hp, h]
 
 inductive Descent (w : Wiring) :
     Tongues → Nat → List Nat → Nat → Tongues → Prop
@@ -381,66 +376,11 @@ theorem lobe_hop (w : Wiring) (a p : Nat) (u : Tongues)
       · rw [if_neg hj, if_neg hj]
     simp [stepN, step, arrive, h0, hd, hb, hlobe', h1d, hstem, hpin]
 
-/-- **The generalized dogbone bounce** (T6, arbitrary N, arbitrary interior
-cascade).  Two lobed switches `a` and `b`, `a`'s stem wired into a trailing
-cascade `p :: ps` landing on `b`'s stem.  From `a`'s stem with any tongues
-agreeing with the cascade's pins and avoiding `a`, `b` inside the cascade:
-one half-period of `2·|ps| + 6` steps flips exactly `a` and `b` and returns
-the train to `a`'s stem.  The walk is trapped in the bounce forever. -/
-theorem dogbone_halfPeriod
-    (w : Wiring) (a b p : Nat) (ps : List Nat) (t₀ t₁ : Tongues) (u : Tongues)
-    (ha_lobe : w.link (3 * a + 1) = some (3 * a + 2))
-    (hb_lobe : w.link (3 * b + 1) = some (3 * b + 2))
-    (ha_stem : w.link (3 * a) = some p)
-    (hD : Descent w t₀ p ps (3 * b) t₁)
-    (hagree : Agrees u (p :: ps))
-    (hnota : ∀ q ∈ p :: ps, q / 3 ≠ a)
-    (hnotb : ∀ q ∈ p :: ps, q / 3 ≠ b) :
-    stepN w (2 * ps.length + 6) (3 * a, u)
-      = some (3 * a, flipAt (flipAt u a) b) := by
-  -- Phase 1: hop a's lobe (2 steps).
-  have hop1 := lobe_hop w a p u ha_lobe ha_stem
-  -- Phase 2: ride the cascade, a no-op on tongues (|ps| + 1 steps).
-  have hagree1 : Agrees (flipAt u a) (p :: ps) := agrees_flip hagree hnota
-  obtain ⟨t₂, hD1⟩ := descent_rebase hD (flipAt u a)
-  have ride := descent_sound_noop hD1 hagree1
-  -- Phase 3: hop b's lobe (2 steps); b's stem edge comes from the descent.
-  have hb_stem : w.link (3 * b) = some (3 * (lastOf p ps / 3)) :=
-    w.symm _ _ (descent_last_link hD)
-  have hop2 := lobe_hop w b (3 * (lastOf p ps / 3)) (flipAt u a)
-    hb_lobe hb_stem
-  -- Phase 4: retrace the cascade backwards (|ps| + 1 steps).
-  have hagree2 : Agrees (flipAt (flipAt u a) b) (p :: ps) :=
-    agrees_flip hagree1 hnotb
-  have back := retrace hD (3 * a) ha_stem (flipAt (flipAt u a) b) hagree2
-  -- Assemble: 2 + (|ps|+1) + 2 + (|ps|+1) = 2|ps| + 6.
-  have hlen : 2 * ps.length + 6
-      = 2 + ((ps.length + 1) + (2 + (p :: ps).length)) := by
-    rw [List.length_cons]; omega
-  rw [hlen, stepN_add, hop1]
-  show (stepN w ((ps.length + 1) + (2 + (p :: ps).length))
-    (p, flipAt u a)) = _
-  rw [stepN_add, ride]
-  show (stepN w (2 + (p :: ps).length) (3 * b, flipAt u a)) = _
-  rw [stepN_add, hop2]
-  simpa using back
 
 def IsReflector (w : Wiring) (g e k : Nat)
     (S : Tongues → Prop) (τ : Tongues → Tongues) : Prop :=
   ∀ u, S u → stepN w k (g, u) = some (e, τ u) ∧ S (τ u)
 
-/-- A lobed switch is a reflector on all states. -/
-theorem lobe_isReflector (w : Wiring) (a p : Nat)
-    (hlobe : w.link (3 * a + 1) = some (3 * a + 2))
-    (hstem : w.link (3 * a) = some p) :
-    IsReflector w (3 * a) p 2 (fun _ => True) (flipAt · a) := by
-  intro u _
-  exact ⟨lobe_hop w a p u hlobe hstem, trivial⟩
-
-/-- **The reflector bounce, half period.**  Reflector A's exit feeds a
-trailing cascade landing on reflector B's mouth; B's exit is the cascade's
-last stem, so the retrace carries the train straight back to A's mouth.
-One half-period applies `τA` then `τB`. -/
 theorem reflector_halfPeriod
     (w : Wiring) {gA kA gB kB p : Nat} {ps : List Nat}
     {SA SB : Tongues → Prop} {τA τB : Tongues → Tongues}
@@ -468,43 +408,5 @@ theorem reflector_halfPeriod
   show (stepN w kB (gB, τA u)).bind (stepN w (p :: ps).length) = _
   rw [hopB]
   exact back
-
-/-- **The reflector bounce, full period.**  For involutive, commuting state
-maps (disjoint gadget supports), two half-periods restore the tongues
-exactly: any reflector pair joined by any cascade is trapped in a genuine
-cycle whose tongue states are the Gray orbit `{u, τA u, τB (τA u), τB u}`. -/
-theorem reflector_period
-    (w : Wiring) {gA kA gB kB p : Nat} {ps : List Nat}
-    {SA SB : Tongues → Prop} {τA τB : Tongues → Tongues}
-    {t₀ t₁ : Tongues}
-    (hA : IsReflector w gA p kA SA τA)
-    (hB : IsReflector w gB (3 * (lastOf p ps / 3)) kB SB τB)
-    (hD : Descent w t₀ p ps gB t₁)
-    (hga : w.link gA = some p)
-    (hAa : ∀ u, Agrees u (p :: ps) → Agrees (τA u) (p :: ps))
-    (hBa : ∀ u, Agrees u (p :: ps) → Agrees (τB u) (p :: ps))
-    (hSAB : ∀ u, SA u → SA (τB (τA u)))
-    (hSBB : ∀ u, SB u → SB (τA (τB u)))
-    (hcomm : ∀ u, τA (τB u) = τB (τA u))
-    (hinvA : ∀ u, τA (τA u) = u)
-    (hinvB : ∀ u, τB (τB u) = u)
-    (u : Tongues) (hSA : SA u) (hSB : SB (τA u))
-    (hagree : Agrees u (p :: ps)) :
-    stepN w (2 * (kA + (ps.length + 1) + kB + (p :: ps).length)) (gA, u)
-      = some (gA, u) := by
-  have h1 := reflector_halfPeriod w hA hB hD hga hAa hBa u hSA hSB hagree
-  have hagree2 : Agrees (τB (τA u)) (p :: ps) := hBa _ (hAa _ hagree)
-  have hSA2 : SA (τB (τA u)) := hSAB u hSA
-  have hSB2 : SB (τA (τB (τA u))) := hSBB (τA u) hSB
-  have h2 := reflector_halfPeriod w hA hB hD hga hAa hBa
-    (τB (τA u)) hSA2 hSB2 hagree2
-  have hflip : τB (τA (τB (τA u))) = u := by
-    rw [hcomm (τA u), hinvA, hinvB]
-  have hlen : 2 * (kA + (ps.length + 1) + kB + (p :: ps).length)
-      = (kA + (ps.length + 1) + kB + (p :: ps).length)
-        + (kA + (ps.length + 1) + kB + (p :: ps).length) := by omega
-  rw [hlen, stepN_add, h1]
-  show stepN w _ (gA, τB (τA u)) = _
-  rw [h2, hflip]
 
 end GeneralN

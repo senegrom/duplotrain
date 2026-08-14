@@ -98,22 +98,6 @@ theorem mem_rawRepeatedWriterNovelTimes_iff
       k < K ∧ RawRepeatedWriterNovelAt w N start k := by
   classical
   simp [rawRepeatedWriterNovelTimes]
-
-theorem mem_rawRepeatedWriterTimes_iff
-    {w : Wiring} {N K k : Nat} {start : Nat × Tongues} :
-    k ∈ rawRepeatedWriterTimes w N start K ↔
-      k < K ∧ RawProductiveAt w N start k ∧
-        ¬ RawFirstWriterAt w N start k := by
-  classical
-  simp [rawRepeatedWriterTimes]
-
-/-- **THE FINITE ALTERNATION TARGET. OPEN.**
-
-In every finite raw prefix, at most five productive events both revisit a
-previously productive writer and create a globally new restricted tongue
-vector. This is the exact matching/endpoint theorem sought by the sharp
-proof; it quantifies over arbitrary `N`, arbitrary symmetric wirings, every
-start, and every finite horizon. -/
 def FiveRepeatedWriterNovelty : Prop :=
   ∀ (w : Wiring) (N : Nat),
     (∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N) →
@@ -263,25 +247,6 @@ theorem rawNovelAt_post_injective
       apply List.mem_map.mpr
       exact ⟨j+1, List.mem_range.mpr (by omega), hvector.symm⟩
 
-/-- On a raw prefix whose complete restricted tongue-vector list is
-duplicate-free, every productive repeated-writer event is globally novel at
-that point. -/
-theorem repeatedWriterAt_novel_of_distinct_prefix
-    {w : Wiring} {N K k : Nat} {start : Nat × Tongues}
-    (hk : k < K)
-    (hnd : ((List.range (K+1)).map
-      (restrictedTonguesAt w N start)).Nodup)
-    (hrepeat : RawProductiveAt w N start k ∧
-      ¬ RawFirstWriterAt w N start k) :
-    RawRepeatedWriterNovelAt w N start k := by
-  refine ⟨hrepeat.1, hrepeat.2, ?_⟩
-  intro hseen
-  obtain ⟨j, hj, hvector⟩ := List.mem_map.mp hseen
-  have hjlt : j < k+1 := List.mem_range.mp hj
-  have heq : j = k+1 := map_nodup_injective_on_raw hnd
-    j (List.mem_range.mpr (by omega))
-    (k+1) (List.mem_range.mpr (by omega)) hvector
-  omega
 
 theorem rawProductiveAt_writer_lt
     {w : Wiring} {N : Nat}
@@ -542,21 +507,5 @@ theorem le_maxRawTime_of_mem {k : Nat} :
       rcases List.mem_cons.mp hk with rfl | hkRest
       · exact Nat.le_max_left _ _
       · exact Nat.le_trans (ih hkRest) (Nat.le_max_right _ _)
-
-/-- **Exact reduction of the open state law to the finite alternation
-target.** Proving `FiveRepeatedWriterNovelty` proves `StateLaw`. -/
-theorem stateLaw_of_fiveRepeatedWriterNovelty
-    (hfive : FiveRepeatedWriterNovelty) : StateLaw := by
-  intro w N hN start times _hlive hnd
-  let K := maxRawTime times
-  have htimes : ∀ k, k ∈ times → k ≤ K := by
-    intro k hk
-    exact le_maxRawTime_of_mem hk
-  have hbudget :
-      (rawRepeatedWriterNovelTimes w N start K).length ≤ 5 :=
-    hfive w N hN start K
-  have hcount := distinct_samples_le_of_repeated_writer_novelty
-    w N hN start K 5 hbudget times htimes hnd
-  omega
 
 end GeneralN

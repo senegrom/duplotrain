@@ -337,35 +337,6 @@ theorem preserved_simple_fall_distinct_le_N_add_two
       hN rfl htrace hsimple hA hend
   omega
 
-/-- Concrete support-disjoint corollary: avoiding every old support switch
-derives the endpoint groove condition automatically. -/
-theorem foreign_simple_fall_distinct_le_N_add_two
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    {finish : Nat × Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w (e, A.activatedState) passages finish)
-    (hsimple : SwitchSimple passages)
-    (hforeign : ∀ fresh ∈ passages,
-      ∀ path ∈ A.toSupported.paths, ∀ old ∈ path,
-        passageSwitch fresh ≠ passageSwitch old)
-    (hfall : step w finish = none)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    times.length ≤ N + 2 := by
-  have hend : PathGrooves A.toSupported.paths finish.2 :=
-    pathGrooves_preserved_by_foreign_trace htrace hA hforeign
-  exact preserved_simple_fall_distinct_le_N_add_two
-    hN A hA htrace hsimple hend hfall times hlive hnd
-
-/-- A support-preserving simple lead followed by a tail with one settled
-vector at every positive local time has at most `N+3` distinct vectors on
-the complete raw run. -/
 theorem simple_lead_one_vector_tail_distinct_le_N_add_three
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →

@@ -236,49 +236,4 @@ theorem reg_foreign (cells : List Nat) (hallcells : ∀ s, m.cellOf s ∈ cells)
       rw [reg_skip m e r0
         (fun h : m.cellOf (e (n+1)) = c => hc (h ▸ hallcells (e (n+1))))]
       exact ih
-
-theorem run_rho (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells slots : List Nat) (hnd : slots.Nodup)
-    (hallcells : ∀ s, m.cellOf s ∈ cells)
-    (hcells : ∀ k, m.star (m.cellOf (e k)) ∈ cells)
-    (hregslots : ∀ j c, reg m e r0 j c ∈ slots) :
-    ∃ K p, 0 < p ∧ K + p ≤ slots.length ^ (cells.length + 1) + 1 ∧
-      (∀ t, K ≤ t → e (t + p) = e t) ∧
-      (∀ t c, K ≤ t → reg m e r0 (t + p) c = reg m e r0 t c) ∧
-      (∀ t, K ≤ t → ProductiveStep m e r0 t →
-        TokenEnd m e r0 (t+1) (reg m e r0 t (m.cellOf (e (t+1))))) := by
-  have hslots : ∀ k, e k ∈ slots := by
-    intro k
-    have hw : reg m e r0 k (m.cellOf (e k)) = e k := reg_write m e r0 rfl
-    have h := hregslots k (m.cellOf (e k))
-    rwa [hw] at h
-  obtain ⟨i, j, hij, hjle, hF⟩ := state_repeat m e r0 cells slots hregslots
-  have hp0 : 0 < j - i := by omega
-  have hreplay := state_replay m e r0 hrun cells hcells hF
-  have hentry : ∀ t, i ≤ t → e (t + (j - i)) = e t := by
-    intro t ht
-    obtain ⟨s, rfl⟩ : ∃ s, t = i + s := ⟨t - i, by omega⟩
-    have h := stateCode_entry_eq m e r0 cells (hreplay s)
-    have harith : i + s + (j - i) = j + s := by omega
-    rw [harith]
-    exact h.symm
-  have hregs : ∀ t c, i ≤ t →
-      reg m e r0 (t + (j - i)) c = reg m e r0 t c := by
-    intro t c ht
-    obtain ⟨s, rfl⟩ : ∃ s, t = i + s := ⟨t - i, by omega⟩
-    have harith : i + s + (j - i) = j + s := by omega
-    rw [harith]
-    by_cases hc : c ∈ cells
-    · exact (stateCode_reg_eq m e r0 cells (hreplay s) c hc).symm
-    · rw [reg_foreign m e r0 cells hallcells hc,
-        reg_foreign m e r0 cells hallcells hc]
-  refine ⟨i, j - i, hp0, by omega, hentry, hregs, ?_⟩
-  intro t ht hprod
-  obtain ⟨q, r, hqr, hrlt⟩ : ∃ q r, q + r = t - i ∧ r < j - i :=
-    ⟨(j - i) * ((t - i) / (j - i)), (t - i) % (j - i),
-      Nat.div_add_mod _ _, Nat.mod_lt _ hp0⟩
-  exact recurrence_emission m e r0 hrun hr0 slots hnd hslots
-    (fun c => (hregs (i + q) c (Nat.le_add_right _ _)).symm)
-    (by omega) (by omega) hprod
-
 end Echo

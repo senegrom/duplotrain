@@ -131,26 +131,6 @@ theorem echo (hrun : IsRun m e r0) {i j k : Nat}
   have hj : e (j+1) = m.bar (e i) := return_jump m e r0 hrun h2c h2j h2no
   rw [hk, hj, m.bar_invol]
 
-/-- **Alternation propagation, positive form.**  Two ascents of the same
-cell whose gap contains no partner-cell ascent produce the *same*
-successor entry.  (So an entry change at a cell requires its feeder's
-partner to have been ascended in between.) -/
-theorem succ_repeat (hrun : IsRun m e r0) {i j : Nat}
-    (hcell : m.cellOf (e i) = m.cellOf (e j)) (hij : i ≤ j)
-    (hno : ∀ ℓ, i < ℓ → ℓ ≤ j → m.cellOf (e ℓ) ≠ m.star (m.cellOf (e i))) :
-    e (j+1) = e (i+1) := by
-  have hi := hrun i
-  have hj := hrun j
-  rw [hcell] at hi hno
-  have hreg : reg m e r0 j (m.star (m.cellOf (e j)))
-      = reg m e r0 i (m.star (m.cellOf (e j))) := by
-    obtain ⟨d, rfl⟩ : ∃ d, j = i + d := ⟨j - i, by omega⟩
-    exact reg_stable m e r0 d (fun ℓ h1 h2 => hno ℓ h1 h2)
-  rw [hj, hreg, ← hi]
-
-/-- **Alternation propagation, contrapositive form.**  If two ascents of
-the same cell produce different successors, the partner register itself
-changed value in between. -/
 theorem entry_change_read_change (hrun : IsRun m e r0) {i j : Nat}
     (_hcell : m.cellOf (e i) = m.cellOf (e j))
     (hne : e (j+1) ≠ e (i+1)) :
@@ -197,32 +177,9 @@ theorem witness (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
   · rw [hv]; exact reg_cell m e r0 hr0 k _
   · exact hv.symm
 
-/-- **Merge at the mouth, direct form.**  Two ascents of the same cell
-whose partner registers agree at read time have identical successors:
-an alternating cell cannot steer its own variation. -/
-theorem succ_of_reg_eq (hrun : IsRun m e r0) {i j : Nat}
-    (hcell : m.cellOf (e i) = m.cellOf (e j))
-    (hreg : reg m e r0 i (m.star (m.cellOf (e i)))
-          = reg m e r0 j (m.star (m.cellOf (e j)))) :
-    e (i+1) = e (j+1) := by
-  rw [hrun i, hrun j, hcell] at *
-  exact congrArg m.bar hreg
-
-/-- The dogbone pattern: consecutive ascents are of partner cells. -/
 def Alternating : Prop :=
   ∀ k, m.cellOf (e (k+1)) = m.star (m.cellOf (e k))
 
-/-- **The bounce.**  On a partner-alternating run each read sees the
-register written two steps ago, so `e (k+2) = bar (e k)`. -/
-theorem bounce_step (hrun : IsRun m e r0) (halt : Alternating m e)
-    (k : Nat) : e (k+2) = m.bar (e k) := by
-  have h1 := hrun (k+1)
-  rw [halt k, m.star_invol] at h1
-  have hne : m.cellOf (e (k+1)) ≠ m.cellOf (e k) := by
-    rw [halt k]
-    exact m.star_ne _
-  rw [reg_skip m e r0 hne, reg_write m e r0 rfl] at h1
-  exact h1
 
 private theorem twoStep (P : Nat → Prop) (h0 : P 0) (h1 : P 1)
     (hs : ∀ n, P n → P (n+2)) : ∀ n, P n
@@ -668,95 +625,6 @@ private theorem nodup_map_filter {f : Nat → List Nat} {p : Nat → Bool} :
           exact ih h.2
 
 open Classical in
-/-- **Conditional counting scaffold — NOT the state law.**  IF a run
-has a Gray tail (`htail`: from some `K` on the snapshot lies in a
-fixed ≤4-element set) and at most one alternation before it
-(`hcover`/`halts`), THEN at most `#cells + 6` distinct snapshots
-occur.  Those two hypotheses are **the open core of the problem — the
-hard part**, unproved for general runs; what this theorem contributes
-is only the counting around them: snapshot stability, last-write
-extraction, first-write injectivity, the coding.  The actual target
-statement lives in `StateLaw.lean` (`GeneralN.StateLaw`) and is open. -/
-theorem state_law (_hrun : IsRun m e r0)
-    (cells : List Nat) (hcells : ∀ k, m.cellOf (e k) ∈ cells)
-    (K : Nat) (S : List (List Nat)) (hS : S.length ≤ 4)
-    (htail : ∀ j, K ≤ j → snap m e r0 cells j ∈ S)
-    (alts : List Nat) (halts : alts.length ≤ 1)
-    (hcover : ∀ i, i < K → ProductiveStep m e r0 i →
-      FirstStep m e i ∨ i ∈ alts)
-    (ks : List Nat)
-    (hnd : (ks.map (snap m e r0 cells)).Nodup) :
-    ks.length ≤ cells.length + 6 := by
-  have hsplit := filter_split (fun k => decide (k < K)) ks
-  -- tail: distinct snapshots inside S
-  have htailpart :
-      (ks.filter (fun k => !(decide (k < K)))).length ≤ 4 := by
-    have hnd2 := nodup_map_filter
-      (p := fun k => !(decide (k < K))) hnd
-    have hmem : ∀ v ∈ (ks.filter (fun k => !(decide (k < K)))).map
-        (snap m e r0 cells), v ∈ S := by
-      intro v hv
-      obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hv
-      have hk2 := (List.mem_filter.mp hk).2
-      have hK : K ≤ k := by
-        simp only [Bool.not_eq_true', decide_eq_false_iff_not] at hk2
-        omega
-      exact htail k hK
-    have hle := nodup_subset_length hnd2 hmem
-    rw [List.length_map] at hle
-    omega
-  -- transient: inject into 0 :: 1 :: cells.map (· + 2)
-  have htrans :
-      (ks.filter (fun k => decide (k < K))).length
-        ≤ cells.length + 2 := by
-    have hltK : ∀ k ∈ ks.filter (fun k => decide (k < K)), k < K := by
-      intro k hk
-      have := (List.mem_filter.mp hk).2
-      simpa using this
-    have hndl := nodup_map_filter (p := fun k => decide (k < K)) hnd
-    have hcodes : ((ks.filter (fun k => decide (k < K))).map
-        (codeOf m e r0)).Nodup :=
-      nodup_transfer _
-        (fun x hx y hy hc => code_eq_snap_eq m e r0 cells K alts halts
-          hcover (hltK x hx) (hltK y hy) hc)
-        hndl
-    have hmemcodes : ∀ v ∈ (ks.filter (fun k => decide (k < K))).map
-        (codeOf m e r0), v ∈ 0 :: 1 :: cells.map (· + 2) := by
-      intro v hv
-      obtain ⟨k, _, rfl⟩ := List.mem_map.mp hv
-      rcases codeOf_spec m e r0 cells k with ⟨hc0, _⟩ |
-        ⟨j, _, _, _, hcase⟩
-      · rw [hc0]; exact List.mem_cons_self
-      · rcases hcase with ⟨_, hcode⟩ | ⟨_, hcode⟩
-        · rw [hcode]
-          exact List.mem_cons_of_mem _ (List.mem_cons_of_mem _
-            (List.mem_map.mpr ⟨_, hcells (j+1), rfl⟩))
-        · rw [hcode]
-          exact List.mem_cons_of_mem _ List.mem_cons_self
-    have hle := nodup_subset_length hcodes hmemcodes
-    rw [List.length_map] at hle
-    simp only [List.length_cons, List.length_map] at hle
-    omega
-  omega
-
-/-! ## The heat structure (unconditional)
-
-A slot is **confirmed** when its own cell's register points at it; each
-cell confirms exactly one slot.  Every step's read value is confirmed
-(`head_confirmed`), so the walk always traverses an edge out of a
-confirmed slot; the step is productive exactly when the *arrival* end
-is unconfirmed with confirmed partner — a **token** (`arrival_token`).
-A productive step consumes its token and can create at most one new
-one, at the evicted slot of the same cell (`token_step`).  Hence the
-total number of tokens — the machine's capacity for future
-alternations — **never increases** (`tokens_nonincreasing`) and is at
-most one per cell at every moment (`tokens_le_cells`).  These are
-theorems about arbitrary runs, no hypotheses beyond well-formed
-initial registers.  What they do NOT give: a bound on the number of
-alternation *events* (a token can be consumed and re-emitted forever —
-that is exactly the Gray flip), so the open core stands. -/
-
-/-- Slot `s` is confirmed at time `k`: its cell's register points at it. -/
 def Confirmed (k s : Nat) : Prop :=
   reg m e r0 k (m.cellOf s) = s
 
@@ -866,28 +734,6 @@ private theorem nodup_filter (p : Nat → Bool) :
       | false =>
           simp only [List.filter_cons, hp]
           exact ih h.2
-
-private theorem nodup_map_on {f : Nat → Nat} :
-    ∀ {l : List Nat}, (∀ x ∈ l, ∀ y ∈ l, f x = f y → x = y) →
-      l.Nodup → (l.map f).Nodup := by
-  intro l
-  induction l with
-  | nil => intro _ _; simp
-  | cons x t ih =>
-      intro hinj hnd
-      rw [List.nodup_cons] at hnd
-      simp only [List.map_cons, List.nodup_cons]
-      refine ⟨?_, ih (fun a ha b hb =>
-        hinj a (List.mem_cons_of_mem _ ha) b (List.mem_cons_of_mem _ hb))
-        hnd.2⟩
-      intro hmem
-      obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hmem
-      exact hnd.1 (hinj y (List.mem_cons_of_mem _ hy) x
-        List.mem_cons_self hfy ▸ hy)
-
-/-- **Heat never grows.**  The number of tokens is non-increasing along
-the run: a productive step consumes its token and creates at most one
-(at the evicted slot); an unproductive step moves nothing. -/
 theorem tokens_nonincreasing (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (slots : List Nat) (hnd : slots.Nodup)
@@ -1195,14 +1041,6 @@ theorem future_register (hrun : IsRun m e r0)
   intro d
   exact aux d d (Nat.le_refl _)
 
-/-- Arbitrary-time form of the collapse: for any `j ≥ K`, cell `C`'s
-register at `j` is its `K`-value or the slot of a `K`-token. -/
-theorem future_register_le (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c) {K C j : Nat} (hj : K ≤ j) :
-    reg m e r0 j C = reg m e r0 K C ∨
-      TokenEnd m e r0 K (reg m e r0 j C) := by
-  obtain ⟨d, rfl⟩ : ∃ d, j = K + d := ⟨j - K, by omega⟩
-  exact future_register m e r0 hrun hr0 d
 
 theorem tokens_antitone (hrun : IsRun m e r0)
     (hr0 : ∀ c, m.cellOf (r0 c) = c)

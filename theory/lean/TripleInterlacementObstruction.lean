@@ -288,57 +288,6 @@ theorem pivot_releases_strict_subcurve
   · simpa [unmatched_after_flip_eq_selected u C] using hsurvives
   · simp
 
-/-- The dynamic form of the inserted edge: every raw productive event joins
-its formerly unmatched arrival branch to the unique fixed stem. -/
-theorem rawProductiveAt_joins_curve_components
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    {start : Nat × Tongues} {k : Nat}
-    (hprod : RawProductiveAt w N start k) :
-    ∃ cur next C,
-      stepN w k start = some cur ∧
-      stepN w (k+1) start = some next ∧
-      cur.1 = unmatchedBranch cur.2 C ∧
-      next.2 = flipAt cur.2 C ∧
-      CurveEdge w next.2 cur.1 (3*C) ∧
-      unmatchedBranch next.2 C = selectedBranch cur.2 C := by
-  obtain ⟨cur, next, C, _hC, hcur, hnext, _hstep,
-      hentry, _hexit, hflip, _hback⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN hprod
-  have hjoin : CurveEdge w next.2 cur.1 (3*C) := by
-    rw [hflip]
-    rw [curveEdge_flip_iff]
-    exact Or.inr (Or.inl (by
-      unfold InsertedPivotEdge
-      exact Or.inr ⟨rfl, hentry⟩))
-  refine ⟨cur, next, C, hcur, hnext, hentry, hflip, hjoin, ?_⟩
-  rw [hflip, unmatched_after_flip_eq_selected]
-
-/-- Event-indexed form of the well-founded part of Koizumi's invariant:
-there is no infinite sequence of strict finite subarc replacements. -/
-theorem no_infinite_strict_curve_shrink
-    (curve : Nat → List Nat)
-    (hshrink : ∀ n, (curve (n+1)).length < (curve n).length) :
-    False := by
-  have hbound : ∀ n, (curve n).length + n ≤ (curve 0).length := by
-    intro n
-    induction n with
-    | zero => simp
-    | succ n ih =>
-        have hs := hshrink n
-        omega
-  have h := hbound ((curve 0).length + 1)
-  omega
-
-/-! ## Component-level form of the shrinking move
-
-The list theorem above is the literal subarc picture.  The following version
-uses the repository's raw `CurveReach` relation and counts the actual in-range
-ports of a component.  Its one explicit premise says that, after cutting the
-old selected edge, the released endpoint side does not reconnect to the stem.
-For an endpoint-curve this is exactly the fact that the component is a path,
-not an endpoint-free cycle.
--/
 
 noncomputable def ReachableCurvePorts
     (w : Wiring) (N : Nat) (u : Tongues) (root : Nat) : List Nat := by
@@ -422,50 +371,6 @@ private theorem nodup_strict_subset_length
   simp only [List.length_cons] at hle
   omega
 
-/-- **Strict component shrink.**  If the released old-selected side does not
-reconnect to the pivot stem, then its new component is a strict subset of the
-old donor component containing the selected stem edge. -/
-theorem pivot_residual_component_strictly_shrinks
-    {w : Wiring} {N C : Nat} (hC : C < N) (u : Tongues)
-    (hseparated : ¬ GeneralN.CurveReach w (flipAt u C)
-      (selectedBranch u C) (3*C)) :
-    (ReachableCurvePorts w N (flipAt u C)
-        (selectedBranch u C)).length <
-      (ReachableCurvePorts w N u (3*C)).length := by
-  have hsubset : ∀ p,
-      p ∈ ReachableCurvePorts w N (flipAt u C)
-          (selectedBranch u C) →
-      p ∈ ReachableCurvePorts w N u (3*C) := by
-    intro p hp
-    have hpData := mem_reachableCurvePorts_iff.mp hp
-    have hback := GeneralN.curveReach_flip_subset_of_stem_outside
-      (w := w) (u := flipAt u C)
-      (root := selectedBranch u C) (C := C)
-      hseparated hpData.2
-    have hbackOld : GeneralN.CurveReach w u
-        (selectedBranch u C) p := by
-      simpa [flipAt_flipAt] using hback
-    have hstemSelected : GeneralN.CurveReach w u
-        (3*C) (selectedBranch u C) :=
-      GeneralN.curveReach_edge (Or.inr (arrive_stem_selected u C))
-    exact mem_reachableCurvePorts_iff.mpr
-      ⟨hpData.1,
-        GeneralN.curveReach_trans hstemSelected hbackOld⟩
-  have hstemOld : 3*C ∈ ReachableCurvePorts w N u (3*C) :=
-    mem_reachableCurvePorts_iff.mpr
-      ⟨by omega, GeneralN.CurveReach.refl⟩
-  have hstemNew : 3*C ∉ ReachableCurvePorts w N (flipAt u C)
-      (selectedBranch u C) := by
-    intro h
-    exact hseparated (mem_reachableCurvePorts_iff.mp h).2
-  exact nodup_strict_subset_length
-    (reachableCurvePorts_nodup w N (flipAt u C)
-      (selectedBranch u C))
-    hsubset (3*C) hstemOld hstemNew
-
-/-- The endpoint name is preserved by the adaptive shrink: the old selected
-branch released by a pivot is precisely the new unmatched endpoint of the
-same switch. -/
 theorem pivot_residual_keeps_endpoint_name (u : Tongues) (C : Nat) :
     selectedBranch u C = unmatchedBranch (flipAt u C) C := by
   exact (unmatched_after_flip_eq_selected u C).symm
@@ -491,26 +396,6 @@ theorem trailing_step_fixed_stem_successor
       subst next
       exact (by simp)
 
-/-- Hence two trailing visits to the same switch have exactly the same
-post-switch external port, even when they enter opposite branches. -/
-theorem trailing_same_switch_same_successor
-    {w : Wiring}
-    {p q : Nat} {tp tq : Tongues}
-    {nextP nextQ : Nat × Tongues}
-    (hp : p % 3 ≠ 0) (hq : q % 3 ≠ 0)
-    (hswitch : p / 3 = q / 3)
-    (hstepP : step w (p, tp) = some nextP)
-    (hstepQ : step w (q, tq) = some nextQ) :
-    nextP.1 = nextQ.1 := by
-  have hP := (trailing_step_fixed_stem_successor hp hstepP).1
-  have hQ := (trailing_step_fixed_stem_successor hq hstepQ).1
-  have hQ' : w.link (3 * (p / 3)) = some nextQ.1 := by
-    rwa [hswitch]
-  rw [hP] at hQ'
-  injection hQ'
-
-/-- A realised canonical slot is not fixed by the echo jump whenever the
-underlying physical wiring has no self-linked external port. -/
 theorem canonical_live_bar_ne
     {w : Wiring} {p : Nat}
     (hirr : IrreflexiveLinks w)

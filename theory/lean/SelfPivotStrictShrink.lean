@@ -76,45 +76,6 @@ theorem raw_self_pivot_strict_or_same_size
   · right
     omega
 
-/-- **Forced-self size dichotomy for a globally novel repeated writer.**
-
-The returned `anchor` is strictly after the last preceding write of the
-closing writer and no later than the close itself.  It is productive and a
-self-pivot.  At that concrete raw event the finite train curve either
-strictly shrinks or has exactly the same size. -/
-theorem RawRepeatedWriterNovelAt.forced_self_strict_or_same_size
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {right : Nat}
-    (h : RawRepeatedWriterNovelAt w N start right) :
-    ∃ left anchor,
-      RawLastWriterFrame w N start left right ∧
-      left < anchor ∧ anchor ≤ right ∧
-      RawProductiveAt w N start anchor ∧
-      RawTrainCurveSelfAt w start anchor ∧
-      (RawStrictSelfShrinkAt w N start anchor ∨
-        rawFiniteCurveSizeAt w N start (anchor + 1) =
-          rawFiniteCurveSizeAt w N start anchor) := by
-  obtain ⟨left, F⟩ := h.last_writer_frame
-  rcases repeated_writer_close_self_or_interior_self
-      hN F.order F.open_productive F.close_productive F.same_writer with
-    hclose | hinterior
-  · refine ⟨left, right, F, F.order, Nat.le_refl _,
-      F.close_productive, hclose, ?_⟩
-    exact raw_self_pivot_strict_or_same_size hN
-      F.close_productive hclose
-  · obtain ⟨anchor, hleft, hright, hprod, hself⟩ := hinterior
-    refine ⟨left, anchor, F, hleft, by omega, hprod, hself, ?_⟩
-    exact raw_self_pivot_strict_or_same_size hN hprod hself
-
-/-! ## The exact `C,D,C` serial-gadget obstruction -/
-
-/-- A switch-simple excursion which returns to the switch at which it
-started cannot continue through a third, independent forward gadget.  It
-either settles on a selected cycle, or its next move is exactly backwards
-over the external edge by which the excursion was entered.
-
-This is the empty-runway specialization of `first_revisit_fork`. -/
 theorem simple_serial_repeated_switch_cycle_or_retrace
     {w : Wiring}
     {p x q y : Nat} {u₀ u v : Tongues} {body : List Passage}
@@ -136,65 +97,6 @@ theorem simple_serial_repeated_switch_cycle_or_retrace
   · obtain ⟨settled, hretrace⟩ := hretrace
     exact Or.inr ⟨settled, by simpa using hretrace⟩
 
-/-- **Explicit serial `C,D,C` test.**
-
-The trace records the first passage through `C` and one passage through a
-different switch `D`; the final configuration is poised to pass through
-`C` again.  The two recorded switches are therefore switch-simple, and the
-matching obstruction above applies: the close absorbs or reverses.  In
-particular it does not expose an independent forward output on which a
-second copy could be concatenated. -/
-theorem serial_CDC_one_shot_cycle_or_retrace
-    {w : Wiring}
-    {p x d z q y C D : Nat} {u₀ u v : Tongues}
-    (htrace : PhysicalTrace w (p, u₀) [(p, x), (d, z)] (q, u))
-    (hfirst : p / 3 = C)
-    (hmiddle : d / 3 = D)
-    (hcloseSwitch : q / 3 = C)
-    (hCD : C ≠ D)
-    (hclose : arrive u q = (y, v)) :
-    SettlesOnSimpleCycle w (q, u) ∨
-      ∃ settled : Tongues,
-        stepN w 1 (q, u) =
-          (w.link p).map (fun ell => (ell, settled)) := by
-  have hsimple : SwitchSimple [(p, x), (d, z)] := by
-    simp [SwitchSimple, passageSwitch, hfirst, hmiddle, hCD]
-  have hsame : p / 3 = q / 3 := by
-    rw [hfirst, hcloseSwitch]
-  exact simple_serial_repeated_switch_cycle_or_retrace
-    htrace hsimple hsame hclose
-
-/-- If a repeated-switch excursion avoids both outcomes forced by the
-matching (absorption and exact backward retrace), its passage trace was not
-switch-simple.  Hence a proposed serial construction can escape only by an
-interior repeated-switch contact; it is not a concatenation of independent
-`C,D,C` one-shots. -/
-theorem serial_forward_escape_forces_interior_repeat
-    {w : Wiring}
-    {p x q y : Nat} {u₀ u v : Tongues} {body : List Passage}
-    (htrace : PhysicalTrace w (p, u₀) ((p, x) :: body) (q, u))
-    (hsame : p / 3 = q / 3)
-    (hclose : arrive u q = (y, v))
-    (hnoCycle : ¬ SettlesOnSimpleCycle w (q, u))
-    (hnoRetrace : ∀ settled : Tongues,
-      stepN w 1 (q, u) ≠
-        (w.link p).map (fun ell => (ell, settled))) :
-    ¬ SwitchSimple ((p, x) :: body) := by
-  intro hsimple
-  rcases simple_serial_repeated_switch_cycle_or_retrace
-      htrace hsimple hsame hclose with hcycle | hretrace
-  · exact hnoCycle hcycle
-  · obtain ⟨settled, hsettled⟩ := hretrace
-    exact hnoRetrace settled hsettled
-
-/-- Two productive visits to one writer leave through the same immutable
-stem endpoint.  Thus a switch-simple interval between them takes the
-same-direction branch of the first-revisit matching, and is absorbed by a
-simple cycle.  The crossed/retrace branch is unavailable.
-
-This is stronger than `simple_serial_repeated_switch_cycle_or_retrace`: the
-extra productive hypotheses identify the exit endpoint, not just the
-physical switch. -/
 theorem productive_repeat_switchSimple_settles
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
@@ -270,37 +172,6 @@ theorem productive_repeat_switchSimple_settles
       rw [← hQcfg]
       exact hresult
 
-/-- **Productive serial `C,D,C` test.**  Quiet moves may occur between the
-three productive writes.  If the complete physical interval is
-switch-simple, the second productive `C` cannot hand off to another serial
-copy: it enters an absorbing simple cycle.  Notice that the proof actually
-uses only the two productive `C` endpoints, so inserting any one-shot `D`
-gadget cannot evade the fixed-stem matching obstruction. -/
-theorem productive_serial_CDC_switchSimple_settles
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start before close : Nat × Tongues}
-    {left middle right C D : Nat} {passages : List Passage}
-    (hleftMiddle : left < middle) (hmiddleRight : middle < right)
-    (hleft : RawProductiveAt w N start left)
-    (_hmiddle : RawProductiveAt w N start middle)
-    (hright : RawProductiveAt w N start right)
-    (hleftWriter : rawWriterAt w start left = C)
-    (_hmiddleWriter : rawWriterAt w start middle = D)
-    (hrightWriter : rawWriterAt w start right = C)
-    (_hCD : C ≠ D)
-    (hbeforeAt : stepN w left start = some before)
-    (hcloseAt : stepN w right start = some close)
-    (hlength : passages.length = right - left)
-    (htrace : PhysicalTrace w before passages close)
-    (hsimple : SwitchSimple passages) :
-    SettlesOnSimpleCycle w close := by
-  exact productive_repeat_switchSimple_settles hN
-    (Nat.lt_trans hleftMiddle hmiddleRight) hleft hright
-    (hleftWriter.trans hrightWriter.symm)
-    hbeforeAt hcloseAt hlength htrace hsimple
-
-/-! ## Raw novelty frames inherit the same serial obstruction -/
 
 private theorem selfPivot_prefix_config
     {w : Wiring} {start finish : Nat × Tongues} {d K : Nat}
@@ -390,35 +261,6 @@ theorem RawRepeatedWriterNovelAt.nonsimple_or_cycle_or_retrace
           · exact Or.inr (Or.inr hretrace)
         · exact Or.inl hsimple
 
-/-- The productive fixed-stem information removes the retrace alternative
-from the preceding raw classification.  A globally novel repeated-writer
-frame is either physically non-simple (so it contains an interior repeated
-switch contact), or its closing configuration is already trapped on an
-absorbing simple cycle. -/
-theorem RawRepeatedWriterNovelAt.nonsimple_or_absorbing_cycle
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {right : Nat}
-    (h : RawRepeatedWriterNovelAt w N start right) :
-    ∃ left before close x body,
-      RawLastWriterFrame w N start left right ∧
-      stepN w left start = some before ∧
-      stepN w right start = some close ∧
-      ((before.1, x) :: body).length = right - left ∧
-      PhysicalTrace w before ((before.1, x) :: body) close ∧
-      (¬ SwitchSimple ((before.1, x) :: body) ∨
-        SettlesOnSimpleCycle w close) := by
-  obtain ⟨left, before, close, x, body, F, hbeforeAt, hcloseAt,
-      hlength, htrace, _⟩ := h.nonsimple_or_cycle_or_retrace hN
-  refine ⟨left, before, close, x, body, F, hbeforeAt, hcloseAt,
-    hlength, htrace, ?_⟩
-  by_cases hsimple : SwitchSimple ((before.1, x) :: body)
-  · exact Or.inr (productive_repeat_switchSimple_settles hN
-      F.order F.open_productive F.close_productive F.same_writer
-      hbeforeAt hcloseAt hlength htrace hsimple)
-  · exact Or.inl hsimple
-
-/-! ## Persistent endpoint charges are intrinsically two-ended -/
 
 private theorem nodup_subset_length_self_pivot
     {xs pool : List Nat}
@@ -486,38 +328,6 @@ theorem RawSelfTailCertificate.distinct_snapshots_le_four
   exact rawSelfOnlyEpoch_distinct_snapshots_le_four
     hN start K T.live T.self ks hks hnd
 
-/-- **Finite-horizon continuation dichotomy.**  From any raw starting
-configuration, either the whole live continuation is a certified
-two-endpoint/four-state self tail, or one concrete productive event is a
-non-self pivot and therefore strictly enlarges the selected train carrier.
-
-The latter event is the only way a non-simple serial contact can leave the
-persistent two-endpoint carrier. -/
-theorem self_tail_or_strict_carrier_change
-    {w : Wiring} {N K : Nat} (start : Nat × Tongues)
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome) :
-    RawSelfTailCertificate w N start K ∨
-      ∃ k, k < K ∧ RawProductiveAt w N start k ∧
-        ¬ RawCurveSelfAt w start k ∧
-        rawFiniteCurveSizeAt w N start k <
-          rawFiniteCurveSizeAt w N start (k + 1) := by
-  by_cases hself : ∀ k, k < K → RawProductiveAt w N start k →
-      RawCurveSelfAt w start k
-  · exact Or.inl ⟨hlive, hself⟩
-  · right
-    apply Classical.byContradiction
-    intro hnone
-    apply hself
-    intro k hk hprod
-    apply Classical.byContradiction
-    intro hnonself
-    apply hnone
-    exact ⟨k, hk, hprod, hnonself,
-      rawProductiveAt_nonself_curve_growth hN hprod hnonself⟩
-
-/-- The finite carrier itself, rather than just its cardinality, at a raw
-time. -/
 noncomputable def rawFiniteCurvePortsAt
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) : List Nat :=
   let cur := (stepN w k start).getD start
@@ -601,99 +411,6 @@ theorem raw_self_pivot_equal_size_carrier_iff
     simp only [List.length_cons, hlength] at hle
     omega
 
-/-- **An equal-size self-pivot preserves the two endpoint names.**  The
-physical branch selected by the flip changes, but the finite carrier does
-not.  Every endpoint writer before the pivot is therefore still an endpoint
-writer afterwards, and conversely.  In particular an equal-size pivot is a
-genuine endpoint plateau, not a hidden exchange with a third switch. -/
-theorem raw_self_pivot_equal_size_endpoint_writers_iff
-    {w : Wiring} {N k : Nat} {start : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hprod : RawProductiveAt w N start k)
-    (hself : RawCurveSelfAt w start k)
-    (hsize : rawFiniteCurveSizeAt w N start (k + 1) =
-      rawFiniteCurveSizeAt w N start k) :
-    ∀ D, D ∈ rawFiniteCurveEndpointWritersAt w N start (k + 1) ↔
-      D ∈ rawFiniteCurveEndpointWritersAt w N start k := by
-  classical
-  obtain ⟨cur, next, C, hCwriter, hcur, hnext, _hstep,
-      _hentry, _hexit, hflip, _hback⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN hprod
-  have hCcur : C = cur.1 / 3 := by
-    simpa [rawWriterAt, rawEntryAt, hcur] using hCwriter
-  have hC_lt : C < N := by
-    rw [hCwriter]
-    exact rawProductiveAt_writer_lt hN hprod
-  have hselfStem : CurveReach w cur.2 cur.1 (3 * C) := by
-    unfold RawCurveSelfAt at hself
-    simpa [hcur, hCcur] using hself
-  have hcarrier := raw_self_pivot_equal_size_carrier_iff
-    hN hprod hself hsize
-  intro D
-  constructor
-  · exact rawProductiveAt_self_endpointWriters_subset
-      hN hprod hself D
-  · intro hDold
-    by_cases hDC : D = C
-    · subst D
-      have hselectedReach : CurveReach w cur.2 cur.1
-          (selectedBranch cur.2 C) :=
-        CurveReach.step hselfStem
-          (Or.inr (arrive_stem_selected cur.2 C))
-      have hselectedLt : selectedBranch cur.2 C < 3 * N := by
-        cases hc : cur.2 C <;>
-          simp [selectedBranch, branchPort, hc] <;> omega
-      have hselectedOld : selectedBranch cur.2 C ∈
-          rawFiniteCurvePortsAt w N start k := by
-        unfold rawFiniteCurvePortsAt
-        simp only [hcur, Option.getD_some]
-        rw [mem_finiteCurvePorts_iff]
-        exact ⟨hselectedLt, hselectedReach⟩
-      have hselectedNew := (hcarrier (selectedBranch cur.2 C)).2
-        hselectedOld
-      unfold rawFiniteCurvePortsAt at hselectedNew
-      simp only [hnext, Option.getD_some] at hselectedNew
-      have hnewReach : CurveReach w next.2 next.1
-          (unmatchedBranch next.2 C) := by
-        have hreach := (mem_finiteCurvePorts_iff.mp hselectedNew).2
-        have hbranch : unmatchedBranch next.2 C =
-            selectedBranch cur.2 C := by
-          rw [hflip, unmatched_after_flip_eq_selected]
-        rw [hbranch]
-        exact hreach
-      unfold rawFiniteCurveEndpointWritersAt
-      simp only [hnext, Option.getD_some]
-      rw [mem_finiteCurveEndpointWriters_iff]
-      exact ⟨hC_lt, hnewReach⟩
-    · unfold rawFiniteCurveEndpointWritersAt at hDold
-      simp only [hcur, Option.getD_some] at hDold
-      have hDdata := mem_finiteCurveEndpointWriters_iff.mp hDold
-      have hunmatchedLt : unmatchedBranch cur.2 D < 3 * N := by
-        cases hd : cur.2 D <;>
-          simp [unmatchedBranch, branchPort, hd] <;> omega
-      have holdPort : unmatchedBranch cur.2 D ∈
-          rawFiniteCurvePortsAt w N start k := by
-        unfold rawFiniteCurvePortsAt
-        simp only [hcur, Option.getD_some]
-        rw [mem_finiteCurvePorts_iff]
-        exact ⟨hunmatchedLt, hDdata.2⟩
-      have hnewPort := (hcarrier (unmatchedBranch cur.2 D)).2 holdPort
-      unfold rawFiniteCurvePortsAt at hnewPort
-      simp only [hnext, Option.getD_some] at hnewPort
-      have hnewReachSame := (mem_finiteCurvePorts_iff.mp hnewPort).2
-      have hbranch : unmatchedBranch next.2 D =
-          unmatchedBranch cur.2 D := by
-        rw [hflip]
-        simp [unmatchedBranch, flipAt, hDC]
-      unfold rawFiniteCurveEndpointWritersAt
-      simp only [hnext, Option.getD_some]
-      rw [mem_finiteCurveEndpointWriters_iff]
-      refine ⟨hDdata.1, ?_⟩
-      rw [hbranch]
-      exact hnewReachSame
-
-/-- A live nonproductive move merely reroots the same selected component;
-in particular the next finite carrier is contained in the current one. -/
 theorem raw_nonproductive_carrier_subset
     {w : Wiring} {N k : Nat} {start : Nat × Tongues}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
@@ -788,33 +505,6 @@ theorem RawStrictSelfShrinkAt.dropped_carrier_port
     rawFiniteCurvePortsAt_length] at hle
   exact (Nat.not_lt_of_ge hle) h.2.2
 
-/-- **Persistent train-free charge.**  A concrete port discarded by a
-strict self-shrink remains outside the train's represented carrier for an
-entire subsequent self-only epoch.  Therefore that physical charge cannot
-be reused without an intervening non-self growth event. -/
-theorem RawStrictSelfShrinkAt.persistent_dropped_port
-    {w : Wiring} {N k K : Nat} {start after : Nat × Tongues}
-    (h : RawStrictSelfShrinkAt w N start k)
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hafter : stepN w (k + 1) start = some after)
-    (T : RawSelfTailCertificate w N after K) :
-    ∃ p, p ∈ rawFiniteCurvePortsAt w N start k ∧
-      p ∉ rawFiniteCurvePortsAt w N start (k + 1) ∧
-      ∀ j, j ≤ K → p ∉ rawFiniteCurvePortsAt w N after j := by
-  obtain ⟨p, hpOld, hpNew⟩ := h.dropped_carrier_port
-  refine ⟨p, hpOld, hpNew, ?_⟩
-  intro j hj hpLater
-  have hpInitial := T.carrier_subset_initial hN j hj p hpLater
-  apply hpNew
-  unfold rawFiniteCurvePortsAt at hpInitial ⊢
-  simp only [stepN, Option.getD_some] at hpInitial
-  simpa only [hafter, Option.getD_some] using hpInitial
-
-/-! ## The exact global charge still required -/
-
-/-- A globally novel repeated-writer event whose forced pivot is itself a
-strict carrier shrink.  These are precisely the events to which the physical
-lost-port charge applies. -/
 def RawNovelRepeatedStrictShrinkAt
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) : Prop :=
   RawRepeatedWriterNovelAt w N start k ∧
@@ -874,30 +564,6 @@ def ReusedNovelStrictShrinkPortForcesReplay
     restrictedTonguesAt w N start (j + 1) ∈
       (List.range (j + 1)).map (restrictedTonguesAt w N start)
 
-/-- **Exact raw equal-size obligation (OPEN).**  A globally novel repeated
-writer which is itself a self-pivot and preserves the complete finite
-carrier must start a self-only continuation.  The already-proved endpoint
-capacity theorem then makes every finite live continuation a four-vector
-epoch.
-
-This proposition is deliberately stated only with `Wiring`, `stepN`, raw
-novelty, raw curve membership, and finite liveness.  It is the unconditional
-equal-size assertion requested by the global proof, not a hidden certificate
-or a theorem claimed below. -/
-def NovelEqualSelfPivotEntersEndpointEpoch : Prop :=
-  ∀ (w : Wiring) (N : Nat),
-    (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
-    ∀ (start : Nat × Tongues) (k : Nat),
-      RawRepeatedWriterNovelAt w N start k →
-      RawCurveSelfAt w start k →
-      rawFiniteCurveSizeAt w N start (k + 1) =
-        rawFiniteCurveSizeAt w N start k →
-      ∀ after, stepN w (k + 1) start = some after →
-        ∀ K, (∀ d, d ≤ K → (stepN w d after).isSome) →
-          RawSelfTailCertificate w N after K
-
-/-- Under the raw restoration statement, the canonical lost-port charge is
-injective on globally novel repeated-writer strict shrinks. -/
 theorem rawNovelStrictShrinkCharge_injective
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     (hreplay : ReusedNovelStrictShrinkPortForcesReplay w N start)

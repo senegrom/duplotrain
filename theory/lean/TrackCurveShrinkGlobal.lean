@@ -1202,23 +1202,4 @@ noncomputable def rawProductiveCurveTimes
   classical
   exact (List.range K).filter
     (fun k => decide (RawProductiveAt w N start k))
-
-private theorem rawProductiveCurveTimes_length_succ_of_productive
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) :
-    RawProductiveAt w N start K →
-    (rawProductiveCurveTimes w N start (K+1)).length =
-      (rawProductiveCurveTimes w N start K).length + 1 := by
-  classical
-  intro hprod
-  simp [rawProductiveCurveTimes, List.range_succ, hprod]
-
-private theorem rawProductiveCurveTimes_length_succ_of_nonproductive
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) :
-    ¬ RawProductiveAt w N start K →
-    (rawProductiveCurveTimes w N start (K+1)).length =
-      (rawProductiveCurveTimes w N start K).length := by
-  classical
-  intro hnot
-  simp [rawProductiveCurveTimes, List.range_succ, hnot]
-
 end GeneralN

@@ -1,5 +1,4 @@
 import RunwaySpliceNovelty
-import SharpStateLawAssembly
 
 /-!
 # Three fresh vectors for a historical runway entry

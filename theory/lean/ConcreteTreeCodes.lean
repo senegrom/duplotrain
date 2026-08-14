@@ -135,12 +135,4 @@ theorem entryRoot_eq_of_mem_entryAction
   rw [entryRoot_eq_of_descent hsuffix,
     entryRoot_eq_of_descent hd]
   exact descent_same_landing_same_root hsuffix hd
-
-theorem rootCode_eq_of_mem_entryAction
-    {w : Wiring} {p b : Nat}
-    (hp : IsDescentEntry w p)
-    (hb : b ∈ entryAction w p) :
-    rootCode w (entryRoot w b) = rootCode w (entryRoot w p) := by
-  rw [entryRoot_eq_of_mem_entryAction hp hb]
-
 end GeneralN

@@ -14,17 +14,6 @@ namespace Echo
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-theorem predecessor_cell
-    (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c) (k : Nat) :
-    m.cellOf (e k) = m.star (m.cellOf (m.bar (e (k+1)))) := by
-  have hw := (witness m e r0 hrun hr0 k).1
-  have hs := congrArg m.star hw
-  rw [m.star_invol] at hs
-  exact hs.symm
-
-def AlternationStep (k : Nat) : Prop :=
-  ProductiveStep m e r0 k ∧ ¬ FirstStep m e k
-
 private theorem nodup_map_of_injective_on
     {f : Nat → Nat} {l : List Nat}
     (hinj : ∀ x, x ∈ l → ∀ y, y ∈ l → f x = f y → x = y)
