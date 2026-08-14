@@ -1,6 +1,5 @@
 import StateLawTwoCandidate
 import ShortSuffixCount
-import NoveltyChargeBound
 import ArbitraryStartDirectLift
 
 /-!

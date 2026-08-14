@@ -1,5 +1,7 @@
 import TwoHistoryUnionCharge
-import MellitDynamicResidual
+import ShrinkingCurveFinal
+import JourneyReachesActivated
+import FirstCycleCountSharp
 import ProtectedRepairFour
 
 /-!
@@ -24,6 +26,16 @@ support selector.
 -/
 
 namespace GeneralN
+
+structure UnionOldTrackedShrink
+    (w : Wiring) (N : Nat)
+    {g e : Nat} (A : ManufacturedReflector w g e)
+    (fresh : List Passage) (finish : Nat × Tongues) : Type where
+  selection : UnionFirstRepeat A.exploration fresh
+  raw :
+    RawUnionOldContactShrink w N A.exploration fresh selection
+      (e, A.activatedState) finish
+
 
 /-- The passage named by an old-contact split really occurs in the old
 list.  This small explicit equality transport avoids rewriting the list

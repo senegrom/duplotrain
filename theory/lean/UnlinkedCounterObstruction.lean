@@ -1,5 +1,6 @@
 import TrackQuantitativeTight
-import ManufacturedPairTailNovelty
+import ManufacturedPairNovelty
+import FirstReflectorNovelty
 
 /-!
 # Obstructions to reusable counters made from unlinked lazy points

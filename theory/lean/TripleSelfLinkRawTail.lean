@@ -1,5 +1,6 @@
 import TripleSelfLinkPlacement
-import SixEventSharpClosure
+import TrackFiniteAlternation
+import FirstRevisitActivatedOutcome
 
 /-!
 # Raw closure after the placed self-link

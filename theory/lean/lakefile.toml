@@ -4,7 +4,6 @@ defaultTargets = [
   "Alternation",
   "AlternationBound",
   "ArbitraryStartDirectLift",
-  "BABAInterlacementTail",
   "BlockAbstractEpochBoundCore",
   "BlockSparseBoundCore",
   "BlockSparseFixedCountCore",
@@ -54,6 +53,7 @@ defaultTargets = [
   "EdgeReversal",
   "EndpointAccountingStandalone",
   "EndpointEpochExtraction",
+  "EventuallyPeriodicPrefixes",
   "ExternalLobeReflectionCore",
   "ExternalLobeRoundtrip",
   "FacingForwardNovelty",
@@ -62,6 +62,7 @@ defaultTargets = [
   "FirstCycleCount",
   "FirstCycleCountSharp",
   "FirstReflectorNovelty",
+  "FirstRevisitActivatedOutcome",
   "FiveFrameObstruction",
   "ForeignSpliceNovelty",
   "FullReachPersistencePaired",
@@ -70,10 +71,10 @@ defaultTargets = [
   "HiddenAbsorb",
   "HiddenDichotomy",
   "HiddenFibre",
+  "JourneyReachesActivated",
   "KnownEdgeFive",
   "KnownEdgeFourteen",
   "KnownEdgeLift",
-  "KnownEdgeNAddFiveAlt",
   "KnownEdgeNAddFourChangedClosed",
   "KnownEdgeNAddFourComplete",
   "KnownEdgeNAddFourFrontier",
@@ -86,28 +87,16 @@ defaultTargets = [
   "LobePartnerBounce",
   "LobeToggle",
   "ManufacturedPairNovelty",
-  "ManufacturedPairTailNovelty",
-  "MellitDirectSharpAssembly",
   "MellitDirectStateBound",
-  "MellitDynamicResidual",
-  "MellitEarlySecondRepeatAssembly",
-  "MellitFiveNoveltyAssembly",
-  "MellitGlobalIncompatibleClosure",
-  "MellitGlobalNoveltyBound",
-  "MellitNoncompatibleSecondRepeat",
-  "MellitSharpTail",
-  "MellitSupportInteraction",
   "MonotoneSupport",
   "NestedRestorationCharge",
   "NestedRestorationElimination",
   "NoFullFreezeCore",
   "NoveltyAwareLasso",
-  "NoveltyChargeBound",
   "OldContactContinuation",
   "OneJourneyTailCount",
   "OneReflectorContinuation",
   "OneReserveFromNoTail",
-  "OverlappingFiveWindowReduction",
   "OverwriteDynamics",
   "PairActionCorners",
   "PairTongueCountAbsoluteFour",
@@ -123,6 +112,7 @@ defaultTargets = [
   "PersistentLobeSeparationStandalone",
   "PointwiseRetraceSeparation",
   "PointwiseSimpleCycleTail",
+  "PreReturnProtectedRoute",
   "ProductiveBoundaryNAddFour",
   "ProductiveBoundaryNAddFourComplete",
   "ProductiveBoundarySupportContact",
@@ -148,7 +138,6 @@ defaultTargets = [
   "SimpleTraceOneNetChange",
   "SingleCoordinateFlip",
   "SixEventReduction",
-  "SixEventSharpClosure",
   "SlotBound",
   "StableSimpleCycleRecord",
   "StarIndependent",
@@ -173,7 +162,6 @@ defaultTargets = [
   "SupportRelativePointwiseReplay",
   "SupportSize",
   "SupportWeightFibres",
-  "ThirdWriterTail",
   "ThreeQuarterArithmetic",
   "TraceRetainingFirstRevisit",
   "TrackCurveGrowth",
@@ -227,9 +215,6 @@ name = "AlternationBound"
 
 [[lean_lib]]
 name = "ArbitraryStartDirectLift"
-
-[[lean_lib]]
-name = "BABAInterlacementTail"
 
 [[lean_lib]]
 name = "BlockAbstractEpochBoundCore"
@@ -379,6 +364,9 @@ name = "EndpointAccountingStandalone"
 name = "EndpointEpochExtraction"
 
 [[lean_lib]]
+name = "EventuallyPeriodicPrefixes"
+
+[[lean_lib]]
 name = "ExternalLobeReflectionCore"
 
 [[lean_lib]]
@@ -401,6 +389,9 @@ name = "FirstCycleCountSharp"
 
 [[lean_lib]]
 name = "FirstReflectorNovelty"
+
+[[lean_lib]]
+name = "FirstRevisitActivatedOutcome"
 
 [[lean_lib]]
 name = "FiveFrameObstruction"
@@ -427,6 +418,9 @@ name = "HiddenDichotomy"
 name = "HiddenFibre"
 
 [[lean_lib]]
+name = "JourneyReachesActivated"
+
+[[lean_lib]]
 name = "KnownEdgeFive"
 
 [[lean_lib]]
@@ -434,9 +428,6 @@ name = "KnownEdgeFourteen"
 
 [[lean_lib]]
 name = "KnownEdgeLift"
-
-[[lean_lib]]
-name = "KnownEdgeNAddFiveAlt"
 
 [[lean_lib]]
 name = "KnownEdgeNAddFourChangedClosed"
@@ -475,37 +466,7 @@ name = "LobeToggle"
 name = "ManufacturedPairNovelty"
 
 [[lean_lib]]
-name = "ManufacturedPairTailNovelty"
-
-[[lean_lib]]
-name = "MellitDirectSharpAssembly"
-
-[[lean_lib]]
 name = "MellitDirectStateBound"
-
-[[lean_lib]]
-name = "MellitDynamicResidual"
-
-[[lean_lib]]
-name = "MellitEarlySecondRepeatAssembly"
-
-[[lean_lib]]
-name = "MellitFiveNoveltyAssembly"
-
-[[lean_lib]]
-name = "MellitGlobalIncompatibleClosure"
-
-[[lean_lib]]
-name = "MellitGlobalNoveltyBound"
-
-[[lean_lib]]
-name = "MellitNoncompatibleSecondRepeat"
-
-[[lean_lib]]
-name = "MellitSharpTail"
-
-[[lean_lib]]
-name = "MellitSupportInteraction"
 
 [[lean_lib]]
 name = "MonotoneSupport"
@@ -523,9 +484,6 @@ name = "NoFullFreezeCore"
 name = "NoveltyAwareLasso"
 
 [[lean_lib]]
-name = "NoveltyChargeBound"
-
-[[lean_lib]]
 name = "OldContactContinuation"
 
 [[lean_lib]]
@@ -536,9 +494,6 @@ name = "OneReflectorContinuation"
 
 [[lean_lib]]
 name = "OneReserveFromNoTail"
-
-[[lean_lib]]
-name = "OverlappingFiveWindowReduction"
 
 [[lean_lib]]
 name = "OverwriteDynamics"
@@ -584,6 +539,9 @@ name = "PointwiseRetraceSeparation"
 
 [[lean_lib]]
 name = "PointwiseSimpleCycleTail"
+
+[[lean_lib]]
+name = "PreReturnProtectedRoute"
 
 [[lean_lib]]
 name = "ProductiveBoundaryNAddFour"
@@ -661,9 +619,6 @@ name = "SingleCoordinateFlip"
 name = "SixEventReduction"
 
 [[lean_lib]]
-name = "SixEventSharpClosure"
-
-[[lean_lib]]
 name = "SlotBound"
 
 [[lean_lib]]
@@ -734,9 +689,6 @@ name = "SupportSize"
 
 [[lean_lib]]
 name = "SupportWeightFibres"
-
-[[lean_lib]]
-name = "ThirdWriterTail"
 
 [[lean_lib]]
 name = "ThreeQuarterArithmetic"

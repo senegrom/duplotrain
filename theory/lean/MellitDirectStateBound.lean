@@ -1,4 +1,5 @@
-import MellitGlobalNoveltyBound
+import BlockSparseBoundCore
+import TrackTheta
 
 /-!
 # Mellit's direct first/second-repeat state bound

@@ -71,4 +71,13 @@ theorem state_law_N_add_four : StateLawNAddFour := by
   · intro w N hN
     exact productiveInitialBoundaryNAddFour hN
 
+/-- The historically stated target `StateLaw` (`StateLaw.lean`), which the
+whole bound-tightening campaign aimed at, follows a fortiori. -/
+theorem stateLaw : StateLaw := by
+  intro w N hN c0 ks hlive hnd
+  have hnd' : (ks.map (fun k => VectorCount.restrict N
+      ((stepN w k c0).getD c0).2)).Nodup := hnd
+  have hbound := state_law_N_add_four w N hN c0 ks hlive hnd'
+  omega
+
 end GeneralN
