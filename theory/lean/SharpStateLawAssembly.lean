@@ -1,9 +1,5 @@
 import FirstReflectorNovelty
-import ManufacturedPairNovelty
-import ForeignSpliceNovelty
 import RepeatedNoveltyDecomposition
-import RunwaySpliceNovelty
-import TrackGlobalRepair
 
 /-!
 # Sharp state-law assembly
@@ -28,41 +24,6 @@ path length or period length occurs in the conclusion.
 
 namespace GeneralN
 
-/-- Five exceptional vectors above a supplied history. -/
-def FiveNoveltyCover (w : Wiring) (N : Nat)
-    (start : Nat × Tongues) (times : List Nat)
-    (history : List (List Bool)) : Prop :=
-  NoveltyCoverOn w N start times history 5
-
-
-theorem ManufacturedReflector.ChangedForwardMerge.distinct_le_N_add_five
-    {w : Wiring} {g e N : Nat}
-    {A : ManufacturedReflector w g e}
-    {R : ManufacturedFlipReflector w e g}
-    (hmerge : A.ChangedForwardMerge (.flip R))
-    (history : List (List Bool))
-    (hhistory : history.length ≤ N + 1)
-    (hleadHistorical : ∀ j, j ≤ A.toSupported.travel →
-      restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).activatedState) j ∈ history)
-    (times : List Nat)
-    (hnd : (times.map (restrictedTonguesAt w N
-      (g, (ManufacturedReflector.flip R).activatedState))).Nodup) :
-    times.length ≤ N + 5 := by
-  have hcover := hmerge.runway_or_candy_absolute_four_novelty
-    N history hleadHistorical times
-  have hcount := fourNoveltyCover_distinct_count hcover hnd
-  omega
-
-theorem three_pair_then_one_splice_four
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {pairTimes spliceTimes : List Nat}
-    {history : List (List Bool)}
-    (hpair : NoveltyCoverOn w N start pairTimes history 3)
-    (hsplice : NoveltyCoverOn w N start spliceTimes history 1) :
-    FourNoveltyCover w N start (pairTimes ++ spliceTimes) history := by
-  have hcombined := noveltyCoverOn_append hpair hsplice
-  simpa [FourNoveltyCover] using hcombined
 
 def ManufacturedReflector.sharpConstructionHistory
     {w : Wiring} {g e : Nat}
@@ -120,28 +81,6 @@ theorem ManufacturedReflector.manufacturing_journey_mem_sharpHistory
     · exact List.mem_append_left _ hhistory
     · apply List.mem_append_right prefixHistory
       exact List.mem_singleton.mpr hactivated
-
-structure SharpGlobalRepairCertificate
-    (w : Wiring) (N : Nat) (start : Nat × Tongues)
-    (times : List Nat) where
-  history : List (List Bool)
-  pairTimes : List Nat
-  spliceTimes : List Nat
-  history_length : history.length ≤ N + 2
-  times_eq : times = pairTimes ++ spliceTimes
-  pair_cover : NoveltyCoverOn w N start pairTimes history 3
-  splice_cover : NoveltyCoverOn w N start spliceTimes history 1
-
-structure KnownEdgeSharpRepairCertificate
-    (w : Wiring) (N : Nat) (start : Nat × Tongues)
-    (times : List Nat) where
-  history : List (List Bool)
-  pairTimes : List Nat
-  spliceTimes : List Nat
-  history_length : history.length ≤ N + 1
-  times_eq : times = pairTimes ++ spliceTimes
-  pair_cover : NoveltyCoverOn w N start pairTimes history 3
-  splice_cover : NoveltyCoverOn w N start spliceTimes history 1
 
 
 private theorem sharp_nodup_of_map_nodup
@@ -308,78 +247,5 @@ theorem knownEdge_distinct_le_N_add_five_of_fourRepeatedWriterNovelty
   have hcount := distinct_samples_le_of_repeated_writer_novelty
     w N hN start K 4 hbudget times htimes hnd
   omega
-
-/-- The exact known-edge four-event proposition closes the public raw-track
-`StateLaw`.  For an arbitrary start, time zero is separated off; after one
-successful step the train is on the far endpoint of the known external edge
-it just crossed, so the shifted positive-time sample has the `N+5` bound. -/
-theorem stateLaw_of_knownEdgeFourRepeatedWriterNovelty
-    (hfour : KnownEdgeFourRepeatedWriterNovelty) : StateLaw := by
-  intro w N hN start times hlive hnd
-  have htimesNodup : times.Nodup :=
-    sharp_nodup_of_map_nodup
-      (restrictedTonguesAt w N start) hnd
-  cases hstep : step w start with
-  | none =>
-      have hlt : ∀ k ∈ times, k < 1 := by
-        intro k hk
-        cases k with
-        | zero => omega
-        | succ k =>
-            have hkLive := hlive (k+1) hk
-            simp [stepN, hstep] at hkLive
-      have hsmall := nodup_nat_lt_length htimesNodup hlt
-      omega
-  | some next =>
-      have hstepOne : stepN w 1 start = some next := by
-        simpa [stepN] using hstep
-      let positive := times.filter (fun k => decide (0 < k))
-      let shifted := positive.map (fun k => k - 1)
-      have hshiftVector : shifted.map
-          (restrictedTonguesAt w N next) =
-          positive.map (restrictedTonguesAt w N start) := by
-        dsimp [shifted]
-        rw [List.map_map]
-        apply List.map_congr_left
-        intro k hk
-        have hkPos : 0 < k :=
-          of_decide_eq_true (List.mem_filter.mp hk).2
-        have hkTimes : k ∈ times := (List.mem_filter.mp hk).1
-        have hkEq : k = 1 + (k - 1) := by omega
-        have hrun : stepN w k start = stepN w (k - 1) next := by
-          rw [hkEq, stepN_add, hstepOne]
-          simp
-        have hkLive := hlive k hkTimes
-        cases htail : stepN w (k - 1) next with
-        | none =>
-            rw [hrun, htail] at hkLive
-            simp at hkLive
-        | some finish =>
-            have hglobal : stepN w k start = some finish := by
-              rw [hrun, htail]
-            simp [Function.comp_apply, restrictedTonguesAt, tonguesAt,
-              hglobal, htail]
-      have hpositiveNodup :
-          (positive.map (restrictedTonguesAt w N start)).Nodup := by
-        dsimp [positive]
-        exact sharp_nodup_map_filter _ hnd
-      have hshiftedNodup :
-          (shifted.map (restrictedTonguesAt w N next)).Nodup := by
-        rw [hshiftVector]
-        exact hpositiveNodup
-      have hentry : w.link (exitPort start) = some next.1 :=
-        (step_some_parts hstep).1
-      have hshiftedBound : shifted.length ≤ N + 5 :=
-        knownEdge_distinct_le_N_add_five_of_fourRepeatedWriterNovelty
-          hfour w N (exitPort start) hN next shifted hentry
-            hshiftedNodup
-      have hpositiveLength : positive.length = shifted.length := by
-        simp [shifted]
-      have hzeroBound :
-          (times.filter (fun k => decide (k = 0))).length ≤ 1 :=
-        sharp_zero_filter_length_le_one htimesNodup
-      have hpartition := sharp_zero_positive_partition times
-      dsimp [positive] at hpositiveLength
-      omega
 
 end GeneralN

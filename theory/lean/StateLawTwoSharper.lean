@@ -1,6 +1,5 @@
-import StateLawTwoSharp
-import ProtectedRepairFour
 import ArbitraryStartDirectLift
+import ProtectedRepairFour
 
 /-! Current sharp coefficient-two unconditional state bound. -/
 

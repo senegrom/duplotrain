@@ -111,30 +111,6 @@ theorem blockUniverseCore_add_four (n : Nat) :
   simp only [blockUniverseCore]
   rw [blockCore_rect_length, blockPatterns4_length]
 
-private theorem blockCore_nodup_subset_length
-    {xs ys : List (List Bool)}
-    (hnd : xs.Nodup)
-    (hsub : ∀ x ∈ xs, x ∈ ys) :
-    xs.length ≤ ys.length := by
-  induction xs generalizing ys with
-  | nil => exact Nat.zero_le _
-  | cons x rest ih =>
-      rw [List.nodup_cons] at hnd
-      have hx : x ∈ ys := hsub x List.mem_cons_self
-      have hsub' : ∀ z ∈ rest, z ∈ ys.erase x := by
-        intro z hz
-        have hzy := hsub z (List.mem_cons_of_mem _ hz)
-        have hzx : z ≠ x := fun h => hnd.1 (h ▸ hz)
-        exact (List.mem_erase_of_ne hzx).mpr hzy
-      have hle := ih hnd.2 hsub'
-      rw [List.length_erase_of_mem hx] at hle
-      have hpos : 0 < ys.length := by
-        cases ys with
-        | nil => cases hx
-        | cons _ _ => simp
-      simp only [List.length_cons]
-      omega
-
 theorem blockCoreFourth_mono {x y : Nat} (h : x ≤ y) :
     fourth x ≤ fourth y := by
   unfold fourth
@@ -177,38 +153,5 @@ theorem blockUniverseCore_fourth_bound : ∀ n : Nat,
 
 /-- Eighth power for the final rational exponent. -/
 def blockCoreEighth (x : Nat) : Nat := fourth x * fourth x
-
-/-- Strict arithmetic for an `A`-bit auxiliary fibre over an `M`-coordinate
-block-sparse code. -/
-theorem blockCore_eighth_bound
-    (C A M S : Nat)
-    (hC : C = A + M)
-    (hAM : A ≤ M)
-    (hcount : S ≤ 2^A * (blockUniverseCore M).length) :
-    blockCoreEighth S ≤ 2^(7*C+18) := by
-  have hs4 := blockCoreFourth_mono hcount
-  have hu := blockUniverseCore_fourth_bound M
-  have h4 : fourth S ≤ 2^(4*A+3*M+9) := by
-    calc
-      fourth S ≤ fourth (2^A * (blockUniverseCore M).length) := hs4
-      _ = 2^(4*A) * fourth (blockUniverseCore M).length := by
-        rw [blockCoreFourth_mul, blockCoreFourth_two_pow]
-      _ ≤ 2^(4*A) * 2^(3*M+9) :=
-        Nat.mul_le_mul_left _ hu
-      _ = 2^(4*A+3*M+9) := by
-        rw [← Nat.pow_add]
-        congr 1 <;> omega
-  unfold blockCoreEighth
-  have hsq := Nat.mul_le_mul h4 h4
-  have hpow :
-      2^(4*A+3*M+9) * 2^(4*A+3*M+9) =
-        2^(2*(4*A+3*M+9)) := by
-    rw [← Nat.pow_add]
-    congr 1 <;> omega
-  rw [hpow] at hsq
-  have hexp : 2*(4*A+3*M+9) ≤ 7*C+18 := by
-    omega
-  exact Nat.le_trans hsq
-    (Nat.pow_le_pow_right (by omega) hexp)
 
 end Echo

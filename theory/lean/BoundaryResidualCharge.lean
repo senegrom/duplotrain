@@ -1,5 +1,4 @@
 import BoundaryCanonicalGeometry
-import TrackThetaAllTime
 
 /-!
 # Coordinate charge in the canonical productive-boundary residual

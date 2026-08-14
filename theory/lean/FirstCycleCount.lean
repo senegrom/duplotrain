@@ -1,6 +1,5 @@
 import FirstActivatedExact
 import TripleSelfLinkSimpleCycleClosure
-import TrackNoveltyCover
 
 /-!
 # Direct tongue count for the first simple-cycle outcome

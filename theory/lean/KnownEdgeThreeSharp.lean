@@ -1,7 +1,6 @@
 import FirstCycleCount
 import OneJourneyTailCount
 import ProtectedRepairThree
-import TwoJourneyTailCountSharp
 import TwoJourneyBoundaryTailCount
 
 /-!

@@ -1,5 +1,3 @@
-import ReversalFacts
-import TreeReplay
 import TwoReflectorEdgeTrap
 
 /-!
@@ -75,29 +73,6 @@ structure CompatibleTwoReflectorTail (k x a b : Nat) : Prop where
   bOccupied : ∀ q, k ≤ q → Occupied m e r0 q b
   distinct : ReflectorCellsDistinct
     (m.cellOf a) (m.cellOf x) (m.cellOf (m.bar x)) (m.cellOf b)
-
-theorem returned_root_replays_component_of_support
-    (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c)
-    (cells : List Nat) {k l : Nat}
-    (hpk : ProductiveStep m e r0 k)
-    (hpl : ProductiveStep m e r0 l)
-    (hsupport : ∀ s,
-      Occupied m e r0 k s ↔ Occupied m e r0 (l+1) s)
-    (hpres : Occupied m e r0 (k+1) (oldSlot m e r0 k))
-    (hdiffk : ¬ SameEdge m (oldSlot m e r0 k) (e (k+1)))
-    (hdiffl : ¬ SameEdge m (oldSlot m e r0 l) (e (l+1)))
-    (hreturn : e (l+1) = oldSlot m e r0 k)
-    (hroot : RootedCells m e r0 k (oldSlot m e r0 k) cells) :
-    snap m e r0 cells (l+1) = snap m e r0 cells k := by
-  have hfullK : Full m e r0 k (oldSlot m e r0 k) := by
-    simpa [oldSlot] using old_edge_full_of_preserved
-      m e r0 hrun hr0 k hpk hpres (by simpa [oldSlot] using hdiffk)
-  have hfullL : Full m e r0 (l+1) (e (l+1)) := by
-    exact new_edge_full_of_preserved
-      m e r0 hrun hr0 l hpl (by simpa [oldSlot] using hdiffl)
-  exact rootedCells_sameEdge_replay m e r0 hr0 cells hsupport
-    hfullK hfullL (Or.inl hreturn) hroot
 
 
 private theorem exists_first_after {P : Nat → Prop} :

@@ -2490,36 +2490,4 @@ theorem long_run_eventually_periodic_within_thirty
       rw [stepN_add, hreachA]
       simpa [hactivatedB] using hreachB
     exact (hlocal.prepend hreach).weaken (by omega)
-
-theorem long_run_eventually_periodic_within_thirty_without_entry
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start finish : Nat × Tongues}
-    (hlive : stepN w (3 * N + 3) start = some finish) :
-    EventuallyPeriodicWithin w start (30 * N + 3) := by
-  have hsplit : 3 * N + 3 = 1 + (3 * N + 2) := by omega
-  rw [hsplit, stepN_add] at hlive
-  cases hone : stepN w 1 start with
-  | none =>
-      rw [hone] at hlive
-      contradiction
-  | some middle =>
-      rw [hone] at hlive
-      simp only [Option.bind_some] at hlive
-      rcases start with ⟨startPort, startState⟩
-      have honeStep : stepN w 1 (startPort, startState) =
-          some middle := hone
-      simp only [stepN, step] at hone
-      let localStep := arrive startState startPort
-      cases hlink : w.link localStep.1 with
-      | none =>
-          simp [localStep, hlink] at hone
-      | some entry =>
-          have hmiddle : middle = (entry, localStep.2) := by
-            simpa [localStep, hlink] using hone.symm
-          subst middle
-          have hlocal := long_run_eventually_periodic_within_thirty
-            hN hlive hlink
-          exact (hlocal.prepend honeStep).weaken (by omega)
 end GeneralN

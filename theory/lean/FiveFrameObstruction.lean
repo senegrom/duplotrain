@@ -1,10 +1,6 @@
-import RepeatedNoveltyDecomposition
 import SelfEpochAmortization
-import TrackTrace
 import TripleInterlacementObstruction
-import TrackQuantitative
 import ManufacturedPairNovelty
-import FirstReflectorNovelty
 
 /-!
 # Five closing frames reduce to a triple obstruction
@@ -87,15 +83,6 @@ theorem rawLastWriterFrame_open_ne_of_close_lt
 
 /-! ## The adversarial serial `C,D,C` module -/
 
-/-- A successful trailing traversal leaves over its switch's immutable stem
-edge. This is the configuration-level form of the fixed-successor law. -/
-private theorem successful_trailing_stem_link
-    {w : Wiring} {p q : Nat} {u v : Tongues}
-    (hstep : step w (p, u) = some (q, v))
-    (hbranch : p % 3 ≠ 0) :
-    w.link (3 * (p / 3)) = some q := by
-  have hparts := step_some_parts hstep
-  simpa [exitPort, arrive, hbranch] using hparts.1
 
 private theorem grooved_passages_physicalTrace
     (w : Wiring) (u : Tongues) (p x q : Nat) (rest : List Passage)
@@ -872,198 +859,6 @@ private theorem reached_configuration_has_entry_edge
         simpa [stepN] using hone
       exact ⟨exitPort before, (step_some_parts hstep).1⟩
 
-/-- **Pointwise serial-retrace certificate.**
-
-The exact caller retrace forced by five serial novelties retains all data
-needed by the novelty calculus:
-
-* the caller's actual `PhysicalTrace`;
-* the fact that every caller passage is grooved in the contact state;
-* the contact equation at the repeated switch;
-* the exact incoming edge and exact re-entry configuration; and
-* a pointwise statement saying depth zero has the contact's old vector and
-  every positive depth through the completed retrace has the one settled
-  vector.
-
-Consequently any sample contained in this backward segment has a
-`NoveltyCoverOn ... 1` over any history already containing the contact's old
-vector.  This is an unconditional conclusion from the five raw serial
-frames, not a recursively assumed return certificate. -/
-theorem five_serial_novelties_completed_retrace_one_novelty
-    {w : Wiring} {N initialEdge : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues}
-    (hentry : w.link initialEdge = some start.1)
-    {z₀ z₁ z₂ z₃ z₄ : Nat}
-    (H₀ : RawRepeatedWriterNovelAt w N start z₀)
-    (H₁ : RawRepeatedWriterNovelAt w N start z₁)
-    (H₂ : RawRepeatedWriterNovelAt w N start z₂)
-    (H₃ : RawRepeatedWriterNovelAt w N start z₃)
-    (H₄ : RawRepeatedWriterNovelAt w N start z₄)
-    {a₀ q₀ a₁ q₁ a₂ q₂ a₃ q₃ a₄ q₄ : Nat}
-    (F₀ : RawNovelClosingFrame w N start a₀ q₀ z₀)
-    (F₁ : RawNovelClosingFrame w N start a₁ q₁ z₁)
-    (F₂ : RawNovelClosingFrame w N start a₂ q₂ z₂)
-    (F₃ : RawNovelClosingFrame w N start a₃ q₃ z₃)
-    (F₄ : RawNovelClosingFrame w N start a₄ q₄ z₄)
-    (hserial : FiveFrameSerialBreak z₀ a₁ a₂ a₃ a₄) :
-    ∃ g base oldEntry mouthState q u settled edge repeatTime caller,
-      stepN w a₀ start = some (g, base) ∧
-      PhysicalTrace w (g, base) caller (oldEntry, mouthState) ∧
-      SwitchSimple caller ∧
-      PassagesGrooved settled caller ∧
-      caller.length ≤ N ∧
-      w.link edge = some g ∧
-      stepN w repeatTime start = some (q, u) ∧
-      a₀ ≤ repeatTime ∧ repeatTime < z₀ ∧
-      repeatTime + caller.length + 1 ≤ z₀ ∧
-      arrive u q = (oldEntry, settled) ∧
-      stepN w (caller.length + 1) (q, u) = some (edge, settled) ∧
-      (∀ d, d ≤ caller.length + 1 →
-        ∃ port, stepN w d (q, u) =
-          some (port, if d = 0 then u else settled)) ∧
-      (∀ history times,
-        VectorCount.restrict N u ∈ history →
-        (∀ j, j ∈ times →
-          repeatTime ≤ j ∧ j ≤ repeatTime + caller.length + 1) →
-        NoveltyCoverOn w N start times history 1) := by
-  obtain ⟨before, close, passages, runway, repeated, suffix,
-      hbefore, _hclose, hlength, htrace, hsplit, hsimple,
-      hrepeatMem⟩ :=
-    five_serial_novelties_force_first_repeated_switch
-      hN H₀ H₁ H₂ H₃ H₄ F₀ F₁ F₂ F₃ F₄ hserial
-  rcases before with ⟨g, base⟩
-  rw [hsplit] at htrace
-  obtain ⟨atRepeat, hprefix, hafter⟩ := htrace.split_append
-  obtain ⟨old, hold, hsameSwitch⟩ := List.mem_map.mp hrepeatMem
-  obtain ⟨caller, body, hrunway⟩ := List.append_of_mem hold
-  rw [hrunway] at hprefix
-  obtain ⟨atOld, hcaller, hbody⟩ := hprefix.split_append
-  rcases old with ⟨p, x⟩
-  rcases repeated with ⟨q, y⟩
-  have hatOldPort : atOld.1 = p := hbody.head_arrive.1
-  rcases atOld with ⟨oldPort, mouthState⟩
-  simp only at hatOldPort
-  subst oldPort
-  have hatRepeatPort : atRepeat.1 = q := hafter.head_arrive.1
-  rcases atRepeat with ⟨repeatPort, u⟩
-  simp only at hatRepeatPort
-  subst repeatPort
-  obtain ⟨v, hrepeat⟩ := hafter.head_arrive.2
-  have hsimpleFrame :
-      SwitchSimple (caller ++ (p, x) :: body) := by
-    simpa [hrunway] using hsimple
-  have hcallerSimple : SwitchSimple caller := by
-    unfold SwitchSimple at hsimpleFrame ⊢
-    simp only [List.map_append, List.map_cons] at hsimpleFrame
-    exact (List.nodup_append.mp hsimpleFrame).1
-  have hcallerLe : caller.length ≤ N :=
-    hcaller.simple_length_le hN hcallerSimple
-  have hswitch : p / 3 = q / 3 := by
-    simpa [passageSwitch] using hsameSwitch
-  have hprefixSound :
-      stepN w runway.length (g, base) = some (q, u) := by
-    simpa [hrunway] using hprefix.sound
-  let repeatTime := a₀ + runway.length
-  have hrepeatAt :
-      stepN w repeatTime start = some (q, u) := by
-    dsimp [repeatTime]
-    rw [stepN_add, hbefore]
-    exact hprefixSound
-  have hrunwayShort : runway.length < passages.length := by
-    rw [hsplit]
-    simp
-  have hrepeatBeforeClose : repeatTime < z₀ := by
-    dsimp [repeatTime]
-    have hframeOrder := F₀.outer.order
-    omega
-  rcases hcaller.first_revisit_cycle_traces_or_retrace
-      hbody hsimpleFrame hswitch hrepeat with hcycle | hretrace
-  · obtain ⟨cycle, cycleState, hnonempty, htransient,
-        hstable, hcycleSimple⟩ := hcycle
-    rcases hserial with hs | hs | hs | hs
-    · exact (serial_repeated_novel_after_simple_cycle_trace_false
-        hrepeatAt htransient hstable hcycleSimple hnonempty
-          F₁.outer H₁ (by omega)).elim
-    · exact (serial_repeated_novel_after_simple_cycle_trace_false
-        hrepeatAt htransient hstable hcycleSimple hnonempty
-          F₂.outer H₂ (by omega)).elim
-    · exact (serial_repeated_novel_after_simple_cycle_trace_false
-        hrepeatAt htransient hstable hcycleSimple hnonempty
-          F₃.outer H₃ (by omega)).elim
-    · exact (serial_repeated_novel_after_simple_cycle_trace_false
-        hrepeatAt htransient hstable hcycleSimple hnonempty
-          F₄.outer H₄ (by omega)).elim
-  · obtain ⟨settled, hgrooved, hcontact, hback⟩ := hretrace
-    obtain ⟨edge, hedge⟩ :=
-      reached_configuration_has_entry_edge hentry hbefore
-    have hreverse : w.link g = some edge := w.symm _ _ hedge
-    have hreturn :
-        stepN w (caller.length + 1) (q, u) =
-          some (edge, settled) := by
-      simpa [hreverse] using hback
-    have hpointwise : ∀ d, d ≤ caller.length + 1 →
-        ∃ port, stepN w d (q, u) =
-          some (port, if d = 0 then u else settled) :=
-      (physicalTrace_contact_retraces_prefix_pointwise
-        hcaller hgrooved hedge hcontact).2
-    have hreturnBeforeClose :
-        repeatTime + caller.length + 1 ≤ z₀ := by
-      apply Classical.byContradiction
-      intro hnot
-      have hpostLe : z₀ + 1 ≤ repeatTime + caller.length + 1 := by
-        omega
-      let d := z₀ + 1 - repeatTime
-      have hdPositive : 0 < d := by
-        dsimp [d]
-        omega
-      have hdLe : d ≤ caller.length + 1 := by
-        dsimp [d]
-        omega
-      have htimeD : repeatTime + d = z₀ + 1 := by
-        dsimp [d]
-        omega
-      obtain ⟨portOne, hlocalOne⟩ := hpointwise 1 (by omega)
-      have hglobalOne :
-          stepN w (repeatTime + 1) start =
-            some (portOne, settled) := by
-        rw [stepN_add, hrepeatAt]
-        simpa using hlocalOne
-      obtain ⟨portPost, hlocalPost⟩ := hpointwise d hdLe
-      have hglobalPost :
-          stepN w (z₀ + 1) start =
-            some (portPost, settled) := by
-        rw [← htimeD, stepN_add, hrepeatAt]
-        simpa [Nat.ne_of_gt hdPositive] using hlocalPost
-      have hvector :
-          restrictedTonguesAt w N start (repeatTime + 1) =
-            restrictedTonguesAt w N start (z₀ + 1) := by
-        simp [restrictedTonguesAt, tonguesAt,
-          hglobalOne, hglobalPost]
-      apply H₀.2.2
-      apply List.mem_map.mpr
-      exact ⟨repeatTime + 1,
-        List.mem_range.mpr (by omega), hvector⟩
-    have hcover : ∀ history times,
-        VectorCount.restrict N u ∈ history →
-        (∀ j, j ∈ times →
-          repeatTime ≤ j ∧ j ≤ repeatTime + caller.length + 1) →
-        NoveltyCoverOn w N start times history 1 := by
-      intro history times hu htimes
-      exact completed_retrace_at_one_novelty_cover
-        hcaller hgrooved hedge hcontact hrepeatAt
-          N history hu times htimes
-    exact ⟨g, base, p, mouthState, q, u, settled, edge,
-      repeatTime, caller, hbefore, hcaller, hcallerSimple,
-      hgrooved, hcallerLe, hedge, hrepeatAt, by omega,
-      hrepeatBeforeClose, hreturnBeforeClose, hcontact,
-      hreturn, hpointwise, hcover⟩
-
-/-! ## The later serial frame is an actual suffix frame -/
-
-/-- A productive raw event rebases to any earlier reached configuration.
-This is the exact time-shift operation needed after a completed caller
-retrace. -/
 private theorem rawProductiveAt_rebase
     {w : Wiring} {N shift time : Nat}
     {start middle : Nat × Tongues}
@@ -1301,36 +1096,6 @@ private theorem descentEntry_stem_link_exists
   | last _ hlink _ => exact ⟨_, hlink⟩
   | cons _ hlink _ _ => exact ⟨_, hlink⟩
 
-/-- Strengthening of `certified_fixed_bar_has_self_link`: the self-link
-alternative already carries its exact raw identity-reflector semantics. -/
-theorem certified_fixed_bar_has_identity_reflector
-    {w : Wiring} (run : CertifiedConcreteEchoRun w) {q : Nat}
-    (hfixed :
-      (canonicalEchoMachine w).bar (encodedEntries run.entry q) =
-        encodedEntries run.entry q) :
-    HasSelfLinkIdentityReflector w := by
-  let branch := run.toConcreteAscentTrace.entry q
-  have hencoded : encodeSlot (wireBar w branch) = encodeSlot branch := by
-    simpa [branch, encodedEntries, canonicalEchoMachine,
-      encodedMachine, encodedBar_encodeSlot] using hfixed
-  have hwire : wireBar w branch = branch :=
-    encodeSlot_injective hencoded
-  have hslot := run.toConcreteAscentTrace.freeSlot q
-  have hlink : w.link branch = some (wireBar w branch) := by
-    simpa [branch] using hslot.2.2.1
-  rw [hwire] at hlink
-  have hentry : IsDescentEntry w branch := by
-    simpa [branch] using hslot.1
-  have hbranch : branch % 3 ≠ 0 := by
-    simpa [branch] using hslot.2.1
-  obtain ⟨outside, hmouth⟩ :=
-    descentEntry_stem_link_exists hentry
-  exact ⟨branch, outside, hlink,
-    self_linked_branch_is_identity_reflector
-      hbranch hlink hmouth⟩
-
-/-- Three closing frames whose openings and closings have the same order:
-`a₀ < a₁ < a₂ < z₀ < z₁ < z₂`. -/
 def EndpointABCABC
     (a₀ z₀ a₁ z₁ a₂ z₂ : Nat) : Prop :=
   a₀ < a₁ ∧ a₁ < a₂ ∧ a₂ < z₀ ∧ z₀ < z₁ ∧ z₁ < z₂
@@ -1526,27 +1291,6 @@ theorem five_common_raw_closing_frames_have_triple
     (rawLastWriterFrame_open_ne_of_close_lt hz24 F₂.outer F₄.outer)
     (rawLastWriterFrame_open_ne_of_close_lt hz34 F₃.outer F₄.outer)
 
-/-- Once strict three-frame nesting has been excluded, five common-overlap
-frames force an actual `ABCABC` endpoint interlacement. -/
-theorem five_common_raw_closing_frames_abcabc_of_no_nest
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {a₀ q₀ z₀ a₁ q₁ z₁ a₂ q₂ z₂ a₃ q₃ z₃ a₄ q₄ z₄ : Nat}
-    (hz01 : z₀ < z₁) (hz12 : z₁ < z₂)
-    (hz23 : z₂ < z₃) (hz34 : z₃ < z₄)
-    (F₀ : RawNovelClosingFrame w N start a₀ q₀ z₀)
-    (F₁ : RawNovelClosingFrame w N start a₁ q₁ z₁)
-    (F₂ : RawNovelClosingFrame w N start a₂ q₂ z₂)
-    (F₃ : RawNovelClosingFrame w N start a₃ q₃ z₃)
-    (F₄ : RawNovelClosingFrame w N start a₄ q₄ z₄)
-    (hcommon : a₁ < z₀ ∧ a₂ < z₀ ∧ a₃ < z₀ ∧ a₄ < z₀)
-    (hnoNest : ¬ FiveFrameStrictNest
-      a₀ z₀ a₁ z₁ a₂ z₂ a₃ z₃ a₄ z₄) :
-    FiveFrameABCABC a₀ z₀ a₁ z₁ a₂ z₂ a₃ z₃ a₄ z₄ := by
-  rcases five_common_raw_closing_frames_have_triple
-      hz01 hz12 hz23 hz34 F₀ F₁ F₂ F₃ F₄ hcommon with
-    habc | hnest
-  · exact habc
-  · exact (hnoNest hnest).elim
 
 theorem five_repeated_novelties_serial_or_triple
     {w : Wiring} {N : Nat}

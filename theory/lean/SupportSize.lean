@@ -1,4 +1,3 @@
-import ThreeQuarterArithmetic
 import SupportMove
 
 /-!
@@ -17,47 +16,10 @@ namespace Echo
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-/-- A list contains at most one representative of each physical jump edge. -/
-def EdgeRepresentatives (edges : List Nat) : Prop :=
-  edges.Nodup ∧
-  ∀ s, s ∈ edges → ∀ t, t ∈ edges → SameEdge m s t → s = t
-
-/-- Pick a confirmed endpoint when the edge is occupied. -/
 noncomputable def chosenEndpoint
     (m : Machine) (e r0 : Nat → Nat) (k s : Nat) : Nat := by
   classical
   exact if Confirmed m e r0 k s then s else m.bar s
-
-theorem chosenEndpoint_sameEdge (k s : Nat) :
-    SameEdge m s (chosenEndpoint m e r0 k s) := by
-  classical
-  unfold chosenEndpoint
-  split
-  · exact Or.inl rfl
-  · exact Or.inr rfl
-
-theorem chosenEndpoint_confirmed {k s : Nat}
-    (hocc : Occupied m e r0 k s) :
-    Confirmed m e r0 k (chosenEndpoint m e r0 k s) := by
-  classical
-  unfold chosenEndpoint
-  split <;> rename_i h
-  · exact h
-  · exact hocc.resolve_left h
-
-/-- Same-edge is transitive. -/
-theorem sameEdge_trans {a b c : Nat}
-    (hab : SameEdge m a b) (hbc : SameEdge m b c) :
-    SameEdge m a c := by
-  rcases hab with hab | hab <;> rcases hbc with hbc | hbc
-  · exact Or.inl (hbc.trans hab)
-  · subst b
-    exact Or.inr hbc
-  · subst c
-    exact Or.inr hab
-  · subst b
-    rw [m.bar_invol] at hbc
-    exact Or.inl hbc
 
 private theorem nodup_subset_length_nat {l S : List Nat}
     (hnd : l.Nodup) (hsub : ∀ x ∈ l, x ∈ S) : l.length ≤ S.length := by

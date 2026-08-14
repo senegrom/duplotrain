@@ -1,7 +1,5 @@
 import TrackQuantitativeRouteSharp
-import TrackNoveltyCover
 import RunwaySpliceNovelty
-import ForeignSpliceNovelty
 
 /-!
 # Tongue counts for the early protected-repair exits

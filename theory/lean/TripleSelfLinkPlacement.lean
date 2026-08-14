@@ -294,92 +294,6 @@ theorem CertifiedConcreteEchoRun.ascent_interval_raw_reach
       · rw [stepN_add, hlead]
         simpa [Nat.add_assoc] using hfinal
 
-/-- Ordered certified indices therefore expose the later certified
-configuration at a positive raw distance from the earlier one. -/
-theorem CertifiedConcreteEchoRun.ascent_order_raw_reach
-    {w : Wiring} (run : CertifiedConcreteEchoRun w) {i j : Nat}
-    (hij : i < j) :
-    exists travel, 0 < travel /\
-      stepN w travel (run.entry i, run.boundary i) =
-        some (run.entry j, run.boundary j) := by
-  obtain ⟨travel, hbound, hreach⟩ :=
-    run.ascent_interval_raw_reach i (j - i)
-  refine ⟨travel, by omega, ?_⟩
-  have hindex : i + (j - i) = j := by omega
-  simpa [hindex] using hreach
-
-/-! ## Endpoint-only raw transport -/
-
-/-- A raw productive event guarantees that the configuration represented by
-`rawEntryAt` and `tonguesAt` is genuinely reached; the defaults in those
-definitions are therefore irrelevant at this time. -/
-private theorem raw_configuration_at_of_productive
-    {w : Wiring} {N k : Nat} {start : Nat × Tongues}
-    (hprod : RawProductiveAt w N start k) :
-    stepN w k start =
-      some (rawEntryAt w start k, tonguesAt w start k) := by
-  obtain ⟨post, hpost⟩ := Option.isSome_iff_exists.mp hprod.1
-  obtain ⟨current, hcurrent⟩ := stepN_prefix_some
-    (d := k) (K := k + 1) (by omega) hpost
-  simpa [rawEntryAt, tonguesAt, hcurrent] using hcurrent
-
-/-- The opening selected by an arbitrary `Fin 5` index is productive. -/
-private theorem FiveRawClosingFrames.opening_productiveAt
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    (F : FiveRawClosingFrames w N start z0 z1 z2 z3 z4)
-    (i : Fin 5) :
-    RawProductiveAt w N start (F.openingAt i) := by
-  rcases i with ⟨i, hi⟩
-  have hcases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 := by
-    omega
-  rcases hcases with h | h | h | h | h
-  · subst i
-    simpa [FiveRawClosingFrames.openingAt] using
-      F.frame₀.outer.open_productive
-  · subst i
-    simpa [FiveRawClosingFrames.openingAt] using
-      F.frame₁.outer.open_productive
-  · subst i
-    simpa [FiveRawClosingFrames.openingAt] using
-      F.frame₂.outer.open_productive
-  · subst i
-    simpa [FiveRawClosingFrames.openingAt] using
-      F.frame₃.outer.open_productive
-  · subst i
-    simpa [FiveRawClosingFrames.openingAt] using
-      F.frame₄.outer.open_productive
-
-/-- The closing selected by an arbitrary `Fin 5` index is productive. -/
-private theorem FiveRawClosingFrames.closing_productiveAt
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    (F : FiveRawClosingFrames w N start z0 z1 z2 z3 z4)
-    (i : Fin 5) :
-    RawProductiveAt w N start (F.closingAt i) := by
-  rcases i with ⟨i, hi⟩
-  have hcases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 := by
-    omega
-  rcases hcases with h | h | h | h | h
-  · subst i
-    simpa [FiveRawClosingFrames.closingAt] using
-      F.frame₀.outer.close_productive
-  · subst i
-    simpa [FiveRawClosingFrames.closingAt] using
-      F.frame₁.outer.close_productive
-  · subst i
-    simpa [FiveRawClosingFrames.closingAt] using
-      F.frame₂.outer.close_productive
-  · subst i
-    simpa [FiveRawClosingFrames.closingAt] using
-      F.frame₃.outer.close_productive
-  · subst i
-    simpa [FiveRawClosingFrames.closingAt] using
-      F.frame₄.outer.close_productive
-
-/-- A raw periodic orbit whose interior contains a physical self-link.  This
-is the exact endpoint-only residual when a certified journey reaches the raw
-closing endpoint only after wrapping around it. -/
 structure RawCycleThroughSelfLink
     (w : Wiring) (start : Nat × Tongues) (close : Nat) where
   closeConfig : Nat × Tongues
@@ -535,24 +449,6 @@ theorem RawCycleThroughSelfLink.outside_period
   refine ⟨outside, hmouth, hout, ?_⟩
   rw [hsplit', stepN_add, hreturn]
   exact hout
-
-def CertifiedSelfLinkRawEndpointOutcome
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    {S : SelectedFiveFrameABCABC T}
-    (C : CertifiedEndpointEmptyABCABC S) : Prop :=
-  (exists q shift,
-    T.frames.openingAt S.i2 < shift ∧
-    shift <= T.frames.closingAt S.i0 ∧
-    stepN w shift start =
-      some (C.run.entry q, C.run.boundary q) ∧
-    w.link (C.run.entry q) = some (C.run.entry q)) ∨
-  Nonempty (RawCycleThroughSelfLink w start
-    (T.frames.closingAt S.i0))
-
-/-- The physical self-link forced by the non-irreflexive branch, retaining
-its exact location in the selected certified-ascent window. -/
 def CertifiedSelfLinkInSelectedWindow
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     {z0 z1 z2 z3 z4 : Nat}
@@ -564,41 +460,6 @@ def CertifiedSelfLinkInSelectedWindow
     q < C.clock (T.frames.closingAt S.i0) ∧
     w.link (C.run.entry q) = some (C.run.entry q)
 
-/-- Unconditional certified placement of the self-link.  This is the timing
-information that `forces_used_self_link` previously erased. -/
-theorem CertifiedEndpointEmptyABCABC.forces_windowed_self_link
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    {S : SelectedFiveFrameABCABC T}
-    (C : CertifiedEndpointEmptyABCABC S) :
-    CertifiedSelfLinkInSelectedWindow C := by
-  have hKb : C.K <= C.clock (T.frames.openingAt S.i2) := by
-    exact Nat.le_trans C.base_before_first
-      (Nat.le_of_lt (Nat.lt_trans C.selected_clock_order.1
-        C.selected_clock_order.2.1))
-  have hout := Echo.cyclic_minimal_stable_blocker_obstruction_bounded
-    (canonicalEchoMachine w) (encodedEntries C.run.entry)
-      C.run.initialRegister
-      (certifiedConcreteEcho_isRun C.run) C.run.initialWellFormed
-      C.tail C.crossing hKb C.selected_clock_order.2.1
-      C.selected_clock_order.2.2 C.stable
-  rcases hout with hlobe | hreplay | hfixed
-  · obtain ⟨k, hk⟩ := hlobe
-    exact (C.no_lobe k hk).elim
-  · exact (C.no_replay hreplay).elim
-  · obtain ⟨q, hqlo, hqhi, hfix⟩ := hfixed
-    exact ⟨q, hqlo, hqhi,
-      certified_fixed_encoded_entry_has_self_link C.run hfix⟩
-
-def FiveFixedStemNovelFrames.closePostTimes
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    (F : FiveFixedStemNovelFrames w N start) : List Nat :=
-  [F.z₀ + 1, F.z₁ + 1, F.z₂ + 1, F.z₃ + 1, F.z₄ + 1]
-
-/-- A raw suffix whose restricted tongue vector is always one of two
-explicit vectors.  The reach and liveness fields make the time shift exact;
-there is no use of `getD` defaults. -/
 structure RawTwoVectorTail
     (w : Wiring) (N : Nat) (start : Nat × Tongues) where
   shift : Nat
@@ -649,28 +510,5 @@ private theorem FiveRawClosingFrames.val_lt_of_closingAt_lt
       have hback := F.closingAt_lt_of_val_lt
         h01 h12 h23 h34 hstrict
       omega
-
-/-- In every selected chronological triple, the first selected frame is one
-of the first three global frames.  Hence at most two close vectors precede
-the selected raw window. -/
-theorem SelectedFiveFrameABCABC.first_index_le_two
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    (h01 : z0 < z1) (h12 : z1 < z2)
-    (h23 : z2 < z3) (h34 : z3 < z4)
-    (S : SelectedFiveFrameABCABC T) : S.i0.1 ≤ 2 := by
-  have hclose01 :
-      T.frames.closingAt S.i0 < T.frames.closingAt S.i1 :=
-    S.shape.2.2.2.1
-  have hclose12 :
-      T.frames.closingAt S.i1 < T.frames.closingAt S.i2 :=
-    S.shape.2.2.2.2
-  have hi01 := T.frames.val_lt_of_closingAt_lt
-    h01 h12 h23 h34 hclose01
-  have hi12 := T.frames.val_lt_of_closingAt_lt
-    h01 h12 h23 h34 hclose12
-  have hi2 : S.i2.1 < 5 := S.i2.2
-  omega
 
 end GeneralN

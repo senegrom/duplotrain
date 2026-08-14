@@ -2000,40 +2000,6 @@ theorem pathGrooves_after_arrive_without_support_change
     rw [hexit]
     exact hsame
 
-/-- An actually broken old groove names a concrete old support passage whose
-switch occurs in the new exploration.  This is stronger than mere path
-intersection: the returned groove is false in the activated state. -/
-theorem ManufacturedReflector.broken_support_contact
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (before after : Tongues)
-    (hgrooves : PathGrooves A.toSupported.paths before)
-    (hpreserves : ∀ j, j ∉ B.exploration.map passageSwitch →
-      after j = before j)
-    (hbroken : ¬ PathGrooves A.toSupported.paths after) :
-    ∃ path ∈ A.toSupported.paths, ∃ old ∈ path,
-      passageSwitch old ∈ B.exploration.map passageSwitch ∧
-      arrive after old.2 ≠ (old.1, after) := by
-  classical
-  apply Classical.byContradiction
-  intro hnone
-  apply hbroken
-  intro path hp old hold
-  by_cases hmem : passageSwitch old ∈
-      B.exploration.map passageSwitch
-  · apply Classical.byContradiction
-    intro hbad
-    apply hnone
-    exact ⟨path, hp, old, hold, hmem, hbad⟩
-  · have hgroove := hgrooves path hp old hold
-    have hexit : old.2 / 3 = passageSwitch old := by
-      have hs := arrive_exit_switch before old.2
-      rw [hgroove] at hs
-      exact hs.symm
-    apply groove_transfer hgroove
-    rw [hexit]
-    exact hpreserves (passageSwitch old) hmem
 
 theorem exists_broken_groove
     {state : Tongues} {paths : List (List Passage)}
@@ -2309,55 +2275,6 @@ theorem ManufacturedReflector.OutwardSupportFault.preReturn_broken
   intro hgroovesPre
   exact hbadPre (hgroovesPre path hp old hold)
 
-/-- Dynamic first-contact package.  The second exploration reaches its first
-old-support switch through a prefix that has preserved every old groove; the
-remaining physical trace, beginning with the contacting passage, is retained
-for the local contact analysis. -/
-theorem ManufacturedReflector.first_support_contact_trace
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (before : Tongues)
-    (hbase : B.baseState = before)
-    (hgrooves : PathGrooves A.toSupported.paths before)
-    (hcontact : ¬ A.SupportAvoidsExploration B) :
-    ∃ approach fresh suffix contactState,
-      B.exploration = approach ++ fresh :: suffix ∧
-      PhysicalTrace w (e, before) approach (fresh.1, contactState) ∧
-      PhysicalTrace w (fresh.1, contactState) (fresh :: suffix)
-        B.preReturn ∧
-      PathGrooves A.toSupported.paths contactState ∧
-      (∀ prior ∈ approach, ¬ A.TouchesSupport prior) ∧
-      A.TouchesSupport fresh := by
-  obtain ⟨approach, fresh, suffix, hsplit, hprefix, hfresh⟩ :=
-    A.first_support_contact B hcontact
-  have htrace := B.exploration_trace
-  rw [hsplit] at htrace
-  obtain ⟨middle, hbeforeTrace, hafterTrace⟩ := htrace.split_append
-  have hmiddlePort : middle.1 = fresh.1 := hafterTrace.head_arrive.1
-  rcases middle with ⟨middlePort, contactState⟩
-  simp only at hmiddlePort
-  subst middlePort
-  have hbeforeTrace' :
-      PhysicalTrace w (e, before) approach (fresh.1, contactState) := by
-    simpa [hbase] using hbeforeTrace
-  have hforeign :
-      ∀ passage ∈ approach, ∀ path ∈ A.toSupported.paths,
-        ∀ old ∈ path,
-          passageSwitch passage ≠ passageSwitch old := by
-    intro passage hp path hpath old hold hEq
-    apply hprefix passage hp
-    exact ⟨path, hpath, old, hold, hEq.symm⟩
-  exact ⟨approach, fresh, suffix, contactState, hsplit,
-    hbeforeTrace', hafterTrace,
-    pathGrooves_preserved_by_foreign_trace
-      hbeforeTrace' hgrooves hforeign,
-    hprefix, hfresh⟩
-
-/-- Local geometry of a first contact with an existing groove.  Whatever the
-third port and the current tongue orientation are, the fresh passage exits
-through one of the two ports of the old grooved passage.  Hence its next
-plain-track edge lies on the old component. -/
 theorem grooved_contact_exits_on_old_passage
     {state next : Tongues} {oldEntry oldExit freshEntry freshExit : Nat}
     (hold : arrive state oldExit = (oldEntry, state))
@@ -4372,49 +4289,5 @@ theorem long_run_eventually_periodic_or_outward_fault
         firstTravel, secondTravel,
         hbaseA, hactivatedA, hreachA, hgroovesA,
         hbaseB, hactivatedB, hreachB, hgroovesB, houtward⟩
-
-/-- **Forward-only global residual.**  Combining the global two-reflector
-reduction with the orientation-normalized splice closes every backward
-contact.  After `3*N+2` live steps, failure of eventual periodicity now
-exposes only a concrete forward, branch-to-stem contact whose old passage is
-certified to repair itself. -/
-theorem long_run_eventually_periodic_or_forward_fault
-    {w : Wiring} {N e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start finish : Nat × Tongues}
-    (hlive : stepN w (3 * N + 2) start = some finish)
-    (hentry : w.link e = some start.1) :
-    EventuallyPeriodic w start ∨
-      ∃ (A : ManufacturedReflector w start.1 e)
-          (B : ManufacturedReflector w e start.1)
-          (stateA stateB : Tongues) (firstTravel secondTravel : Nat),
-        A.baseState = start.2 ∧
-        stateA = A.activatedState ∧
-        stepN w firstTravel start = some (e, stateA) ∧
-        PathGrooves A.toSupported.paths stateA ∧
-        B.baseState = stateA ∧
-        stateB = B.activatedState ∧
-        stepN w secondTravel (e, stateA) = some (start.1, stateB) ∧
-        PathGrooves B.toSupported.paths stateB ∧
-        A.ForwardOrientedFault B := by
-  rcases long_run_eventually_periodic_or_outward_fault
-      hN hlive hentry with hperiodic | houtward
-  · exact Or.inl hperiodic
-  · obtain ⟨A, B, stateA, stateB, firstTravel, secondTravel,
-      hbaseA, hactivatedA, hreachA, hgroovesA,
-      hbaseB, hactivatedB, hreachB, hgroovesB, hfault⟩ := houtward
-    have hbaseGrooves :
-        PathGrooves A.toSupported.paths B.baseState := by
-      rw [hbaseB]
-      exact hgroovesA
-    rcases outward_fault_eventuallyPeriodic_or_forward
-      A B hfault hbaseGrooves with hperiodic | hforward
-    · have hperiodic' : EventuallyPeriodic w (e, stateA) := by
-        simpa [hbaseB] using hperiodic
-      exact Or.inl (EventuallyPeriodic.prepend hreachA hperiodic')
-    · exact Or.inr ⟨A, B, stateA, stateB,
-        firstTravel, secondTravel,
-        hbaseA, hactivatedA, hreachA, hgroovesA,
-        hbaseB, hactivatedB, hreachB, hgroovesB, hforward⟩
 
 end GeneralN

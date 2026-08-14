@@ -1,4 +1,3 @@
-import ManufacturedPairNovelty
 import RunwaySpliceNovelty
 
 /-!

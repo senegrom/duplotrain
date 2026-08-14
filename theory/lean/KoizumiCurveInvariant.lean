@@ -124,22 +124,4 @@ structure TrainFreeCurveShrinkHistory (N affects : Nat) where
   curve : Nat → TrackedEndpointCurve N
   shrinks : ∀ k, k < affects → StrictTrackedSubcurve (curve (k+1)) (curve k)
 
-/-- Quantitative form of “a finite curve cannot shrink indefinitely”.  A
-tracked train-free endpoint curve can be affected at most once per switch on
-its initial carrier, hence at most `N` times. -/
-theorem trainFreeCurve_affects_le_initial_length
-    (H : TrainFreeCurveShrinkHistory N affects) :
-    affects ≤ (H.curve 0).switches.length := by
-  have hmeasure : ∀ k, k ≤ affects →
-      (H.curve k).switches.length + k ≤ (H.curve 0).switches.length := by
-    intro k hk
-    induction k with
-    | zero => simp
-    | succ k ih =>
-        have hklt : k < affects := by omega
-        have hshrink := (H.shrinks k hklt).2
-        have hprev := ih (by omega)
-        omega
-  have hfinal := hmeasure affects (Nat.le_refl _)
-  omega
 end GeneralN

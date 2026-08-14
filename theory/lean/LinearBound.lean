@@ -111,40 +111,6 @@ private theorem first_same_cell_same_step {j1 j2 : Nat}
       exact absurd hc.symm hn
     · omega
 
-private theorem linearCode_eq_snap_eq (cells : List Nat)
-    {k1 k2 : Nat} (hc : linearCode m e r0 k1 = linearCode m e r0 k2) :
-    snap m e r0 cells k1 = snap m e r0 cells k2 := by
-  rcases linearCode_spec m e r0 cells k1 with h01 | h1
-  · rcases linearCode_spec m e r0 cells k2 with h02 | h2
-    · exact h01.2.trans h02.2.symm
-    · obtain ⟨j2, _, _, _, hc2⟩ := h2
-      rcases hc2 with ⟨_, hcode2⟩ | ⟨_, hcode2⟩ <;>
-        rw [h01.1, hcode2] at hc <;> omega
-  · rcases linearCode_spec m e r0 cells k2 with h02 | h2
-    · obtain ⟨j1, _, _, _, hc1⟩ := h1
-      rcases hc1 with ⟨_, hcode1⟩ | ⟨_, hcode1⟩ <;>
-        rw [hcode1, h02.1] at hc <;> omega
-    · obtain ⟨j1, _, _, hs1, hc1⟩ := h1
-      obtain ⟨j2, _, _, hs2, hc2⟩ := h2
-      rcases hc1 with ⟨hf1, hcode1⟩ | ⟨_hnf1, hcode1⟩
-      · rcases hc2 with ⟨hf2, hcode2⟩ | ⟨_hnf2, hcode2⟩
-        · have hcell : m.cellOf (e (j1+1)) = m.cellOf (e (j2+1)) := by
-            rw [hcode1, hcode2] at hc
-            omega
-          have hj : j1 = j2 := first_same_cell_same_step m e hf1 hf2 hcell
-          subst j2
-          exact hs1.trans hs2.symm
-        · rw [hcode1, hcode2] at hc
-          omega
-      · rcases hc2 with ⟨_hf2, hcode2⟩ | ⟨_hnf2, hcode2⟩
-        · rw [hcode1, hcode2] at hc
-          omega
-        · have hj : j1 = j2 := by
-            rw [hcode1, hcode2] at hc
-            omega
-          subst j2
-          exact hs1.trans hs2.symm
-
 private theorem nodup_transfer {f : Nat → List Nat} {g : Nat → Nat} :
     ∀ {l : List Nat},
       (∀ x, x ∈ l → ∀ y, y ∈ l → g x = g y → f x = f y) →

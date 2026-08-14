@@ -1,6 +1,4 @@
 import PartialSecondRunSharp
-import ChangedFlipCountFour
-import CompleteRepairFour
 
 /-!
 # The protected pre-return facts of a completed opposite pair

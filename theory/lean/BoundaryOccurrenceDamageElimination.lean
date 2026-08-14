@@ -1,6 +1,5 @@
 import BoundaryApproachActionElimination
 import BoundaryCanonicalGeometry
-import TrackThetaAllTime
 
 /-!
 # Elimination of the occurrence-support-damage residuals

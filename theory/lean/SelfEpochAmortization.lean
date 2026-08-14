@@ -1,8 +1,13 @@
-import TrackCurveShrinkGlobal
 import EndpointEpochExtraction
 import SelfPivotStrictShrink
-import NestedRestorationCharge
-import NestedRestorationElimination
+import RestorationFrameOrdering
+import HiddenFibre
+import Periodicity
+import SupportMove
+import BlockSparseBoundCore
+import RestorationFrames
+import PersistentLobeSeparationStandalone
+import StarIndependent
 
 /-!
 # Global amortization of train-curve growth and self epochs
@@ -142,25 +147,6 @@ theorem raw_nonself_growth_amortized
         unfold rawCurveDropAt
         omega
 
-/-- Port-cap corollary of `raw_nonself_growth_amortized`. -/
-theorem raw_nonself_growth_le_three_mul_add_drop
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome) :
-    (rawNonselfProductiveTimes w N start K).length ≤
-      3 * N + rawCurveDropMass w N start K := by
-  have hpotential := raw_nonself_growth_amortized hN start K hlive
-  have hfinal : rawFiniteCurveSizeAt w N start K ≤ 3 * N := by
-    unfold rawFiniteCurveSizeAt
-    exact finiteCurvePorts_length_le w N
-      ((stepN w K start).getD start).2
-      ((stepN w K start).getD start).1
-  omega
-
-/-! ## Strict shrinks are paid for by drop mass -/
-
-/-- Strict productive self-shrinks in `[0, K)`. -/
 noncomputable def rawStrictSelfShrinkTimes
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : List Nat := by
   classical
@@ -232,18 +218,6 @@ private theorem rawNonselfProductiveTimes_prefix_subset
   exact mem_rawNonselfProductiveTimes_iff.mpr
     ⟨by omega, hdata.2.1, hdata.2.2⟩
 
-/-- The non-self epoch rank is monotone in raw time. -/
-theorem rawNonselfRank_mono
-    {w : Wiring} {N a b : Nat} {start : Nat × Tongues}
-    (hab : a ≤ b) :
-    rawNonselfRank w N start a ≤ rawNonselfRank w N start b := by
-  unfold rawNonselfRank
-  exact nodup_subset_length_amortization
-    (rawNonselfProductiveTimes_nodup w N start a)
-    (rawNonselfProductiveTimes_prefix_subset hab)
-
-/-- Crossing one productive non-self pivot strictly increases the epoch
-rank. -/
 theorem rawNonselfRank_lt_of_event_between
     {w : Wiring} {N a j b : Nat} {start : Nat × Tongues}
     (haj : a ≤ j) (hjb : j < b)
@@ -462,163 +436,6 @@ private theorem map_filter_nodup_amortization
           simp only [List.filter_cons, hp]
           exact ih hnd.2
 
-/-- **Four-state fibre theorem.**  Among any duplicate-free sample from a
-live prefix, all times with the same number of preceding non-self pivots lie
-in one self-only epoch and therefore contribute at most four vectors. -/
-theorem rawNonselfRank_fibre_le_four
-    {w : Wiring} {N K r : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (times : List Nat) (htimes : ∀ k, k ∈ times → k ≤ K)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    (times.filter (fun k => decide
-      (rawNonselfRank w N start k = r))).length ≤ 4 := by
-  classical
-  let fibre := times.filter (fun k => decide
-    (rawNonselfRank w N start k = r))
-  change fibre.length ≤ 4
-  cases hfibre : fibre with
-  | nil => simp
-  | cons x xs =>
-      let a := epochMinFrom x xs
-      let b := epochMaxFrom x xs
-      have haMem : a ∈ fibre := by
-        rw [hfibre]
-        exact epochMinFrom_mem x xs
-      have hbMem : b ∈ fibre := by
-        rw [hfibre]
-        exact epochMaxFrom_mem x xs
-      have hmemBounds : ∀ k, k ∈ fibre → a ≤ k ∧ k ≤ b := by
-        intro k hk
-        rw [hfibre] at hk
-        exact ⟨epochMinFrom_le_mem x xs k hk,
-          mem_le_epochMaxFrom x xs k hk⟩
-      have hab : a ≤ b := (hmemBounds a haMem).2
-      have hfibreTimes : ∀ k, k ∈ fibre → k ∈ times := by
-        intro k hk
-        exact (List.mem_filter.mp hk).1
-      have hrank : ∀ k, k ∈ fibre →
-          rawNonselfRank w N start k = r := by
-        intro k hk
-        exact of_decide_eq_true (List.mem_filter.mp hk).2
-      have hnoNonself : ∀ j, a ≤ j → j < b →
-          RawProductiveAt w N start j → RawCurveSelfAt w start j := by
-        intro j haj hjb hprod
-        apply Classical.byContradiction
-        intro hnonself
-        have hlt := rawNonselfRank_lt_of_event_between
-          haj hjb hprod hnonself
-        have haRank := hrank a haMem
-        have hbRank := hrank b hbMem
-        omega
-      have haK : a ≤ K := htimes a (hfibreTimes a haMem)
-      obtain ⟨middle, hmiddle⟩ :=
-        Option.isSome_iff_exists.mp (hlive a haK)
-      let span := b - a
-      have habEq : a + span = b := by
-        dsimp [span]
-        omega
-      have hlocalLive : ∀ d, d ≤ span →
-          (stepN w d middle).isSome := by
-        intro d hd
-        rw [stepN_shift_eq hmiddle]
-        apply hlive
-        have hbK : b ≤ K := htimes b (hfibreTimes b hbMem)
-        omega
-      have hlocalSelf : ∀ d, d < span →
-          RawProductiveAt w N middle d →
-          RawCurveSelfAt w middle d := by
-        intro d hd hprod
-        have hnextSome := hprod.1
-        have hnextExists := Option.isSome_iff_exists.mp hnextSome
-        have hglobalProd :=
-          (RawProductiveAt.shift_iff hmiddle hnextExists).mp hprod
-        have hglobalSelf := hnoNonself (a + d)
-          (by omega) (by omega) hglobalProd
-        have hcurSome := hlocalLive d (by omega)
-        have hcurExists := Option.isSome_iff_exists.mp hcurSome
-        exact (RawCurveSelfAt.shift_iff hmiddle hcurExists).mpr hglobalSelf
-      let offsets := fibre.map (fun k => k - a)
-      have hoffsetsBound : ∀ d, d ∈ offsets → d ≤ span := by
-        intro d hd
-        obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hd
-        have hkBounds := hmemBounds k hk
-        omega
-      have hfibreNodup :
-          (fibre.map (restrictedTonguesAt w N start)).Nodup := by
-        dsimp [fibre]
-        exact map_filter_nodup_amortization
-          (restrictedTonguesAt w N start)
-          (fun k => decide (rawNonselfRank w N start k = r)) hnd
-      have hoffsetsMap :
-          offsets.map (restrictedTonguesAt w N middle) =
-            fibre.map (restrictedTonguesAt w N start) := by
-        dsimp [offsets]
-        rw [List.map_map]
-        apply List.map_congr_left
-        intro k hk
-        have hkBounds := hmemBounds k hk
-        have hka : a + (k - a) = k := by omega
-        have hlocalSome := hlocalLive (k - a) (by omega)
-        have hlocalExists := Option.isSome_iff_exists.mp hlocalSome
-        have hshift := restrictedTonguesAt_shift_eq
-          (N := N) hmiddle hlocalExists
-        simpa [Function.comp_apply, hka] using hshift
-      have hoffsetsNodup :
-          (offsets.map (restrictedTonguesAt w N middle)).Nodup := by
-        rw [hoffsetsMap]
-        exact hfibreNodup
-      have hfour := rawSelfEpoch_distinct_le_four
-        hN middle hlocalLive hlocalSelf hoffsetsBound hoffsetsNodup
-      simpa [offsets, hfibre] using hfour
-
-private theorem bounded_multiplicity_length_amortization
-    (f : Nat → Nat) (cap : Nat) : ∀ (tags : List Nat) (xs : List Nat),
-    (∀ tag, (xs.filter (fun x => decide (f x = tag))).length ≤ cap) →
-    (∀ x, x ∈ xs → f x ∈ tags) →
-    xs.length ≤ cap * tags.length := by
-  intro tags
-  induction tags with
-  | nil =>
-      intro xs _ hmem
-      cases xs with
-      | nil => simp
-      | cons x rest => cases hmem x List.mem_cons_self
-  | cons tag tags ih =>
-      intro xs hcap hmem
-      let yes := xs.filter (fun x => decide (f x = tag))
-      let no := xs.filter (fun x => ! decide (f x = tag))
-      have hyes : yes.length ≤ cap := by
-        simpa [yes] using hcap tag
-      have hcapNo : ∀ other,
-          (no.filter (fun x => decide (f x = other))).length ≤ cap := by
-        intro other
-        have hle := List.length_filter_le
-          (fun x => ! decide (f x = tag))
-          (xs.filter (fun x => decide (f x = other)))
-        have hcomm :
-            no.filter (fun x => decide (f x = other)) =
-              (xs.filter (fun x => decide (f x = other))).filter
-                (fun x => ! decide (f x = tag)) := by
-          simp [no, List.filter_filter, Bool.and_comm]
-        rw [hcomm]
-        exact Nat.le_trans hle (hcap other)
-      have hmemNo : ∀ x, x ∈ no → f x ∈ tags := by
-        intro x hx
-        have hxData := List.mem_filter.mp hx
-        have hne : f x ≠ tag := by
-          simpa only [Bool.not_eq_true', decide_eq_false_iff_not]
-            using hxData.2
-        rcases List.mem_cons.mp (hmem x hxData.1) with heq | htail
-        · exact (hne heq).elim
-        · exact htail
-      have hno := ih no hcapNo hmemNo
-      have hsplit := filter_partition_length_amortization
-        (fun x => decide (f x = tag)) xs
-      change yes.length + no.length = xs.length at hsplit
-      simp only [List.length_cons, Nat.mul_add, Nat.mul_one]
-      omega
 
 
 theorem raw_self_pivot_curve_ports_subset
@@ -766,42 +583,6 @@ theorem rawDroppedCurvePortUnits_mem_lt
   unfold rawFiniteCurvePortsAt at hpOld
   exact (mem_finiteCurvePorts_iff.mp hpOld).1
 
-/-- **Finite physical drop charge.**  If no represented carrier port is
-discarded twice, total downward variation is at most the `3 * N` physical
-ports. -/
-theorem rawCurveDropMass_le_three_mul_of_lost_ports_nodup
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (hcharge : (rawDroppedCurvePortUnits w N start K).Nodup) :
-    rawCurveDropMass w N start K ≤ 3 * N := by
-  have hports := nodup_nat_lt_length hcharge
-    (fun p hp => rawDroppedCurvePortUnits_mem_lt hp)
-  rw [rawDroppedCurvePortUnits_length_eq_dropMass hN start K hlive]
-    at hports
-  exact hports
-
-
-theorem rawCurveDropMass_le_two_mul_of_nested_restoration_charge
-    {w : Wiring} {N K : Nat} {start : Nat × Tongues}
-    {m : Echo.Machine} {e r0 : Nat → Nat}
-    {depth : Nat} {opening closing : Nat → Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (A : Echo.FiniteStrictNestedRestorationFamily
-      m e r0 depth opening closing)
-    (slots : List Nat)
-    (hroot : ∀ i, i < depth → Echo.oldSlot m e r0 (opening i) ∈ slots)
-    (hslots : slots.length ≤ 2 * N)
-    (hcompile : rawCurveDropMass w N start K ≤ depth) :
-    rawCurveDropMass w N start K ≤ 2 * N := by
-  have _hphysical := rawDroppedCurvePortUnits_length_eq_dropMass
-    hN start K hlive
-  have hdepth :=
-    Echo.FiniteStrictNestedRestorationFamily.depth_le_two_mul
-      m e r0 A slots hroot hslots
-  exact Nat.le_trans hcompile hdepth
 
 
 structure RawPermanentSelfTail

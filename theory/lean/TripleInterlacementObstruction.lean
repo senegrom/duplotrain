@@ -1,9 +1,6 @@
-import Alternation
 import ConcreteCertifiedEchoRun
-import KoizumiCurveInvariant
 import RestorationFrameOrdering
 import TrackCurveGrowth
-import TrackEndpointMatching
 
 /-!
 # The physical triple-interlacement obstruction
@@ -295,13 +292,6 @@ noncomputable def ReachableCurvePorts
   exact (List.range (3*N)).filter
     (fun p => decide (GeneralN.CurveReach w u root p))
 
-theorem mem_reachableCurvePorts_iff
-    {w : Wiring} {N : Nat} {u : Tongues} {root p : Nat} :
-    p ∈ ReachableCurvePorts w N u root ↔
-      p < 3*N ∧ GeneralN.CurveReach w u root p := by
-  classical
-  simp [ReachableCurvePorts]
-
 private theorem nodup_filter_nat_local (pred : Nat → Bool) :
     ∀ {xs : List Nat}, xs.Nodup → (xs.filter pred).Nodup := by
   intro xs
@@ -345,56 +335,12 @@ private theorem nodup_subset_length_local
       simp only [List.length_cons]
       omega
 
-private theorem reachableCurvePorts_nodup
-    (w : Wiring) (N : Nat) (u : Tongues) (root : Nat) :
-    (ReachableCurvePorts w N u root).Nodup := by
-  classical
-  unfold ReachableCurvePorts
-  exact nodup_filter_nat_local _ List.nodup_range
-
-private theorem nodup_strict_subset_length
-    {α : Type} [BEq α] [LawfulBEq α]
-    {small big : List α}
-    (hnd : small.Nodup)
-    (hsub : ∀ x ∈ small, x ∈ big)
-    (extra : α) (hextra : extra ∈ big) (hnot : extra ∉ small) :
-    small.length < big.length := by
-  have hcons : (extra :: small).Nodup := by
-    rw [List.nodup_cons]
-    exact ⟨hnot, hnd⟩
-  have hconsSub : ∀ x ∈ extra :: small, x ∈ big := by
-    intro x hx
-    rcases List.mem_cons.mp hx with rfl | hx
-    · exact hextra
-    · exact hsub x hx
-  have hle := nodup_subset_length_local hcons hconsSub
-  simp only [List.length_cons] at hle
-  omega
-
 theorem pivot_residual_keeps_endpoint_name (u : Tongues) (C : Nat) :
     selectedBranch u C = unmatchedBranch (flipAt u C) C := by
   exact (unmatched_after_flip_eq_selected u C).symm
 
 end TripleInterlacement
 
-/-- **Fixed stem successor.**  A trailing pass through a branch of switch
-`p/3` always follows the one fixed external edge attached to its stem.
-The successor port is independent of both the tongue and the entered arm. -/
-theorem trailing_step_fixed_stem_successor
-    {w : Wiring} {p : Nat} {t : Tongues} {next : Nat × Tongues}
-    (hp : p % 3 ≠ 0)
-    (hstep : step w (p, t) = some next) :
-    w.link (3 * (p / 3)) = some next.1 /\
-    next.2 = pin t p := by
-  cases hlink : w.link (3 * (p / 3)) with
-  | none =>
-      simp [step, arrive, hp, hlink] at hstep
-  | some q =>
-      have hsome : some (q, pin t p) = some next := by
-        simpa [step, arrive, hp, hlink] using hstep
-      injection hsome with hEq
-      subst next
-      exact (by simp)
 
 theorem canonical_live_bar_ne
     {w : Wiring} {p : Nat}

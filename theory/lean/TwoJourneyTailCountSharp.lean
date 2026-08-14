@@ -1,8 +1,5 @@
 import SharpStateLawAssembly
 import PairTongueCountSharp
-import TrackGlobalRepairSimple
-import TrackQuantitativeRouteSharp
-import NoveltyAwareLasso
 
 /-!
 # Two manufacturing journeys followed by a directly counted tail

@@ -75,15 +75,6 @@ noncomputable def rawRepeatedWriterNovelTimes
   exact (List.range K).filter
     (fun k => decide (RawRepeatedWriterNovelAt w N start k))
 
-/-- Productive repeated-writer times, without assuming their post-vectors
-are new.  On a duplicate-free prefix these are exactly the events in the
-user's compressed formulation. -/
-noncomputable def rawRepeatedWriterTimes
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : List Nat := by
-  classical
-  exact (List.range K).filter (fun k => decide
-    (RawProductiveAt w N start k ∧
-      ¬ RawFirstWriterAt w N start k))
 
 theorem mem_rawFirstWriterTimes_iff
     {w : Wiring} {N K k : Nat} {start : Nat × Tongues} :
@@ -171,35 +162,6 @@ private theorem nodup_subset_length_raw
         | cons _ _ => simp
       simp only [List.length_cons]
       omega
-
-private theorem map_nodup_injective_on_raw
-    {α β : Type} [BEq α] [LawfulBEq α]
-    [BEq β] [LawfulBEq β]
-    {f : α → β} {xs : List α}
-    (hnd : (xs.map f).Nodup) :
-    ∀ x, x ∈ xs → ∀ y, y ∈ xs → f x = f y → x = y := by
-  induction xs with
-  | nil =>
-      intro x hx
-      cases hx
-  | cons a rest ih =>
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      intro x hx y hy hxy
-      rcases List.mem_cons.mp hx with rfl | hxRest
-      · rcases List.mem_cons.mp hy with rfl | hyRest
-        · rfl
-        · exfalso
-          apply hnd.1
-          apply List.mem_map.mpr
-          exact ⟨y, hyRest, hxy.symm⟩
-      · rcases List.mem_cons.mp hy with rfl | hyRest
-        · exfalso
-          apply hnd.1
-          apply List.mem_map.mpr
-          exact ⟨x, hxRest, hxy⟩
-        · exact ih hnd.2 x hxRest y hyRest hxy
-
-/-- Every visible novelty is necessarily a live productive event. -/
 theorem rawNovelAt_productive
     {w : Wiring} {N : Nat} {start : Nat × Tongues} {k : Nat}
     (hnovel : RawNovelAt w N start k) :

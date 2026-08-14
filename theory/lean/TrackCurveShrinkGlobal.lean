@@ -1196,10 +1196,4 @@ theorem rawNonproductiveAt_curve_size_eq
   simp only [hcur, hnext, Option.getD_some]
   exact hlength.symm
 
-/-- Productive event times in a finite raw prefix. -/
-noncomputable def rawProductiveCurveTimes
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : List Nat := by
-  classical
-  exact (List.range K).filter
-    (fun k => decide (RawProductiveAt w N start k))
 end GeneralN

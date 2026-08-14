@@ -26,18 +26,6 @@ def Full (k s : Nat) : Prop :=
 /-- Two slots represent the same jump edge. -/
 def SameEdge (s t : Nat) : Prop := t = s ∨ t = m.bar s
 
-/-- Same-edge is symmetric. -/
-theorem sameEdge_symm {s t : Nat} :
-    SameEdge m s t → SameEdge m t s := by
-  rintro (rfl | h)
-  · exact Or.inl rfl
-  · right
-    rw [h, m.bar_invol]
-
-/-- A slot and its bar-partner always represent the same edge. -/
-theorem sameEdge_bar (s : Nat) : SameEdge m s (m.bar s) := Or.inr rfl
-
-/-- If two confirmed slots belong to one cell, they are equal. -/
 theorem confirmed_same_cell_eq
     {k s t : Nat}
     (hs : Confirmed m e r0 k s) (ht : Confirmed m e r0 k t)

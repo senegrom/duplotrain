@@ -1,5 +1,4 @@
 import ConcreteTreeDisjoint
-import DescentSimplicity
 
 /-!
 # Last-ascent pins survive other-tree traffic

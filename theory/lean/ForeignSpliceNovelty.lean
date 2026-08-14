@@ -1303,17 +1303,4 @@ theorem ManufacturedReflector.ChangedForwardMerge.runway_or_candy_absolute_one_n
     apply hleadHistorical j
     omega
 
-/-- Budget handoff used by the global assembly: a pre-existing four-exception
-cover followed by this one-exception candy residual remains inside the
-absolute five-exception budget. -/
-theorem four_cover_then_candy_splice_five
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {priorTimes spliceTimes : List Nat}
-    {history : List (List Bool)}
-    (hprior : FourNoveltyCover w N start priorTimes history)
-    (hsplice : NoveltyCoverOn w N start spliceTimes history 1) :
-    NoveltyCoverOn w N start (priorTimes ++ spliceTimes) history 5 := by
-  have hcombined := noveltyCoverOn_append hprior hsplice
-  simpa [FourNoveltyCover] using hcombined
-
 end GeneralN

@@ -262,33 +262,6 @@ theorem completed_retrace_at_vector_mem_history_or_contact
   · right
     rw [hvector, if_neg hzero]
 
-/-- A completed retrace has a one-novelty cover on any selected collection of
-depths contained in the frame. -/
-theorem completed_retrace_one_novelty_cover
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (N : Nat) (history : List (List Bool))
-    (hu : VectorCount.restrict N u ∈ history)
-    (times : List Nat)
-    (htimes : ∀ d ∈ times, d ≤ recorded.length + 1) :
-    NoveltyCoverOn w N (p, u) times history 1 := by
-  refine ⟨[VectorCount.restrict N v], by simp, ?_⟩
-  intro d hd
-  rcases completed_retrace_vector_mem_history_or_contact
-      hrecorded hgrooved hentry hcontact N history hu
-      (htimes d hd) with hhistorical | hcontactVector
-  · exact List.mem_append_left _ hhistorical
-  · apply List.mem_append_right history
-    simp [hcontactVector]
-
-/-- Absolute-time one-novelty cover for a completed frame embedded in the
-original run. -/
 theorem completed_retrace_at_one_novelty_cover
     {w : Wiring} {g e p oldEntry : Nat}
     {base mouthState u v : Tongues}
@@ -314,35 +287,4 @@ theorem completed_retrace_at_one_novelty_cover
   · exact List.mem_append_left _ hhistorical
   · apply List.mem_append_right history
     simp [hcontactVector]
-
-theorem completed_retrace_novel_vectors_le_one
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (N : Nat) (history : List (List Bool))
-    (hu : VectorCount.restrict N u ∈ history)
-    (times : List Nat)
-    (htimes : ∀ d ∈ times, d ≤ recorded.length + 1)
-    (hnovel : ∀ d ∈ times,
-      restrictedTonguesAt w N (p, u) d ∉ history)
-    (hnd : (times.map (restrictedTonguesAt w N (p, u))).Nodup) :
-    times.length ≤ 1 := by
-  have hsubset :
-      ∀ x ∈ times.map (restrictedTonguesAt w N (p, u)),
-        x ∈ [VectorCount.restrict N v] := by
-    intro x hx
-    obtain ⟨d, hd, rfl⟩ := List.mem_map.mp hx
-    rcases completed_retrace_vector_mem_history_or_contact
-        hrecorded hgrooved hentry hcontact N history hu
-        (htimes d hd) with hhistorical | hcontactVector
-    · exact (hnovel d hd hhistorical).elim
-    · simp [hcontactVector]
-  have hbound := nodup_subset_length_novelty hnd hsubset
-  simpa using hbound
-
 end GeneralN

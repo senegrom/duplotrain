@@ -317,20 +317,6 @@ theorem repeatedWriterPostTimes_avoid_firstHistory
   obtain ⟨k, hk, rfl⟩ := List.mem_map.mp ht
   exact repeatedWriterPost_not_mem_firstHistory hN hk
 
-/-- **Exact cover interface for the endpoint/matching proof. OPEN.**
-
-The local structural argument may return its exceptional vectors rather than
-counting event times directly.  It must cover the post-times of *all*
-repeated-writer novelties by the first-writer history plus at most five
-vectors.  Unlike a periodic-tail statement, this quantifies over every finite
-horizon and makes no recurrence assumption. -/
-def FiveRepeatedWriterNoveltyCover : Prop :=
-  ∀ (w : Wiring) (N : Nat),
-    (∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N) →
-    ∀ (start : Nat × Tongues) (K : Nat),
-      NoveltyCoverOn w N start
-        (rawRepeatedWriterPostTimes w N start K)
-        (rawFirstWriterHistory w N start K) 5
 
 
 theorem rawProductiveAt_is_endpoint_pivot

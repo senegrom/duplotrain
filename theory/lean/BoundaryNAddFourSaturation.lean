@@ -1,5 +1,4 @@
 import StateLawNAddFourTop
-import BoundaryDoubleDuplicate
 
 /-!
 # Saturation at the productive `N+4` boundary

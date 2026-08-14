@@ -1,6 +1,4 @@
 import TripleSelfLinkPlacement
-import TrackFiniteAlternation
-import FirstRevisitActivatedOutcome
 
 /-!
 # Raw closure after the placed self-link
@@ -46,19 +44,6 @@ theorem stepN_eq_one_period_earlier
       rw [hprevious, stepN_add, hbase]
       simp only [Option.bind_some]
 
-/-- The preceding complete-configuration replay also reproduces the
-restricted tongue vector. -/
-theorem restrictedTonguesAt_eq_one_period_earlier
-    {w : Wiring} {N : Nat} {start cycleStart : Nat × Tongues}
-    {base period t : Nat}
-    (hbase : stepN w base start = some cycleStart)
-    (hperiod : stepN w period cycleStart = some cycleStart)
-    (hafter : base + period ≤ t) :
-    restrictedTonguesAt w N start t =
-      restrictedTonguesAt w N start (t - period) := by
-  have hstep := stepN_eq_one_period_earlier hbase hperiod hafter
-  simp only [restrictedTonguesAt, tonguesAt]
-  rw [hstep]
 
 
 theorem RawCycleThroughSelfLink.self_period_has_first_revisit
@@ -117,101 +102,5 @@ theorem RawCycleThroughSelfLink.first_revisit_cycle_or_reflector
     R.self_period_has_first_revisit
   exact htrace.first_revisit_activated_outcome
     hnonsimple R.self_link
-
-/-- Rotating the same period to the outside of the self-link gives the useful
-orientation for repair: the incoming edge is the self-link stem.  The trace
-is still nonsimple because its final prefix passage exits through the
-self-linked branch and the last passage starts at that same branch. -/
-theorem RawCycleThroughSelfLink.outside_period_has_first_revisit
-    {w : Wiring} {start : Nat × Tongues} {close : Nat}
-    (R : RawCycleThroughSelfLink w start close) :
-    ∃ outside passages,
-      w.link (3 * (R.branch / 3)) = some outside ∧
-      passages.length = R.period ∧
-      PhysicalTrace w (outside, R.state) passages
-        (outside, R.state) ∧
-      ¬ SwitchSimple passages := by
-  obtain ⟨outside, hmouth, hout, _houtPeriod⟩ := R.outside_period
-  have hselfPeriod := R.self_period
-  have hsplit : R.period = 1 + (R.period - 1) := by
-    have hpositive : 0 < R.period := R.period_positive
-    omega
-  have hreturn :
-      stepN w (R.period - 1) (outside, R.state) =
-        some (R.branch, R.state) := by
-    rw [hsplit, stepN_add, hout] at hselfPeriod
-    exact hselfPeriod
-  have hperiodTwo : 2 ≤ R.period := by
-    by_cases hone : R.period = 1
-    · have hcfg : (outside, R.state) = (R.branch, R.state) := by
-        simpa [hone, stepN] using hreturn
-      have houtside : outside = R.branch :=
-        congrArg Prod.fst hcfg
-      have hstemLink :
-          w.link (3 * (R.branch / 3)) = some R.branch := by
-        simpa [houtside] using hmouth
-      have hstem : 3 * (R.branch / 3) = R.branch :=
-        w.link_injective hstemLink R.self_link
-      have hmod : R.branch % 3 = 0 := by omega
-      exact (R.branch_port hmod).elim
-    · have hpositive : 0 < R.period := R.period_positive
-      omega
-  obtain ⟨runwayPrefix, hprefixLength, hprefix⟩ :=
-    physicalTrace_of_stepN w hreturn
-  have hprefixNonempty : runwayPrefix ≠ [] := by
-    intro hempty
-    rw [hempty] at hprefixLength
-    simp only [List.length_nil] at hprefixLength
-    omega
-  have hpin : pin R.state R.branch = R.state :=
-    pin_of_agrees R.self_selected
-  have harrive : arrive R.state R.branch =
-      (3 * (R.branch / 3), R.state) := by
-    simp [arrive, R.branch_port, hpin]
-  have hlast : PhysicalTrace w (R.branch, R.state)
-      [(R.branch, 3 * (R.branch / 3))]
-      (outside, R.state) :=
-    PhysicalTrace.cons harrive hmouth (PhysicalTrace.nil _)
-  let passages :=
-    runwayPrefix ++ [(R.branch, 3 * (R.branch / 3))]
-  have hfull : PhysicalTrace w (outside, R.state) passages
-      (outside, R.state) := by
-    dsimp [passages]
-    exact hprefix.append hlast
-  have hlength : passages.length = R.period := by
-    dsimp [passages]
-    simp only [List.length_append, List.length_cons, List.length_nil]
-    omega
-  refine ⟨outside, passages, hmouth, hlength, hfull, ?_⟩
-  intro hsimple
-  cases hprefixEq : runwayPrefix with
-  | nil => exact hprefixNonempty hprefixEq
-  | cons passage rest =>
-      rcases passage with ⟨p, x⟩
-      have hprefix' : PhysicalTrace w (outside, R.state)
-          ((p, x) :: rest) (R.branch, R.state) := by
-        simpa [hprefixEq] using hprefix
-      have hlastLink :
-          w.link (lastPassageExit x rest) = some R.branch :=
-        hprefix'.last_link
-      have hlastExit : lastPassageExit x rest = R.branch :=
-        w.link_injective hlastLink R.self_link
-      have hleft : R.branch / 3 ∈
-          (((p, x) :: rest).map passageSwitch) := by
-        have hmem := hprefix'.last_exit_switch_mem
-        simpa [hlastExit] using hmem
-      have hsimple' : SwitchSimple
-          (((p, x) :: rest) ++
-            [(R.branch, 3 * (R.branch / 3))]) := by
-        simpa [passages, hprefixEq] using hsimple
-      unfold SwitchSimple at hsimple'
-      rw [List.map_append] at hsimple'
-      have hparts := List.nodup_append.mp hsimple'
-      have hright : R.branch / 3 ∈
-          ([(R.branch, 3 * (R.branch / 3))].map passageSwitch) := by
-        simp [passageSwitch]
-      have hne := hparts.2.2 (R.branch / 3) hleft
-        (R.branch / 3) hright
-      exact hne rfl
 
 end GeneralN

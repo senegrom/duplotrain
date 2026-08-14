@@ -1,5 +1,4 @@
 import BoundaryOverlapTailCount
-import NoveltyAwareLasso
 
 /-!
 # Boundary-aware assembly of two manufacturing journeys and a direct tail

@@ -46,8 +46,6 @@ defaultTargets = [
   "EdgeReversal",
   "EndpointEpochExtraction",
   "EventuallyPeriodicPrefixes",
-  "ExternalLobeReflectionCore",
-  "ExternalLobeRoundtrip",
   "FacingForwardNovelty",
   "FacingMergeCount",
   "FirstActivatedExact",
@@ -57,11 +55,7 @@ defaultTargets = [
   "FirstRevisitActivatedOutcome",
   "FiveFrameObstruction",
   "ForeignSpliceNovelty",
-  "FullReachPersistencePaired",
-  "FullyLobedComponentTrap",
   "GeneralN",
-  "HiddenAbsorb",
-  "HiddenDichotomy",
   "HiddenFibre",
   "JourneyReachesActivated",
   "KnownEdgeFive",
@@ -77,23 +71,14 @@ defaultTargets = [
   "LobePartnerBounce",
   "LobeToggle",
   "ManufacturedPairNovelty",
-  "MellitDirectStateBound",
-  "MonotoneSupport",
-  "NestedRestorationCharge",
-  "NestedRestorationElimination",
-  "NoFullFreezeCore",
   "NoveltyAwareLasso",
-  "OldContactContinuation",
   "OneJourneyTailCount",
   "OneReflectorContinuation",
-  "OneReserveFromNoTail",
   "OverwriteDynamics",
   "PairActionCorners",
   "PairTongueCountAbsoluteFour",
   "PairTongueCountFour",
   "PairTongueCountSharp",
-  "PairedNoFullReachFreeze",
-  "PairedReachReplay",
   "PartialJourneyDichotomy",
   "PartialSecondRunNAddFour",
   "PartialSecondRunSharp",
@@ -104,7 +89,6 @@ defaultTargets = [
   "PreReturnProtectedRoute",
   "ProductiveBoundaryNAddFour",
   "ProductiveBoundaryNAddFourComplete",
-  "ProductiveBoundarySupportContact",
   "ProtectedPairNAddFour",
   "ProtectedRepairFour",
   "ProtectedRepairThree",
@@ -123,13 +107,10 @@ defaultTargets = [
   "SharpCertificateClosure",
   "SharpStateLawAssembly",
   "ShortSuffixCount",
-  "ShrinkingCurveFinal",
   "SimpleTraceOneNetChange",
   "SingleCoordinateFlip",
   "SlotBound",
-  "StableSimpleCycleRecord",
   "StarIndependent",
-  "StarPairCountingCore",
   "StateLaw",
   "StateLawAxiomAudit",
   "StateLawCoefficientOneTop",
@@ -142,12 +123,9 @@ defaultTargets = [
   "StateLawTwoSharp",
   "StateLawTwoSharper",
   "StateLawTwoSixUltra",
-  "StationaryTail",
-  "SteeringLaw",
   "SupportBound",
   "SupportMove",
   "SupportSize",
-  "SupportWeightFibres",
   "ThreeQuarterArithmetic",
   "TraceRetainingFirstRevisit",
   "TrackCurveGrowth",
@@ -171,7 +149,6 @@ defaultTargets = [
   "TrackThetaAllTime",
   "TrackThetaPointwiseCore",
   "TrackTrace",
-  "TreeReplay",
   "TripleFramePhysicalClosure",
   "TripleInterlacementObstruction",
   "TripleSelfLinkPlacement",
@@ -183,8 +160,7 @@ defaultTargets = [
   "TwoJourneyTailCountSharp",
   "TwoPhasePrefixTailCount",
   "TwoReflectorEdgeTrap",
-  "VectorCount",
-  "VisibleChipReduction"
+  "VectorCount"
 ]
 
 [[lean_lib]]
@@ -326,12 +302,6 @@ name = "EndpointEpochExtraction"
 name = "EventuallyPeriodicPrefixes"
 
 [[lean_lib]]
-name = "ExternalLobeReflectionCore"
-
-[[lean_lib]]
-name = "ExternalLobeRoundtrip"
-
-[[lean_lib]]
 name = "FacingForwardNovelty"
 
 [[lean_lib]]
@@ -359,19 +329,7 @@ name = "FiveFrameObstruction"
 name = "ForeignSpliceNovelty"
 
 [[lean_lib]]
-name = "FullReachPersistencePaired"
-
-[[lean_lib]]
-name = "FullyLobedComponentTrap"
-
-[[lean_lib]]
 name = "GeneralN"
-
-[[lean_lib]]
-name = "HiddenAbsorb"
-
-[[lean_lib]]
-name = "HiddenDichotomy"
 
 [[lean_lib]]
 name = "HiddenFibre"
@@ -419,34 +377,13 @@ name = "LobeToggle"
 name = "ManufacturedPairNovelty"
 
 [[lean_lib]]
-name = "MellitDirectStateBound"
-
-[[lean_lib]]
-name = "MonotoneSupport"
-
-[[lean_lib]]
-name = "NestedRestorationCharge"
-
-[[lean_lib]]
-name = "NestedRestorationElimination"
-
-[[lean_lib]]
-name = "NoFullFreezeCore"
-
-[[lean_lib]]
 name = "NoveltyAwareLasso"
-
-[[lean_lib]]
-name = "OldContactContinuation"
 
 [[lean_lib]]
 name = "OneJourneyTailCount"
 
 [[lean_lib]]
 name = "OneReflectorContinuation"
-
-[[lean_lib]]
-name = "OneReserveFromNoTail"
 
 [[lean_lib]]
 name = "OverwriteDynamics"
@@ -462,12 +399,6 @@ name = "PairTongueCountFour"
 
 [[lean_lib]]
 name = "PairTongueCountSharp"
-
-[[lean_lib]]
-name = "PairedNoFullReachFreeze"
-
-[[lean_lib]]
-name = "PairedReachReplay"
 
 [[lean_lib]]
 name = "PartialJourneyDichotomy"
@@ -498,9 +429,6 @@ name = "ProductiveBoundaryNAddFour"
 
 [[lean_lib]]
 name = "ProductiveBoundaryNAddFourComplete"
-
-[[lean_lib]]
-name = "ProductiveBoundarySupportContact"
 
 [[lean_lib]]
 name = "ProtectedPairNAddFour"
@@ -557,9 +485,6 @@ name = "SharpStateLawAssembly"
 name = "ShortSuffixCount"
 
 [[lean_lib]]
-name = "ShrinkingCurveFinal"
-
-[[lean_lib]]
 name = "SimpleTraceOneNetChange"
 
 [[lean_lib]]
@@ -569,13 +494,7 @@ name = "SingleCoordinateFlip"
 name = "SlotBound"
 
 [[lean_lib]]
-name = "StableSimpleCycleRecord"
-
-[[lean_lib]]
 name = "StarIndependent"
-
-[[lean_lib]]
-name = "StarPairCountingCore"
 
 [[lean_lib]]
 name = "StateLaw"
@@ -614,12 +533,6 @@ name = "StateLawTwoSharper"
 name = "StateLawTwoSixUltra"
 
 [[lean_lib]]
-name = "StationaryTail"
-
-[[lean_lib]]
-name = "SteeringLaw"
-
-[[lean_lib]]
 name = "SupportBound"
 
 [[lean_lib]]
@@ -627,9 +540,6 @@ name = "SupportMove"
 
 [[lean_lib]]
 name = "SupportSize"
-
-[[lean_lib]]
-name = "SupportWeightFibres"
 
 [[lean_lib]]
 name = "ThreeQuarterArithmetic"
@@ -701,9 +611,6 @@ name = "TrackThetaPointwiseCore"
 name = "TrackTrace"
 
 [[lean_lib]]
-name = "TreeReplay"
-
-[[lean_lib]]
 name = "TripleFramePhysicalClosure"
 
 [[lean_lib]]
@@ -738,7 +645,4 @@ name = "TwoReflectorEdgeTrap"
 
 [[lean_lib]]
 name = "VectorCount"
-
-[[lean_lib]]
-name = "VisibleChipReduction"
 

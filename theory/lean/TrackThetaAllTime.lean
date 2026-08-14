@@ -1,5 +1,4 @@
 import TrackThetaPointwiseCore
-import TrackNoveltyCover
 
 /-!
 # All-time phase covers for theta-intersecting reflector pairs

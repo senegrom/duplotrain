@@ -27,15 +27,6 @@ noncomputable instance (k s : Nat) : Decidable (Occupied m e r0 k s) := by
   unfold Occupied Confirmed
   infer_instance
 
-/-- Occupancy is independent of which endpoint represents the jump edge. -/
-theorem occupied_bar (k s : Nat) :
-    Occupied m e r0 k (m.bar s) ↔ Occupied m e r0 k s := by
-  unfold Occupied
-  rw [m.bar_invol]
-  exact or_comm
-
-/-- **Occupied support is pointwise non-increasing.** If a jump edge is
-occupied after a step, it was already occupied before that step. -/
 theorem occupied_nonincreasing
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
     (k s : Nat) :

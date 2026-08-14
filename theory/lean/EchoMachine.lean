@@ -177,9 +177,6 @@ theorem witness (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)
   · rw [hv]; exact reg_cell m e r0 hr0 k _
   · exact hv.symm
 
-def Alternating : Prop :=
-  ∀ k, m.cellOf (e (k+1)) = m.star (m.cellOf (e k))
-
 
 private theorem twoStep (P : Nat → Prop) (h0 : P 0) (h1 : P 1)
     (hs : ∀ n, P n → P (n+2)) : ∀ n, P n
@@ -513,40 +510,6 @@ private theorem mem_len_one {l : List Nat} (h : l.length ≤ 1) :
           rw [ha', hb']
       | cons y t2 => simp only [List.length_cons] at h; omega
 
-/-- Equal codes force equal snapshots (before the tail). -/
-private theorem code_eq_snap_eq (cells : List Nat) (K : Nat)
-    (alts : List Nat) (halts : alts.length ≤ 1)
-    (hcover : ∀ i, i < K → ProductiveStep m e r0 i →
-      FirstStep m e i ∨ i ∈ alts)
-    {k1 k2 : Nat} (h1 : k1 < K) (h2 : k2 < K)
-    (hc : codeOf m e r0 k1 = codeOf m e r0 k2) :
-    snap m e r0 cells k1 = snap m e r0 cells k2 := by
-  rcases codeOf_spec m e r0 cells k1 with ⟨c1, s1⟩ | ⟨j1, hj1, hp1, hs1, hcase1⟩
-  · rcases codeOf_spec m e r0 cells k2 with ⟨c2, s2⟩ | ⟨j2, hj2, hp2, hs2, hcase2⟩
-    · rw [s1, s2]
-    · rcases hcase2 with ⟨_, hcode⟩ | ⟨_, hcode⟩ <;>
-        (rw [c1, hcode] at hc; omega)
-  · rcases codeOf_spec m e r0 cells k2 with ⟨c2, s2⟩ | ⟨j2, hj2, hp2, hs2, hcase2⟩
-    · rcases hcase1 with ⟨_, hcode⟩ | ⟨_, hcode⟩ <;>
-        (rw [c2, hcode] at hc; omega)
-    · rcases hcase1 with ⟨hf1, hcode1⟩ | ⟨hnf1, hcode1⟩ <;>
-        rcases hcase2 with ⟨hf2, hcode2⟩ | ⟨hnf2, hcode2⟩
-      · have hcell : m.cellOf (e (j1+1)) = m.cellOf (e (j2+1)) := by
-          rw [hcode1, hcode2] at hc; omega
-        have hj : j1 = j2 := by
-          rcases Nat.lt_trichotomy j1 j2 with h | h | h
-          · exact absurd hcell (hf2 (j1+1) (by omega))
-          · exact h
-          · exact absurd hcell.symm (hf1 (j2+1) (by omega))
-        rw [hs1, hs2, hj]
-      · rw [hcode1, hcode2] at hc; omega
-      · rw [hcode1, hcode2] at hc; omega
-      · have m1 : j1 ∈ alts :=
-          (hcover j1 (by omega) hp1).resolve_left hnf1
-        have m2 : j2 ∈ alts :=
-          (hcover j2 (by omega) hp2).resolve_left hnf2
-        have hj : j1 = j2 := mem_len_one halts m1 m2
-        rw [hs1, hs2, hj]
 
 private theorem nodup_transfer {f : Nat → List Nat} {c : Nat → Nat} :
     ∀ l : List Nat, (∀ x ∈ l, ∀ y ∈ l, c x = c y → f x = f y) →
@@ -590,18 +553,6 @@ private theorem nodup_subset_length {α : Type} [BEq α] [LawfulBEq α] :
         | cons a t2 => simp
       simp only [List.length_cons]
       omega
-
-private theorem filter_split (p : Nat → Bool) :
-    ∀ l : List Nat,
-      (l.filter p).length + (l.filter (fun x => !(p x))).length
-        = l.length := by
-  intro l
-  induction l with
-  | nil => rfl
-  | cons x t ih =>
-      cases hp : p x with
-      | true => simp [hp]; omega
-      | false => simp [hp]; omega
 
 private theorem nodup_map_filter {f : Nat → List Nat} {p : Nat → Bool} :
     ∀ {l : List Nat}, (l.map f).Nodup → ((l.filter p).map f).Nodup := by
@@ -986,60 +937,6 @@ theorem token_pedigree (hrun : IsRun m e r0)
         · exact Or.inl h
         · exact Or.inr ⟨t, h1, by omega, h3⟩
 
-/-- **The repertoire collapse.**  Every value a cell's register will
-ever hold is either its value now or the slot of a token alive now:
-the machine can never invent values.  Unconditional, for every cell
-and every base time. -/
-theorem future_register (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c) {K C : Nat} :
-    ∀ d, reg m e r0 (K+d) C = reg m e r0 K C ∨
-      TokenEnd m e r0 K (reg m e r0 (K+d) C) := by
-  have aux : ∀ d d', d' ≤ d →
-      reg m e r0 (K+d') C = reg m e r0 K C ∨
-      TokenEnd m e r0 K (reg m e r0 (K+d') C) := by
-    intro d
-    induction d with
-    | zero =>
-        intro d' hd'
-        have hz : d' = 0 := by omega
-        subst hz
-        exact Or.inl rfl
-    | succ n ih =>
-        intro d' hd'
-        by_cases hn : d' ≤ n
-        · exact ih d' hn
-        · have hs : d' = n + 1 := by omega
-          subst hs
-          show reg m e r0 (K+n+1) C = reg m e r0 K C ∨
-            TokenEnd m e r0 K (reg m e r0 (K+n+1) C)
-          by_cases hC : m.cellOf (e (K+n+1)) = C
-          · have hwrite : reg m e r0 (K+n+1) C = e (K+n+1) :=
-              reg_write m e r0 hC
-            by_cases hp : ProductiveStep m e r0 (K+n)
-            · have harr := arrival_token m e r0 hrun hr0 (K+n) hp
-              rcases token_pedigree m e r0 hrun hr0 n (e (K+n+1)) harr
-                with h | ⟨t, h1, h2, h3⟩
-              · rw [hwrite]
-                exact Or.inr h
-              · rw [hC] at h3
-                obtain ⟨d'', rfl⟩ : ∃ d'', t = K + d'' := ⟨t - K, by omega⟩
-                have hd'' : d'' ≤ n := by omega
-                have hIH := ih d'' hd''
-                rw [h3] at hIH
-                rw [hwrite]
-                exact hIH
-            · have heq : e (K+n+1)
-                  = reg m e r0 (K+n) (m.cellOf (e (K+n+1))) := by
-                by_cases hq : e (K+n+1)
-                    = reg m e r0 (K+n) (m.cellOf (e (K+n+1)))
-                · exact hq
-                · exact absurd hq hp
-              rw [unproductive_stall m e r0 (K+n) heq C]
-              exact ih n (Nat.le_refl _)
-          · rw [reg_skip m e r0 hC]
-            exact ih n (Nat.le_refl _)
-  intro d
-  exact aux d d (Nat.le_refl _)
 
 
 theorem tokens_antitone (hrun : IsRun m e r0)

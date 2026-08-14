@@ -223,17 +223,6 @@ theorem flipAt_comm {u : Tongues} {a b : Nat} (hab : a ≠ b) :
     · simp [hjb, Ne.symm hab]
     · simp [hja, hjb]
 
-/-- Flipping a switch outside a cascade preserves agreement with its pins. -/
-theorem agrees_flip {u : Tongues} {l : List Nat} {k : Nat}
-    (h : Agrees u l) (hk : ∀ q ∈ l, q / 3 ≠ k) :
-    Agrees (flipAt u k) l := by
-  intro b hb
-  unfold flipAt
-  rw [if_neg (hk b hb)]
-  exact h b hb
-
-/-- The last link of a descent: the landing stem is wired to the last
-cascade switch's stem. -/
 theorem descent_last_link {w : Wiring} {t : Tongues} {p s : Nat}
     {ps : List Nat} {t' : Tongues}
     (h : Descent w t p ps s t') :
@@ -337,76 +326,9 @@ theorem land_last_unique {w : Wiring} {t₁ t₂ : Tongues}
   rw [b₁] at b₂
   injection b₂
 
-/-- **Lobe hop.**  Facing a lobed switch crosses the lobe, flips the tongue,
-and leaves by the stem edge -- two steps, both tongue values alike. -/
-theorem lobe_hop (w : Wiring) (a p : Nat) (u : Tongues)
-    (hlobe : w.link (3 * a + 1) = some (3 * a + 2))
-    (hstem : w.link (3 * a) = some p) :
-    stepN w 2 (3 * a, u) = some (p, flipAt u a) := by
-  have h0 : (3 * a) % 3 = 0 := by omega
-  have hd : (3 * a) / 3 = a := by omega
-  have hn1 : (3 * a + 1) % 3 ≠ 0 := by omega
-  have hn2 : (3 * a + 2) % 3 ≠ 0 := by omega
-  have h1d : (3 * a + 1) / 3 = a := by omega
-  have h2d : (3 * a + 2) / 3 = a := by omega
-  have hlobe' : w.link (3 * a + 2) = some (3 * a + 1) := w.symm _ _ hlobe
-  have h1m : (3 * a + 1) % 3 = 1 := by omega
-  have h2m : (3 * a + 2) % 3 = 2 := by omega
-  cases hu : u a with
-  | false =>
-    have hb : branchPort a (u a) = 3 * a + 1 := by rw [hu]; rfl
-    have hpin : pin u (3 * a + 2) = flipAt u a := by
-      funext j
-      unfold pin flipAt bval
-      rw [h2d, h2m]
-      by_cases hj : j = a
-      · rw [if_pos hj, if_pos hj, hj, hu]
-        rfl
-      · rw [if_neg hj, if_neg hj]
-    simp [stepN, step, arrive, h0, hd, hb, hlobe, h2d, hstem, hpin]
-  | true =>
-    have hb : branchPort a (u a) = 3 * a + 2 := by rw [hu]; rfl
-    have hpin : pin u (3 * a + 1) = flipAt u a := by
-      funext j
-      unfold pin flipAt bval
-      rw [h1d, h1m]
-      by_cases hj : j = a
-      · rw [if_pos hj, if_pos hj, hj, hu]
-        rfl
-      · rw [if_neg hj, if_neg hj]
-    simp [stepN, step, arrive, h0, hd, hb, hlobe', h1d, hstem, hpin]
 
 
 def IsReflector (w : Wiring) (g e k : Nat)
     (S : Tongues → Prop) (τ : Tongues → Tongues) : Prop :=
   ∀ u, S u → stepN w k (g, u) = some (e, τ u) ∧ S (τ u)
-
-theorem reflector_halfPeriod
-    (w : Wiring) {gA kA gB kB p : Nat} {ps : List Nat}
-    {SA SB : Tongues → Prop} {τA τB : Tongues → Tongues}
-    {t₀ t₁ : Tongues}
-    (hA : IsReflector w gA p kA SA τA)
-    (hB : IsReflector w gB (3 * (lastOf p ps / 3)) kB SB τB)
-    (hD : Descent w t₀ p ps gB t₁)
-    (hga : w.link gA = some p)
-    (hAa : ∀ u, Agrees u (p :: ps) → Agrees (τA u) (p :: ps))
-    (hBa : ∀ u, Agrees u (p :: ps) → Agrees (τB u) (p :: ps))
-    (u : Tongues) (hSA : SA u) (hSB : SB (τA u))
-    (hagree : Agrees u (p :: ps)) :
-    stepN w (kA + (ps.length + 1) + kB + (p :: ps).length) (gA, u)
-      = some (gA, τB (τA u)) := by
-  obtain ⟨hopA, _⟩ := hA u hSA
-  have hagree1 : Agrees (τA u) (p :: ps) := hAa u hagree
-  obtain ⟨t₂, hD1⟩ := descent_rebase hD (τA u)
-  have ride := descent_sound_noop hD1 hagree1
-  obtain ⟨hopB, _⟩ := hB (τA u) hSB
-  have back := retrace hD gA hga (τB (τA u)) (hBa _ hagree1)
-  rw [stepN_add, stepN_add, stepN_add, hopA]
-  show ((stepN w (ps.length + 1) (p, τA u)).bind (stepN w kB)).bind
-    (stepN w (p :: ps).length) = _
-  rw [ride]
-  show (stepN w kB (gB, τA u)).bind (stepN w (p :: ps).length) = _
-  rw [hopB]
-  exact back
-
 end GeneralN

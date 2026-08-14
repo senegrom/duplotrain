@@ -572,39 +572,6 @@ theorem ManufacturedReflector.return_change_facing_eventuallyPeriodic
       exact R.facing_mouth_contact_eventuallyPeriodic
         hrouteSplit hrouteSimple happroach hpaths
 
-/-- Whole-route form of the local forward-repair law.  If no broken passage
-of a switch-simple reference trace is approached through its stem, every
-broken passage is trailing and the trace repairs all of its grooves. -/
-theorem PhysicalTrace.repair_forward_damage_or_facing
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    (hbase : PassagesGrooved start.2 passages)
-    (state : Tongues) :
-    (∃ passage ∈ passages,
-      arrive state passage.2 ≠ (passage.1, state) ∧
-      passage.1 % 3 = 0) ∨
-    ∃ finalState,
-      PhysicalTrace w (start.1, state) passages
-        (finish.1, finalState) ∧
-      PassagesGrooved finalState passages := by
-  classical
-  by_cases hfacing : ∃ passage ∈ passages,
-      arrive state passage.2 ≠ (passage.1, state) ∧
-      passage.1 % 3 = 0
-  · exact Or.inl hfacing
-  · right
-    apply htrace.repair_forward_damage hsimple hbase state
-    intro passage hpassage hbroken
-    by_cases hstem : passage.1 % 3 = 0
-    · exact (hfacing ⟨passage, hpassage, hbroken, hstem⟩).elim
-    · exact hstem
-
-/-- Endpoint-strengthened deterministic prefix comparison.  Two traces from
-the same physical configuration are prefix-comparable; moreover, the unmatched
-suffix is itself a physical trace from the shorter trace's endpoint to the
-longer trace's endpoint. -/
 theorem physicalTrace_prefix_comparable_with_endpoints
     {w : Wiring} {start finishA finishB : Nat × Tongues}
     {left right : List Passage}
@@ -1095,14 +1062,6 @@ theorem ManufacturedReflector.oriented_data_eq_of_route_grooved
           simp [ManufacturedReflector.orientedRoute,
             ManufacturedReflector.orientedFinish,
             hselected, hstateNotSelected]
-
-def ManufacturedReflector.FacingDiversion
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (selector state : Tongues) : Prop :=
-  ∃ passage ∈ A.orientedRoute selector,
-    arrive state passage.2 ≠ (passage.1, state) ∧
-    passage.1 % 3 = 0
 
 theorem ManufacturedReflector.changed_exploration_passage_mem_support
     {w : Wiring} {g e : Nat}

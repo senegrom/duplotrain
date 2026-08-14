@@ -1,8 +1,5 @@
 import EventuallyPeriodicPrefixes
-import FirstCycleCountSharp
-import TwoHistoryUnionCharge
 import StateLawTwoSixUltra
-import PointwiseSimpleCycleTail
 import OneReflectorContinuation
 import TraceRetainingFirstRevisit
 
@@ -690,77 +687,6 @@ theorem known_edge_N_add_six_or_one_reflector_early_outcome
               left
               exact closePair B hbaseB hgroovesB
 
-/-- Raw global prefix form of the preserved-simple-continuation bridge. -/
-theorem ManufacturedReflector.journey_then_preserved_simple_distinct_le_N_add_two
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    {finish : Nat × Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w (e, A.activatedState) passages finish)
-    (hsimple : SwitchSimple passages)
-    (hend : PathGrooves A.toSupported.paths finish.2)
-    (times : List Nat)
-    (htimes : forall k, k ∈ times ->
-      k <= A.exploration.length + A.runway.length + 1 + passages.length)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    times.length <= N + 2 := by
-  let firstTravel := A.exploration.length + A.runway.length + 1
-  let localStart : Nat × Tongues := (e, A.activatedState)
-  let history :=
-    A.preservedSimpleContinuationHistory N localStart passages.length
-  have hreachA : stepN w firstTravel (g, A.baseState) =
-      some localStart := by
-    simpa [firstTravel, localStart] using
-      A.manufacturing_journey_reaches_activated hA
-  have hcover : NoveltyCoverOn w N (g, A.baseState)
-      times history 0 := by
-    refine ⟨[], by simp, ?_⟩
-    intro k hk
-    simp only [List.append_nil]
-    by_cases hfirst : k <= firstTravel
-    · apply List.mem_append_left
-      apply A.mem_sharpHistoryCore_of_mem
-      exact A.manufacturing_journey_mem_sharpHistory hA (by
-        simpa [firstTravel] using hfirst)
-    · let d := k - firstTravel
-      have hkEq : k = firstTravel + d := by
-        dsimp [d]
-        omega
-      have hd : d <= passages.length := by
-        have htotal := htimes k hk
-        dsimp [d, firstTravel] at htotal ⊢
-        omega
-      have hlocalLive := stepN_prefix_some hd htrace.sound
-      have hshift := tonguesAt_add_of_reaches hreachA hlocalLive
-      have hvector : restrictedTonguesAt w N
-          (g, A.baseState) k =
-          restrictedTonguesAt w N localStart d := by
-        unfold restrictedTonguesAt
-        rw [hkEq]
-        exact congrArg (VectorCount.restrict N) hshift
-      rw [hvector]
-      exact A.mem_preservedSimpleContinuationHistory
-        (N := N) (finish := finish) (passages := passages)
-        rfl htrace hsimple hd
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  have hlength := A.preservedSimpleContinuationHistory_length_le
-    hN rfl htrace hsimple hA hend
-  dsimp [history, localStart] at hcount hlength
-  omega
-
-/-! ## First damaging contact in an arbitrary simple continuation
-
-The old first-contact package was indexed by a *completed* second
-manufactured reflector.  The two remaining top-level outcomes do not have
-one: the second probe either stops, or is captured by a same-exit cycle.
-The following record keeps exactly the geometry actually available in those
-branches and no more. -/
-
-/-- The canonical first passage of a switch-simple continuation which
-changes one of the first reflector's supported grooves. -/
 structure SimpleContinuationChangedContact
     {g e : Nat} (w : Wiring) (A : ManufacturedReflector w g e) : Type where
   full : List Passage

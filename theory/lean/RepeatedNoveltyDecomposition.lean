@@ -43,21 +43,6 @@ structure RawLastWriterFrame
     RawProductiveAt w N start j →
     rawWriterAt w start j ≠ rawWriterAt w start right
 
-/-- A productive event in the interior of a last-writer frame, chosen last
-among all productive events there.  It is the switch which performs the
-final rerouting needed to reach the closing writer's opposite branch. -/
-structure RawLastRerouter
-    (w : Wiring) (N : Nat) (start : Nat × Tongues)
-    (left reroute right : Nat) : Prop where
-  inside_left : left < reroute
-  inside_right : reroute < right
-  productive : RawProductiveAt w N start reroute
-  quiet_after : ∀ j, reroute < j → j < right →
-    ¬ RawProductiveAt w N start j
-
-/-- The temporal shape of the last rerouter relative to the repeated
-writer's frame.  `crossing` is the interlacing `b < open < reroute < close`;
-`nested` is the laminar `open < b < reroute < close`. -/
 inductive RawReroutingShape
     (w : Wiring) (N : Nat) (start : Nat × Tongues)
     (left reroute right : Nat) : Prop where
@@ -621,49 +606,12 @@ theorem RawRepeatedWriterNovelAt.open_rerouting_decomposition
       exact RawOpenReroutingShape.crossing G
         ⟨hbleft, hlr, hrr⟩
 
-/-- Novelty therefore forces at least one genuinely different productive
-rerouting event inside the last-writer frame. -/
-theorem RawRepeatedWriterNovelAt.has_interior_rerouter
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    {start : Nat × Tongues} {right left : Nat}
-    (h : RawRepeatedWriterNovelAt w N start right)
-    (F : RawLastWriterFrame w N start left right) :
-    ∃ j, left < j ∧ j < right ∧
-      RawProductiveAt w N start j ∧
-      rawWriterAt w start j ≠ rawWriterAt w start right := by
-  apply Classical.byContradiction
-  intro hnone
-  have hquiet : ∀ j, left < j → j < right →
-      ¬ RawProductiveAt w N start j := by
-    intro j hoj hjc hjprod
-    have hdiff := F.no_same_writer_between j hoj hjc hjprod
-    exact hnone ⟨j, hoj, hjc, hjprod, hdiff⟩
-  have hrepeat := F.closes_vector_of_quiet hN hquiet
-  apply h.2.2
-  apply List.mem_map.mpr
-  exact ⟨left, List.mem_range.mpr (by
-    have horder := F.order
-    omega), hrepeat.symm⟩
 
 
 def SelectedInternalEdge (u : Tongues) (p q : Nat) : Prop :=
   ∃ C,
     (p = 3*C ∧ q = selectedBranch u C) ∨
     (q = 3*C ∧ p = selectedBranch u C)
-
-theorem selectedInternalEdge_symm
-    {u : Tongues} {p q : Nat}
-    (h : SelectedInternalEdge u p q) :
-    SelectedInternalEdge u q p := by
-  obtain ⟨C, h | h⟩ := h
-  · exact ⟨C, Or.inr ⟨h.1, h.2⟩⟩
-  · exact ⟨C, Or.inl ⟨h.1, h.2⟩⟩
-
-theorem selectedInternalEdge_stem_selected
-    (u : Tongues) (C : Nat) :
-    SelectedInternalEdge u (3*C) (selectedBranch u C) :=
-  ⟨C, Or.inl ⟨rfl, rfl⟩⟩
 
 theorem selectedInternalEdge_unmatched_none_left
     (u : Tongues) (C q : Nat) :
@@ -683,26 +631,6 @@ theorem unmatched_after_flip_eq_selected (u : Tongues) (C : Nat) :
   cases h : u C <;>
     simp [unmatchedBranch, selectedBranch, branchPort, flipAt, h]
 
-/-- A pivot inserts the old endpoint as the new selected branch. -/
-theorem selectedInternalEdge_after_flip_new
-    (u : Tongues) (C : Nat) :
-    SelectedInternalEdge (flipAt u C)
-      (3*C) (unmatchedBranch u C) := by
-  refine ⟨C, Or.inl ⟨rfl, ?_⟩⟩
-  exact (selected_after_flip_eq_unmatched u C).symm
-
-/-- The old selected branch becomes the new unmatched endpoint. -/
-theorem selectedInternalEdge_after_flip_old_none
-    (u : Tongues) (C q : Nat) :
-    ¬ SelectedInternalEdge (flipAt u C)
-      (selectedBranch u C) q := by
-  have hnone := selectedInternalEdge_unmatched_none_left
-    (flipAt u C) C q
-  rw [unmatched_after_flip_eq_selected] at hnone
-  exact hnone
-
-/-- One edge of a state curve: either a fixed external track edge or a
-selected internal stem--branch edge. -/
 def DecompCurveEdge (w : Wiring) (u : Tongues) (p q : Nat) : Prop :=
   w.link p = some q ∨ SelectedInternalEdge u p q
 
@@ -712,43 +640,4 @@ inductive DecompCurveConnected (w : Wiring) (u : Tongues) : Nat → Nat → Prop
       DecompCurveEdge w u p q →
       DecompCurveConnected w u q r →
       DecompCurveConnected w u p r
-
-theorem DecompCurveConnected.of_edge
-    {w : Wiring} {u : Tongues} {p q : Nat}
-    (h : DecompCurveEdge w u p q) : DecompCurveConnected w u p q :=
-  .cons h (.refl q)
-
-/-- Exact local curve surgery performed by one productive raw pass. -/
-structure RawProductiveCurvePivot
-    (w : Wiring) (N : Nat) (start : Nat × Tongues)
-    (k : Nat) (before after : Nat × Tongues) (switch : Nat) : Prop where
-  writer_eq : switch = rawWriterAt w start k
-  before_at : stepN w k start = some before
-  after_at : stepN w (k+1) start = some after
-  physical_step : step w before = some after
-  entered_old_endpoint : before.1 = unmatchedBranch before.2 switch
-  exited_stem : exitPort before = 3*switch
-  fixed_stem_edge : w.link (3*switch) = some after.1
-  state_flip : after.2 = flipAt before.2 switch
-  old_through_edge : SelectedInternalEdge before.2
-    (3*switch) (selectedBranch before.2 switch)
-  old_endpoint_closed : ∀ q,
-    ¬ SelectedInternalEdge before.2 before.1 q
-  new_through_edge : SelectedInternalEdge after.2
-    (3*switch) before.1
-  new_endpoint_closed : ∀ q,
-    ¬ SelectedInternalEdge after.2
-      (selectedBranch before.2 switch) q
-  immediate_reverse : arrive after.2 (3*switch) =
-    (before.1, after.2)
-
-def RawCurveSelfJoin (w : Wiring)
-    (before : Nat × Tongues) (C : Nat) : Prop :=
-  DecompCurveConnected w before.2 before.1 (3*C)
-
-
-def StrictSubarc {α : Type} (small big : List α) : Prop :=
-  ∃ pre : List α, ∃ pivot : α, ∃ post : List α,
-    big = pre ++ pivot :: post ∧
-    (small = pre ∨ small = post)
 end GeneralN

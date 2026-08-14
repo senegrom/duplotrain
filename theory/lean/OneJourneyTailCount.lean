@@ -1,4 +1,3 @@
-import FirstActivatedExact
 import TwoJourneyTailCountSharp
 
 /-!

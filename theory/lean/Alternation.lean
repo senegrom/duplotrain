@@ -43,52 +43,6 @@ theorem productive_periodic {K p : Nat}
     exact h
   rw [he, hregper t _ ht]
 
-/-- Iterated state replay: a state coincidence at distance `q` repeats at
-every multiple of `q`. -/
-theorem state_replay_iter (hrun : IsRun m e r0) (cells : List Nat)
-    (hcells : ∀ k, m.star (m.cellOf (e k)) ∈ cells) {i q : Nat}
-    (h : stateCode m e r0 cells i = stateCode m e r0 cells (i + q)) :
-    ∀ M n, stateCode m e r0 cells (i + n) =
-      stateCode m e r0 cells (i + M * q + n) := by
-  intro M
-  induction M with
-  | zero =>
-      intro n
-      rw [Nat.zero_mul, Nat.add_zero]
-  | succ M ih =>
-      intro n
-      have h1 := ih n
-      have h2 := state_replay m e r0 hrun cells hcells h (M * q + n)
-      have e1 : i + M * q + n = i + (M * q + n) := by omega
-      have e2 : i + q + (M * q + n) = i + (M + 1) * q + n := by
-        rw [Nat.succ_mul]
-        omega
-      rw [e1] at h1
-      rw [e2] at h2
-      exact h1.trans h2
-
-/-- Productivity transfers along equal states. -/
-theorem productive_iff_of_state_eq (hrun : IsRun m e r0)
-    (cells : List Nat)
-    (hcells : ∀ k, m.star (m.cellOf (e k)) ∈ cells)
-    (hallcells : ∀ s, m.cellOf s ∈ cells) {i j : Nat}
-    (h : stateCode m e r0 cells i = stateCode m e r0 cells j) :
-    (ProductiveStep m e r0 i ↔ ProductiveStep m e r0 j) := by
-  have hnext := state_step m e r0 hrun cells hcells h
-  have he : e (i + 1) = e (j + 1) :=
-    stateCode_entry_eq m e r0 cells hnext
-  have hreg : reg m e r0 i (m.cellOf (e (j + 1)))
-      = reg m e r0 j (m.cellOf (e (j + 1))) :=
-    stateCode_reg_eq m e r0 cells h _ (hallcells (e (j + 1)))
-  unfold ProductiveStep
-  rw [he, hreg]
-
-/-- **The replay invariant.**  Between consecutive productive writes of
-the same cell `C`, with the walk avoiding `C` and `star C` strictly
-inside the window, the stretch after the second write replays the
-stretch after the first: entries coincide from offset 1 on, foreign
-registers agree, `C`'s register holds the second delivery, and no
-productive step occurs after the second write within the window. -/
 theorem consecutive_replay (hrun : IsRun m e r0)
     {C t1 t2 : Nat} (h12 : t1 < t2)
     (hq : ∀ s, t1 < s → s < t2 → ¬ ProductiveStep m e r0 s)

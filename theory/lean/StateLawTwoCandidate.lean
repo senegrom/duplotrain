@@ -1,15 +1,10 @@
 import StateLawThreeSharp
 import FirstCycleCountSharp
-import OneJourneyTailCount
-import TwoJourneyBoundaryTailCount
 import TrackEarlyRepairConstant
 import EarlyFacingConstant
 import ChangedStayCountConstant
 import ChangedFlipCountConstant
 import CompleteRepairConstant
-import RepairLeadTwoPhase
-import TwoPhasePrefixTailCount
-import FacingMergeCount
 
 /-!
 # Constant tongue count for protected facing-forward repairs

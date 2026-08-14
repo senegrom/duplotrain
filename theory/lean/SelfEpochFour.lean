@@ -1,5 +1,4 @@
 import TrackCurveShrinkGlobal
-import KoizumiRawExtraction
 
 /-!
 # Four states in a two-endpoint self epoch

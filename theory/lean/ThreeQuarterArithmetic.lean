@@ -26,16 +26,6 @@ namespace Echo
 multiplication. -/
 def fourth (x : Nat) : Nat := (x * x) * (x * x)
 
-private theorem fourth_mul (x y : Nat) :
-    fourth (x*y) = fourth x * fourth y := by
-  unfold fourth
-  simp only [Nat.mul_assoc, Nat.mul_left_comm, Nat.mul_comm]
-
-private theorem fourth_two_pow (A : Nat) :
-    fourth (2^A) = 2^(A+A+A+A) := by
-  unfold fourth
-  simp [Nat.pow_add, Nat.mul_assoc, Nat.mul_left_comm, Nat.mul_comm]
-
 
 def profileCells : List (Nat × Nat) → Nat
   | [] => 0

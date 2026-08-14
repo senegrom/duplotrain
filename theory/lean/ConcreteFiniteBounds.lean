@@ -78,19 +78,6 @@ theorem descent_route_bounded
         omega
       · exact ih b (List.mem_cons.mpr hb)
 
-/-- The root switch of every bounded descent is below `N`. -/
-theorem descent_root_bounded
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {t : Tongues} {p s : Nat} {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') : descentRoot p ps < N := by
-  have hlast := descent_last_link h
-  have hstem := (hN _ _ hlast).1
-  unfold descentRoot
-  omega
-
-/-- A compact code for a branch port. -/
 def branchCode (p : Nat) : Nat :=
   2 * (p / 3) + (p % 3 - 1)
 
@@ -199,23 +186,6 @@ theorem isDescentEntry_bounded
   rcases hp with ⟨t, ps, s, t', h⟩
   exact descent_entry_bounded hN h
 
-/-- **Concrete slot bound.**  A duplicate-free finite list of realised
-cascade entries has at most two entries per switch. -/
-theorem descent_entry_list_length_le_two_mul
-    {w : Wiring} {N : Nat} {slots : List Nat}
-    (hN : ∀ a b, w.link a = some b →
-      a < 3 * N ∧ b < 3 * N)
-    (hnd : slots.Nodup)
-    (hentries : ∀ p ∈ slots, IsDescentEntry w p) :
-    slots.length ≤ 2 * N := by
-  apply branch_port_list_length_le_two_mul hnd
-  · intro p hp
-    exact isDescentEntry_bounded hN (hentries p hp)
-  · intro p hp
-    exact isDescentEntry_branch (hentries p hp)
-
-/-- Any duplicate-free finite list of cell indices below `N` has length at
-most `N`. -/
 theorem bounded_cell_list_length_le
     {N : Nat} {cells : List Nat}
     (hnd : cells.Nodup)
@@ -226,9 +196,5 @@ theorem bounded_cell_list_length_le
     exact List.mem_range.mpr (hbounded c hc)
   have hle := nodup_subset_length_nat hnd hsub
   simpa using hle
-
-/-- A cell is realised as the root of some concrete descent. -/
-def IsDescentRoot (w : Wiring) (c : Nat) : Prop :=
-  ∃ t p ps s t', Descent w t p ps s t' ∧ descentRoot p ps = c
 
 end GeneralN

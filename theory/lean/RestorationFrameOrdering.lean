@@ -98,22 +98,6 @@ def ShiftedExitResidual
     r' < b ∧
     AvoidsOriginalCrossingWindows t0 u0 t1 u1 b' r'
 
-/-- Complete blocker-order conclusion.  The failed read `j` is retained in
-the exit branch so the temporal premise `j <= u1` is visible rather than
-silently discarded. -/
-def MiddleBlockerResidual
-    (K p t0 u0 t1 u1 b j r : Nat) : Prop :=
-  SameEdgeWrite m e r0 b ∨
-  SameEdgeWrite m e r0 r ∨
-  r <= u0 ∨
-  (j <= u1 ∧ u1 <= r ∧
-    ShiftedExitResidual m e r0 K p t0 u0 t1 u1 b r)
-
-/-- The overlap length of a lifted crossing.  For
-`t0 < t1 < u0 < u1` this is exactly the time during which the two
-restoration frames are simultaneously open.  Unlike the containing hull,
-it strictly decreases when the second opening moves right while the first
-closing stays fixed. -/
 def crossingOverlap (_t0 u0 t1 _u1 : Nat) : Nat :=
   u0 - t1
 
@@ -177,24 +161,6 @@ private theorem exists_cyclic_overlap_minimal_bounded :
         apply hsmaller
         exact ⟨a0, b0, a1, b1, hcomp, by omega⟩
 
-/-- Every nonempty family of canonical period lifts has an overlap-minimal
-member.  No finite-instance enumeration is involved. -/
-theorem exists_cyclic_overlap_minimal
-    (hex : exists t0 u0 t1 u1,
-      PeriodNormalizedForeignRestorationCrossing
-        m e r0 K p t0 u0 t1 u1) :
-    exists t0 u0 t1 u1,
-      CyclicOverlapMinimalForeignRestorationCrossing
-        m e r0 K p t0 u0 t1 u1 := by
-  obtain ⟨t0, u0, t1, u1, hnorm⟩ := hex
-  exact exists_cyclic_overlap_minimal_bounded m e r0
-    (crossingOverlap t0 u0 t1 u1)
-    ⟨t0, u0, t1, u1, hnorm, Nat.le_refl _⟩
-
-/-- A foreign blocker frame starting in the overlap and closing after `u0`
-creates another period-normalized crossing with strictly smaller overlap.
-This remains true when its closing endpoint lies beyond `u1` or beyond the
-chosen period cut. -/
 theorem cyclic_overlap_descent
     {K p t0 u0 t1 u1 b r : Nat}
     (hmin : CyclicOverlapMinimalForeignRestorationCrossing
@@ -548,24 +514,6 @@ decreasing_by
   have hp := hper.positive
   omega
 
-theorem exit_frame_shift_reduction
-    {K p t0 u0 t1 u1 b r : Nat}
-    (hper : RestorationPeriodicTail m e r0 K p)
-    (hmin : MinimalForeignRestorationCrossing m e r0 t0 u0 t1 u1)
-    (hframe : ForeignRestorationFrame m e r0 b r)
-    (hrperiod : r < b+p) :
-    ShiftedExitResidual m e r0 K p t0 u0 t1 u1 b r := by
-  by_cases hfirst : b < K+p
-  · exact Or.inl hfirst
-  · right
-    have hKp : K+p <= b := by omega
-    have hpb : p <= b := by omega
-    have hK : K <= b-p := by omega
-    have hshift := foreignRestorationFrame_shift_back m e r0 hper hpb hK hframe
-    refine ⟨b-p, r-p, rfl, rfl, hshift, ?_, ?_⟩
-    · omega
-    · exact foreign_frame_avoids_original_crossing_windows m e r0 hmin hshift
-
 theorem cyclic_minimal_stable_blocker_order
     (hr0 : forall c, m.cellOf (r0 c) = c)
     {K p t0 u0 t1 u1 b j : Nat}
@@ -649,29 +597,5 @@ theorem first_restoration_forbids_early_returned_register
       m e r0 hr0 houter.1.1 hgap hreturn
   have hne := houter.2 v hvframe.1.2.1 (by omega)
   exact hne hvframe.1.2.2.2.2
-
-/-- Hence the exact shared-close boundary identified above is impossible in
-a well-formed machine.  A foreign blocker whose failed read is at or after
-`u0` cannot occur in a cyclic-overlap-minimal crossing. -/
-theorem cyclic_minimal_foreign_blocker_at_or_after_close_impossible
-    (hr0 : forall c, m.cellOf (r0 c) = c)
-    {K p t0 u0 t1 u1 b j r : Nat}
-    (hmin : CyclicOverlapMinimalForeignRestorationCrossing
-      m e r0 K p t0 u0 t1 u1)
-    (hframe : ForeignRestorationFrame m e r0 b r)
-    (ht1b : t1 < b) (hbu0 : b < u0)
-    (hrperiod : r < b+p)
-    (hstable : StableBlockerUntil m e r0 b j)
-    (hu0j : u0 <= j) : False := by
-  obtain ⟨hre, _hje, hwriter, hold⟩ :=
-    cyclic_minimal_foreign_blocker_shared_close
-      m e r0 hmin hframe ht1b hbu0 hrperiod hstable hu0j
-  have hframe0 : ForeignRestorationFrame m e r0 t0 u0 :=
-    hmin.1.1.1.1
-  have ht0t1 : t0 < t1 := hmin.1.1.1.2.2.1
-  apply first_restoration_forbids_early_returned_register
-    m e r0 hr0 hframe0.1 (by omega) hbu0
-  · exact hwriter
-  · exact hold
 
 end Echo

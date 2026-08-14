@@ -1,4 +1,3 @@
-import ChangedContactNAddFour
 import KnownEdgeNAddFourChangedClosed
 
 /-!

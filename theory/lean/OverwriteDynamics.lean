@@ -43,31 +43,6 @@ private theorem pinValue_eq_bval (p : Nat) : pinValue p = bval p := by
     · rfl
     · exact absurd (eq_of_beq hb) h
 
-/-- Evaluation of a pin word is completely described by its last assignment
-to each switch. -/
-theorem pinList_apply : ∀ ps t k,
-    pinList ps t k = (finalPinValue ps k).getD (t k) := by
-  intro ps
-  induction ps with
-  | nil =>
-      intro t k
-      rfl
-  | cons p ps ih =>
-      intro t k
-      unfold pinList finalPinValue
-      rw [ih]
-      cases hlast : finalPinValue ps k with
-      | some b => simp [hlast]
-      | none =>
-          by_cases hpk : p / 3 = k
-          · rw [if_pos hpk]
-            show pin t p k = pinValue p
-            unfold pin
-            rw [if_pos hpk.symm, pinValue_eq_bval]
-          · rw [if_neg hpk]
-            show pin t p k = t k
-            unfold pin
-            rw [if_neg (fun hk : k = p / 3 => hpk hk.symm)]
 
 
 theorem descent_result_eq_pinList

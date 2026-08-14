@@ -1,5 +1,4 @@
 import StateLawTwoSixUltra
-import TwoHistoryUnionCharge
 import BoundaryAbsentSecondWriter
 
 /-!
@@ -457,32 +456,5 @@ theorem ManufacturedFlipReflector.action_lt
         simp [ManufacturedReflector.exploration])
   simpa [passageSwitch,
     ManufacturedFlipReflector.actionSwitch] using hlt
-
-/-- Equality in the reusable/second-first-writer coordinate charge forces
-the omitted action mouth to be a productive first writer of the second
-construction. -/
-theorem ManufacturedFlipReflector.action_mem_second_writers_of_full_charge
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (R : ManufacturedFlipReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbaseGrooves : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths B.baseState)
-    (hpreGrooves : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths B.preReturn.2)
-    (hfull :
-      (ManufacturedReflector.flip R).reusableSwitches.length +
-        (rawFirstWriterTimes w N (e, B.baseState)
-          B.exploration.length).length = N) :
-    R.actionSwitch ∈ B.constructionFirstWriterSwitches N := by
-  by_cases hmem :
-      R.actionSwitch ∈ B.constructionFirstWriterSwitches N
-  · exact hmem
-  · have hsave :=
-      (ManufacturedReflector.flip R).reusable_add_second_first_writers_add_reserved_le
-        hN B hbaseGrooves hpreGrooves
-          (R.action_lt hN) R.action_not_mem_reusable hmem
-    omega
 
 end GeneralN

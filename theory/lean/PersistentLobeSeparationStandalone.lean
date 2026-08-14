@@ -1,5 +1,4 @@
-import HiddenAbsorb
-import StarPairCountingCore
+import HiddenFibre
 
 /-!
 # Active lobe separation before the Gray tail
@@ -69,45 +68,5 @@ theorem standalone_partner_lobes_absorb
 /-- Cells represented by active lobe slots. -/
 def standaloneActiveLobeCells (lobes : List Nat) : List Nat :=
   lobes.map m.cellOf
-
-/-- **Before absorption, active lobe cells are star-separated.** -/
-theorem standaloneActiveLobes_starSeparated
-    (hrun : IsRun m e r0)
-    (lo hi : Nat) (lobes : List Nat)
-    (hnd : (standaloneActiveLobeCells m lobes).Nodup)
-    (hloop : ∀ a ∈ lobes,
-      m.cellOf (m.bar a) = m.cellOf a)
-    (hocc : ∀ k, lo ≤ k → k ≤ hi → ∀ a ∈ lobes,
-      Occupied m e r0 k a)
-    (hvisit : ∀ a ∈ lobes,
-      StandaloneLobeVisited m e r0 lo hi a)
-    (hno : StandaloneNoFourTailIn m e r0 lo hi) :
-    StarSeparatedCore m (standaloneActiveLobeCells m lobes) := by
-  constructor
-  · exact hnd
-  · intro c hc hstarMem
-    obtain ⟨a, ha, hac⟩ := List.mem_map.mp hc
-    obtain ⟨b, hb, hbc⟩ := List.mem_map.mp hstarMem
-    rcases hvisit a ha with ⟨k, hkLo, hkHi, he | he⟩
-    · have hstar : m.star (m.cellOf a) = m.cellOf b := by
-        rw [hac, hbc]
-      have htail := standalone_partner_lobes_absorb m e r0 hrun
-        (hloop a ha) (hloop b hb) hstar he
-        (hocc k hkLo hkHi b hb)
-      exact (hno k hkLo hkHi) htail
-    · let a' := m.bar a
-      have ha' : m.cellOf (m.bar a') = m.cellOf a' := by
-        dsimp [a']
-        rw [m.bar_invol]
-        exact (hloop a ha).symm
-      have hcellA' : m.cellOf a' = m.cellOf a := by
-        dsimp [a']
-        exact hloop a ha
-      have hstar : m.star (m.cellOf a') = m.cellOf b := by
-        rw [hcellA', hac, hbc]
-      have htail := standalone_partner_lobes_absorb m e r0 hrun
-        ha' (hloop b hb) hstar he
-        (hocc k hkLo hkHi b hb)
-      exact (hno k hkLo hkHi) htail
 
 end Echo

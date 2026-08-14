@@ -167,17 +167,4 @@ theorem pigeonhole : ∀ (N : Nat) (l : List (List Bool)),
         rw [Nat.pow_succ]; omega
       omega
 
-/-- **f(N) ≤ 2^N, unconditionally.**  Any list of tongue assignments
-whose restrictions to the first `N` switches are pairwise distinct has
-at most `2^N` elements — in particular the distinct tongue vectors
-visited by any run of any N-switch wiring, of any length. -/
-theorem vector_count_le (N : Nat) (us : List Tongues)
-    (hnd : (us.map (restrict N)).Nodup) : us.length ≤ 2 ^ N := by
-  have h := pigeonhole N (us.map (restrict N))
-    (fun x hx => by
-      obtain ⟨u, _, rfl⟩ := List.mem_map.mp hx
-      exact restrict_length N u)
-    hnd
-  simpa only [List.length_map] using h
-
 end VectorCount

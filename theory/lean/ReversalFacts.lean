@@ -24,14 +24,6 @@ namespace Echo
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-theorem nextCell_stable {i c : Nat} :
-    ∀ d, (∀ l, i < l → l ≤ i + d →
-      m.cellOf (e l) ≠ m.star c) →
-      nextCell m e r0 (i+d) c = nextCell m e r0 i c := by
-  intro d hno
-  unfold nextCell
-  rw [reg_stable m e r0 d hno]
-
 
 theorem nextCell_stall_of_mirror_present
     (hrun : IsRun m e r0) (hr0 : ∀ c, m.cellOf (r0 c) = c)

@@ -1,6 +1,4 @@
 import BoundaryResidualNovelty
-import BoundaryAbsentSecondWriter
-import BoundaryDoubleDuplicate
 
 /-!
 # The absent initial coordinate across a fully protected pair

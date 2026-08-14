@@ -263,24 +263,4 @@ theorem repeated_writer_close_self_or_interior_self
     rw [← hsame]
     simpa [hsum] using hpersist
 
-/-- In a prefix with no productive self-pivot, every productive writer is
-necessarily appearing for the first time.  A repeated writer would force a
-self-pivot by `repeated_writer_close_self_or_interior_self`. -/
-theorem rawProductiveAt_first_of_no_self_prefix
-    {w : Wiring} {N K : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {k : Nat}
-    (hk : k < K)
-    (havoid : ∀ j, j < K → RawProductiveAt w N start j →
-      ¬ RawTrainCurveSelfAt w start j)
-    (hprod : RawProductiveAt w N start k) :
-    RawFirstWriterAt w N start k := by
-  refine ⟨hprod, ?_⟩
-  intro j hj hjprod hsame
-  rcases repeated_writer_close_self_or_interior_self
-      hN hj hjprod hprod hsame with hclose | hinterior
-  · exact (havoid k hk hprod hclose).elim
-  · obtain ⟨t, _hjt, htk, htprod, htself⟩ := hinterior
-    exact (havoid t (by omega) htprod htself).elim
-
 end GeneralN

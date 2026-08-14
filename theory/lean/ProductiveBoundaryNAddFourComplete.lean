@@ -1,14 +1,6 @@
-import BoundaryNAddFourSaturation
-import BoundaryAbsentSecondWriter
 import PartialJourneyDichotomy
 import PartialSecondRunNAddFour
-import ProtectedPairNAddFour
-import ProductiveBoundarySupportContact
-import BoundaryDoubleDuplicate
-import BoundaryResidualNovelty
 import BoundaryAbsentProtectedPair
-import BoundaryResidualCharge
-import KnownEdgeNAddFourComplete
 
 /-!
 # Exact completion frontier for the productive `N+4` boundary

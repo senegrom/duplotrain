@@ -135,24 +135,4 @@ theorem descent_switch_path_bounded
   have hbBound := descent_route_bounded hN h b hb
   omega
 
-/-- **Cascade length bound.**  A landed cascade in an `N`-switch wiring
-contains at most `N` branch arrivals. -/
-theorem descent_path_length_le
-    {w : Wiring} {N : Nat}
-    (hN : ∀ a b, w.link a = some b →
-      a < 3 * N ∧ b < 3 * N)
-    {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') :
-    (p :: ps).length ≤ N := by
-  let switches := (p :: ps).map (fun b => b / 3)
-  have hnd : switches.Nodup := by
-    dsimp [switches]
-    exact descent_switch_path_nodup h
-  have hbound : ∀ c ∈ switches, c < N := by
-    dsimp [switches]
-    exact descent_switch_path_bounded hN h
-  have hle := bounded_cell_list_length_le hnd hbound
-  simpa [switches] using hle
-
 end GeneralN

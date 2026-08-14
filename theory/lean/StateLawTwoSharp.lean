@@ -1,6 +1,5 @@
 import StateLawTwoCandidate
 import ShortSuffixCount
-import ArbitraryStartDirectLift
 
 /-!
 # Sharp coefficient-two state bound
@@ -868,26 +867,5 @@ theorem known_edge_all_run_distinct_le_of_protected_cap
                   hreachA hgroovesA hbaseB hactivatedB hreachB
                   hgroovesB htail (by omega) times hlive hnd
               omega
-
-/-- Five protected vectors give the sharp known-edge coefficient-two
-constant `2*N+7`. -/
-theorem known_edge_all_run_distinct_le_two_add_seven
-    {w : Wiring} {N e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues}
-    (hentry : w.link e = some start.1)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ 2 * N + 7 := by
-  have hc := known_edge_all_run_distinct_le_of_protected_cap
-    hN (tailCap := 5) (by omega)
-    (fun A B hA hB tailTimes htailLive htailNodup =>
-      manufactured_pair_protected_repair_distinct_le_five
-        A B hA hB tailTimes htailLive htailNodup)
-    hentry times hlive hnd
-  omega
-
 
 end GeneralN

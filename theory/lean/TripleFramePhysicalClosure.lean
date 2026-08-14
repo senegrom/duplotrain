@@ -244,33 +244,6 @@ def CertifiedRunUsesSelfLink {w : Wiring}
     (run : CertifiedConcreteEchoRun w) : Prop :=
   exists q, w.link (run.entry q) = some (run.entry q)
 
-/-- An encountered self-link in a certified run is not an unrelated wiring
-defect: its realised descent supplies the stem successor, so the selected
-branch is exactly a two-step identity reflector. -/
-theorem certified_used_self_link_has_identity_reflector
-    {w : Wiring} {run : CertifiedConcreteEchoRun w}
-    (huse : CertifiedRunUsesSelfLink run) :
-    exists q outside,
-      w.link (run.entry q) = some (run.entry q) ∧
-      IsReflector w (3 * (run.entry q / 3)) outside 2
-        (fun state => state (run.entry q / 3) = bval (run.entry q))
-        (fun state => state) := by
-  obtain ⟨q, hself⟩ := huse
-  have hslot := run.toConcreteAscentTrace.freeSlot q
-  rcases hslot.1 with ⟨t, ps, landing, t', hd⟩
-  cases hd with
-  | last hbranch hmouth _ =>
-      exact ⟨q, landing, hself,
-        self_linked_branch_is_identity_reflector
-          hbranch hself hmouth⟩
-  | @cons _ p next landing tail _ hbranch hmouth _ _ =>
-      exact ⟨q, next, hself,
-        self_linked_branch_is_identity_reflector
-          hbranch hself hmouth⟩
-
-/-- One selected raw productive time is represented by the corresponding
-certified ascent time, both at the physical entry port and at the incoming
-tongue boundary. -/
 def CertifiedRepresentsRawTime {w : Wiring}
     (run : CertifiedConcreteEchoRun w) (clock : Nat -> Nat)
     (start : Nat × Tongues) (k : Nat) : Prop :=
@@ -416,26 +389,6 @@ theorem certified_fixed_encoded_entry_has_self_link
       some (wireBar w (run.entry q)) := hslot.2.2.1
   rwa [hwire] at hlink
 
-/-- Conversely, a self-link at a certified entry fixes its encoded canonical
-jump. -/
-theorem certified_self_linked_entry_has_fixed_bar
-    {w : Wiring} (run : CertifiedConcreteEchoRun w) {q : Nat}
-    (hself : w.link (run.entry q) = some (run.entry q)) :
-    (canonicalEchoMachine w).bar (encodedEntries run.entry q) =
-      encodedEntries run.entry q := by
-  have hslot := run.toConcreteAscentTrace.freeSlot q
-  have hlink : w.link (run.entry q) =
-      some (wireBar w (run.entry q)) := hslot.2.2.1
-  rw [hself] at hlink
-  have hwire : wireBar w (run.entry q) = run.entry q := by
-    injection hlink with h
-    exact h.symm
-  simp [encodedEntries, canonicalEchoMachine, encodedMachine,
-    encodedBar_encodeSlot, hwire]
-
-/-- Honest non-irreflexive form of the physical closure.  If lobe and replay
-escapes are absent, an `ABCABC` certificate forces a self-link actually
-encountered by its certified run. -/
 theorem CertifiedEndpointEmptyABCABC.forces_used_self_link
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     {z0 z1 z2 z3 z4 : Nat}

@@ -1,6 +1,6 @@
 import RunwayHistoricalThree
+import TrackGlobalRepair
 import FirstRevisitActivatedOutcome
-import SharpStateLawAssembly
 import FiveFrameObstruction
 
 /-!
@@ -135,41 +135,6 @@ theorem rawProductiveAt_sub_of_reach
     _ = restrictedTonguesAt w N start (shift + d) :=
       hpreVector.symm
 
-/-- Global novelty survives rebasing at an actually reached configuration.
-If a local post-vector had occurred earlier in the rebased run, transporting
-that occurrence back by `shift` would contradict the original novelty. -/
-theorem rawNovelAt_sub_of_reach
-    {w : Wiring} {N shift d : Nat}
-    {start middle : Nat × Tongues}
-    (hreach : stepN w shift start = some middle)
-    (hnovel : RawNovelAt w N start (shift + d)) :
-    RawNovelAt w N middle d := by
-  have hlocalProductive : RawProductiveAt w N middle d :=
-    rawProductiveAt_sub_of_reach hreach
-      (rawNovelAt_productive hnovel)
-  intro hseen
-  obtain ⟨j, hj, hvector⟩ := List.mem_map.mp hseen
-  have hjLt : j < d + 1 := List.mem_range.mp hj
-  obtain ⟨post, hpost⟩ :=
-    Option.isSome_iff_exists.mp hlocalProductive.1
-  obtain ⟨earlier, hearlier⟩ := stepN_prefix_some
-    (d := j) (K := d + 1) (by omega) hpost
-  have hearlierVector := restrictedTonguesAt_add_of_reach
-    (N := N) hreach hearlier
-  have hpostVector := restrictedTonguesAt_add_of_reach
-    (N := N) hreach hpost
-  apply hnovel
-  apply List.mem_map.mpr
-  refine ⟨shift + j, List.mem_range.mpr (by omega), ?_⟩
-  calc
-    restrictedTonguesAt w N start (shift + j) =
-        restrictedTonguesAt w N middle j := hearlierVector
-    _ = restrictedTonguesAt w N middle (d + 1) := hvector
-    _ = restrictedTonguesAt w N start (shift + (d + 1)) :=
-      hpostVector.symm
-    _ = restrictedTonguesAt w N start (shift + d + 1) := by
-      have harith : shift + (d + 1) = shift + d + 1 := by omega
-      rw [harith]
 
 theorem PhysicalTrace.rawWriterAt_eq_passageSwitch_getElem
     {w : Wiring} {start finish : Nat × Tongues}
@@ -321,57 +286,6 @@ theorem ManufacturedReflector.exploration_mem_rawFirstWriterHistory
     |>.restrictedTonguesAt_mem_rawFirstWriterHistory_of_le
       A.exploration_simple horizon
 
-/-- The complete out-and-back journey which manufactures a reflector uses
-only the raw first-writer construction history plus its single activated
-contact vector.  This replaces the old ad-hoc `N+2` construction list by the
-canonical `N+1` raw history and one explicit exceptional state. -/
-theorem ManufacturedReflector.manufacturing_journey_mem_rawHistory_one_extra
-    {w : Wiring} {N K g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hpaths : PathGrooves A.toSupported.paths A.activatedState)
-    (horizon : A.exploration.length ≤ K) :
-    ∀ j, j ≤ A.exploration.length + A.runway.length + 1 →
-      restrictedTonguesAt w N (g, A.baseState) j ∈
-        rawFirstWriterHistory w N (g, A.baseState) K ++
-          [VectorCount.restrict N A.activatedState] := by
-  intro j hj
-  have hm := A.manufacturing_journey_mem_sharpHistory
-    (N := N) hpaths hj
-  unfold ManufacturedReflector.sharpConstructionHistory at hm
-  rcases List.mem_append.mp hm with hm | hm
-  · obtain ⟨k, hk, hvector⟩ := List.mem_map.mp hm
-    have hkBound : k ≤ A.exploration.length := by
-      have hkRange := List.mem_range.mp hk
-      omega
-    apply List.mem_append_left
-    rw [← hvector]
-    exact A.exploration_mem_rawFirstWriterHistory
-      horizon k hkBound
-  · exact List.mem_append_right _ hm
-
-
-theorem exists_entryEdge_of_reach
-    {w : Wiring} {start reached : Nat × Tongues}
-    {initialEdge k : Nat}
-    (hentry : w.link initialEdge = some start.1)
-    (hreach : stepN w k start = some reached) :
-    ∃ edge, w.link edge = some reached.1 := by
-  cases k with
-  | zero =>
-      have hreached : reached = start := by
-        simpa [stepN] using Option.some.inj hreach.symm
-      subst reached
-      exact ⟨initialEdge, hentry⟩
-  | succ k =>
-      obtain ⟨before, hbefore⟩ := stepN_prefix_some
-        (d := k) (K := k + 1) (by omega) hreach
-      have hsplit := stepN_add w k 1 start
-      rw [hreach, hbefore] at hsplit
-      simp only [Option.bind_some] at hsplit
-      have hone : stepN w 1 before = some reached := hsplit.symm
-      have hstep : step w before = some reached := by
-        simpa [stepN] using hone
-      exact ⟨exitPort before, (step_some_parts hstep).1⟩
 
 
 theorem four_raw_novel_post_vectors_nodup
@@ -421,111 +335,6 @@ or on the new side, where the novelty rebases to a genuine repeated-writer
 novelty of the returned run.  There is no third, uncharged source of novelty.
 -/
 
-/-- A productive event cannot occur strictly inside a pointwise retrace
-whose positive-depth configurations all carry the same tongue state. -/
-theorem rawProductive_not_strictly_inside_pointwise_retrace
-    {w : Wiring} {N repeatTime span time q : Nat}
-    {start : Nat × Tongues} {old settled : Tongues}
-    (hrepeat : stepN w repeatTime start = some (q, old))
-    (hpointwise : ∀ d, d ≤ span →
-      ∃ port, stepN w d (q, old) =
-        some (port, if d = 0 then old else settled))
-    (hproductive : RawProductiveAt w N start time)
-    (hafter : repeatTime < time) :
-    repeatTime + span ≤ time := by
-  apply Classical.byContradiction
-  intro hnot
-  have htimeBeforeEnd : time < repeatTime + span := by omega
-  let d := time - repeatTime
-  have hdPositive : 0 < d := by
-    dsimp [d]
-    omega
-  have hdLt : d < span := by
-    dsimp [d]
-    omega
-  have hdSucc : d + 1 ≤ span := by omega
-  have htime : repeatTime + d = time := by
-    dsimp [d]
-    omega
-  have htimeSucc : repeatTime + (d + 1) = time + 1 := by omega
-  obtain ⟨beforePort, hbeforeLocal⟩ := hpointwise d (by omega)
-  obtain ⟨afterPort, hafterLocal⟩ := hpointwise (d + 1) hdSucc
-  have hbeforeGlobal :
-      stepN w time start = some (beforePort, settled) := by
-    rw [← htime, stepN_add, hrepeat]
-    simpa [Nat.ne_of_gt hdPositive] using hbeforeLocal
-  have hafterGlobal :
-      stepN w (time + 1) start = some (afterPort, settled) := by
-    rw [← htimeSucc, stepN_add, hrepeat]
-    simp only [Option.bind_some]
-    simpa using hafterLocal
-  apply hproductive.2
-  simp [restrictedTonguesAt, tonguesAt,
-    hbeforeGlobal, hafterGlobal]
-
-private theorem exists_first_in_half_open
-    (P : Nat → Prop) [DecidablePred P] :
-    ∀ (lo span : Nat),
-      (∃ j, lo ≤ j ∧ j < lo + span ∧ P j) →
-      ∃ j, lo ≤ j ∧ j < lo + span ∧ P j ∧
-        ∀ t, lo ≤ t → t < j → ¬ P t := by
-  intro lo span
-  induction span generalizing lo with
-  | zero =>
-      rintro ⟨j, hj, hbound, _⟩
-      omega
-  | succ n ih =>
-      intro hex
-      by_cases hlo : P lo
-      · exact ⟨lo, Nat.le_refl _, by omega, hlo, by omega⟩
-      · have htail : ∃ j, lo + 1 ≤ j ∧
-            j < (lo + 1) + n ∧ P j := by
-          obtain ⟨j, hjlo, hjhi, hjP⟩ := hex
-          refine ⟨j, ?_, ?_, hjP⟩
-          · by_cases hEq : j = lo
-            · subst j
-              exact (hlo hjP).elim
-            · omega
-          · omega
-        obtain ⟨j, hjlo, hjhi, hjP, hfirst⟩ := ih (lo + 1) htail
-        refine ⟨j, by omega, by omega, hjP, ?_⟩
-        intro t htlo htj htP
-        by_cases hEq : t = lo
-        · subst t
-          exact hlo htP
-        · exact hfirst t (by omega) htj htP
-
-theorem completed_retrace_endpoint_eq_turn_post
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    {start : Nat × Tongues} {K N : Nat}
-    (hreach : stepN w K start = some (p, u)) :
-    restrictedTonguesAt w N start (K + recorded.length + 1) =
-      restrictedTonguesAt w N start (K + 1) := by
-  have hpointwise :=
-    (physicalTrace_contact_retraces_prefix_pointwise
-      hrecorded hgrooved hentry hcontact).2
-  obtain ⟨firstPort, hfirstLocal⟩ := hpointwise 1 (by omega)
-  obtain ⟨endPort, hendLocal⟩ :=
-    hpointwise (recorded.length + 1) (Nat.le_refl _)
-  have hfirstGlobal :
-      stepN w (K + 1) start = some (firstPort, v) := by
-    rw [stepN_add, hreach]
-    simpa using hfirstLocal
-  have hendGlobal :
-      stepN w (K + recorded.length + 1) start =
-        some (endPort, v) := by
-    rw [show K + recorded.length + 1 =
-        K + (recorded.length + 1) by omega,
-      stepN_add, hreach]
-    simpa using hendLocal
-  simp [restrictedTonguesAt, tonguesAt, hfirstGlobal, hendGlobal]
 
 theorem crossing_frame_open_in_caller_oriented_contact
     {w : Wiring} {N callerStart returnTime left escape g edge : Nat}
@@ -812,109 +621,6 @@ def KnownEdgeEarlyChangedForwardDichotomy : Prop :=
       (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 ∨
         Nonempty (EarlyChangedForwardHistoryCertificate w N start K)
 
-/-- Closing the direct exhaustive dichotomy closes the public known-edge
-four-repeated-writer theorem, with no five-frame extraction. -/
-theorem knownEdgeFourRepeatedWriterNovelty_of_earlyChangedForwardDichotomy
-    (hcontrol : KnownEdgeEarlyChangedForwardDichotomy) :
-    KnownEdgeFourRepeatedWriterNovelty := by
-  intro w N e hN start K hentry
-  rcases hcontrol w N e hN start K hentry with hsmall | hcertificate
-  · exact hsmall
-  · obtain ⟨C⟩ := hcertificate
-    exact C.repeatedWriterNovelty_le_four hN
-
-theorem ManufacturedReflector.ChangedForwardMerge.exists_short_lead_three_novelty
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {R : ManufacturedFlipReflector w e g}
-    (hmerge : A.ChangedForwardMerge (.flip R)) :
-    ∃ leadSteps, leadSteps ≤ A.toSupported.travel ∧
-      ∀ (N : Nat) (history : List (List Bool)),
-        (∀ j, j ≤ leadSteps →
-          restrictedTonguesAt w N
-            (g, (ManufacturedReflector.flip R).activatedState) j ∈
-              history) →
-        ∀ times : List Nat,
-          NoveltyCoverOn w N
-            (g, (ManufacturedReflector.flip R).activatedState)
-            times history 3 := by
-  obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
-      approach, candy, state, leadSteps, _tailSteps, horiented,
-      hrouteSplit, hOldTail, hApproach, hApproachGrooved,
-      hApproachForeign, _hCandyEq, hentryBranch, _hmouthStem,
-      hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
-      hRpaths, _hCandy, hCandyForeignNew, hLobe, hreach,
-      _hcomplete, hleadLen, _htailLen, happroachLe⟩ :=
-    hmerge.spliced_lobe_reflector
-  have hleadLe : leadSteps ≤ A.toSupported.travel := by
-    rw [hleadLen]
-    exact happroachLe
-  refine ⟨leadSteps, hleadLe, ?_⟩
-  intro N history hleadHistorical times
-  have hentryHistorical : VectorCount.restrict N
-      (flipAt state (mouth / 3)) ∈ history := by
-    have hvector : restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).activatedState)
-        leadSteps =
-        VectorCount.restrict N (flipAt state (mouth / 3)) := by
-      simp [restrictedTonguesAt, tonguesAt, hreach]
-    rw [← hvector]
-    exact hleadHistorical leadSteps (Nat.le_refl _)
-  by_cases hrunway : (entry, mouth) ∈ R.runway
-  · obtain ⟨before, after, hrunwaySplit⟩ :=
-      List.append_of_mem hrunway
-    obtain ⟨C, _hCAction, hEntryOldNe, hCpaths,
-        hNewAvoidsCRaw, _htravel⟩ :=
-      R.suffix_after_runway_passage_with_travel state hRpaths
-        hrunwaySplit hmouthLink
-    have hentrySwitch : entry / 3 = mouth / 3 := by
-      have hheadGroove : arrive state entry = (mouth, state) :=
-        hfullGrooved (mouth, entry) List.mem_cons_self
-      have hswitch := arrive_exit_switch state entry
-      rw [hheadGroove] at hswitch
-      exact hswitch.symm
-    have hActionsNe : mouth / 3 ≠ C.actionSwitch := by
-      rw [← hentrySwitch]
-      exact hEntryOldNe
-    have hNewAvoidsC : (LocalAction.flip (mouth / 3)).Avoids
-        C.toSupported.paths := by
-      simpa [hentrySwitch] using hNewAvoidsCRaw
-    by_cases hcontact : ∃ passage ∈ candy,
-        passageSwitch passage = C.actionSwitch
-    · apply manufactured_flip_arbitrary_lobe_absolute_three_novelty
-        C state hCpaths hNewAvoidsC hentryBranch hentrySwitch
-        hfullGrooved hfullTrace hcrossed hCandyForeignNew hLobe
-        hmouthLink hcontact hreach times history hentryHistorical
-      intro j _hj hjLead
-      exact hleadHistorical j (Nat.le_of_lt hjLead)
-    · have hCandyForeignOld : ∀ passage ∈ candy,
-          passageSwitch passage ≠ C.actionSwitch := by
-        intro passage hp hEq
-        exact hcontact ⟨passage, hp, hEq⟩
-      apply manufactured_suffix_explicit_lobe_absolute_three_novelty
-        C state hCpaths hNewAvoidsC hActionsNe hentryBranch
-        hentrySwitch hfullGrooved hfullTrace hcrossed
-        hCandyForeignNew hCandyForeignOld hLobe hmouthLink hreach
-        times history hentryHistorical
-      intro j _hj hjLead
-      exact hleadHistorical j (Nat.le_of_lt hjLead)
-  · obtain ⟨old, hold, horientation⟩ :=
-      R.nonrunway_oriented_branch_entry_is_candy state
-        horiented hrunway hentryBranch
-    have hentryGrooved : arrive state entry = (mouth, state) :=
-      hfullGrooved (mouth, entry) List.mem_cons_self
-    have hone := manufactured_flip_candy_splice_absolute_one_novelty
-      R state hRpaths hrouteSplit hOldTail hrunway hentryBranch
-      hold horientation hentryGrooved hApproach hApproachGrooved
-      hApproachForeign hcrossed hmouthLink harms hreach
-      N history hentryHistorical times (by
-        intro j _hj hjLead
-        exact hleadHistorical j (Nat.le_of_lt hjLead))
-    obtain ⟨fresh, hfresh, hmem⟩ := hone
-    exact ⟨fresh, by omega, hmem⟩
-
-/-- Reusable package for the actual short lead selected by a changed-forward
-merge. -/
 structure ChangedForwardShortLead
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
@@ -1081,16 +787,6 @@ def KnownEdgeShortEarlyChangedForwardDichotomy : Prop :=
         Nonempty
           (ShortEarlyChangedForwardHistoryCertificate w N start K)
 
-/-- The short exhaustive control-flow dichotomy closes the public known-edge
-four-event theorem. -/
-theorem knownEdgeFourRepeatedWriterNovelty_of_shortEarlyDichotomy
-    (hcontrol : KnownEdgeShortEarlyChangedForwardDichotomy) :
-    KnownEdgeFourRepeatedWriterNovelty := by
-  intro w N e hN start K hentry
-  rcases hcontrol w N e hN start K hentry with hsmall | hcertificate
-  · exact hsmall
-  · obtain ⟨C⟩ := hcertificate
-    exact C.repeatedWriterNovelty_le_four hN
 
 structure RawFixedStemOpenFrame
     (w : Wiring) (N : Nat) (start : Nat × Tongues)
@@ -1236,58 +932,6 @@ structure FiveFrameTripleCase
     frames.a₀ z₀ frames.a₁ z₁ frames.a₂ z₂
     frames.a₃ z₃ frames.a₄ z₄
 
-/-- The conflict-resolved raw/curve obstruction reduces every ordered five
-novelties to the serial case or the triple-interlacement case. -/
-theorem FiveFixedStemNovelFrames.serial_or_triple
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (F : FiveFixedStemNovelFrames w N start) :
-    Nonempty (FiveFrameSerialCase w N start
-      F.z₀ F.z₁ F.z₂ F.z₃ F.z₄) ∨
-    Nonempty (FiveFrameTripleCase w N start
-      F.z₀ F.z₁ F.z₂ F.z₃ F.z₄) := by
-  obtain ⟨a₀, q₀, a₁, q₁, a₂, q₂, a₃, q₃, a₄, q₄,
-      G₀, G₁, G₂, G₃, G₄, hout⟩ :=
-    five_repeated_novelties_serial_or_triple hN
-      F.order₀₁ F.order₁₂ F.order₂₃ F.order₃₄
-      F.event₀ F.event₁ F.event₂ F.event₃ F.event₄
-  let G : FiveRawClosingFrames w N start
-      F.z₀ F.z₁ F.z₂ F.z₃ F.z₄ := {
-    a₀ := a₀
-    q₀ := q₀
-    a₁ := a₁
-    q₁ := q₁
-    a₂ := a₂
-    q₂ := q₂
-    a₃ := a₃
-    q₃ := q₃
-    a₄ := a₄
-    q₄ := q₄
-    frame₀ := G₀
-    frame₁ := G₁
-    frame₂ := G₂
-    frame₃ := G₃
-    frame₄ := G₄
-  }
-  rcases hout with hserial | htriple
-  · exact Or.inl ⟨G, hserial⟩
-  · exact Or.inr ⟨G, htriple⟩
-
-/-- Exact serial residual: a serially separated five-frame configuration
-must expose the manufactured changed-forward tail before the second close. -/
-def KnownEdgeSerialFrameRunwayExtraction : Prop :=
-  ∀ (w : Wiring) (N e : Nat),
-    (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
-    ∀ (start : Nat × Tongues),
-      w.link e = some start.1 →
-      ∀ F : FiveFixedStemNovelFrames w N start,
-        FiveFrameSerialCase w N start
-          F.z₀ F.z₁ F.z₂ F.z₃ F.z₄ →
-        Nonempty (RunwayTailBeforeSecond w N start F.z₁)
-
-/-- Exact common-overlap residual: the physical curve/interlacement theorem
-must rule out the `ABCABC`/strict-nest case.  This has no counting conclusion
-and no manufactured-certificate choice. -/
 def KnownEdgeTripleFrameObstruction : Prop :=
   ∀ (w : Wiring) (N e : Nat),
     (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
@@ -1437,82 +1081,5 @@ theorem rawRepeatedWriterNovelTimes_pairwise_lt
   classical
   unfold rawRepeatedWriterNovelTimes
   exact List.pairwise_lt_range.filter _
-
-/-- **Global closure bridge.**  The exact five-frame manufactured-tail
-extraction implies the raw known-edge four-event theorem.  This proof selects
-the first five events from an arbitrary finite prefix, attaches all five raw
-fixed-stem decompositions, invokes the physical extraction once, and closes
-with the absolute three-vector runway theorem above. -/
-theorem knownEdgeFourRepeatedWriterNovelty_of_fiveFrameRunwayExtraction
-    (hextract : KnownEdgeFiveFrameRunwayExtraction) :
-    KnownEdgeFourRepeatedWriterNovelty := by
-  classical
-  intro w N e hN start K hentry
-  let events := rawRepeatedWriterNovelTimes w N start K
-  by_cases hsmall : events.length ≤ 4
-  · simpa [events] using hsmall
-  · exfalso
-    have hfive : 5 ≤ events.length := by omega
-    let z₀ := events[0]'(by omega)
-    let z₁ := events[1]'(by omega)
-    let z₂ := events[2]'(by omega)
-    let z₃ := events[3]'(by omega)
-    let z₄ := events[4]'(by omega)
-    have hsorted : events.Pairwise (· < ·) := by
-      simpa [events] using rawRepeatedWriterNovelTimes_pairwise_lt
-        w N start K
-    have hget := List.pairwise_iff_getElem.mp hsorted
-    have hz₀₁ : z₀ < z₁ := hget 0 1 (by omega) (by omega) (by omega)
-    have hz₁₂ : z₁ < z₂ := hget 1 2 (by omega) (by omega) (by omega)
-    have hz₂₃ : z₂ < z₃ := hget 2 3 (by omega) (by omega) (by omega)
-    have hz₃₄ : z₃ < z₄ := hget 3 4 (by omega) (by omega) (by omega)
-    have hmem₀ : z₀ ∈ rawRepeatedWriterNovelTimes w N start K := by
-      simpa [events, z₀] using List.getElem_mem events (n := 0) (by omega)
-    have hmem₁ : z₁ ∈ rawRepeatedWriterNovelTimes w N start K := by
-      simpa [events, z₁] using List.getElem_mem events (n := 1) (by omega)
-    have hmem₂ : z₂ ∈ rawRepeatedWriterNovelTimes w N start K := by
-      simpa [events, z₂] using List.getElem_mem events (n := 2) (by omega)
-    have hmem₃ : z₃ ∈ rawRepeatedWriterNovelTimes w N start K := by
-      simpa [events, z₃] using List.getElem_mem events (n := 3) (by omega)
-    have hmem₄ : z₄ ∈ rawRepeatedWriterNovelTimes w N start K := by
-      simpa [events, z₄] using List.getElem_mem events (n := 4) (by omega)
-    have H₀ : RawRepeatedWriterNovelAt w N start z₀ :=
-      (mem_rawRepeatedWriterNovelTimes_iff.mp hmem₀).2
-    have H₁ : RawRepeatedWriterNovelAt w N start z₁ :=
-      (mem_rawRepeatedWriterNovelTimes_iff.mp hmem₁).2
-    have H₂ : RawRepeatedWriterNovelAt w N start z₂ :=
-      (mem_rawRepeatedWriterNovelTimes_iff.mp hmem₂).2
-    have H₃ : RawRepeatedWriterNovelAt w N start z₃ :=
-      (mem_rawRepeatedWriterNovelTimes_iff.mp hmem₃).2
-    have H₄ : RawRepeatedWriterNovelAt w N start z₄ :=
-      (mem_rawRepeatedWriterNovelTimes_iff.mp hmem₄).2
-    obtain ⟨frame₀⟩ := H₀.fixedStemOpenFrame hN
-    obtain ⟨frame₁⟩ := H₁.fixedStemOpenFrame hN
-    obtain ⟨frame₂⟩ := H₂.fixedStemOpenFrame hN
-    obtain ⟨frame₃⟩ := H₃.fixedStemOpenFrame hN
-    obtain ⟨frame₄⟩ := H₄.fixedStemOpenFrame hN
-    let F : FiveFixedStemNovelFrames w N start := {
-      z₀ := z₀
-      z₁ := z₁
-      z₂ := z₂
-      z₃ := z₃
-      z₄ := z₄
-      order₀₁ := hz₀₁
-      order₁₂ := hz₁₂
-      order₂₃ := hz₂₃
-      order₃₄ := hz₃₄
-      event₀ := H₀
-      event₁ := H₁
-      event₂ := H₂
-      event₃ := H₃
-      event₄ := H₄
-      frame₀ := frame₀
-      frame₁ := frame₁
-      frame₂ := frame₂
-      frame₃ := frame₃
-      frame₄ := frame₄
-    }
-    obtain ⟨tail⟩ := hextract w N e hN start hentry F
-    exact no_five_fixed_stem_novelties_of_runway_tail F tail
 
 end GeneralN

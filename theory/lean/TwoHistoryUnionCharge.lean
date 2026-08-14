@@ -1023,39 +1023,6 @@ theorem ManufacturedReflector.mem_twoSharpHistoryCore
       exact (List.mem_erase_of_ne hboundary).mpr
         (B.mem_sharpHistoryCore_of_mem hxB)
 
-/-- **NODUP two-history union charge, support-avoiding branch.**
-
-After the two internal repetitions and the shared boundary are erased, every
-vector represented by either construction history fits in N+2 slots.
-Unlike the earlier N+4 theorem, this statement bounds an arbitrary
-duplicate-free union rather than the length of a particular raw list. -/
-theorem ManufacturedReflector.two_sharp_histories_nodup_union_le_N_add_two
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbase : B.baseState = A.activatedState)
-    (havoid : A.SupportAvoidsExploration B)
-    (pool : List (List Bool))
-    (hpool : ∀ x ∈ pool,
-      x ∈ A.sharpConstructionHistory N ∨
-        x ∈ B.sharpConstructionHistory N)
-    (hnd : pool.Nodup) :
-    pool.length ≤ N + 2 := by
-  have hsubset :
-      ∀ x ∈ pool, x ∈ A.twoSharpHistoryCore B N := by
-    intro x hx
-    exact A.mem_twoSharpHistoryCore B (hpool x hx)
-  have hcover :=
-    nodup_subset_length_two_history hnd hsubset
-  have hpaths :=
-    A.two_explorations_length_le_N_add_one hN B havoid
-  have hcore := A.twoSharpHistoryCore_length (N := N) B hbase
-  omega
-
-/-- A concrete old-support contact, retaining the exact physical prefix and
-suffix of the second exploration. -/
 structure SecondHistoryContactData
     (w : Wiring) (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g) where
@@ -1340,22 +1307,6 @@ theorem SecondHistorySupportContact.reusable_add_approach_le
   have hbound := nodup_nat_lt_length hnd hlt
   simpa [switches] using hbound
 
-/-- The full first exploration and the strictly pre-contact part of the
-second exploration cost at most N+1 passages. -/
-theorem SecondHistorySupportContact.first_exploration_add_approach_le
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B) :
-    A.exploration.length + C.approach.length ≤ N + 1 := by
-  have hsupport := C.reusable_add_approach_le hN
-  have hA := A.exploration_length_le_reusable_add_one
-  omega
-
-/-- Restricted tongue vectors of the second journey from its shared initial
-boundary through the post-vector of the first old-support contact. -/
 def SecondHistoryContactData.prefixHistory
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}

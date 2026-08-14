@@ -1,5 +1,4 @@
 import SelfEpochFour
-import TrackCurveShrinkGlobal
 import KoizumiFramePersistence
 
 /-!

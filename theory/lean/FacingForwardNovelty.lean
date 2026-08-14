@@ -15,51 +15,6 @@ Everything below is over the raw `Wiring` / `stepN` dynamics, for arbitrary
 -/
 
 namespace GeneralN
-
-private theorem twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    exact hrun
-
-private theorem groovedTrace_twoPhase
-    {w : Wiring} {startPort finishPort : Nat}
-    {u v : Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w (startPort, u) passages (finishPort, u))
-    (hgrooved : PassagesGrooved u passages)
-    (d : Nat) (hd : d ≤ passages.length) :
-    ∃ port phase,
-      stepN w d (startPort, u) = some (port, phase) ∧
-        (phase = u ∨ phase = v) := by
-  obtain ⟨port, hrun⟩ :=
-    htrace.grooved_prefix_tongues u hgrooved hd
-  exact ⟨port, u, hrun, Or.inl rfl⟩
-
-/-- Pointwise strengthening of mouth capture.  The capture starts in the
-action-flipped state, traverses the candy in that state, pins the action tongue
-on the return arm, and retraces the runway in the original state.  There are
-therefore only the two endpoint tongue vectors at every intermediate time. -/
 theorem ManufacturedFlipReflector.capture_from_mouth_twoPhases
     {w : Wiring} {e g : Nat}
     (R : ManufacturedFlipReflector w e g)
@@ -371,23 +326,5 @@ theorem ManufacturedFlipReflector.reverse_candy_suffix_absorbs_twoPhases
     rcases hphase with hphase | hphase
     · exact ⟨port, phase, hrun, Or.inr hphase⟩
     · exact ⟨port, phase, hrun, Or.inr hphase⟩
-
-/-- The bounded pointwise certificate exposed by a facing-forward merge.  The
-lead is the route prefix actually traversed by the train followed by the
-absorbing reverse-candy suffix; it is bounded by the two reflector travels.
-The complete infinite suffix has exactly the two named tongue phases. -/
-structure FacingForwardPointwiseTail
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g) where
-  contact : Tongues
-  alternate : Tongues
-  leadSteps : Nat
-  lead_le : leadSteps ≤ A.toSupported.travel + B.toSupported.travel
-  reached : stepN w leadSteps (g, B.activatedState) =
-    some (g, alternate)
-  tail_twoPhase : ∀ d, ∃ port phase,
-    stepN w d (g, alternate) = some (port, phase) ∧
-      (phase = alternate ∨ phase = contact)
 
 end GeneralN

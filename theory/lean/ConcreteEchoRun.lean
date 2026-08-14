@@ -1,6 +1,4 @@
 import ConcreteEchoStep
-import EchoMachine
-import OverwriteDynamics
 
 /-!
 # From the physical last-writer register to an echo run
@@ -34,9 +32,6 @@ noncomputable def physicalReg (w : Wiring)
 def encodedEntries (entry : Nat → Nat) : Nat → Nat :=
   fun k => encodeSlot (entry k)
 
-/-- Encode physical initial registers. -/
-def encodedInitial (initial : Nat → Nat) : Nat → Nat :=
-  fun c => encodeSlot (initial c)
 
 @[simp] theorem canonicalEchoMachine_cell_encodedEntry
     (w : Wiring) (entry : Nat → Nat) (k : Nat) :

@@ -1,6 +1,4 @@
 import PartialSecondRunSharp
-import StableSimpleCycleRecord
-import PointwiseSimpleCycleTail
 
 /-!
 # Structural dichotomy for an unfinished second journey
@@ -36,22 +34,5 @@ structure PartialSecondReflectorCompletion
   preserves : forall j,
     j ∉ reflector.exploration.map passageSwitch ->
       state j = A.activatedState j
-
-/-- A retained first-activation cycle is already a reached stable simple
-cycle, with the exact shift equal to the switch-simple lead length. -/
-def PartialSecondCycleOutcome.toReachedStableSimpleCycle
-    {w : Wiring} {start : Nat × Tongues} {N : Nat}
-    (C : PartialSecondCycleOutcome w start N) :
-    ReachedStableSimpleCycle w start := {
-  shift := C.lead.length
-  atRepeat := C.atRepeat
-  cycle := C.cycle
-  settled := C.settled
-  reached := C.lead_trace.sound
-  nonempty := C.cycle_nonempty
-  transient := C.transient
-  stable := C.stable
-  simple := C.cycle_simple
-}
 
 end GeneralN

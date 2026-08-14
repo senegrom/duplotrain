@@ -1,4 +1,3 @@
-import DescentRouteCatalogue
 import ConcreteMachine
 
 /-!
@@ -122,17 +121,4 @@ theorem rootCode_injective_on_proper
       rw [hs, hsbBack] at hsaBack
       exact hsaBack.symm
 
-/-- Every branch in one realised cascade has the same canonical root. -/
-theorem entryRoot_eq_of_mem_entryAction
-    {w : Wiring} {p b : Nat}
-    (hp : IsDescentEntry w p)
-    (hb : b ∈ entryAction w p) :
-    entryRoot w b = entryRoot w p := by
-  rcases hp with ⟨t, ps, s, t', hd⟩
-  have haction := entryAction_eq_of_descent hd
-  rw [haction] at hb
-  obtain ⟨u, qs, hsuffix, hlen⟩ := descent_suffix hd hb
-  rw [entryRoot_eq_of_descent hsuffix,
-    entryRoot_eq_of_descent hd]
-  exact descent_same_landing_same_root hsuffix hd
 end GeneralN

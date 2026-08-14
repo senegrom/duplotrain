@@ -49,40 +49,6 @@ noncomputable def slotCode (k : Nat) : Nat :=
     e ((exists_last_prod_lt m e r0 k h).choose + 1) + 1
   else 0
 
-private theorem slotCode_spec (cells : List Nat) (k : Nat) :
-    (slotCode m e r0 k = 0 ∧
-      snap m e r0 cells k = snap m e r0 cells 0) ∨
-    (∃ j, j < k ∧ ProductiveStep m e r0 j ∧
-      slotCode m e r0 k = e (j+1) + 1 ∧
-      snap m e r0 cells k = snap m e r0 cells (j+1)) := by
-  by_cases h : ∃ j, j < k ∧ ProductiveStep m e r0 j
-  · right
-    obtain ⟨hj, hp, hno⟩ := (exists_last_prod_lt m e r0 k h).choose_spec
-    refine ⟨(exists_last_prod_lt m e r0 k h).choose, hj, hp, ?_, ?_⟩
-    · unfold slotCode
-      rw [dif_pos h]
-    · have hd : (exists_last_prod_lt m e r0 k h).choose + 1 +
-          (k - ((exists_last_prod_lt m e r0 k h).choose + 1)) = k := by omega
-      have hsb := snap_between m e r0 cells
-        ((exists_last_prod_lt m e r0 k h).choose + 1)
-        (k - ((exists_last_prod_lt m e r0 k h).choose + 1))
-        (fun i h1 h2 => hno i (by omega) (by omega))
-      rw [hd] at hsb
-      exact hsb
-  · left
-    constructor
-    · unfold slotCode; rw [dif_neg h]
-    · have hsb := snap_between m e r0 cells 0 k
-        (fun i _ h2 => fun hp => h ⟨i, by omega, hp⟩)
-      rw [Nat.zero_add] at hsb
-      exact hsb
-
-/-- The structural replay property needed by slot accounting. -/
-def ProductiveSlotReplay (cells : List Nat) : Prop :=
-  ∀ i j, ProductiveStep m e r0 i → ProductiveStep m e r0 j →
-    e (i+1) = e (j+1) →
-    snap m e r0 cells (i+1) = snap m e r0 cells (j+1)
-
 private theorem nodup_subset_length_nat {l S : List Nat}
     (hnd : l.Nodup) (hsub : ∀ x ∈ l, x ∈ S) : l.length ≤ S.length := by
   induction l generalizing S with

@@ -1,10 +1,6 @@
 import PreReturnProtectedRoute
 import KnownEdgeNAddFourChangedClosed
 import BoundaryAbsentSecondWriter
-import RepeatedNoveltyDecomposition
-import TrackNovelReplay
-import PointwiseRetraceSeparation
-import ReuseForcesReplayClosure
 
 /-!
 # The protected-pair `N+4` frontier

@@ -1,5 +1,4 @@
 import KoizumiFramePersistence
-import TrackCurveShrinkGlobal
 import SelfEpochFour
 import RepeatedNoveltyDecomposition
 
@@ -56,25 +55,6 @@ private theorem rawTrainCurveSelfAt_iff_rawCurveSelfAt
     RawTrainCurveSelfAt w start k ↔ RawCurveSelfAt w start k := by
   rfl
 
-/-- At a productive train-curve self-pivot, the finite carrier either drops
-strictly or is preserved in cardinality.  The non-increase is geometric;
-the final split is just antisymmetry of natural-number order. -/
-theorem raw_self_pivot_strict_or_same_size
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {k : Nat}
-    (hprod : RawProductiveAt w N start k)
-    (hself : RawTrainCurveSelfAt w start k) :
-    RawStrictSelfShrinkAt w N start k ∨
-      rawFiniteCurveSizeAt w N start (k + 1) =
-        rawFiniteCurveSizeAt w N start k := by
-  have hle := rawProductiveAt_self_curve_nonincrease hN hprod
-    (rawTrainCurveSelfAt_iff_rawCurveSelfAt.mp hself)
-  by_cases hlt : rawFiniteCurveSizeAt w N start (k + 1) <
-      rawFiniteCurveSizeAt w N start k
-  · exact Or.inl ⟨hprod, hself, hlt⟩
-  · right
-    omega
 
 theorem simple_serial_repeated_switch_cycle_or_retrace
     {w : Wiring}
@@ -96,81 +76,6 @@ theorem simple_serial_repeated_switch_cycle_or_retrace
     exact Or.inl ⟨period, settled, hpositive, honce, hfixed⟩
   · obtain ⟨settled, hretrace⟩ := hretrace
     exact Or.inr ⟨settled, by simpa using hretrace⟩
-
-theorem productive_repeat_switchSimple_settles
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start before close : Nat × Tongues} {left right : Nat}
-    {passages : List Passage}
-    (horder : left < right)
-    (hleft : RawProductiveAt w N start left)
-    (hright : RawProductiveAt w N start right)
-    (hsame : rawWriterAt w start left = rawWriterAt w start right)
-    (hbeforeAt : stepN w left start = some before)
-    (hcloseAt : stepN w right start = some close)
-    (hlength : passages.length = right - left)
-    (htrace : PhysicalTrace w before passages close)
-    (hsimple : SwitchSimple passages) :
-    SettlesOnSimpleCycle w close := by
-  obtain ⟨P⟩ := rawProductiveAt_koizumiPivot hN hleft
-  obtain ⟨Q⟩ := rawProductiveAt_koizumiPivot hN hright
-  have hPcfg : P.before = before :=
-    Option.some.inj (P.before_at.symm.trans hbeforeAt)
-  have hQcfg : Q.before = close :=
-    Option.some.inj (Q.before_at.symm.trans hcloseAt)
-  have hwriter : P.writer = Q.writer :=
-    P.writer_eq.trans (hsame.trans Q.writer_eq.symm)
-  have hbaseTrace : PhysicalTrace w P.before passages Q.before := by
-    simpa [hPcfg, hQcfg] using htrace
-  cases hpassages : passages with
-  | nil =>
-      have hzero : right - left = 0 := by
-        simpa [hpassages] using hlength.symm
-      omega
-  | cons passage rest =>
-      rcases passage with ⟨p, x⟩
-      have htrace' : PhysicalTrace w P.before ((p, x) :: rest) Q.before := by
-        simpa [hpassages] using hbaseTrace
-      have hsimple' : SwitchSimple ((p, x) :: rest) := by
-        simpa [hpassages] using hsimple
-      have hp : P.before.1 = p := htrace'.head_arrive.1
-      obtain ⟨afterOpen, harriveOpen⟩ := htrace'.head_arrive.2
-      have hx : exitPort P.before = x := by
-        unfold exitPort
-        rw [hp]
-        exact congrArg Prod.fst harriveOpen
-      have hxStem : x = 3 * P.writer := by
-        rw [← hx, P.exited_stem]
-      have hpartsQ := step_some_parts Q.physical_step
-      have harriveQ : arrive Q.before.2 Q.before.1 =
-          (3 * Q.writer, Q.after.2) := by
-        apply Prod.ext
-        · exact Q.exited_stem
-        · exact hpartsQ.2.symm
-      have hnext : arrive Q.before.2 Q.before.1 =
-          (x, Q.after.2) := by
-        simpa [hxStem, hwriter] using harriveQ
-      have hPpair : P.before = (p, P.before.2) := by
-        apply Prod.ext
-        · exact hp
-        · rfl
-      have hQpair : Q.before = (Q.before.1, Q.before.2) := Prod.eta _
-      have htracePair : PhysicalTrace w (p, P.before.2)
-          ((p, x) :: rest) (Q.before.1, Q.before.2) := by
-        rw [← hPpair, ← hQpair]
-        exact htrace'
-      have hcycle := htracePair.simple_same_exit_enters_period
-        hsimple' hnext
-      have hresult : SettlesOnSimpleCycle w Q.before := by
-        refine ⟨((Q.before.1, x) :: rest).length, Q.after.2,
-          by simp, ?_, ?_⟩
-        · change stepN w ((Q.before.1, x) :: rest).length
-            (Q.before.1, Q.before.2) =
-              some (Q.before.1, Q.after.2)
-          exact hcycle.1
-        · exact hcycle.2
-      rw [← hQcfg]
-      exact hresult
 
 
 private theorem selfPivot_prefix_config
@@ -366,50 +271,6 @@ theorem raw_self_pivot_carrier_subset
   rw [mem_finiteCurvePorts_iff] at hp ⊢
   exact ⟨hp.1, hlift p hp.2⟩
 
-/-- **Equal size means equal physical carrier.**  At a productive self-pivot
-the carrier can only shrink.  If its finite size is unchanged, every old
-port is still present after the pivot and conversely.  This is the exact
-set-level plateau fact needed before an endpoint epoch can be extracted. -/
-theorem raw_self_pivot_equal_size_carrier_iff
-    {w : Wiring} {N k : Nat} {start : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hprod : RawProductiveAt w N start k)
-    (hself : RawCurveSelfAt w start k)
-    (hsize : rawFiniteCurveSizeAt w N start (k + 1) =
-      rawFiniteCurveSizeAt w N start k) :
-    ∀ p, p ∈ rawFiniteCurvePortsAt w N start (k + 1) ↔
-      p ∈ rawFiniteCurvePortsAt w N start k := by
-  classical
-  let old := rawFiniteCurvePortsAt w N start k
-  let new := rawFiniteCurvePortsAt w N start (k + 1)
-  have hsub : ∀ p, p ∈ new → p ∈ old := by
-    intro p hp
-    exact raw_self_pivot_carrier_subset hN hprod hself p hp
-  have hnewNodup : new.Nodup := by
-    dsimp [new, rawFiniteCurvePortsAt]
-    exact finiteCurvePorts_nodup w N
-      ((stepN w (k + 1) start).getD start).2
-      ((stepN w (k + 1) start).getD start).1
-  intro p
-  constructor
-  · exact hsub p
-  · intro hpOld
-    apply Classical.byContradiction
-    intro hpNew
-    have hconsNodup : (p :: new).Nodup := by
-      rw [List.nodup_cons]
-      exact ⟨hpNew, hnewNodup⟩
-    have hconsSub : ∀ q, q ∈ p :: new → q ∈ old := by
-      intro q hq
-      rcases List.mem_cons.mp hq with rfl | hq
-      · exact hpOld
-      · exact hsub q hq
-    have hle := nodup_subset_length_self_pivot hconsNodup hconsSub
-    have hlength : new.length = old.length := by
-      dsimp [new, old]
-      simpa only [rawFiniteCurvePortsAt_length] using hsize
-    simp only [List.length_cons, hlength] at hle
-    omega
 
 theorem raw_nonproductive_carrier_subset
     {w : Wiring} {N k : Nat} {start : Nat × Tongues}
@@ -454,32 +315,6 @@ theorem raw_self_only_step_carrier_subset
   · exact raw_self_pivot_carrier_subset hN hprod (hself hprod)
   · exact raw_nonproductive_carrier_subset hN hlive hprod
 
-/-- Throughout a certified self-only tail, every represented carrier port
-at a later time was already present at the tail entrance. -/
-theorem RawSelfTailCertificate.carrier_subset_initial
-    {w : Wiring} {N K : Nat} {start : Nat × Tongues}
-    (T : RawSelfTailCertificate w N start K)
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) :
-    ∀ j, j ≤ K → ∀ p,
-      p ∈ rawFiniteCurvePortsAt w N start j →
-      p ∈ rawFiniteCurvePortsAt w N start 0 := by
-  intro j hj
-  induction j with
-  | zero =>
-      intro p hp
-      exact hp
-  | succ j ih =>
-      intro p hp
-      have hprev := raw_self_only_step_carrier_subset hN
-        (T.live (j + 1) (by omega))
-        (fun hprod => T.self j (by omega) hprod)
-        p hp
-      exact ih (by omega) p hprev
-
-/-- A strict self-pivot really discards a represented carrier point; the
-shrink alternative cannot be discharged merely by renaming or rerooting the
-same curve.  Immediately after the pivot this point lies on a train-free
-component. -/
 theorem RawStrictSelfShrinkAt.dropped_carrier_port
     {w : Wiring} {N : Nat} {start : Nat × Tongues} {k : Nat}
     (h : RawStrictSelfShrinkAt w N start k) :

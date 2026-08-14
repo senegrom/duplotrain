@@ -194,46 +194,4 @@ private theorem exists_repeat_aux :
           ih (fun t => F (t+1)) (U.erase (F 0)) hmem' hlen'
         exact ⟨i+1, k+1, by omega, by omega, hF⟩
 
-/-- **The pigeonhole.**  Some state recurs within the first
-`|slots|^(|cells|+1) + 1` steps.  No run hypothesis is needed: only that
-all registers live in `slots`. -/
-theorem state_repeat (cells slots : List Nat)
-    (hregslots : ∀ j c, reg m e r0 j c ∈ slots) :
-    ∃ i j, i < j ∧ j ≤ slots.length ^ (cells.length + 1) + 1 ∧
-      stateCode m e r0 cells i = stateCode m e r0 cells j := by
-  have hmem : ∀ t, stateCode m e r0 cells t
-      ∈ listPow slots (cells.length + 1) := by
-    intro t
-    apply mem_listPow
-    · show (e t :: cells.map (reg m e r0 t)).length = cells.length + 1
-      rw [List.length_cons, List.length_map]
-    · intro x hx
-      have hx1 : x ∈ e t :: cells.map (reg m e r0 t) := hx
-      rcases List.mem_cons.mp hx1 with rfl | hx'
-      · have hw : reg m e r0 t (m.cellOf (e t)) = e t := reg_write m e r0 rfl
-        rw [← hw]
-        exact hregslots t _
-      · obtain ⟨C, _, rfl⟩ := List.mem_map.mp hx'
-        exact hregslots t C
-  obtain ⟨i, j, hij, hjle, hF⟩ := exists_repeat_aux
-    ((listPow slots (cells.length + 1)).length + 1)
-    (fun t => stateCode m e r0 cells t)
-    (listPow slots (cells.length + 1))
-    (fun t _ => hmem t) (Nat.lt_succ_self _)
-  refine ⟨i, j, hij, ?_, hF⟩
-  rw [listPow_length] at hjle
-  exact hjle
-
-/-- A cell outside the write range keeps its initial register forever. -/
-theorem reg_foreign (cells : List Nat) (hallcells : ∀ s, m.cellOf s ∈ cells)
-    {c : Nat} (hc : c ∉ cells) : ∀ k, reg m e r0 k c = r0 c := by
-  intro k
-  induction k with
-  | zero =>
-      show (if m.cellOf (e 0) = c then e 0 else r0 c) = r0 c
-      rw [if_neg (fun h : m.cellOf (e 0) = c => hc (h ▸ hallcells (e 0)))]
-  | succ n ih =>
-      rw [reg_skip m e r0
-        (fun h : m.cellOf (e (n+1)) = c => hc (h ▸ hallcells (e (n+1))))]
-      exact ih
 end Echo

@@ -20,64 +20,6 @@ namespace GeneralN
 
 /-! ## Exact raw semantics of a self-linked selected branch -/
 
-/-- A selected self-linked branch is literally the two recorded passages
-`stem -> branch -> stem`, after which the immutable stem edge leads to
-`outside`.  The full tongue vector is unchanged. -/
-theorem self_link_exact_two_passage_trace
-    {w : Wiring} {branch outside : Nat} {state : Tongues}
-    (hbranch : branch % 3 ≠ 0)
-    (hself : w.link branch = some branch)
-    (hmouth : w.link (3 * (branch / 3)) = some outside)
-    (hselected : state (branch / 3) = bval branch) :
-    PhysicalTrace w (3 * (branch / 3), state)
-      [(3 * (branch / 3), branch),
-       (branch, 3 * (branch / 3))]
-      (outside, state) := by
-  have hstemMod : (3 * (branch / 3)) % 3 = 0 := by omega
-  have hstemDiv : (3 * (branch / 3)) / 3 = branch / 3 := by omega
-  have hforward :
-      arrive state (3 * (branch / 3)) = (branch, state) := by
-    simp [arrive, hstemMod, hstemDiv, hselected,
-      branchPort_bval hbranch]
-  have hpin : pin state branch = state := pin_of_agrees hselected
-  have hback :
-      arrive state branch = (3 * (branch / 3), state) := by
-    simp [arrive, hbranch, hpin]
-  exact PhysicalTrace.cons hforward hself
-    (PhysicalTrace.cons hback hmouth (PhysicalTrace.nil _))
-
-theorem self_link_core_stay_reflector
-    {w : Wiring} {branch outside : Nat} {state : Tongues}
-    (hbranch : branch % 3 ≠ 0)
-    (hself : w.link branch = some branch)
-    (hmouth : w.link (3 * (branch / 3)) = some outside)
-    (hselected : state (branch / 3) = bval branch) :
-    Nonempty (ManufacturedStayReflector w
-      (3 * (branch / 3)) outside) := by
-  have hstemMod : (3 * (branch / 3)) % 3 = 0 := by omega
-  have hstemDiv : (3 * (branch / 3)) / 3 = branch / 3 := by omega
-  have hforward :
-      arrive state (3 * (branch / 3)) = (branch, state) := by
-    simp [arrive, hstemMod, hstemDiv, hselected,
-      branchPort_bval hbranch]
-  have hentry : w.link outside = some (3 * (branch / 3)) :=
-    w.symm _ _ hmouth
-  let R : ManufacturedStayReflector w
-      (3 * (branch / 3)) outside := {
-    base := state
-    mouthState := state
-    returnState := state
-    runway := []
-    mouth := 3 * (branch / 3)
-    arm := branch
-    runwayTrace := PhysicalTrace.nil _
-    coreTrace := PhysicalTrace.cons hforward hself (PhysicalTrace.nil _)
-    simple := by simp [SwitchSimple, passageSwitch]
-    stemEndpoint := Or.inl (by omega)
-    selfLink := hself
-    entryEdge := hentry
-  }
-  exact Nonempty.intro R
 
 theorem flip_then_self_link_all_time_two_phase_tongues
     {w : Wiring} {g e : Nat}
