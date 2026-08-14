@@ -305,17 +305,6 @@ structure CertifiedEndpointEmptyABCABC
     (canonicalEchoMachine w) (encodedEntries run.entry)
     run.initialRegister K period)
 
-/-- The exact third escape branch returned by the abstract physical
-obstruction for this certificate. -/
-def CertifiedEndpointEmptyABCABC.HasFixedEscape
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    {S : SelectedFiveFrameABCABC T}
-    (C : CertifiedEndpointEmptyABCABC S) : Prop :=
-  exists q,
-    (canonicalEchoMachine w).bar (encodedEntries C.run.entry q) =
-      encodedEntries C.run.entry q
 
 private theorem CertifiedEndpointEmptyABCABC.blocker_bounds
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
@@ -334,30 +323,6 @@ private theorem CertifiedEndpointEmptyABCABC.blocker_bounds
   exact ⟨Nat.le_trans C.base_before_first (Nat.le_of_lt hc02),
     C.selected_clock_order.2.1, C.selected_clock_order.2.2⟩
 
-/-- After the certificate has excluded the lobe and complete-replay branches,
-the abstract obstruction leaves exactly a fixed canonical entry. -/
-theorem CertifiedEndpointEmptyABCABC.forces_fixed_escape
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    {S : SelectedFiveFrameABCABC T}
-    (C : CertifiedEndpointEmptyABCABC S) : C.HasFixedEscape := by
-  obtain ⟨hKb, ht1b, hbu0⟩ := C.blocker_bounds
-  have hout := Echo.cyclic_minimal_stable_blocker_obstruction
-    (canonicalEchoMachine w) (encodedEntries C.run.entry)
-    C.run.initialRegister
-    (certifiedConcreteEcho_isRun C.run) C.run.initialWellFormed
-    C.tail C.crossing hKb ht1b hbu0 C.stable
-  rcases hout with hlobe | hreplay | hfixed
-  · obtain ⟨k, hk⟩ := hlobe
-    exact (C.no_lobe k hk).elim
-  · exact (C.no_replay hreplay).elim
-  · exact hfixed
-
-/-- The desired direct bridge to
-`TripleInterlacementObstruction.physical_endpoint_empty_abcabc_impossible`.
-Once the selected raw triple has the certified data above, physical
-irreflexivity closes it. -/
 theorem CertifiedEndpointEmptyABCABC.impossible_of_irreflexive
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     {z0 z1 z2 z3 z4 : Nat}
@@ -370,34 +335,6 @@ theorem CertifiedEndpointEmptyABCABC.impossible_of_irreflexive
     hirr C.run C.tail C.crossing hKb ht1b hbu0 C.stable
       C.no_lobe C.no_replay
 
-/-- A fixed canonical jump at a concrete encoded entry is the self-link at
-that very entry, not merely an unspecified self-link elsewhere in the wiring. -/
-theorem certified_fixed_encoded_entry_has_self_link
-    {w : Wiring} (run : CertifiedConcreteEchoRun w) {q : Nat}
-    (hfixed :
-      (canonicalEchoMachine w).bar (encodedEntries run.entry q) =
-        encodedEntries run.entry q) :
-    w.link (run.entry q) = some (run.entry q) := by
-  have hencoded : encodeSlot (wireBar w (run.entry q)) =
-      encodeSlot (run.entry q) := by
-    simpa [encodedEntries, canonicalEchoMachine, encodedMachine,
-      encodedBar_encodeSlot] using hfixed
-  have hwire : wireBar w (run.entry q) = run.entry q :=
-    encodeSlot_injective hencoded
-  have hslot := run.toConcreteAscentTrace.freeSlot q
-  have hlink : w.link (run.entry q) =
-      some (wireBar w (run.entry q)) := hslot.2.2.1
-  rwa [hwire] at hlink
-
-theorem CertifiedEndpointEmptyABCABC.forces_used_self_link
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {z0 z1 z2 z3 z4 : Nat}
-    {T : FiveFrameTripleCase w N start z0 z1 z2 z3 z4}
-    {S : SelectedFiveFrameABCABC T}
-    (C : CertifiedEndpointEmptyABCABC S) :
-    CertifiedRunUsesSelfLink C.run := by
-  obtain ⟨q, hq⟩ := C.forces_fixed_escape
-  exact ⟨q, certified_fixed_encoded_entry_has_self_link C.run hq⟩
 
 
 theorem FiveFrameTripleCase.impossible_of_irreflexive

@@ -27,12 +27,6 @@ open GeneralN (Tongues)
 /-- The tongue vector restricted to the first `N` switches. -/
 def restrict (N : Nat) (u : Tongues) : List Bool :=
   (List.range N).map u
-
-theorem restrict_length (N : Nat) (u : Tongues) :
-    (restrict N u).length = N := by
-  simp [restrict]
-
-/-- The tails of the elements starting with `b`. -/
 private def tails (b : Bool) : List (List Bool) → List (List Bool)
   | [] => []
   | [] :: rest => tails b rest

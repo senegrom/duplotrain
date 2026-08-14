@@ -219,140 +219,8 @@ private theorem exists_last {P : Nat → Prop} :
         · exact hie ▸ hn
         · exact h3 i hi1 (by omega)
 
-/-- **Absorption step.**  If the current entry is one of the lobe slots
-`{a, bar a}` of cell A and the partner cell B's register holds one of
-its lobe slots `{b, bar b}`, the same holds two steps later — with the
-intermediate entry in `{b, bar b}`. -/
-private theorem absorb_step (hrun : IsRun m e r0) {a b k : Nat}
-    (ha : m.cellOf (m.bar a) = m.cellOf a)
-    (hb : m.cellOf (m.bar b) = m.cellOf b)
-    (hAB : m.star (m.cellOf a) = m.cellOf b)
-    (hek : e k = a ∨ e k = m.bar a)
-    (hrB : reg m e r0 k (m.cellOf b) = b ∨
-           reg m e r0 k (m.cellOf b) = m.bar b) :
-    (e (k+2) = a ∨ e (k+2) = m.bar a) ∧
-    (reg m e r0 (k+2) (m.cellOf b) = b ∨
-     reg m e r0 (k+2) (m.cellOf b) = m.bar b) := by
-  have hne : m.cellOf b ≠ m.cellOf a := by
-    rw [← hAB]
-    exact m.star_ne _
-  have hBA : m.star (m.cellOf b) = m.cellOf a := by
-    have h := congrArg m.star hAB
-    rw [m.star_invol] at h
-    exact h.symm
-  have hcellk : m.cellOf (e k) = m.cellOf a := by
-    rcases hek with h | h
-    · rw [h]
-    · rw [h]; exact ha
-  have h1 : e (k+1) = m.bar (reg m e r0 k (m.cellOf b)) := by
-    have h := hrun k
-    rw [hcellk, hAB] at h
-    exact h
-  have hek1 : e (k+1) = m.bar b ∨ e (k+1) = b := by
-    rcases hrB with hr | hr
-    · exact Or.inl (by rw [h1, hr])
-    · exact Or.inr (by rw [h1, hr, m.bar_invol])
-  have hcellk1 : m.cellOf (e (k+1)) = m.cellOf b := by
-    rcases hek1 with h | h
-    · rw [h]; exact hb
-    · rw [h]
-  have hrB1 : reg m e r0 (k+1) (m.cellOf b) = e (k+1) :=
-    reg_write m e r0 hcellk1
-  have hrA : reg m e r0 (k+1) (m.cellOf a) = e k := by
-    rw [reg_skip m e r0 (by rw [hcellk1]; exact hne)]
-    exact reg_write m e r0 hcellk
-  have h2 : e (k+1+1) = m.bar (e k) := by
-    have h := hrun (k+1)
-    rw [hcellk1, hBA, hrA] at h
-    exact h
-  have hek2 : e (k+1+1) = a ∨ e (k+1+1) = m.bar a := by
-    rcases hek with h | h
-    · exact Or.inr (by rw [h2, h])
-    · exact Or.inl (by rw [h2, h, m.bar_invol])
-  have hcellk2 : m.cellOf (e (k+1+1)) = m.cellOf a := by
-    rcases hek2 with h | h
-    · rw [h]
-    · rw [h]; exact ha
-  have hregB2 : reg m e r0 (k+1+1) (m.cellOf b) = e (k+1) := by
-    rw [reg_skip m e r0 (by rw [hcellk2]; exact hne.symm)]
-    exact hrB1
-  refine ⟨hek2, ?_⟩
-  rcases hek1 with h | h
-  · exact Or.inr (hregB2.trans h)
-  · exact Or.inl (hregB2.trans h)
 
-/-- **Absorption: the lobed Gray square is a trap.**  Suppose slots `a`
-and `bar a` share a cell A, slots `b` and `bar b` share the partner
-cell B = star A.  If the walk ever enters `a` while B's register holds
-`b` or `bar b`, then **forever after** the even-step entries stay in
-`{a, bar a}` and B's register stays in `{b, bar b}`. -/
-theorem absorb (hrun : IsRun m e r0) {a b k0 : Nat}
-    (ha : m.cellOf (m.bar a) = m.cellOf a)
-    (hb : m.cellOf (m.bar b) = m.cellOf b)
-    (hAB : m.star (m.cellOf a) = m.cellOf b)
-    (hstart : e k0 = a)
-    (hreg : reg m e r0 k0 (m.cellOf b) = b ∨
-            reg m e r0 k0 (m.cellOf b) = m.bar b) :
-    ∀ t, (e (k0 + 2*t) = a ∨ e (k0 + 2*t) = m.bar a) ∧
-         (reg m e r0 (k0 + 2*t) (m.cellOf b) = b ∨
-          reg m e r0 (k0 + 2*t) (m.cellOf b) = m.bar b) := by
-  intro t
-  induction t with
-  | zero => exact ⟨Or.inl hstart, hreg⟩
-  | succ n ih =>
-      exact absorb_step m e r0 hrun ha hb hAB ih.1 ih.2
 
-/-- **The absorbed alternation bound.**  After absorption every entry —
-even and odd steps alike — lies in the four-element set
-`{a, bar a, b, bar b}`: the run is captured by the dogbone pattern, so
-every later write (productive or not) happens in the two cells A, B,
-and the eventual cycle carries at most four distinct entries.  This is
-the machine form of the lobed case of the cycle theorem. -/
-theorem absorb_entries (hrun : IsRun m e r0) {a b k0 : Nat}
-    (ha : m.cellOf (m.bar a) = m.cellOf a)
-    (hb : m.cellOf (m.bar b) = m.cellOf b)
-    (hAB : m.star (m.cellOf a) = m.cellOf b)
-    (hstart : e k0 = a)
-    (hreg : reg m e r0 k0 (m.cellOf b) = b ∨
-            reg m e r0 k0 (m.cellOf b) = m.bar b) :
-    ∀ j, k0 ≤ j →
-      e j = a ∨ e j = m.bar a ∨ e j = b ∨ e j = m.bar b := by
-  intro j hj
-  obtain ⟨d, rfl⟩ : ∃ d, j = k0 + d := ⟨j - k0, by omega⟩
-  have habs := absorb m e r0 hrun ha hb hAB hstart hreg
-  have hsplit : d = 2 * (d / 2) ∨ d = 2 * (d / 2) + 1 := by omega
-  rcases hsplit with h | h
-  · rcases (habs (d / 2)).1 with he | he
-    · rw [h]; exact Or.inl he
-    · rw [h]; exact Or.inr (Or.inl he)
-  · have hek := (habs (d / 2)).1
-    have hcellk : m.cellOf (e (k0 + 2 * (d / 2))) = m.cellOf a := by
-      rcases hek with he | he
-      · rw [he]
-      · rw [he]; exact ha
-    have h1 : e (k0 + 2 * (d / 2) + 1)
-        = m.bar (reg m e r0 (k0 + 2 * (d / 2)) (m.cellOf b)) := by
-      have hh := hrun (k0 + 2 * (d / 2))
-      rw [hcellk, hAB] at hh
-      exact hh
-    have hodd : e (k0 + 2 * (d / 2) + 1) = m.bar b ∨
-        e (k0 + 2 * (d / 2) + 1) = b := by
-      rcases (habs (d / 2)).2 with hr | hr
-      · exact Or.inl (by rw [h1, hr])
-      · exact Or.inr (by rw [h1, hr, m.bar_invol])
-    rw [h]
-    rcases hodd with he | he
-    · exact Or.inr (Or.inr (Or.inr he))
-    · exact Or.inr (Or.inr (Or.inl he))
-
-/-- **The accounting theorem** (unconditional, general N).  A productive
-write is either the **first** write of its cell — at most one per cell,
-i.e. at most N over the whole run — or an **alternation**: it differs
-from that cell's most recent previous write.  Together with
-`unproductive_stall` this is the skeleton of f(N) ≤ N + O(1): every
-change of the machine state is a first ascent or an alternation, so the
-state count is 1 + #first-ascents + #alternations, and the two open
-lemmas B and C only have to bound the alternations. -/
 theorem productive_first_or_alternation (k : Nat)
     (hprod : e (k+1) ≠ reg m e r0 k (m.cellOf (e (k+1)))) :
     (∀ j, j ≤ k → m.cellOf (e j) ≠ m.cellOf (e (k+1))) ∨
@@ -391,9 +259,6 @@ def snap (cells : List Nat) (k : Nat) : List Nat :=
 def ProductiveStep (k : Nat) : Prop :=
   e (k+1) ≠ reg m e r0 k (m.cellOf (e (k+1)))
 
-/-- Step `k → k+1` performs the first write of its cell. -/
-def FirstStep (k : Nat) : Prop :=
-  ∀ j, j ≤ k → m.cellOf (e j) ≠ m.cellOf (e (k+1))
 
 private theorem map_congr' {f g : Nat → Nat} :
     ∀ l : List Nat, (∀ x ∈ l, f x = g x) → l.map f = l.map g := by
@@ -406,30 +271,7 @@ private theorem map_congr' {f g : Nat → Nat} :
       rw [h x List.mem_cons_self,
         ih (fun y hy => h y (List.mem_cons_of_mem _ hy))]
 
-/-- Unproductive steps do not move the snapshot. -/
-theorem snap_stall (cells : List Nat) {k : Nat}
-    (h : ¬ ProductiveStep m e r0 k) :
-    snap m e r0 cells (k+1) = snap m e r0 cells k := by
-  have heq : e (k+1) = reg m e r0 k (m.cellOf (e (k+1))) := by
-    by_cases hq : e (k+1) = reg m e r0 k (m.cellOf (e (k+1)))
-    · exact hq
-    · exact absurd hq h
-  exact map_congr' _ (fun c _ => unproductive_stall m e r0 k heq c)
 
-/-- Snapshots are constant across productive-free stretches. -/
-theorem snap_between (cells : List Nat) (a : Nat) :
-    ∀ d, (∀ i, a ≤ i → i < a + d → ¬ ProductiveStep m e r0 i) →
-      snap m e r0 cells (a + d) = snap m e r0 cells a := by
-  intro d
-  induction d with
-  | zero => intro _; rfl
-  | succ n ih =>
-      intro h
-      calc snap m e r0 cells (a + (n+1))
-          = snap m e r0 cells (a + n) :=
-            snap_stall m e r0 cells (h (a+n) (by omega) (by omega))
-        _ = snap m e r0 cells a :=
-            ih (fun i h1 h2 => h i h1 (by omega))
 
 private theorem exists_last_lt {P : Nat → Prop} :
     ∀ k, (∃ j, j < k ∧ P j) →
@@ -457,58 +299,6 @@ private theorem exists_last_lt {P : Nat → Prop} :
         · exact h3 i hi1 (by omega)
 
 open Classical in
-/-- The tag of time `k`: 0 if no productive step precedes `k`; else,
-for the last productive step `j` before `k`, the written cell's code
-(first write) or 1 (alternation). -/
-private noncomputable def codeOf (k : Nat) : Nat :=
-  if h : ∃ j, j < k ∧ ProductiveStep m e r0 j then
-    if FirstStep m e (exists_last_lt k h).choose
-    then m.cellOf (e ((exists_last_lt k h).choose + 1)) + 2
-    else 1
-  else 0
-
-private theorem codeOf_spec (cells : List Nat) (k : Nat) :
-    (codeOf m e r0 k = 0 ∧
-      snap m e r0 cells k = snap m e r0 cells 0) ∨
-    (∃ j, j < k ∧ ProductiveStep m e r0 j ∧
-      snap m e r0 cells k = snap m e r0 cells (j+1) ∧
-      ((FirstStep m e j ∧ codeOf m e r0 k = m.cellOf (e (j+1)) + 2) ∨
-       (¬ FirstStep m e j ∧ codeOf m e r0 k = 1))) := by
-  by_cases h : ∃ j, j < k ∧ ProductiveStep m e r0 j
-  · right
-    obtain ⟨hj, hp, hno⟩ := (exists_last_lt k h).choose_spec
-    refine ⟨(exists_last_lt k h).choose, hj, hp, ?_, ?_⟩
-    · have hd : (exists_last_lt k h).choose + 1 +
-          (k - ((exists_last_lt k h).choose + 1)) = k := by omega
-      have hsb := snap_between m e r0 cells
-        ((exists_last_lt k h).choose + 1)
-        (k - ((exists_last_lt k h).choose + 1))
-        (fun i h1 h2 => hno i (by omega) (by omega))
-      rw [hd] at hsb
-      exact hsb
-    · by_cases hf : FirstStep m e (exists_last_lt k h).choose
-      · exact Or.inl ⟨hf, by unfold codeOf; rw [dif_pos h, if_pos hf]⟩
-      · exact Or.inr ⟨hf, by unfold codeOf; rw [dif_pos h, if_neg hf]⟩
-  · left
-    constructor
-    · unfold codeOf; rw [dif_neg h]
-    · have hsb := snap_between m e r0 cells 0 k
-        (fun i _ h2 => fun hp => h ⟨i, by omega, hp⟩)
-      rw [Nat.zero_add] at hsb
-      exact hsb
-
-private theorem mem_len_one {l : List Nat} (h : l.length ≤ 1) :
-    ∀ {a b : Nat}, a ∈ l → b ∈ l → a = b := by
-  intro a b ha hb
-  cases l with
-  | nil => cases ha
-  | cons x t =>
-      cases t with
-      | nil =>
-          have ha' : a = x := by simpa using ha
-          have hb' : b = x := by simpa using hb
-          rw [ha', hb']
-      | cons y t2 => simp only [List.length_cons] at h; omega
 
 
 private theorem nodup_transfer {f : Nat → List Nat} {c : Nat → Nat} :
@@ -912,30 +702,6 @@ at base time — are paid for one-for-one by base-time tokens
 `#cells` of them ever appear, in total, across all cells and all
 future time. -/
 
-/-- **Token pedigree.**  A token alive at `K+d` was already a token at
-`K`, or its slot has held its own cell's register at some time in
-`[K, K+d]`. -/
-theorem token_pedigree (hrun : IsRun m e r0)
-    (hr0 : ∀ c, m.cellOf (r0 c) = c) {K : Nat} :
-    ∀ d s, TokenEnd m e r0 (K+d) s →
-      TokenEnd m e r0 K s ∨
-      ∃ t, K ≤ t ∧ t ≤ K + d ∧ reg m e r0 t (m.cellOf s) = s := by
-  intro d
-  induction d with
-  | zero => intro s hs; exact Or.inl hs
-  | succ n ih =>
-      intro s hs
-      have hs' : TokenEnd m e r0 (K+n+1) s := hs
-      rcases token_step m e r0 hrun hr0 (K+n) s hs' with hv | ⟨hTk, _⟩
-      · refine Or.inr ⟨K+n, Nat.le_add_right _ _, by omega, ?_⟩
-        have hc : m.cellOf s = m.cellOf (e (K+n+1)) := by
-          rw [hv]
-          exact reg_cell m e r0 hr0 (K+n) _
-        rw [hc]
-        exact hv.symm
-      · rcases ih s hTk with h | ⟨t, h1, h2, h3⟩
-        · exact Or.inl h
-        · exact Or.inr ⟨t, h1, by omega, h3⟩
 
 
 

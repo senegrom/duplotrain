@@ -110,26 +110,6 @@ theorem blockUniverseCore_add_four (n : Nat) :
       8 * (blockUniverseCore n).length := by
   simp only [blockUniverseCore]
   rw [blockCore_rect_length, blockPatterns4_length]
-
-theorem blockCoreFourth_mono {x y : Nat} (h : x ≤ y) :
-    fourth x ≤ fourth y := by
-  unfold fourth
-  have hs : x*x ≤ y*y := Nat.mul_le_mul h h
-  exact Nat.mul_le_mul hs hs
-
-/-- Fourth powers distribute over products. -/
-theorem blockCoreFourth_mul (x y : Nat) :
-    fourth (x*y) = fourth x * fourth y := by
-  simp [fourth, Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm]
-
-/-- Fourth power of a power of two. -/
-theorem blockCoreFourth_two_pow (A : Nat) :
-    fourth (2^A) = 2^(4*A) := by
-  unfold fourth
-  simp only [← Nat.pow_add]
-  congr 1 <;> omega
-
-/-- Three bits of capacity per four coordinates, with a base-case constant. -/
 theorem blockUniverseCore_fourth_bound : ∀ n : Nat,
     fourth (blockUniverseCore n).length ≤ 2^(3*n+9)
   | 0 => by decide
@@ -150,8 +130,5 @@ theorem blockUniverseCore_fourth_bound : ∀ n : Nat,
           have h4096 : 4096 = 2^12 := by decide
           rw [h4096, ← Nat.pow_add]
           congr 1 <;> omega
-
-/-- Eighth power for the final rational exponent. -/
-def blockCoreEighth (x : Nat) : Nat := fourth x * fourth x
 
 end Echo

@@ -56,15 +56,6 @@ theorem finiteCurvePorts_nodup
   unfold finiteCurvePorts
   exact nodup_filter_nat_curve _ List.nodup_range
 
-theorem finiteCurvePorts_length_le
-    (w : Wiring) (N : Nat) (u : Tongues) (root : Nat) :
-    (finiteCurvePorts w N u root).length ≤ 3 * N := by
-  classical
-  unfold finiteCurvePorts
-  have h := List.length_filter_le
-    (fun p => decide (CurveReach w u root p)) (List.range (3 * N))
-  simpa using h
-
 private theorem nodup_subset_length_curve
     {α : Type} [BEq α] [LawfulBEq α] :
     ∀ {xs ys : List α},
@@ -726,33 +717,6 @@ theorem self_endpoint_pivot_curveReach_subset
           · simpa [hflip] using hinternal
         simpa [hentry] using hy
 
-/-- At a self-pivot the next train curve is contained in the old one.  This
-is the shrinking half dual to `unmatched_pivot_strict_curve_growth`. -/
-theorem self_endpoint_pivot_finiteCurvePorts_nonincrease
-    {w : Wiring} {N C : Nat} {cur next : Nat × Tongues}
-    (hstep : step w cur = some next)
-    (hentry : cur.1 = unmatchedBranch cur.2 C)
-    (hexit : exitPort cur = 3 * C)
-    (hflip : next.2 = flipAt cur.2 C)
-    (hself : CurveReach w cur.2 cur.1 (3 * C)) :
-    (finiteCurvePorts w N next.2 next.1).length ≤
-      (finiteCurvePorts w N cur.2 cur.1).length := by
-  have hlift : ∀ p, CurveReach w next.2 next.1 p →
-      CurveReach w cur.2 cur.1 p :=
-    self_endpoint_pivot_curveReach_subset
-      hstep hentry hexit hflip hself
-  have hsubset : ∀ p,
-      p ∈ finiteCurvePorts w N next.2 next.1 →
-      p ∈ finiteCurvePorts w N cur.2 cur.1 := by
-    intro p hp
-    rw [mem_finiteCurvePorts_iff] at hp ⊢
-    exact ⟨hp.1, hlift p hp.2⟩
-  exact nodup_subset_length_curve
-    (finiteCurvePorts_nodup w N next.2 next.1) hsubset
-
-/-- The selected train curve at a raw time, represented by its in-range
-ports.  The default configuration matters only after a fall-off; all growth
-theorems below assume the relevant productive step is live. -/
 noncomputable def rawFiniteCurveSizeAt
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) : Nat :=
   let cur := (stepN w k start).getD start
@@ -1091,31 +1055,6 @@ theorem rawProductiveAt_nonself_curve_growth
     hC hstep hentry hexit hflip houtside
   simpa [rawFiniteCurveSizeAt, hcur, hnext] using hgrowth
 
-/-- Raw `stepN` form of the shrinking half: a productive self-pivot cannot
-increase the finite train curve. -/
-theorem rawProductiveAt_self_curve_nonincrease
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {k : Nat}
-    (hprod : RawProductiveAt w N start k)
-    (hself : RawCurveSelfAt w start k) :
-    rawFiniteCurveSizeAt w N start (k+1) ≤
-      rawFiniteCurveSizeAt w N start k := by
-  obtain ⟨cur, next, C, hCwriter, hcur, hnext, hstep,
-      hentry, hexit, hflip, _hback⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN hprod
-  have hCcur : C = cur.1 / 3 := by
-    simpa [rawWriterAt, rawEntryAt, hcur] using hCwriter
-  have hself' : CurveReach w cur.2 cur.1 (3 * C) := by
-    unfold RawCurveSelfAt at hself
-    simpa [hcur, hCcur] using hself
-  have hshrink := self_endpoint_pivot_finiteCurvePorts_nonincrease
-    (N := N) hstep hentry hexit hflip hself'
-  simpa [rawFiniteCurveSizeAt, hcur, hnext] using hshrink
-
-/-- A live raw step which is not productive leaves the complete tongue
-vector unchanged.  Boundedness is used only to know that the current writer
-is one of the represented `N` switches. -/
 theorem rawNonproductiveAt_tongues_eq
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
@@ -1143,57 +1082,5 @@ theorem rawNonproductiveAt_tongues_eq
       simpa [arrivedTongues] using hparts.2
     rw [harrived]
     exact arrive_preserves_other rfl hj
-
-/-- A live nonproductive step only moves the root along its present selected
-curve.  Consequently the represented finite curve, and hence its size, is
-unchanged. -/
-theorem rawNonproductiveAt_curve_size_eq
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {k : Nat}
-    (hlive : (stepN w (k+1) start).isSome)
-    (hnot : ¬ RawProductiveAt w N start k) :
-    rawFiniteCurveSizeAt w N start (k+1) =
-      rawFiniteCurveSizeAt w N start k := by
-  obtain ⟨cur, next, hcur, hnext, hstep⟩ :=
-    live_successor_configs hlive
-  have hstate := rawNonproductiveAt_tongues_eq
-    hN hcur hnext hstep hnot
-  have hparts := step_some_parts hstep
-  have hinternal : InternalCurveEdge cur.2 cur.1 (exitPort cur) := by
-    unfold InternalCurveEdge
-    apply Prod.ext
-    · rfl
-    · change arrivedTongues cur = cur.2
-      rw [← hparts.2, hstate]
-  have hcurNext : CurveReach w cur.2 cur.1 next.1 :=
-    CurveReach.step
-      (curveReach_edge (Or.inr hinternal))
-      (Or.inl hparts.1)
-  have hnextCur : CurveReach w cur.2 next.1 cur.1 :=
-    curveReach_symm hcurNext
-  have hforward : ∀ p,
-      p ∈ finiteCurvePorts w N cur.2 cur.1 →
-      p ∈ finiteCurvePorts w N next.2 next.1 := by
-    intro p hp
-    rw [mem_finiteCurvePorts_iff] at hp ⊢
-    rw [hstate]
-    exact ⟨hp.1, curveReach_trans hnextCur hp.2⟩
-  have hbackward : ∀ p,
-      p ∈ finiteCurvePorts w N next.2 next.1 →
-      p ∈ finiteCurvePorts w N cur.2 cur.1 := by
-    intro p hp
-    rw [mem_finiteCurvePorts_iff] at hp ⊢
-    rw [hstate] at hp
-    exact ⟨hp.1, curveReach_trans hcurNext hp.2⟩
-  have hleForward := nodup_subset_length_curve
-    (finiteCurvePorts_nodup w N cur.2 cur.1) hforward
-  have hleBackward := nodup_subset_length_curve
-    (finiteCurvePorts_nodup w N next.2 next.1) hbackward
-  have hlength : (finiteCurvePorts w N cur.2 cur.1).length =
-      (finiteCurvePorts w N next.2 next.1).length := by omega
-  unfold rawFiniteCurveSizeAt
-  simp only [hcur, hnext, Option.getD_some]
-  exact hlength.symm
 
 end GeneralN

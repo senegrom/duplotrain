@@ -90,16 +90,4 @@ theorem mouthPartner_invol_of_paired {w : Wiring} {a b : Nat}
     mouthPartner w (mouthPartner w a) = a := by
   rw [mouthPartner_eq_of_paired h]
   exact mouthPartner_eq_of_paired (mouthPaired_symm h)
-
-theorem descent_same_landing_same_root
-    {w : Wiring} {t₁ t₂ : Tongues}
-    {p₁ p₂ s : Nat} {ps₁ ps₂ : List Nat}
-    {t₁' t₂' : Tongues}
-    (h₁ : Descent w t₁ p₁ ps₁ s t₁')
-    (h₂ : Descent w t₂ p₂ ps₂ s t₂') :
-    descentRoot p₁ ps₁ = descentRoot p₂ ps₂ := by
-  have hlast := land_last_unique h₁ h₂
-  unfold descentRoot
-  omega
-
 end GeneralN

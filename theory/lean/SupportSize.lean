@@ -16,11 +16,6 @@ namespace Echo
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-noncomputable def chosenEndpoint
-    (m : Machine) (e r0 : Nat → Nat) (k s : Nat) : Nat := by
-  classical
-  exact if Confirmed m e r0 k s then s else m.bar s
-
 private theorem nodup_subset_length_nat {l S : List Nat}
     (hnd : l.Nodup) (hsub : ∀ x ∈ l, x ∈ S) : l.length ≤ S.length := by
   induction l generalizing S with

@@ -17,32 +17,6 @@ the two-phase or four-phase tail used by the literal five-close bound.
 
 namespace GeneralN
 
-/-- A raw periodic configuration reproduces the complete configuration one
-period earlier at every time after the first completed lap. -/
-theorem stepN_eq_one_period_earlier
-    {w : Wiring} {start cycleStart : Nat × Tongues}
-    {base period t : Nat}
-    (hbase : stepN w base start = some cycleStart)
-    (hperiod : stepN w period cycleStart = some cycleStart)
-    (hafter : base + period ≤ t) :
-    stepN w t start = stepN w (t - period) start := by
-  let d := t - (base + period)
-  have ht : t = base + (period + d) := by
-    dsimp [d]
-    omega
-  have hprevious : t - period = base + d := by
-    dsimp [d]
-    omega
-  calc
-    stepN w t start = stepN w (period + d) cycleStart := by
-      rw [ht, stepN_add, hbase]
-      simp only [Option.bind_some]
-    _ = stepN w d cycleStart := by
-      rw [stepN_add, hperiod]
-      simp only [Option.bind_some]
-    _ = stepN w (t - period) start := by
-      rw [hprevious, stepN_add, hbase]
-      simp only [Option.bind_some]
 
 
 

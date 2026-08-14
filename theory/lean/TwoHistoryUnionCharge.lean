@@ -21,37 +21,6 @@ All statements are over `Wiring`, `PhysicalTrace`, and `stepN`, for arbitrary
 
 namespace GeneralN
 
-private theorem nodup_subset_length_two_history
-    {α : Type} [BEq α] [LawfulBEq α] :
-    ∀ {xs cover : List α},
-      xs.Nodup →
-      (∀ x ∈ xs, x ∈ cover) →
-      xs.length ≤ cover.length := by
-  intro xs
-  induction xs with
-  | nil =>
-      intro cover _ _
-      exact Nat.zero_le _
-  | cons x rest ih =>
-      intro cover hnd hsub
-      rw [List.nodup_cons] at hnd
-      have hx : x ∈ cover := hsub x List.mem_cons_self
-      have hrest : ∀ y ∈ rest, y ∈ cover.erase x := by
-        intro y hy
-        have hyCover : y ∈ cover :=
-          hsub y (List.mem_cons_of_mem _ hy)
-        have hyx : y ≠ x := fun heq => hnd.1 (heq ▸ hy)
-        exact (List.mem_erase_of_ne hyx).mpr hyCover
-      have hle := ih hnd.2 hrest
-      have herase : (cover.erase x).length = cover.length - 1 :=
-        List.length_erase_of_mem hx
-      have hpositive : 0 < cover.length := by
-        cases cover with
-        | nil => cases hx
-        | cons _ _ => simp
-      simp only [List.length_cons]
-      omega
-
 private theorem nodup_filter_nat_two_history (p : Nat → Bool) :
     ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
   intro xs
@@ -382,28 +351,6 @@ theorem ManufacturedReflector.exploration_length_le_reusable_add_one
     simp [ManufacturedReflector.exploration,
       ManufacturedReflector.reusableSwitches] <;> omega
 
-/-- If the second construction avoids the first reusable support, the two
-coordinate lists share no element. -/
-theorem ManufacturedReflector.reusable_append_exploration_nodup
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (havoid : A.SupportAvoidsExploration B) :
-    (A.reusableSwitches ++
-      B.exploration.map passageSwitch).Nodup := by
-  apply List.nodup_append.mpr
-  refine ⟨A.reusableSwitches_nodup, B.exploration_simple, ?_⟩
-  intro a ha b hb hab
-  obtain ⟨path, hpath, passage, hpassage, hpassageSwitch⟩ :=
-    A.mem_reusableSwitches ha
-  have hnot := havoid path hpath passage hpassage
-  apply hnot
-  obtain ⟨fresh, hfresh, hfreshSwitch⟩ := List.mem_map.mp hb
-  apply List.mem_map.mpr
-  refine ⟨fresh, hfresh, ?_⟩
-  exact hfreshSwitch.trans (hab ▸ hpassageSwitch.symm)
-
-/-- Every reusable support coordinate is within the ambient switch bound. -/
 theorem ManufacturedReflector.reusableSwitch_lt
     {w : Wiring} {N g e k : Nat}
     (hN : ∀ p q, w.link p = some q →
@@ -542,42 +489,7 @@ theorem ManufacturedReflector.writerConstructionHistory_length
     rawFirstWriterHistory]
 
 
-/-- The disjoint reusable/fresh coordinate charge is global: together the
-two lists consume at most the `N` available switches. -/
-theorem ManufacturedReflector.reusable_add_second_exploration_le
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (havoid : A.SupportAvoidsExploration B) :
-    A.reusableSwitches.length + B.exploration.length ≤ N := by
-  let switches := A.reusableSwitches ++
-    B.exploration.map passageSwitch
-  have hnd : switches.Nodup := by
-    simpa [switches] using A.reusable_append_exploration_nodup B havoid
-  have hlt : ∀ k ∈ switches, k < N := by
-    intro k hk
-    rcases List.mem_append.mp hk with hA | hB
-    · exact A.reusableSwitch_lt hN hA
-    · obtain ⟨passage, hpassage, rfl⟩ := List.mem_map.mp hB
-      exact B.exploration_trace.switch_lt hN passage hpassage
-  have hbound := nodup_nat_lt_length hnd hlt
-  simpa [switches] using hbound
 
-/-- Consequently, the two complete simple explorations cost only `N+1`
-passages: the sole extra slot is the first reflector's facing action mouth. -/
-theorem ManufacturedReflector.two_explorations_length_le_N_add_one
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (havoid : A.SupportAvoidsExploration B) :
-    A.exploration.length + B.exploration.length ≤ N + 1 := by
-  have hsupport := A.reusable_add_second_exploration_le hN B havoid
-  have hA := A.exploration_length_le_reusable_add_one
-  omega
 
 private theorem ManufacturedFlipReflector.runway_boundary_repeated
     {w : Wiring} {g e N : Nat}
@@ -971,57 +883,7 @@ theorem two_manufacturing_journeys_preserved_support_then_four_tail_le_N_add_six
       hpreGrooves htail (by omega) times hlive hnd
   omega
 
-/-- A membership cover for the union of two sharp histories.  It erases one
-internal duplicate from each history and then erases the shared activation
-boundary from the second compressed history. -/
-def ManufacturedReflector.twoSharpHistoryCore
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (N : Nat) : List (List Bool) :=
-  A.sharpHistoryCore N ++
-    (B.sharpHistoryCore N).erase
-      (VectorCount.restrict N A.activatedState)
 
-/-- The second compressed history really contains the shared A-to-B boundary,
-so the final erasure removes one element. -/
-theorem ManufacturedReflector.twoSharpHistoryCore_length
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbase : B.baseState = A.activatedState) :
-    (A.twoSharpHistoryCore B N).length =
-      A.exploration.length + B.exploration.length + 1 := by
-  have hboundary :
-      VectorCount.restrict N A.activatedState ∈ B.sharpHistoryCore N := by
-    simpa [hbase] using B.base_mem_sharpHistoryCore (N := N)
-  unfold ManufacturedReflector.twoSharpHistoryCore
-  rw [List.length_append, List.length_erase_of_mem hboundary,
-    A.sharpHistoryCore_length, B.sharpHistoryCore_length]
-  omega
-
-/-- Every vector from either original sharp history remains in the compressed
-two-history cover.  At the erased common boundary the first compressed
-history supplies the representative. -/
-theorem ManufacturedReflector.mem_twoSharpHistoryCore
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    {x : List Bool}
-    (hx : x ∈ A.sharpConstructionHistory N ∨
-      x ∈ B.sharpConstructionHistory N) :
-    x ∈ A.twoSharpHistoryCore B N := by
-  rcases hx with hxA | hxB
-  · apply List.mem_append_left
-    exact A.mem_sharpHistoryCore_of_mem hxA
-  · by_cases hboundary :
-        x = VectorCount.restrict N A.activatedState
-    · subst x
-      apply List.mem_append_left
-      exact A.activated_mem_sharpHistoryCore
-    · apply List.mem_append_right
-      exact (List.mem_erase_of_ne hboundary).mpr
-        (B.mem_sharpHistoryCore_of_mem hxB)
 
 structure SecondHistoryContactData
     (w : Wiring) (A : ManufacturedReflector w g e)
@@ -1258,54 +1120,7 @@ theorem SecondHistoryContactData.damageContactHistory_length_le_N_add_three
 
 /-! ## Stop the second charge at its first old-support contact -/
 
-/-- The old reusable coordinates and the second journey's strictly
-pre-contact coordinates are disjoint and individually simple. -/
-theorem SecondHistorySupportContact.reusable_append_approach_nodup
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B) :
-    (A.reusableSwitches ++ C.approach.map passageSwitch).Nodup := by
-  apply List.nodup_append.mpr
-  refine ⟨A.reusableSwitches_nodup, ?_, ?_⟩
-  · have hsimple := B.exploration_simple
-    unfold SwitchSimple at hsimple
-    rw [C.split] at hsimple
-    simp only [List.map_append, List.map_cons] at hsimple
-    exact (List.nodup_append.mp hsimple).1
-  · intro oldSwitch holdSwitch freshSwitch hfreshSwitch hEq
-    obtain ⟨path, hpath, old, hold, holdEq⟩ :=
-      A.mem_reusableSwitches holdSwitch
-    obtain ⟨prior, hprior, hpriorEq⟩ :=
-      List.mem_map.mp hfreshSwitch
-    apply C.approach_fresh prior hprior
-    refine ⟨path, hpath, old, hold, ?_⟩
-    exact holdEq.trans (hEq.trans hpriorEq.symm)
 
-/-- The old support and the fresh approach together consume at most N
-switch coordinates. -/
-theorem SecondHistorySupportContact.reusable_add_approach_le
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B) :
-    A.reusableSwitches.length + C.approach.length ≤ N := by
-  let switches :=
-    A.reusableSwitches ++ C.approach.map passageSwitch
-  have hnd : switches.Nodup := by
-    simpa [switches] using C.reusable_append_approach_nodup
-  have hlt : ∀ k ∈ switches, k < N := by
-    intro k hk
-    rcases List.mem_append.mp hk with hA | hB
-    · exact A.reusableSwitch_lt hN hA
-    · obtain ⟨passage, hpassage, rfl⟩ := List.mem_map.mp hB
-      apply B.exploration_trace.switch_lt hN passage
-      rw [C.split]
-      exact List.mem_append_left _ hpassage
-  have hbound := nodup_nat_lt_length hnd hlt
-  simpa [switches] using hbound
 
 def SecondHistoryContactData.prefixHistory
     {w : Wiring} {g e : Nat}

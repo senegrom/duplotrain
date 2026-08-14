@@ -100,22 +100,6 @@ inductive Descent (w : Wiring) :
       Descent w (pin t p) p' ps s t' →
       Descent w t p (p' :: ps) s t'
 
-theorem descent_sound {w : Wiring} {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') :
-    stepN w (ps.length + 1) (p, t) = some (s, t') := by
-  induction h with
-  | @last t p s hp hlink hs =>
-    simp [stepN, step, arrive, hp, hlink]
-  | @cons t p p' s ps t' hp hlink hp' _ ih =>
-    have hlen : (p' :: ps).length + 1 = 1 + (ps.length + 1) := by
-      rw [List.length_cons]; omega
-    rw [hlen, stepN_add]
-    have h1 : stepN w 1 (p, t) = some (p', pin t p) := by
-      simp [stepN, step, arrive, hp, hlink]
-    rw [h1]
-    simpa using ih
-
 def Agrees (u : Tongues) (l : List Nat) : Prop :=
   ∀ b ∈ l, u (b / 3) = bval b
 
@@ -127,33 +111,6 @@ theorem pin_of_agrees {u : Tongues} {b : Nat} (h : u (b / 3) = bval b) :
   · rw [if_pos hj, hj, ← h]
   · rw [if_neg hj]
 
-theorem descent_noop {w : Wiring} {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') (hagree : Agrees t (p :: ps)) :
-    t' = t := by
-  induction h with
-  | @last t p s hp hlink hs =>
-    exact pin_of_agrees (hagree p (by simp))
-  | @cons t p p' s ps t' hp hlink hp' hrest ih =>
-    have hpin : pin t p = t := pin_of_agrees (hagree p (by simp))
-    have htail : Agrees (pin t p) (p' :: ps) := by
-      intro b hb
-      rw [hpin]
-      exact hagree b (List.mem_cons_of_mem _ hb)
-    rw [ih htail, hpin]
-
-/-- Re-running a cascade over agreeing tongues moves the train but not the
-tongues. -/
-theorem descent_sound_noop {w : Wiring} {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') (hagree : Agrees t (p :: ps)) :
-    stepN w (ps.length + 1) (p, t) = some (s, t) := by
-  have hs := descent_sound h
-  rwa [descent_noop h hagree] at hs
-
-/-! ## The retrace theorem (T3) -/
-
-/-- The last branch of the cascade `p :: ps`. -/
 def lastOf (p : Nat) : List Nat → Nat
   | [] => p
   | q :: qs => lastOf q qs
@@ -231,22 +188,6 @@ theorem descent_last_link {w : Wiring} {t : Tongues} {p s : Nat}
   | last hp hlink hs => exact hlink
   | cons hp hlink hp' _ ih => exact ih
 
-/-- A descent's route and wiring facts do not depend on the initial tongues:
-the same cascade runs from any tongue state. -/
-theorem descent_rebase {w : Wiring} {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') (t₂ : Tongues) :
-    ∃ t₃, Descent w t₂ p ps s t₃ := by
-  induction h generalizing t₂ with
-  | last hp hlink hs => exact ⟨_, Descent.last hp hlink hs⟩
-  | cons hp hlink hp' _ ih =>
-    obtain ⟨t₃, hd⟩ := ih (pin t₂ _)
-    exact ⟨t₃, Descent.cons hp hlink hp' hd⟩
-
-/-! ## Merge and landing uniqueness (T2 sharpened: systems have one mouth) -/
-
-/-- Any branch on a descent's path carries its own sub-descent to the same
-landing. -/
 theorem descent_mem_suffix {w : Wiring} {t : Tongues} {p s : Nat}
     {ps : List Nat} {t' : Tongues}
     (h : Descent w t p ps s t') {q : Nat} (hq : q ∈ p :: ps) :

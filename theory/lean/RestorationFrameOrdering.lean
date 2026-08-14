@@ -78,25 +78,7 @@ theorem productive_sameEdgeWrite_exact_lobe
     rw [hbar] at hcell
     exact ⟨hbar, hback, hcell.symm⟩
 
-/-- The two strict interleavings in which a new foreign frame would form a
-strictly smaller crossing with one of the original frames. -/
-def AvoidsOriginalCrossingWindows
-    (t0 u0 t1 u1 b r : Nat) : Prop :=
-  ¬ (t0 < b ∧ b < u0 ∧ u0 < r ∧ r < u1) ∧
-  ¬ (t0 < b ∧ b < t1 ∧ t1 < r ∧ r < u1)
 
-/-- Exact residue after shifting an exit frame back by one period.  Either
-the blocker lies in the first period of the recurrent tail, or its shifted
-foreign frame exists, closes before the unshifted blocker, and avoids both
-strictly-smaller crossing windows. -/
-def ShiftedExitResidual
-    (K p t0 u0 t1 u1 b r : Nat) : Prop :=
-  b < K+p ∨
-  exists b' r',
-    b' = b-p ∧ r' = r-p ∧
-    ForeignRestorationFrame m e r0 b' r' ∧
-    r' < b ∧
-    AvoidsOriginalCrossingWindows t0 u0 t1 u1 b' r'
 
 def crossingOverlap (_t0 u0 t1 _u1 : Nat) : Nat :=
   u0 - t1
@@ -129,37 +111,6 @@ def CyclicOverlapMinimalForeignRestorationCrossing
     crossingOverlap a0 b0 a1 b1 < crossingOverlap t0 u0 t1 u1 ->
     False
 
-/-- Well-founded descent on the overlap length chooses a cyclic-overlap
-minimal crossing from any nonempty family of canonical period lifts. -/
-private theorem exists_cyclic_overlap_minimal_bounded :
-    forall n,
-      (exists t0 u0 t1 u1,
-        PeriodNormalizedForeignRestorationCrossing
-          m e r0 K p t0 u0 t1 u1 ∧
-        crossingOverlap t0 u0 t1 u1 <= n) ->
-      exists t0 u0 t1 u1,
-        CyclicOverlapMinimalForeignRestorationCrossing
-          m e r0 K p t0 u0 t1 u1 := by
-  classical
-  intro n
-  induction n with
-  | zero =>
-      rintro ⟨t0, u0, t1, u1, hnorm, hzero⟩
-      refine ⟨t0, u0, t1, u1, hnorm, ?_⟩
-      intro a0 b0 a1 b1 _hcomp hlt
-      omega
-  | succ n ih =>
-      intro hex
-      by_cases hsmaller : exists a0 b0 a1 b1,
-          PeriodNormalizedForeignRestorationCrossing
-            m e r0 K p a0 b0 a1 b1 ∧
-          crossingOverlap a0 b0 a1 b1 <= n
-      · exact ih hsmaller
-      · obtain ⟨t0, u0, t1, u1, hnorm, hbound⟩ := hex
-        refine ⟨t0, u0, t1, u1, hnorm, ?_⟩
-        intro a0 b0 a1 b1 hcomp hlt
-        apply hsmaller
-        exact ⟨a0, b0, a1, b1, hcomp, by omega⟩
 
 theorem cyclic_overlap_descent
     {K p t0 u0 t1 u1 b r : Nat}
@@ -202,54 +153,7 @@ theorem cyclic_minimal_middle_foreign_restoration_nested
     exact cyclic_overlap_descent m e r0 hmin hframe ht1b hbu0
       (by omega) hrperiod
 
-/-- If a foreign frame beginning inside `(t0,u0)` crosses the closing time
-`u0` and ends before `u1`, it forms a strictly smaller crossing with the
-first original frame. -/
-theorem minimal_crossing_excludes_first_window
-    {t0 u0 t1 u1 b r : Nat}
-    (hmin : MinimalForeignRestorationCrossing m e r0 t0 u0 t1 u1)
-    (hframe : ForeignRestorationFrame m e r0 b r)
-    (ht0b : t0 < b) (hbu0 : b < u0)
-    (hu0r : u0 < r) (hru1 : r < u1) : False := by
-  rcases hmin with ⟨hcross, hminimal⟩
-  rcases hcross with ⟨hframe0, _hframe1, _horder⟩
-  have hsmaller : ForeignRestorationCrossing m e r0 t0 u0 b r :=
-    ⟨hframe0, hframe, ⟨ht0b, hbu0, hu0r⟩⟩
-  exact hminimal t0 u0 b r hsmaller (Nat.le_refl _)
-    (Nat.le_of_lt hru1) (Or.inr hru1)
 
-/-- If a foreign frame beginning after `t0` crosses `t1` and ends before
-`u1`, it forms a strictly smaller crossing with the second original frame. -/
-theorem minimal_crossing_excludes_second_window
-    {t0 u0 t1 u1 b r : Nat}
-    (hmin : MinimalForeignRestorationCrossing m e r0 t0 u0 t1 u1)
-    (hframe : ForeignRestorationFrame m e r0 b r)
-    (ht0b : t0 < b) (hbt1 : b < t1)
-    (ht1r : t1 < r) (hru1 : r < u1) : False := by
-  rcases hmin with ⟨hcross, hminimal⟩
-  rcases hcross with ⟨_hframe0, hframe1, _horder⟩
-  have hsmaller : ForeignRestorationCrossing m e r0 b r t1 u1 :=
-    ⟨hframe, hframe1, ⟨hbt1, ht1r, hru1⟩⟩
-  exact hminimal b r t1 u1 hsmaller (Nat.le_of_lt ht0b)
-    (Nat.le_refl _) (Or.inl ht0b)
-
-/-- Minimality excludes both strict crossing windows for every additional
-foreign frame. -/
-theorem foreign_frame_avoids_original_crossing_windows
-    {t0 u0 t1 u1 b r : Nat}
-    (hmin : MinimalForeignRestorationCrossing m e r0 t0 u0 t1 u1)
-    (hframe : ForeignRestorationFrame m e r0 b r) :
-    AvoidsOriginalCrossingWindows t0 u0 t1 u1 b r := by
-  constructor
-  · rintro ⟨ht0b, hbu0, hu0r, hru1⟩
-    exact minimal_crossing_excludes_first_window m e r0 hmin hframe
-      ht0b hbu0 hu0r hru1
-  · rintro ⟨ht0b, hbt1, ht1r, hru1⟩
-    exact minimal_crossing_excludes_second_window m e r0 hmin hframe
-      ht0b hbt1 ht1r hru1
-
-/-- A stable blocker cannot be restored before the failed read: restoration
-itself is a productive rewrite of the blocker's cell. -/
 theorem stable_blocker_restoration_after_read
     {b j r : Nat}
     (hstable : StableBlockerUntil m e r0 b j)
@@ -544,40 +448,6 @@ theorem cyclic_minimal_stable_blocker_order
       exact Or.inr (Or.inr
         (cyclic_minimal_middle_foreign_restoration_nested
           m e r0 hmin hforeign ht1b hbu0 hrperiod))
-
-theorem cyclic_minimal_foreign_blocker_shared_close
-    {K p t0 u0 t1 u1 b j r : Nat}
-    (hmin : CyclicOverlapMinimalForeignRestorationCrossing
-      m e r0 K p t0 u0 t1 u1)
-    (hframe : ForeignRestorationFrame m e r0 b r)
-    (ht1b : t1 < b) (hbu0 : b < u0)
-    (hrperiod : r < b+p)
-    (hstable : StableBlockerUntil m e r0 b j)
-    (hu0j : u0 <= j) :
-    r = u0 ∧ j = u0 ∧
-      writerAt m e b = writerAt m e t0 ∧
-      oldSlot m e r0 b = oldSlot m e r0 t0 := by
-  have hru0 := cyclic_minimal_middle_foreign_restoration_nested
-    m e r0 hmin hframe ht1b hbu0 hrperiod
-  have hjr := stable_blocker_restoration_after_read m e r0 hstable hframe.1.1
-  have hre : r = u0 := by omega
-  have hje : j = u0 := by omega
-  have hframe0 : ForeignRestorationFrame m e r0 t0 u0 :=
-    hmin.1.1.1.1
-  rcases hframe.1.1 with ⟨_hpb, _hbr, _hpr, hwriterB, hreturnB⟩
-  rcases hframe0.1.1 with
-    ⟨_hpt0, _ht0u0, _hpu0, hwriter0, hreturn0⟩
-  have hwriter : writerAt m e b = writerAt m e t0 := by
-    rw [hre] at hwriterB
-    exact hwriterB.symm.trans hwriter0
-  have hold : oldSlot m e r0 b = oldSlot m e r0 t0 := by
-    rw [hre] at hreturnB
-    exact hreturnB.symm.trans hreturn0
-  exact ⟨hre, hje, hwriter, hold⟩
-
-/-- A first restoration cannot have its old register value already restored
-strictly before its declared closing time.  The returned register would
-itself generate an earlier first restoration. -/
 theorem first_restoration_forbids_early_returned_register
     (hr0 : forall c, m.cellOf (r0 c) = c)
     {t0 u0 b : Nat}

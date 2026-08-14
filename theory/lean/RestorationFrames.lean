@@ -1,4 +1,5 @@
-import TwoReflectorEdgeTrap
+import HiddenFibre
+import Periodicity
 
 /-!
 # Restoration frames and the foreign-crossing obstruction
@@ -51,28 +52,7 @@ def ForeignRestorationCrossing (t₀ u₀ t₁ u₁ : Nat) : Prop :=
   ForeignRestorationFrame m e r0 t₁ u₁ ∧
   RestorationFramesCross t₀ u₀ t₁ u₁
 
-/-- Inclusion-minimality for a foreign crossing pair. The open global proof
-must show that a failed corridor retrace creates a strictly contained pair,
-unless the compatible two-reflector alternative below already holds. -/
-def MinimalForeignRestorationCrossing (t₀ u₀ t₁ u₁ : Nat) : Prop :=
-  ForeignRestorationCrossing m e r0 t₀ u₀ t₁ u₁ ∧
-  ∀ a₀ b₀ a₁ b₁,
-    ForeignRestorationCrossing m e r0 a₀ b₀ a₁ b₁ →
-    t₀ ≤ a₀ → b₁ ≤ u₁ →
-    (t₀ < a₀ ∨ b₁ < u₁) → False
 
-/-- Exact premise package for the already-proved separated two-reflector
-four-snapshot tail. -/
-structure CompatibleTwoReflectorTail (k x a b : Nat) : Prop where
-  start : e k = x
-  aLobe : m.cellOf (m.bar a) = m.cellOf a
-  aPartner : m.cellOf x = m.star (m.cellOf a)
-  bLobe : m.cellOf (m.bar b) = m.cellOf b
-  bPartner : m.cellOf (m.bar x) = m.star (m.cellOf b)
-  aOccupied : ∀ q, k ≤ q → Occupied m e r0 q a
-  bOccupied : ∀ q, k ≤ q → Occupied m e r0 q b
-  distinct : ReflectorCellsDistinct
-    (m.cellOf a) (m.cellOf x) (m.cellOf (m.bar x)) (m.cellOf b)
 
 
 private theorem exists_first_after {P : Nat → Prop} :

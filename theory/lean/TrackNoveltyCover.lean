@@ -163,61 +163,7 @@ theorem fourNoveltyCover_to_N_add_six
   have hcount := fourNoveltyCover_distinct_count hcover hnd
   omega
 
-/-- **Exact completed-retrace tongue law.**  Depth zero has the initial vector
-`u`; every positive depth through the final reverse passage has exactly the
-contact vector `v`. -/
-theorem completed_retrace_tongues_exact
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    {d : Nat} (hd : d ≤ recorded.length + 1) :
-    tonguesAt w (p, u) d = if d = 0 then u else v := by
-  obtain ⟨port, hstep⟩ :=
-    (physicalTrace_contact_retraces_prefix_pointwise
-      hrecorded hgrooved hentry hcontact).2 d hd
-  simp [tonguesAt, hstep]
 
-/-- Historical-or-contact projection of `completed_retrace_tongues_exact` to
-the first `N` switch bits.  This is stronger than the requested switch-simple
-form: switch simplicity is not used once the semantically necessary grooving
-premise is available. -/
-theorem completed_retrace_vector_mem_history_or_contact
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (N : Nat) (history : List (List Bool))
-    (hu : VectorCount.restrict N u ∈ history)
-    {d : Nat} (hd : d ≤ recorded.length + 1) :
-    restrictedTonguesAt w N (p, u) d ∈ history ∨
-      restrictedTonguesAt w N (p, u) d =
-        VectorCount.restrict N v := by
-  obtain ⟨port, hstep⟩ :=
-    (physicalTrace_contact_retraces_prefix_pointwise
-      hrecorded hgrooved hentry hcontact).2 d hd
-  have hvector :
-      restrictedTonguesAt w N (p, u) d =
-        VectorCount.restrict N (if d = 0 then u else v) := by
-    simp [restrictedTonguesAt, tonguesAt, hstep]
-  by_cases hzero : d = 0
-  · left
-    rw [hvector, if_pos hzero]
-    exact hu
-  · right
-    rw [hvector, if_neg hzero]
-
-/-- Absolute-time form of the exact novelty law.  If the original run reaches
-the contact configuration at time `K`, every time in the corresponding
-completed frame is historical or has exactly the contact vector. -/
 theorem completed_retrace_at_vector_mem_history_or_contact
     {w : Wiring} {g e p oldEntry : Nat}
     {base mouthState u v : Tongues}
@@ -261,30 +207,4 @@ theorem completed_retrace_at_vector_mem_history_or_contact
     exact hu
   · right
     rw [hvector, if_neg hzero]
-
-theorem completed_retrace_at_one_novelty_cover
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    {start : Nat × Tongues} {K : Nat}
-    (hreach : stepN w K start = some (p, u))
-    (N : Nat) (history : List (List Bool))
-    (hu : VectorCount.restrict N u ∈ history)
-    (times : List Nat)
-    (htimes : ∀ j ∈ times,
-      K ≤ j ∧ j ≤ K + recorded.length + 1) :
-    NoveltyCoverOn w N start times history 1 := by
-  refine ⟨[VectorCount.restrict N v], by simp, ?_⟩
-  intro j hj
-  rcases completed_retrace_at_vector_mem_history_or_contact
-      hrecorded hgrooved hentry hcontact hreach N history hu
-      (htimes j hj).1 (htimes j hj).2 with hhistorical | hcontactVector
-  · exact List.mem_append_left _ hhistorical
-  · apply List.mem_append_right history
-    simp [hcontactVector]
 end GeneralN

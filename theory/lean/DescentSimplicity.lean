@@ -120,19 +120,4 @@ theorem descent_switch_path_nodup
         simp only [List.map_cons, List.nodup_cons] at ih'
         exact ih'
 
-/-- Every switch on a bounded landed cascade belongs to the first `N`
-switches. -/
-theorem descent_switch_path_bounded
-    {w : Wiring} {N : Nat}
-    (hN : ∀ a b, w.link a = some b →
-      a < 3 * N ∧ b < 3 * N)
-    {t : Tongues} {p s : Nat}
-    {ps : List Nat} {t' : Tongues}
-    (h : Descent w t p ps s t') :
-    ∀ c ∈ (p :: ps).map (fun b => b / 3), c < N := by
-  intro c hc
-  obtain ⟨b, hb, rfl⟩ := List.mem_map.mp hc
-  have hbBound := descent_route_bounded hN h b hb
-  omega
-
 end GeneralN

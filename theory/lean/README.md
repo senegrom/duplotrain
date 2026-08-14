@@ -27,7 +27,7 @@ symbolic in `N`: no finite-instance argument, no Mathlib, no `native_decide`,
 and no `sorry`. The lower bound is also symbolic for `N ≥ 4`; its `N = 3`
 base case is checked by kernel `decide`.
 
-There are 161 self-contained Lean libraries. To check everything:
+There are 152 self-contained Lean libraries. To check everything:
 
 ```
 lake build

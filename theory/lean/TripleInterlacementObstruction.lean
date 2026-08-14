@@ -285,56 +285,6 @@ theorem pivot_releases_strict_subcurve
   · simpa [unmatched_after_flip_eq_selected u C] using hsurvives
   · simp
 
-
-noncomputable def ReachableCurvePorts
-    (w : Wiring) (N : Nat) (u : Tongues) (root : Nat) : List Nat := by
-  classical
-  exact (List.range (3*N)).filter
-    (fun p => decide (GeneralN.CurveReach w u root p))
-
-private theorem nodup_filter_nat_local (pred : Nat → Bool) :
-    ∀ {xs : List Nat}, xs.Nodup → (xs.filter pred).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : pred x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hmem => hnd.1 ((List.mem_filter.mp hmem).1),
-            ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem nodup_subset_length_local
-    {α : Type} [BEq α] [LawfulBEq α] :
-    ∀ {small big : List α}, small.Nodup →
-      (∀ x ∈ small, x ∈ big) → small.length ≤ big.length := by
-  intro small
-  induction small with
-  | nil => intro big _ _; exact Nat.zero_le _
-  | cons x rest ih =>
-      intro big hnd hsub
-      rw [List.nodup_cons] at hnd
-      have hx : x ∈ big := hsub x List.mem_cons_self
-      have hrest : ∀ y ∈ rest, y ∈ big.erase x := by
-        intro y hy
-        have hyBig : y ∈ big := hsub y (List.mem_cons_of_mem _ hy)
-        have hyx : y ≠ x := fun heq => hnd.1 (heq ▸ hy)
-        exact (List.mem_erase_of_ne hyx).mpr hyBig
-      have hle := ih hnd.2 hrest
-      have herase : (big.erase x).length = big.length - 1 :=
-        List.length_erase_of_mem hx
-      have hpositive : 0 < big.length := by
-        cases big with
-        | nil => cases hx
-        | cons _ _ => simp
-      simp only [List.length_cons]
-      omega
-
 theorem pivot_residual_keeps_endpoint_name (u : Tongues) (C : Nat) :
     selectedBranch u C = unmatchedBranch (flipAt u C) C := by
   exact (unmatched_after_flip_eq_selected u C).symm

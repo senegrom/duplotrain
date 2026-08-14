@@ -49,13 +49,6 @@ theorem unmatchedBranch_switch (u : Tongues) (C : Nat) :
 theorem unmatchedBranch_is_branch (u : Tongues) (C : Nat) :
     unmatchedBranch u C % 3 ≠ 0 := by
   cases h : u C <;> simp [unmatchedBranch, branchPort, h] <;> omega
-
-theorem selected_unmatched_ne (u : Tongues) (C : Nat) :
-    selectedBranch u C ≠ unmatchedBranch u C := by
-  cases h : u C <;>
-    simp [selectedBranch, unmatchedBranch, branchPort, h]
-
-/-- Facing the stem traverses the selected matching edge without a write. -/
 theorem arrive_stem_selected (u : Tongues) (C : Nat) :
     arrive u (3*C) = (selectedBranch u C, u) := by
   simp [arrive, selectedBranch]
@@ -240,82 +233,8 @@ theorem rawProductiveAt_changes_writer
     simpa [restrictedTonguesAt, tonguesAt, hcur, hnext] using hrestrict
   exact ⟨cur, next, hcur, hnext, hstep, hchanged⟩
 
-/-- A first productive writer always creates a globally novel restricted
-tongue vector. -/
-theorem rawFirstWriterAt_novel
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    {start : Nat × Tongues} {k : Nat}
-    (hfirst : RawFirstWriterAt w N start k) :
-    RawNovelAt w N start k := by
-  have hwriterLt : rawWriterAt w start k < N :=
-    rawProductiveAt_writer_lt hN hfirst.1
-  obtain ⟨cur, next, hcur, hnext, _hstep, hchange⟩ :=
-    rawProductiveAt_changes_writer hN hfirst.1
-  let C := rawWriterAt w start k
-  have hcurWriter : cur.1/3 = C := by
-    simp [C, rawWriterAt, rawEntryAt, hcur]
-  have hstable : ∀ t, t ≤ k →
-      (tonguesAt w start t) C = start.2 C := by
-    intro t ht
-    apply raw_tongue_stable_before_writer hwriterLt start t
-    intro j hj hprod
-    exact hfirst.2 j (by omega) hprod
-  intro hseen
-  obtain ⟨j, hj, hvectorEq⟩ := List.mem_map.mp hseen
-  have hjlt : j < k+1 := List.mem_range.mp hj
-  have hbitEq : (tonguesAt w start j) C =
-      (tonguesAt w start (k+1)) C := by
-    apply restrict_eq_apply hvectorEq hwriterLt
-  have hjStable := hstable j (by omega)
-  have hkStable := hstable k (Nat.le_refl _)
-  have hnextChange : (tonguesAt w start (k+1)) C ≠
-      (tonguesAt w start k) C := by
-    simpa [tonguesAt, hcur, hnext, C, hcurWriter] using hchange
-  apply hnextChange
-  rw [← hbitEq, hjStable, hkStable]
 
-/-- A repeated-writer novelty post-vector cannot be hidden in the initial
-vector or among any first-writer post-vector, whether that first writer lies
-earlier or later in the finite horizon. -/
-theorem repeatedWriterPost_not_mem_firstHistory
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    {start : Nat × Tongues} {K k : Nat}
-    (hk : k ∈ rawRepeatedWriterNovelTimes w N start K) :
-    restrictedTonguesAt w N start (k+1) ∉
-      rawFirstWriterHistory w N start K := by
-  classical
-  have hkEvent : RawRepeatedWriterNovelAt w N start k :=
-    (mem_rawRepeatedWriterNovelTimes_iff.mp hk).2
-  intro hmem
-  rcases List.mem_cons.mp hmem with hinitial | hfirstPost
-  · apply hkEvent.2.2
-    apply List.mem_map.mpr
-    exact ⟨0, List.mem_range.mpr (by omega), hinitial.symm⟩
-  · obtain ⟨i, hi, hvector⟩ := List.mem_map.mp hfirstPost
-    have hiFirst : RawFirstWriterAt w N start i :=
-      (mem_rawFirstWriterTimes_iff.mp hi).2
-    have hiNovel : RawNovelAt w N start i :=
-      rawFirstWriterAt_novel hN hiFirst
-    have hik : i = k :=
-      rawNovelAt_post_injective hiNovel hkEvent.2.2 hvector
-    subst i
-    exact hkEvent.2.1 hiFirst
 
-/-- Every sampled repeated-writer post-time is genuinely outside the complete
-first-writer history. -/
-theorem repeatedWriterPostTimes_avoid_firstHistory
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    (start : Nat × Tongues) (K : Nat) :
-    ∀ t ∈ rawRepeatedWriterPostTimes w N start K,
-      restrictedTonguesAt w N start t ∉
-        rawFirstWriterHistory w N start K := by
-  classical
-  intro t ht
-  obtain ⟨k, hk, rfl⟩ := List.mem_map.mp ht
-  exact repeatedWriterPost_not_mem_firstHistory hN hk
 
 
 

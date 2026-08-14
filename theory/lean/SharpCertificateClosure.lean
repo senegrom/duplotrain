@@ -1,5 +1,4 @@
 import RunwayHistoricalThree
-import TrackGlobalRepair
 import FirstRevisitActivatedOutcome
 import FiveFrameObstruction
 
@@ -105,35 +104,6 @@ theorem rawWriterAt_add_of_reach
   obtain ⟨finish, hfinish⟩ := Option.isSome_iff_exists.mp hlive
   simp [rawWriterAt, rawEntryAt, stepN_add, hreach, hfinish]
 
-/-- A productive event in an ambient run remains productive after shifting
-to a previously reached configuration. -/
-theorem rawProductiveAt_sub_of_reach
-    {w : Wiring} {N shift d : Nat}
-    {start middle : Nat × Tongues}
-    (hreach : stepN w shift start = some middle)
-    (hprod : RawProductiveAt w N start (shift + d)) :
-    RawProductiveAt w N middle d := by
-  have hpostGlobal :
-      (stepN w (shift + (d + 1)) start).isSome := by
-    simpa [Nat.add_assoc] using hprod.1
-  obtain ⟨post, hpost⟩ := stepN_suffix_some_of_reach
-    hreach hpostGlobal
-  obtain ⟨pre, hpre⟩ := stepN_prefix_some
-    (d := d) (K := d + 1) (by omega) hpost
-  refine ⟨by simp [hpost], ?_⟩
-  intro heq
-  apply hprod.2
-  have hpostVector := restrictedTonguesAt_add_of_reach
-    (N := N) hreach hpost
-  have hpreVector := restrictedTonguesAt_add_of_reach
-    (N := N) hreach hpre
-  calc
-    restrictedTonguesAt w N start (shift + d + 1) =
-        restrictedTonguesAt w N middle (d + 1) := by
-          simpa [Nat.add_assoc] using hpostVector
-    _ = restrictedTonguesAt w N middle d := heq
-    _ = restrictedTonguesAt w N start (shift + d) :=
-      hpreVector.symm
 
 
 theorem PhysicalTrace.rawWriterAt_eq_passageSwitch_getElem
@@ -235,56 +205,8 @@ theorem PhysicalTrace.restrictedTonguesAt_mem_rawFirstWriterHistory
   rw [hempty] at hcover
   simpa using hcover
 
-/-- The canonical first-writer history is monotone in its raw horizon. -/
-theorem rawFirstWriterHistory_mono
-    {w : Wiring} {N K L : Nat} {start : Nat × Tongues}
-    (hKL : K ≤ L) :
-    ∀ {v : List Bool},
-      v ∈ rawFirstWriterHistory w N start K →
-      v ∈ rawFirstWriterHistory w N start L := by
-  classical
-  intro v hv
-  unfold rawFirstWriterHistory at hv ⊢
-  rcases List.mem_cons.mp hv with hv | hv
-  · exact List.mem_cons.mpr (Or.inl hv)
-  · apply List.mem_cons.mpr
-    apply Or.inr
-    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hv
-    apply List.mem_map.mpr
-    refine ⟨k, ?_, rfl⟩
-    have hkData := mem_rawFirstWriterTimes_iff.mp hk
-    exact mem_rawFirstWriterTimes_iff.mpr
-      ⟨Nat.lt_of_lt_of_le hkData.1 hKL, hkData.2⟩
 
-/-- Horizon-independent form of the switch-simple construction-history
-extraction.  A later ambient horizon retains every construction vector. -/
-theorem PhysicalTrace.restrictedTonguesAt_mem_rawFirstWriterHistory_of_le
-    {w : Wiring} {N K : Nat} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    (horizon : passages.length ≤ K) :
-    ∀ k, k ≤ passages.length →
-      restrictedTonguesAt w N start k ∈
-        rawFirstWriterHistory w N start K := by
-  intro k hk
-  exact rawFirstWriterHistory_mono horizon
-    (htrace.restrictedTonguesAt_mem_rawFirstWriterHistory hsimple k hk)
 
-/-- The full simple exploration used to manufacture any reflector is already
-present in the ambient raw first-writer history.  This is the promised
-construction-state extraction from the actual first-revisit control flow,
-not a cardinality surrogate. -/
-theorem ManufacturedReflector.exploration_mem_rawFirstWriterHistory
-    {w : Wiring} {N K g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (horizon : A.exploration.length ≤ K) :
-    ∀ k, k ≤ A.exploration.length →
-      restrictedTonguesAt w N (g, A.baseState) k ∈
-        rawFirstWriterHistory w N (g, A.baseState) K := by
-  exact A.exploration_trace
-    |>.restrictedTonguesAt_mem_rawFirstWriterHistory_of_le
-      A.exploration_simple horizon
 
 
 
@@ -484,308 +406,7 @@ theorem crossing_frame_open_in_caller_oriented_contact
     hcur, hnext, hfresh, holdCur, hflip, hchanged,
     hforwardEndpoint⟩
 
-theorem rawRepeatedWriterNovelTimes_le_four_of_early_changedForward_one_extra
-    {w : Wiring} {N K g e shift : Nat}
-    {start : Nat × Tongues}
-    {A : ManufacturedReflector w g e}
-    {R : ManufacturedFlipReflector w e g}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hmerge : A.ChangedForwardMerge (.flip R))
-    (hreach : stepN w shift start =
-      some (g, (ManufacturedReflector.flip R).activatedState))
-    (extra : List (List Bool))
-    (hextra : extra.length ≤ 1)
-    (hbeforeCovered : ∀ t,
-      t ∈ rawRepeatedWriterPostTimes w N start K → t < shift →
-      restrictedTonguesAt w N start t ∈
-        rawFirstWriterHistory w N start K ++ extra)
-    (hleadCovered : ∀ j, j ≤ A.toSupported.travel →
-      restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).activatedState) j ∈
-          rawFirstWriterHistory w N start K ++ extra) :
-    (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 := by
-  let postTimes := rawRepeatedWriterPostTimes w N start K
-  let history := rawFirstWriterHistory w N start K
-  let extendedHistory := history ++ extra
-  let localTimes := postTimes.map (fun t => t - shift)
-  obtain ⟨tailFresh, htailLength, htailMem⟩ :=
-    hmerge.runway_or_candy_absolute_three_novelty
-      N extendedHistory (by
-        simpa [extendedHistory, history] using hleadCovered) localTimes
-  let fresh := extra ++ tailFresh
-  have hfreshLength : fresh.length ≤ 4 := by
-    dsimp [fresh]
-    simp only [List.length_append]
-    omega
-  have hcover : NoveltyCoverOn w N start postTimes history 4 := by
-    refine ⟨fresh, hfreshLength, ?_⟩
-    intro t ht
-    by_cases htshift : t < shift
-    · have hm := hbeforeCovered t (by simpa [postTimes] using ht) htshift
-      rcases List.mem_append.mp hm with hm | hm
-      · exact List.mem_append_left fresh hm
-      · exact List.mem_append_right history
-          (List.mem_append_left tailFresh hm)
-    · have hshiftLe : shift ≤ t := by omega
-      let d := t - shift
-      have hd : d ∈ localTimes := by
-        apply List.mem_map.mpr
-        exact ⟨t, ht, rfl⟩
-      have htLive : (stepN w t start).isSome := by
-        dsimp [postTimes] at ht
-        obtain ⟨k, hk, hkt⟩ := List.mem_map.mp ht
-        subst t
-        exact (mem_rawRepeatedWriterNovelTimes_iff.mp hk).2.1.1
-      have hvector := restrictedTonguesAt_sub_of_reach
-        (N := N) hreach hshiftLe htLive
-      have hm := htailMem d hd
-      dsimp [d] at hm
-      rw [← hvector] at hm
-      rcases List.mem_append.mp hm with hm | hm
-      · rcases List.mem_append.mp hm with hm | hm
-        · exact List.mem_append_left fresh hm
-        · exact List.mem_append_right history
-            (List.mem_append_left tailFresh hm)
-      · exact List.mem_append_right history
-          (List.mem_append_right extra hm)
-  have hnew : ∀ t ∈ postTimes,
-      restrictedTonguesAt w N start t ∉ history := by
-    simpa [postTimes, history] using
-      repeatedWriterPostTimes_avoid_firstHistory
-        (w := w) (N := N) hN start K
-  have hnd :
-      (postTimes.map (restrictedTonguesAt w N start)).Nodup := by
-    dsimp [postTimes]
-    rw [map_repeatedWriterPostTimes_eq_fresh]
-    exact rawRepeatedWriterFresh_nodup w N start K
-  have hcount := noveltyCoverOn_fresh_distinct_count
-    hcover hnew hnd
-  simpa [postTimes, rawRepeatedWriterPostTimes] using hcount
 
-/-! ## Exact direct-control-flow residual
-
-The global theorem need not force one tail from every arbitrary five-frame
-selection.  It suffices to follow the actual first-revisit/repair run and
-return either the desired bound immediately or the one-extra changed-forward
-certificate consumed above. -/
-
-/-- Concrete witness returned by the non-small branch of the direct global
-control-flow dichotomy.  Every field is pointwise raw-run data; there is no
-cardinality conclusion or hidden frame-extraction premise in the structure. -/
-structure EarlyChangedForwardHistoryCertificate
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) where
-  g : Nat
-  e : Nat
-  A : ManufacturedReflector w g e
-  R : ManufacturedFlipReflector w e g
-  shift : Nat
-  merge : A.ChangedForwardMerge (.flip R)
-  reached : stepN w shift start =
-    some (g, (ManufacturedReflector.flip R).activatedState)
-  extra : List (List Bool)
-  extra_length : extra.length ≤ 1
-  before_covered : ∀ t,
-    t ∈ rawRepeatedWriterPostTimes w N start K → t < shift →
-    restrictedTonguesAt w N start t ∈
-      rawFirstWriterHistory w N start K ++ extra
-  lead_covered : ∀ j, j ≤ A.toSupported.travel →
-    restrictedTonguesAt w N
-      (g, (ManufacturedReflector.flip R).activatedState) j ∈
-        rawFirstWriterHistory w N start K ++ extra
-
-/-- A direct early-tail certificate gives the sharp four-event bound. -/
-theorem EarlyChangedForwardHistoryCertificate.repeatedWriterNovelty_le_four
-    {w : Wiring} {N K : Nat} {start : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (C : EarlyChangedForwardHistoryCertificate w N start K) :
-    (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 := by
-  exact rawRepeatedWriterNovelTimes_le_four_of_early_changedForward_one_extra
-    hN C.merge C.reached C.extra C.extra_length
-      C.before_covered C.lead_covered
-
-/-- **Exact weaker exhaustive dichotomy for the open global control flow.**
-
-For the actual known-edge raw run and horizon, either the sharp event bound
-already holds, or first-revisit/repair exposes one concrete early
-changed-forward history certificate.  This is strictly weaker than
-`KnownEdgeFiveFrameRunwayExtraction`: it does not select five events, impose
-a common geometric normal form, or demand that every frame family produce a
-tail. -/
-def KnownEdgeEarlyChangedForwardDichotomy : Prop :=
-  ∀ (w : Wiring) (N e : Nat),
-    (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
-    ∀ (start : Nat × Tongues) (K : Nat),
-      w.link e = some start.1 →
-      (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 ∨
-        Nonempty (EarlyChangedForwardHistoryCertificate w N start K)
-
-structure ChangedForwardShortLead
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (R : ManufacturedFlipReflector w e g) where
-  leadSteps : Nat
-  lead_le : leadSteps ≤ A.toSupported.travel
-  three_novelty : ∀ (N : Nat) (history : List (List Bool)),
-    (∀ j, j ≤ leadSteps →
-      restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).activatedState) j ∈ history) →
-    ∀ times : List Nat,
-      NoveltyCoverOn w N
-        (g, (ManufacturedReflector.flip R).activatedState)
-        times history 3
-
-theorem rawRepeatedWriterNovelTimes_le_four_of_reached_three_cover
-    {w : Wiring} {N K g shift : Nat}
-    {start : Nat × Tongues} {localState : Tongues}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hreach : stepN w shift start = some (g, localState))
-    (extra : List (List Bool))
-    (hextra : extra.length ≤ 1)
-    (hbeforeCovered : ∀ t,
-      t ∈ rawRepeatedWriterPostTimes w N start K → t < shift →
-      restrictedTonguesAt w N start t ∈
-        rawFirstWriterHistory w N start K ++ extra)
-    (htail : NoveltyCoverOn w N (g, localState)
-      ((rawRepeatedWriterPostTimes w N start K).map
-        (fun t => t - shift))
-      (rawFirstWriterHistory w N start K ++ extra) 3) :
-    (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 := by
-  let postTimes := rawRepeatedWriterPostTimes w N start K
-  let history := rawFirstWriterHistory w N start K
-  obtain ⟨tailFresh, htailLength, htailMem⟩ := htail
-  let fresh := extra ++ tailFresh
-  have hfreshLength : fresh.length ≤ 4 := by
-    dsimp [fresh]
-    simp only [List.length_append]
-    omega
-  have hcover : NoveltyCoverOn w N start postTimes history 4 := by
-    refine ⟨fresh, hfreshLength, ?_⟩
-    intro t ht
-    by_cases htshift : t < shift
-    · have hm := hbeforeCovered t (by simpa [postTimes] using ht) htshift
-      rcases List.mem_append.mp hm with hm | hm
-      · exact List.mem_append_left fresh hm
-      · exact List.mem_append_right history
-          (List.mem_append_left tailFresh hm)
-    · have hshiftLe : shift ≤ t := by omega
-      let d := t - shift
-      have hd : d ∈ (rawRepeatedWriterPostTimes w N start K).map
-          (fun s => s - shift) := by
-        apply List.mem_map.mpr
-        exact ⟨t, by simpa [postTimes] using ht, rfl⟩
-      have htLive : (stepN w t start).isSome := by
-        dsimp [postTimes] at ht
-        obtain ⟨k, hk, hkt⟩ := List.mem_map.mp ht
-        subst t
-        exact (mem_rawRepeatedWriterNovelTimes_iff.mp hk).2.1.1
-      have hvector := restrictedTonguesAt_sub_of_reach
-        (N := N) hreach hshiftLe htLive
-      have hm := htailMem d hd
-      dsimp [d] at hm
-      rw [← hvector] at hm
-      rcases List.mem_append.mp hm with hm | hm
-      · rcases List.mem_append.mp hm with hm | hm
-        · exact List.mem_append_left fresh hm
-        · exact List.mem_append_right history
-            (List.mem_append_left tailFresh hm)
-      · exact List.mem_append_right history
-          (List.mem_append_right extra hm)
-  have hnew : ∀ t ∈ postTimes,
-      restrictedTonguesAt w N start t ∉ history := by
-    simpa [postTimes, history] using
-      repeatedWriterPostTimes_avoid_firstHistory
-        (w := w) (N := N) hN start K
-  have hnd :
-      (postTimes.map (restrictedTonguesAt w N start)).Nodup := by
-    dsimp [postTimes]
-    rw [map_repeatedWriterPostTimes_eq_fresh]
-    exact rawRepeatedWriterFresh_nodup w N start K
-  have hcount := noveltyCoverOn_fresh_distinct_count
-    hcover hnew hnd
-  simpa [postTimes, rawRepeatedWriterPostTimes] using hcount
-
-/-- **Shortest current direct-control-flow bridge.**  The global extraction
-need cover only the merge's actual short lead by the canonical history plus
-one exceptional vector.  No nominal `A.travel` coverage is required. -/
-theorem rawRepeatedWriterNovelTimes_le_four_of_short_changedForward
-    {w : Wiring} {N K g e shift : Nat}
-    {start : Nat × Tongues}
-    {A : ManufacturedReflector w g e}
-    {R : ManufacturedFlipReflector w e g}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (_hmerge : A.ChangedForwardMerge (.flip R))
-    (hreach : stepN w shift start =
-      some (g, (ManufacturedReflector.flip R).activatedState))
-    (S : ChangedForwardShortLead A R)
-    (extra : List (List Bool))
-    (hextra : extra.length ≤ 1)
-    (hbeforeCovered : ∀ t,
-      t ∈ rawRepeatedWriterPostTimes w N start K → t < shift →
-      restrictedTonguesAt w N start t ∈
-        rawFirstWriterHistory w N start K ++ extra)
-    (hleadCovered : ∀ j, j ≤ S.leadSteps →
-      restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).activatedState) j ∈
-          rawFirstWriterHistory w N start K ++ extra) :
-    (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 := by
-  apply rawRepeatedWriterNovelTimes_le_four_of_reached_three_cover
-    hN hreach extra hextra hbeforeCovered
-  exact S.three_novelty N
-    (rawFirstWriterHistory w N start K ++ extra)
-    hleadCovered
-    ((rawRepeatedWriterPostTimes w N start K).map
-      (fun t => t - shift))
-
-/-- Strongest direct certificate currently required from global control
-flow.  Compared with `EarlyChangedForwardHistoryCertificate`, its history
-obligation stops at the physically extracted short lead. -/
-structure ShortEarlyChangedForwardHistoryCertificate
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) where
-  g : Nat
-  e : Nat
-  A : ManufacturedReflector w g e
-  R : ManufacturedFlipReflector w e g
-  shift : Nat
-  merge : A.ChangedForwardMerge (.flip R)
-  reached : stepN w shift start =
-    some (g, (ManufacturedReflector.flip R).activatedState)
-  shortLead : ChangedForwardShortLead A R
-  extra : List (List Bool)
-  extra_length : extra.length ≤ 1
-  before_covered : ∀ t,
-    t ∈ rawRepeatedWriterPostTimes w N start K → t < shift →
-    restrictedTonguesAt w N start t ∈
-      rawFirstWriterHistory w N start K ++ extra
-  lead_covered : ∀ j, j ≤ shortLead.leadSteps →
-    restrictedTonguesAt w N
-      (g, (ManufacturedReflector.flip R).activatedState) j ∈
-        rawFirstWriterHistory w N start K ++ extra
-
-/-- The short direct certificate proves the four-event bound. -/
-theorem ShortEarlyChangedForwardHistoryCertificate.repeatedWriterNovelty_le_four
-    {w : Wiring} {N K : Nat} {start : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (C : ShortEarlyChangedForwardHistoryCertificate w N start K) :
-    (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 := by
-  exact rawRepeatedWriterNovelTimes_le_four_of_short_changedForward
-    hN C.merge C.reached C.shortLead C.extra C.extra_length
-      C.before_covered C.lead_covered
-
-/-- Weakest current exhaustive raw-run residual: already small, or one short
-changed-forward history certificate. -/
-def KnownEdgeShortEarlyChangedForwardDichotomy : Prop :=
-  ∀ (w : Wiring) (N e : Nat),
-    (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
-    ∀ (start : Nat × Tongues) (K : Nat),
-      w.link e = some start.1 →
-      (rawRepeatedWriterNovelTimes w N start K).length ≤ 4 ∨
-        Nonempty
-          (ShortEarlyChangedForwardHistoryCertificate w N start K)
 
 
 structure RawFixedStemOpenFrame
@@ -875,26 +496,6 @@ structure RunwayTailBeforeSecond
       some finish
   lead_before_second : shift + A.toSupported.travel ≤ second
 
-/-- **Exact remaining global geometry statement.**
-
-Starting beyond a known physical edge, any five explicit fixed-stem novelty
-frames force the changed-forward manufactured tail before the second frame
-closes.  Unlike `KnownEdgeFourRepeatedWriterNovelty`, this proposition has no
-list length or state-count conclusion: it asks only for the concrete physical
-object which the global repair construction must extract from the raw frames.
--/
-def KnownEdgeFiveFrameRunwayExtraction : Prop :=
-  ∀ (w : Wiring) (N e : Nat),
-    (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
-    ∀ (start : Nat × Tongues),
-      w.link e = some start.1 →
-      ∀ F : FiveFixedStemNovelFrames w N start,
-        Nonempty (RunwayTailBeforeSecond w N start F.z₁)
-
-/-! ## Reduction of the global extraction to two physical cases -/
-
-/-- The five raw closing frames returned by the Erdős--Szekeres reduction,
-without yet choosing its serial or triple branch. -/
 structure FiveRawClosingFrames
     (w : Wiring) (N : Nat) (start : Nat × Tongues)
     (z₀ z₁ z₂ z₃ z₄ : Nat) where
@@ -914,16 +515,6 @@ structure FiveRawClosingFrames
   frame₃ : RawNovelClosingFrame w N start a₃ q₃ z₃
   frame₄ : RawNovelClosingFrame w N start a₄ q₄ z₄
 
-/-- The later construction starts only after the first frame has closed. -/
-structure FiveFrameSerialCase
-    (w : Wiring) (N : Nat) (start : Nat × Tongues)
-    (z₀ z₁ z₂ z₃ z₄ : Nat) where
-  frames : FiveRawClosingFrames w N start z₀ z₁ z₂ z₃ z₄
-  serial : FiveFrameSerialBreak z₀
-    frames.a₁ frames.a₂ frames.a₃ frames.a₄
-
-/-- The five common-overlap openings contain an exact `ABCABC` or strict
-three-frame nest. -/
 structure FiveFrameTripleCase
     (w : Wiring) (N : Nat) (start : Nat × Tongues)
     (z₀ z₁ z₂ z₃ z₄ : Nat) where
@@ -1072,14 +663,5 @@ theorem no_five_fixed_stem_novelties_of_runway_tail
     simpa [localTimes, hv₁, hv₂, hv₃, hv₄] using hglobalNodup
   have hcount := noveltyCoverOn_distinct_count hfreshCover hlocalNodup
   simp [localTimes] at hcount
-
-/-- The finite list of repeated-writer novelties is chronologically ordered,
-because it is a filter of `List.range`. -/
-theorem rawRepeatedWriterNovelTimes_pairwise_lt
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) :
-    (rawRepeatedWriterNovelTimes w N start K).Pairwise (· < ·) := by
-  classical
-  unfold rawRepeatedWriterNovelTimes
-  exact List.pairwise_lt_range.filter _
 
 end GeneralN

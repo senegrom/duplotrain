@@ -33,16 +33,6 @@ def finalPinValue : List Nat → Nat → Option Bool
       | some b => some b
       | none => if p / 3 = k then some (pinValue p) else none
 
-private theorem pinValue_eq_bval (p : Nat) : pinValue p = bval p := by
-  unfold pinValue bval
-  by_cases h : p % 3 = 2
-  · rw [h]
-    rfl
-  · rw [decide_eq_false h]
-    cases hb : (p % 3 == 2)
-    · rfl
-    · exact absurd (eq_of_beq hb) h
-
 
 
 theorem descent_result_eq_pinList

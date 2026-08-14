@@ -110,18 +110,4 @@ theorem TrackedEndpointCurve.length_le (D : TrackedEndpointCurve N) :
     D.switches.length ≤ N :=
   nodup_nat_lt_length D.simple D.inRange
 
-/-- The amount of information needed from “the unique newly closed strict
-subarc”: its carrier is strictly shorter.  Carrier inclusion is retained so
-the later raw extraction theorem cannot discharge this with an unrelated
-short curve. -/
-def StrictTrackedSubcurve (D' D : TrackedEndpointCurve N) : Prop :=
-  (∀ C, C ∈ D'.switches → C ∈ D.switches) ∧
-  D'.switches.length < D.switches.length
-
-/-- A finite prefix of Koizumi's adaptive train-free curve.  Every time the
-train affects it, the tracker is replaced by the newly closed strict subarc. -/
-structure TrainFreeCurveShrinkHistory (N affects : Nat) where
-  curve : Nat → TrackedEndpointCurve N
-  shrinks : ∀ k, k < affects → StrictTrackedSubcurve (curve (k+1)) (curve k)
-
 end GeneralN

@@ -613,19 +613,6 @@ def SelectedInternalEdge (u : Tongues) (p q : Nat) : Prop :=
     (p = 3*C ∧ q = selectedBranch u C) ∨
     (q = 3*C ∧ p = selectedBranch u C)
 
-theorem selectedInternalEdge_unmatched_none_left
-    (u : Tongues) (C q : Nat) :
-    ¬ SelectedInternalEdge u (unmatchedBranch u C) q := by
-  intro h
-  obtain ⟨D, h | h⟩ := h
-  · have hbranch := unmatchedBranch_is_branch u C
-    rw [h.1] at hbranch
-    simp at hbranch
-  · have hdiv := congrArg (fun p : Nat => p / 3) h.2
-    rw [unmatchedBranch_switch, selectedBranch_switch] at hdiv
-    subst D
-    exact selected_unmatched_ne u C h.2.symm
-
 theorem unmatched_after_flip_eq_selected (u : Tongues) (C : Nat) :
     unmatchedBranch (flipAt u C) C = selectedBranch u C := by
   cases h : u C <;>

@@ -50,11 +50,6 @@ def RawStrictSelfShrinkAt
   rawFiniteCurveSizeAt w N start (k + 1) <
     rawFiniteCurveSizeAt w N start k
 
-private theorem rawTrainCurveSelfAt_iff_rawCurveSelfAt
-    {w : Wiring} {start : Nat × Tongues} {k : Nat} :
-    RawTrainCurveSelfAt w start k ↔ RawCurveSelfAt w start k := by
-  rfl
-
 
 theorem simple_serial_repeated_switch_cycle_or_retrace
     {w : Wiring}
@@ -301,19 +296,6 @@ theorem raw_nonproductive_carrier_subset
   rw [hstate] at hp
   exact ⟨hp.1, curveReach_trans hcurNext hp.2⟩
 
-/-- One step of a self-only continuation makes its complete finite carrier
-monotone decreasing. -/
-theorem raw_self_only_step_carrier_subset
-    {w : Wiring} {N k : Nat} {start : Nat × Tongues}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (hlive : (stepN w (k + 1) start).isSome)
-    (hself : RawProductiveAt w N start k →
-      RawCurveSelfAt w start k) :
-    ∀ p, p ∈ rawFiniteCurvePortsAt w N start (k + 1) →
-      p ∈ rawFiniteCurvePortsAt w N start k := by
-  by_cases hprod : RawProductiveAt w N start k
-  · exact raw_self_pivot_carrier_subset hN hprod (hself hprod)
-  · exact raw_nonproductive_carrier_subset hN hlive hprod
 
 theorem RawStrictSelfShrinkAt.dropped_carrier_port
     {w : Wiring} {N : Nat} {start : Nat × Tongues} {k : Nat}

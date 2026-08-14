@@ -25,16 +25,6 @@ namespace Echo
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-private theorem map_congr_forall {f g : Nat → Nat} :
-    ∀ l : List Nat, (∀ x ∈ l, f x = g x) → l.map f = l.map g := by
-  intro l
-  induction l with
-  | nil => intro _; rfl
-  | cons a t ih =>
-      intro h
-      simp only [List.map_cons]
-      rw [h a List.mem_cons_self, ih (fun x hx => h x (List.mem_cons_of_mem _ hx))]
-
 private theorem map_eq_forall {f g : Nat → Nat} :
     ∀ l : List Nat, l.map f = l.map g → ∀ x ∈ l, f x = g x := by
   intro l
@@ -69,129 +59,8 @@ theorem stateCode_reg_eq (cells : List Nat) {i j : Nat}
     congrArg List.tail h
   exact map_eq_forall cells h'
 
-/-- **Determinism.**  Equal states step to equal states: the state code
-evolves autonomously. -/
-theorem state_step (hrun : IsRun m e r0) (cells : List Nat)
-    (hcells : ∀ k, m.star (m.cellOf (e k)) ∈ cells) {i j : Nat}
-    (h : stateCode m e r0 cells i = stateCode m e r0 cells j) :
-    stateCode m e r0 cells (i+1) = stateCode m e r0 cells (j+1) := by
-  have he : e i = e j := stateCode_entry_eq m e r0 cells h
-  have hsnap := stateCode_reg_eq m e r0 cells h
-  have hnext : e (i+1) = e (j+1) := by
-    rw [hrun i, hrun j, he]
-    exact congrArg m.bar (hsnap _ (hcells j))
-  have hmap : cells.map (reg m e r0 (i+1)) = cells.map (reg m e r0 (j+1)) := by
-    apply map_congr_forall
-    intro C hC
-    by_cases hc : m.cellOf (e (j+1)) = C
-    · rw [reg_write m e r0 (by rw [hnext]; exact hc), reg_write m e r0 hc,
-        hnext]
-    · rw [reg_skip m e r0 (by rw [hnext]; exact hc), reg_skip m e r0 hc]
-      exact hsnap C hC
-  show e (i+1) :: cells.map (reg m e r0 (i+1))
-      = e (j+1) :: cells.map (reg m e r0 (j+1))
-  rw [hnext, hmap]
 
-/-- A state coincidence replays forever: the whole future repeats. -/
-theorem state_replay (hrun : IsRun m e r0) (cells : List Nat)
-    (hcells : ∀ k, m.star (m.cellOf (e k)) ∈ cells) {i j : Nat}
-    (h : stateCode m e r0 cells i = stateCode m e r0 cells j) :
-    ∀ t, stateCode m e r0 cells (i+t) = stateCode m e r0 cells (j+t) := by
-  intro t
-  induction t with
-  | zero => exact h
-  | succ n ih => exact state_step m e r0 hrun cells hcells ih
-
-/-- All lists of a given length over a fixed alphabet. -/
 def listPow (S : List Nat) : Nat → List (List Nat)
   | 0 => [[]]
   | n+1 => S.flatMap (fun x => (listPow S n).map (fun l => x :: l))
-
-private theorem flatMap_const_length (f : Nat → List (List Nat)) (n : Nat)
-    (hf : ∀ x, (f x).length = n) :
-    ∀ S : List Nat, (S.flatMap f).length = S.length * n := by
-  intro S
-  induction S with
-  | nil => simp
-  | cons a t ih =>
-      rw [List.flatMap_cons, List.length_append, hf, ih, List.length_cons,
-        Nat.succ_mul]
-      omega
-
-theorem listPow_length (S : List Nat) (n : Nat) :
-    (listPow S n).length = S.length ^ n := by
-  induction n with
-  | zero => simp [listPow]
-  | succ k ih =>
-      have hf : ∀ x, ((listPow S k).map (fun l => x :: l)).length
-          = S.length ^ k := by
-        intro x
-        rw [List.length_map, ih]
-      show (S.flatMap (fun x => (listPow S k).map (fun l => x :: l))).length
-          = S.length ^ (k+1)
-      rw [flatMap_const_length _ _ hf S, Nat.pow_succ]
-      exact Nat.mul_comm _ _
-
-theorem mem_listPow (S : List Nat) :
-    ∀ (n : Nat) (l : List Nat), l.length = n → (∀ x ∈ l, x ∈ S) →
-      l ∈ listPow S n := by
-  intro n
-  induction n with
-  | zero =>
-      intro l hl _
-      cases l with
-      | nil => simp [listPow]
-      | cons x t =>
-          simp only [List.length_cons] at hl
-          omega
-  | succ k ih =>
-      intro l hl hmem
-      cases l with
-      | nil =>
-          simp only [List.length_nil] at hl
-          omega
-      | cons x t =>
-          have ht : t.length = k := by
-            simp only [List.length_cons] at hl
-            omega
-          show x :: t ∈ S.flatMap (fun y => (listPow S k).map (fun l => y :: l))
-          apply List.mem_flatMap.mpr
-          refine ⟨x, hmem x List.mem_cons_self, ?_⟩
-          exact List.mem_map.mpr
-            ⟨t, ih t ht (fun y hy => hmem y (List.mem_cons_of_mem _ hy)), rfl⟩
-
-/-- Pigeonhole for trajectories: a sequence confined to a finite universe
-repeats within `|universe| + 1` steps. -/
-private theorem exists_repeat_aux :
-    ∀ (n : Nat) (F : Nat → List Nat) (U : List (List Nat)),
-      (∀ t, t ≤ n → F t ∈ U) → U.length < n →
-      ∃ i j, i < j ∧ j ≤ n ∧ F i = F j := by
-  intro n
-  induction n with
-  | zero =>
-      intro F U _ hlen
-      exact absurd hlen (Nat.not_lt_zero _)
-  | succ n ih =>
-      intro F U hmem hlen
-      by_cases h : ∃ k, 1 ≤ k ∧ k ≤ n + 1 ∧ F k = F 0
-      · obtain ⟨k, hk1, hkn, hkF⟩ := h
-        exact ⟨0, k, hk1, hkn, hkF.symm⟩
-      · have hne : ∀ k, 1 ≤ k → k ≤ n + 1 → F k ≠ F 0 :=
-          fun k h1 h2 heq => h ⟨k, h1, h2, heq⟩
-        have hmem0 : F 0 ∈ U := hmem 0 (Nat.zero_le _)
-        have hmem' : ∀ t, t ≤ n → F (t+1) ∈ U.erase (F 0) := by
-          intro t ht
-          refine (List.mem_erase_of_ne ?_).mpr (hmem (t+1) (by omega))
-          exact hne (t+1) (by omega) (by omega)
-        have hpos : 0 < U.length := by
-          cases U with
-          | nil => cases hmem0
-          | cons _ _ => simp
-        have hlen' : (U.erase (F 0)).length < n := by
-          rw [List.length_erase_of_mem hmem0]
-          omega
-        obtain ⟨i, k, hik, hkn, hF⟩ :=
-          ih (fun t => F (t+1)) (U.erase (F 0)) hmem' hlen'
-        exact ⟨i+1, k+1, by omega, by omega, hF⟩
-
 end Echo

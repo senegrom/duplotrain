@@ -655,70 +655,6 @@ theorem physicalTrace_endpoints_eq_before_avoided_switch
         simp only at hstart
         simp [passageSwitch, ← hstart, hfinishB]
 
-/-- Endpoint-strengthened forward merge.  The fresh branch changes only the
-contact tongue.  Rebase the old suffix in that changed state; determinism then
-identifies not only which suffix is longer, but the exact physical trace along
-the unmatched tail. -/
-theorem forward_merge_tails_endpoint_dichotomy
-    {w : Wiring} {oldEntry freshEntry exit : Nat}
-    {u v : Tongues} {oldTail freshTail : List Passage}
-    {oldFinish freshFinish : Nat × Tongues}
-    (holdTrace : PhysicalTrace w (oldEntry, u)
-      ((oldEntry, exit) :: oldTail) oldFinish)
-    (hfreshTrace : PhysicalTrace w (freshEntry, u)
-      ((freshEntry, exit) :: freshTail) freshFinish)
-    (hOldSimple : SwitchSimple ((oldEntry, exit) :: oldTail))
-    (hold : arrive u oldEntry = (exit, u))
-    (hswitch : oldEntry / 3 = freshEntry / 3)
-    (hfresh : arrive u freshEntry = (exit, v))
-    (hchanged : v (freshEntry / 3) ≠ u (freshEntry / 3)) :
-    (∃ suffix,
-      freshTail = oldTail ++ suffix ∧
-      PhysicalTrace w
-        (oldFinish.1, flipAt oldFinish.2 (freshEntry / 3))
-        suffix freshFinish) ∨
-    (∃ suffix,
-      oldTail = freshTail ++ suffix ∧
-      PhysicalTrace w freshFinish suffix
-        (oldFinish.1, flipAt oldFinish.2 (freshEntry / 3))) := by
-  cases holdTrace with
-  | @cons _ _ oldNext _ oldAfter _ _ holdArrive oldLink oldRest =>
-      have hOldAfter : oldAfter = u := by
-        have hEq := hold.symm.trans holdArrive
-        exact (congrArg Prod.snd hEq).symm
-      subst oldAfter
-      cases hfreshTrace with
-      | @cons _ _ freshNext _ freshAfter _ _ freshArrive freshLink
-          freshRest =>
-          have hfreshAfter : freshAfter = v := by
-            have hEq := hfresh.symm.trans freshArrive
-            exact (congrArg Prod.snd hEq).symm
-          subst freshAfter
-          have hnext : oldNext = freshNext := by
-            rw [oldLink] at freshLink
-            injection freshLink
-          subst freshNext
-          have hflip : v = flipAt u (freshEntry / 3) :=
-            changed_arrival_eq_flipAt hfresh hchanged
-          have hforeign : ∀ passage ∈ oldTail,
-              passageSwitch passage ≠ freshEntry / 3 := by
-            unfold SwitchSimple at hOldSimple
-            simp only [List.map_cons, List.nodup_cons] at hOldSimple
-            intro passage hp hEq
-            apply hOldSimple.1
-            apply List.mem_map.mpr
-            exact ⟨passage, hp, by
-              simpa [passageSwitch, hswitch] using hEq⟩
-          have oldRest' : PhysicalTrace w
-              (oldNext, flipAt u (freshEntry / 3)) oldTail
-              (oldFinish.1,
-                flipAt oldFinish.2 (freshEntry / 3)) :=
-            oldRest.flip_unvisited hforeign
-          rw [← hflip] at oldRest'
-          exact physicalTrace_prefix_comparable_with_endpoints
-            oldRest' freshRest
-
-/-- Converse membership for the explicitly reversed passage list. -/
 theorem source_of_mem_reversePassages
     {passage : Passage} {passages : List Passage}
     (hmem : passage ∈ reversePassages passages) :
@@ -4076,33 +4012,4 @@ theorem manufactured_pair_protected_repair_eventuallyPeriodic
       A B hA hB with hperiodic | hchanged
   · exact hperiodic
   · exact hchanged.eventuallyPeriodic
-theorem ManufacturedReflector.travel_le_two_mul_exploration_length
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) :
-    A.toSupported.travel ≤ 2 * A.exploration.length := by
-  cases A with
-  | stay R =>
-      simp [ManufacturedReflector.toSupported,
-        ManufacturedReflector.exploration,
-        ManufacturedStayReflector.toSupported]
-      omega
-  | flip R =>
-      simp [ManufacturedReflector.toSupported,
-        ManufacturedReflector.exploration,
-        ManufacturedFlipReflector.toSupported]
-      omega
-
-/-- In an `N`-switch wiring every manufactured reflector macro has travel
-at most `2*N`. -/
-theorem ManufacturedReflector.travel_le_two_mul_switches
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N) :
-    A.toSupported.travel ≤ 2 * N := by
-  have hexploration : A.exploration.length ≤ N :=
-    A.exploration_trace.simple_length_le hN A.exploration_simple
-  have htravel := A.travel_le_two_mul_exploration_length
-  omega
-
 end GeneralN

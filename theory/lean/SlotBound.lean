@@ -44,10 +44,6 @@ private theorem exists_last_prod_lt :
         · exact h3 i hi1 (by omega)
 
 open Classical in
-noncomputable def slotCode (k : Nat) : Nat :=
-  if h : ∃ j, j < k ∧ ProductiveStep m e r0 j then
-    e ((exists_last_prod_lt m e r0 k h).choose + 1) + 1
-  else 0
 
 private theorem nodup_subset_length_nat {l S : List Nat}
     (hnd : l.Nodup) (hsub : ∀ x ∈ l, x ∈ S) : l.length ≤ S.length := by

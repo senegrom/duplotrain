@@ -15,7 +15,6 @@ defaultTargets = [
   "BoundaryNAddFourSaturation",
   "BoundaryOccurrenceDamageElimination",
   "BoundaryOverlapTailCount",
-  "BoundaryPresentSecondWriter",
   "BoundaryResidualCharge",
   "BoundaryResidualNovelty",
   "BoundaryResidualSharpening",
@@ -66,24 +65,18 @@ defaultTargets = [
   "KnownEdgeThreeSharp",
   "KoizumiCurveInvariant",
   "KoizumiFramePersistence",
-  "KoizumiRawExtraction",
   "LinearBound",
-  "LobePartnerBounce",
-  "LobeToggle",
   "ManufacturedPairNovelty",
-  "NoveltyAwareLasso",
   "OneJourneyTailCount",
   "OneReflectorContinuation",
   "OverwriteDynamics",
   "PairActionCorners",
   "PairTongueCountAbsoluteFour",
   "PairTongueCountFour",
-  "PairTongueCountSharp",
   "PartialJourneyDichotomy",
   "PartialSecondRunNAddFour",
   "PartialSecondRunSharp",
   "Periodicity",
-  "PersistentLobeSeparationStandalone",
   "PointwiseRetraceSeparation",
   "PointwiseSimpleCycleTail",
   "PreReturnProtectedRoute",
@@ -97,7 +90,6 @@ defaultTargets = [
   "RestorationFrameOrdering",
   "RestorationFrames",
   "ReuseForcesReplayClosure",
-  "ReversalFacts",
   "RunwayHistoricalOne",
   "RunwayHistoricalThree",
   "RunwaySpliceNovelty",
@@ -159,7 +151,6 @@ defaultTargets = [
   "TwoJourneyBoundaryTailCount",
   "TwoJourneyTailCountSharp",
   "TwoPhasePrefixTailCount",
-  "TwoReflectorEdgeTrap",
   "VectorCount"
 ]
 
@@ -207,9 +198,6 @@ name = "BoundaryOccurrenceDamageElimination"
 
 [[lean_lib]]
 name = "BoundaryOverlapTailCount"
-
-[[lean_lib]]
-name = "BoundaryPresentSecondWriter"
 
 [[lean_lib]]
 name = "BoundaryResidualCharge"
@@ -362,22 +350,10 @@ name = "KoizumiCurveInvariant"
 name = "KoizumiFramePersistence"
 
 [[lean_lib]]
-name = "KoizumiRawExtraction"
-
-[[lean_lib]]
 name = "LinearBound"
 
 [[lean_lib]]
-name = "LobePartnerBounce"
-
-[[lean_lib]]
-name = "LobeToggle"
-
-[[lean_lib]]
 name = "ManufacturedPairNovelty"
-
-[[lean_lib]]
-name = "NoveltyAwareLasso"
 
 [[lean_lib]]
 name = "OneJourneyTailCount"
@@ -398,9 +374,6 @@ name = "PairTongueCountAbsoluteFour"
 name = "PairTongueCountFour"
 
 [[lean_lib]]
-name = "PairTongueCountSharp"
-
-[[lean_lib]]
 name = "PartialJourneyDichotomy"
 
 [[lean_lib]]
@@ -411,9 +384,6 @@ name = "PartialSecondRunSharp"
 
 [[lean_lib]]
 name = "Periodicity"
-
-[[lean_lib]]
-name = "PersistentLobeSeparationStandalone"
 
 [[lean_lib]]
 name = "PointwiseRetraceSeparation"
@@ -453,9 +423,6 @@ name = "RestorationFrames"
 
 [[lean_lib]]
 name = "ReuseForcesReplayClosure"
-
-[[lean_lib]]
-name = "ReversalFacts"
 
 [[lean_lib]]
 name = "RunwayHistoricalOne"
@@ -639,9 +606,6 @@ name = "TwoJourneyTailCountSharp"
 
 [[lean_lib]]
 name = "TwoPhasePrefixTailCount"
-
-[[lean_lib]]
-name = "TwoReflectorEdgeTrap"
 
 [[lean_lib]]
 name = "VectorCount"
