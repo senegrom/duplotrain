@@ -243,13 +243,9 @@ structure RawCycleThroughSelfLink
   state : Tongues
   offset : Nat
   period : Nat
-  close_at : stepN w close start = some closeConfig
   period_positive : 0 < period
-  offset_positive : 0 < offset
-  offset_before_period : offset < period
   cycle : stepN w period closeConfig = some closeConfig
   self_at : stepN w offset closeConfig = some (branch, state)
-  branch_port : branch % 3 ≠ 0
   self_link : w.link branch = some branch
 
 /-- Rotate the raw period from its recorded closing configuration to the
@@ -279,7 +275,5 @@ structure RawTwoVectorTail
   phase₁ : List Bool
   reached : stepN w shift start = some localStart
   live : ∀ d, ∃ finish, stepN w d localStart = some finish
-  two_vectors : ∀ d,
-    restrictedTonguesAt w N localStart d ∈ [phase₀, phase₁]
 
 end GeneralN

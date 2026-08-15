@@ -2,6 +2,7 @@ import EventuallyPeriodicPrefixes
 import OneReflectorContinuation
 import TraceRetainingFirstRevisit
 import BoundaryNAddFourSaturation
+import PartialSecondRunSharp
 
 /-!
 # Coefficient-one top-level assembly
@@ -29,7 +30,6 @@ structure FirstActivatedCycleOutcome
   settled : Tongues
   lead_trace : PhysicalTrace w start lead atRepeat
   lead_simple : SwitchSimple lead
-  lead_length_le : lead.length <= N
   cycle_nonempty : cycle ≠ []
   transient : PhysicalTrace w atRepeat cycle
     (atRepeat.1, settled)
@@ -97,7 +97,6 @@ theorem first_activated_trace_outcome_sharp
       settled := settled
       lead_trace := hprefTrace
       lead_simple := hbeforeSimple
-      lead_length_le := hprefLe
       cycle_nonempty := hnonempty
       transient := htransient
       stable := hstable
@@ -1080,37 +1079,6 @@ would expose either a stable cycle or a completed opposite reflector.  Both
 outcomes are eventually periodic and therefore contradict the later fall.
 -/
 
-/-- Every finite dead run has a literal final live physical trace. -/
-private theorem coeffTop_terminal_trace_of_dead
-    {w : Wiring} {start : Nat × Tongues} :
-    ∀ {L : Nat}, stepN w L start = none →
-      ∃ finish passages,
-        passages.length < L ∧
-        PhysicalTrace w start passages finish ∧
-        step w finish = none := by
-  intro L
-  induction L with
-  | zero =>
-      intro hdead
-      simp [stepN] at hdead
-  | succ n ih =>
-      intro hdead
-      cases hprev : stepN w n start with
-      | none =>
-          obtain ⟨finish, passages, hlength, htrace, hfall⟩ :=
-            ih hprev
-          exact ⟨finish, passages,
-            Nat.lt_trans hlength (Nat.lt_succ_self n), htrace, hfall⟩
-      | some finish =>
-          obtain ⟨passages, hlength, htrace⟩ :=
-            physicalTrace_of_stepN w hprev
-          refine ⟨finish, passages, ?_, htrace, ?_⟩
-          · rw [hlength]
-            exact Nat.lt_succ_self n
-          · change stepN w (n + 1) start = none at hdead
-            rw [stepN_add, hprev] at hdead
-            simpa [stepN] using hdead
-
 /-- A physical prefix of the doomed second run cannot repeat a switch.
 The cycle alternative is non-falling.  The reflector alternative completes
 an opposite pair, whose protected-repair theorem is also non-falling. -/
@@ -1216,7 +1184,7 @@ theorem OneReflectorSecondDead.N_add_three_or_forward
     times.length ≤ N + 3 ∨
       Nonempty (OneReflectorForwardContact w N e start) := by
   obtain ⟨finish, passages, _hlength, htrace, hfall⟩ :=
-    coeffTop_terminal_trace_of_dead D.dead
+    PartialSecondRunSharp.terminal_trace_of_dead D.dead
   have hsimple : SwitchSimple passages := D.trace_simple htrace
   have hliveA : ∀ k ∈ times,
       (stepN w k (start.1, D.A.baseState)).isSome := by

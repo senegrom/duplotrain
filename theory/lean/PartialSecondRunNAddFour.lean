@@ -212,35 +212,6 @@ theorem changedContact_stepN_some_all
         exact changedContact_forward_flip_stepN_some_all
           C hforward hrepair hrestored
 
-private theorem terminal_trace_of_dead_local
-    {w : Wiring} {start : Nat × Tongues} :
-    ∀ {L : Nat}, stepN w L start = none →
-      ∃ finish passages,
-        passages.length < L ∧
-        PhysicalTrace w start passages finish ∧
-        step w finish = none := by
-  intro L
-  induction L with
-  | zero =>
-      intro hdead
-      simp [stepN] at hdead
-  | succ n ih =>
-      intro hdead
-      cases hprev : stepN w n start with
-      | none =>
-          obtain ⟨finish, passages, hlength, htrace, hfall⟩ := ih hprev
-          exact ⟨finish, passages,
-            Nat.lt_trans hlength (Nat.lt_succ_self n), htrace, hfall⟩
-      | some finish =>
-          obtain ⟨passages, hlength, htrace⟩ :=
-            physicalTrace_of_stepN w hprev
-          refine ⟨finish, passages, ?_, htrace, ?_⟩
-          · rw [hlength]
-            exact Nat.lt_succ_self n
-          · change stepN w (n + 1) start = none at hdead
-            rw [stepN_add, hprev] at hdead
-            simpa [stepN] using hdead
-
 /-- **Dead second run, sharp form.**  The damaged-support case would be live
 forever by `ChangedContact.stepN_some_all`, contradicting the dead horizon.
 Thus the old support is preserved and the existing `N+2` theorem applies. -/
@@ -257,7 +228,7 @@ theorem ManufacturedReflector.dead_second_run_distinct_le_N_add_two
       (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
     times.length ≤ N + 2 := by
   obtain ⟨finish, passages, _hlength, htrace, hfall⟩ :=
-    terminal_trace_of_dead_local hdead
+    PartialSecondRunSharp.terminal_trace_of_dead hdead
   have hsimple : SwitchSimple passages :=
     ManufacturedReflector.dead_continuation_trace_simple
       A hA hdead htrace

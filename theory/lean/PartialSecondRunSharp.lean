@@ -30,7 +30,6 @@ structure PartialSecondCycleOutcome
   settled : Tongues
   lead_trace : PhysicalTrace w start lead atRepeat
   lead_simple : SwitchSimple lead
-  lead_length_le : lead.length ≤ N
   cycle_nonempty : cycle ≠ []
   transient : PhysicalTrace w atRepeat cycle (atRepeat.1, settled)
   stable : PhysicalTrace w (atRepeat.1, settled) cycle
@@ -298,7 +297,6 @@ theorem first_activated_trace_outcome_sharp_partial
       settled := settled
       lead_trace := hleadTrace
       lead_simple := hbeforeSimple
-      lead_length_le := hleadLe
       cycle_nonempty := hnonempty
       transient := htransient
       stable := hstable
@@ -1314,7 +1312,7 @@ theorem ChangedContact.all_run_distinct_le_N_add_five
   omega
 
 /-- Every finite dead run has a literal final live physical trace. -/
-private theorem terminal_trace_of_dead
+theorem terminal_trace_of_dead
     {w : Wiring} {start : Nat × Tongues} :
     ∀ {L : Nat}, stepN w L start = none →
       ∃ finish passages,

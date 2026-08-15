@@ -33,13 +33,6 @@ structure SelfLinkPairTailBeforeSecond
   reached : stepN w shift start = some (g, state)
   live : forall d, exists finish,
     stepN w d (g, state) = some finish
-  groovesA : PathGrooves
-    (ManufacturedReflector.flip A).toSupported.paths state
-  groovesR : PathGrooves
-    (ManufacturedReflector.stay R).toSupported.paths state
-  compatible : (ManufacturedReflector.flip A).toSupported.action.Avoids
-    (ManufacturedReflector.stay R).toSupported.paths
-  reached_before_second : shift <= second + 1
 
 def CertifiedSelfLinkReplayOrTail
     {w : Wiring} {N : Nat} {start : Prod Nat Tongues}

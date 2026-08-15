@@ -864,23 +864,6 @@ structure SecondHistoryContactData
   old_grooves : PathGrooves A.toSupported.paths contactState
   touches : A.TouchesSupport fresh
 
-/-- A first old-support contact is contact data whose strict approach has no
-earlier old-support passage.  The dynamic contact theorems below only need
-the parent data; freshness is retained here for the original coordinate
-charge and for callers that genuinely stop at the first contact. -/
-structure SecondHistorySupportContact
-    (w : Wiring) (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    extends SecondHistoryContactData w A B where
-  approach_fresh : ∀ prior ∈ approach, ¬ A.TouchesSupport prior
-
-instance {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g} :
-    Coe (SecondHistorySupportContact w A B)
-      (SecondHistoryContactData w A B) :=
-  ⟨SecondHistorySupportContact.toSecondHistoryContactData⟩
-
 /-! ## Charge a prefix ending at the first damaging support passage -/
 
 /-- Every contact approach is a prefix of the second switch-simple
@@ -1108,18 +1091,6 @@ theorem SecondHistoryContactData.mem_prefixHistory
   apply List.mem_map.mpr
   exact ⟨j, List.mem_range.mpr (by omega), rfl⟩
 
-/-- The second prefix begins at the activated endpoint of the first
-construction, so this shared boundary may be erased once. -/
-theorem SecondHistoryContactData.boundary_mem_prefixHistory
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (C : SecondHistoryContactData w A B)
-    (hbase : B.baseState = A.activatedState) :
-    VectorCount.restrict N A.activatedState ∈ C.prefixHistory N := by
-  have hzero := C.mem_prefixHistory (N := N) (j := 0) (by omega)
-  simpa [restrictedTonguesAt, tonguesAt, stepN, hbase] using hzero
-
 /-- A coefficient-one cover: the compressed first sharp history, followed
 only by the second prefix through first contact, with the shared boundary
 removed from the latter. -/
@@ -1133,50 +1104,6 @@ def SecondHistoryContactData.contactHistory
     (C.prefixHistory N).erase
       (VectorCount.restrict N A.activatedState)
 
-/-- Exact length of the first-contact cover. -/
-theorem SecondHistoryContactData.contactHistory_length
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (C : SecondHistoryContactData w A B)
-    (hbase : B.baseState = A.activatedState) :
-    (C.contactHistory N).length =
-      A.exploration.length + C.approach.length + 2 := by
-  have hboundary := C.boundary_mem_prefixHistory (N := N) hbase
-  unfold SecondHistoryContactData.contactHistory
-  rw [List.length_append, List.length_erase_of_mem hboundary,
-    A.sharpHistoryCore_length]
-  simp [SecondHistoryContactData.prefixHistory]
-  omega
-
-/-- Compatibility view of the generalized prefix history for a literal
-first-support contact. -/
-abbrev SecondHistorySupportContact.prefixHistory
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
-    (N : Nat) : List (List Bool) :=
-  C.toSecondHistoryContactData.prefixHistory N
-
-/-- Compatibility view of the generalized contact history. -/
-abbrev SecondHistorySupportContact.contactHistory
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
-    (N : Nat) : List (List Bool) :=
-  C.toSecondHistoryContactData.contactHistory N
-
-theorem SecondHistorySupportContact.contactHistory_length
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (C : SecondHistorySupportContact w A B)
-    (hbase : B.baseState = A.activatedState) :
-    (C.contactHistory N).length =
-      A.exploration.length + C.approach.length + 2 :=
-  C.toSecondHistoryContactData.contactHistory_length hbase
 
 theorem SecondHistoryContactData.mem_contactHistory
     {w : Wiring} {N g e : Nat}

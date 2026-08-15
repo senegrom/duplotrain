@@ -125,10 +125,6 @@ structure SelectedFiveFrameABCABC
   i0 : Fin 5
   i1 : Fin 5
   i2 : Fin 5
-  shape : EndpointABCABC
-    (T.frames.openingAt i0) (T.frames.closingAt i0)
-    (T.frames.openingAt i1) (T.frames.closingAt i1)
-    (T.frames.openingAt i2) (T.frames.closingAt i2)
 
 /-- One concrete decreasing-opening triple selected from a grouped strict
 nest outcome. -/
@@ -139,10 +135,6 @@ structure SelectedFiveFrameStrictNest
   i0 : Fin 5
   i1 : Fin 5
   i2 : Fin 5
-  shape : EndpointStrictNest
-    (T.frames.openingAt i0) (T.frames.closingAt i0)
-    (T.frames.openingAt i1) (T.frames.closingAt i1)
-    (T.frames.openingAt i2) (T.frames.closingAt i2)
 
 /-- The grouped five-frame disjunction always exposes an actual selected
 triple, with its three indices retained. -/
@@ -154,87 +146,27 @@ theorem FiveFrameTripleCase.select_endpoint_triple
       Nonempty (SelectedFiveFrameStrictNest T) := by
   rcases T.triple with habc | hnest
   · rcases habc with h | h | h | h | h | h | h | h | h | h
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 0, i1 := 1, i2 := 2
-        shape := by
-          simpa using h }
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 0, i1 := 1, i2 := 3
-        shape := by
-          simpa using h }
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 0, i1 := 1, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 0, i1 := 2, i2 := 3
-        shape := by
-          simpa using h }
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 0, i1 := 2, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 0, i1 := 3, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 1, i1 := 2, i2 := 3
-        shape := by
-          simpa using h }
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 1, i1 := 2, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 1, i1 := 3, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inl <| Nonempty.intro {
-        i0 := 2, i1 := 3, i2 := 4
-        shape := by
-          simpa using h }
+    · exact Or.inl ⟨⟨0, 1, 2⟩⟩
+    · exact Or.inl ⟨⟨0, 1, 3⟩⟩
+    · exact Or.inl ⟨⟨0, 1, 4⟩⟩
+    · exact Or.inl ⟨⟨0, 2, 3⟩⟩
+    · exact Or.inl ⟨⟨0, 2, 4⟩⟩
+    · exact Or.inl ⟨⟨0, 3, 4⟩⟩
+    · exact Or.inl ⟨⟨1, 2, 3⟩⟩
+    · exact Or.inl ⟨⟨1, 2, 4⟩⟩
+    · exact Or.inl ⟨⟨1, 3, 4⟩⟩
+    · exact Or.inl ⟨⟨2, 3, 4⟩⟩
   · rcases hnest with h | h | h | h | h | h | h | h | h | h
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 0, i1 := 1, i2 := 2
-        shape := by
-          simpa using h }
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 0, i1 := 1, i2 := 3
-        shape := by
-          simpa using h }
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 0, i1 := 1, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 0, i1 := 2, i2 := 3
-        shape := by
-          simpa using h }
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 0, i1 := 2, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 0, i1 := 3, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 1, i1 := 2, i2 := 3
-        shape := by
-          simpa using h }
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 1, i1 := 2, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 1, i1 := 3, i2 := 4
-        shape := by
-          simpa using h }
-    · exact Or.inr <| Nonempty.intro {
-        i0 := 2, i1 := 3, i2 := 4
-        shape := by
-          simpa using h }
+    · exact Or.inr ⟨⟨0, 1, 2⟩⟩
+    · exact Or.inr ⟨⟨0, 1, 3⟩⟩
+    · exact Or.inr ⟨⟨0, 1, 4⟩⟩
+    · exact Or.inr ⟨⟨0, 2, 3⟩⟩
+    · exact Or.inr ⟨⟨0, 2, 4⟩⟩
+    · exact Or.inr ⟨⟨0, 3, 4⟩⟩
+    · exact Or.inr ⟨⟨1, 2, 3⟩⟩
+    · exact Or.inr ⟨⟨1, 2, 4⟩⟩
+    · exact Or.inr ⟨⟨1, 3, 4⟩⟩
+    · exact Or.inr ⟨⟨2, 3, 4⟩⟩
 
 /-! ## The exact raw-to-certified `ABCABC` interface -/
 
@@ -244,12 +176,6 @@ contains some irrelevant self-link. -/
 def CertifiedRunUsesSelfLink {w : Wiring}
     (run : CertifiedConcreteEchoRun w) : Prop :=
   exists q, w.link (run.entry q) = some (run.entry q)
-
-def CertifiedRepresentsRawTime {w : Wiring}
-    (run : CertifiedConcreteEchoRun w) (clock : Nat -> Nat)
-    (start : Nat × Tongues) (k : Nat) : Prop :=
-  run.entry (clock k) = rawEntryAt w start k ∧
-    run.boundary (clock k) = tonguesAt w start k
 
 /-- The complete certified data consumed by the existing physical
 endpoint-empty theorem.  The clock explicitly identifies all six selected raw
@@ -262,18 +188,6 @@ structure CertifiedEndpointEmptyABCABC
     (S : SelectedFiveFrameABCABC T) : Type where
   run : CertifiedConcreteEchoRun w
   clock : Nat -> Nat
-  represents_open0 : CertifiedRepresentsRawTime run clock start
-    (T.frames.openingAt S.i0)
-  represents_close0 : CertifiedRepresentsRawTime run clock start
-    (T.frames.closingAt S.i0)
-  represents_open1 : CertifiedRepresentsRawTime run clock start
-    (T.frames.openingAt S.i1)
-  represents_close1 : CertifiedRepresentsRawTime run clock start
-    (T.frames.closingAt S.i1)
-  represents_open2 : CertifiedRepresentsRawTime run clock start
-    (T.frames.openingAt S.i2)
-  represents_close2 : CertifiedRepresentsRawTime run clock start
-    (T.frames.closingAt S.i2)
   selected_clock_order :
     clock (T.frames.openingAt S.i0) <
         clock (T.frames.openingAt S.i1) ∧

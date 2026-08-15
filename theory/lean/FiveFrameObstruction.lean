@@ -31,13 +31,6 @@ structure RawNovelClosingFrame
     (w : Wiring) (N : Nat) (start : Nat × Tongues)
     (left reroute right : Nat) : Prop where
   outer : RawLastWriterFrame w N start left right
-  reroute_productive : RawProductiveAt w N start reroute
-  different_writer :
-    rawWriterAt w start reroute ≠ rawWriterAt w start right
-  no_same_rerouter_before : ∀ j, left < j → j < reroute →
-    RawProductiveAt w N start j →
-    rawWriterAt w start j ≠ rawWriterAt w start reroute
-  shape : RawOpenReroutingShape w N start left reroute right
 
 /-- Package the open-frame decomposition as one existential witness. -/
 theorem RawRepeatedWriterNovelAt.novelClosingFrame
@@ -50,10 +43,6 @@ theorem RawRepeatedWriterNovelAt.novelClosingFrame
       noEarlier, shape⟩ := h.open_rerouting_decomposition hN
   exact ⟨left, reroute, {
     outer := outer
-    reroute_productive := productive
-    different_writer := different
-    no_same_rerouter_before := noEarlier
-    shape := shape
   }⟩
 
 /-- Last-writer frames with strictly ordered closing times cannot share an

@@ -259,13 +259,6 @@ structure RawFixedStemOpenFrame
   left : Nat
   reroute : Nat
   outer : RawLastWriterFrame w N start left right
-  reroute_productive : RawProductiveAt w N start reroute
-  different_writer :
-    rawWriterAt w start reroute ≠ rawWriterAt w start right
-  no_same_rerouter_before : ∀ j, left < j → j < reroute →
-    RawProductiveAt w N start j →
-    rawWriterAt w start j ≠ rawWriterAt w start reroute
-  shape : RawOpenReroutingShape w N start left reroute right
 
 /-- Five chronological raw novelties together with all five proved fixed-stem
 open frames.  This is the global object consumed by the remaining physical
