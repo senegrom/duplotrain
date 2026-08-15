@@ -5,6 +5,7 @@ import EarlyFacingConstant
 import ChangedStayCountConstant
 import ChangedFlipCountConstant
 import CompleteRepairConstant
+import ShortSuffixCount
 
 /-!
 # Constant tongue count for protected facing-forward repairs
@@ -678,31 +679,6 @@ end GeneralN
 
 namespace GeneralN
 
-/-- If the train is already off by `horizon`, every live sample time lies
-strictly before that horizon. -/
-private theorem twocand_dead_tail_distinct_le
-    {w : Wiring} {N horizon : Nat} {start : Nat × Tongues}
-    (hdead : stepN w horizon start = none)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ horizon := by
-  have htimesNodup : times.Nodup :=
-    tailsharp_nodup_of_map_nodup
-      (restrictedTonguesAt w N start) hnd
-  have hlt : ∀ k ∈ times, k < horizon := by
-    intro k hk
-    by_cases hsmall : k < horizon
-    · exact hsmall
-    · have hkge : horizon ≤ k := by omega
-      have hkEq : k = horizon + (k - horizon) := by omega
-      have hnone : stepN w k start = none := by
-        rw [hkEq, stepN_add, hdead]
-        simp
-      have hkLive := hlive k hk
-      simp [hnone] at hkLive
-  exact nodup_nat_lt_length htimesNodup hlt
-
 /-- **Known incoming edge, coefficient two.**  The first and second sharp
 manufacturing histories contribute at most `2*N+2` after their shared
 boundary is erased.  Every protected-repair suffix is flat at six vectors.
@@ -720,7 +696,7 @@ theorem known_edge_distinct_le_two_mul_add_eight_candidate
     times.length ≤ 2 * N + 8 := by
   cases hfirstLive : stepN w (N + 1) start with
   | none =>
-      have hc := twocand_dead_tail_distinct_le
+      have hc := dead_horizon_live_distinct_le
         (N := N) hfirstLive times hlive hnd
       omega
   | some firstFinish =>
@@ -741,7 +717,7 @@ theorem known_edge_distinct_le_two_mul_add_eight_candidate
                   (restrictedTonguesAt w N (e, stateA))).Nodup →
                 tailTimes.length ≤ N + 1 := by
               intro tailTimes htailLive htailNodup
-              exact twocand_dead_tail_distinct_le
+              exact dead_horizon_live_distinct_le
                 (N := N) hsecondLive tailTimes
                   htailLive htailNodup
             have hcount :=
@@ -832,7 +808,7 @@ theorem state_law_linear_two_add_nine_candidate
       (restrictedTonguesAt w N start) hnd
   cases hone : stepN w 1 start with
   | none =>
-      have hc := twocand_dead_tail_distinct_le
+      have hc := dead_horizon_live_distinct_le
         (N := N) hone times hlive hnd
       omega
   | some middle =>

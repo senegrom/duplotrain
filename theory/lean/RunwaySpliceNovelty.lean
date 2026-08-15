@@ -587,11 +587,11 @@ theorem manufactured_flip_arbitrary_lobe_theta_half_three_phase
       · simpa using hrun
       · rcases htwo with hbase | hold
         · have hm : middle.2 = state := hphase.symm.trans hbase
-          simpa [hm]
+          simp [hm]
         · have hm : middle.2 = oldState := by
             change tonguesAt w (outside, state) d = oldState at hold
             exact hphase.symm.trans hold
-          simpa [oldState, hm]
+          simp [oldState, hm]
     · let q := d - C.toSupported.travel
       have hq : q ≤ faultTravel := by
         dsimp [q, travel] at hd ⊢
@@ -976,7 +976,7 @@ theorem manufactured_suffix_explicit_lobe_four_phase_tongues
       rw [htongues]
       rcases hphase with rfl | rfl
       · simp [newState, oldNewState]
-      · simp [newState, oldState]
+      · simp
     · by_cases hSecondC :
           d <= (C.toSupported.travel + lobeTravel) +
             C.toSupported.travel
@@ -995,7 +995,7 @@ theorem manufactured_suffix_explicit_lobe_four_phase_tongues
           have hshift := tonguesAt_add_of_reaches hHalfRun hlive
           rw [← hdq] at hshift
           rw [hshift, hold]
-          simp [newState, oldState]
+          simp [oldState]
         · have hlive : ∃ finish,
               stepN w q (outside, oldState) = some finish :=
             stepN_prefix_some hq hCrunOld
@@ -1026,8 +1026,8 @@ theorem manufactured_suffix_explicit_lobe_four_phase_tongues
           simp [tonguesAt, hrun]
         rw [htongues]
         rcases hphase with rfl | rfl
-        · simp [newState]
-        · simp [newState]
+        · simp
+        · simp
 
 /-- The compatible four-phase window repeats forever.  The endpoint period
 comes from the old supported-reflector API; every intermediate vector is

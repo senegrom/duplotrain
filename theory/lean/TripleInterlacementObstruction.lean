@@ -1,6 +1,7 @@
 import ConcreteCertifiedEchoRun
 import RestorationFrameOrdering
 import TrackCurveGrowth
+import RepeatedNoveltyDecomposition
 
 /-!
 # The physical triple-interlacement obstruction
@@ -86,14 +87,9 @@ theorem curveEdge_symm {w : Wiring} {u : Tongues} {p q : Nat}
   · exact Or.inr (internalCurveEdge_symm h)
 
 
-theorem unmatched_after_flip_eq_selected (u : Tongues) (C : Nat) :
-    unmatchedBranch (flipAt u C) C = selectedBranch u C := by
-  cases h : u C <;>
-    simp [unmatchedBranch, selectedBranch, branchPort, flipAt, h]
-
 theorem pivot_residual_keeps_endpoint_name (u : Tongues) (C : Nat) :
     selectedBranch u C = unmatchedBranch (flipAt u C) C := by
-  exact (unmatched_after_flip_eq_selected u C).symm
+  exact (GeneralN.unmatched_after_flip_eq_selected u C).symm
 
 end TripleInterlacement
 

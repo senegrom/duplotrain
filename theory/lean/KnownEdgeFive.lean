@@ -105,7 +105,7 @@ theorem ManufacturedReflector.protected_changed_contact_count_or_forward
     have happroachGroovedV : PassagesGrooved v approach :=
       happroachV.grooved_of_switchSimple happroachSimple
     have happroachLe : approach.length ≤ N :=
-      happroach.switchSimple_length_le_switches hN happroachSimple
+      happroach.simple_length_le hN happroachSimple
     exact Or.inl (fun times hnd =>
       backward_contact_distinct_le_succ_succ happroachLe
         hrecorded hrecordedGroovedV B.entryEdge
@@ -164,7 +164,7 @@ theorem ManufacturedReflector.protected_facing_contact_count_or_forward
     have happroachGrooved : PassagesGrooved contact approach :=
       happroach.grooved_of_switchSimple happroachSimple
     have happroachLe : approach.length ≤ N :=
-      happroach.switchSimple_length_le_switches hN happroachSimple
+      happroach.simple_length_le hN happroachSimple
     exact Or.inl (fun times hnd =>
       backward_contact_distinct_le_succ_succ happroachLe
         hrecorded hrecordedGrooved B.entryEdge harrive

@@ -485,7 +485,7 @@ def SelectedInternalEdge (u : Tongues) (p q : Nat) : Prop :=
     (p = 3*C ∧ q = selectedBranch u C) ∨
     (q = 3*C ∧ p = selectedBranch u C)
 
-theorem unmatched_after_flip_eq_selected (u : Tongues) (C : Nat) :
+theorem GeneralN.unmatched_after_flip_eq_selected (u : Tongues) (C : Nat) :
     unmatchedBranch (flipAt u C) C = selectedBranch u C := by
   cases h : u C <;>
     simp [unmatchedBranch, selectedBranch, branchPort, flipAt, h]

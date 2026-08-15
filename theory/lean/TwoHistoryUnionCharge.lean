@@ -2034,9 +2034,6 @@ theorem SecondHistoryContactData.backward_contact_two_novelty
     {oriented : Passage}
     (horiented :
       oriented ∈ A.orientedRoute C.contactState)
-    (horientedGroove :
-      arrive C.contactState oriented.2 =
-        (oriented.1, C.contactState))
     (horientedSwitch :
       passageSwitch oriented = C.fresh.1 / 3)
     (hbackward : C.fresh.2 = oriented.1)
@@ -2200,7 +2197,7 @@ theorem SecondHistoryContactData.changed_contact_two_novelty
       hswitch harrive hchanged
   rcases hdirection with hbackward | hforward
   · exact C.backward_contact_two_novelty
-      harrive horiented horientedGroove horientedSwitch
+      harrive horiented horientedSwitch
       hbackward times
   · obtain ⟨hforwardExit, repaired, hrepair, hrestored⟩ :=
       hforward

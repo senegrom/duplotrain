@@ -1,7 +1,6 @@
-import PartialSecondRunSharp
-import StateLawCoefficientOneTop
 import ReuseForcesReplayClosure
 import PointwiseRetraceSeparation
+import BoundaryDoubleDuplicate
 
 /-!
 # The changed-contact `N+4` frontier
@@ -73,21 +72,6 @@ theorem ManufacturedFlipReflector.action_not_mem_reusable_changedContact
   · exact (R.support_foreign R.candy (by simp)
       passage hcandy) hswitch
 
-/-- The private action switch is nevertheless one of the ambient `N`
-switches. -/
-theorem ManufacturedFlipReflector.action_lt_changedContact
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    (R : ManufacturedFlipReflector w g e) :
-    R.actionSwitch < N := by
-  have hlt :=
-    (ManufacturedReflector.flip R).exploration_trace.switch_lt
-      hN (R.mouth, R.firstArm) (by
-        simp [ManufacturedReflector.exploration])
-  simpa [passageSwitch,
-    ManufacturedFlipReflector.actionSwitch] using hlt
-
 /-- If the strict approach does not first-write the omitted action switch,
 then reusable support, approach writers, and that reserved switch occupy
 pairwise distinct ambient coordinates. -/
@@ -116,10 +100,10 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
       (e, (ManufacturedReflector.flip R).activatedState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact ultra_nodup_filter_nat _ List.nodup_range
+    exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply coeffTop_nodup_map_nat_of_injective_on
+    apply nodup_map_nat_of_injective_on_two_history
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)
@@ -137,7 +121,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
     have hkData := mem_rawFirstWriterTimes_iff.mp (by
       simpa [times] using hk)
     have houtside :=
-      C.approach_trace.productive_writer_not_reusable_of_endpoint_grooves
+      C.approach_trace.productive_writer_not_old_reusable
         hN (ManufacturedReflector.flip R) C.approach_simple
         hA C.old_grooves hkData.1 hkData.2.1
     apply houtside
@@ -164,7 +148,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
       switch ∈ R.actionSwitch :: occupied -> switch < N := by
     intro switch hswitch
     rcases List.mem_cons.mp hswitch with rfl | hoccupied
-    · exact R.action_lt_changedContact hN
+    · exact R.action_lt hN
     · rcases List.mem_append.mp hoccupied with hold | hfresh
       · exact (ManufacturedReflector.flip R).reusableSwitch_lt hN hold
       · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hfresh
@@ -352,20 +336,6 @@ structure SimpleContinuationChangedContact.RunwayNAddFourResidual
     Not (VectorCount.restrict N
       (flipAt C.contactState R.actionSwitch) ∈ C.compressedLead N)
 
-private theorem changedContact_period_all_depths_live
-    {w : Wiring} {start : Nat × Tongues} {period d : Nat}
-    (hpositive : 0 < period)
-    (hperiod : stepN w period start = some start) :
-    exists finish, stepN w d start = some finish := by
-  have hfar : stepN w ((d + 1) * period) start = some start :=
-    stepN_mul_period_pair_novelty hperiod (d + 1)
-  have hbound : d <= (d + 1) * period := by
-    have hone : 1 <= period := by omega
-    have hmul := Nat.mul_le_mul_left (d + 1) hone
-    simp only [Nat.mul_one] at hmul
-    omega
-  exact stepN_prefix_some hbound hfar
-
 /-- A forward changed contact into a flip reflector has a one-novelty tail,
 unless it produces the exact runway Gray-square residual above. -/
 theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_residual
@@ -491,7 +461,7 @@ theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_resi
               D state hDpaths hNewAvoidsD hentryBranch hentrySwitch
               hfullGrooved hfullTrace hcrossed hCandyForeignNew hLobe
               hmouthLink hcontact
-          have hlive := changedContact_period_all_depths_live
+          have hlive := runway_period_stepN_some
             (d := d) hpositive hperiod
           simpa [state] using hlive
         · have hCandyForeignOld : forall passage, passage ∈ candy ->
@@ -546,7 +516,7 @@ theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_resi
             dsimp [period]
             exact D.toSupported.paired_period L hOldAvoidsL hNewAvoidsD
               (flipAt state (mouth / 3)) hDNew hLNew
-          have hlive := changedContact_period_all_depths_live
+          have hlive := runway_period_stepN_some
             (d := d) hpositive hperiod
           simpa [state] using hlive
       have hgray : forall d,
@@ -861,7 +831,7 @@ theorem SimpleContinuationChangedContact.RunwayNAddFourResidual.impossible
         rw [hcontactSum] at htRight
         exact htRight
       have hnotReusable :=
-        PhysicalTrace.productive_writer_not_reusable_of_endpoint_grooves
+        PhysicalTrace.productive_writer_not_old_reusable
           hN (ManufacturedReflector.flip R) C.approach_trace
           C.approach_simple hA C.old_grooves htBound htProd
       apply hnotReusable

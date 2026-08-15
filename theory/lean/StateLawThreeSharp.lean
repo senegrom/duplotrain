@@ -15,7 +15,7 @@ theorem state_law_linear_three_sharp
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ 3 * N + 7 := by
   apply arbitrary_start_distinct_le_succ_of_known_edge
-    (cap := 3 * N + 6) hN (by omega)
+    (N := N) (cap := 3 * N + 6) (by omega)
   · intro e localStart finish hlong hentry localTimes
       hlocalLive hlocalNodup
     exact known_edge_long_run_distinct_le_three_sharp

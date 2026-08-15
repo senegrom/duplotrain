@@ -27,6 +27,6 @@ def encodedEntries (entry : Nat → Nat) : Nat → Nat :=
     (w : Wiring) (entry : Nat → Nat) (k : Nat) :
     (canonicalEchoMachine w).cellOf (encodedEntries entry k) =
       physicalCell w (entry k) := by
-  simp [encodedEntries, physicalCell, canonicalPhysicalCellOf]
+  simp [encodedEntries, physicalCell]
 
 end GeneralN

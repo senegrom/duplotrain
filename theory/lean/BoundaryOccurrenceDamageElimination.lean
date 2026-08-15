@@ -17,7 +17,7 @@ namespace GeneralN
 
 /-- Pairing a grooved flip reflector with itself at equal endpoints collapses
 the general four-phase law to its two action phases. -/
-private theorem ManufacturedFlipReflector.same_endpoint_two_phase
+theorem ManufacturedFlipReflector.same_endpoint_two_phase
     {w : Wiring} {g e : Nat}
     (R : ManufacturedFlipReflector w g e)
     (hge : g = e)
@@ -212,7 +212,6 @@ theorem InitialEntryWriterOccurrence.mem_doubleReducedContactLead_of_mem_compres
       (ManufacturedReflector.flip R))
     (original : Tongues)
     (hstay : O.next = O.middle)
-    (hdifferent : O.before.length ≠ R.runway.length)
     {x : List Bool}
     (hx : x ∈ C.compressedLead N) :
     x ∈ O.doubleReducedContactLead (N := N) C original := by
@@ -221,7 +220,7 @@ theorem InitialEntryWriterOccurrence.mem_doubleReducedContactLead_of_mem_compres
   rcases List.mem_append.mp hx with hxFirst | hxTail
   · apply List.mem_append_left
     apply O.sharp_mem_doubleReducedBoundaryHistory original
-      hstay hdifferent
+      hstay
     exact List.mem_of_mem_erase hxFirst
   · exact List.mem_append_right _ hxTail
 
@@ -236,7 +235,6 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_global_cover
       (ManufacturedReflector.flip R))
     (original : Tongues)
     (hstay : O.next = O.middle)
-    (hdifferent : O.before.length ≠ R.runway.length)
     (hA : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths
       (ManufacturedReflector.flip R).activatedState)
@@ -271,7 +269,7 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_global_cover
     unfold InitialEntryWriterOccurrence.doubleReducedContactLead
     apply List.mem_append_left
     apply O.sharp_mem_doubleReducedBoundaryHistory original
-      hstay hdifferent
+      hstay
     exact A.manufacturing_journey_mem_sharpHistory hA (by
       simpa [firstTravel] using hfirst)
   · let d := k - firstTravel
@@ -285,7 +283,7 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_global_cover
     rcases List.mem_append.mp hm with hmHistory | hmFresh
     · apply List.mem_append_left
       exact O.mem_doubleReducedContactLead_of_mem_compressedLead
-        (N := N) C original hstay hdifferent hmHistory
+        (N := N) C original hstay hmHistory
     · exact List.mem_append_right _ hmFresh
 
 /-- Count the arbitrary boundary vector together with a changed-contact run
@@ -299,7 +297,6 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_count
       (ManufacturedReflector.flip R))
     (original : Tongues)
     (hstay : O.next = O.middle)
-    (hdifferent : O.before.length ≠ R.runway.length)
     (hA : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths
       (ManufacturedReflector.flip R).activatedState)
@@ -319,7 +316,7 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_count
     times.length + 1 ≤
       (O.doubleReducedContactLead (N := N) C original).length + budget := by
   have hcover := O.doubleReducedContactLead_global_cover
-    (N := N) C original hstay hdifferent hA times hlive hlocal
+    (N := N) C original hstay hA times hlive hlocal
   exact novelty_cover_count_with_historical_extra
     (VectorCount.restrict N original) hcover
       (O.original_mem_doubleReducedContactLead (N := N) C original) hnd
@@ -373,7 +370,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_occurrenc
   · have hlocal := C.backward_all_time_zero_novelty
       (N := N) hbackward localTimes
     have hcount := O.doubleReducedContactLead_count
-      (N := N) C S.source.original hstay hdifferent hA
+      (N := N) C S.source.original hstay hA
         S.source.times hlive hnd (by
           simpa [localTimes] using hlocal)
     have hlengthEq := O.doubleReducedContactLead_length_eq
@@ -386,7 +383,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_occurrenc
           hforward hrepair hrestored haction localTimes with
         hone | hresidual
       · have hcount := O.doubleReducedContactLead_count
-          (N := N) C S.source.original hstay hdifferent hA
+          (N := N) C S.source.original hstay hA
             S.source.times hlive hnd (by
               simpa [localTimes] using hone)
         have hlengthEq := O.doubleReducedContactLead_length_eq
@@ -396,7 +393,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_occurrenc
       · exact (Classical.choice hresidual).impossible hN hA
     · have hlocal := C.changed_two_novelty (N := N) localTimes
       have hcount := O.doubleReducedContactLead_count
-        (N := N) C S.source.original hstay hdifferent hA
+        (N := N) C S.source.original hstay hA
           S.source.times hlive hnd (by
             simpa [localTimes] using hlocal)
       have hlengthEq := O.doubleReducedContactLead_length_eq

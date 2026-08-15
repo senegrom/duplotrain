@@ -913,33 +913,6 @@ theorem ChangedContact.forward_flip_all_time_two_novelty
     obtain ⟨fresh, hfresh, hmem⟩ := hone
     exact ⟨fresh, by omega, hmem⟩
 
-private theorem partial_twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    simpa using hrun
-
 /-- Exact two-phase tail after a changed forward contact with a stay
 reflector, generalized to an arbitrary switch-simple partial route. -/
 theorem ChangedContact.forward_stay_two_phase_tail
@@ -1084,14 +1057,14 @@ theorem ChangedContact.forward_stay_two_phase_tail
           stepN w d (outside, alternate) = some (port, phase) ∧
           (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact partial_twoPhase_concat
+        exact GeneralN.stay_twoPhase_concat
           hDaltEnd hDaltPhase hReversePhase d
           (by simpa [half] using hd)
       have hHalfStatePhase : ∀ d, d ≤ half → ∃ port phase,
           stepN w d (outside, C.contactState) = some (port, phase) ∧
           (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact partial_twoPhase_concat
+        exact GeneralN.stay_twoPhase_concat
           hDstateEnd hDstatePhase hForwardPhase d
           (by simpa [half] using hd)
       let period := half + half
@@ -1104,7 +1077,7 @@ theorem ChangedContact.forward_stay_two_phase_tail
           stepN w d (outside, alternate) = some (port, phase) ∧
           (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact partial_twoPhase_concat
+        exact GeneralN.stay_twoPhase_concat
           hHalfAlt hHalfAltPhase hHalfStatePhase d
           (by simpa [period] using hd)
       have hpositive : 0 < period := by
@@ -1166,7 +1139,7 @@ theorem ChangedContact.forward_stay_two_phase_tail
           stepN w d (R.arm, alternate) = some (port, phase) ∧
           (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact partial_twoPhase_concat
+        exact GeneralN.stay_twoPhase_concat
           hReverseEnd hReversePhase hForwardPhase d
           (by simpa [period] using hd)
       have hpositive : 0 < period := by
@@ -1480,7 +1453,7 @@ theorem ManufacturedReflector.partial_second_run_distinct_le_N_add_six
 /-- **Known incoming edge, coefficient one.**  The first probe either dies,
 settles on its own simple cycle, or manufactures `A`; in the last case the
 preceding theorem closes the entire second run at `N+6`. -/
-theorem known_edge_all_run_distinct_le_N_add_six
+theorem PartialSecondRunSharp.known_edge_all_run_distinct_le_N_add_six
     {w : Wiring} {N e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     {start : Nat × Tongues}

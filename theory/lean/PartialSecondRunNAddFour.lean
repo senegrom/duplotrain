@@ -1,4 +1,3 @@
-import PartialSecondRunSharp
 import StateLawCoefficientOneTop
 
 /-!

@@ -59,7 +59,7 @@ theorem canonicalEchoMachine_star_entry
   have hpartnerEq : partner = entryLanding w p / 3 :=
     mouthPaired_right_unique hmouth hcanonical
   subst partner
-  simp only [canonicalEchoMachine_cell, canonicalEchoMachine,
+  simp only [canonicalEchoMachine,
     encodedMachine, encodedCellOf_encodeSlot, canonicalPhysicalCellOf]
   exact rootCode_mouth_partner hcanonical hne
 

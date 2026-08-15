@@ -46,10 +46,10 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_reser
       (e, (ManufacturedReflector.flip R).activatedState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact ultra_nodup_filter_nat _ List.nodup_range
+    exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply bccs_nodup_map_nat_of_injective_on
+    apply nodup_map_nat_of_injective_on_two_history
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)
@@ -67,7 +67,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_reser
     have hkData := mem_rawFirstWriterTimes_iff.mp (by
       simpa [times] using hk)
     have houtside :=
-      C.approach_trace.productive_writer_not_reusable_of_endpoint_grooves
+      C.approach_trace.productive_writer_not_old_reusable
         hN (ManufacturedReflector.flip R) C.approach_simple
         hA C.old_grooves hkData.1 hkData.2.1
     apply houtside

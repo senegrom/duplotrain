@@ -166,7 +166,7 @@ theorem ManufacturedReflector.completed_route_with_pair_support_distinct_le_n_su
     simpa [L, endpoint] using hrouteFinal'.sound
   have hLLe : L ≤ N := by
     dsimp [L]
-    exact hrepair.switchSimple_length_le_switches hN
+    exact hrepair.simple_length_le hN
       (A.orientedRoute_simple state)
   have htimesNodup : times.Nodup :=
     tailsharp_nodup_of_map_nodup

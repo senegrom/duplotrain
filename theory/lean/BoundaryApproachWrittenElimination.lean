@@ -1,5 +1,4 @@
 import BoundaryResidualSharpening
-import BoundaryApproachActionElimination
 
 /-!
 # Elimination of the approach-written productive-boundary residual

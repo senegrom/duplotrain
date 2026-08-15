@@ -3043,7 +3043,7 @@ theorem ManufacturedFlipReflector.candy_tail_foreign_action
     have hne := hparts.2.2 R.actionSwitch hactionPrefix
       (passageSwitch passage)
       (List.mem_cons_of_mem _ htailKey)
-    exact hne (by simpa [hEq])
+    exact hne (by simp [hEq])
   · have htargetCandy :
         (entry, mouth) ∈ reversePassages R.candy := by
       simp only [ManufacturedReflector.orientedRoute, hselected,
@@ -3109,7 +3109,7 @@ theorem ManufacturedFlipReflector.candy_tail_foreign_action
     have hne := hparts.2.2 R.actionSwitch hactionPrefix
       (passageSwitch passage)
       (List.mem_cons_of_mem _ htailKey)
-    exact hne (by simpa [hEq])
+    exact hne (by simp [hEq])
 
 /-- After the selected one-way route of a flip reflector reaches its far
 candy arm, one trailing passage applies the reflector's action and the train

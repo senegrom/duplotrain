@@ -82,36 +82,6 @@ private theorem exists_first_after {P : Nat → Prop} :
           exact hnext
         · exact hsmin r (by omega) hrs
 
-/-- A nonempty bounded predicate has a last witness below its bound. -/
-private theorem exists_last_before {P : Nat → Prop} :
-    ∀ b, (∃ t, t < b ∧ P t) →
-      ∃ t, t < b ∧ P t ∧
-        ∀ s, t < s → s < b → ¬ P s := by
-  intro b
-  induction b with
-  | zero =>
-      intro h
-      obtain ⟨t, ht, _⟩ := h
-      omega
-  | succ n ih =>
-      intro h
-      by_cases hn : P n
-      · exact ⟨n, by omega, hn, fun s hs0 hs1 => by omega⟩
-      · have h' : ∃ t, t < n ∧ P t := by
-          obtain ⟨t, ht, hPt⟩ := h
-          refine ⟨t, ?_, hPt⟩
-          by_cases htn : t = n
-          · subst t
-            exact (hn hPt).elim
-          · omega
-        obtain ⟨t, ht, hPt, hlast⟩ := ih h'
-        refine ⟨t, by omega, hPt, ?_⟩
-        intro s hts hsn
-        by_cases hsnEq : s = n
-        · subst s
-          exact hn
-        · exact hlast s hts (by omega)
-
 /-- If a register changed on `[i,j]`, choose the *last* productive write of
 that register before `j`. No later productive step before `j` writes the same
 cell. This is the stable top-frame witness needed by crossing arguments. -/
@@ -128,7 +98,7 @@ theorem change_has_last_productive_write
       (ProductiveStep m e r0 t ∧ writerAt m e t = c) := by
     exact ⟨t₀, ht₀j, hp₀, by simpa [writerAt] using hc₀⟩
   obtain ⟨t, htj, hp, hlast⟩ :=
-    exists_last_before (P := fun s =>
+    exists_last_lt (P := fun s =>
       ProductiveStep m e r0 s ∧ writerAt m e s = c) j hex
   have hit : i ≤ t := by
     by_cases hle : i ≤ t

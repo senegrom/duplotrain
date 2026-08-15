@@ -337,7 +337,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_succ_succ
       exact periodic_two_phase_prefix_tongues
         hloopPositive hperiod hperiodPhase
   have hbeforeLeN : before.length ≤ N :=
-    hprefix.switchSimple_length_le_switches hN hbeforeSimple
+    hprefix.simple_length_le hN hbeforeSimple
   have hcontactWindow :
       restrictedTonguesAt w N
         (g, (ManufacturedReflector.flip R).activatedState)

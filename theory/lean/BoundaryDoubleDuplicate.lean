@@ -61,7 +61,6 @@ private theorem canonical_pre_mem_doubleReducedTimes
     {R : ManufacturedFlipReflector w g e}
     (O : InitialEntryWriterOccurrence w g e k0
       (ManufacturedReflector.flip R))
-    (hdifferent : O.before.length ≠ R.runway.length)
     (hnotOccurrencePost : R.runway.length ≠ O.before.length + 1) :
     R.runway.length ∈ O.doubleReducedTimes := by
   apply mem_doubleReducedTimes_of_ne O
@@ -75,7 +74,6 @@ private theorem occurrence_pre_mem_doubleReducedTimes
     {R : ManufacturedFlipReflector w g e}
     (O : InitialEntryWriterOccurrence w g e k0
       (ManufacturedReflector.flip R))
-    (hdifferent : O.before.length ≠ R.runway.length)
     (hnotCanonicalPost : O.before.length ≠ R.runway.length + 1) :
     O.before.length ∈ O.doubleReducedTimes := by
   apply mem_doubleReducedTimes_of_ne O
@@ -123,8 +121,7 @@ theorem InitialEntryWriterOccurrence.sharp_mem_doubleReducedBoundaryHistory
     (O : InitialEntryWriterOccurrence w g e k0
       (ManufacturedReflector.flip R))
     (original : Tongues)
-    (hstay : O.next = O.middle)
-    (hdifferent : O.before.length ≠ R.runway.length) :
+    (hstay : O.next = O.middle) :
     ∀ v,
       v ∈ (ManufacturedReflector.flip R).sharpConstructionHistory N →
       v ∈ O.doubleReducedBoundaryHistory N original := by
@@ -153,27 +150,27 @@ theorem InitialEntryWriterOccurrence.sharp_mem_doubleReducedBoundaryHistory
     · subst t
       by_cases hoverlap : R.runway.length = O.before.length + 1
       · apply put O.before.length
-          (occurrence_pre_mem_doubleReducedTimes O hdifferent (by omega))
+          (occurrence_pre_mem_doubleReducedTimes O (by omega))
         calc
           f O.before.length = f (O.before.length + 1) := hoccurrence
           _ = f R.runway.length := by rw [hoverlap]
           _ = f (R.runway.length + 1) := hcanonical
           _ = v := htv
       · apply put R.runway.length
-          (canonical_pre_mem_doubleReducedTimes O hdifferent hoverlap)
+          (canonical_pre_mem_doubleReducedTimes O hoverlap)
         exact hcanonical.trans htv
     · by_cases htOccurrence : t = O.before.length + 1
       · subst t
         by_cases hoverlap : O.before.length = R.runway.length + 1
         · apply put R.runway.length
-            (canonical_pre_mem_doubleReducedTimes O hdifferent (by omega))
+            (canonical_pre_mem_doubleReducedTimes O (by omega))
           calc
             f R.runway.length = f (R.runway.length + 1) := hcanonical
             _ = f O.before.length := by rw [hoverlap]
             _ = f (O.before.length + 1) := hoccurrence
             _ = v := htv
         · apply put O.before.length
-            (occurrence_pre_mem_doubleReducedTimes O hdifferent hoverlap)
+            (occurrence_pre_mem_doubleReducedTimes O hoverlap)
           exact hoccurrence.trans htv
       · apply put t
           (mem_doubleReducedTimes_of_ne O htBound
@@ -228,10 +225,7 @@ theorem InitialEntryWriterOccurrence.mem_doubleReducedTwoHistory
       (ManufacturedReflector.flip R))
     (B : ManufacturedReflector w e g)
     (original : Tongues)
-    (hstay : O.next = O.middle)
-    (hdifferent : O.before.length ≠ R.runway.length)
-    (hbase : B.baseState =
-      (ManufacturedReflector.flip R).activatedState) :
+    (hstay : O.next = O.middle) :
     VectorCount.restrict N original ∈
         O.doubleReducedTwoHistory B N original ∧
       (∀ x,
@@ -243,7 +237,7 @@ theorem InitialEntryWriterOccurrence.mem_doubleReducedTwoHistory
           (ManufacturedReflector.flip R).activatedState ∈
         O.doubleReducedBoundaryHistory N original := by
     apply O.sharp_mem_doubleReducedBoundaryHistory original
-      hstay hdifferent
+      hstay
     simp [ManufacturedReflector.sharpConstructionHistory]
   constructor
   · apply List.mem_append_left
@@ -252,7 +246,7 @@ theorem InitialEntryWriterOccurrence.mem_doubleReducedTwoHistory
     rcases hx with hA | hB
     · apply List.mem_append_left
       exact O.sharp_mem_doubleReducedBoundaryHistory
-        original hstay hdifferent x hA
+        original hstay x hA
     · have hwriter := B.mem_writerConstructionHistory_of_mem_sharp hB
       by_cases hboundary :
           x = VectorCount.restrict N

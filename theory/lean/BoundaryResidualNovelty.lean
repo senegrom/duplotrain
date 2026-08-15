@@ -186,7 +186,6 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_one_novelty_of_
     (B : ManufacturedReflector w e g)
     (original : Tongues)
     (hstay : O.next = O.middle)
-    (hdifferent : O.before.length ≠ R.runway.length)
     (hbase : B.baseState =
       (ManufacturedReflector.flip R).activatedState)
     (hApaths : PathGrooves
@@ -210,7 +209,7 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_one_novelty_of_
       (O.doubleReducedTwoHistory B N original) 1 := by
   let history := O.doubleReducedTwoHistory B N original
   have hhistoryData := O.mem_doubleReducedTwoHistory
-    (N := N) B original hstay hdifferent hbase
+    (N := N) B original hstay
   have hhistory : ∀ x,
       x ∈ (ManufacturedReflector.flip R).sharpConstructionHistory N ∨
         x ∈ B.sharpConstructionHistory N → x ∈ history := by
@@ -272,7 +271,7 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_cover
         (O.doubleReducedTwoHistory B N original) budget := by
   let history := O.doubleReducedTwoHistory B N original
   have hhistoryData := O.mem_doubleReducedTwoHistory
-    (N := N) B original hstay hdifferent hbase
+    (N := N) B original hstay
   have hhistory : ∀ x,
       x ∈ (ManufacturedReflector.flip R).sharpConstructionHistory N ∨
         x ∈ B.sharpConstructionHistory N → x ∈ history := by
@@ -288,7 +287,7 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_cover
     obtain ⟨t, ht, hwriter⟩ := List.mem_map.mp haction
     have hcover :=
       O.noncanonical_protected_pair_one_novelty_of_action_writer
-        hN B original hstay hdifferent hbase hApaths hBpaths hpre
+        hN B original hstay hbase hApaths hBpaths hpre
           ht hwriter times hlive hnd
     have hlength := O.doubleReducedTwoHistory_length_le_N_add_three
       hN B original hdifferent hbase hAatBase hpre
@@ -351,8 +350,8 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_all_run_distinc
         (List.nodup_cons.mp hnd).2
   have horiginal : VectorCount.restrict N original ∈
       O.doubleReducedTwoHistory B N original :=
-    (O.mem_doubleReducedTwoHistory (N := N) B original hstay
-      hdifferent hbase).1
+    (O.mem_doubleReducedTwoHistory (N := N) B original
+      hstay).1
   have hcount := novelty_cover_count_with_historical_extra
     (VectorCount.restrict N original) hcover horiginal hnd
   omega

@@ -124,7 +124,7 @@ theorem manufactured_pair_all_time_action_corners_tongues
                 ManufacturedReflector.toSupported,
                 ManufacturedStayReflector.toSupported,
                 ManufacturedFlipReflector.toSupported,
-                LocalAction.apply, flipAt_flipAt]
+                LocalAction.apply]
       | flip FB =>
           change PathGrooves [FA.runway, FA.candy] state at hA
           change PathGrooves [FB.runway, FB.candy] state at hB

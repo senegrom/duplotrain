@@ -56,10 +56,10 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_add_reserved_le
   let writers := times.map (rawWriterAt w (e, B.baseState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact ultra_nodup_filter_nat _ List.nodup_range
+    exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply coeffTop_nodup_map_nat_of_injective_on
+    apply nodup_map_nat_of_injective_on_two_history
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)
@@ -141,10 +141,10 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_add_two_reserved
   let writers := times.map (rawWriterAt w (e, B.baseState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact ultra_nodup_filter_nat _ List.nodup_range
+    exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply coeffTop_nodup_map_nat_of_injective_on
+    apply nodup_map_nat_of_injective_on_two_history
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)

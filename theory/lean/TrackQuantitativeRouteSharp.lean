@@ -37,19 +37,4 @@ theorem PhysicalTrace.passage_switches_lt
         omega
       · exact ih s hs
 
-/-- A switch-simple trace in an `N`-switch wiring contains at most `N`
-passages. -/
-theorem PhysicalTrace.switchSimple_length_le_switches
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    {start finish : Nat × Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages) :
-    passages.length ≤ N := by
-  unfold SwitchSimple at hsimple
-  have hlt := htrace.passage_switches_lt hN
-  simpa only [List.length_map] using
-    nodup_nat_lt_length hsimple hlt
-
 end GeneralN

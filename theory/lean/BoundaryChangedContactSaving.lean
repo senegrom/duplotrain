@@ -21,29 +21,6 @@ refined residuals the sharp law still has to eliminate.
 
 namespace GeneralN
 
-theorem bccs_nodup_map_nat_of_injective_on
-    {f : Nat -> Nat} {xs : List Nat}
-    (hinj : forall i, i ∈ xs -> forall j, j ∈ xs ->
-      f i = f j -> i = j)
-    (hnd : xs.Nodup) : (xs.map f).Nodup := by
-  induction xs with
-  | nil => simp
-  | cons x rest ih =>
-      rw [List.nodup_cons] at hnd
-      rw [List.map_cons, List.nodup_cons]
-      constructor
-      · intro hm
-        obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-        have hxy : y = x :=
-          hinj y (List.mem_cons_of_mem _ hy) x List.mem_cons_self hfy
-        rw [hxy] at hy
-        exact hnd.1 hy
-      · exact ih
-          (fun i hi j hj =>
-            hinj i (List.mem_cons_of_mem _ hi)
-              j (List.mem_cons_of_mem _ hj))
-          hnd.2
-
 /-- A switch absent from a flip reflector's exploration is absent from its
 reusable support. -/
 theorem ManufacturedFlipReflector.reserved_not_mem_reusable
@@ -115,10 +92,10 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
       (e, (ManufacturedReflector.flip R).activatedState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact ultra_nodup_filter_nat _ List.nodup_range
+    exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply bccs_nodup_map_nat_of_injective_on
+    apply nodup_map_nat_of_injective_on_two_history
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)
@@ -136,7 +113,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
     have hkData := mem_rawFirstWriterTimes_iff.mp (by
       simpa [times] using hk)
     have houtside :=
-      C.approach_trace.productive_writer_not_reusable_of_endpoint_grooves
+      C.approach_trace.productive_writer_not_old_reusable
         hN (ManufacturedReflector.flip R) C.approach_simple
         hA C.old_grooves hkData.1 hkData.2.1
     apply houtside
@@ -180,7 +157,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
     rcases List.mem_cons.mp hswitch with rfl | hrest
     · exact hk0
     rcases List.mem_cons.mp hrest with rfl | hoccupied
-    · exact R.action_lt_changedContact hN
+    · exact R.action_lt hN
     rcases List.mem_append.mp hoccupied with hold | hfresh
     · exact (ManufacturedReflector.flip R).reusableSwitch_lt hN hold
     · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hfresh

@@ -16,38 +16,6 @@ retrace case.
 
 namespace GeneralN
 
-/-- A finite nonempty set of natural indices has a greatest member. -/
-theorem exists_last_le {P : Nat → Prop} :
-    ∀ k, (∃ j, j ≤ k ∧ P j) →
-      ∃ j, j ≤ k ∧ P j ∧
-        ∀ i, j < i → i ≤ k → ¬ P i := by
-  intro k
-  induction k with
-  | zero =>
-      intro h
-      obtain ⟨j, hj, hp⟩ := h
-      have hj0 : j = 0 := Nat.le_zero.mp hj
-      subst j
-      exact ⟨0, Nat.le_refl _, hp,
-        fun i hi hle _ => by omega⟩
-  | succ n ih =>
-      intro h
-      by_cases htop : P (n + 1)
-      · exact ⟨n + 1, Nat.le_refl _, htop,
-          fun i hi hle _ => by omega⟩
-      · obtain ⟨j, hj, hp⟩ := h
-        have hjn : j ≤ n := by
-          by_cases hjeq : j = n + 1
-          · exact False.elim (htop (hjeq ▸ hp))
-          · omega
-        obtain ⟨r, hrn, hrP, hrLast⟩ :=
-          ih ⟨j, hjn, hp⟩
-        refine ⟨r, Nat.le_trans hrn (Nat.le_succ n), hrP, ?_⟩
-        intro i hri hik hiP
-        by_cases hitop : i = n + 1
-        · exact htop (hitop ▸ hiP)
-        · exact hrLast i hri (by omega) hiP
-
 /-- With no write to `c` through time `k`, the echo register remains its
 initial value. -/
 theorem reg_eq_initial_of_no_write

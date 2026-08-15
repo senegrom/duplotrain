@@ -150,7 +150,7 @@ theorem unproductive_stall (k : Nat)
   · rw [reg_write m e r0 hc, h, hc]
   · exact reg_skip m e r0 hc
 
-private theorem exists_last {P : Nat → Prop} :
+theorem exists_last {P : Nat → Prop} :
     ∀ k, (∃ j, j ≤ k ∧ P j) →
       ∃ j, j ≤ k ∧ P j ∧ ∀ i, j < i → i ≤ k → ¬ P i := by
   intro k
@@ -229,7 +229,7 @@ private theorem map_congr' {f g : Nat → Nat} :
         ih (fun y hy => h y (List.mem_cons_of_mem _ hy))]
 
 
-private theorem exists_last_lt {P : Nat → Prop} :
+theorem exists_last_lt {P : Nat → Prop} :
     ∀ k, (∃ j, j < k ∧ P j) →
       ∃ j, j < k ∧ P j ∧ ∀ i, j < i → i < k → ¬ P i := by
   intro k

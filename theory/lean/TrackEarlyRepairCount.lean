@@ -304,7 +304,7 @@ theorem ManufacturedFlipReflector.facing_mouth_contact_distinct_le_succ_succ
     rw [stepN_add, happroach.sound]
     exact hcaptureFromContact
   have happroachLe : approach.length ≤ N :=
-    happroach.switchSimple_length_le_switches hN happroachSimple
+    happroach.simple_length_le hN happroachSimple
   have hcontactWindow :
       restrictedTonguesAt w N (g, startState) approach.length =
         VectorCount.restrict N contact := by

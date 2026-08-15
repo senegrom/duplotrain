@@ -146,7 +146,7 @@ theorem certifiedConcreteEcho_isRun
   by_cases hprev : ∃ j, j ≤ k ∧
       physicalCell w (trace.entry j) = partner
   · obtain ⟨j, hjk, hjCell, hjLast⟩ :=
-      exists_last_le k hprev
+      Echo.exists_last k hprev
     have hreg :
         Echo.reg (canonicalEchoMachine w)
           (encodedEntries trace.entry) run.initialRegister k partner =

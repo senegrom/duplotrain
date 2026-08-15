@@ -164,11 +164,11 @@ theorem arbitrary_start_distinct_le_N_add_four_of_known_edge_and_productive_boun
             simp [shifted]
           have hzeroBound : zeroTimes.length <= 1 := by
             dsimp [zeroTimes]
-            exact ultra_zero_filter_length_le_one htimesNodup
+            exact kel_zero_filter_length_le_one htimesNodup
           have hpartition : zeroTimes.length + positive.length =
               times.length := by
             simpa [zeroTimes, positive] using
-              ultra_zero_positive_partition times
+              kel_zero_positive_partition times
           by_cases hzero : 0 ∈ times
           · have hzeroMem : 0 ∈ zeroTimes := by
               dsimp [zeroTimes]

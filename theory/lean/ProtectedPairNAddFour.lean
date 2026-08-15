@@ -1,6 +1,5 @@
 import PreReturnProtectedRoute
 import KnownEdgeNAddFourChangedClosed
-import BoundaryDoubleDuplicate
 
 /-!
 # The protected-pair `N+4` frontier
@@ -131,7 +130,7 @@ theorem ManufacturedFlipReflector.action_writer_is_last_productive
         rw [hendpointSum] at hlaterRight
         exact hlaterRight
       have hnotReusable :=
-        PhysicalTrace.productive_writer_not_reusable_of_endpoint_grooves
+        PhysicalTrace.productive_writer_not_old_reusable
           hN (ManufacturedReflector.flip R) B.exploration_trace
           B.exploration_simple hbaseGrooves hpreGrooves
           hlaterBound hlaterProd

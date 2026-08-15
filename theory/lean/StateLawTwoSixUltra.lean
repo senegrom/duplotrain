@@ -1428,71 +1428,6 @@ private theorem ultra_nodup_map_eq_of_mem
         case inr =>
           exact ih hnd.2 ha hb heq
 
-theorem ultra_nodup_filter_nat
-    (p : Nat -> Bool) :
-    forall {xs : List Nat},
-      xs.Nodup -> (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil =>
-      intro _
-      simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true,
-            List.nodup_cons]
-          constructor
-          case left =>
-            intro hm
-            apply hnd.1
-            exact (List.mem_filter.mp hm).1
-          case right =>
-            exact ih hnd.2
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-theorem ultra_zero_positive_partition :
-    forall xs : List Nat,
-      (xs.filter
-        (fun k => decide (k = 0))).length +
-      (xs.filter
-        (fun k => decide (0 < k))).length =
-      xs.length := by
-  intro xs
-  induction xs with
-  | nil =>
-      simp
-  | cons k rest ih =>
-      by_cases hk : k = 0
-      case pos =>
-        subst k
-        simp
-        omega
-      case neg =>
-        have hkPos : 0 < k := by
-          omega
-        simp [hk, hkPos]
-        omega
-
-theorem ultra_zero_filter_length_le_one
-    {xs : List Nat}
-    (hnd : xs.Nodup) :
-    (xs.filter
-      (fun k => decide (k = 0))).length <= 1 := by
-  have hfilterNodup :
-      (xs.filter
-        (fun k => decide (k = 0))).Nodup :=
-    ultra_nodup_filter_nat _ hnd
-  apply nodup_nat_lt_length hfilterNodup
-  intro k hk
-  have hk0 : k = 0 :=
-    of_decide_eq_true (List.mem_filter.mp hk).2
-  omega
-
 private theorem ultra_known_edge_distinct_le_two_mul_add_six
     {w : Wiring} {N e : Nat}
     (hN : forall p q, w.link p = some q ->
@@ -1656,13 +1591,13 @@ theorem state_law_linear_two_add_six_ultra
               have hzeroBound :
                   zeroTimes.length <= 1 := by
                 dsimp [zeroTimes]
-                exact ultra_zero_filter_length_le_one
+                exact kel_zero_filter_length_le_one
                   htimesNodup
               have hpartition :
                   zeroTimes.length + positive.length =
                     times.length := by
                 simpa [zeroTimes, positive] using
-                  ultra_zero_positive_partition times
+                  kel_zero_positive_partition times
               by_cases hzero : List.Mem 0 times
               case neg =>
                 have hzeroLength :

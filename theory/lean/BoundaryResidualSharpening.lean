@@ -2,7 +2,6 @@ import BoundaryResidualCharge
 import KnownEdgeNAddFourComplete
 import ProductiveBoundaryNAddFourComplete
 import PartialJourneyDichotomy
-import BoundaryChangedContactSaving
 
 /-!
 # Sharpening the productive-boundary residuals
@@ -44,8 +43,6 @@ theorem ProductiveBoundaryNAddFourSavingResidual.changed_contact_approach_writte
       p < 3 * N /\ q < 3 * N)
     (habsentA : Not (S.source.k0 ∈
       S.A.exploration.map passageSwitch))
-    (hagree : S.A.activatedState S.source.k0 =
-      S.source.base S.source.k0)
     (D : PartialSecondRunSharp.ChangedContact w S.A) :
     Nonempty (BoundaryApproachWrittenResidual S) := by
   have hApaths : PathGrooves S.A.toSupported.paths
@@ -70,7 +67,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.changed_contact_approach_writte
           hN hApaths S.source.times hlive hnd
       exact absurd hbound (by omega)
   | flip R =>
-      rw [hkind] at D hApaths hlive hnd habsentA hagree
+      rw [hkind] at D hApaths hlive hnd habsentA
       rcases D.flip_saving_le_N_add_three_or_approach_written
           hN hApaths S.source.switch_lt habsentA
             S.source.times hlive hnd with hbound | hwritten
@@ -91,8 +88,6 @@ theorem ProductiveBoundaryNAddFourSavingResidual.cycle_damage_approach_written_o
       p < 3 * N /\ q < 3 * N)
     (habsentA : Not (S.source.k0 ∈
       S.A.exploration.map passageSwitch))
-    (hagree : S.A.activatedState S.source.k0 =
-      S.source.base S.source.k0)
     (C : PartialSecondCycleOutcome w
       (S.source.e, S.A.activatedState) N)
     (hdamage : Not
@@ -105,7 +100,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.cycle_damage_approach_written_o
   obtain ⟨D⟩ := PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple S.A
     hApaths C.lead_trace C.lead_simple hdamage
   exact S.changed_contact_approach_written_of_absent
-    hN habsentA hagree D
+    hN habsentA D
 
 /-- A support-damaging completed opposite reflector under the absent
 saving is the approach-written residual. -/
@@ -116,8 +111,6 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reflector_damage_approach_writt
       p < 3 * N /\ q < 3 * N)
     (habsentA : Not (S.source.k0 ∈
       S.A.exploration.map passageSwitch))
-    (hagree : S.A.activatedState S.source.k0 =
-      S.source.base S.source.k0)
     (P : PartialSecondReflectorCompletion S.A N)
     (hdamage : Not (PathGrooves S.A.toSupported.paths
       P.reflector.preReturn.2)) :
@@ -133,7 +126,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reflector_damage_approach_writt
   obtain ⟨D⟩ := PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple S.A
     hApaths htrace P.reflector.exploration_simple hdamage
   exact S.changed_contact_approach_written_of_absent
-    hN habsentA hagree D
+    hN habsentA D
 
 /-- The sharpened residual set.  Support damage survives only as an
 approach-written flip contact or under the occurrence saving. -/
@@ -197,9 +190,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
           rcases S.saving with habsent | hoccurrence
           case inl =>
             obtain ⟨D⟩ := S.cycle_damage_approach_written_of_absent
-              hN habsent.1 (by
-                rw [<- S.activated]
-                exact habsent.2) C hprotected
+              hN habsent.1 C hprotected
             exact ⟨BoundarySharpResidual.approachWritten D⟩
           case inr =>
             let O := Classical.choose hoccurrence
@@ -237,9 +228,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
           rcases S.saving with habsent | hoccurrence
           case inl =>
             obtain ⟨D⟩ := S.reflector_damage_approach_written_of_absent
-              hN habsent.1 (by
-                rw [<- S.activated]
-                exact habsent.2) P (by simpa [P] using hpre)
+              hN habsent.1 P (by simpa [P] using hpre)
             exact ⟨BoundarySharpResidual.approachWritten D⟩
           case inr =>
             let O := Classical.choose hoccurrence
@@ -327,7 +316,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
                 by_cases hcanonical :
                     Oflip.before.length = R.runway.length
                 case pos =>
-                  exact (S.false_of_canonical_unchanged
+                  exact (S.false_of_canonical_saturation
                     hN R hkind Oflip hstayFlip hcanonical).elim
                 case neg =>
                   exact (S.false_of_noncanonical_unchanged_protected_pair

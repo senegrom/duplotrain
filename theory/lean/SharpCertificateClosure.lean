@@ -209,7 +209,6 @@ theorem four_raw_novel_post_vectors_nodup
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     {z₁ z₂ z₃ z₄ : Nat}
     (h₁₂ : z₁ < z₂) (h₂₃ : z₂ < z₃) (h₃₄ : z₃ < z₄)
-    (H₁ : RawNovelAt w N start z₁)
     (H₂ : RawNovelAt w N start z₂)
     (H₃ : RawNovelAt w N start z₃)
     (H₄ : RawNovelAt w N start z₄) :
@@ -458,7 +457,7 @@ theorem no_five_fixed_stem_novelties_of_runway_tail
     · simpa [h] using hfresh₄
   have hglobalNodup := four_raw_novel_post_vectors_nodup
     F.order₁₂ F.order₂₃ F.order₃₄
-    F.event₁.2.2 F.event₂.2.2 F.event₃.2.2 F.event₄.2.2
+    F.event₂.2.2 F.event₃.2.2 F.event₄.2.2
   have hlocalNodup :
       (localTimes.map (restrictedTonguesAt w N localStart)).Nodup := by
     simpa [localTimes, hv₁, hv₂, hv₃, hv₄] using hglobalNodup

@@ -32,29 +32,12 @@ theorem mem_finiteCurvePorts_iff
   classical
   simp [finiteCurvePorts]
 
-private theorem nodup_filter_nat_curve (pred : Nat → Bool) :
-    ∀ {xs : List Nat}, xs.Nodup → (xs.filter pred).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : pred x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hmem => hnd.1 ((List.mem_filter.mp hmem).1),
-            ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
 theorem finiteCurvePorts_nodup
     (w : Wiring) (N : Nat) (u : Tongues) (root : Nat) :
     (finiteCurvePorts w N u root).Nodup := by
   classical
   unfold finiteCurvePorts
-  exact nodup_filter_nat_curve _ List.nodup_range
+  exact nodup_filter_nat _ List.nodup_range
 
 private theorem nodup_subset_length_curve
     {α : Type} [BEq α] [LawfulBEq α] :
@@ -164,7 +147,7 @@ structure FiniteSimpleCurvePath
 private theorem reverseSimplePath_of
     {w : Wiring} {u : Tongues} {root p : Nat}
     (h : CurveReach w u root p) :
-    ∃ path : FiniteSimpleCurvePath w u p root, True := by
+    ∃ _ : FiniteSimpleCurvePath w u p root, True := by
   induction h with
   | refl =>
       exact ⟨{
@@ -502,7 +485,7 @@ theorem finiteCurveEndpointWriters_nodup
     (finiteCurveEndpointWriters w N u root).Nodup := by
   classical
   unfold finiteCurveEndpointWriters
-  exact nodup_filter_nat_curve _ List.nodup_range
+  exact nodup_filter_nat _ List.nodup_range
 
 /-- **Endpoint capacity.** Every finite selected component exposes unmatched
 branches from at most two represented switches.  This is a theorem about the
@@ -559,7 +542,7 @@ theorem finiteCurveEndpointWriters_length_le_two
           change (finiteCurveEndpointWriters w N u root).length ≤ [A].length
           exact hle
         rw [hlist] at hleE
-        simp only [List.length_cons, List.length_nil, Nat.add_zero] at hleE ⊢
+        simp only [List.length_cons, List.length_nil] at hleE ⊢
         omega
 
 /-- A newly selected internal edge at `C` never escapes the old selected

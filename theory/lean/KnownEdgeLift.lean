@@ -42,8 +42,6 @@ theorem kel_zero_filter_length_le_one
 The short-run hypothesis is the only arithmetic side condition. -/
 theorem arbitrary_start_distinct_le_succ_of_known_edge
     {w : Wiring} {N cap : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
     (hshort : 3 * N + 3 ≤ cap + 1)
     (hknown : ∀ {e : Nat} {localStart finish : Nat × Tongues},
       stepN w (3 * N + 2) localStart = some finish →
