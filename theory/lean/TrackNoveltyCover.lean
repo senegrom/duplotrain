@@ -92,35 +92,6 @@ theorem noveltyCoverOn_distinct_count
   simp only [List.length_map, List.length_append] at hbound
   omega
 
-/-- Novelty covers compose by concatenating both the sampled times and their
-exception lists.  Thus four one-novelty frame covers yield a four-novelty
-cover once the global track argument supplies the four-frame decomposition. -/
-theorem noveltyCoverOn_append
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {leftTimes rightTimes : List Nat} {history : List (List Bool)}
-    {leftBudget rightBudget : Nat}
-    (hleft : NoveltyCoverOn w N start leftTimes history leftBudget)
-    (hright : NoveltyCoverOn w N start rightTimes history rightBudget) :
-    NoveltyCoverOn w N start (leftTimes ++ rightTimes) history
-      (leftBudget + rightBudget) := by
-  obtain ⟨leftFresh, hleftLength, hleftMem⟩ := hleft
-  obtain ⟨rightFresh, hrightLength, hrightMem⟩ := hright
-  refine ⟨leftFresh ++ rightFresh, ?_, ?_⟩
-  · simp only [List.length_append]
-    omega
-  · intro k hk
-    rcases List.mem_append.mp hk with hkLeft | hkRight
-    · rcases List.mem_append.mp (hleftMem k hkLeft) with
-        hhistory | hfresh
-      · exact List.mem_append_left _ hhistory
-      · exact List.mem_append_right history
-          (List.mem_append_left _ hfresh)
-    · rcases List.mem_append.mp (hrightMem k hkRight) with
-        hhistory | hfresh
-      · exact List.mem_append_left _ hhistory
-      · exact List.mem_append_right history
-          (List.mem_append_right leftFresh hfresh)
-
 /-- In particular, a four-novelty cover gives the desired constant-four
 count above the supplied history. -/
 theorem fourNoveltyCover_distinct_count
@@ -130,24 +101,6 @@ theorem fourNoveltyCover_distinct_count
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ history.length + 4 :=
   noveltyCoverOn_distinct_count hcover hnd
-
-/-- Four independently established one-novelty covers combine into the
-four-candidate interface.  The time lists need not be ordered; the theorem is
-purely a cover assembly result. -/
-theorem four_one_novelty_covers
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {times₁ times₂ times₃ times₄ : List Nat}
-    {history : List (List Bool)}
-    (h₁ : NoveltyCoverOn w N start times₁ history 1)
-    (h₂ : NoveltyCoverOn w N start times₂ history 1)
-    (h₃ : NoveltyCoverOn w N start times₃ history 1)
-    (h₄ : NoveltyCoverOn w N start times₄ history 1) :
-    FourNoveltyCover w N start
-      (((times₁ ++ times₂) ++ times₃) ++ times₄) history := by
-  have h₁₂ := noveltyCoverOn_append h₁ h₂
-  have h₁₂₃ := noveltyCoverOn_append h₁₂ h₃
-  have h₁₂₃₄ := noveltyCoverOn_append h₁₂₃ h₄
-  simpa [FourNoveltyCover] using h₁₂₃₄
 
 /-- Once the structural argument supplies a history of size at most `N+2`
 and a four-novelty cover, the requested `N+6` arithmetic is immediate.  The

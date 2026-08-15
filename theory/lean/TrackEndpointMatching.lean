@@ -38,9 +38,6 @@ def selectedBranch (u : Tongues) (C : Nat) : Nat :=
 def unmatchedBranch (u : Tongues) (C : Nat) : Nat :=
   branchPort C (!(u C))
 
-theorem selectedBranch_switch (u : Tongues) (C : Nat) :
-    selectedBranch u C / 3 = C := by
-  cases h : u C <;> simp [selectedBranch, branchPort, h] <;> omega
 
 theorem unmatchedBranch_switch (u : Tongues) (C : Nat) :
     unmatchedBranch u C / 3 = C := by
@@ -232,10 +229,6 @@ theorem rawProductiveAt_changes_writer
         exact arrive_preserves_other rfl hjWriter
     simpa [restrictedTonguesAt, tonguesAt, hcur, hnext] using hrestrict
   exact ⟨cur, next, hcur, hnext, hstep, hchanged⟩
-
-
-
-
 
 
 theorem rawProductiveAt_is_endpoint_pivot

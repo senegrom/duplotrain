@@ -1,5 +1,4 @@
 import ForeignSpliceNovelty
-import ManufacturedPairNovelty
 
 /-!
 # Pointwise novelty of the runway splice

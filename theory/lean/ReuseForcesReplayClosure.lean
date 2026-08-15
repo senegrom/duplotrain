@@ -92,14 +92,7 @@ structure RawFirstPortRestoration
     (w : Wiring) (N : Nat) (start : Nat × Tongues)
     (afterDrop restore p : Nat) : Prop where
   afterDrop_le_restore : afterDrop ≤ restore
-  absent_through : ∀ t, afterDrop ≤ t → t ≤ restore →
-    p ∉ rawFiniteCurvePortsAt w N start t
-  restored_next : p ∈ rawFiniteCurvePortsAt w N start (restore + 1)
   productive : RawProductiveAt w N start restore
-  nonself : ¬ RawCurveSelfAt w start restore
-  strict_growth :
-    rawFiniteCurveSizeAt w N start restore <
-      rawFiniteCurveSizeAt w N start (restore + 1)
 
 /-- **First-restoration extraction.**  Reappearance of a port discarded at
 time `i` forces a concrete productive non-self event strictly before the
@@ -159,12 +152,7 @@ theorem dropped_port_reuse_has_first_restoration
     exact habsentMem restore hafter (Nat.le_refl _) hback
   refine ⟨restore, hrestoreLt, {
     afterDrop_le_restore := hafter
-    absent_through := habsentMem
-    restored_next := hrestoredMem
     productive := hproductive
-    nonself := hnonself
-    strict_growth := rawProductiveAt_nonself_curve_growth
-      hN hproductive hnonself
   }⟩
 
 /-! ## Exhaustive state contribution of the restoring event -/

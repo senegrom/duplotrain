@@ -92,9 +92,6 @@ theorem EventuallyPeriodicWithin.forward
       by simp [stepN], hcycle⟩
 
 
-
-
-
 theorem first_revisit_quantitative_or_activated_reflector
     (w : Wiring) {start : Nat × Tongues}
     {runway path : List Passage}

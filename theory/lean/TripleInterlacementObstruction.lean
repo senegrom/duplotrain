@@ -65,14 +65,6 @@ edges together with the currently selected internal edges. -/
 def CurveEdge (w : Wiring) (u : Tongues) (p q : Nat) : Prop :=
   w.link p = some q ∨ InternalCurveEdge u p q
 
-/-- The internal edge removed when switch `C` pivots. -/
-def RemovedPivotEdge (u : Tongues) (C p q : Nat) : Prop :=
-  SwitchCurveEdge u C p q
-
-/-- The internal edge inserted when switch `C` pivots. -/
-def InsertedPivotEdge (u : Tongues) (C p q : Nat) : Prop :=
-  (p = 3*C ∧ q = unmatchedBranch u C) ∨
-  (q = 3*C ∧ p = unmatchedBranch u C)
 
 theorem switchCurveEdge_symm {u : Tongues} {C p q : Nat}
     (h : SwitchCurveEdge u C p q) :
@@ -93,86 +85,11 @@ theorem curveEdge_symm {w : Wiring} {u : Tongues} {p q : Nat}
   · exact Or.inl (w.symm _ _ h)
   · exact Or.inr (internalCurveEdge_symm h)
 
-/-- Both endpoints of an internal edge belong to its declared switch. -/
-theorem switchCurveEdge_switches {u : Tongues} {C p q : Nat}
-    (h : SwitchCurveEdge u C p q) : p / 3 = C ∧ q / 3 = C := by
-  rcases h with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
-  · exact ⟨by omega, selectedBranch_switch u C⟩
-  · exact ⟨selectedBranch_switch u C, by omega⟩
-
-/-- The switch label of an internal edge is unique. -/
-theorem switchCurveEdge_switch_unique
-    {u : Tongues} {C D p q : Nat}
-    (hC : SwitchCurveEdge u C p q)
-    (hD : SwitchCurveEdge u D p q) : C = D := by
-  have hc := (switchCurveEdge_switches hC).1
-  have hd := (switchCurveEdge_switches hD).1
-  omega
-
-theorem selectedBranch_flip_other
-    (u : Tongues) {C D : Nat} (hDC : D ≠ C) :
-    selectedBranch (flipAt u C) D = selectedBranch u D := by
-  simp [selectedBranch, flipAt, hDC]
 
 theorem unmatched_after_flip_eq_selected (u : Tongues) (C : Nat) :
     unmatchedBranch (flipAt u C) C = selectedBranch u C := by
   cases h : u C <;>
     simp [unmatchedBranch, selectedBranch, branchPort, flipAt, h]
-
-/-- At the pivoting switch the new selected edge is exactly the old endpoint
-edge. -/
-theorem switchCurveEdge_flip_same_iff
-    (u : Tongues) (C p q : Nat) :
-    SwitchCurveEdge (flipAt u C) C p q ↔
-      InsertedPivotEdge u C p q := by
-  unfold SwitchCurveEdge InsertedPivotEdge
-  rw [selected_after_flip_eq_unmatched]
-
-/-- Internal edges at all other switches are literally unchanged. -/
-theorem switchCurveEdge_flip_other_iff
-    (u : Tongues) {C D p q : Nat} (hDC : D ≠ C) :
-    SwitchCurveEdge (flipAt u C) D p q ↔
-      SwitchCurveEdge u D p q := by
-  unfold SwitchCurveEdge
-  rw [selectedBranch_flip_other u hDC]
-
-/-- Exact internal matching surgery: replace precisely the old selected edge
-at `C` by the old endpoint edge. -/
-theorem internalCurveEdge_flip_iff
-    (u : Tongues) (C p q : Nat) :
-    InternalCurveEdge (flipAt u C) p q ↔
-      InsertedPivotEdge u C p q ∨
-      (InternalCurveEdge u p q ∧ ¬ RemovedPivotEdge u C p q) := by
-  constructor
-  · rintro ⟨D, hD⟩
-    by_cases hDC : D = C
-    · subst D
-      exact Or.inl ((switchCurveEdge_flip_same_iff u C p q).mp hD)
-    · right
-      have hOld : SwitchCurveEdge u D p q :=
-        (switchCurveEdge_flip_other_iff u hDC).mp hD
-      refine ⟨⟨D, hOld⟩, ?_⟩
-      intro hC
-      exact hDC (switchCurveEdge_switch_unique hOld hC)
-  · intro h
-    rcases h with hnew | ⟨⟨D, hD⟩, hnotC⟩
-    · exact ⟨C, (switchCurveEdge_flip_same_iff u C p q).mpr hnew⟩
-    · have hDC : D ≠ C := by
-        intro hEq
-        subst D
-        exact hnotC hD
-      exact ⟨D, (switchCurveEdge_flip_other_iff u hDC).mpr hD⟩
-
-/-- Exact two-colour curve-graph surgery.  External edges are untouched;
-among internal edges one old edge is removed and one endpoint edge inserted. -/
-theorem curveEdge_flip_iff
-    (w : Wiring) (u : Tongues) (C p q : Nat) :
-    CurveEdge w (flipAt u C) p q ↔
-      w.link p = some q ∨
-      InsertedPivotEdge u C p q ∨
-      (InternalCurveEdge u p q ∧ ¬ RemovedPivotEdge u C p q) := by
-  unfold CurveEdge
-  rw [internalCurveEdge_flip_iff]
 
 /-- A finite arc in the curve graph.  Repetition-freeness is kept separate:
 it is the property which turns an arc into an honest subarc of a curve. -/
@@ -184,106 +101,6 @@ inductive CurveSegment (w : Wiring) (u : Tongues) : List Nat → Prop
       (tail : CurveSegment w u (q :: rest)) :
       CurveSegment w u (p :: q :: rest)
 
-/-- No consecutive edge of the segment is the selected edge about to be
-removed at switch `C`. -/
-def AvoidsRemovedPivot (u : Tongues) (C : Nat) : List Nat → Prop
-  | [] => True
-  | [_] => True
-  | p :: q :: rest =>
-      ¬ RemovedPivotEdge u C p q ∧
-      AvoidsRemovedPivot u C (q :: rest)
-
-/-- If the stem of `C` is absent from an arc, that arc cannot contain the
-selected internal edge of `C`. -/
-theorem avoidsRemovedPivot_of_stem_not_mem
-    (u : Tongues) (C : Nat) :
-    ∀ xs : List Nat, 3*C ∉ xs → AvoidsRemovedPivot u C xs := by
-  intro xs
-  induction xs with
-  | nil => intro _; trivial
-  | cons p rest ih =>
-      cases rest with
-      | nil => intro _; trivial
-      | cons q tail =>
-          intro hstem
-          have hp : p ≠ 3*C := by
-            intro h
-            apply hstem
-            simp [h]
-          have htail : 3*C ∉ q :: tail := by
-            intro h
-            exact hstem (List.mem_cons_of_mem _ h)
-          constructor
-          · intro hedge
-            rcases hedge with ⟨h, _⟩ | ⟨h, _⟩
-            · exact hp h
-            · exact htail (by simp [h])
-          · exact ih htail
-
-/-- Every old curve edge other than the removed selected edge survives the
-pivot. -/
-theorem curveEdge_survives_flip
-    {w : Wiring} {u : Tongues} {C p q : Nat}
-    (hedge : CurveEdge w u p q)
-    (havoid : ¬ RemovedPivotEdge u C p q) :
-    CurveEdge w (flipAt u C) p q := by
-  rw [curveEdge_flip_iff]
-  rcases hedge with hext | hint
-  · exact Or.inl hext
-  · exact Or.inr (Or.inr ⟨hint, havoid⟩)
-
-/-- An arc avoiding the removed edge remains an arc after the pivot. -/
-theorem curveSegment_survives_flip
-    {w : Wiring} {u : Tongues} {C : Nat} :
-    ∀ {xs : List Nat}, CurveSegment w u xs →
-      AvoidsRemovedPivot u C xs →
-      CurveSegment w (flipAt u C) xs := by
-  intro xs hsegment
-  induction hsegment with
-  | nil => intro _; exact CurveSegment.nil
-  | singleton p => intro _; exact CurveSegment.singleton p
-  | @cons p q rest hedge htail ih =>
-      intro havoid
-      exact CurveSegment.cons
-        (curveEdge_survives_flip hedge havoid.1)
-        (ih havoid.2)
-
-/-- **Koizumi local component surgery.**
-
-Orient a simple train-free curve so that the switch being entered contributes
-the consecutive old selected edge `stem -- selected`.  A productive pivot
-inserts `old-unmatched -- stem`; the old selected branch becomes the new
-endpoint, and the opposite side is a strict, still-valid subarc.  This is the
-raw matching-language version of the shrinking-curve move. -/
-theorem pivot_releases_strict_subcurve
-    {w : Wiring} {u : Tongues} {C : Nat} {rest : List Nat}
-    (hcurve : CurveSegment w u
-      (3*C :: selectedBranch u C :: rest))
-    (hsimple : (3*C :: selectedBranch u C :: rest).Nodup) :
-    CurveEdge w (flipAt u C) (unmatchedBranch u C) (3*C) ∧
-    unmatchedBranch (flipAt u C) C = selectedBranch u C ∧
-    CurveSegment w (flipAt u C)
-      (unmatchedBranch (flipAt u C) C :: rest) ∧
-    (unmatchedBranch (flipAt u C) C :: rest).length <
-      (3*C :: selectedBranch u C :: rest).length := by
-  have htail : CurveSegment w u (selectedBranch u C :: rest) := by
-    cases hcurve with
-    | cons _ tail => exact tail
-  have hstem : 3*C ∉ selectedBranch u C :: rest :=
-    (List.nodup_cons.mp hsimple).1
-  have havoid : AvoidsRemovedPivot u C
-      (selectedBranch u C :: rest) :=
-    avoidsRemovedPivot_of_stem_not_mem u C _ hstem
-  have hsurvives : CurveSegment w (flipAt u C)
-      (selectedBranch u C :: rest) :=
-    curveSegment_survives_flip htail havoid
-  have hjoin : CurveEdge w (flipAt u C)
-      (unmatchedBranch u C) (3*C) := by
-    rw [curveEdge_flip_iff]
-    exact Or.inr (Or.inl (Or.inr ⟨rfl, rfl⟩))
-  refine ⟨hjoin, unmatched_after_flip_eq_selected u C, ?_, ?_⟩
-  · simpa [unmatched_after_flip_eq_selected u C] using hsurvives
-  · simp
 
 theorem pivot_residual_keeps_endpoint_name (u : Tongues) (C : Nat) :
     selectedBranch u C = unmatchedBranch (flipAt u C) C := by

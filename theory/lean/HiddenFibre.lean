@@ -28,13 +28,6 @@ variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 def oldSlot (k : Nat) : Nat :=
   reg m e r0 k (m.cellOf (e (k+1)))
 
-/-- Two slots represent parallel jump edges with the same ordered pair of
-endpoint cells. -/
-def ParallelEdge (s t : Nat) : Prop :=
-  m.cellOf s = m.cellOf t ∧
-  m.cellOf (m.bar s) = m.cellOf (m.bar t)
-
-/-- The old and new slots always have the same near endpoint cell. -/
 theorem old_new_cell
     (hr0 : ∀ c, m.cellOf (r0 c) = c) (k : Nat) :
     m.cellOf (oldSlot m e r0 k) = m.cellOf (e (k+1)) := by

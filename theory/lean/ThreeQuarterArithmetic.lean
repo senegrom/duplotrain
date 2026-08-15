@@ -27,10 +27,6 @@ multiplication. -/
 def fourth (x : Nat) : Nat := (x * x) * (x * x)
 
 
-def profileCells : List (Nat × Nat) → Nat
-  | [] => 0
-  | p :: ps => p.1 + profileCells ps
-
 def profileCapacity : List (Nat × Nat) → Nat
   | [] => 1
   | p :: ps => p.2 * profileCapacity ps

@@ -27,10 +27,6 @@ structure PartialSecondReflectorCompletion
   paths : PathGrooves reflector.toSupported.paths state
   base : reflector.baseState = A.activatedState
   activated : state = reflector.activatedState
-  reaches :
-    stepN w
-      (reflector.exploration.length + reflector.runway.length + 1)
-      (e, A.activatedState) = some (g, state)
   preserves : forall j,
     j ∉ reflector.exploration.map passageSwitch ->
       state j = A.activatedState j

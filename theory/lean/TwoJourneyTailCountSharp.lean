@@ -1,6 +1,4 @@
 import SharpStateLawAssembly
-import ManufacturedPairNovelty
-import FirstActivatedExact
 
 /-!
 # Two manufacturing journeys followed by a directly counted tail

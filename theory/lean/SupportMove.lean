@@ -19,10 +19,6 @@ namespace Echo
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-/-- Both endpoints of the jump edge represented by `s` are selected. -/
-def Full (k s : Nat) : Prop :=
-  Confirmed m e r0 k s ∧ Confirmed m e r0 k (m.bar s)
-
 /-- Two slots represent the same jump edge. -/
 def SameEdge (s t : Nat) : Prop := t = s ∨ t = m.bar s
 end Echo

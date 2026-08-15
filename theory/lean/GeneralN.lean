@@ -268,7 +268,6 @@ theorem land_last_unique {w : Wiring} {t₁ t₂ : Tongues}
   injection b₂
 
 
-
 def IsReflector (w : Wiring) (g e k : Nat)
     (S : Tongues → Prop) (τ : Tongues → Tongues) : Prop :=
   ∀ u, S u → stepN w k (g, u) = some (e, τ u) ∧ S (τ u)

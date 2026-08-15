@@ -27,10 +27,6 @@ noncomputable def canonicalPhysicalCellOf (w : Wiring) (p : Nat) : Nat :=
 noncomputable def canonicalEchoMachine (w : Wiring) : Echo.Machine :=
   encodedMachine w (canonicalPhysicalCellOf w)
 
-/-- Canonical overwrite word emitted by one finite echo configuration. -/
-noncomputable def canonicalEchoAction
-    (w : Wiring) (config : Nat × List Nat) : List Nat :=
-  entryAction w (decodeSlot config.1)
 
 @[simp] theorem canonicalEchoMachine_cell
     (w : Wiring) (p : Nat) :
@@ -44,15 +40,6 @@ noncomputable def canonicalEchoAction
       encodeSlot (wireBar w p) := by
   simp [canonicalEchoMachine]
 
-@[simp] theorem canonicalEchoAction_encode
-    (w : Wiring) (p : Nat) (snapshot : List Nat) :
-    canonicalEchoAction w (encodeSlot p, snapshot) = entryAction w p := by
-  unfold canonicalEchoAction decodeSlot encodeSlot
-  congr
-  omega
-
-/-- A physical free slot is a realised branch entry whose branch edge leads
-to another realised branch entry. -/
 def IsCanonicalEchoSlot (w : Wiring) (p : Nat) : Prop :=
   IsDescentEntry w p ∧
   p % 3 ≠ 0 ∧

@@ -1,13 +1,13 @@
 import BoundaryResidualCharge
 import KnownEdgeNAddFourComplete
 import ProductiveBoundaryNAddFourComplete
+import PartialJourneyDichotomy
 import BoundaryChangedContactSaving
 
 /-!
 # Sharpening the productive-boundary residuals
 
-The two support-damage residuals of
-`ProductiveBoundaryNAddFourExactResidual` both expose a sharp changed
+The two support-damage residuals of the productive boundary both expose a sharp changed
 contact of the first reflector: the damaged stable cycle through its
 lead, the damaged opposite reflector through its exploration.  Under the
 *absent* boundary saving the keystone dichotomy
@@ -31,18 +31,8 @@ structure BoundaryApproachWrittenResidual
   kind : S.A = ManufacturedReflector.flip R
   absentExploration : Not (S.source.k0 ∈
     (ManufacturedReflector.flip R).exploration.map passageSwitch)
-  agrees :
-    (ManufacturedReflector.flip R).activatedState S.source.k0 =
-      S.source.base S.source.k0
   contact : PartialSecondRunSharp.ChangedContact w
     (ManufacturedReflector.flip R)
-  written :
-    R.actionSwitch ∈
-      contact.toSimpleContinuationChangedContact.approachFirstWriterSwitches
-        N ∨
-    S.source.k0 ∈
-      contact.toSimpleContinuationChangedContact.approachFirstWriterSwitches
-        N
 
 /-- **The keystone applied to a saving residual.**  Under the absent
 boundary saving, any sharp changed contact of the first reflector either
@@ -89,9 +79,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.changed_contact_approach_writte
           R := R
           kind := hkind
           absentExploration := habsentA
-          agrees := hagree
           contact := D
-          written := hwritten
         }⟩
 
 /-- A support-damaging stable second cycle under the absent saving is the
@@ -241,7 +229,6 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
           paths := hBpathsRaw
           base := hbase
           activated := hactivated
-          reaches := hdata.2.2.2.2.1
           preserves := hdata.2.2.2.2.2
         }
         by_cases hpre :

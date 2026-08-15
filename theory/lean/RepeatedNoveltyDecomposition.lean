@@ -1,4 +1,5 @@
 import TrackEndpointMatching
+import ManufacturedPairNovelty
 
 /-!
 # Raw repeated-novelty decomposition
@@ -153,21 +154,6 @@ theorem restrictedTonguesAt_succ_eq_of_not_productive
   exact hquiet ⟨hlive, hne⟩
 
 /-- Every prefix of a successful finite run is successful. -/
-private theorem stepN_prefix_some_local
-    {w : Wiring} {start finish : Nat × Tongues} {d K : Nat}
-    (hd : d ≤ K) (hfinish : stepN w K start = some finish) :
-    ∃ middle, stepN w d start = some middle := by
-  let rest := K - d
-  have hsplit : K = d + rest := by
-    dsimp [rest]
-    omega
-  rw [hsplit, stepN_add] at hfinish
-  cases hprefix : stepN w d start with
-  | none => simp [hprefix] at hfinish
-  | some middle => exact ⟨middle, rfl⟩
-
-/-- A live interval containing no productive event preserves the represented
-tongue vector pointwise. -/
 theorem restrictedTonguesAt_eq_of_quiet_interval
     {w : Wiring} {N : Nat} {start finish : Nat × Tongues}
     {first span : Nat}
@@ -181,7 +167,7 @@ theorem restrictedTonguesAt_eq_of_quiet_interval
   | succ n ih =>
       have hprefix : ∃ middle,
           stepN w (first + n) start = some middle :=
-        stepN_prefix_some_local (by omega) hfinish
+        stepN_prefix_some (by omega) hfinish
       obtain ⟨middle, hmiddle⟩ := hprefix
       have hprev := ih hmiddle
         (fun j hfirst hj => hquiet j hfirst (by omega))
@@ -246,104 +232,6 @@ theorem rawProductiveAt_fixed_stem_successor
   subst C
   exact ⟨next, hnext, by simpa [hexit] using hparts.1⟩
 
-/-- Hence two productive occurrences of the same writer have literally the
-same post-write entry port. -/
-theorem same_raw_writer_post_entries_eq
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    {start : Nat × Tongues} {i k : Nat}
-    (hi : RawProductiveAt w N start i)
-    (hk : RawProductiveAt w N start k)
-    (hsame : rawWriterAt w start i = rawWriterAt w start k) :
-    rawEntryAt w start (i+1) = rawEntryAt w start (k+1) := by
-  obtain ⟨nextI, hnextI, hlinkI⟩ :=
-    rawProductiveAt_fixed_stem_successor hN hi
-  obtain ⟨nextK, hnextK, hlinkK⟩ :=
-    rawProductiveAt_fixed_stem_successor hN hk
-  have hport : nextI.1 = nextK.1 := by
-    rw [hsame, hlinkK] at hlinkI
-    injection hlinkI with hEq
-    exact hEq.symm
-  simp [rawEntryAt, hnextI, hnextK, hport]
-
-/-- If a last-writer frame had no productive event in its interior, its two
-endpoint flips would restore the complete represented tongue vector to the
-vector immediately before the opening event. -/
-theorem RawLastWriterFrame.closes_vector_of_quiet
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
-    {start : Nat × Tongues} {left right : Nat}
-    (F : RawLastWriterFrame w N start left right)
-    (hquiet : ∀ j, left < j → j < right →
-      ¬ RawProductiveAt w N start j) :
-    restrictedTonguesAt w N start (right+1) =
-      restrictedTonguesAt w N start left := by
-  have horder : left < right := F.order
-  have hopenFlip := rawProductiveAt_restricted_flip hN F.open_productive
-  have hcloseFlip := rawProductiveAt_restricted_flip hN F.close_productive
-  cases hcloseState : stepN w right start with
-  | none =>
-      have hlive := F.close_productive.1
-      have hsplit := stepN_add w right 1 start
-      simp [hcloseState] at hsplit
-      rw [hsplit] at hlive
-      contradiction
-  | some closeState =>
-      have hstable :
-          restrictedTonguesAt w N start right =
-            restrictedTonguesAt w N start (left+1) := by
-        let span := right - (left+1)
-        have harith : left+1+span = right := by
-          dsimp [span]
-          omega
-        have hquiet' : ∀ j, left+1 ≤ j → j < left+1+span →
-            ¬ RawProductiveAt w N start j := by
-          intro j hj hbound
-          apply hquiet j <;> omega
-        have hinterval := restrictedTonguesAt_eq_of_quiet_interval
-          (first := left+1) (span := span)
-          (finish := closeState) (by simpa [harith] using hcloseState)
-          hquiet'
-        simpa [harith] using hinterval
-      have hfirstCongr :
-          VectorCount.restrict N
-              (flipAt (tonguesAt w start (left+1))
-                (rawWriterAt w start right)) =
-            VectorCount.restrict N
-              (flipAt
-                (flipAt (tonguesAt w start left)
-                  (rawWriterAt w start right))
-                (rawWriterAt w start right)) := by
-        apply restrict_flipAt_congr
-        calc
-          VectorCount.restrict N (tonguesAt w start (left+1)) =
-              restrictedTonguesAt w N start (left+1) := rfl
-          _ = VectorCount.restrict N
-              (flipAt (tonguesAt w start left)
-                (rawWriterAt w start left)) := hopenFlip
-          _ = VectorCount.restrict N
-              (flipAt (tonguesAt w start left)
-                (rawWriterAt w start right)) := by rw [F.same_writer]
-      calc
-        restrictedTonguesAt w N start (right+1) =
-            VectorCount.restrict N
-              (flipAt (tonguesAt w start right)
-                (rawWriterAt w start right)) := hcloseFlip
-        _ = VectorCount.restrict N
-              (flipAt (tonguesAt w start (left+1))
-                (rawWriterAt w start right)) :=
-            restrict_flipAt_congr hstable
-        _ = VectorCount.restrict N
-              (flipAt
-                (flipAt (tonguesAt w start left)
-                  (rawWriterAt w start right))
-                (rawWriterAt w start right)) := hfirstCongr
-        _ = restrictedTonguesAt w N start left := by
-          rw [flipAt_flipAt]
-          rfl
-
-/-- The endpoint cancellation only needs equality of the two middle
-vectors.  The middle may contain arbitrarily many productive events. -/
 theorem RawLastWriterFrame.closes_vector_of_middle_eq
     {w : Wiring} {N : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
@@ -442,7 +330,7 @@ private theorem tongueAt_eq_of_no_writer_interval
       have harith : first + (n+1) = first+n+1 := by omega
       have hprefix : ∃ middle,
           stepN w (first+n) start = some middle :=
-        stepN_prefix_some_local
+        stepN_prefix_some
           (d := first+n) (K := first+(n+1)) (by omega) hfinish
       obtain ⟨middle, hmiddle⟩ := hprefix
       have hprev := ih hmiddle
@@ -530,7 +418,7 @@ theorem RawRepeatedWriterNovelAt.first_changed_writer
   obtain ⟨C, hC, hCne⟩ := restrict_ne_has_coordinate hmiddle
   have hright : ∃ finish, stepN w right start = some finish := by
     obtain ⟨last, hlast⟩ := Option.isSome_iff_exists.mp h.1.1
-    exact stepN_prefix_some_local
+    exact stepN_prefix_some
       (d := right) (K := right+1) (by omega) hlast
   obtain ⟨finish, hfinish⟩ := hright
   let span := right - (left+1)
@@ -605,7 +493,6 @@ theorem RawRepeatedWriterNovelAt.open_rerouting_decomposition
           · omega
       exact RawOpenReroutingShape.crossing G
         ⟨hbleft, hlr, hrr⟩
-
 
 
 def SelectedInternalEdge (u : Tongues) (p q : Nat) : Prop :=

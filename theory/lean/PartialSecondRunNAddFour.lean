@@ -651,10 +651,8 @@ structure PartialSecondCycleRunwayResidual
     (A : ManufacturedReflector w g e)
     (C : PartialSecondCycleOutcome w (e, A.activatedState) N) : Type where
   contact : ChangedContact w A
-  full_eq : contact.full = C.lead
   finish_eq : contact.finish = C.atRepeat
   reflector : ManufacturedFlipReflector w g e
-  reflector_eq : A = ManufacturedReflector.flip reflector
   repaired : Tongues
   forward : contact.x = contact.oriented.2
   repair : arrive contact.nextState contact.oriented.1 =
@@ -663,9 +661,6 @@ structure PartialSecondCycleRunwayResidual
     (contact.oriented.1, repaired)
   entry : Nat
   mouth : Nat
-  selected : (entry, mouth) ∈
-    (ManufacturedReflector.flip reflector).orientedRoute
-      contact.contactState
   runway : (entry, mouth) ∈ reflector.runway
   tailStart : Nat × Tongues
   post_reach : stepN w (contact.approach.length + 1)
@@ -736,17 +731,14 @@ theorem PartialSecondCycleOutcome.all_run_distinct_le_N_add_four_or_runway
               hpostReach, ⟨hnonconstant⟩⟩ := hrunway
             exact ⟨{
               contact := D
-              full_eq := hfull
               finish_eq := hfinish
               reflector := R
-              reflector_eq := rfl
               repaired := repaired
               forward := hforward
               repair := hrepair
               restored := hrestored
               entry := entry
               mouth := mouth
-              selected := hselected
               runway := hentryRunway
               tailStart := tailStart
               post_reach := hpostReach

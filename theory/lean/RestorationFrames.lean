@@ -1,5 +1,4 @@
 import HiddenFibre
-import Periodicity
 
 /-!
 # Restoration frames and the foreign-crossing obstruction
@@ -51,8 +50,6 @@ def ForeignRestorationCrossing (t₀ u₀ t₁ u₁ : Nat) : Prop :=
   ForeignRestorationFrame m e r0 t₀ u₀ ∧
   ForeignRestorationFrame m e r0 t₁ u₁ ∧
   RestorationFramesCross t₀ u₀ t₁ u₁
-
-
 
 
 private theorem exists_first_after {P : Nat → Prop} :

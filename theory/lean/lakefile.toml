@@ -63,7 +63,6 @@ defaultTargets = [
   "KnownEdgeNAddFourComplete",
   "KnownEdgeNAddFourFrontier",
   "KnownEdgeThreeSharp",
-  "KoizumiCurveInvariant",
   "KoizumiFramePersistence",
   "LinearBound",
   "ManufacturedPairNovelty",
@@ -342,9 +341,6 @@ name = "KnownEdgeNAddFourFrontier"
 
 [[lean_lib]]
 name = "KnownEdgeThreeSharp"
-
-[[lean_lib]]
-name = "KoizumiCurveInvariant"
 
 [[lean_lib]]
 name = "KoizumiFramePersistence"

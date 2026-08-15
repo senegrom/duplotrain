@@ -1,5 +1,4 @@
 import TrackCurveGrowth
-import KoizumiCurveInvariant
 
 /-!
 # Self-pivots are unavoidable inside a repeated-writer frame

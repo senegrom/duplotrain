@@ -19,16 +19,6 @@ namespace GeneralN
 noncomputable def physicalCell (w : Wiring) (p : Nat) : Nat :=
   rootCode w (entryRoot w p)
 
-/-- Last physical ascent entry of a cell after entries `0,…,k`. -/
-noncomputable def physicalReg (w : Wiring)
-    (entry : Nat → Nat) (initial : Nat → Nat) :
-    Nat → Nat → Nat
-  | 0, c => if physicalCell w (entry 0) = c then entry 0 else initial c
-  | k + 1, c =>
-      if physicalCell w (entry (k + 1)) = c then entry (k + 1)
-      else physicalReg w entry initial k c
-
-/-- Encode a physical entry sequence. -/
 def encodedEntries (entry : Nat → Nat) : Nat → Nat :=
   fun k => encodeSlot (entry k)
 

@@ -1,5 +1,5 @@
 import TrackGlobalRepair
-import TrackNoveltyCover
+import ManufacturedPairNovelty
 
 /-!
 # Pointwise novelty of foreign candy splices
@@ -140,21 +140,6 @@ theorem PhysicalTrace.two_change_prefix_tongues
     exact hrest
 
 
-private theorem stepN_mul_period_foreign
-    {w : Wiring} {start : Nat × Tongues} {period : Nat}
-    (hperiod : stepN w period start = some start) :
-    ∀ q, stepN w (q * period) start = some start := by
-  intro q
-  induction q with
-  | zero => simp [stepN]
-  | succ q ih =>
-      have hlen : (q + 1) * period = q * period + period := by
-        simp [Nat.add_mul]
-      rw [hlen, stepN_add, ih]
-      exact hperiod
-
-/-- A two-phase description of one positive period extends pointwise to the
-whole infinite periodic run. -/
 theorem periodic_two_phase_prefix_tongues
     {w : Wiring} {startPort : Nat} {u v : Tongues} {period : Nat}
     (hpositive : 0 < period)
@@ -178,7 +163,7 @@ theorem periodic_two_phase_prefix_tongues
     omega
   refine ⟨port, phase, ?_, hphase⟩
   rw [hdecomp, stepN_add,
-    stepN_mul_period_foreign hperiod q]
+    stepN_mul_period_pair_novelty hperiod q]
   exact hlocal
 
 /-! ## The approach-foreign candy splice -/

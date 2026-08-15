@@ -1,4 +1,6 @@
 import StateLawNAddFourTop
+import PointwiseSimpleCycleTail
+import StateLawTwoSixUltra
 
 /-!
 # Saturation at the productive `N+4` boundary
@@ -28,10 +30,9 @@ smaller raw physical obstruction just described.
 namespace GeneralN
 
 /-- A literal failure of boundary absorption after the known-edge run has
-saturated its complete `N+4` allowance.  `covers_live` is the saturation
-statement: there is no further live vector outside the selected family.
-`avoids_original` records that the pre-flip vector is absent from the whole
-shifted run, not merely from the selected times. -/
+saturated its complete `N+4` allowance.  `avoids_original` records that the
+pre-flip vector is absent from the whole shifted run, not merely from the
+selected times. -/
 structure ProductiveBoundaryNAddFourSaturation
     (w : Wiring) (N : Nat) : Type where
   g : Nat
@@ -49,10 +50,6 @@ structure ProductiveBoundaryNAddFourSaturation
   distinct : (VectorCount.restrict N original ::
     times.map (restrictedTonguesAt w N (g, base))).Nodup
   saturated : times.length = N + 4
-  covers_live : forall d,
-    (stepN w d (g, base)).isSome ->
-    restrictedTonguesAt w N (g, base) d ∈
-      times.map (restrictedTonguesAt w N (g, base))
   avoids_original : forall d,
     (stepN w d (g, base)).isSome ->
     restrictedTonguesAt w N (g, base) d ≠
@@ -320,7 +317,6 @@ theorem productive_boundary_N_add_four_or_saturation
       live := hlive
       distinct := hnd
       saturated := hsaturated
-      covers_live := hcover
       avoids_original := havoid
     }⟩
 

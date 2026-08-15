@@ -89,11 +89,6 @@ theorem mem_rawRepeatedWriterNovelTimes_iff
       k < K ∧ RawRepeatedWriterNovelAt w N start k := by
   classical
   simp [rawRepeatedWriterNovelTimes]
-def FiveRepeatedWriterNovelty : Prop :=
-  ∀ (w : Wiring) (N : Nat),
-    (∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N) →
-    ∀ (start : Nat × Tongues) (K : Nat),
-      (rawRepeatedWriterNovelTimes w N start K).length ≤ 5
 
 private theorem nodup_filter_nat (p : Nat → Bool) :
     ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
@@ -134,7 +129,6 @@ theorem rawNovelAt_productive
     apply List.mem_map.mpr
     refine ⟨k, List.mem_range.mpr (by omega), ?_⟩
     exact heq.symm
-
 
 
 theorem rawProductiveAt_writer_lt

@@ -236,7 +236,6 @@ namespace GeneralN
 /-! ## Certified ascents are genuine positive raw journeys -/
 
 
-
 structure RawCycleThroughSelfLink
     (w : Wiring) (start : Nat × Tongues) (close : Nat) where
   closeConfig : Nat × Tongues
@@ -270,8 +269,6 @@ theorem RawCycleThroughSelfLink.self_period
   simp only [Option.bind_some] at hselfThenPeriod
   rw [Nat.add_comm R.offset R.period, hcloseThenSelf] at hselfThenPeriod
   exact hselfThenPeriod.symm
-
-
 
 
 structure RawTwoVectorTail

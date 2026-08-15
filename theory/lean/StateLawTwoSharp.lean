@@ -257,8 +257,6 @@ theorem manufactured_suffix_explicit_lobe_absolute_two_novelty
   · exact hlead
 
 
-
-
 theorem ManufacturedReflector.protected_changed_contact_three_or_forward
     {w : Wiring} {N g e p x : Nat}
     (A : ManufacturedReflector w g e)

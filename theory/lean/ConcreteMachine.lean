@@ -44,10 +44,6 @@ theorem mateNat_ne : ∀ n, mateNat n ≠ n
 /-- Encode a physical branch port as an even echo slot. -/
 def encodeSlot (p : Nat) : Nat := 2 * p
 
-/-- A canonical odd slot belonging to cell `c`. -/
-def syntheticSlot (c : Nat) : Nat := 2 * c + 1
-
-/-- Decode the physical port carried by an even echo slot. -/
 def decodeSlot (s : Nat) : Nat := s / 2
 
 /-- Lift the concrete partial wiring involution to all echo slots.  Even slots
@@ -63,13 +59,6 @@ theorem encodedBar_encodeSlot (w : Wiring) (p : Nat) :
   congr
   omega
 
-theorem encodedBar_syntheticSlot (w : Wiring) (c : Nat) :
-    encodedBar w (syntheticSlot c) = syntheticSlot c := by
-  unfold encodedBar syntheticSlot
-  have hodd : (2 * c + 1) % 2 ≠ 0 := by omega
-  rw [if_neg hodd]
-
-/-- The lifted jump map is an involution on every natural slot. -/
 theorem encodedBar_invol (w : Wiring) (s : Nat) :
     encodedBar w (encodedBar w s) = s := by
   by_cases hs : s % 2 = 0
@@ -94,16 +83,6 @@ theorem encodedCellOf_encodeSlot
   congr
   omega
 
-theorem encodedCellOf_syntheticSlot
-    (physicalCellOf : Nat → Nat) (c : Nat) :
-    encodedCellOf physicalCellOf (syntheticSlot c) = c := by
-  unfold encodedCellOf syntheticSlot
-  have hodd : (2 * c + 1) % 2 ≠ 0 := by omega
-  rw [if_neg hodd]
-  omega
-
-/-- The total echo machine associated to a physical wiring and a cell
-assignment on physical branch ports. -/
 def encodedMachine (w : Wiring)
     (physicalCellOf : Nat → Nat) : Echo.Machine where
   cellOf := encodedCellOf physicalCellOf
@@ -119,10 +98,6 @@ def encodedMachine (w : Wiring)
       physicalCellOf p :=
   encodedCellOf_encodeSlot physicalCellOf p
 
-@[simp] theorem encodedMachine_cell_synthetic
-    (w : Wiring) (physicalCellOf : Nat → Nat) (c : Nat) :
-    (encodedMachine w physicalCellOf).cellOf (syntheticSlot c) = c :=
-  encodedCellOf_syntheticSlot physicalCellOf c
 
 @[simp] theorem encodedMachine_bar_encode
     (w : Wiring) (physicalCellOf : Nat → Nat) (p : Nat) :
@@ -130,11 +105,6 @@ def encodedMachine (w : Wiring)
       encodeSlot (wireBar w p) :=
   encodedBar_encodeSlot w p
 
-@[simp] theorem encodedMachine_bar_synthetic
-    (w : Wiring) (physicalCellOf : Nat → Nat) (c : Nat) :
-    (encodedMachine w physicalCellOf).bar (syntheticSlot c) =
-      syntheticSlot c :=
-  encodedBar_syntheticSlot w c
 
 theorem encodeSlot_injective : Function.Injective encodeSlot := by
   intro p q h

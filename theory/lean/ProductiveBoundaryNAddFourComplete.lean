@@ -1,4 +1,3 @@
-import PartialJourneyDichotomy
 import PartialSecondRunNAddFour
 import BoundaryAbsentProtectedPair
 
@@ -804,33 +803,5 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_first_stay_protected_p
   dsimp [history] at hcount
   dsimp only [A] at hcount
   omega
-
-/-- The exact physical obstructions still left after the committed N+4
-closures.  Each constructor stores raw trace data rather than a black-box
-counting assumption. -/
-inductive ProductiveBoundaryNAddFourExactResidual
-    {w : Wiring} {N : Nat}
-    (S : ProductiveBoundaryNAddFourSavingResidual w N) : Type where
-  | secondCycleDamage
-      (C : PartialSecondCycleOutcome w
-        (S.source.e, S.A.activatedState) N)
-      (damage : Not
-        (PathGrooves S.A.toSupported.paths C.atRepeat.2))
-  | oppositeReflectorDamage
-      (P : PartialSecondReflectorCompletion S.A N)
-      (damage : Not
-        (PathGrooves S.A.toSupported.paths
-          P.reflector.preReturn.2))
-  | absentPresentWriter
-      (R : ManufacturedFlipReflector w S.source.g S.source.e)
-      (kind : S.A = ManufacturedReflector.flip R)
-      (absentA : Not (Membership.mem
-        (S.A.exploration.map passageSwitch) S.source.k0))
-      (P : PartialSecondReflectorCompletion S.A N)
-      (supportGrooved : PathGrooves S.A.toSupported.paths
-        P.reflector.preReturn.2)
-      (present : Membership.mem
-        (P.reflector.constructionFirstWriterSwitches N)
-          S.source.k0)
 
 end GeneralN

@@ -18,8 +18,6 @@ the two-phase or four-phase tail used by the literal five-close bound.
 namespace GeneralN
 
 
-
-
 theorem RawCycleThroughSelfLink.self_period_has_first_revisit
     {w : Wiring} {start : Nat × Tongues} {close : Nat}
     (R : RawCycleThroughSelfLink w start close) :

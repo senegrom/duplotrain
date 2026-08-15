@@ -388,23 +388,12 @@ structure SimpleContinuationChangedContact.RunwayNAddFourResidual
     R.actionSwitch ∈ C.approachFirstWriterSwitches N
   mouth : Nat
   outside : Nat
-  actions_ne : mouth / 3 ≠ R.actionSwitch
   post_reach : stepN w (C.approach.length + 1)
       (e, (ManufacturedReflector.flip R).activatedState) =
     some (outside, flipAt C.contactState (mouth / 3))
   old_corner_missing :
     Not (VectorCount.restrict N
       (flipAt C.contactState R.actionSwitch) ∈ C.compressedLead N)
-  tail_live : forall d, exists finish,
-    stepN w d
-      (outside, flipAt C.contactState (mouth / 3)) = some finish
-  gray_tail : forall d,
-    tonguesAt w
-      (outside, flipAt C.contactState (mouth / 3)) d ∈
-      [flipAt C.contactState (mouth / 3),
-       flipAt (flipAt C.contactState (mouth / 3)) R.actionSwitch,
-       C.contactState,
-       flipAt C.contactState R.actionSwitch]
 
 private theorem changedContact_period_all_depths_live
     {w : Wiring} {start : Nat × Tongues} {period d : Nat}
@@ -643,11 +632,8 @@ theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_resi
         action_first_written := haction
         mouth := mouth
         outside := outside
-        actions_ne := hActionsNeR
         post_reach := by simpa [K, state, alternate] using hreach'
         old_corner_missing := hmissingR
-        tail_live := htailLive
-        gray_tail := hgray
       }⟩
   · obtain ⟨old, hold, horientation⟩ :=
       R.nonrunway_oriented_branch_entry_is_candy state

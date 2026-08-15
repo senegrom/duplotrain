@@ -1,4 +1,5 @@
 import SharpCertificateClosure
+import TripleInterlacementObstruction
 
 /-!
 # Closing the raw five-frame triple through the physical obstruction
@@ -334,7 +335,6 @@ theorem CertifiedEndpointEmptyABCABC.impossible_of_irreflexive
   exact Echo.physical_endpoint_empty_abcabc_impossible
     hirr C.run C.tail C.crossing hKb ht1b hbu0 C.stable
       C.no_lobe C.no_replay
-
 
 
 theorem FiveFrameTripleCase.impossible_of_irreflexive

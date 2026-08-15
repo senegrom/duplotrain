@@ -1,8 +1,8 @@
 import EndpointEpochExtraction
 import SelfPivotStrictShrink
-import RestorationFrameOrdering
 import BlockSparseBoundCore
 import StarIndependent
+import ManufacturedPairNovelty
 
 /-!
 # Global amortization of train-curve growth and self epochs
@@ -38,39 +38,12 @@ namespace GeneralN
 /-! ## Event lists and drop mass -/
 
 
-noncomputable def rawCurveDropAt
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) : Nat :=
-  rawFiniteCurveSizeAt w N start k -
-    rawFiniteCurveSizeAt w N start (k + 1)
-
-/-- Total downward variation of the finite train-curve size on `[0, K)`. -/
-noncomputable def rawCurveDropMass
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : Nat :=
-  ((List.range K).map (rawCurveDropAt w N start)).sum
-
-@[simp] theorem rawCurveDropMass_zero
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) :
-    rawCurveDropMass w N start 0 = 0 := by
-  simp [rawCurveDropMass]
 theorem stepN_shift_eq
     {w : Wiring} {shift d : Nat} {start middle : Nat × Tongues}
     (hreach : stepN w shift start = some middle) :
     stepN w d middle = stepN w (shift + d) start := by
   rw [stepN_add, hreach]
   rfl
-
-private theorem stepN_prefix_some_amortization
-    {w : Wiring} {start finish : Nat × Tongues} {d K : Nat}
-    (hd : d ≤ K) (hfinish : stepN w K start = some finish) :
-    ∃ middle, stepN w d start = some middle := by
-  let rest := K - d
-  have hsplit : K = d + rest := by
-    dsimp [rest]
-    omega
-  rw [hsplit, stepN_add] at hfinish
-  cases hprefix : stepN w d start with
-  | none => simp [hprefix] at hfinish
-  | some middle => exact ⟨middle, rfl⟩
 
 theorem restrictedTonguesAt_shift_eq
     {w : Wiring} {N shift d : Nat} {start middle : Nat × Tongues}
@@ -84,23 +57,6 @@ theorem restrictedTonguesAt_shift_eq
     exact hfinish
   simp [restrictedTonguesAt, tonguesAt, hfinish, hglobal]
 
-theorem rawEntryAt_shift_eq
-    {w : Wiring} {shift d : Nat} {start middle : Nat × Tongues}
-    (hreach : stepN w shift start = some middle)
-    (hlive : ∃ finish, stepN w d middle = some finish) :
-    rawEntryAt w middle d = rawEntryAt w start (shift + d) := by
-  obtain ⟨finish, hfinish⟩ := hlive
-  have hglobal : stepN w (shift + d) start = some finish := by
-    rw [← stepN_shift_eq hreach]
-    exact hfinish
-  simp [rawEntryAt, hfinish, hglobal]
-
-theorem rawWriterAt_shift_eq
-    {w : Wiring} {shift d : Nat} {start middle : Nat × Tongues}
-    (hreach : stepN w shift start = some middle)
-    (hlive : ∃ finish, stepN w d middle = some finish) :
-    rawWriterAt w middle d = rawWriterAt w start (shift + d) := by
-  simp [rawWriterAt, rawEntryAt_shift_eq hreach hlive]
 
 theorem RawProductiveAt.shift_iff
     {w : Wiring} {N shift d : Nat} {start middle : Nat × Tongues}
@@ -110,7 +66,7 @@ theorem RawProductiveAt.shift_iff
       RawProductiveAt w N start (shift + d) := by
   obtain ⟨finish, hfinish⟩ := hlive
   obtain ⟨current, hcurrent⟩ :=
-    stepN_prefix_some_amortization (d := d) (K := d + 1)
+    stepN_prefix_some (d := d) (K := d + 1)
       (by omega) hfinish
   have hnextLive : ∃ finish, stepN w (d + 1) middle = some finish :=
     ⟨finish, hfinish⟩
@@ -136,17 +92,6 @@ theorem RawCurveSelfAt.shift_iff
   simp [hfinish, hglobal]
 
 /-! ## Canonical self-epoch fibres -/
-
-private def epochMinFrom : Nat → List Nat → Nat
-  | x, [] => x
-  | x, y :: ys => Nat.min x (epochMinFrom y ys)
-
-private def epochMaxFrom : Nat → List Nat → Nat
-  | x, [] => x
-  | x, y :: ys => Nat.max x (epochMaxFrom y ys)
-
-
-
 
 
 structure RawPermanentSelfTail

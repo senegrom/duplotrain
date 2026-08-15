@@ -74,12 +74,6 @@ structure KnownEdgeProtectedPair
   B_grooves : PathGrooves B.toSupported.paths B.activatedState
   A_base : A.baseState = start.2
   B_base : B.baseState = A.activatedState
-  A_reached : stepN w
-    (A.exploration.length + A.runway.length + 1) start =
-      some (e, A.activatedState)
-  B_reached : stepN w
-    (B.exploration.length + B.runway.length + 1)
-      (e, B.baseState) = some (start.1, B.activatedState)
 
 /-- Known-edge N+4 frontier.
 
@@ -191,8 +185,6 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
                 B_grooves := hB
                 A_base := hbaseA
                 B_base := hbaseB
-                A_reached := hreachA
-                B_reached := by simpa [hbaseB] using hreachB
               }⟩
 
 end GeneralN

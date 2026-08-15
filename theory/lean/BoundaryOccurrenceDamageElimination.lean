@@ -325,7 +325,6 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_count
       (O.original_mem_doubleReducedContactLead (N := N) C original) hnd
 
 
-
 /-- A saturated productive boundary cannot contain a changed contact after a
 noncanonical unchanged occurrence of its first flip reflector. -/
 theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_occurrence_flip_changed_contact
@@ -406,8 +405,6 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_occurrenc
         C.compressedLead_length_le_N_add_two_of_action_absent
           hN hA haction
       omega
-
-
 
 
 /-- Every changed contact after an unchanged initial-switch occurrence is

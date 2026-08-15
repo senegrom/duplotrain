@@ -720,34 +720,6 @@ theorem theta_capture_after_unvisited_prefix
   rw [stepN_add, hprefixFlip.sound]
   exact hcapture
 
-/-- The other branch of the first-contact dichotomy.  If the broken passage
-is met trailing-first, it repairs the foreign flip and the exact old suffix
-replays. -/
-theorem flipped_trace_trailing_repairs
-    {w : Wiring} {e p x q k : Nat}
-    {u : Tongues} {before after : List Passage}
-    {finish : Nat × Tongues}
-    (hprefix : PhysicalTrace w (e, u) before (p, u))
-    (hforeign : ∀ passage ∈ before,
-      passageSwitch passage ≠ k)
-    (hk : p / 3 = k)
-    (hpbranch : p % 3 ≠ 0)
-    (hgroove : arrive u p = (x, u))
-    (hlink : w.link x = some q)
-    (htail : PhysicalTrace w (q, u) after finish) :
-    stepN w (before ++ (p, x) :: after).length
-      (e, flipAt u k) = some finish := by
-  have hprefixFlip := hprefix.flip_unvisited hforeign
-  have hrepair : arrive (flipAt u k) p = (x, u) := by
-    rw [← hk]
-    exact flipped_passage_forward_trailing hgroove hpbranch
-  have hfull := hprefixFlip.append
-    (PhysicalTrace.cons hrepair hlink htail)
-  exact hfull.sound
-
-/-- Step-count version of `flipped_trace_trailing_repairs`, convenient when
-the deterministic suffix is known by decomposing a reflector run rather than
-by retaining its passage list. -/
 theorem flipped_prefix_trailing_then
     {w : Wiring} {e p x q k tailSteps : Nat}
     {u : Tongues} {before : List Passage}
@@ -1850,36 +1822,6 @@ theorem PhysicalTrace.changed_switch_has_changed_passage
       exact ⟨before, p, x, after, u, v, hsplit,
         hswitch, hbefore, harrive, hu, hv, hvu⟩
 
-theorem grooved_contact_exits_on_old_passage
-    {state next : Tongues} {oldEntry oldExit freshEntry freshExit : Nat}
-    (hold : arrive state oldExit = (oldEntry, state))
-    (hfresh : arrive state freshEntry = (freshExit, next))
-    (hswitch : oldEntry / 3 = freshEntry / 3) :
-    freshExit = oldEntry ∨ freshExit = oldExit := by
-  have holdSwitch : oldExit / 3 = oldEntry / 3 := by
-    have hs := arrive_exit_switch state oldExit
-    rw [hold] at hs
-    exact hs.symm
-  have hshare := same_switch_passages_share_port
-    state state oldExit freshEntry (holdSwitch.trans hswitch)
-  rw [hold, hfresh] at hshare
-  rcases hshare with hsameEntry | hOldExit | hOldEntry | hsameExit
-  · have hcmp := hold
-    rw [hsameEntry, hfresh] at hcmp
-    injection hcmp with hExit _
-    exact Or.inl hExit
-  · exact Or.inr hOldExit.symm
-  · have hforward := groove_forward hold
-    change oldEntry = freshEntry at hOldEntry
-    rw [hOldEntry, hfresh] at hforward
-    injection hforward with hExit _
-    exact Or.inr hExit
-  · exact Or.inl hsameExit.symm
-
-/-- Earliest damaging contact of a physical trace with an existing groove
-family.  Every preceding passage preserves the old support; at the returned
-passage one old groove is still valid, its tongue genuinely changes, and the
-fresh passage is forced to exit onto that old passage. -/
 theorem PhysicalTrace.first_changed_support_passage
     {w : Wiring} {start finish : Nat × Tongues}
     {passages : List Passage} {paths : List (List Passage)}
@@ -1906,7 +1848,7 @@ theorem PhysicalTrace.first_changed_support_passage
         have hgroove := hbase path hp old hold
         have hsameSwitch : old.1 / 3 = p / 3 := by
           simpa [passageSwitch] using hswitch
-        have hExit := grooved_contact_exits_on_old_passage
+        have hExit := grooved_contact_exit_dichotomy
           hgroove harrive hsameSwitch
         exact ⟨[], p, x, passages, u, v, path, old,
           rfl, PhysicalTrace.nil _, hbase, harrive,

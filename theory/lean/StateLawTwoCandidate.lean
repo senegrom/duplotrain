@@ -1024,31 +1024,6 @@ theorem state_law_linear_two_add_nine_candidate
           dsimp [positive] at hpositiveLength
           omega
 
-end GeneralN
-
-namespace GeneralN
-
-/-
-/-- Pointwise-best published form: never weaker than the previous `3*N+7`
-theorem, and equal to the new coefficient-two bound from `N = 2` onward. -/
-theorem state_law_linear_two_candidate
-    (w : Wiring) (N : Nat)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ Nat.min (2 * N + 9) (3 * N + 7) := by
-  apply Nat.le_min
-  · exact state_law_linear_two_add_nine_candidate
-      w N hN start times hlive hnd
-  · exact state_law_linear_three_sharp
-      w N hN start times hlive hnd
-
--/
-
-namespace GeneralN
-
 /-- Pointwise-best published form: never weaker than the previous `3*N+7`
 theorem, and equal to the new coefficient-two bound from `N = 2` onward. -/
 theorem state_law_linear_two_candidate
@@ -1065,5 +1040,4 @@ theorem state_law_linear_two_candidate
     state_law_linear_three_sharp
       w N hN start times hlive hnd⟩
 
-end GeneralN
 end GeneralN

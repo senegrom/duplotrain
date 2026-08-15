@@ -161,20 +161,6 @@ theorem step_some_parts {w : Wiring} {c d : Nat × Tongues}
       cases h
       exact ⟨rfl, rfl⟩
 
-/-- A successful step leaves both the switch passage and the track edge ready
-for the exact reverse traversal. -/
-theorem step_grooves {w : Wiring} {c d : Nat × Tongues}
-    (h : step w c = some d) :
-    arrive d.2 (exitPort c) = (c.1, d.2) ∧
-      w.link d.1 = some (exitPort c) := by
-  have hp := step_some_parts h
-  constructor
-  · rw [hp.2]
-    exact arrive_back c.2 c.1
-  · exact w.symm _ _ hp.1
-
-/-! ## Grooved passage lists and arbitrary-path retrace -/
-
 /-- One local switch passage, stored as `(entryPort, exitPort)`. -/
 abbrev Passage := Nat × Nat
 

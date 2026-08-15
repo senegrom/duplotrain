@@ -1,6 +1,5 @@
 import KoizumiFramePersistence
 import SelfEpochFour
-import RepeatedNoveltyDecomposition
 
 /-!
 # Self-pivot shrinkage and the serial one-shot obstruction
@@ -51,117 +50,6 @@ def RawStrictSelfShrinkAt
     rawFiniteCurveSizeAt w N start k
 
 
-theorem simple_serial_repeated_switch_cycle_or_retrace
-    {w : Wiring}
-    {p x q y : Nat} {u₀ u v : Tongues} {body : List Passage}
-    (htrace : PhysicalTrace w (p, u₀) ((p, x) :: body) (q, u))
-    (hsimple : SwitchSimple ((p, x) :: body))
-    (hsame : p / 3 = q / 3)
-    (hclose : arrive u q = (y, v)) :
-    SettlesOnSimpleCycle w (q, u) ∨
-      ∃ settled : Tongues,
-        stepN w 1 (q, u) =
-          (w.link p).map (fun ell => (ell, settled)) := by
-  have hrunway : PhysicalTrace w (p, u₀) [] (p, u₀) :=
-    PhysicalTrace.nil _
-  have hfork := first_revisit_fork hrunway htrace
-    (by simpa using hsimple) hsame hclose
-  rcases hfork with hcycle | hretrace
-  · obtain ⟨period, settled, hpositive, honce, hfixed⟩ := hcycle
-    exact Or.inl ⟨period, settled, hpositive, honce, hfixed⟩
-  · obtain ⟨settled, hretrace⟩ := hretrace
-    exact Or.inr ⟨settled, by simpa using hretrace⟩
-
-
-private theorem selfPivot_prefix_config
-    {w : Wiring} {start finish : Nat × Tongues} {d K : Nat}
-    (hd : d ≤ K) (hfinish : stepN w K start = some finish) :
-    ∃ middle, stepN w d start = some middle := by
-  let rest := K - d
-  have hsplit : K = d + rest := by
-    dsimp [rest]
-    omega
-  rw [hsplit, stepN_add] at hfinish
-  cases hprefix : stepN w d start with
-  | none => simp [hprefix] at hfinish
-  | some middle => exact ⟨middle, rfl⟩
-
-/-- **Every raw repeated-writer novelty exposes the serial obstruction.**
-
-Take the physical trace from the last preceding productive visit of the
-closing writer up to the closing entry.  There are exactly three outcomes:
-
-1. the trace already repeats a switch passage internally;
-2. the close settles on an absorbing selected cycle; or
-3. the close sends the train exactly backwards over the edge preceding the
-   opening visit.
-
-Consequently a forward chain of independent `C,D,C` one-shots is impossible.
-Any attempted escape is necessarily the non-simple interlacement/nesting
-case, not another disjoint serial gadget. -/
-theorem RawRepeatedWriterNovelAt.nonsimple_or_cycle_or_retrace
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {right : Nat}
-    (h : RawRepeatedWriterNovelAt w N start right) :
-    ∃ left before close x body,
-      RawLastWriterFrame w N start left right ∧
-      stepN w left start = some before ∧
-      stepN w right start = some close ∧
-      ((before.1, x) :: body).length = right - left ∧
-      PhysicalTrace w before ((before.1, x) :: body) close ∧
-      (¬ SwitchSimple ((before.1, x) :: body) ∨
-        SettlesOnSimpleCycle w close ∨
-        ∃ settled : Tongues,
-          stepN w 1 close =
-            (w.link before.1).map (fun ell => (ell, settled))) := by
-  obtain ⟨left, F⟩ := h.last_writer_frame
-  obtain ⟨close, after, C, _hC, hcloseAt, _hafterAt, hcloseStep,
-      _hentry, _hexit, _hflip, _hback⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN h.1
-  obtain ⟨before, hbeforeAt⟩ := selfPivot_prefix_config
-    (Nat.le_of_lt F.order) hcloseAt
-  let span := right - left
-  have hsum : left + span = right := by
-    simpa [span] using Nat.add_sub_of_le (Nat.le_of_lt F.order)
-  have hspanPositive : 0 < span := by
-    simpa [span] using Nat.sub_pos_of_lt F.order
-  have hinterval : stepN w span before = some close := by
-    have hsplit := stepN_add w left span start
-    rw [hbeforeAt] at hsplit
-    simp only [Option.bind_some] at hsplit
-    rw [hsum, hcloseAt] at hsplit
-    exact hsplit.symm
-  obtain ⟨passages, hlength, htrace⟩ :=
-    physicalTrace_of_stepN w hinterval
-  cases passages with
-  | nil =>
-      simp only [List.length_nil] at hlength
-      exact False.elim ((Nat.ne_of_gt hspanPositive) hlength.symm)
-  | cons passage body =>
-      rcases passage with ⟨p, x⟩
-      have hp : before.1 = p := htrace.head_arrive.1
-      subst p
-      have hsame : before.1 / 3 = close.1 / 3 := by
-        simpa [rawWriterAt, rawEntryAt, hbeforeAt, hcloseAt] using
-          F.same_writer
-      have hparts := step_some_parts hcloseStep
-      have harrive : arrive close.2 close.1 =
-          (exitPort close, after.2) := by
-        apply Prod.ext
-        · rfl
-        · exact hparts.2.symm
-      refine ⟨left, before, close, x, body, F, hbeforeAt, hcloseAt,
-        ?_, htrace, ?_⟩
-      · simpa [span] using hlength
-      · by_cases hsimple : SwitchSimple ((before.1, x) :: body)
-        · rcases simple_serial_repeated_switch_cycle_or_retrace
-            htrace hsimple hsame harrive with hcycle | hretrace
-          · exact Or.inr (Or.inl hcycle)
-          · exact Or.inr (Or.inr hretrace)
-        · exact Or.inl hsimple
-
-
 private theorem nodup_subset_length_self_pivot
     {xs pool : List Nat}
     (hnd : xs.Nodup) (hsub : ∀ x ∈ xs, x ∈ pool) :
@@ -185,31 +73,6 @@ private theorem nodup_subset_length_self_pivot
         | cons _ _ => simp
       omega
 
-/-- Distinct switch charges whose unmatched branches all remain on one
-persistent selected curve are injectively bounded by the curve's two
-endpoints.  A third serial charge must therefore change the carrier (the
-strict-subcurve/interlacement branch); it cannot remain an independent
-one-shot on the same curve. -/
-theorem persistent_endpoint_charges_le_two
-    {w : Wiring} {N : Nat} {u : Tongues} {root : Nat}
-    {charges : List Nat}
-    (hnd : charges.Nodup)
-    (hcharges : ∀ C ∈ charges,
-      C < N ∧ CurveReach w u root (unmatchedBranch u C)) :
-    charges.length ≤ 2 := by
-  have hsub : ∀ C ∈ charges,
-      C ∈ finiteCurveEndpointWriters w N u root := by
-    intro C hC
-    exact mem_finiteCurveEndpointWriters_iff.mpr (hcharges C hC)
-  have hcarrier := nodup_subset_length_self_pivot hnd hsub
-  exact Nat.le_trans hcarrier
-    (finiteCurveEndpointWriters_length_le_two w N u root)
-
-/-! ## Four-state self tails versus a strict carrier change -/
-
-/-- The exact raw certificate saying that a finite continuation is live and
-contains only productive self-pivots.  `TrackCurveShrinkGlobal` proves that
-its endpoint-writer carrier is monotone and has size at most two. -/
 structure RawSelfTailCertificate
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : Prop where
   live : ∀ k, k ≤ K → (stepN w k start).isSome
@@ -465,18 +328,5 @@ theorem rawNovelRepeatedStrictShrinks_le_three_mul
     (fun p hp => List.mem_range.mpr (hchargeBound p hp))
   dsimp [events, charge] at hle ⊢
   simpa only [List.length_map, List.length_range] using hle
-
-/-- Once a raw self-only interval has been certified by its two persistent
-endpoint writers, the already-proved Gray-square theorem gives the exact
-four-state bound.  This wrapper records the endpoint side of the intended
-shrink-or-Gray dichotomy in the same file as the serial obstruction. -/
-theorem certified_persistent_self_tail_le_four
-    {w : Wiring} {N K A B : Nat} {start : Nat × Tongues}
-    (hepoch : RawSelfTwoEndpointEpoch w N start K A B)
-    {times : List Nat}
-    (htimes : ∀ k ∈ times, k ≤ K)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ 4 :=
-  raw_self_two_endpoint_epoch_distinct_le_four hepoch htimes hnd
 
 end GeneralN

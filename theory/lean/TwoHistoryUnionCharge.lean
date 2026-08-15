@@ -489,8 +489,6 @@ theorem ManufacturedReflector.writerConstructionHistory_length
     rawFirstWriterHistory]
 
 
-
-
 private theorem ManufacturedFlipReflector.runway_boundary_repeated
     {w : Wiring} {g e N : Nat}
     (R : ManufacturedFlipReflector w g e) :
@@ -636,22 +634,6 @@ theorem ManufacturedReflector.activated_mem_sharpHistoryCore
   apply A.mem_sharpHistoryCore_of_mem
   simp [ManufacturedReflector.sharpConstructionHistory]
 
-/-- Time zero, hence the reflector's base state, is retained by the compressed
-history. -/
-theorem ManufacturedReflector.base_mem_sharpHistoryCore
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e) :
-    VectorCount.restrict N A.baseState ∈ A.sharpHistoryCore N := by
-  apply A.mem_sharpHistoryCore_of_mem
-  unfold ManufacturedReflector.sharpConstructionHistory
-  apply List.mem_append_left
-  apply List.mem_map.mpr
-  refine ⟨0, List.mem_range.mpr (by omega), ?_⟩
-  simp [restrictedTonguesAt, tonguesAt, stepN]
-
-/-- Coefficient-one cover for the two completed constructions in the
-endpoint-groove-preserved branch.  The common activation boundary is erased
-from the compressed second history and retained by the first core. -/
 noncomputable def ManufacturedReflector.preservedTwoHistoryCore
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
@@ -882,7 +864,6 @@ theorem two_manufacturing_journeys_preserved_support_then_four_tail_le_N_add_six
       hgroovesA hbaseB hactivatedB hreachB hgroovesB
       hpreGrooves htail (by omega) times hlive hnd
   omega
-
 
 
 structure SecondHistoryContactData
@@ -1119,7 +1100,6 @@ theorem SecondHistoryContactData.damageContactHistory_length_le_N_add_three
   omega
 
 /-! ## Stop the second charge at its first old-support contact -/
-
 
 
 def SecondHistoryContactData.prefixHistory

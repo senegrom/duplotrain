@@ -82,27 +82,6 @@ private theorem nodup_subset_length_curve
       simp only [List.length_cons]
       omega
 
-private theorem length_lt_of_strict_subset_curve
-    {α : Type} [BEq α] [LawfulBEq α]
-    {xs ys : List α}
-    (hnd : xs.Nodup)
-    (hsub : ∀ x ∈ xs, x ∈ ys)
-    (y : α) (hy : y ∈ ys) (hnot : y ∉ xs) :
-    xs.length < ys.length := by
-  have hcons : (y :: xs).Nodup := by
-    rw [List.nodup_cons]
-    exact ⟨hnot, hnd⟩
-  have hconsSub : ∀ x ∈ y :: xs, x ∈ ys := by
-    intro x hx
-    rcases List.mem_cons.mp hx with rfl | hx
-    · exact hy
-    · exact hsub x hx
-  have hle := nodup_subset_length_curve hcons hconsSub
-  simp only [List.length_cons] at hle
-  omega
-
-/-! ## Endpoint capacity of one selected curve -/
-
 /-- A finite walk in the selected curve graph. -/
 def FiniteCurveChain (w : Wiring) (u : Tongues) : List Nat → Prop
   | [] => True
@@ -607,55 +586,6 @@ theorem finiteCurveEndpointWriters_length_le_two
         simp only [List.length_cons, List.length_nil, Nat.add_zero] at hleE ⊢
         omega
 
-/-- A non-self productive endpoint pivot strictly enlarges the finite train
-curve, even after re-rooting that curve at the next raw entry port. -/
-theorem nonself_endpoint_pivot_finiteCurvePorts_growth
-    {w : Wiring} {N C : Nat} {cur next : Nat × Tongues}
-    (hC : C < N)
-    (hstep : step w cur = some next)
-    (hentry : cur.1 = unmatchedBranch cur.2 C)
-    (hexit : exitPort cur = 3 * C)
-    (hflip : next.2 = flipAt cur.2 C)
-    (houtside : ¬ CurveReach w cur.2 cur.1 (3 * C)) :
-    (finiteCurvePorts w N cur.2 cur.1).length <
-      (finiteCurvePorts w N next.2 next.1).length := by
-  have hgrowth := unmatched_pivot_strict_curve_growth cur.2 C (by
-    simpa [hentry] using houtside)
-  have hlink : w.link (3 * C) = some next.1 := by
-    have hp := (step_some_parts hstep).1
-    simpa [hexit] using hp
-  have hrootStem :
-      CurveReach w next.2 cur.1 (3 * C) := by
-    simpa [hentry, hflip] using hgrowth.2.1
-  have hrootNext : CurveReach w next.2 cur.1 next.1 :=
-    CurveReach.step hrootStem (Or.inl hlink)
-  have hnextRoot : CurveReach w next.2 next.1 cur.1 :=
-    curveReach_symm hrootNext
-  have hlift : ∀ p, CurveReach w cur.2 cur.1 p →
-      CurveReach w next.2 next.1 p := by
-    intro p hp
-    have hp' : CurveReach w next.2 cur.1 p := by
-      simpa [hentry, hflip] using hgrowth.1 p (by
-        simpa [hentry] using hp)
-    exact curveReach_trans hnextRoot hp'
-  have hstemNew : CurveReach w next.2 next.1 (3 * C) :=
-    curveReach_trans hnextRoot hrootStem
-  have hsubset : ∀ p,
-      p ∈ finiteCurvePorts w N cur.2 cur.1 →
-      p ∈ finiteCurvePorts w N next.2 next.1 := by
-    intro p hp
-    rw [mem_finiteCurvePorts_iff] at hp ⊢
-    exact ⟨hp.1, hlift p hp.2⟩
-  have hstemMem : 3 * C ∈ finiteCurvePorts w N next.2 next.1 := by
-    rw [mem_finiteCurvePorts_iff]
-    exact ⟨by omega, hstemNew⟩
-  have hstemNot : 3 * C ∉ finiteCurvePorts w N cur.2 cur.1 := by
-    intro hm
-    exact houtside (mem_finiteCurvePorts_iff.mp hm).2
-  exact length_lt_of_strict_subset_curve
-    (finiteCurvePorts_nodup w N cur.2 cur.1)
-    hsubset (3 * C) hstemMem hstemNot
-
 /-- A newly selected internal edge at `C` never escapes the old selected
 curve when the pivot is a self-join.  Away from `C` the internal edge is
 unchanged; at `C` both of its endpoints were already on the old curve. -/
@@ -891,22 +821,6 @@ theorem rawSelfOnlyEpoch_endpointWriters_subset
         (fun hprod => hself j (by omega) hprod)
       exact ih (by omega) D (hstep D hD)
 
-/-- Every productive writer in a self-only epoch is one of the at-most-two
-endpoint writers present at the epoch's initial configuration. -/
-theorem rawSelfOnlyEpoch_productive_writer_mem_initial
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (start : Nat × Tongues) (K : Nat)
-    (hlive : ∀ k, k ≤ K → (stepN w k start).isSome)
-    (hself : ∀ k, k < K → RawProductiveAt w N start k →
-      RawCurveSelfAt w start k)
-    {k : Nat} (hk : k < K) (hprod : RawProductiveAt w N start k) :
-    rawWriterAt w start k ∈
-      rawFiniteCurveEndpointWritersAt w N start 0 := by
-  have hmem := rawProductiveAt_writer_mem_endpointWritersAt hN hprod
-  exact rawSelfOnlyEpoch_endpointWriters_subset
-    hN start K hlive hself k (by omega)
-    (rawWriterAt w start k) hmem
 
 theorem rawSelfOnlyEpoch_tongue_stable_outside
     {w : Wiring} {N : Nat}
@@ -1030,30 +944,6 @@ theorem rawSelfOnlyEpoch_distinct_snapshots_le_four
   simp only [List.length_map] at hcount
   omega
 
-/-- Raw `stepN` form of strict train-curve growth. -/
-theorem rawProductiveAt_nonself_curve_growth
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {k : Nat}
-    (hprod : RawProductiveAt w N start k)
-    (hnonself : ¬ RawCurveSelfAt w start k) :
-    rawFiniteCurveSizeAt w N start k <
-      rawFiniteCurveSizeAt w N start (k+1) := by
-  obtain ⟨cur, next, C, hCwriter, hcur, hnext, hstep,
-      hentry, hexit, hflip, _hback⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN hprod
-  have hwriterLt := rawProductiveAt_writer_lt hN hprod
-  have hC : C < N := by
-    rw [hCwriter]
-    exact hwriterLt
-  have hCcur : C = cur.1 / 3 := by
-    simpa [rawWriterAt, rawEntryAt, hcur] using hCwriter
-  have houtside : ¬ CurveReach w cur.2 cur.1 (3 * C) := by
-    unfold RawCurveSelfAt at hnonself
-    simpa [hcur, hCcur] using hnonself
-  have hgrowth := nonself_endpoint_pivot_finiteCurvePorts_growth
-    hC hstep hentry hexit hflip houtside
-  simpa [rawFiniteCurveSizeAt, hcur, hnext] using hgrowth
 
 theorem rawNonproductiveAt_tongues_eq
     {w : Wiring} {N : Nat}

@@ -1,6 +1,6 @@
 import PreReturnProtectedRoute
 import KnownEdgeNAddFourChangedClosed
-import BoundaryAbsentSecondWriter
+import BoundaryDoubleDuplicate
 
 /-!
 # The protected-pair `N+4` frontier
@@ -65,44 +65,6 @@ theorem ManufacturedReflector.preReturn_mem_sharpHistoryCore
 
 /-- The facing mouth coordinate of a flip reflector is not part of its
 reusable support. -/
-private theorem ManufacturedFlipReflector.action_not_mem_reusable
-    {w : Wiring} {g e : Nat}
-    (R : ManufacturedFlipReflector w g e) :
-    R.actionSwitch ∉ (ManufacturedReflector.flip R).reusableSwitches := by
-  intro hmem
-  change R.actionSwitch ∈
-    ((R.runway ++ R.candy).map passageSwitch) at hmem
-  obtain ⟨passage, hpassage, hswitch⟩ := List.mem_map.mp hmem
-  rcases List.mem_append.mp hpassage with hrunway | hcandy
-  · exact (R.support_foreign R.runway (by simp)
-      passage hrunway) hswitch
-  · exact (R.support_foreign R.candy (by simp)
-      passage hcandy) hswitch
-
-/-- The omitted facing mouth is nevertheless one of the represented
-coordinates. -/
-private theorem ManufacturedFlipReflector.action_lt
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (R : ManufacturedFlipReflector w g e) :
-    R.actionSwitch < N := by
-  have hlt :=
-    (ManufacturedReflector.flip R).exploration_trace.switch_lt
-      hN (R.mouth, R.firstArm) (by
-        simp [ManufacturedReflector.exploration])
-  simpa [passageSwitch, ManufacturedFlipReflector.actionSwitch] using hlt
-
-/-- A productive write of the old flip reflector's action switch is the
-last productive event of the second switch-simple exploration.
-
-Entering that action branch exits through the old mouth.  Because the old
-support is grooved at both endpoints of the second exploration, no later
-productive event can have damaged an old runway coordinate; hence the
-runway is still grooved immediately after the action write.  The train must
-therefore retrace the runway pointwise to the literal start port `e`.
-Switch simplicity forces the second exploration to end no later than that
-return, while a productive event strictly after the action write would have
-to lie at or beyond the end of the pointwise retrace. -/
 theorem ManufacturedFlipReflector.action_writer_is_last_productive
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)

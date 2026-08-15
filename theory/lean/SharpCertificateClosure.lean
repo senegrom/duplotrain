@@ -105,7 +105,6 @@ theorem rawWriterAt_add_of_reach
   simp [rawWriterAt, rawEntryAt, stepN_add, hreach, hfinish]
 
 
-
 theorem PhysicalTrace.rawWriterAt_eq_passageSwitch_getElem
     {w : Wiring} {start finish : Nat × Tongues}
     {passages : List Passage}
@@ -206,10 +205,6 @@ theorem PhysicalTrace.restrictedTonguesAt_mem_rawFirstWriterHistory
   simpa using hcover
 
 
-
-
-
-
 theorem four_raw_novel_post_vectors_nodup
     {w : Wiring} {N : Nat} {start : Nat × Tongues}
     {z₁ z₂ z₃ z₄ : Nat}
@@ -258,157 +253,6 @@ novelty of the returned run.  There is no third, uncharged source of novelty.
 -/
 
 
-theorem crossing_frame_open_in_caller_oriented_contact
-    {w : Wiring} {N callerStart returnTime left escape g edge : Nat}
-    {start finish : Nat × Tongues}
-    {base settled : Tongues} {caller : List Passage}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (hcallerStart : stepN w callerStart start = some (g, base))
-    (hcaller : PhysicalTrace w (g, base) caller finish)
-    (hgrooved : PassagesGrooved settled caller)
-    (hreturn : stepN w returnTime start = some (edge, settled))
-    (hreturnEscape : returnTime ≤ escape)
-    (hminimal : ∀ t, returnTime ≤ t → t < escape →
-      ¬ RawProductiveAt w N start t)
-    (F : RawLastWriterFrame w N start left escape)
-    (hleftStart : callerStart ≤ left)
-    (hleftEnd : left < callerStart + caller.length) :
-    ∃ (old : Passage) (cur next : Nat × Tongues) (C : Nat),
-      old ∈ caller ∧
-      C = rawWriterAt w start escape ∧
-      passageSwitch old = C ∧
-      stepN w escape start = some cur ∧
-      stepN w (escape + 1) start = some next ∧
-      arrive cur.2 cur.1 = (3 * C, next.2) ∧
-      arrive cur.2 old.2 = (old.1, cur.2) ∧
-      next.2 = flipAt cur.2 C ∧
-      next.2 C ≠ cur.2 C ∧
-      3 * C = old.2 := by
-  let d := left - callerStart
-  have hd : d < caller.length := by
-    dsimp [d]
-    omega
-  have hleftTime : callerStart + d = left := by
-    dsimp [d]
-    omega
-  obtain ⟨localAtLeft, hlocalAtLeft⟩ := stepN_prefix_some
-    (d := d) (K := caller.length) (Nat.le_of_lt hd) hcaller.sound
-  have hlocalLive : (stepN w d (g, base)).isSome := by
-    rw [hlocalAtLeft]
-    simp
-  have hshiftWriter := rawWriterAt_add_of_reach
-    hcallerStart hlocalLive
-  rw [hleftTime] at hshiftWriter
-  have hlocalWriter :=
-    hcaller.rawWriterAt_eq_passageSwitch_getElem hd
-  let old : Passage := caller[d]
-  have holdMem : old ∈ caller := by
-    dsimp [old]
-    exact List.getElem_mem hd
-  obtain ⟨cur, next, C, hC, hcur, hnext, hstep,
-      _hentry, hexit, hflip, _hback⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN F.close_productive
-  have holdWriter : passageSwitch old = C := by
-    calc
-      passageSwitch old = rawWriterAt w (g, base) d := by
-        dsimp [old]
-        exact hlocalWriter.symm
-      _ = rawWriterAt w start left := hshiftWriter.symm
-      _ = rawWriterAt w start escape := F.same_writer
-      _ = C := hC.symm
-  have hCLt : C < N := by
-    rw [hC]
-    exact rawProductiveAt_writer_lt hN F.close_productive
-  let quietSpan := escape - returnTime
-  have hreturnSum : returnTime + quietSpan = escape := by
-    dsimp [quietSpan]
-    omega
-  have hquiet : ∀ t, returnTime ≤ t →
-      t < returnTime + quietSpan →
-      ¬ RawProductiveAt w N start t := by
-    intro t ht hbound
-    apply hminimal t ht
-    rw [hreturnSum] at hbound
-    exact hbound
-  have hquietVector := restrictedTonguesAt_eq_of_quiet_interval
-    (first := returnTime) (span := quietSpan) (finish := cur)
-    (by simpa [hreturnSum] using hcur) hquiet
-  have hrestrict : VectorCount.restrict N cur.2 =
-      VectorCount.restrict N settled := by
-    simpa [restrictedTonguesAt, tonguesAt, hreturnSum,
-      hcur, hreturn] using hquietVector
-  have hbit : cur.2 C = settled C :=
-    restrict_eq_apply hrestrict hCLt
-  have holdSettled : arrive settled old.2 = (old.1, settled) :=
-    hgrooved old holdMem
-  have holdExitSwitch : old.2 / 3 = C := by
-    have hs := arrive_exit_switch settled old.2
-    rw [holdSettled] at hs
-    exact hs.symm.trans holdWriter
-  have holdCur : arrive cur.2 old.2 = (old.1, cur.2) := by
-    apply groove_transfer holdSettled
-    rw [holdExitSwitch]
-    exact hbit
-  have hcallerDecomp :
-      caller = caller.take d ++ old :: caller.drop (d + 1) := by
-    calc
-      caller = caller.take d ++ caller.drop d :=
-        (List.take_append_drop d caller).symm
-      _ = caller.take d ++ old :: caller.drop (d + 1) := by
-        rw [List.drop_eq_getElem_cons hd]
-  have hcallerSplit := hcaller
-  rw [hcallerDecomp] at hcallerSplit
-  obtain ⟨atOld, hprefix, htail⟩ := hcallerSplit.split_append
-  have hprefixSound := hprefix.sound
-  rw [List.length_take_of_le (Nat.le_of_lt hd)] at hprefixSound
-  have hatOld : atOld = localAtLeft := by
-    rw [hlocalAtLeft] at hprefixSound
-    exact (Option.some.inj hprefixSound).symm
-  have holdHead := htail.head_arrive
-  have holdEntry : atOld.1 = old.1 := holdHead.1
-  obtain ⟨afterOld, holdArrival⟩ := holdHead.2
-  have holdExit : exitPort atOld = old.2 := by
-    unfold exitPort
-    rw [holdEntry]
-    exact congrArg Prod.fst holdArrival
-  obtain ⟨openCur, _openNext, openC, hopenC, hopenCur,
-      _hopenNext, _hopenStep, _hopenEntry, hopenExit,
-      _hopenFlip, _hopenBack⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN F.open_productive
-  have hglobalAtLeft :
-      stepN w left start = some localAtLeft := by
-    rw [← hleftTime, stepN_add, hcallerStart]
-    exact hlocalAtLeft
-  have hopenCurEq : openCur = localAtLeft := by
-    rw [hglobalAtLeft] at hopenCur
-    exact (Option.some.inj hopenCur).symm
-  have hopenCEq : openC = C := by
-    calc
-      openC = rawWriterAt w start left := hopenC
-      _ = rawWriterAt w start escape := F.same_writer
-      _ = C := hC.symm
-  have hforwardEndpoint : 3 * C = old.2 := by
-    calc
-      3 * C = 3 * openC := by rw [hopenCEq]
-      _ = exitPort openCur := hopenExit.symm
-      _ = exitPort atOld := by rw [hopenCurEq, hatOld]
-      _ = old.2 := holdExit
-  have hparts := step_some_parts hstep
-  have hfresh : arrive cur.2 cur.1 = (3 * C, next.2) := by
-    apply Prod.ext
-    · exact hexit
-    · exact hparts.2.symm
-  have hchanged : next.2 C ≠ cur.2 C := by
-    rw [hflip]
-    simp [flipAt]
-  exact ⟨old, cur, next, C, holdMem, hC, holdWriter,
-    hcur, hnext, hfresh, holdCur, hflip, hchanged,
-    hforwardEndpoint⟩
-
-
-
-
 structure RawFixedStemOpenFrame
     (w : Wiring) (N : Nat) (start : Nat × Tongues)
     (right : Nat) where
@@ -422,34 +266,6 @@ structure RawFixedStemOpenFrame
     RawProductiveAt w N start j →
     rawWriterAt w start j ≠ rawWriterAt w start reroute
   shape : RawOpenReroutingShape w N start left reroute right
-  reroute_stem_successor : ∃ next,
-    stepN w (reroute + 1) start = some next ∧
-    w.link (3 * rawWriterAt w start reroute) = some next.1
-  close_stem_successor : ∃ next,
-    stepN w (right + 1) start = some next ∧
-    w.link (3 * rawWriterAt w start right) = some next.1
-
-/-- Raw repeated-writer decomposition, repackaged without losing any of its
-fixed-stem routing facts. -/
-theorem RawRepeatedWriterNovelAt.fixedStemOpenFrame
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {right : Nat}
-    (h : RawRepeatedWriterNovelAt w N start right) :
-    Nonempty (RawFixedStemOpenFrame w N start right) := by
-  obtain ⟨left, reroute, outer, hprod, hdiff, hfirst, hshape,
-      hreroute, hclose⟩ := h.open_frame_with_fixed_stem_successors hN
-  exact ⟨{
-    left := left
-    reroute := reroute
-    outer := outer
-    reroute_productive := hprod
-    different_writer := hdiff
-    no_same_rerouter_before := hfirst
-    shape := hshape
-    reroute_stem_successor := hreroute
-    close_stem_successor := hclose
-  }⟩
 
 /-- Five chronological raw novelties together with all five proved fixed-stem
 open frames.  This is the global object consumed by the remaining physical
@@ -523,14 +339,6 @@ structure FiveFrameTripleCase
     frames.a₀ z₀ frames.a₁ z₁ frames.a₂ z₂
     frames.a₃ z₃ frames.a₄ z₄
 
-def KnownEdgeTripleFrameObstruction : Prop :=
-  ∀ (w : Wiring) (N e : Nat),
-    (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
-    ∀ (start : Nat × Tongues),
-      w.link e = some start.1 →
-      ∀ F : FiveFixedStemNovelFrames w N start,
-        FiveFrameTripleCase w N start
-          F.z₀ F.z₁ F.z₂ F.z₃ F.z₄ → False
 
 theorem no_five_fixed_stem_novelties_of_runway_tail
     {w : Wiring} {N : Nat} {start : Nat × Tongues}

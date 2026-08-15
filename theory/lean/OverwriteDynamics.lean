@@ -22,18 +22,6 @@ def pinList : List Nat → Tongues → Tongues
   | [], t => t
   | p :: ps, t => pinList ps (pin t p)
 
-/-- The Boolean written by a trailing arrival at branch port `p`. -/
-def pinValue (p : Nat) : Bool := decide (p % 3 = 2)
-
-/-- The final assignment made to switch `k` by a pin word, if any. -/
-def finalPinValue : List Nat → Nat → Option Bool
-  | [], _ => none
-  | p :: ps, k =>
-      match finalPinValue ps k with
-      | some b => some b
-      | none => if p / 3 = k then some (pinValue p) else none
-
-
 
 theorem descent_result_eq_pinList
     {w : Wiring} {t : Tongues} {p s : Nat}

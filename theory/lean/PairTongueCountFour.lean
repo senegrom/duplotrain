@@ -1,5 +1,4 @@
 import TrackThetaAllTime
-import FirstActivatedExact
 
 /-!
 # Tongue counts from the absolute phase laws

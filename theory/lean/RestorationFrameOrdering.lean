@@ -79,7 +79,6 @@ theorem productive_sameEdgeWrite_exact_lobe
     exact ⟨hbar, hback, hcell.symm⟩
 
 
-
 def crossingOverlap (_t0 u0 t1 _u1 : Nat) : Nat :=
   u0 - t1
 
@@ -307,41 +306,6 @@ theorem foreignRestorationFrame_periodic
       fun h => hopen ((sameEdgeWrite_periodic m e r0 hper ht).mp h),
       fun h => hclose ((sameEdgeWrite_periodic m e r0 hper hut).mp h)⟩
 
-theorem periodLiftedForeignRestorationCrossing_periodic
-    {K p t0 u0 t1 u1 : Nat}
-    (hper : RestorationPeriodicTail m e r0 K p)
-    (ht0 : K <= t0) :
-    PeriodLiftedForeignRestorationCrossing m e r0 p
-      (t0+p) (u0+p) (t1+p) (u1+p) ↔
-    PeriodLiftedForeignRestorationCrossing m e r0 p
-      t0 u0 t1 u1 := by
-  constructor
-  · rintro ⟨hcross, hu0period, hu1period⟩
-    rcases hcross with ⟨hframe0, hframe1, horder⟩
-    have horder0 : RestorationFramesCross t0 u0 t1 u1 := by
-      rcases horder with ⟨h01, h10, h01'⟩
-      exact ⟨by omega, by omega, by omega⟩
-    have ht1 : K <= t1 := by
-      rcases horder0 with ⟨ht0t1, _⟩
-      omega
-    have hframe0' :=
-      (foreignRestorationFrame_periodic m e r0 hper ht0).mp hframe0
-    have hframe1' :=
-      (foreignRestorationFrame_periodic m e r0 hper ht1).mp hframe1
-    exact ⟨⟨hframe0', hframe1', horder0⟩, by omega, by omega⟩
-  · rintro ⟨hcross, hu0period, hu1period⟩
-    rcases hcross with ⟨hframe0, hframe1, horder⟩
-    rcases horder with ⟨ht0t1, ht1u0, hu0u1⟩
-    have ht1 : K <= t1 := by omega
-    have hframe0' :=
-      (foreignRestorationFrame_periodic m e r0 hper ht0).mpr hframe0
-    have hframe1' :=
-      (foreignRestorationFrame_periodic m e r0 hper ht1).mpr hframe1
-    exact ⟨⟨hframe0', hframe1', ⟨by omega, by omega, by omega⟩⟩,
-      by omega, by omega⟩
-
-/-- A foreign restoration frame can be shifted back one period whenever its
-opening endpoint remains on the periodic tail. -/
 theorem foreignRestorationFrame_shift_back
     {K p b r : Nat}
     (hper : RestorationPeriodicTail m e r0 K p)
