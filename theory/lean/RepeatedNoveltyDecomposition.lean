@@ -106,4 +106,4 @@ theorem rawProductiveAt_restricted_flip
   subst C
   simp [restrictedTonguesAt, tonguesAt, hcur, hnext, hflip]
 
-
+end GeneralN

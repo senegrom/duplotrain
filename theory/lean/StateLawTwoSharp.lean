@@ -242,4 +242,4 @@ theorem manufactured_suffix_explicit_lobe_absolute_two_novelty
   · exact hstateHistorical
   · exact hlead
 
-
+end GeneralN

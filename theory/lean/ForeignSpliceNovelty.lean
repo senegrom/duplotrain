@@ -1202,3 +1202,4 @@ theorem manufactured_flip_candy_splice_absolute_one_novelty
   · exact hinitial
   · exact hleadHistorical
 
+end GeneralN

@@ -39,16 +39,7 @@ structure PartialSecondReflectorCompletion
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e) (N : Nat) : Type where
   reflector : ManufacturedReflector w e g
-  state : Tongues
-  length_le :
-    reflector.exploration.length + reflector.runway.length + 1 <=
-      2 * N + 1
-  paths : PathGrooves reflector.toSupported.paths state
   base : reflector.baseState = A.activatedState
-  activated : state = reflector.activatedState
-  preserves : forall j,
-    j ∉ reflector.exploration.map passageSwitch ->
-      state j = A.activatedState j
 
 end GeneralN
 
@@ -271,12 +262,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
           exact hBpathsRaw
         let P : PartialSecondReflectorCompletion S.A N := {
           reflector := B
-          state := state
-          length_le := hdata.1
-          paths := hBpathsRaw
           base := hbase
-          activated := hactivated
-          preserves := hdata.2.2.2.2.2
         }
         by_cases hpre :
             PathGrooves S.A.toSupported.paths B.preReturn.2

@@ -813,4 +813,4 @@ theorem backward_contact_all_time_two_phase_two_history
       obtain ⟨port, hrun⟩ := hfromU (m + 1) (by omega)
       exact ⟨port, v, hrun, Or.inr rfl⟩
 
-
+end GeneralN

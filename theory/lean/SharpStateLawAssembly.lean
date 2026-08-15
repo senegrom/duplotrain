@@ -69,3 +69,5 @@ theorem ManufacturedReflector.manufacturing_journey_mem_sharpHistory
     · exact List.mem_append_left _ hhistory
     · apply List.mem_append_right prefixHistory
       exact List.mem_singleton.mpr hactivated
+
+end GeneralN

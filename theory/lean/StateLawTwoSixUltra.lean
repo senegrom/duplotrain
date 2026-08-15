@@ -654,4 +654,4 @@ theorem ultra_nodup_of_map_nodup
       case right =>
         exact ih hnd.2
 
-
+end GeneralN

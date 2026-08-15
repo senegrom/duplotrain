@@ -27,7 +27,7 @@ symbolic in `N`: no finite-instance argument, no Mathlib, no `native_decide`,
 and no `sorry`. The lower bound is also symbolic for `N ≥ 4`; its `N = 3`
 base case is checked by kernel `decide`.
 
-There are 144 self-contained Lean libraries. To check everything:
+There are 75 self-contained Lean libraries. To check everything:
 
 ```
 lake build
@@ -111,9 +111,9 @@ exact arbitrary-start wrapper from `StateLawNAddFourTop.lean`.
   `native_decide`; they are separate from the symbolic proofs.
   (`f(3) = 7` and `f(4) = 8` follow from the symbolic bounds and need
   no exhaustion.)
-* The `N+6` assembly (`GeneralN.stateLaw`, `KnownEdgeNAddFiveAlt.lean`)
-  remains in the tree — not for history, but because the sharp
-  protected-pair closure genuinely builds on it.
+* `GeneralN.stateLaw` — the historical `N+6` target statement in
+  `StateLaw.lean` — is proved in `StateLawNAddFourSharp.lean` as a
+  direct weakening of the sharp bound.
 
 ## Independent open directions
 

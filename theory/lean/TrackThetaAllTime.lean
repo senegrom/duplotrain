@@ -591,3 +591,4 @@ theorem manufactured_flip_pair_all_time_four_phase
       · simp [h]
       · simp [h]
 
+end GeneralN

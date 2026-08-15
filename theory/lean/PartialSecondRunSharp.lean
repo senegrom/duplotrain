@@ -58,18 +58,9 @@ structure PartialSecondCycleOutcome
     (w : Wiring) (start : Nat × Tongues) (N : Nat) : Type where
   lead : List Passage
   atRepeat : Nat × Tongues
-  cycle : List Passage
   settled : Tongues
   lead_trace : PhysicalTrace w start lead atRepeat
   lead_simple : SwitchSimple lead
-  cycle_nonempty : cycle ≠ []
-  transient : PhysicalTrace w atRepeat cycle (atRepeat.1, settled)
-  stable : PhysicalTrace w (atRepeat.1, settled) cycle
-    (atRepeat.1, settled)
-  cycle_simple : SwitchSimple cycle
-  transient_phase : ∀ d, d ≤ cycle.length → ∃ port phase,
-    stepN w d atRepeat = some (port, phase) ∧
-      (phase = atRepeat.2 ∨ phase = settled)
   positive_settled : ∀ d, 0 < d → ∃ port,
     stepN w d atRepeat = some (port, settled)
 
@@ -320,20 +311,14 @@ theorem first_activated_trace_outcome_sharp_partial
   have hleadLe : (runway ++ (p, x) :: path).length ≤ N :=
     hleadTrace.simple_length_le hN hbeforeSimple
   rcases hfork with hcycle | hreflector
-  · obtain ⟨cycle, settled, hnonempty, htransient,
-      hstable, hsimpleCycle, hphase, hpositive⟩ := hcycle
+  · obtain ⟨_cycle, settled, _hnonempty, _htransient,
+      _hstable, _hsimpleCycle, _hphase, hpositive⟩ := hcycle
     exact Or.inl ⟨{
       lead := runway ++ (p, x) :: path
       atRepeat := (q, u)
-      cycle := cycle
       settled := settled
       lead_trace := hleadTrace
       lead_simple := hbeforeSimple
-      cycle_nonempty := hnonempty
-      transient := htransient
-      stable := hstable
-      cycle_simple := hsimpleCycle
-      transient_phase := hphase
       positive_settled := hpositive
     }⟩
   · right
@@ -1125,3 +1110,5 @@ theorem ManufacturedReflector.dead_continuation_trace_simple
     rw [hdead] at hlater
     cases hlater
 
+end PartialSecondRunSharp
+end GeneralN

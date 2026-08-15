@@ -62,3 +62,4 @@ theorem map_nodup_of_injective_on_mem_self_pivot
           (fun x hx y hy => hinj x (List.mem_cons_of_mem _ hx)
             y (List.mem_cons_of_mem _ hy))
 
+end GeneralN

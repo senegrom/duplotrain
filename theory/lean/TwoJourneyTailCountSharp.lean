@@ -39,4 +39,4 @@ theorem tailsharp_nodup_map_filter
           simp only [List.filter_cons, hp]
           exact ih hnd.2
 
-
+end GeneralN

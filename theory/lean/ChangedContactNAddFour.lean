@@ -377,19 +377,8 @@ structure SimpleContinuationChangedContact.RunwayNAddFourResidual
     (R : ManufacturedFlipReflector w g e)
     (C : SimpleContinuationChangedContact w
       (ManufacturedReflector.flip R)) : Type where
-  repaired : Tongues
-  forward : C.x = C.oriented.2
-  repair : arrive C.nextState C.oriented.1 =
-    (C.oriented.2, repaired)
-  restored : arrive repaired C.oriented.2 =
-    (C.oriented.1, repaired)
   action_first_written :
     R.actionSwitch ∈ C.approachFirstWriterSwitches N
-  mouth : Nat
-  outside : Nat
-  post_reach : stepN w (C.approach.length + 1)
-      (e, (ManufacturedReflector.flip R).activatedState) =
-    some (outside, flipAt C.contactState (mouth / 3))
   old_corner_missing :
     Not (VectorCount.restrict N
       (flipAt C.contactState R.actionSwitch) ∈ C.compressedLead N)
@@ -610,14 +599,7 @@ theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_resi
               (by simpa [state, hDAction] using hp)))
           · exact Or.inr (Or.inr (Or.inl (by simpa [state] using hp)))
       exact ⟨{
-        repaired := repaired
-        forward := hforward
-        repair := hrepair
-        restored := hrestored
         action_first_written := haction
-        mouth := mouth
-        outside := outside
-        post_reach := by simpa [K, state, alternate] using hreach'
         old_corner_missing := hmissingR
       }⟩
   · obtain ⟨old, hold, horientation⟩ :=

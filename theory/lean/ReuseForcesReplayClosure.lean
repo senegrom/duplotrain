@@ -118,3 +118,4 @@ theorem changed_coordinate_has_writer_between
       exact hnone ⟨t, hlo, hhi, hprod, hwriter⟩)
   exact hchange hstable
 
+end GeneralN

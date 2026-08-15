@@ -453,12 +453,6 @@ structure OneReflectorForwardContact
     (A.exploration.length + A.runway.length + 1) start =
       some (e, A.activatedState)
   contact : SimpleContinuationChangedContact w A
-  repaired : Tongues
-  forward : contact.x = contact.oriented.2
-  repair : arrive contact.nextState contact.oriented.1 =
-    (contact.oriented.2, repaired)
-  restored : arrive repaired contact.oriented.2 =
-    (contact.oriented.1, repaired)
 
 /-- The early-death branch is coefficient one unless its terminal simple
 trace contains the same exact forward self-repairing contact.  Preserved
@@ -492,7 +486,7 @@ theorem OneReflectorSecondDead.N_add_three_or_forward
   · obtain ⟨C⟩ := D.A.simpleContinuationChangedContact
       D.grooves htrace hsimple hend
     rcases C.direction with hbackward |
-        ⟨hforward, repaired, hrepair, hrestored⟩
+        ⟨_hforward, _repaired, _hrepair, _hrestored⟩
     · left
       exact C.backward_all_run_distinct_le_N_add_three
         hN D.grooves hbackward times hliveA hndA
@@ -503,10 +497,6 @@ theorem OneReflectorSecondDead.N_add_three_or_forward
         base := D.base
         reached := D.reached
         contact := C
-        repaired := repaired
-        forward := hforward
-        repair := hrepair
-        restored := hrestored
       }⟩
 
 /-- The forward-contact splice uses only a simple partial approach.  The
@@ -1153,3 +1143,4 @@ theorem SimpleContinuationChangedContact.changed_two_novelty
         exact C.forward_flip_two_novelty
           hforward hrepair hrestored times
 
+end GeneralN

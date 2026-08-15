@@ -70,4 +70,4 @@ theorem dead_horizon_live_distinct_le
       simp [hnone] at hkLive
   exact nodup_nat_lt_length htimesNodup hlt
 
-
+end GeneralN

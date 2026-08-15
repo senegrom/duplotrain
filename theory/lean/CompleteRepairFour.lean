@@ -84,3 +84,4 @@ theorem ManufacturedReflector.completed_repair_initial_action_relation
         (u := R.afterReturn) (v := finalState)
         (k := R.actionSwitch) hchanges'
 
+end GeneralN

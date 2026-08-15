@@ -5,17 +5,9 @@ import GeneralN
 
 This file states the actual claim about trains, tracks and switches.
 **`StateLaw` is proved.**  The downstream theorem
-`GeneralN.stateLaw` in `KnownEdgeNAddFiveAlt.lean` has exactly this type.
-Its stronger known-incoming-edge core bounds the run by `N+5`; shifting an
-arbitrary start past its first successful physical step costs at most the
-time-zero vector, giving the raw `N+6` result.  The proof is entirely symbolic
-in `N`, with no fixed-`N` enumeration.
-
-The direct physical-track route in `TrackTrace`, `TrackLobe`, `TrackNormalForm`,
-`TrackTheta`, `TrackGlobalRepair`, `TrackQuantitative`, and
-`TrackQuantitativeTight` close the global two-component assembly, retain
-explicit lasso lengths, and prove the older `26*N+3` tongue-vector count.  The
-coefficient-one proof in `KnownEdgeNAddFiveAlt.lean` supersedes that bound.
+`GeneralN.stateLaw` in `StateLawNAddFourSharp.lean` has exactly this type;
+it is a weakening of the sharp `N + 4` bound proved there.  The proof is
+entirely symbolic in `N`, with no fixed-`N` enumeration.
 
 ## How to read the statement
 
@@ -41,29 +33,8 @@ coefficient-one proof in `KnownEdgeNAddFiveAlt.lean` supersedes that bound.
 
 So `StateLaw` reads: **a single train, on any lazy-point layout with
 `N` switches, starting anywhere, ever sees at most `N + 6` distinct
-switch settings.**  (Exhaustive checking suggests the sharp constant
-is `N + 4`; any constant would settle the open problem.)
--/
-
-
-/-!
-# The unconditional ceiling: f(N) ≤ 2^N, machine-checked
-
-The state-count question asks how many distinct tongue vectors a single
-train can visit on an N-switch wiring.  The conjectured law is
-f(N) = min(2^N, N+4); the N+4 half currently rests on the two echo-machine
-lemmas (../lazy-point-theory.md).  This file closes the other half
-unconditionally: **no run of any wiring, of any length, ever visits more
-than 2^N distinct tongue vectors** — a genuine pigeonhole proof (no
-`native_decide`, no Mathlib), not an appeal to "obviously the state space
-is 2^N".
-
-The content is `pigeonhole`: a duplicate-free list of length-N boolean
-vectors has at most 2^N elements, by induction on N (split on the first
-coordinate, recurse on the tails).  `vector_count_le` and
-`trajectory_count_le` specialise it to tongue assignments and to
-trajectories `Nat → Tongues` — the tongue component of any run of any
-wiring in the `GeneralN` model.
+switch settings.**  (The sharp constant, proved in
+`StateLawNAddFourSharp.lean`, is `N + 4`.)
 -/
 
 namespace VectorCount
@@ -74,6 +45,7 @@ open GeneralN (Tongues)
 def restrict (N : Nat) (u : Tongues) : List Bool :=
   (List.range N).map u
 
+end VectorCount
 
 namespace GeneralN
 

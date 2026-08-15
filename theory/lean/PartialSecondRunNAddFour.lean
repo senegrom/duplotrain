@@ -244,4 +244,5 @@ theorem ManufacturedReflector.dead_second_run_distinct_le_N_add_two
 
 /-! ## The retained one-vector-cycle branch -/
 
-
+end PartialSecondRunNAddFour
+end GeneralN

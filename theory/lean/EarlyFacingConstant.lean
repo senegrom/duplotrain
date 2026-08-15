@@ -152,3 +152,4 @@ theorem ManufacturedFlipReflector.facing_mouth_tail_two_phase
   have hphase' := hphase.symm
   simpa [alternate] using hphase'
 
+end GeneralN

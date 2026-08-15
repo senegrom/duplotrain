@@ -57,9 +57,6 @@ structure KnownEdgeChangedContact
   A : ManufacturedReflector w start.1 e
   grooves : PathGrooves A.toSupported.paths A.activatedState
   base : A.baseState = start.2
-  reached : stepN w
-    (A.exploration.length + A.runway.length + 1) start =
-      some (e, A.activatedState)
   contact : PartialSecondRunSharp.ChangedContact w A
 
 /-- A literal pair reached by the two probes. Each reflector's supported
@@ -144,7 +141,6 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
                 A := C.A
                 grooves := C.grooves
                 base := C.base
-                reached := C.reached
                 contact := C.contact.toSharpChangedContact
               }⟩
         | some secondFinish =>
@@ -168,7 +164,6 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
                   A := A
                   grooves := hA
                   base := hbaseA
-                  reached := hreachA
                   contact := D
                 }⟩
             · right

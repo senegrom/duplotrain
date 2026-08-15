@@ -474,3 +474,4 @@ theorem manufactured_stay_then_flip_contact_all_time_two_phase
     rw [hdecomp, stepN_add, hArun]
     exact hrun
 
+end GeneralN

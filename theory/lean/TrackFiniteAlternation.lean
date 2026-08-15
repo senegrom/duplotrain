@@ -241,4 +241,4 @@ theorem restrictedTonguesAt_mem_finite_writer_cover
   intro k hk
   exact main K k hk (Nat.le_refl _)
 
-
+end GeneralN

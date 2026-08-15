@@ -30,3 +30,4 @@ theorem runway_period_stepN_some
     omega
   exact stepN_prefix_some hbound hfar
 
+end GeneralN
