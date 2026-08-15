@@ -90,7 +90,7 @@ theorem mem_rawRepeatedWriterNovelTimes_iff
   classical
   simp [rawRepeatedWriterNovelTimes]
 
-private theorem nodup_filter_nat (p : Nat → Bool) :
+theorem nodup_filter_nat (p : Nat → Bool) :
     ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
   intro xs
   induction xs with

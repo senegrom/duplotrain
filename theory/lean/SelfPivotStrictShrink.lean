@@ -50,29 +50,6 @@ def RawStrictSelfShrinkAt
     rawFiniteCurveSizeAt w N start k
 
 
-private theorem nodup_subset_length_self_pivot
-    {xs pool : List Nat}
-    (hnd : xs.Nodup) (hsub : ∀ x ∈ xs, x ∈ pool) :
-    xs.length ≤ pool.length := by
-  induction xs generalizing pool with
-  | nil => exact Nat.zero_le _
-  | cons x rest ih =>
-      rw [List.nodup_cons] at hnd
-      have hx : x ∈ pool := hsub x List.mem_cons_self
-      have htail : ∀ y ∈ rest, y ∈ pool.erase x := by
-        intro y hy
-        have hyPool := hsub y (List.mem_cons_of_mem _ hy)
-        have hyx : y ≠ x := fun hEq => hnd.1 (hEq ▸ hy)
-        exact (List.mem_erase_of_ne hyx).mpr hyPool
-      have hle := ih hnd.2 htail
-      rw [List.length_erase_of_mem hx] at hle
-      simp only [List.length_cons]
-      have hpos : 0 < pool.length := by
-        cases pool with
-        | nil => cases hx
-        | cons _ _ => simp
-      omega
-
 structure RawSelfTailCertificate
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : Prop where
   live : ∀ k, k ≤ K → (stepN w k start).isSome
@@ -180,7 +157,7 @@ theorem RawStrictSelfShrinkAt.dropped_carrier_port
       ((stepN w k start).getD start).1
   have hle : (rawFiniteCurvePortsAt w N start k).length ≤
       (rawFiniteCurvePortsAt w N start (k + 1)).length :=
-    nodup_subset_length_self_pivot hnd hsub
+    nodup_subset_length_nat hnd hsub
   rw [rawFiniteCurvePortsAt_length,
     rawFiniteCurvePortsAt_length] at hle
   exact (Nat.not_lt_of_ge hle) h.2.2
@@ -324,7 +301,7 @@ theorem rawNovelRepeatedStrictShrinks_le_three_mul
     have hspec := rawNovelStrictShrinkCharge_spec hkData.2.2
     unfold rawFiniteCurvePortsAt at hspec
     exact (mem_finiteCurvePorts_iff.mp hspec.1).1
-  have hle := nodup_subset_length_self_pivot hchargesNodup
+  have hle := nodup_subset_length_nat hchargesNodup
     (fun p hp => List.mem_range.mpr (hchargeBound p hp))
   dsimp [events, charge] at hle ⊢
   simpa only [List.length_map, List.length_range] using hle

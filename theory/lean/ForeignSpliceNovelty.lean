@@ -17,29 +17,6 @@ small-`N` argument is used.
 
 namespace GeneralN
 
-private theorem mem_reverse_nat_foreign {x : Nat} {xs : List Nat} :
-    x ∈ xs.reverse ↔ x ∈ xs := by
-  induction xs with
-  | nil => simp
-  | cons y ys ih => simp [ih, or_comm]
-
-private theorem nodup_reverse_nat_foreign {xs : List Nat}
-    (hnd : xs.Nodup) : xs.reverse.Nodup := by
-  induction xs with
-  | nil => simp
-  | cons x xs ih =>
-      rw [List.nodup_cons] at hnd
-      simp only [List.reverse_cons]
-      apply List.nodup_append.mpr
-      refine ⟨ih hnd.2, by simp, ?_⟩
-      intro a ha b hb
-      simp only [List.mem_singleton] at hb
-      subst b
-      intro hax
-      apply hnd.1
-      rw [← hax]
-      exact mem_reverse_nat_foreign.mp ha
-
 private theorem passagesGrooved_append
     {u : Tongues} {left right : List Passage}
     (hleft : PassagesGrooved u left)
@@ -319,7 +296,7 @@ theorem manufactured_flip_candy_splice_approach_foreign_two_phases
       have hreverseSimple : SwitchSimple (reversePassages R.runway) := by
         unfold SwitchSimple at hrunwaySimple ⊢
         rw [map_passageSwitch_reversePassages R.runwayTrace]
-        exact nodup_reverse_nat_foreign hrunwaySimple
+        exact nodup_reverse_nat hrunwaySimple
       have hreverseGrooved :
           PassagesGrooved bothState (reversePassages R.runway) :=
         hreverseTrace.grooved_of_switchSimple hreverseSimple
@@ -523,7 +500,7 @@ theorem manufactured_flip_candy_splice_approach_foreign_settled_tongues
           (reversePassages R.runway) := by
         unfold SwitchSimple at hrunwaySimple ⊢
         rw [map_passageSwitch_reversePassages R.runwayTrace]
-        exact nodup_reverse_nat_foreign hrunwaySimple
+        exact nodup_reverse_nat hrunwaySimple
       have hreverseGroovedOld : PassagesGrooved
           (flipAt state R.actionSwitch)
           (reversePassages R.runway) :=
@@ -926,7 +903,7 @@ theorem manufactured_flip_candy_splice_approach_contact_two_phases
       have hreverseSimple : SwitchSimple (reversePassages R.runway) := by
         unfold SwitchSimple at hrunwaySimple ⊢
         rw [map_passageSwitch_reversePassages R.runwayTrace]
-        exact nodup_reverse_nat_foreign hrunwaySimple
+        exact nodup_reverse_nat hrunwaySimple
       have hreverseGrooved :
           PassagesGrooved bothState (reversePassages R.runway) :=
         hreverseTrace.grooved_of_switchSimple hreverseSimple

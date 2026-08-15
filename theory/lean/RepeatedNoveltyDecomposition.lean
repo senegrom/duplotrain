@@ -44,21 +44,6 @@ structure RawLastWriterFrame
     RawProductiveAt w N start j →
     rawWriterAt w start j ≠ rawWriterAt w start right
 
-inductive RawReroutingShape
-    (w : Wiring) (N : Nat) (start : Nat × Tongues)
-    (left reroute right : Nat) : Prop where
-  | fresh
-      (first : RawFirstWriterAt w N start reroute) :
-      RawReroutingShape w N start left reroute right
-  | crossing {b : Nat}
-      (frame : RawLastWriterFrame w N start b reroute)
-      (order : b < left ∧ left < reroute ∧ reroute < right) :
-      RawReroutingShape w N start left reroute right
-  | nested {b : Nat}
-      (frame : RawLastWriterFrame w N start b reroute)
-      (order : left < b ∧ b < reroute ∧ reroute < right) :
-      RawReroutingShape w N start left reroute right
-
 /-- A parity-witness rerouter has no nested alternative.  It is chosen as
 the first interior write to a tongue which really differs across the outer
 frame.  Its preceding write is therefore either absent or lies before the
@@ -300,7 +285,7 @@ theorem RawRepeatedWriterNovelAt.interior_vector_ne
     have horder := F.order
     omega), hrepeat.symm⟩
 
-private theorem restrict_ne_has_coordinate
+theorem restrict_ne_has_coordinate
     {N : Nat} {u v : Tongues}
     (hne : VectorCount.restrict N u ≠ VectorCount.restrict N v) :
     ∃ C, C < N ∧ u C ≠ v C := by

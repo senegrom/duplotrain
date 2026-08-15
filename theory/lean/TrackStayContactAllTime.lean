@@ -12,7 +12,7 @@ all remaining motion is grooved in the original vector.
 
 namespace GeneralN
 
-private theorem stay_twoPhase_concat
+theorem stay_twoPhase_concat
     {w : Wiring} {start middle : Nat × Tongues}
     {left right : Nat} {u v : Tongues}
     (hleft : stepN w left start = some middle)

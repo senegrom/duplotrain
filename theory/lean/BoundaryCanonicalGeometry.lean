@@ -1,5 +1,4 @@
 import BoundaryDoubleDuplicate
-import BoundaryNAddFourSaturation
 
 /-!
 # Geometry of the canonical productive boundary

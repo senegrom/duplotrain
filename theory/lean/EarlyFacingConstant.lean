@@ -1,6 +1,6 @@
-import RunwaySpliceNovelty
 import RepairLeadTwoPhase
 import TwoPhasePrefixTailCount
+import TrackStayContactAllTime
 
 /-!
 # Constant count for the protected final-mouth facing exit
@@ -13,33 +13,6 @@ total.
 -/
 
 namespace GeneralN
-
-private theorem earlyfacing_twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    simpa using hrun
 
 /-- From a flip reflector's final mouth/contact state, every future tongue
 vector is either the contact phase or its action-switch flip. -/
@@ -147,13 +120,13 @@ theorem ManufacturedFlipReflector.facing_mouth_tail_two_phase
       stepN w d (B.mouth, contact) = some (port, phase) ∧
         (phase = alternate ∨ phase = contact) := by
     intro d hd
-    exact earlyfacing_twoPhase_concat hcapContact hcapContactPhase
+    exact stay_twoPhase_concat hcapContact hcapContactPhase
       happroachAlternatePhase d (by simpa [half] using hd)
   have hhalfAlternatePhase : ∀ d, d ≤ half → ∃ port phase,
       stepN w d (B.mouth, alternate) = some (port, phase) ∧
         (phase = alternate ∨ phase = contact) := by
     intro d hd
-    exact earlyfacing_twoPhase_concat hcapAlternate hcapAlternatePhase
+    exact stay_twoPhase_concat hcapAlternate hcapAlternatePhase
       happroachContactPhase d (by simpa [half] using hd)
   let period := half + half
   have hperiod : stepN w period (B.mouth, contact) =
@@ -166,7 +139,7 @@ theorem ManufacturedFlipReflector.facing_mouth_tail_two_phase
         (phase = contact ∨ phase = alternate) := by
     intro d hd
     obtain ⟨port, phase, hrun, hphase⟩ :=
-      earlyfacing_twoPhase_concat hhalfContact hhalfContactPhase
+      stay_twoPhase_concat hhalfContact hhalfContactPhase
         hhalfAlternatePhase d (by simpa [period] using hd)
     exact ⟨port, phase, hrun, hphase.symm⟩
   have hpositive : 0 < period := by

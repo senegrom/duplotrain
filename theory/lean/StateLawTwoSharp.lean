@@ -11,20 +11,6 @@ N+6 GeneralN.StateLaw explicitly open.
 namespace GeneralN
 
 
-private theorem runwaytwo_period_stepN_some
-    {w : Wiring} {start : Nat × Tongues} {period d : Nat}
-    (hpositive : 0 < period)
-    (hperiod : stepN w period start = some start) :
-    ∃ finish, stepN w d start = some finish := by
-  have hfar : stepN w ((d + 1) * period) start = some start :=
-    stepN_mul_period_pair_novelty hperiod (d + 1)
-  have hbound : d ≤ (d + 1) * period := by
-    have hone : 1 ≤ period := by omega
-    have hmul := Nat.mul_le_mul_left (d + 1) hone
-    simp only [Nat.mul_one] at hmul
-    omega
-  exact stepN_prefix_some hbound hfar
-
 /-- Shift an all-time four-phase law into an ambient run when the first and
 third listed phases are already historical. -/
 theorem absolute_two_novelty_of_historical_first_third_four_phase
@@ -145,7 +131,7 @@ theorem manufactured_flip_arbitrary_lobe_absolute_two_novelty
     (v₃ := flipAt state C.actionSwitch)
     hreach
   · intro d
-    exact runwaytwo_period_stepN_some hperiodPositive hperiod
+    exact runway_period_stepN_some hperiodPositive hperiod
   · intro d
     exact manufactured_flip_arbitrary_lobe_all_time_four_phase_tongues
       C state hCpaths hNewAvoidsC hentryBranch hentrySwitch
@@ -246,7 +232,7 @@ theorem manufactured_suffix_explicit_lobe_absolute_two_novelty
     (v₃ := state)
     hreach
   · intro d
-    exact runwaytwo_period_stepN_some hperiodPos hperiod
+    exact runway_period_stepN_some hperiodPos hperiod
   · intro d
     exact manufactured_suffix_explicit_lobe_all_time_four_phase_tongues
       C state hCpaths hNewAvoidsC hActionsNe hentryBranch
@@ -517,24 +503,6 @@ theorem manufactured_pair_protected_repair_constant_outcomes
             hrepair, hgroove⟩))
     · exact Or.inr (Or.inr (Or.inr hcomplete))
 
-private theorem ketc_nodup_of_map_nodup
-    {α β : Type} [BEq α] [LawfulBEq α]
-    [BEq β] [LawfulBEq β]
-    (f : α → β) :
-    ∀ {xs : List α}, (xs.map f).Nodup → xs.Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      rw [List.nodup_cons]
-      constructor
-      · intro hx
-        apply hnd.1
-        exact List.mem_map.mpr ⟨x, hx, rfl⟩
-      · exact ih hnd.2
-
 private theorem ketc_live_distinct_le_of_stepN_none
     {w : Wiring} {N L : Nat} {start : Nat × Tongues}
     {times : List Nat}
@@ -543,7 +511,7 @@ private theorem ketc_live_distinct_le_of_stepN_none
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ L := by
   have htimesNodup : times.Nodup :=
-    ketc_nodup_of_map_nodup
+    tailsharp_nodup_of_map_nodup
       (restrictedTonguesAt w N start) hnd
   apply nodup_nat_lt_length htimesNodup
   intro k hk

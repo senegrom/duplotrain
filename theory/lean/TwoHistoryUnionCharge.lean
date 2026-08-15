@@ -21,24 +21,7 @@ All statements are over `Wiring`, `PhysicalTrace`, and `stepN`, for arbitrary
 
 namespace GeneralN
 
-private theorem nodup_filter_nat_two_history (p : Nat → Bool) :
-    ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hmem => hnd.1 ((List.mem_filter.mp hmem).1),
-            ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem nodup_map_nat_of_injective_on_two_history
+theorem nodup_map_nat_of_injective_on_two_history
     {f : Nat → Nat} {xs : List Nat}
     (hinj : ∀ x, x ∈ xs → ∀ y, y ∈ xs →
       f x = f y → x = y)
@@ -398,7 +381,7 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_le
   let writers := times.map (rawWriterAt w (e, B.baseState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact nodup_filter_nat_two_history _ List.nodup_range
+    exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
     apply nodup_map_nat_of_injective_on_two_history
@@ -489,7 +472,7 @@ theorem ManufacturedReflector.writerConstructionHistory_length
     rawFirstWriterHistory]
 
 
-private theorem ManufacturedFlipReflector.runway_boundary_repeated
+theorem ManufacturedFlipReflector.runway_boundary_repeated
     {w : Wiring} {g e N : Nat}
     (R : ManufacturedFlipReflector w g e) :
     restrictedTonguesAt w N (g, R.base) R.runway.length =
@@ -973,7 +956,7 @@ theorem SecondHistoryContactData.reusable_add_approach_first_writers_le
   let writers := times.map (rawWriterAt w (e, B.baseState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact nodup_filter_nat_two_history _ List.nodup_range
+    exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
     apply nodup_map_nat_of_injective_on_two_history
@@ -1636,33 +1619,6 @@ theorem SecondHistoryContactData.changed_forward_flip_two_novelty
       hleadHistorical
     obtain ⟨fresh, hfresh, hmem⟩ := hone
     exact ⟨fresh, by omega, hmem⟩
-private theorem twoHistory_twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    simpa using hrun
-
 /-- Exact all-time two-phase tail for a first changing forward contact into a
 stay reflector.  The entry time is the literal post-contact time of
 prefixHistory, not an existentially reconstructed lead. -/
@@ -1829,14 +1785,14 @@ theorem SecondHistoryContactData.changed_forward_stay_two_phase_tail
           stepN w d (outside, alternate) = some (port, phase) ∧
             (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact twoHistory_twoPhase_concat hDaltEnd hDaltPhase
+        exact stay_twoPhase_concat hDaltEnd hDaltPhase
           hReversePhase d (by simpa [half] using hd)
       have hHalfStatePhase : ∀ d, d ≤ half → ∃ port phase,
           stepN w d (outside, C.contactState) =
             some (port, phase) ∧
             (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact twoHistory_twoPhase_concat hDstateEnd hDstatePhase
+        exact stay_twoPhase_concat hDstateEnd hDstatePhase
           hForwardPhase d (by simpa [half] using hd)
       let period := half + half
       have hperiod :
@@ -1849,7 +1805,7 @@ theorem SecondHistoryContactData.changed_forward_stay_two_phase_tail
           stepN w d (outside, alternate) = some (port, phase) ∧
             (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact twoHistory_twoPhase_concat hHalfAlt hHalfAltPhase
+        exact stay_twoPhase_concat hHalfAlt hHalfAltPhase
           hHalfStatePhase d (by simpa [period] using hd)
       have hpositive : 0 < period := by
         have hdpos := (ManufacturedReflector.stay D).travel_pos
@@ -1913,7 +1869,7 @@ theorem SecondHistoryContactData.changed_forward_stay_two_phase_tail
           stepN w d (R.arm, alternate) = some (port, phase) ∧
             (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact twoHistory_twoPhase_concat hReverseEnd hReversePhase
+        exact stay_twoPhase_concat hReverseEnd hReversePhase
           hForwardPhase d (by simpa [period] using hd)
       have hpositive : 0 < period := by
         dsimp [period, lTravel]

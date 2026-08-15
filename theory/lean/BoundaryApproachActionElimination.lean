@@ -14,47 +14,6 @@ itself.
 
 namespace GeneralN
 
-private theorem baae_nodup_filter_nat (p : Nat -> Bool) :
-    forall {xs : List Nat}, xs.Nodup -> (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil =>
-      intro _
-      simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hm => hnd.1 (List.mem_filter.mp hm).1, ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem baae_nodup_map_nat_of_injective_on
-    {f : Nat -> Nat} {xs : List Nat}
-    (hinj : forall i, i ∈ xs -> forall j, j ∈ xs ->
-      f i = f j -> i = j)
-    (hnd : xs.Nodup) : (xs.map f).Nodup := by
-  induction xs with
-  | nil => simp
-  | cons x rest ih =>
-      rw [List.nodup_cons] at hnd
-      rw [List.map_cons, List.nodup_cons]
-      constructor
-      · intro hm
-        obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-        have hxy : y = x :=
-          hinj y (List.mem_cons_of_mem _ hy) x List.mem_cons_self hfy
-        rw [hxy] at hy
-        exact hnd.1 hy
-      · exact ih
-          (fun i hi j hj =>
-            hinj i (List.mem_cons_of_mem _ hi)
-              j (List.mem_cons_of_mem _ hj))
-          hnd.2
-
 /-- If the reserved boundary switch is absent both from the old reusable
 support and from productive first writers in the strict approach, it supplies
 one ambient coordinate independently of whether the old action is itself an
@@ -87,10 +46,10 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_reser
       (e, (ManufacturedReflector.flip R).activatedState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact baae_nodup_filter_nat _ List.nodup_range
+    exact ultra_nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply baae_nodup_map_nat_of_injective_on
+    apply bccs_nodup_map_nat_of_injective_on
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)

@@ -12,33 +12,6 @@ has exactly two possible tongue vectors, irrespective of its physical travel.
 
 namespace GeneralN
 
-private theorem staySplice_twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    exact hrun
-
 /-- A changed-forward stay splice has a switch-simple lead of at most `N`,
 after which every future tongue vector is one of two phases. -/
 theorem ManufacturedReflector.ChangedForwardMerge.stay_two_phase_tail
@@ -190,13 +163,13 @@ theorem ManufacturedReflector.ChangedForwardMerge.stay_two_phase_tail
         stepN w d (outside, alternate) = some (port, phase) ∧
           (phase = alternate ∨ phase = state) := by
       intro d hd
-      exact staySplice_twoPhase_concat hCaltEnd hCaltPhase
+      exact stay_twoPhase_concat hCaltEnd hCaltPhase
         hReversePhase d (by simpa [half] using hd)
     have hHalfStatePhase : ∀ d, d ≤ half → ∃ port phase,
         stepN w d (outside, state) = some (port, phase) ∧
           (phase = alternate ∨ phase = state) := by
       intro d hd
-      exact staySplice_twoPhase_concat hCstateEnd hCstatePhase
+      exact stay_twoPhase_concat hCstateEnd hCstatePhase
         hForwardPhase d (by simpa [half] using hd)
     let period := half + half
     have hperiod : stepN w period (outside, alternate) =
@@ -208,7 +181,7 @@ theorem ManufacturedReflector.ChangedForwardMerge.stay_two_phase_tail
         stepN w d (outside, alternate) = some (port, phase) ∧
           (phase = alternate ∨ phase = state) := by
       intro d hd
-      exact staySplice_twoPhase_concat hHalfAlt hHalfAltPhase
+      exact stay_twoPhase_concat hHalfAlt hHalfAltPhase
         hHalfStatePhase d (by simpa [period] using hd)
     have hpositive : 0 < period := by
       have hcpos := (ManufacturedReflector.stay C).travel_pos
@@ -269,7 +242,7 @@ theorem ManufacturedReflector.ChangedForwardMerge.stay_two_phase_tail
         stepN w d (R.arm, alternate) = some (port, phase) ∧
           (phase = alternate ∨ phase = state) := by
       intro d hd
-      exact staySplice_twoPhase_concat hReverseEnd hReversePhase
+      exact stay_twoPhase_concat hReverseEnd hReversePhase
         hForwardPhase d (by simpa [period] using hd)
     have hpositive : 0 < period := by
       dsimp [period, lTravel]

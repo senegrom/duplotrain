@@ -1,5 +1,4 @@
 import ProtectedPairNAddFour
-import StateLawNAddFourTop
 
 /-!
 # The unconditional known-incoming-edge `N + 4` theorem

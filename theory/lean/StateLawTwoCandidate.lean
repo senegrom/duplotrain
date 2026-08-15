@@ -19,33 +19,6 @@ three restricted tongue vectors.
 
 namespace GeneralN
 
-private theorem facingconstant_twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    simpa using hrun
-
 /-- **Protected facing-forward count:** at most three distinct restricted
 tongue vectors. -/
 theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
@@ -128,7 +101,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
       stepN w d (g, contact) = some (port, phase) ∧
         (phase = alternate ∨ phase = contact) := by
     intro d hd
-    exact facingconstant_twoPhase_concat hprefixContact.sound
+    exact stay_twoPhase_concat hprefixContact.sound
       hbeforePhase htailContactPhase' d
         (by simpa [loopSteps] using hd)
   have hallPhase : ∀ d, ∃ port phase,
@@ -206,7 +179,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
               stepN w d (g, alternate) = some (port, phase) ∧
                 (phase = alternate ∨ phase = contact) := by
           intro d hd
-          exact facingconstant_twoPhase_concat hpriorAlternate.sound
+          exact stay_twoPhase_concat hpriorAlternate.sound
             hpriorPhase hcapturePhase d hd
         let period := prior.length + captureSteps + loopSteps
         have hperiod : stepN w period (g, alternate) =
@@ -221,7 +194,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
             stepN w d (g, alternate) = some (port, phase) ∧
               (phase = alternate ∨ phase = contact) := by
           intro d hd
-          exact facingconstant_twoPhase_concat htoContact htoContactPhase
+          exact stay_twoPhase_concat htoContact htoContactPhase
             hcontactLoopPhase d (by simpa [period] using hd)
         exact periodic_two_phase_prefix_tongues
           hperiodPositive hperiod hperiodPhase
@@ -327,7 +300,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
             stepN w d (g, alternate) = some (port, phase) ∧
               (phase = alternate ∨ phase = contact) := by
           intro d hd
-          exact facingconstant_twoPhase_concat hrepairPrefix.sound
+          exact stay_twoPhase_concat hrepairPrefix.sound
             hrepairPrefixPhase htailContactPhase' d
               (by simpa [loopSteps] using hd)
         exact periodic_two_phase_prefix_tongues
@@ -372,7 +345,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
           rcases hphase with hphase | hphase
           · exact ⟨port, phase, hrun, Or.inr hphase⟩
           · exact ⟨port, phase, hrun, Or.inl hphase⟩
-        exact facingconstant_twoPhase_concat hprefixAlternate.sound
+        exact stay_twoPhase_concat hprefixAlternate.sound
           hbeforeAlternatePhase htailAlternatePhase' d
             (by simpa [loopSteps] using hd)
       exact periodic_two_phase_prefix_tongues
@@ -705,24 +678,6 @@ end GeneralN
 
 namespace GeneralN
 
-private theorem twocand_nodup_of_map_nodup
-    {α β : Type} [BEq α] [LawfulBEq α]
-    [BEq β] [LawfulBEq β]
-    (f : α → β) :
-    ∀ {xs : List α}, (xs.map f).Nodup → xs.Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      rw [List.nodup_cons]
-      constructor
-      · intro hx
-        apply hnd.1
-        exact List.mem_map.mpr ⟨x, hx, rfl⟩
-      · exact ih hnd.2
-
 /-- If the train is already off by `horizon`, every live sample time lies
 strictly before that horizon. -/
 private theorem twocand_dead_tail_distinct_le
@@ -733,7 +688,7 @@ private theorem twocand_dead_tail_distinct_le
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ horizon := by
   have htimesNodup : times.Nodup :=
-    twocand_nodup_of_map_nodup
+    tailsharp_nodup_of_map_nodup
       (restrictedTonguesAt w N start) hnd
   have hlt : ∀ k ∈ times, k < horizon := by
     intro k hk
@@ -859,76 +814,6 @@ end GeneralN
 
 namespace GeneralN
 
-private theorem twocand_nodup_map_filter
-    {α : Type} [BEq α] [LawfulBEq α]
-    {f : Nat → α} (p : Nat → Bool) :
-    ∀ {xs : List Nat},
-      (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.map_cons,
-            List.nodup_cons]
-          constructor
-          · intro hm
-            obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-            apply hnd.1
-            exact List.mem_map.mpr
-              ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-          · exact ih hnd.2
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem twocand_nodup_filter_nat (p : Nat → Bool) :
-    ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hm => hnd.1 (List.mem_filter.mp hm).1, ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem twocand_zero_positive_partition :
-    ∀ xs : List Nat,
-      (xs.filter (fun k => decide (k = 0))).length +
-        (xs.filter (fun k => decide (0 < k))).length = xs.length := by
-  intro xs
-  induction xs with
-  | nil => simp
-  | cons k rest ih =>
-      by_cases hk : k = 0
-      · subst k
-        simp
-        omega
-      · have hkPos : 0 < k := by omega
-        simp [hk, hkPos]
-        omega
-
-private theorem twocand_zero_filter_length_le_one
-    {xs : List Nat} (hnd : xs.Nodup) :
-    (xs.filter (fun k => decide (k = 0))).length ≤ 1 := by
-  have hfilterNodup :
-      (xs.filter (fun k => decide (k = 0))).Nodup :=
-    twocand_nodup_filter_nat _ hnd
-  apply nodup_nat_lt_length hfilterNodup
-  intro k hk
-  have hk0 : k = 0 :=
-    of_decide_eq_true (List.mem_filter.mp hk).2
-  omega
-
 /-- **Unconditional general-`N` coefficient-two state bound.**  A single
 train on any `N`-switch lazy-point wiring visits at most `2*N+9`
 pairwise-distinct restricted tongue vectors, whether it runs forever or
@@ -943,7 +828,7 @@ theorem state_law_linear_two_add_nine_candidate
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ 2 * N + 9 := by
   have htimesNodup : times.Nodup :=
-    twocand_nodup_of_map_nodup
+    tailsharp_nodup_of_map_nodup
       (restrictedTonguesAt w N start) hnd
   cases hone : stepN w 1 start with
   | none =>
@@ -995,7 +880,7 @@ theorem state_law_linear_two_add_nine_candidate
               (positive.map (restrictedTonguesAt w N
                 (startPort, startState))).Nodup := by
             dsimp [positive]
-            exact twocand_nodup_map_filter _ hnd
+            exact tailsharp_nodup_map_filter _ hnd
           have hshiftedNodup :
               (shifted.map (restrictedTonguesAt w N
                 (entry, localStep.2))).Nodup := by
@@ -1019,8 +904,8 @@ theorem state_law_linear_two_add_nine_candidate
             simp [shifted]
           have hzeroBound :
               (times.filter (fun k => decide (k = 0))).length ≤ 1 :=
-            twocand_zero_filter_length_le_one htimesNodup
-          have hpartition := twocand_zero_positive_partition times
+            kel_zero_filter_length_le_one htimesNodup
+          have hpartition := kel_zero_positive_partition times
           dsimp [positive] at hpositiveLength
           omega
 

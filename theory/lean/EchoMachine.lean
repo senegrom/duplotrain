@@ -275,7 +275,7 @@ private theorem nodup_transfer {f : Nat → List Nat} {c : Nat → Nat} :
         hinj x List.mem_cons_self y (List.mem_cons_of_mem _ hy) hcy.symm
       exact hnd.1 (List.mem_map.mpr ⟨y, hy, hfy.symm⟩)
 
-private theorem nodup_subset_length {α : Type} [BEq α] [LawfulBEq α] :
+theorem nodup_subset_length {α : Type} [BEq α] [LawfulBEq α] :
     ∀ {l S : List α},
     l.Nodup → (∀ x ∈ l, x ∈ S) → l.length ≤ S.length := by
   intro l

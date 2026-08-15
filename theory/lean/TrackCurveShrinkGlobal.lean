@@ -211,30 +211,6 @@ private theorem reverseSimplePath_of
           chain := hchain
         }, trivial⟩
 
-/-- Every `CurveReach` witness admits an ordinary finite simple path. -/
-private theorem mem_reverse_curve {x : Nat} {xs : List Nat} :
-    x ∈ xs.reverse ↔ x ∈ xs := by
-  induction xs with
-  | nil => simp
-  | cons y ys ih => simp [ih, or_comm]
-
-private theorem nodup_reverse_curve {xs : List Nat}
-    (hnd : xs.Nodup) : xs.reverse.Nodup := by
-  induction xs with
-  | nil => simp
-  | cons x xs ih =>
-      rw [List.nodup_cons] at hnd
-      simp only [List.reverse_cons]
-      apply List.nodup_append.mpr
-      refine ⟨ih hnd.2, by simp, ?_⟩
-      intro a ha b hb
-      simp only [List.mem_singleton] at hb
-      subst b
-      intro hax
-      apply hnd.1
-      rw [← hax]
-      exact mem_reverse_curve.mp ha
-
 theorem curveReach_finiteSimplePath
     {w : Wiring} {u : Tongues} {root p : Nat}
     (h : CurveReach w u root p) :
@@ -242,7 +218,7 @@ theorem curveReach_finiteSimplePath
   obtain ⟨backward, _⟩ := reverseSimplePath_of h
   exact ⟨{
     vertices := backward.vertices.reverse
-    nodup := nodup_reverse_curve backward.nodup
+    nodup := nodup_reverse_nat backward.nodup
     first := by simpa using backward.last
     last := by simpa using backward.first
     chain := finiteCurveChain_reverse backward.chain
@@ -450,7 +426,7 @@ private theorem unmatched_endpoint_cannot_extend
       have hback : CurveEdge w u (unmatchedBranch u B) r := hrevChain.1
       have hrq := unmatchedBranch_curveEdge_unique w u B hback hboundary
       have hrRev : r ∈ vertices.reverse := by rw [hrev]; simp
-      have hr : r ∈ vertices := mem_reverse_curve.mp hrRev
+      have hr : r ∈ vertices := mem_reverse_nat.mp hrRev
       rw [List.nodup_append] at hndExtended
       have hrne : r ≠ q := hndExtended.2.2 r hr q (by simp)
       exact hrne hrq

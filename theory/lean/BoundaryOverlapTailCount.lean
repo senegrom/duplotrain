@@ -11,32 +11,6 @@ vector exactly compared with naïvely adding the two cardinality bounds.
 
 namespace GeneralN
 
-private theorem bot_nodup_map_filter
-    {α : Type} [BEq α] [LawfulBEq α]
-    {f : Nat → α} (p : Nat → Bool) :
-    ∀ {xs : List Nat},
-      (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.map_cons,
-            List.nodup_cons]
-          constructor
-          · intro hm
-            obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-            apply hnd.1
-            exact List.mem_map.mpr
-              ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-          · exact ih hnd.2
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
 /-- Generic boundary-overlap theorem.  `prefixHistory` covers every time up to
 and including `lead`; the suffix begins at `endpoint`, whose vector is already
 in that history.  A direct suffix cap `cap` then contributes only `cap-1`
@@ -98,14 +72,14 @@ theorem boundary_history_then_direct_tail_distinct_le
   have hlateNodup :
       (late.map (restrictedTonguesAt w N start)).Nodup := by
     dsimp [late]
-    exact bot_nodup_map_filter _ hnd
+    exact tailsharp_nodup_map_filter _ hnd
   have hshiftedNodup :
       (shifted.map (restrictedTonguesAt w N endpoint)).Nodup := by
     rw [hlateVector]
     exact hlateNodup
   have hotherNodup : otherVectors.Nodup := by
     dsimp [otherVectors, other]
-    exact bot_nodup_map_filter _ hshiftedNodup
+    exact tailsharp_nodup_map_filter _ hshiftedNodup
   have hzeroVector : restrictedTonguesAt w N endpoint 0 = boundary := by
     dsimp [boundary]
     simp [restrictedTonguesAt, tonguesAt, stepN]

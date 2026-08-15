@@ -10,21 +10,6 @@ in the protected lead.
 
 namespace GeneralN
 
-/-- Every finite depth of a positive closed period is live. -/
-private theorem runwayone_period_stepN_some
-    {w : Wiring} {start : Nat × Tongues} {period d : Nat}
-    (hpositive : 0 < period)
-    (hperiod : stepN w period start = some start) :
-    ∃ finish, stepN w d start = some finish := by
-  have hfar : stepN w ((d + 1) * period) start = some start :=
-    stepN_mul_period_pair_novelty hperiod (d + 1)
-  have hbound : d ≤ (d + 1) * period := by
-    have hone : 1 ≤ period := by omega
-    have hmul := Nat.mul_le_mul_left (d + 1) hone
-    simp only [Nat.mul_one] at hmul
-    omega
-  exact stepN_prefix_some hbound hfar
-
 /-- Shift an all-time four-phase law when its first, third and fourth phases
 are already historical. -/
 theorem absolute_one_novelty_of_historical_first_third_fourth_four_phase
@@ -110,7 +95,7 @@ theorem manufactured_flip_arbitrary_lobe_absolute_one_novelty
     (v₃ := flipAt state C.actionSwitch)
     hreach
   · intro d
-    exact runwayone_period_stepN_some hperiodPositive hperiod
+    exact runway_period_stepN_some hperiodPositive hperiod
   · intro d
     exact manufactured_flip_arbitrary_lobe_all_time_four_phase_tongues
       C state hCpaths hNewAvoidsC hentryBranch hentrySwitch
@@ -214,7 +199,7 @@ theorem manufactured_suffix_explicit_lobe_absolute_one_novelty
     (v₃ := state)
     hreach
   · intro d
-    exact runwayone_period_stepN_some hperiodPos hperiod
+    exact runway_period_stepN_some hperiodPos hperiod
   · intro d
     exact manufactured_suffix_explicit_lobe_all_time_four_phase_tongues
       C state hCpaths hNewAvoidsC hActionsNe hentryBranch

@@ -1,4 +1,4 @@
-import SlotBound
+import AlternationBound
 
 /-!
 # Monotone jump-edge support

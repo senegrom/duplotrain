@@ -1,6 +1,7 @@
 import TrackQuantitativeRouteSharp
 import PairTongueCountFour
 import TrackStayContactAllTime
+import TwoJourneyTailCountSharp
 
 /-!
 # Every manufactured reflector pair costs at most four tongue vectors
@@ -12,82 +13,6 @@ bound, and complete repair costs only one switch-simple route plus four.
 -/
 
 namespace GeneralN
-
-private theorem pairabs_nodup_of_map_nodup
-    {α β : Type} [BEq α] [LawfulBEq α]
-    [BEq β] [LawfulBEq β]
-    (f : α → β) :
-    ∀ {xs : List α}, (xs.map f).Nodup → xs.Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      rw [List.nodup_cons]
-      constructor
-      · intro hx
-        apply hnd.1
-        exact List.mem_map.mpr ⟨x, hx, rfl⟩
-      · exact ih hnd.2
-
-private theorem pairabs_nodup_filter_nat (p : Nat → Bool) :
-    ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hm => hnd.1 (List.mem_filter.mp hm).1, ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem pairabs_nodup_map_filter
-    {α : Type} [BEq α] [LawfulBEq α]
-    {f : Nat → α} (p : Nat → Bool) :
-    ∀ {xs : List Nat},
-      (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.map_cons,
-            List.nodup_cons]
-          constructor
-          · intro hm
-            obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-            apply hnd.1
-            exact List.mem_map.mpr
-              ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-          · exact ih hnd.2
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem pairabs_lt_ge_partition (L : Nat) :
-    ∀ xs : List Nat,
-      (xs.filter (fun k => decide (k < L))).length +
-        (xs.filter (fun k => decide (L ≤ k))).length = xs.length := by
-  intro xs
-  induction xs with
-  | nil => simp
-  | cons k rest ih =>
-      by_cases hk : k < L
-      · have hnot : ¬ L ≤ k := by omega
-        simp [hk, hnot]
-        omega
-      · have hge : L ≤ k := by omega
-        simp [hk, hge]
-        omega
 
 /-- Every opposite manufactured reflector pair exposes at most four distinct
 restricted tongue vectors, for arbitrary sample times. -/
@@ -244,14 +169,14 @@ theorem ManufacturedReflector.completed_route_with_pair_support_distinct_le_n_su
     exact hrepair.switchSimple_length_le_switches hN
       (A.orientedRoute_simple state)
   have htimesNodup : times.Nodup :=
-    pairabs_nodup_of_map_nodup
+    tailsharp_nodup_of_map_nodup
       (restrictedTonguesAt w N (g, state)) hnd
   let preTimes := times.filter (fun k => decide (k < L))
   let tailTimes := times.filter (fun k => decide (L ≤ k))
   let shifted := tailTimes.map (fun k => k - L)
   have hpreNodup : preTimes.Nodup := by
     dsimp [preTimes]
-    exact pairabs_nodup_filter_nat _ htimesNodup
+    exact nodup_filter_nat _ htimesNodup
   have hpreLt : ∀ k ∈ preTimes, k < L := by
     intro k hk
     exact of_decide_eq_true (List.mem_filter.mp hk).2
@@ -285,7 +210,7 @@ theorem ManufacturedReflector.completed_route_with_pair_support_distinct_le_n_su
   have htailNodup :
       (tailTimes.map (restrictedTonguesAt w N (g, state))).Nodup := by
     dsimp [tailTimes]
-    exact pairabs_nodup_map_filter _ hnd
+    exact tailsharp_nodup_map_filter _ hnd
   have hshiftedNodup :
       (shifted.map (restrictedTonguesAt w N endpoint)).Nodup := by
     rw [htailVector]
@@ -307,7 +232,7 @@ theorem ManufacturedReflector.completed_route_with_pair_support_distinct_le_n_su
         hshiftedLive hshiftedNodup
   have htailLength : tailTimes.length = shifted.length := by
     simp [shifted]
-  have hpartition := pairabs_lt_ge_partition L times
+  have hpartition := tailsharp_lt_ge_partition L times
   dsimp [preTimes, tailTimes] at hpartition hpreBound htailLength
   omega
 

@@ -12,7 +12,7 @@ passed to an arbitrary tongue-vector counting theorem.
 
 namespace GeneralN
 
-private theorem tailsharp_nodup_of_map_nodup
+theorem tailsharp_nodup_of_map_nodup
     {α β : Type} [BEq α] [LawfulBEq α]
     [BEq β] [LawfulBEq β]
     (f : α → β) :
@@ -30,7 +30,7 @@ private theorem tailsharp_nodup_of_map_nodup
         exact List.mem_map.mpr ⟨x, hx, rfl⟩
       · exact ih hnd.2
 
-private theorem tailsharp_nodup_map_filter
+theorem tailsharp_nodup_map_filter
     {α : Type} [BEq α] [LawfulBEq α]
     {f : Nat → α} (p : Nat → Bool) :
     ∀ {xs : List Nat},
@@ -56,7 +56,7 @@ private theorem tailsharp_nodup_map_filter
           simp only [List.filter_cons, hp]
           exact ih hnd.2
 
-private theorem tailsharp_lt_ge_partition (L : Nat) :
+theorem tailsharp_lt_ge_partition (L : Nat) :
     ∀ xs : List Nat,
       (xs.filter (fun k => decide (k < L))).length +
         (xs.filter (fun k => decide (L ≤ k))).length = xs.length := by

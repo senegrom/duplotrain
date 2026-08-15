@@ -14,26 +14,7 @@ namespace Echo
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-private theorem nodup_map_of_injective_on
-    {f : Nat → Nat} {l : List Nat}
-    (hinj : ∀ x, x ∈ l → ∀ y, y ∈ l → f x = f y → x = y)
-    (hnd : l.Nodup) : (l.map f).Nodup := by
-  induction l with
-  | nil => simp
-  | cons x t ih =>
-      simp only [List.nodup_cons] at hnd
-      simp only [List.map_cons, List.nodup_cons]
-      constructor
-      · intro hm
-        obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-        have hxy := hinj x List.mem_cons_self y
-          (List.mem_cons_of_mem _ hy) hfy.symm
-        exact hnd.1 (hxy ▸ hy)
-      · exact ih
-          (fun a ha b hb => hinj a (List.mem_cons_of_mem _ ha)
-            b (List.mem_cons_of_mem _ hb)) hnd.2
-
-private theorem nodup_subset_length_nat {l S : List Nat}
+theorem nodup_subset_length_nat {l S : List Nat}
     (hnd : l.Nodup) (hsub : ∀ x ∈ l, x ∈ S) : l.length ≤ S.length := by
   induction l generalizing S with
   | nil => exact Nat.zero_le _

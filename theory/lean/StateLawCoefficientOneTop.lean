@@ -1,7 +1,7 @@
 import EventuallyPeriodicPrefixes
-import StateLawTwoSixUltra
 import OneReflectorContinuation
 import TraceRetainingFirstRevisit
+import BoundaryNAddFourSaturation
 
 /-!
 # Coefficient-one top-level assembly
@@ -134,66 +134,7 @@ theorem first_activated_trace_outcome_sharp
     · omega
     · simpa [hbase, hactivated] using hreachBase
 
-private theorem coeffTop_nodup_filter_nat (p : Nat -> Bool) :
-    forall {xs : List Nat}, xs.Nodup -> (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact And.intro
-            (fun hm => hnd.1 (List.mem_filter.mp hm).1)
-            (ih hnd.2)
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem coeffTop_nodup_of_map_nodup
-    {alpha beta : Type} [BEq alpha] [LawfulBEq alpha]
-    [BEq beta] [LawfulBEq beta]
-    (f : alpha -> beta) :
-    forall {xs : List alpha}, (xs.map f).Nodup -> xs.Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      rw [List.nodup_cons]
-      constructor
-      · intro hx
-        apply hnd.1
-        exact List.mem_map.mpr ⟨x, hx, rfl⟩
-      · exact ih hnd.2
-
-private theorem coeffTop_live_distinct_le_of_stepN_none
-    {w : Wiring} {N L : Nat} {start : Nat × Tongues}
-    {times : List Nat}
-    (hnone : stepN w L start = none)
-    (hlive : forall k, k ∈ times -> (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length <= L := by
-  have htimesNodup : times.Nodup :=
-    coeffTop_nodup_of_map_nodup
-      (restrictedTonguesAt w N start) hnd
-  apply nodup_nat_lt_length htimesNodup
-  intro k hk
-  by_cases hlt : k < L
-  · exact hlt
-  · have hkEq : k = L + (k - L) := by omega
-    have hnoneK : stepN w k start = none := by
-      rw [hkEq, stepN_add, hnone]
-      simp
-    have hkLive := hlive k hk
-    rw [hnoneK] at hkLive
-    simp at hkLive
-
-private theorem coeffTop_nodup_map_nat_of_injective_on
+theorem coeffTop_nodup_map_nat_of_injective_on
     {f : Nat -> Nat} {xs : List Nat}
     (hinj : forall x, x ∈ xs -> forall y, y ∈ xs ->
       f x = f y -> x = y)
@@ -274,7 +215,7 @@ theorem ManufacturedReflector.reusable_add_preserved_first_writers_le_N
   let writers := times.map (rawWriterAt w start)
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact coeffTop_nodup_filter_nat _ List.nodup_range
+    exact ultra_nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
     apply coeffTop_nodup_map_nat_of_injective_on
@@ -607,7 +548,7 @@ theorem known_edge_N_add_six_or_one_reflector_early_outcome
   cases hfirst : stepN w (N + 1) start with
   | none =>
       left
-      have hc := coeffTop_live_distinct_le_of_stepN_none
+      have hc := saturation_live_distinct_le_of_stepN_none
         (N := N) hfirst hlive hnd
       omega
   | some firstFinish =>
@@ -1650,33 +1591,6 @@ theorem SimpleContinuationChangedContact.forward_flip_two_novelty
     obtain ⟨fresh, hfresh, hmem⟩ := hone
     exact ⟨fresh, by omega, hmem⟩
 
-private theorem partialContact_twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    simpa using hrun
-
 /-- A forward first-changing contact into a stay reflector is trapped in a
 literal two-phase orbit. -/
 theorem SimpleContinuationChangedContact.forward_stay_two_phase_tail
@@ -1830,14 +1744,14 @@ theorem SimpleContinuationChangedContact.forward_stay_two_phase_tail
           stepN w d (outside, alternate) = some (port, phase) ∧
           (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact partialContact_twoPhase_concat
+        exact stay_twoPhase_concat
           hDaltEnd hDaltPhase hReversePhase d
           (by simpa [half] using hd)
       have hHalfStatePhase : ∀ d, d ≤ half → ∃ port phase,
           stepN w d (outside, C.contactState) = some (port, phase) ∧
           (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact partialContact_twoPhase_concat
+        exact stay_twoPhase_concat
           hDstateEnd hDstatePhase hForwardPhase d
           (by simpa [half] using hd)
       let period := half + half
@@ -1850,7 +1764,7 @@ theorem SimpleContinuationChangedContact.forward_stay_two_phase_tail
           stepN w d (outside, alternate) = some (port, phase) ∧
           (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact partialContact_twoPhase_concat
+        exact stay_twoPhase_concat
           hHalfAlt hHalfAltPhase hHalfStatePhase d
           (by simpa [period] using hd)
       have hpositive : 0 < period := by
@@ -1914,7 +1828,7 @@ theorem SimpleContinuationChangedContact.forward_stay_two_phase_tail
           stepN w d (R.arm, alternate) = some (port, phase) ∧
           (phase = alternate ∨ phase = C.contactState) := by
         intro d hd
-        exact partialContact_twoPhase_concat
+        exact stay_twoPhase_concat
           hReverseEnd hReversePhase hForwardPhase d
           (by simpa [period] using hd)
       have hpositive : 0 < period := by

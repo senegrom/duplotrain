@@ -10,48 +10,6 @@ analogue of `two_manufacturing_journeys_then_direct_tail_distinct_le`.
 
 namespace GeneralN
 
-private theorem onejourney_nodup_map_filter
-    {α : Type} [BEq α] [LawfulBEq α]
-    {f : Nat → α} (p : Nat → Bool) :
-    ∀ {xs : List Nat},
-      (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.map_cons,
-            List.nodup_cons]
-          constructor
-          · intro hm
-            obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-            apply hnd.1
-            exact List.mem_map.mpr
-              ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-          · exact ih hnd.2
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem onejourney_lt_ge_partition (L : Nat) :
-    ∀ xs : List Nat,
-      (xs.filter (fun k => decide (k < L))).length +
-        (xs.filter (fun k => decide (L ≤ k))).length = xs.length := by
-  intro xs
-  induction xs with
-  | nil => simp
-  | cons k rest ih =>
-      by_cases hk : k < L
-      · have hnot : ¬ L ≤ k := by omega
-        simp [hk, hnot]
-        omega
-      · have hge : L ≤ k := by omega
-        simp [hk, hge]
-        omega
-
 /-- A complete manufactured journey followed by a suffix with direct vector
 cap `tailCap` exposes at most `N+2+tailCap` distinct restricted vectors. -/
 theorem one_manufacturing_journey_then_direct_tail_distinct_le
@@ -90,7 +48,7 @@ theorem one_manufacturing_journey_then_direct_tail_distinct_le
   have hpreNodup :
       (preTimes.map (restrictedTonguesAt w N start)).Nodup := by
     dsimp [preTimes]
-    exact onejourney_nodup_map_filter _ hnd
+    exact tailsharp_nodup_map_filter _ hnd
   have hpreRange : ∀ k ∈ preTimes,
       k ≤ A.exploration.length + A.runway.length + 1 := by
     intro k hk
@@ -106,7 +64,7 @@ theorem one_manufacturing_journey_then_direct_tail_distinct_le
   have hpostNodup :
       (postTimes.map (restrictedTonguesAt w N start)).Nodup := by
     dsimp [postTimes]
-    exact onejourney_nodup_map_filter _ hnd
+    exact tailsharp_nodup_map_filter _ hnd
   have hshiftVector : shifted.map
       (restrictedTonguesAt w N (e, stateA)) =
       postTimes.map (restrictedTonguesAt w N start) := by
@@ -152,7 +110,7 @@ theorem one_manufacturing_journey_then_direct_tail_distinct_le
     htail shifted hshiftLive hshiftNodup
   have hpostLength : postTimes.length = shifted.length := by
     simp [shifted]
-  have hpartition := onejourney_lt_ge_partition travel times
+  have hpartition := tailsharp_lt_ge_partition travel times
   dsimp [preTimes, postTimes] at hpartition hpreBound hpostLength
   omega
 

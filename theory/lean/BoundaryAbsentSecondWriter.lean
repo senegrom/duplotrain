@@ -1,4 +1,4 @@
-import TwoHistoryUnionCharge
+import StateLawCoefficientOneTop
 
 /-!
 # The productive initial coordinate is absent from the second writer history
@@ -19,48 +19,6 @@ dichotomy.
 -/
 
 namespace GeneralN
-
-private theorem boundaryAbsent_nodup_filter_nat (p : Nat -> Bool) :
-    forall {xs : List Nat}, xs.Nodup -> (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil =>
-      intro _
-      simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hm => hnd.1 (List.mem_filter.mp hm).1,
-            ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem boundaryAbsent_nodup_map_nat_of_injective_on
-    {f : Nat -> Nat} {xs : List Nat}
-    (hinj : forall x, x ∈ xs ->
-      forall y, y ∈ xs -> f x = f y -> x = y)
-    (hnd : xs.Nodup) :
-    (xs.map f).Nodup := by
-  induction xs with
-  | nil => simp
-  | cons x rest ih =>
-      rw [List.nodup_cons] at hnd
-      rw [List.map_cons, List.nodup_cons]
-      constructor
-      · intro hm
-        obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-        have hxy := hinj x List.mem_cons_self y
-          (List.mem_cons_of_mem _ hy) hfy.symm
-        exact hnd.1 (hxy ▸ hy)
-      · exact ih
-          (fun a ha b hb => hinj a
-            (List.mem_cons_of_mem _ ha)
-            b (List.mem_cons_of_mem _ hb))
-          hnd.2
 
 /-- Switch coordinates of the productive first writers in a manufactured
 reflector's switch-simple construction. -/
@@ -98,10 +56,10 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_add_reserved_le
   let writers := times.map (rawWriterAt w (e, B.baseState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact boundaryAbsent_nodup_filter_nat _ List.nodup_range
+    exact ultra_nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply boundaryAbsent_nodup_map_nat_of_injective_on
+    apply coeffTop_nodup_map_nat_of_injective_on
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)
@@ -183,10 +141,10 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_add_two_reserved
   let writers := times.map (rawWriterAt w (e, B.baseState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact boundaryAbsent_nodup_filter_nat _ List.nodup_range
+    exact ultra_nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply boundaryAbsent_nodup_map_nat_of_injective_on
+    apply coeffTop_nodup_map_nat_of_injective_on
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)

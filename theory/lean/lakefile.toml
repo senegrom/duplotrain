@@ -100,7 +100,6 @@ defaultTargets = [
   "ShortSuffixCount",
   "SimpleTraceOneNetChange",
   "SingleCoordinateFlip",
-  "SlotBound",
   "StarIndependent",
   "StateLaw",
   "StateLawAxiomAudit",
@@ -116,7 +115,6 @@ defaultTargets = [
   "StateLawTwoSixUltra",
   "SupportBound",
   "SupportMove",
-  "SupportSize",
   "ThreeQuarterArithmetic",
   "TraceRetainingFirstRevisit",
   "TrackCurveGrowth",
@@ -454,9 +452,6 @@ name = "SimpleTraceOneNetChange"
 name = "SingleCoordinateFlip"
 
 [[lean_lib]]
-name = "SlotBound"
-
-[[lean_lib]]
 name = "StarIndependent"
 
 [[lean_lib]]
@@ -500,9 +495,6 @@ name = "SupportBound"
 
 [[lean_lib]]
 name = "SupportMove"
-
-[[lean_lib]]
-name = "SupportSize"
 
 [[lean_lib]]
 name = "ThreeQuarterArithmetic"

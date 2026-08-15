@@ -21,7 +21,7 @@ namespace Echo
 
 variable (m : Machine) (e : Nat → Nat) (r0 : Nat → Nat)
 
-private theorem exists_last_productive_lt :
+theorem exists_last_productive_lt :
     ∀ k, (∃ j, j < k ∧ ProductiveStep m e r0 j) →
       ∃ j, j < k ∧ ProductiveStep m e r0 j ∧
         ∀ i, j < i → i < k → ¬ ProductiveStep m e r0 i := by
@@ -67,30 +67,5 @@ private theorem nodup_transfer {f : Nat → List Nat} {g : Nat → Nat} :
       have hfy : f x = f y :=
         hinj x List.mem_cons_self y (List.mem_cons_of_mem _ hy) hgy.symm
       exact hnd.1 (List.mem_map.mpr ⟨y, hy, hfy.symm⟩)
-
-private theorem nodup_subset_length {α : Type} [BEq α] [LawfulBEq α] :
-    ∀ {l S : List α},
-    l.Nodup → (∀ x ∈ l, x ∈ S) → l.length ≤ S.length := by
-  intro l
-  induction l with
-  | nil => intro S _ _; exact Nat.zero_le _
-  | cons x t ih =>
-      intro S hnd hsub
-      rw [List.nodup_cons] at hnd
-      have hx : x ∈ S := hsub x List.mem_cons_self
-      have hsub' : ∀ y ∈ t, y ∈ S.erase x := by
-        intro y hy
-        have hyS : y ∈ S := hsub y (List.mem_cons_of_mem _ hy)
-        have hyx : y ≠ x := fun hxy => hnd.1 (hxy ▸ hy)
-        exact (List.mem_erase_of_ne hyx).mpr hyS
-      have hih := ih hnd.2 hsub'
-      have hlen : (S.erase x).length = S.length - 1 :=
-        List.length_erase_of_mem hx
-      have hpos : 0 < S.length := by
-        cases S with
-        | nil => cases hx
-        | cons a t2 => simp
-      simp only [List.length_cons]
-      omega
 
 end Echo

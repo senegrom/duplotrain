@@ -1,6 +1,5 @@
 import StateLawNAddFourTop
 import PointwiseSimpleCycleTail
-import StateLawTwoSixUltra
 
 /-!
 # Saturation at the productive `N+4` boundary
@@ -118,27 +117,7 @@ theorem ProductiveBoundaryNAddFourSaturation.false_of_global_history
   have hsaturated := S.saturated
   omega
 
-private theorem saturation_nodup_of_map_nodup
-    {alpha beta : Type} [BEq alpha] [LawfulBEq alpha]
-    [BEq beta] [LawfulBEq beta]
-    (f : alpha -> beta) :
-    forall {xs : List alpha}, (xs.map f).Nodup -> xs.Nodup := by
-  intro xs
-  induction xs with
-  | nil =>
-      intro _
-      simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      rw [List.nodup_cons]
-      constructor
-      · intro hx
-        apply hnd.1
-        exact List.mem_map.mpr ⟨x, hx, rfl⟩
-      · exact ih hnd.2
-
-private theorem saturation_live_distinct_le_of_stepN_none
+theorem saturation_live_distinct_le_of_stepN_none
     {w : Wiring} {N L : Nat} {start : Nat × Tongues}
     {times : List Nat}
     (hnone : stepN w L start = none)
@@ -148,7 +127,7 @@ private theorem saturation_live_distinct_le_of_stepN_none
       (restrictedTonguesAt w N start)).Nodup) :
     times.length <= L := by
   have htimesNodup : times.Nodup :=
-    saturation_nodup_of_map_nodup
+    ultra_nodup_of_map_nodup
       (restrictedTonguesAt w N start) hnd
   apply nodup_nat_lt_length htimesNodup
   intro k hk

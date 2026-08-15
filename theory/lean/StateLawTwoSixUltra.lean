@@ -524,7 +524,7 @@ theorem productive_entry_writer_occurrence_is_simple_cycle
 
 /-! ## A cover-level boundary-tail abstraction -/
 
-private theorem ultra_nodup_map_filter
+theorem ultra_nodup_map_filter
     {alpha : Type} [BEq alpha] [LawfulBEq alpha]
     {f : Nat -> alpha} (p : Nat -> Bool) :
     forall {xs : List Nat},
@@ -1074,7 +1074,7 @@ theorem two_journeys_with_initial_history_then_tail
 
 /-! ## Known-edge assembly carrying the arbitrary initial vector -/
 
-private theorem ultra_nodup_of_map_nodup
+theorem ultra_nodup_of_map_nodup
     {alpha beta : Type}
     [BEq alpha] [LawfulBEq alpha]
     [BEq beta] [LawfulBEq beta]
@@ -1428,7 +1428,7 @@ private theorem ultra_nodup_map_eq_of_mem
         case inr =>
           exact ih hnd.2 ha hb heq
 
-private theorem ultra_nodup_filter_nat
+theorem ultra_nodup_filter_nat
     (p : Nat -> Bool) :
     forall {xs : List Nat},
       xs.Nodup -> (xs.filter p).Nodup := by
@@ -1455,7 +1455,7 @@ private theorem ultra_nodup_filter_nat
           simp only [List.filter_cons, hp]
           exact ih hnd.2
 
-private theorem ultra_zero_positive_partition :
+theorem ultra_zero_positive_partition :
     forall xs : List Nat,
       (xs.filter
         (fun k => decide (k = 0))).length +
@@ -1478,7 +1478,7 @@ private theorem ultra_zero_positive_partition :
         simp [hk, hkPos]
         omega
 
-private theorem ultra_zero_filter_length_le_one
+theorem ultra_zero_filter_length_le_one
     {xs : List Nat}
     (hnd : xs.Nodup) :
     (xs.filter

@@ -1,4 +1,3 @@
-import BoundaryNAddFourSaturation
 import ProtectedPairNAddFour
 
 /-!
@@ -15,32 +14,6 @@ Either way the complete cover has size at most `N + 4`.
 -/
 
 namespace GeneralN
-
-private theorem residual_nodup_map_filter
-    {α : Type} [BEq α] [LawfulBEq α]
-    {f : Nat → α} (p : Nat → Bool) :
-    ∀ {xs : List Nat},
-      (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.map_cons,
-            List.nodup_cons]
-          constructor
-          · intro hm
-            obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-            apply hnd.1
-            exact List.mem_map.mpr
-              ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-          · exact ih hnd.2
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
 
 /-- Lift a novelty cover for the protected repair tail across the two
 manufacturing journeys.  Every prefix vector is supplied by the shared
@@ -165,7 +138,7 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_cover
   have hfilteredNodup :
       ((times.filter (fun k => decide (totalTravel < k))).map
         (restrictedTonguesAt w N (g, A.baseState))).Nodup :=
-    residual_nodup_map_filter _ hnd
+    tailsharp_nodup_map_filter _ hnd
   have hlocalNodup :
       (localTimes.map
         (restrictedTonguesAt w N (g, B.activatedState))).Nodup := by

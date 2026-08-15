@@ -53,7 +53,7 @@ theorem absolute_three_novelty_of_historical_first_four_phase
       simp [restrictedTonguesAt, hshift, hv₃]
 
 /-- Every finite prefix of a positive closed period is live. -/
-private theorem runway_period_stepN_some
+theorem runway_period_stepN_some
     {w : Wiring} {start : Nat × Tongues} {period d : Nat}
     (hpositive : 0 < period)
     (hperiod : stepN w period start = some start) :

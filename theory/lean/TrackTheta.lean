@@ -301,14 +301,14 @@ theorem reversePassages_grooved {state : Tongues}
         subst passage
         exact groove_forward (hgrooved head List.mem_cons_self)
 
-private theorem mem_reverse_nat {x : Nat} {xs : List Nat} :
+theorem mem_reverse_nat {x : Nat} {xs : List Nat} :
     x ∈ xs.reverse ↔ x ∈ xs := by
   induction xs with
   | nil => simp
   | cons y ys ih =>
       simp [ih, or_comm]
 
-private theorem nodup_reverse_nat {xs : List Nat}
+theorem nodup_reverse_nat {xs : List Nat}
     (hnd : xs.Nodup) : xs.reverse.Nodup := by
   induction xs with
   | nil => simp

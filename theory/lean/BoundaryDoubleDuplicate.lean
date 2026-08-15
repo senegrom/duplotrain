@@ -1,4 +1,3 @@
-import StateLawTwoSixUltra
 import BoundaryAbsentSecondWriter
 
 /-!
@@ -17,41 +16,6 @@ state law or any finite-instance calculation.
 -/
 
 namespace GeneralN
-
-private theorem boundary_flip_runway_repeated
-    {w : Wiring} {g e N : Nat}
-    (R : ManufacturedFlipReflector w g e) :
-    restrictedTonguesAt w N (g, R.base) R.runway.length =
-      restrictedTonguesAt w N (g, R.base) (R.runway.length + 1) := by
-  have hAtRunway :
-      tonguesAt w (g, R.base) R.runway.length = R.mouthState := by
-    simp [tonguesAt, R.runwayTrace.sound]
-  have hstepOne :
-      ∃ q, stepN w 1 (R.mouth, R.mouthState) =
-        some (q, R.mouthState) := by
-    have htrace := R.candyTrace
-    cases htrace with
-    | @cons p x q u v passages finish harrive hlink tail =>
-        have hv : v = R.mouthState := by
-          unfold arrive at harrive
-          rw [if_pos R.mouth_is_stem] at harrive
-          exact (Prod.mk.inj harrive).2.symm
-        refine ⟨q, ?_⟩
-        simp [stepN, step, harrive, hlink, hv]
-  have hAtNext :
-      tonguesAt w (g, R.base) (R.runway.length + 1) =
-        R.mouthState := by
-    have hlive :
-        ∃ finish, stepN w 1 (R.mouth, R.mouthState) = some finish := by
-      obtain ⟨q, hq⟩ := hstepOne
-      exact ⟨(q, R.mouthState), hq⟩
-    have hshift := tonguesAt_add_of_reaches
-      (K := R.runway.length) (d := 1) R.runwayTrace.sound hlive
-    obtain ⟨q, hq⟩ := hstepOne
-    rw [hshift]
-    simp [tonguesAt, hq]
-  simp only [restrictedTonguesAt]
-  rw [hAtRunway, hAtNext]
 
 /-- The time indices left after deleting the post-time of the canonical
 mouth repetition and the post-time of a distinct unchanged occurrence. -/
@@ -174,7 +138,7 @@ theorem InitialEntryWriterOccurrence.sharp_mem_doubleReducedBoundaryHistory
     let f := restrictedTonguesAt w N
       (g, (ManufacturedReflector.flip R).baseState)
     have hcanonical : f R.runway.length = f (R.runway.length + 1) := by
-      exact boundary_flip_runway_repeated R
+      exact R.runway_boundary_repeated
     have hoccurrence : f O.before.length = f (O.before.length + 1) := by
       exact entry_writer_unchanged_gives_consecutive_duplicate
         (N := N) (ManufacturedReflector.flip R) O hstay

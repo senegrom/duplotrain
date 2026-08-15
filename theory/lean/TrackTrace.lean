@@ -474,7 +474,7 @@ theorem recorded_passages_share_port {a b : Passage}
   · right; right; right
     omega
 
-private theorem nodup_subset_length_nat {xs pool : List Nat}
+theorem nodup_subset_length_nat {xs pool : List Nat}
     (hnd : xs.Nodup) (hsub : ∀ x ∈ xs, x ∈ pool) :
     xs.length ≤ pool.length := by
   induction xs generalizing pool with

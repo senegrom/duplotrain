@@ -1,4 +1,5 @@
 import SelfPivotStrictShrink
+import RepeatedNoveltyDecomposition
 
 /-!
 # What reuse of a discarded curve port really forces
@@ -229,22 +230,6 @@ theorem reused_novel_strict_shrink_port_restoration_trichotomy
 
 /-! ## The precise global-state gap -/
 
-/-- Inequality of represented vectors names a differing represented
-coordinate. -/
-private theorem restrict_ne_has_coordinate_reuse
-    {N : Nat} {u v : Tongues}
-    (hne : VectorCount.restrict N u ≠ VectorCount.restrict N v) :
-    ∃ C, C < N ∧ u C ≠ v C := by
-  apply Classical.byContradiction
-  intro hnone
-  apply hne
-  unfold VectorCount.restrict
-  apply List.map_congr_left
-  intro C hC
-  apply Classical.byContradiction
-  intro hneC
-  exact hnone ⟨C, List.mem_range.mp hC, hneC⟩
-
 /-- If coordinate `C` is never productively written on a live half-open
 interval, its tongue is unchanged across that interval. -/
 private theorem tongue_eq_of_no_writer_interval_reuse
@@ -348,7 +333,7 @@ theorem post_restoration_replay_or_named_writer
       apply List.mem_map.mpr
       exact ⟨restore + 1, List.mem_range.mpr (by omega), heq.symm⟩
     obtain ⟨C, hC, hbit⟩ :=
-      restrict_ne_has_coordinate_reuse hvectorNe
+      restrict_ne_has_coordinate hvectorNe
     obtain ⟨finish, hfinish⟩ := Option.isSome_iff_exists.mp hlater
     let span := later - restore
     have hspan : restore + 1 + span = later + 1 := by

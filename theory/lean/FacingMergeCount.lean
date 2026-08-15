@@ -15,33 +15,6 @@ vectors, with no liveness hypothesis.
 
 namespace GeneralN
 
-private theorem facingcount_twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    simpa using hrun
-
 /-- **Facing-forward merge count.**  The route prefix window plus the single
 `alternate` phase: at most `N+2` distinct restricted tongue vectors. -/
 theorem ManufacturedReflector.FacingForwardMerge.distinct_le_succ_succ
@@ -114,7 +87,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_succ_succ
       stepN w d (g, contact) = some (port, phase) ∧
         (phase = alternate ∨ phase = contact) := by
     intro d hd
-    exact facingcount_twoPhase_concat hprefixContact.sound
+    exact stay_twoPhase_concat hprefixContact.sound
       hbeforePhase htailContactPhase' d
         (by simpa [loopSteps] using hd)
   have hallPhase : ∀ d, ∃ port phase,
@@ -192,7 +165,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_succ_succ
               stepN w d (g, alternate) = some (port, phase) ∧
                 (phase = alternate ∨ phase = contact) := by
           intro d hd
-          exact facingcount_twoPhase_concat hpriorAlternate.sound
+          exact stay_twoPhase_concat hpriorAlternate.sound
             hpriorPhase hcapturePhase d hd
         let period := prior.length + captureSteps + loopSteps
         have hperiod : stepN w period (g, alternate) =
@@ -207,7 +180,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_succ_succ
             stepN w d (g, alternate) = some (port, phase) ∧
               (phase = alternate ∨ phase = contact) := by
           intro d hd
-          exact facingcount_twoPhase_concat htoContact htoContactPhase
+          exact stay_twoPhase_concat htoContact htoContactPhase
             hcontactLoopPhase d (by simpa [period] using hd)
         exact periodic_two_phase_prefix_tongues
           hperiodPositive hperiod hperiodPhase
@@ -313,7 +286,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_succ_succ
             stepN w d (g, alternate) = some (port, phase) ∧
               (phase = alternate ∨ phase = contact) := by
           intro d hd
-          exact facingcount_twoPhase_concat hrepairPrefix.sound
+          exact stay_twoPhase_concat hrepairPrefix.sound
             hrepairPrefixPhase htailContactPhase' d
               (by simpa [loopSteps] using hd)
         exact periodic_two_phase_prefix_tongues
@@ -358,7 +331,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_succ_succ
           rcases hphase with hphase | hphase
           · exact ⟨port, phase, hrun, Or.inr hphase⟩
           · exact ⟨port, phase, hrun, Or.inl hphase⟩
-        exact facingcount_twoPhase_concat hprefixAlternate.sound
+        exact stay_twoPhase_concat hprefixAlternate.sound
           hbeforeAlternatePhase htailAlternatePhase' d
             (by simpa [loopSteps] using hd)
       exact periodic_two_phase_prefix_tongues

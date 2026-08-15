@@ -18,54 +18,11 @@ Everything here is symbolic in `N`; no finite enumeration is used.
 
 namespace GeneralN
 
-private theorem changedContact_nodup_filter_nat (p : Nat -> Bool) :
-    forall {xs : List Nat}, xs.Nodup -> (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil =>
-      intro _
-      simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact And.intro
-            (fun hm => hnd.1 (List.mem_filter.mp hm).1)
-            (ih hnd.2)
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem changedContact_nodup_map_nat_of_injective_on
-    {f : Nat -> Nat} {xs : List Nat}
-    (hinj : forall x, x ∈ xs ->
-      forall y, y ∈ xs -> f x = f y -> x = y)
-    (hnd : xs.Nodup) :
-    (xs.map f).Nodup := by
-  induction xs with
-  | nil => simp
-  | cons x rest ih =>
-      rw [List.nodup_cons] at hnd
-      rw [List.map_cons, List.nodup_cons]
-      constructor
-      · intro hm
-        obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-        have hxy := hinj x List.mem_cons_self y
-          (List.mem_cons_of_mem _ hy) hfy.symm
-        exact hnd.1 (hxy ▸ hy)
-      · exact ih
-          (fun a ha b hb => hinj a
-            (List.mem_cons_of_mem _ ha)
-            b (List.mem_cons_of_mem _ hb))
-          hnd.2
-
 /-- A switch-simple physical trace cannot return to its literal starting
 port and then continue.  The raw writer at time zero and at the return time
 would both be the switch of that port, contradicting the indexed `Nodup`
 property of the passage word.  The tongue states need not agree. -/
-private theorem PhysicalTrace.no_strict_return_to_start_port
+theorem PhysicalTrace.no_strict_return_to_start_port
     {w : Wiring} {start finish : Nat × Tongues}
     {passages : List Passage}
     (htrace : PhysicalTrace w start passages finish)
@@ -159,10 +116,10 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
       (e, (ManufacturedReflector.flip R).activatedState))
   have htimesNodup : times.Nodup := by
     dsimp [times, rawFirstWriterTimes]
-    exact changedContact_nodup_filter_nat _ List.nodup_range
+    exact ultra_nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply changedContact_nodup_map_nat_of_injective_on
+    apply coeffTop_nodup_map_nat_of_injective_on
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)

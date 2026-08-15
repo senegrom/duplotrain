@@ -21,34 +21,6 @@ residual for the protected-pair `N+4` attack.
 
 namespace GeneralN
 
-/-- A switch-simple trace cannot return to its literal starting port and
-then continue.  The passage at time zero and the passage at the return time
-would have the same writer switch, contradicting switch simplicity. -/
-private theorem protectedPair_no_strict_return_to_start_port
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    {k : Nat} {returned : Tongues}
-    (hpositive : 0 < k)
-    (hinside : k < passages.length)
-    (hreturn : stepN w k start = some (start.1, returned)) : False := by
-  have hzero :=
-    htrace.rawWriterAt_eq_passageSwitch_getElem
-      (k := 0) (by omega)
-  have hreturned :=
-    htrace.rawWriterAt_eq_passageSwitch_getElem
-      (k := k) hinside
-  have hwriters :
-      rawWriterAt w start 0 = rawWriterAt w start k := by
-    simp [rawWriterAt, rawEntryAt, stepN, hreturn]
-  have hpair := List.pairwise_iff_getElem.mp hsimple
-  have hne := hpair 0 k
-    (by simpa using (show 0 < passages.length by omega))
-    (by simpa using hinside) hpositive
-  apply hne
-  simpa [hzero, hreturned] using hwriters
-
 /-- The pre-return vector is retained by a reflector's compressed sharp
 history. -/
 theorem ManufacturedReflector.preReturn_mem_sharpHistoryCore
@@ -188,8 +160,8 @@ theorem ManufacturedFlipReflector.action_writer_is_last_productive
   have hexplorationByReturn : B.exploration.length ≤ returnTime := by
     apply Nat.le_of_not_gt
     intro hinside
-    exact protectedPair_no_strict_return_to_start_port
-      B.exploration_trace B.exploration_simple
+    exact B.exploration_trace.no_strict_return_to_start_port
+      B.exploration_simple
         (k := returnTime) (returned := next.2)
         (by dsimp [returnTime, runwaySpan]; omega)
         hinside (by simpa [start] using hreturn)
@@ -1583,32 +1555,6 @@ theorem ManufacturedFlipReflector.completed_protected_route_one_novelty_of_actio
       hN B hA hpre ht hwriter
   · exact hlive
 
-private theorem protectedPair_nodup_map_filter
-    {α : Type} [BEq α] [LawfulBEq α]
-    {f : Nat → α} (p : Nat → Bool) :
-    ∀ {xs : List Nat},
-      (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.map_cons,
-            List.nodup_cons]
-          constructor
-          · intro hm
-            obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-            apply hnd.1
-            exact List.mem_map.mpr
-              ⟨y, (List.mem_filter.mp hy).1, hfy⟩
-          · exact ih hnd.2
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
 /-- Generic two-journey bookkeeping over an arbitrary shared history.
 The two manufacturing journeys contribute no vector outside `history`; a
 tail novelty cover over the same history therefore gives the exact sum
@@ -1736,7 +1682,7 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_count
   have hfilteredNodup :
       ((times.filter (fun k => decide (totalTravel < k))).map
         (restrictedTonguesAt w N (g, A.baseState))).Nodup :=
-    protectedPair_nodup_map_filter _ hnd
+    tailsharp_nodup_map_filter _ hnd
   have hlocalNodup :
       (localTimes.map
         (restrictedTonguesAt w N (g, B.activatedState))).Nodup := by

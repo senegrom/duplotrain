@@ -1,5 +1,5 @@
 import TrackQuantitativeRouteSharp
-import RunwaySpliceNovelty
+import TrackStayContactAllTime
 
 /-!
 # Tongue counts for the early protected-repair exits
@@ -17,33 +17,6 @@ liveness hypothesis.
 -/
 
 namespace GeneralN
-
-private theorem earlycount_twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    simpa using hrun
 
 /-- **Backward-contact count.**  The retrace/replay cycle is grooved at the
 post-contact state, so the entire lasso shows the approach window plus a
@@ -291,7 +264,7 @@ theorem ManufacturedFlipReflector.facing_mouth_contact_distinct_le_succ_succ
       stepN w d (g, alternate) = some (port, phase) ∧
         (phase = alternate ∨ phase = contact) := by
     intro d hd
-    refine earlycount_twoPhase_concat happroachAlternate.sound
+    refine stay_twoPhase_concat happroachAlternate.sound
       ?_ hcapPhaseFromAlternate d (by dsimp [half] at hd; omega)
     intro dd hdd
     obtain ⟨port, hrun⟩ :=
@@ -302,7 +275,7 @@ theorem ManufacturedFlipReflector.facing_mouth_contact_distinct_le_succ_succ
       stepN w d (g, contact) = some (port, phase) ∧
         (phase = alternate ∨ phase = contact) := by
     intro d hd
-    refine earlycount_twoPhase_concat happroachContact.sound
+    refine stay_twoPhase_concat happroachContact.sound
       ?_ hcapPhaseFromContact d (by dsimp [half] at hd; omega)
     intro dd hdd
     obtain ⟨port, hrun⟩ :=
@@ -321,7 +294,7 @@ theorem ManufacturedFlipReflector.facing_mouth_contact_distinct_le_succ_succ
       stepN w d (g, alternate) = some (port, phase) ∧
         (phase = alternate ∨ phase = contact) := by
     intro d hd
-    exact earlycount_twoPhase_concat hhalfAlternate
+    exact stay_twoPhase_concat hhalfAlternate
       hhalfPhaseFromAlternate hhalfPhaseFromContact d hd
   have hallPhase := periodic_two_phase_prefix_tongues
     hpositive hperiod hwindowPhase

@@ -91,17 +91,6 @@ theorem unmatched_after_flip_eq_selected (u : Tongues) (C : Nat) :
   cases h : u C <;>
     simp [unmatchedBranch, selectedBranch, branchPort, flipAt, h]
 
-/-- A finite arc in the curve graph.  Repetition-freeness is kept separate:
-it is the property which turns an arc into an honest subarc of a curve. -/
-inductive CurveSegment (w : Wiring) (u : Tongues) : List Nat → Prop
-  | nil : CurveSegment w u []
-  | singleton (p : Nat) : CurveSegment w u [p]
-  | cons {p q : Nat} {rest : List Nat}
-      (edge : CurveEdge w u p q)
-      (tail : CurveSegment w u (q :: rest)) :
-      CurveSegment w u (p :: q :: rest)
-
-
 theorem pivot_residual_keeps_endpoint_name (u : Tongues) (C : Nat) :
     selectedBranch u C = unmatchedBranch (flipAt u C) C := by
   exact (unmatched_after_flip_eq_selected u C).symm

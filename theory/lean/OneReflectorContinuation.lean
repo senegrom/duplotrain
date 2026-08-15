@@ -18,48 +18,6 @@ the same set of `N` switch coordinates.
 
 namespace GeneralN
 
-private theorem nodup_filter_nat (p : Nat → Bool) :
-    ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil =>
-      intro _
-      simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hm => hnd.1 (List.mem_filter.mp hm).1, ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
-
-private theorem nodup_map_nat_of_injective_on
-    {f : Nat → Nat} {xs : List Nat}
-    (hinj : ∀ x, x ∈ xs → ∀ y, y ∈ xs →
-      f x = f y → x = y)
-    (hnd : xs.Nodup) :
-    (xs.map f).Nodup := by
-  induction xs with
-  | nil =>
-      simp
-  | cons x rest ih =>
-      rw [List.nodup_cons] at hnd
-      rw [List.map_cons, List.nodup_cons]
-      constructor
-      · intro hm
-        obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-        have hxy := hinj x List.mem_cons_self y
-          (List.mem_cons_of_mem _ hy) hfy.symm
-        exact hnd.1 (hxy ▸ hy)
-      · exact ih
-          (fun a ha b hb => hinj a
-            (List.mem_cons_of_mem _ ha)
-            b (List.mem_cons_of_mem _ hb))
-          hnd.2
-
 /-- A productive passage in a switch-simple continuation cannot write an old
 reusable coordinate when the old support is grooved at both endpoints. -/
 theorem PhysicalTrace.productive_writer_not_old_reusable
@@ -119,7 +77,7 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
     exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply nodup_map_nat_of_injective_on
+    apply nodup_map_nat_of_injective_on_two_history
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)
