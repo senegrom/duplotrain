@@ -1,4 +1,7 @@
-import FirstCycleCount
+import TrackGlobalRepair
+import StateLaw
+import FirstReflectorNovelty
+import TripleSelfLinkSimpleCycleClosure
 
 /-!
 # Sharp tongue count for the first simple-cycle outcome

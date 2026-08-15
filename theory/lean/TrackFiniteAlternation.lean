@@ -241,18 +241,4 @@ theorem restrictedTonguesAt_mem_finite_writer_cover
   intro k hk
   exact main K k hk (Nat.le_refl _)
 
-def maxRawTime : List Nat → Nat
-  | [] => 0
-  | k :: rest => max k (maxRawTime rest)
 
-theorem le_maxRawTime_of_mem {k : Nat} :
-    ∀ {times : List Nat}, k ∈ times → k ≤ maxRawTime times := by
-  intro times hk
-  induction times with
-  | nil => cases hk
-  | cons x rest ih =>
-      rcases List.mem_cons.mp hk with rfl | hkRest
-      · exact Nat.le_max_left _ _
-      · exact Nat.le_trans (ih hkRest) (Nat.le_max_right _ _)
-
-end GeneralN

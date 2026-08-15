@@ -1,4 +1,6 @@
-import TrackEarlyRepairCount
+import TrackGlobalRepair
+import StateLaw
+import TrackStayContactAllTime
 
 /-!
 # Constant vector counts for protected backward contacts

@@ -70,49 +70,4 @@ theorem dead_horizon_live_distinct_le
       simp [hnone] at hkLive
   exact nodup_nat_lt_length htimesNodup hlt
 
-theorem boundary_history_covered_journey_then_dead_suffix_distinct_le
-    {w : Wiring} {N lead horizon : Nat}
-    {start endpoint : Nat × Tongues}
-    (hreach : stepN w lead start = some endpoint)
-    (history : List (List Bool))
-    (hprefixCover : ∀ d, d ≤ lead →
-      restrictedTonguesAt w N start d ∈ history)
-    (hboundary : VectorCount.restrict N endpoint.2 ∈ history)
-    (hdead : stepN w horizon endpoint = none)
-    (hhorizon : 0 < horizon)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ history.length + horizon - 1 := by
-  have htail : ∀ tailTimes : List Nat,
-      (∀ k ∈ tailTimes, (stepN w k endpoint).isSome) →
-      (tailTimes.map (restrictedTonguesAt w N endpoint)).Nodup →
-      tailTimes.length ≤ horizon := by
-    intro tailTimes htailLive htailNodup
-    exact dead_horizon_live_distinct_le hdead tailTimes
-      htailLive htailNodup
-  exact boundary_history_then_direct_tail_distinct_le
-    hreach history hprefixCover hboundary htail hhorizon
-      times hlive hnd
 
-theorem short_suffix_after_boundary_history_distinct_le_two_mul_add_two
-    {w : Wiring} {N lead : Nat}
-    {start endpoint : Nat × Tongues}
-    (hreach : stepN w lead start = some endpoint)
-    (history : List (List Bool))
-    (hprefixCover : ∀ d, d ≤ lead →
-      restrictedTonguesAt w N start d ∈ history)
-    (hboundary : VectorCount.restrict N endpoint.2 ∈ history)
-    (hhistory : history.length ≤ N + 2)
-    (hdead : stepN w (N + 1) endpoint = none)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ 2 * N + 2 := by
-  have hcount :=
-    boundary_history_covered_journey_then_dead_suffix_distinct_le
-      hreach history hprefixCover hboundary hdead (by omega)
-        times hlive hnd
-  omega
-
-end GeneralN

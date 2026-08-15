@@ -39,40 +39,6 @@ def unmatchedBranch (u : Tongues) (C : Nat) : Nat :=
   branchPort C (!(u C))
 
 
-theorem unmatchedBranch_switch (u : Tongues) (C : Nat) :
-    unmatchedBranch u C / 3 = C := by
-  cases h : u C <;> simp [unmatchedBranch, branchPort, h] <;> omega
-
-theorem unmatchedBranch_is_branch (u : Tongues) (C : Nat) :
-    unmatchedBranch u C % 3 ≠ 0 := by
-  cases h : u C <;> simp [unmatchedBranch, branchPort, h] <;> omega
-theorem arrive_stem_selected (u : Tongues) (C : Nat) :
-    arrive u (3*C) = (selectedBranch u C, u) := by
-  simp [arrive, selectedBranch]
-
-theorem arrive_unmatched_pivots (u : Tongues) (C : Nat) :
-    arrive u (unmatchedBranch u C) = (3*C, flipAt u C) := by
-  have hbranch := unmatchedBranch_is_branch u C
-  have hswitch := unmatchedBranch_switch u C
-  have hvalue : bval (unmatchedBranch u C) = !(u C) := by
-    cases h : u C <;>
-      simp [unmatchedBranch, branchPort, bval, h] <;> omega
-  have hpin : pin u (unmatchedBranch u C) = flipAt u C :=
-    pin_eq_flipAt hswitch hvalue
-  simp [arrive, hbranch, hswitch, hpin]
-
-/-- After the pivot, the old selected branch is the new unmatched endpoint. -/
-theorem selected_after_flip_eq_unmatched (u : Tongues) (C : Nat) :
-    selectedBranch (flipAt u C) C = unmatchedBranch u C := by
-  cases h : u C <;>
-    simp [selectedBranch, unmatchedBranch, branchPort, flipAt, h]
-
-/-- The traversed pivot edge is immediately grooved for exact reversal. -/
-theorem arrive_pivot_back (u : Tongues) (C : Nat) :
-    arrive (flipAt u C) (3*C) =
-      (unmatchedBranch u C, flipAt u C) := by
-  rw [arrive_stem_selected, selected_after_flip_eq_unmatched]
-
 private theorem productive_step_configs
     {w : Wiring} {N : Nat} {start : Nat × Tongues} {k : Nat}
     (hprod : RawProductiveAt w N start k) :
@@ -152,45 +118,6 @@ theorem raw_tongue_change_is_productive_writer
   constructor
   · exact ⟨by simp [hnext], hvectorChange⟩
   · simp [rawWriterAt, rawEntryAt, hcur, hwriter]
-
-/-- If no earlier productive event has writer `C`, tongue `C` is still at
-its initial value. This remains true if the train has already fallen off,
-because `tonguesAt` then uses the initial configuration as its default. -/
-theorem raw_tongue_stable_before_writer
-    {w : Wiring} {N C : Nat} (hC : C < N)
-    (start : Nat × Tongues) :
-    ∀ k,
-      (∀ j, j < k → RawProductiveAt w N start j →
-        rawWriterAt w start j ≠ C) →
-      (tonguesAt w start k) C = start.2 C := by
-  intro k
-  induction k with
-  | zero =>
-      intro _hno
-      simp [tonguesAt, stepN]
-  | succ n ih =>
-      intro hno
-      cases hnext : stepN w (n+1) start with
-      | none => simp [tonguesAt, hnext]
-      | some next =>
-          have hlive : (stepN w (n+1) start).isSome := by
-            simp [hnext]
-          obtain ⟨cur, next', hcur, hnext', hstep⟩ :=
-            live_successor_configs hlive
-          have hnextEq : next' = next := by
-            have heq := hnext'
-            rw [hnext] at heq
-            injection heq with h
-            exact h.symm
-          subst next'
-          have hprior : (tonguesAt w start n) C = start.2 C :=
-            ih (fun j hj hprod => hno j (by omega) hprod)
-          by_cases hchange : next.2 C = cur.2 C
-          · simpa [tonguesAt, hcur, hnext, hchange] using hprior
-          · obtain ⟨hprod, hwriter⟩ :=
-              raw_tongue_change_is_productive_writer
-                hC hcur hnext hstep hchange
-            exact (hno n (by omega) hprod hwriter).elim
 
 /-- Restricted-vector productivity is a genuine change of the entered
 switch's own tongue. -/

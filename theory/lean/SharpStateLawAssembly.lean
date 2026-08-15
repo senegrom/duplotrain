@@ -32,18 +32,6 @@ def ManufacturedReflector.sharpConstructionHistory
       (restrictedTonguesAt w N (g, A.baseState))) ++
     [VectorCount.restrict N A.activatedState]
 
-/-- The canonical first-construction history has size at most `N+2`. -/
-theorem ManufacturedReflector.sharpConstructionHistory_length
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e)
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N) :
-    (A.sharpConstructionHistory N).length ≤ N + 2 := by
-  have hlength : A.exploration.length ≤ N :=
-    A.exploration_trace.simple_length_le hN A.exploration_simple
-  simp [ManufacturedReflector.sharpConstructionHistory]
-  omega
-
 /-- Every raw vector through the complete first manufacturing journey lies
 in the canonical `N+2` history.  This is pointwise, including the contact and
 every depth of the reverse runway. -/
@@ -81,29 +69,3 @@ theorem ManufacturedReflector.manufacturing_journey_mem_sharpHistory
     · exact List.mem_append_left _ hhistory
     · apply List.mem_append_right prefixHistory
       exact List.mem_singleton.mpr hactivated
-theorem RawRepeatedWriterNovelAt.open_frame_with_fixed_stem_successors
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues} {right : Nat}
-    (h : RawRepeatedWriterNovelAt w N start right) :
-    ∃ left reroute,
-      RawLastWriterFrame w N start left right ∧
-      RawProductiveAt w N start reroute ∧
-      rawWriterAt w start reroute ≠ rawWriterAt w start right ∧
-      (∀ j, left < j → j < reroute →
-        RawProductiveAt w N start j →
-        rawWriterAt w start j ≠ rawWriterAt w start reroute) ∧
-      RawOpenReroutingShape w N start left reroute right ∧
-      (∃ next,
-        stepN w (reroute + 1) start = some next ∧
-        w.link (3 * rawWriterAt w start reroute) = some next.1) ∧
-      (∃ next,
-        stepN w (right + 1) start = some next ∧
-        w.link (3 * rawWriterAt w start right) = some next.1) := by
-  obtain ⟨left, reroute, F, hprod, hdiff, hfirst, hshape⟩ :=
-    h.open_rerouting_decomposition hN
-  exact ⟨left, reroute, F, hprod, hdiff, hfirst, hshape,
-    rawProductiveAt_fixed_stem_successor hN hprod,
-    rawProductiveAt_fixed_stem_successor hN h.1⟩
-
-end GeneralN

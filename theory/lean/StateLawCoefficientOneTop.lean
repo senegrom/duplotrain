@@ -19,27 +19,6 @@ single `N`-coordinate budget.
 
 namespace GeneralN
 
-/-- Trace-retaining form of the simple-cycle branch of the sharp first
-activation theorem. -/
-structure FirstActivatedCycleOutcome
-    (w : Wiring) (start : Nat × Tongues) (N : Nat) : Type where
-  lead : List Passage
-  atRepeat : Nat × Tongues
-  cycle : List Passage
-  settled : Tongues
-  lead_trace : PhysicalTrace w start lead atRepeat
-  lead_simple : SwitchSimple lead
-  cycle_nonempty : cycle ≠ []
-  transient : PhysicalTrace w atRepeat cycle
-    (atRepeat.1, settled)
-  stable : PhysicalTrace w (atRepeat.1, settled) cycle
-    (atRepeat.1, settled)
-  cycle_simple : SwitchSimple cycle
-  transient_phase : forall d, d <= cycle.length ->
-    exists port phase,
-      stepN w d atRepeat = some (port, phase) ∧
-        (phase = atRepeat.2 ∨ phase = settled)
-
 /-- The second run falls before the second sharp first-revisit horizon. -/
 structure OneReflectorSecondDead
     (w : Wiring) (N e : Nat) (start : Nat × Tongues) : Type where
@@ -50,20 +29,6 @@ structure OneReflectorSecondDead
     (A.exploration.length + A.runway.length + 1) start =
       some (e, A.activatedState)
   dead : stepN w (N + 1) (e, A.activatedState) = none
-
-/-- The second first-revisit settles on a simple cycle, but its repeat state
-has genuinely damaged the old reflector support.  The support-preserving
-cycle case is already bounded by `N+3`. -/
-structure OneReflectorDamagedCycle
-    (w : Wiring) (N e : Nat) (start : Nat × Tongues) : Type where
-  A : ManufacturedReflector w start.1 e
-  grooves : PathGrooves A.toSupported.paths A.activatedState
-  base : A.baseState = start.2
-  reached : stepN w
-    (A.exploration.length + A.runway.length + 1) start =
-      some (e, A.activatedState)
-  cycle : FirstActivatedCycleOutcome w (e, A.activatedState) N
-  damaged : ¬ PathGrooves A.toSupported.paths cycle.atRepeat.2
 
 
 structure SimpleContinuationChangedContact
@@ -420,68 +385,6 @@ theorem SimpleContinuationChangedContact.backward_all_run_distinct_le_N_add_thre
   have hcount := noveltyCoverOn_distinct_count hcover hnd
   have hlength := C.compressedLead_length_le hN hA
   omega
-
-/-- Exact residual after the generic backward-contact lasso has been
-removed from `OneReflectorDamagedCycle`: the first damaging contact exits
-forward on the old selected route and is self-repaired by the corresponding
-trailing traversal. -/
-structure OneReflectorForwardDamagedCycle
-    (w : Wiring) (N e : Nat) (start : Nat × Tongues) : Type where
-  A : ManufacturedReflector w start.1 e
-  grooves : PathGrooves A.toSupported.paths A.activatedState
-  base : A.baseState = start.2
-  reached : stepN w
-    (A.exploration.length + A.runway.length + 1) start =
-      some (e, A.activatedState)
-  cycle : FirstActivatedCycleOutcome w (e, A.activatedState) N
-  contact : SimpleContinuationChangedContact w A
-  repaired : Tongues
-  forward : contact.x = contact.oriented.2
-  repair : arrive contact.nextState contact.oriented.1 =
-    (contact.oriented.2, repaired)
-  restored : arrive repaired contact.oriented.2 =
-    (contact.oriented.1, repaired)
-
-/-- Split a damaged simple-cycle capture at its first damaging passage.
-The backward orientation is already bounded by `N+3`; the forward
-self-repairing orientation is retained as the sole exact residual. -/
-theorem OneReflectorDamagedCycle.N_add_three_or_forward
-    {w : Wiring} {N e : Nat} {start : Nat × Tongues}
-    (D : OneReflectorDamagedCycle w N e start)
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 3 ∨
-      Nonempty (OneReflectorForwardDamagedCycle w N e start) := by
-  obtain ⟨C⟩ := D.A.simpleContinuationChangedContact
-    D.grooves D.cycle.lead_trace D.cycle.lead_simple D.damaged
-  rcases C.direction with hbackward |
-      ⟨hforward, repaired, hrepair, hrestored⟩
-  · left
-    have hliveA : ∀ k ∈ times,
-        (stepN w k (start.1, D.A.baseState)).isSome := by
-      simpa [D.base] using hlive
-    have hndA : (times.map
-        (restrictedTonguesAt w N
-          (start.1, D.A.baseState))).Nodup := by
-      simpa [D.base] using hnd
-    exact C.backward_all_run_distinct_le_N_add_three
-      hN D.grooves hbackward times hliveA hndA
-  · right
-    exact ⟨{
-      A := D.A
-      grooves := D.grooves
-      base := D.base
-      reached := D.reached
-      cycle := D.cycle
-      contact := C
-      repaired := repaired
-      forward := hforward
-      repair := hrepair
-      restored := hrestored
-    }⟩
 
 /-- A physical prefix of the doomed second run cannot repeat a switch.
 The cycle alternative is non-falling.  The reflector alternative completes
@@ -1250,51 +1153,3 @@ theorem SimpleContinuationChangedContact.changed_two_novelty
         exact C.forward_flip_two_novelty
           hforward hrepair hrestored times
 
-/-- Absolute coefficient-one bound once a partial simple continuation first
-damages the old reflector support. -/
-theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_five
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    times.length ≤ N + 5 := by
-  let firstTravel := A.exploration.length + A.runway.length + 1
-  let localTimes := times.map (fun k => k - firstTravel)
-  have hreach : stepN w firstTravel (g, A.baseState) =
-      some (e, A.activatedState) := by
-    simpa [firstTravel] using
-      A.manufacturing_journey_reaches_activated hA
-  obtain ⟨fresh, hfresh, hlocal⟩ :=
-    C.changed_two_novelty (N := N) localTimes
-  have hcover : NoveltyCoverOn w N (g, A.baseState)
-      times (C.compressedLead N) 2 := by
-    refine ⟨fresh, hfresh, ?_⟩
-    intro k hk
-    by_cases hfirst : k ≤ firstTravel
-    · unfold SimpleContinuationChangedContact.compressedLead
-      apply List.mem_append_left
-      apply List.mem_append_left
-      apply A.mem_sharpHistoryCore_of_mem
-      exact A.manufacturing_journey_mem_sharpHistory hA (by
-        simpa [firstTravel] using hfirst)
-    · let d := k - firstTravel
-      have hdMem : d ∈ localTimes := by
-        dsimp [d, localTimes]
-        exact List.mem_map.mpr ⟨k, hk, rfl⟩
-      have hm := hlocal d hdMem
-      have hshift := restrictedTonguesAt_sub_of_reach
-        (N := N) hreach (by omega) (hlive k hk)
-      rw [hshift]
-      exact hm
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  have hlength := C.compressedLead_length_le hN hA
-  omega
-
-
-end GeneralN

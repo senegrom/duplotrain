@@ -36,12 +36,6 @@ def NoveltyCoverOn (w : Wiring) (N : Nat) (start : Nat × Tongues)
     ∀ k ∈ times,
       restrictedTonguesAt w N start k ∈ history ++ fresh
 
-/-- The cover shape needed by the conjectured sharp tail argument: all
-selected vectors are historical except for at most four candidates. -/
-def FourNoveltyCover (w : Wiring) (N : Nat) (start : Nat × Tongues)
-    (times : List Nat) (history : List (List Bool)) : Prop :=
-  NoveltyCoverOn w N start times history 4
-
 /-- A novelty cover converts directly into a count of distinct sampled
 vectors.  This is the generic final bookkeeping step of a novelty proof. -/
 theorem noveltyCoverOn_distinct_count
@@ -59,30 +53,6 @@ theorem noveltyCoverOn_distinct_count
     exact hmem k hk
   have hbound := nodup_subset_length_nat hnd hsubset
   simp only [List.length_map, List.length_append] at hbound
-  omega
-
-/-- In particular, a four-novelty cover gives the desired constant-four
-count above the supplied history. -/
-theorem fourNoveltyCover_distinct_count
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {times : List Nat} {history : List (List Bool)}
-    (hcover : FourNoveltyCover w N start times history)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ history.length + 4 :=
-  noveltyCoverOn_distinct_count hcover hnd
-
-/-- Once the structural argument supplies a history of size at most `N+2`
-and a four-novelty cover, the requested `N+6` arithmetic is immediate.  The
-open global problem is precisely to construct those objects for an arbitrary
-raw-track trajectory. -/
-theorem fourNoveltyCover_to_N_add_six
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {times : List Nat} {history : List (List Bool)}
-    (hhistory : history.length ≤ N + 2)
-    (hcover : FourNoveltyCover w N start times history)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 6 := by
-  have hcount := fourNoveltyCover_distinct_count hcover hnd
   omega
 
 
