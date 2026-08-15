@@ -25,9 +25,6 @@ structure OneReflectorSecondDead
   A : ManufacturedReflector w start.1 e
   grooves : PathGrooves A.toSupported.paths A.activatedState
   base : A.baseState = start.2
-  reached : stepN w
-    (A.exploration.length + A.runway.length + 1) start =
-      some (e, A.activatedState)
   dead : stepN w (N + 1) (e, A.activatedState) = none
 
 
@@ -449,9 +446,6 @@ structure OneReflectorForwardContact
   A : ManufacturedReflector w start.1 e
   grooves : PathGrooves A.toSupported.paths A.activatedState
   base : A.baseState = start.2
-  reached : stepN w
-    (A.exploration.length + A.runway.length + 1) start =
-      some (e, A.activatedState)
   contact : SimpleContinuationChangedContact w A
 
 /-- The early-death branch is coefficient one unless its terminal simple
@@ -495,7 +489,6 @@ theorem OneReflectorSecondDead.N_add_three_or_forward
         A := D.A
         grooves := D.grooves
         base := D.base
-        reached := D.reached
         contact := C
       }⟩
 

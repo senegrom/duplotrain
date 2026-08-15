@@ -127,7 +127,6 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
               A := A
               grooves := hA
               base := hbaseA
-              reached := hreachA
               dead := hsecond
             }
             rcases D.N_add_three_or_forward
