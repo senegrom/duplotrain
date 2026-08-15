@@ -11,20 +11,17 @@ defaultTargets = [
   "BoundaryNAddFourSaturation",
   "BoundaryOccurrenceDamageElimination",
   "BoundaryOverlapTailCount",
-  "BoundaryResidualCharge",
   "BoundaryResidualNovelty",
   "BoundaryResidualSharpening",
   "ChangedContactNAddFour",
   "CompleteRepairFour",
   "DuplotrainProofs",
   "EarlyFacingConstant",
-  "EventuallyPeriodicPrefixes",
   "FacingForwardNovelty",
   "FirstCycleCountSharp",
   "FirstReflectorNovelty",
   "ForeignSpliceNovelty",
   "GeneralN",
-  "JourneyReachesActivated",
   "KnownEdgeLift",
   "KnownEdgeNAddFourChangedClosed",
   "KnownEdgeNAddFourComplete",
@@ -32,13 +29,10 @@ defaultTargets = [
   "ManufacturedPairNovelty",
   "OneReflectorContinuation",
   "PairActionCorners",
-  "PartialJourneyDichotomy",
   "PartialSecondRunNAddFour",
   "PartialSecondRunSharp",
-  "PointwiseRetraceSeparation",
   "PointwiseSimpleCycleTail",
   "PreReturnProtectedRoute",
-  "ProductiveBoundaryNAddFour",
   "ProductiveBoundaryNAddFourComplete",
   "ProtectedPairNAddFour",
   "RepairLeadTwoPhase",
@@ -80,8 +74,7 @@ defaultTargets = [
   "TripleSelfLinkSimpleCycleClosure",
   "TwoHistoryUnionCharge",
   "TwoJourneyTailCountSharp",
-  "TwoPhasePrefixTailCount",
-  "VectorCount"
+  "TwoPhasePrefixTailCount"
 ]
 
 [[lean_lib]]
@@ -118,9 +111,6 @@ name = "BoundaryOccurrenceDamageElimination"
 name = "BoundaryOverlapTailCount"
 
 [[lean_lib]]
-name = "BoundaryResidualCharge"
-
-[[lean_lib]]
 name = "BoundaryResidualNovelty"
 
 [[lean_lib]]
@@ -139,9 +129,6 @@ name = "DuplotrainProofs"
 name = "EarlyFacingConstant"
 
 [[lean_lib]]
-name = "EventuallyPeriodicPrefixes"
-
-[[lean_lib]]
 name = "FacingForwardNovelty"
 
 [[lean_lib]]
@@ -155,9 +142,6 @@ name = "ForeignSpliceNovelty"
 
 [[lean_lib]]
 name = "GeneralN"
-
-[[lean_lib]]
-name = "JourneyReachesActivated"
 
 [[lean_lib]]
 name = "KnownEdgeLift"
@@ -181,25 +165,16 @@ name = "OneReflectorContinuation"
 name = "PairActionCorners"
 
 [[lean_lib]]
-name = "PartialJourneyDichotomy"
-
-[[lean_lib]]
 name = "PartialSecondRunNAddFour"
 
 [[lean_lib]]
 name = "PartialSecondRunSharp"
 
 [[lean_lib]]
-name = "PointwiseRetraceSeparation"
-
-[[lean_lib]]
 name = "PointwiseSimpleCycleTail"
 
 [[lean_lib]]
 name = "PreReturnProtectedRoute"
-
-[[lean_lib]]
-name = "ProductiveBoundaryNAddFour"
 
 [[lean_lib]]
 name = "ProductiveBoundaryNAddFourComplete"
@@ -326,7 +301,4 @@ name = "TwoJourneyTailCountSharp"
 
 [[lean_lib]]
 name = "TwoPhasePrefixTailCount"
-
-[[lean_lib]]
-name = "VectorCount"
 

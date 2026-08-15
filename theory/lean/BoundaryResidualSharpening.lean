@@ -1,7 +1,7 @@
-import BoundaryResidualCharge
+import BoundaryOccurrenceDamageElimination
 import KnownEdgeNAddFourComplete
 import ProductiveBoundaryNAddFourComplete
-import PartialJourneyDichotomy
+import PartialSecondRunSharp
 
 /-!
 # Sharpening the productive-boundary residuals
@@ -17,6 +17,62 @@ switch.  This file rewires the exact-residual reduction accordingly: the
 two damage constructors survive only in that approach-written form or
 under the occurrence saving.
 -/
+
+
+/-!
+# Structural dichotomy for an unfinished second journey
+
+This file separates the dynamic statement "the second probe does not
+manufacture an opposite reflector" from the coefficient-one accounting
+problem.  The dynamic conclusion is exact: the `N+1` probe either dies, or
+reaches a stable switch-simple cycle.  The latter has one settled restricted
+tongue vector at every absolute time after its transient lap.
+
+The statements are over raw `Wiring`, `PhysicalTrace`, and `stepN`; there is
+no finite-`N` evaluation and no hidden completion selector.
+-/
+
+namespace GeneralN
+
+/-- The literal reflector payload returned by the second `N+1` probe. -/
+structure PartialSecondReflectorCompletion
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e) (N : Nat) : Type where
+  reflector : ManufacturedReflector w e g
+  state : Tongues
+  length_le :
+    reflector.exploration.length + reflector.runway.length + 1 <=
+      2 * N + 1
+  paths : PathGrooves reflector.toSupported.paths state
+  base : reflector.baseState = A.activatedState
+  activated : state = reflector.activatedState
+  preserves : forall j,
+    j ∉ reflector.exploration.map passageSwitch ->
+      state j = A.activatedState j
+
+end GeneralN
+
+
+/-!
+# Coordinate charge in the canonical productive-boundary residual
+
+This file isolates the remaining canonical branch.  At the unchanged
+canonical occurrence, the initial boundary switch is the omitted action
+switch of the first flip reflector.  Full coordinate charge therefore puts
+that switch among the second reflector's productive first writers and the
+present-writer boundary theorem closes the branch.
+
+Saturation alone, however, leaves one exact arithmetic corner: if the action
+is absent from the second first writers, the generic two-novelty protected
+repair and the reserved-action charge bound meet at
+`reusable + secondWriters + 1 = N`.  The final theorem records this tight
+residual without claiming the unavailable full-charge equality.
+-/
+
+namespace GeneralN
+
+end GeneralN
+
 
 namespace GeneralN
 
