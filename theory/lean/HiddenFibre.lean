@@ -1,4 +1,4 @@
-import EdgeReversal
+import SupportMove
 
 /-!
 # The hidden fibre of the cell-level projection

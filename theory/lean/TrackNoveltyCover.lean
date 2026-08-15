@@ -42,37 +42,6 @@ def FourNoveltyCover (w : Wiring) (N : Nat) (start : Nat × Tongues)
     (times : List Nat) (history : List (List Bool)) : Prop :=
   NoveltyCoverOn w N start times history 4
 
-private theorem nodup_subset_length_novelty
-    {α : Type} [BEq α] [LawfulBEq α] :
-    ∀ {xs cover : List α},
-      xs.Nodup →
-      (∀ x ∈ xs, x ∈ cover) →
-      xs.length ≤ cover.length := by
-  intro xs
-  induction xs with
-  | nil =>
-      intro cover _ _
-      exact Nat.zero_le _
-  | cons x rest ih =>
-      intro cover hnd hsub
-      rw [List.nodup_cons] at hnd
-      have hx : x ∈ cover := hsub x List.mem_cons_self
-      have hrest : ∀ y ∈ rest, y ∈ cover.erase x := by
-        intro y hy
-        have hyCover : y ∈ cover :=
-          hsub y (List.mem_cons_of_mem _ hy)
-        have hyx : y ≠ x := fun heq => hnd.1 (heq ▸ hy)
-        exact (List.mem_erase_of_ne hyx).mpr hyCover
-      have hle := ih hnd.2 hrest
-      have herase : (cover.erase x).length = cover.length - 1 :=
-        List.length_erase_of_mem hx
-      have hpositive : 0 < cover.length := by
-        cases cover with
-        | nil => cases hx
-        | cons _ _ => simp
-      simp only [List.length_cons]
-      omega
-
 /-- A novelty cover converts directly into a count of distinct sampled
 vectors.  This is the generic final bookkeeping step of a novelty proof. -/
 theorem noveltyCoverOn_distinct_count
@@ -88,7 +57,7 @@ theorem noveltyCoverOn_distinct_count
     intro x hx
     obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hx
     exact hmem k hk
-  have hbound := nodup_subset_length_novelty hnd hsubset
+  have hbound := nodup_subset_length_nat hnd hsubset
   simp only [List.length_map, List.length_append] at hbound
   omega
 

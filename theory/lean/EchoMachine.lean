@@ -257,24 +257,6 @@ theorem exists_last_lt {P : Nat → Prop} :
 open Classical in
 
 
-private theorem nodup_transfer {f : Nat → List Nat} {c : Nat → Nat} :
-    ∀ l : List Nat, (∀ x ∈ l, ∀ y ∈ l, c x = c y → f x = f y) →
-      (l.map f).Nodup → (l.map c).Nodup := by
-  intro l
-  induction l with
-  | nil => intro _ _; simp
-  | cons x t ih =>
-      intro hinj hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd ⊢
-      refine ⟨?_, ih (fun a ha b hb =>
-        hinj a (List.mem_cons_of_mem _ ha) b (List.mem_cons_of_mem _ hb))
-        hnd.2⟩
-      intro hmem
-      obtain ⟨y, hy, hcy⟩ := List.mem_map.mp hmem
-      have hfy : f x = f y :=
-        hinj x List.mem_cons_self y (List.mem_cons_of_mem _ hy) hcy.symm
-      exact hnd.1 (List.mem_map.mpr ⟨y, hy, hfy.symm⟩)
-
 theorem nodup_subset_length {α : Type} [BEq α] [LawfulBEq α] :
     ∀ {l S : List α},
     l.Nodup → (∀ x ∈ l, x ∈ S) → l.length ≤ S.length := by

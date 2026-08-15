@@ -1,7 +1,6 @@
 name = "duplotrain"
 defaultTargets = [
   "Alternation",
-  "AlternationBound",
   "ArbitraryStartDirectLift",
   "BlockSparseBoundCore",
   "BoundaryAbsentPresentWriterElimination",
@@ -42,7 +41,6 @@ defaultTargets = [
   "DuplotrainProofs",
   "EarlyFacingConstant",
   "EchoMachine",
-  "EdgeReversal",
   "EndpointEpochExtraction",
   "EventuallyPeriodicPrefixes",
   "FacingForwardNovelty",
@@ -64,7 +62,6 @@ defaultTargets = [
   "KnownEdgeNAddFourFrontier",
   "KnownEdgeThreeSharp",
   "KoizumiFramePersistence",
-  "LinearBound",
   "ManufacturedPairNovelty",
   "OneJourneyTailCount",
   "OneReflectorContinuation",
@@ -100,7 +97,6 @@ defaultTargets = [
   "ShortSuffixCount",
   "SimpleTraceOneNetChange",
   "SingleCoordinateFlip",
-  "StarIndependent",
   "StateLaw",
   "StateLawAxiomAudit",
   "StateLawCoefficientOneTop",
@@ -113,7 +109,6 @@ defaultTargets = [
   "StateLawTwoSharp",
   "StateLawTwoSharper",
   "StateLawTwoSixUltra",
-  "SupportBound",
   "SupportMove",
   "ThreeQuarterArithmetic",
   "TraceRetainingFirstRevisit",
@@ -153,9 +148,6 @@ defaultTargets = [
 
 [[lean_lib]]
 name = "Alternation"
-
-[[lean_lib]]
-name = "AlternationBound"
 
 [[lean_lib]]
 name = "ArbitraryStartDirectLift"
@@ -278,9 +270,6 @@ name = "EarlyFacingConstant"
 name = "EchoMachine"
 
 [[lean_lib]]
-name = "EdgeReversal"
-
-[[lean_lib]]
 name = "EndpointEpochExtraction"
 
 [[lean_lib]]
@@ -342,9 +331,6 @@ name = "KnownEdgeThreeSharp"
 
 [[lean_lib]]
 name = "KoizumiFramePersistence"
-
-[[lean_lib]]
-name = "LinearBound"
 
 [[lean_lib]]
 name = "ManufacturedPairNovelty"
@@ -452,9 +438,6 @@ name = "SimpleTraceOneNetChange"
 name = "SingleCoordinateFlip"
 
 [[lean_lib]]
-name = "StarIndependent"
-
-[[lean_lib]]
 name = "StateLaw"
 
 [[lean_lib]]
@@ -489,9 +472,6 @@ name = "StateLawTwoSharper"
 
 [[lean_lib]]
 name = "StateLawTwoSixUltra"
-
-[[lean_lib]]
-name = "SupportBound"
 
 [[lean_lib]]
 name = "SupportMove"

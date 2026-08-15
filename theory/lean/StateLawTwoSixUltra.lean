@@ -773,45 +773,6 @@ theorem boundary_history_then_direct_tail_cover
     intro k hk
     exact hmem k hk
 
-private theorem ultra_nodup_subset_length
-    {alpha : Type} [BEq alpha] [LawfulBEq alpha] :
-    forall {xs cover : List alpha},
-      xs.Nodup ->
-      (forall x, List.Mem x xs -> List.Mem x cover) ->
-      xs.length <= cover.length := by
-  intro xs
-  induction xs with
-  | nil =>
-      intro cover _ _
-      exact Nat.zero_le _
-  | cons x rest ih =>
-      intro cover hnd hsub
-      rw [List.nodup_cons] at hnd
-      have hx : List.Mem x cover :=
-        hsub x List.mem_cons_self
-      have hrest : forall y, List.Mem y rest ->
-          List.Mem y (cover.erase x) := by
-        intro y hy
-        have hyCover : List.Mem y cover :=
-          hsub y (List.mem_cons_of_mem _ hy)
-        have hyx : Ne y x := by
-          intro heq
-          apply hnd.1
-          exact Eq.mp (congrArg (fun z => List.Mem z rest) heq) hy
-        exact (List.mem_erase_of_ne hyx).mpr hyCover
-      have hle := ih hnd.2 hrest
-      have herase :
-          (cover.erase x).length = cover.length - 1 :=
-        List.length_erase_of_mem hx
-      have hpositive : 0 < cover.length := by
-        cases cover with
-        | nil =>
-            cases hx
-        | cons _ _ =>
-            simp
-      simp only [List.length_cons]
-      omega
-
 /-- One vector already in history may be counted together with all sampled
 vectors without increasing the novelty budget. -/
 theorem novelty_cover_count_with_historical_extra
@@ -845,7 +806,7 @@ theorem novelty_cover_count_with_historical_extra
           (fun z => List.Mem z (history ++ fresh)) hk.2)
         (hfresh.2 k hk.1)
   have hcount :=
-    ultra_nodup_subset_length hnd hsubset
+    nodup_subset_length_nat hnd hsubset
   simp only [List.length_cons, List.length_map,
     List.length_append] at hcount
   have hfreshLength : fresh.length <= budget := by

@@ -1,7 +1,7 @@
 import EndpointEpochExtraction
 import SelfPivotStrictShrink
 import BlockSparseBoundCore
-import StarIndependent
+import SupportMove
 import ManufacturedPairNovelty
 
 /-!

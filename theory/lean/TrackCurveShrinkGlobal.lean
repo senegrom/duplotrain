@@ -39,32 +39,6 @@ theorem finiteCurvePorts_nodup
   unfold finiteCurvePorts
   exact nodup_filter_nat _ List.nodup_range
 
-private theorem nodup_subset_length_curve
-    {α : Type} [BEq α] [LawfulBEq α] :
-    ∀ {xs ys : List α},
-      xs.Nodup → (∀ x ∈ xs, x ∈ ys) → xs.length ≤ ys.length := by
-  intro xs
-  induction xs with
-  | nil => intro ys _ _; exact Nat.zero_le _
-  | cons x rest ih =>
-      intro ys hnd hsub
-      rw [List.nodup_cons] at hnd
-      have hx : x ∈ ys := hsub x List.mem_cons_self
-      have hrest : ∀ y ∈ rest, y ∈ ys.erase x := by
-        intro y hy
-        have hy' : y ∈ ys := hsub y (List.mem_cons_of_mem _ hy)
-        have hyx : y ≠ x := fun heq => hnd.1 (heq ▸ hy)
-        exact (List.mem_erase_of_ne hyx).mpr hy'
-      have hle := ih hnd.2 hrest
-      have herase : (ys.erase x).length = ys.length - 1 :=
-        List.length_erase_of_mem hx
-      have hpositive : 0 < ys.length := by
-        cases ys with
-        | nil => cases hx
-        | cons _ _ => simp
-      simp only [List.length_cons]
-      omega
-
 /-- A finite walk in the selected curve graph. -/
 def FiniteCurveChain (w : Wiring) (u : Tongues) : List Nat → Prop
   | [] => True
@@ -521,7 +495,7 @@ theorem finiteCurveEndpointWriters_length_le_two
               exact (connected_unmatched_endpoints_unique w u
                 (Ne.symm hBA) (Ne.symm hCA) hABreach hACreach).symm
             simp [hCB]
-        have hle := nodup_subset_length_curve
+        have hle := nodup_subset_length_nat
           (finiteCurveEndpointWriters_nodup w N u root) hsubset
         have hleE : endpoints.length ≤ [A, B].length := by
           change (finiteCurveEndpointWriters w N u root).length ≤
@@ -536,7 +510,7 @@ theorem finiteCurveEndpointWriters_length_le_two
             intro hne
             exact hsecond ⟨C, hC, hne⟩
           simp [hCA]
-        have hle := nodup_subset_length_curve
+        have hle := nodup_subset_length_nat
           (finiteCurveEndpointWriters_nodup w N u root) hsubset
         have hleE : endpoints.length ≤ [A].length := by
           change (finiteCurveEndpointWriters w N u root).length ≤ [A].length

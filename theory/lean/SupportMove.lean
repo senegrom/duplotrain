@@ -1,4 +1,4 @@
-import SupportBound
+import EchoMachine
 
 /-!
 # What a support-preserving productive step does

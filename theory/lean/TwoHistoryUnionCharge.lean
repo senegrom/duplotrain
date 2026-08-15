@@ -23,26 +23,9 @@ namespace GeneralN
 
 theorem nodup_map_nat_of_injective_on_two_history
     {f : Nat → Nat} {xs : List Nat}
-    (hinj : ∀ x, x ∈ xs → ∀ y, y ∈ xs →
-      f x = f y → x = y)
-    (hnd : xs.Nodup) :
-    (xs.map f).Nodup := by
-  induction xs with
-  | nil => simp
-  | cons x rest ih =>
-      rw [List.nodup_cons] at hnd
-      rw [List.map_cons, List.nodup_cons]
-      constructor
-      · intro hm
-        obtain ⟨y, hy, hfy⟩ := List.mem_map.mp hm
-        have hxy := hinj x List.mem_cons_self y
-          (List.mem_cons_of_mem _ hy) hfy.symm
-        exact hnd.1 (hxy ▸ hy)
-      · exact ih
-          (fun a ha b hb => hinj a
-            (List.mem_cons_of_mem _ ha)
-            b (List.mem_cons_of_mem _ hb))
-          hnd.2
+    (hinj : ∀ x, x ∈ xs → ∀ y, y ∈ xs → f x = f y → x = y)
+    (hnd : xs.Nodup) : (xs.map f).Nodup :=
+  map_nodup_of_injective_on_mem_self_pivot f hnd hinj
 
 private theorem count_map_range_two_of_eq
     {α : Type} [BEq α] [LawfulBEq α]

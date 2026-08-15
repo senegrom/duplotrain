@@ -247,7 +247,7 @@ theorem rawNovelStrictShrinkCharge_injective
       hjSpec.1 hjSpec.2 hiSpec.1 hiSpec.2
     exact (hi.1.2.2 hprior).elim
 
-private theorem map_nodup_of_injective_on_mem_self_pivot
+theorem map_nodup_of_injective_on_mem_self_pivot
     {α β : Type} [BEq α] [LawfulBEq α]
     [BEq β] [LawfulBEq β]
     (f : α → β) : ∀ {xs : List α}, xs.Nodup →
