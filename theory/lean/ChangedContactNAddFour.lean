@@ -130,10 +130,10 @@ theorem ManufacturedFlipReflector.action_not_mem_reusable_changedContact
   · exact (R.support_foreign R.candy (by simp)
       passage hcandy) hswitch
 
-/-- If the strict approach does not first-write the omitted action switch,
-then reusable support, approach writers, and that reserved switch occupy
-pairwise distinct ambient coordinates. -/
-theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_action_le
+/-- Reusable support, approach first-writers, and any duplicate-free list
+of extra switches avoiding both occupy pairwise distinct ambient
+coordinates. -/
+theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_extras_le
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -143,12 +143,17 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_a
     (hA : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths
       (ManufacturedReflector.flip R).activatedState)
-    (habsent : Not (R.actionSwitch ∈
-      C.approachFirstWriterSwitches N)) :
+    (extras : List Nat)
+    (hextrasNodup : extras.Nodup)
+    (hextrasLt : forall s, s ∈ extras -> s < N)
+    (hextrasReusable : forall s, s ∈ extras ->
+      Not (s ∈ (ManufacturedReflector.flip R).reusableSwitches))
+    (hextrasApproach : forall s, s ∈ extras ->
+      Not (s ∈ C.approachFirstWriterSwitches N)) :
     (ManufacturedReflector.flip R).reusableSwitches.length +
         (rawFirstWriterTimes w N
           (e, (ManufacturedReflector.flip R).activatedState)
-          C.approach.length).length + 1 <= N := by
+          C.approach.length).length + extras.length <= N := by
   classical
   let times := rawFirstWriterTimes w N
     (e, (ManufacturedReflector.flip R).activatedState)
@@ -192,35 +197,72 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_a
     exact List.nodup_append.mpr
       ⟨(ManufacturedReflector.flip R).reusableSwitches_nodup,
         hwritersNodup, hdisjoint⟩
-  have hactionNotOccupied : Not (R.actionSwitch ∈ occupied) := by
-    intro hm
+  have hextrasNotOccupied : forall s, s ∈ extras -> Not (s ∈ occupied) := by
+    intro s hs hm
     rcases List.mem_append.mp hm with hold | hfresh
-    · exact R.action_not_mem_reusable_changedContact hold
-    · apply habsent
+    · exact hextrasReusable s hs hold
+    · apply hextrasApproach s hs
       simpa [PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches,
         writers, times] using hfresh
-  have hallNodup : (R.actionSwitch :: occupied).Nodup := by
-    rw [List.nodup_cons]
-    exact ⟨hactionNotOccupied, hoccupiedNodup⟩
+  have hallNodup : (extras ++ occupied).Nodup :=
+    List.nodup_append.mpr
+      ⟨hextrasNodup, hoccupiedNodup,
+        fun s hs t ht hEq => hextrasNotOccupied s hs (hEq ▸ ht)⟩
   have hallLt : forall switch,
-      switch ∈ R.actionSwitch :: occupied -> switch < N := by
+      switch ∈ extras ++ occupied -> switch < N := by
     intro switch hswitch
-    rcases List.mem_cons.mp hswitch with rfl | hoccupied
-    · exact R.action_lt hN
-    · rcases List.mem_append.mp hoccupied with hold | hfresh
-      · exact (ManufacturedReflector.flip R).reusableSwitch_lt hN hold
-      · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hfresh
-        have hkData := mem_rawFirstWriterTimes_iff.mp (by
-          simpa [times] using hk)
-        exact rawProductiveAt_writer_lt hN hkData.2.1
+    rcases List.mem_append.mp hswitch with hextra | hoccupied
+    · exact hextrasLt switch hextra
+    rcases List.mem_append.mp hoccupied with hold | hfresh
+    · exact (ManufacturedReflector.flip R).reusableSwitch_lt hN hold
+    · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hfresh
+      have hkData := mem_rawFirstWriterTimes_iff.mp (by
+        simpa [times] using hk)
+      exact rawProductiveAt_writer_lt hN hkData.2.1
   have hbound := nodup_nat_lt_length hallNodup hallLt
   have hlength :
-      (R.actionSwitch :: occupied).length =
+      (extras ++ occupied).length =
         (ManufacturedReflector.flip R).reusableSwitches.length +
-          times.length + 1 := by
+          times.length + extras.length := by
     simp [occupied, writers]
+    omega
   rw [hlength] at hbound
   simpa [times] using hbound
+
+/-- If the strict approach does not first-write the omitted action switch,
+then reusable support, approach writers, and that reserved switch occupy
+pairwise distinct ambient coordinates. -/
+theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_action_le
+    {w : Wiring} {N g e : Nat}
+    (hN : forall p q, w.link p = some q ->
+      p < 3 * N /\ q < 3 * N)
+    {R : ManufacturedFlipReflector w g e}
+    (C : SimpleContinuationChangedContact w
+      (ManufacturedReflector.flip R))
+    (hA : PathGrooves
+      (ManufacturedReflector.flip R).toSupported.paths
+      (ManufacturedReflector.flip R).activatedState)
+    (habsent : Not (R.actionSwitch ∈
+      C.approachFirstWriterSwitches N)) :
+    (ManufacturedReflector.flip R).reusableSwitches.length +
+        (rawFirstWriterTimes w N
+          (e, (ManufacturedReflector.flip R).activatedState)
+          C.approach.length).length + 1 <= N := by
+  have h := C.reusable_add_approach_writers_add_extras_le hN hA
+    [R.actionSwitch] (by simp)
+    (by intro s hs
+        rw [List.mem_singleton] at hs
+        subst s
+        exact R.action_lt hN)
+    (by intro s hs
+        rw [List.mem_singleton] at hs
+        subst s
+        exact R.action_not_mem_reusable_changedContact)
+    (by intro s hs
+        rw [List.mem_singleton] at hs
+        subst s
+        exact habsent)
+  simpa using h
 
 /-- Reserving the flip action coordinate lowers the changed-contact history
 from `N+3` to `N+2`. -/

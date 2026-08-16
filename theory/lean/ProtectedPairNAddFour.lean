@@ -1162,72 +1162,6 @@ theorem ManufacturedFlipReflector.firstQuietProtectedHistory_length_le_N_add_two
     B.writerConstructionHistory_length]
   omega
 
-/-- If the first reflector's facing mouth is the last productive event of
-the second exploration, flipping that mouth in the second pre-return vector
-recovers the historical pre-write vector. -/
-theorem ManufacturedFlipReflector.flipped_preReturn_mem_preservedHistory_of_last
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (R : ManufacturedFlipReflector w g e)
-    (B : ManufacturedReflector w e g)
-    {t : Nat}
-    (ht : t ∈ rawFirstWriterTimes w N (e, B.baseState)
-      B.exploration.length)
-    (hwriter : rawWriterAt w (e, B.baseState) t = R.actionSwitch)
-    (hlast : ∀ j, t < j → j < B.exploration.length →
-      ¬ RawProductiveAt w N (e, B.baseState) j) :
-    VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch) ∈
-      (ManufacturedReflector.flip R).preservedTwoHistoryCore B N := by
-  have htData := mem_rawFirstWriterTimes_iff.mp ht
-  have hprod : RawProductiveAt w N (e, B.baseState) t := htData.2.1
-  let span := B.exploration.length - (t + 1)
-  have hsum : t + 1 + span = B.exploration.length := by
-    dsimp [span]
-    omega
-  have hendQuiet :
-      restrictedTonguesAt w N (e, B.baseState) B.exploration.length =
-        restrictedTonguesAt w N (e, B.baseState) (t + 1) := by
-    have h := restrictedTonguesAt_eq_of_quiet_interval
-      (first := t + 1) (span := span)
-      (by simpa [hsum] using B.exploration_trace.sound)
-      (fun j hj hbound => hlast j (by omega) (by
-        rw [hsum] at hbound
-        exact hbound))
-    simpa [hsum] using h
-  have hend :
-      restrictedTonguesAt w N (e, B.baseState) B.exploration.length =
-        VectorCount.restrict N B.preReturn.2 := by
-    simp [restrictedTonguesAt, tonguesAt, B.exploration_trace.sound]
-  have hpost := rawProductiveAt_restricted_flip hN hprod
-  rw [hwriter] at hpost
-  have hflipEnd := restrict_flipAt_congr (C := R.actionSwitch)
-    (hend.symm.trans hendQuiet)
-  have hflipPost := restrict_flipAt_congr (C := R.actionSwitch) hpost
-  have hrecover :
-      VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch) =
-        restrictedTonguesAt w N (e, B.baseState) t := by
-    calc
-      VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch) =
-          VectorCount.restrict N
-            (flipAt (tonguesAt w (e, B.baseState) (t + 1))
-              R.actionSwitch) := hflipEnd
-      _ = VectorCount.restrict N
-          (flipAt
-            (flipAt (tonguesAt w (e, B.baseState) t)
-              R.actionSwitch)
-            R.actionSwitch) := hflipPost
-      _ = restrictedTonguesAt w N (e, B.baseState) t := by
-        simp [restrictedTonguesAt, flipAt_flipAt]
-  have htime : restrictedTonguesAt w N (e, B.baseState) t ∈
-      B.sharpConstructionHistory N := by
-    unfold ManufacturedReflector.sharpConstructionHistory
-    apply List.mem_append_left
-    apply List.mem_map.mpr
-    exact ⟨t, List.mem_range.mpr (by omega), rfl⟩
-  rw [hrecover]
-  exact (ManufacturedReflector.flip R).mem_preservedTwoHistoryCore B
-    (Or.inr htime)
-
 /-- The historical corner recovered from the last action writer belongs
 already to the second reflector's uncompressed construction history.  This
 form lets boundary arguments use their own smaller two-journey history
@@ -1290,6 +1224,26 @@ theorem ManufacturedFlipReflector.flipped_preReturn_mem_second_sharp_of_last
   apply List.mem_append_left
   apply List.mem_map.mpr
   exact ⟨t, List.mem_range.mpr (by omega), rfl⟩
+
+/-- If the first reflector's facing mouth is the last productive event of
+the second exploration, flipping that mouth in the second pre-return vector
+recovers the historical pre-write vector. -/
+theorem ManufacturedFlipReflector.flipped_preReturn_mem_preservedHistory_of_last
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    (R : ManufacturedFlipReflector w g e)
+    (B : ManufacturedReflector w e g)
+    {t : Nat}
+    (ht : t ∈ rawFirstWriterTimes w N (e, B.baseState)
+      B.exploration.length)
+    (hwriter : rawWriterAt w (e, B.baseState) t = R.actionSwitch)
+    (hlast : ∀ j, t < j → j < B.exploration.length →
+      ¬ RawProductiveAt w N (e, B.baseState) j) :
+    VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch) ∈
+      (ManufacturedReflector.flip R).preservedTwoHistoryCore B N :=
+  (ManufacturedReflector.flip R).mem_preservedTwoHistoryCore B
+    (Or.inr (R.flipped_preReturn_mem_second_sharp_of_last hN B
+      ht hwriter hlast))
 
 /-- A completed protected repair needs only one fresh vector whenever the
 `A`-action applied to `B`'s pre-return vector is historical.  Depending on

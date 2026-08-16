@@ -83,95 +83,28 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_a
         (rawFirstWriterTimes w N
           (e, (ManufacturedReflector.flip R).activatedState)
           C.approach.length).length + 2 <= N := by
-  classical
-  let times := rawFirstWriterTimes w N
-    (e, (ManufacturedReflector.flip R).activatedState)
-    C.approach.length
-  let writers := times.map
-    (rawWriterAt w
-      (e, (ManufacturedReflector.flip R).activatedState))
-  have htimesNodup : times.Nodup := by
-    dsimp [times, rawFirstWriterTimes]
-    exact nodup_filter_nat _ List.nodup_range
-  have hwritersNodup : writers.Nodup := by
-    dsimp [writers]
-    apply nodup_map_nat_of_injective_on_two_history
-    · intro i hi j hj hEq
-      have hiData := mem_rawFirstWriterTimes_iff.mp (by
-        simpa [times] using hi)
-      have hjData := mem_rawFirstWriterTimes_iff.mp (by
-        simpa [times] using hj)
-      exact rawFirstWriterAt_injective hiData.2 hjData.2 hEq
-    · exact htimesNodup
-  have hdisjoint :
-      forall oldSwitch,
-        oldSwitch ∈ (ManufacturedReflector.flip R).reusableSwitches ->
-      forall freshSwitch, freshSwitch ∈ writers ->
-        oldSwitch ≠ freshSwitch := by
-    intro oldSwitch hOld freshSwitch hFresh hEq
-    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
-    have hkData := mem_rawFirstWriterTimes_iff.mp (by
-      simpa [times] using hk)
-    have houtside :=
-      C.approach_trace.productive_writer_not_old_reusable
-        hN (ManufacturedReflector.flip R) C.approach_simple
-        hA C.old_grooves hkData.1 hkData.2.1
-    apply houtside
-    rw [← hEq]
-    exact hOld
-  let occupied :=
-    (ManufacturedReflector.flip R).reusableSwitches ++ writers
-  have hoccupiedNodup : occupied.Nodup := by
-    dsimp [occupied]
-    exact List.nodup_append.mpr
-      ⟨(ManufacturedReflector.flip R).reusableSwitches_nodup,
-        hwritersNodup, hdisjoint⟩
-  have hactionNotOccupied : Not (R.actionSwitch ∈ occupied) := by
-    intro hm
-    rcases List.mem_append.mp hm with hold | hfresh
-    · exact R.action_not_mem_reusable_changedContact hold
-    · apply habsent
-      simpa [PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches,
-        writers, times] using hfresh
-  have hreservedNotOccupied : Not (k0 ∈ occupied) := by
-    intro hm
-    rcases List.mem_append.mp hm with hold | hfresh
-    · exact R.reserved_not_mem_reusable hreservedExploration hold
-    · apply hreservedApproach
-      simpa [PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches,
-        writers, times] using hfresh
-  have hactionCons : (R.actionSwitch :: occupied).Nodup := by
-    rw [List.nodup_cons]
-    exact ⟨hactionNotOccupied, hoccupiedNodup⟩
-  have hallNodup : (k0 :: R.actionSwitch :: occupied).Nodup := by
-    rw [List.nodup_cons]
-    constructor
-    · intro hm
-      rcases List.mem_cons.mp hm with hact | hocc
-      · exact R.reserved_ne_action hreservedExploration hact
-      · exact hreservedNotOccupied hocc
-    · exact hactionCons
-  have hallLt : forall switch,
-      switch ∈ k0 :: R.actionSwitch :: occupied -> switch < N := by
-    intro switch hswitch
-    rcases List.mem_cons.mp hswitch with rfl | hrest
-    · exact hk0
-    rcases List.mem_cons.mp hrest with rfl | hoccupied
-    · exact R.action_lt hN
-    rcases List.mem_append.mp hoccupied with hold | hfresh
-    · exact (ManufacturedReflector.flip R).reusableSwitch_lt hN hold
-    · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hfresh
-      have hkData := mem_rawFirstWriterTimes_iff.mp (by
-        simpa [times] using hk)
-      exact rawProductiveAt_writer_lt hN hkData.2.1
-  have hbound := nodup_nat_lt_length hallNodup hallLt
-  have hlength :
-      (k0 :: R.actionSwitch :: occupied).length =
-        (ManufacturedReflector.flip R).reusableSwitches.length +
-          times.length + 2 := by
-    simp [occupied, writers]
-  rw [hlength] at hbound
-  simpa [times] using hbound
+  have h := C.reusable_add_approach_writers_add_extras_le hN hA
+    [k0, R.actionSwitch]
+    (by simp [R.reserved_ne_action hreservedExploration])
+    (by intro s hs
+        rcases List.mem_cons.mp hs with rfl | hs
+        · exact hk0
+        rw [List.mem_singleton] at hs
+        subst s
+        exact R.action_lt hN)
+    (by intro s hs
+        rcases List.mem_cons.mp hs with rfl | hs
+        · exact R.reserved_not_mem_reusable hreservedExploration
+        rw [List.mem_singleton] at hs
+        subst s
+        exact R.action_not_mem_reusable_changedContact)
+    (by intro s hs
+        rcases List.mem_cons.mp hs with rfl | hs
+        · exact hreservedApproach
+        rw [List.mem_singleton] at hs
+        subst s
+        exact habsent)
+  simpa using h
 
 /-- Reserving both the action and boundary coordinates lowers the
 changed-contact compressed lead from `N+2` to `N+1`. -/
