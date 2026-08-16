@@ -67,8 +67,11 @@ theorem PhysicalTrace.first_revisit_trace_or_activated_reflector
   refine ⟨(q, u), before.length, ?_, ?_⟩
   · simpa [hbeforeSplit] using hbeforeTrace.sound
   · rcases hout with hcycle | hreflector
-    · exact Or.inl hcycle
-    · obtain ⟨A, state, hA, hbase, hstate, hback⟩ := hreflector
+    · obtain ⟨cycle, settled, hne, htransient, hstable,
+        _hsimple, _hphase, _hpositive⟩ := hcycle
+      exact Or.inl ⟨cycle, settled, hne, htransient, hstable⟩
+    · obtain ⟨A, state, hA, hbase, hstate, hback,
+        _hpreserves⟩ := hreflector
       exact Or.inr ⟨A, state, runway.length + 1,
         hA, by simpa using hbase, hstate, hback⟩
 

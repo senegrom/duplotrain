@@ -1,5 +1,5 @@
 import StateLawNAddFourTop
-import PointwiseSimpleCycleTail
+import TripleSelfLinkSimpleCycleClosure
 
 /-!
 # Saturation at the productive `N+4` boundary
