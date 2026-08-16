@@ -177,54 +177,9 @@ theorem manufactured_suffix_explicit_lobe_absolute_two_novelty
     (hlead : ∀ j ∈ times, j < K →
       restrictedTonguesAt w N start j ∈ history) :
     NoveltyCoverOn w N start times history 2 := by
-  let L : SupportedReflector w mouth outside := {
-    travel := candy.length + 2
-    paths := [candy]
-    action := .flip (mouth / 3)
-    run := by
-      intro current hpaths
-      have hCandyCurrent : PassagesGrooved current candy :=
-        hpaths candy (by simp)
-      obtain ⟨hstep, hnext⟩ := hLobe current hCandyCurrent
-      constructor
-      · exact hstep
-      · intro path hp
-        simp only [List.mem_singleton] at hp
-        subst path
-        exact hnext
-  }
-  have hOldAvoidsL : C.toSupported.action.Avoids L.paths := by
-    change (LocalAction.flip C.actionSwitch).Avoids [candy]
-    intro path hp passage hpassage
-    simp only [List.mem_singleton] at hp
-    subst path
-    exact hCandyForeignOld passage hpassage
-  have hCNew : PathGrooves C.toSupported.paths
-      (flipAt state (mouth / 3)) :=
-    hCpaths.after_avoiding_action hNewAvoidsC
-  have hCandy : PassagesGrooved state candy := by
-    intro passage hp
-    exact hgrooved passage (List.mem_cons_of_mem _ hp)
-  have hCandyNew : PassagesGrooved
-      (flipAt state (mouth / 3)) candy :=
-    grooved_after_flip_other hCandy hCandyForeignNew
-  have hLNew : PathGrooves L.paths
-      (flipAt state (mouth / 3)) := by
-    intro path hp
-    simp only [L, List.mem_singleton] at hp
-    subst path
-    exact hCandyNew
-  let period := 2 * (C.toSupported.travel + L.travel)
-  have hperiodPos : 0 < period := by
-    have hCpos := (ManufacturedReflector.flip C).travel_pos
-    dsimp [period, L]
-    omega
-  have hperiod : stepN w period
-      (outside, flipAt state (mouth / 3)) =
-        some (outside, flipAt state (mouth / 3)) := by
-    dsimp [period]
-    exact C.toSupported.paired_period L hOldAvoidsL hNewAvoidsC
-      (flipAt state (mouth / 3)) hCNew hLNew
+  obtain ⟨period, hperiodPos, hperiod⟩ :=
+    manufactured_suffix_explicit_lobe_period C state hCpaths
+      hNewAvoidsC hgrooved hCandyForeignNew hCandyForeignOld hLobe
   apply absolute_two_novelty_of_historical_first_fourth_four_phase
     (u := flipAt state (mouth / 3))
     (v₁ := flipAt (flipAt state (mouth / 3)) C.actionSwitch)

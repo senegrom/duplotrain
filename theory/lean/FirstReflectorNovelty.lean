@@ -17,27 +17,6 @@ support twice.
 
 namespace GeneralN
 
-/-- The local return passage of either manufactured-reflector constructor
-contacts the retained runway at its mouth and produces the advertised
-activated state. -/
-theorem ManufacturedReflector.return_arrive_mouth
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) :
-    arrive A.preReturn.2 A.preReturn.1 =
-      (A.mouthConfig.1, A.activatedState) := by
-  cases A with
-  | flip R =>
-      exact R.crossed
-  | stay R =>
-      obtain ⟨after, hhead⟩ := R.coreTrace.head_arrive.2
-      have hsound := R.coreTrace.sound
-      have hafter : after = R.returnState := by
-        simp [stepN, step, hhead, R.selfLink] at hsound
-        exact hsound
-      have hback := arrive_back R.mouthState R.mouth
-      rw [hhead, hafter] at hback
-      exact hback
-
 /-- The runway is among the support paths retained by a manufactured
 reflector, so a grooved support state grooves the runway itself. -/
 theorem ManufacturedReflector.runway_grooved

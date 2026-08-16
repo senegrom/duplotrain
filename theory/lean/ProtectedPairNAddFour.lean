@@ -1553,12 +1553,10 @@ theorem ManufacturedFlipReflector.completed_protected_route_one_novelty_of_actio
       hN B hA hpre ht hwriter
   · exact hlive
 
-/-- Generic two-journey bookkeeping over an arbitrary shared history.
-The two manufacturing journeys contribute no vector outside `history`; a
-tail novelty cover over the same history therefore gives the exact sum
-`history.length + budget`.  The tail callback receives the shifted sample's
-`Nodup` certificate, derived here from the original one. -/
-theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_count
+/-- Lift a novelty cover for the protected repair tail across the two
+manufacturing journeys.  Every prefix vector is supplied by the shared
+history; only the shifted tail spends the given novelty budget. -/
+theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_cover
     {w : Wiring} {N g e : Nat}
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -1582,7 +1580,7 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_count
       (stepN w k (g, A.baseState)).isSome)
     (hnd : (times.map
       (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    times.length ≤ history.length + budget := by
+    NoveltyCoverOn w N (g, A.baseState) times history budget := by
   let firstTravel := A.exploration.length + A.runway.length + 1
   let secondTravel := B.exploration.length + B.runway.length + 1
   let totalTravel := firstTravel + secondTravel
@@ -1639,8 +1637,7 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_count
     obtain ⟨k, hkFiltered, rfl⟩ := List.mem_map.mp hd
     have hk := (List.mem_filter.mp hkFiltered).1
     have hkGt : totalTravel < k := by
-      have := (List.mem_filter.mp hkFiltered).2
-      simpa using this
+      simpa using (List.mem_filter.mp hkFiltered).2
     have hkEq : k = totalTravel + (k - totalTravel) := by omega
     have hkLive := hlive k hk
     rw [hkEq, stepN_add, hreachTotal] at hkLive
@@ -1655,8 +1652,7 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_count
     intro k hk
     have hkTimes : k ∈ times := (List.mem_filter.mp hk).1
     have hkGt : totalTravel < k := by
-      have := (List.mem_filter.mp hk).2
-      simpa using this
+      simpa using (List.mem_filter.mp hk).2
     have hkEq : k = totalTravel + (k - totalTravel) := by omega
     have hkLive := hlive k hkTimes
     cases htailRun : stepN w (k - totalTravel)
@@ -1686,40 +1682,66 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_count
         (restrictedTonguesAt w N (g, B.activatedState))).Nodup := by
     rw [hlocalVector]
     exact hfilteredNodup
-  have hlocalCover : NoveltyCoverOn w N
-      (g, B.activatedState) localTimes history budget :=
+  obtain ⟨fresh, hfresh, hlocalMem⟩ :=
     htail localTimes hlocalLive hlocalNodup
-  obtain ⟨fresh, hfresh, hlocalMem⟩ := hlocalCover
-  have hglobalCover : NoveltyCoverOn w N (g, A.baseState)
-      times history budget := by
-    refine ⟨fresh, hfresh, ?_⟩
-    intro k hk
-    by_cases hprefix : k ≤ totalTravel
-    · exact List.mem_append_left _ (hprefixCover k hprefix)
-    · have hkGt : totalTravel < k := by omega
-      let d := k - totalTravel
-      have hkEq : k = totalTravel + d := by
-        dsimp [d]
-        omega
-      have hkFiltered : k ∈
-          times.filter (fun t => decide (totalTravel < t)) := by
-        apply List.mem_filter.mpr
-        exact ⟨hk, by simp [hkGt]⟩
-      have hdMem : d ∈ localTimes := by
-        dsimp [localTimes]
-        exact List.mem_map.mpr ⟨k, hkFiltered, rfl⟩
-      have hlocalReach : ∃ finish,
-          stepN w d (g, B.activatedState) = some finish :=
-        Option.isSome_iff_exists.mp (hlocalLive d hdMem)
-      have hshift := tonguesAt_add_of_reaches hreachTotal hlocalReach
-      have hvector : restrictedTonguesAt w N (g, A.baseState) k =
-          restrictedTonguesAt w N (g, B.activatedState) d := by
-        unfold restrictedTonguesAt
-        rw [hkEq]
-        exact congrArg (VectorCount.restrict N) hshift
-      rw [hvector]
-      exact hlocalMem d hdMem
-  exact noveltyCoverOn_distinct_count hglobalCover hnd
+  refine ⟨fresh, hfresh, ?_⟩
+  intro k hk
+  by_cases hprefix : k ≤ totalTravel
+  · exact List.mem_append_left _ (hprefixCover k hprefix)
+  · have hkGt : totalTravel < k := by omega
+    let d := k - totalTravel
+    have hkEq : k = totalTravel + d := by
+      dsimp [d]
+      omega
+    have hkFiltered : k ∈
+        times.filter (fun t => decide (totalTravel < t)) := by
+      apply List.mem_filter.mpr
+      exact ⟨hk, by simp [hkGt]⟩
+    have hdMem : d ∈ localTimes := by
+      dsimp [localTimes]
+      exact List.mem_map.mpr ⟨k, hkFiltered, rfl⟩
+    obtain ⟨finish, hfinish⟩ :=
+      Option.isSome_iff_exists.mp (hlocalLive d hdMem)
+    have hshift := tonguesAt_add_of_reaches
+      hreachTotal ⟨finish, hfinish⟩
+    have hvector : restrictedTonguesAt w N (g, A.baseState) k =
+        restrictedTonguesAt w N (g, B.activatedState) d := by
+      unfold restrictedTonguesAt
+      rw [hkEq]
+      exact congrArg (VectorCount.restrict N) hshift
+    rw [hvector]
+    exact hlocalMem d hdMem
+
+/-- Generic two-journey bookkeeping over an arbitrary shared history: the
+counting form of the novelty cover above. -/
+theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_count
+    {w : Wiring} {N g e : Nat}
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbase : B.baseState = A.activatedState)
+    (hApaths : PathGrooves A.toSupported.paths A.activatedState)
+    (hBpaths : PathGrooves B.toSupported.paths B.activatedState)
+    (history : List (List Bool))
+    (hhistory : ∀ x,
+      x ∈ A.sharpConstructionHistory N ∨
+        x ∈ B.sharpConstructionHistory N → x ∈ history)
+    (budget : Nat)
+    (htail : ∀ tailTimes : List Nat,
+      (∀ k ∈ tailTimes,
+        (stepN w k (g, B.activatedState)).isSome) →
+      (tailTimes.map
+        (restrictedTonguesAt w N (g, B.activatedState))).Nodup →
+      NoveltyCoverOn w N (g, B.activatedState) tailTimes
+        history budget)
+    (times : List Nat)
+    (hlive : ∀ k ∈ times,
+      (stepN w k (g, A.baseState)).isSome)
+    (hnd : (times.map
+      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
+    times.length ≤ history.length + budget :=
+  noveltyCoverOn_distinct_count
+    (A.two_journeys_then_shared_history_novelty_cover B hbase hApaths
+      hBpaths history hhistory budget htail times hlive hnd) hnd
 
 theorem ManufacturedStayReflector.protectedHistory_length_le_N_add_two
     {w : Wiring} {N g e : Nat}
@@ -2112,9 +2134,11 @@ theorem knownEdgeProtectedPairNAddFourLaw :
   · have htrace : PhysicalTrace w (e, D.A.activatedState)
         D.B.exploration D.B.preReturn := by
       simpa [D.B_base] using D.B.exploration_trace
-    obtain ⟨S⟩ := D.A.simpleContinuationChangedContact
+    obtain ⟨S⟩ :=
+      PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple
+        D.A
       D.A_grooves htrace D.B.exploration_simple hpre
-    let C := S.toSharpChangedContact
+    let C := S
     have hliveA : ∀ k ∈ times,
         (stepN w k (start.1, D.A.baseState)).isSome := by
       simpa [D.A_base] using hlive

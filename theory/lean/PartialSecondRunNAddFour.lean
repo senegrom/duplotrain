@@ -128,10 +128,10 @@ theorem changedContact_forward_flip_tail_eventuallyPeriodic
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
       candy, hentryOld, hrouteSplit, hOldTail,
       hApproachReplay, hApproachGrooved,
-      hApproachForeign, hentryBranch,
+      hApproachForeign, hentryBranch, _hmouthStem,
       hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
       hRpaths, hCandy, hCandyForeign, hLobe, hreach⟩ :=
-    PartialSecondRunSharp.partial_first_forward_contact_active_lead
+    partial_first_forward_contact_active_lead
       (A := ManufacturedReflector.flip R) C.split C.full_simple
       C.approach_trace C.old_grooves C.arrive_eq C.changed
       C.oriented_mem C.oriented_groove C.oriented_switch

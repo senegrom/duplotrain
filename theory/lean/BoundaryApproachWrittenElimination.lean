@@ -21,7 +21,7 @@ theorem BoundaryApproachWrittenResidual.impossible
       p < 3 * N /\ q < 3 * N)
     {S : ProductiveBoundaryNAddFourSavingResidual w N}
     (D : BoundaryApproachWrittenResidual S) : False := by
-  let C := D.contact.toSimpleContinuationChangedContact
+  let C := D.contact
   have hA : PathGrooves
       (ManufacturedReflector.flip D.R).toSupported.paths
       (ManufacturedReflector.flip D.R).activatedState := by

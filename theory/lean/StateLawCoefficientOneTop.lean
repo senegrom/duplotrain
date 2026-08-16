@@ -28,133 +28,18 @@ structure OneReflectorSecondDead
   dead : stepN w (N + 1) (e, A.activatedState) = none
 
 
-structure SimpleContinuationChangedContact
-    {g e : Nat} (w : Wiring) (A : ManufacturedReflector w g e) : Type where
-  full : List Passage
-  finish : Nat × Tongues
-  approach : List Passage
-  p : Nat
-  x : Nat
-  suffix : List Passage
-  contactState : Tongues
-  nextState : Tongues
-  path : List Passage
-  old : Passage
-  oriented : Passage
-  full_trace :
-    PhysicalTrace w (e, A.activatedState) full finish
-  full_simple : SwitchSimple full
-  split : full = approach ++ (p, x) :: suffix
-  approach_trace :
-    PhysicalTrace w (e, A.activatedState) approach (p, contactState)
-  suffix_trace :
-    PhysicalTrace w (p, contactState) ((p, x) :: suffix) finish
-  old_grooves : PathGrooves A.toSupported.paths contactState
-  arrive_eq : arrive contactState p = (x, nextState)
-  path_mem : path ∈ A.toSupported.paths
-  old_mem : old ∈ path
-  old_switch : passageSwitch old = p / 3
-  changed : nextState (p / 3) ≠ contactState (p / 3)
-  oriented_mem : oriented ∈ A.orientedRoute contactState
-  oriented_groove :
-    arrive contactState oriented.2 = (oriented.1, contactState)
-  oriented_switch : passageSwitch oriented = p / 3
-  direction :
-    x = oriented.1 ∨
-      (x = oriented.2 ∧
-        ∃ repaired,
-          arrive nextState oriented.1 = (oriented.2, repaired) ∧
-          arrive repaired oriented.2 = (oriented.1, repaired))
-
-/-- Extract the first damaging contact from an arbitrary switch-simple
-continuation.  This is the generic form needed by both partial-second-run
-outcomes. -/
-theorem ManufacturedReflector.simpleContinuationChangedContact
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    {finish : Nat × Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w (e, A.activatedState) passages finish)
-    (hsimple : SwitchSimple passages)
-    (hbroken : ¬ PathGrooves A.toSupported.paths finish.2) :
-    Nonempty (SimpleContinuationChangedContact w A) := by
-  obtain ⟨approach, p, x, suffix, u, v, path, old,
-      hsplit, happroach, hgrooves, harrive,
-      hpath, hold, hswitch, hchanged⟩ :=
-    htrace.first_changed_support_passage hA hbroken
-  obtain ⟨oriented, horiented, horientedGroove,
-      horientedSwitch, hdirection⟩ :=
-    A.changed_contact_on_orientedRoute u v hgrooves hpath hold
-      hswitch harrive hchanged
-  have hfull := htrace
-  rw [hsplit] at hfull
-  obtain ⟨middle, hbefore, hafter⟩ := hfull.split_append
-  have hmiddle : middle = (p, u) := by
-    have hactual := hbefore.sound
-    have hgiven := happroach.sound
-    rw [hgiven] at hactual
-    exact (Option.some.inj hactual).symm
-  subst middle
-  exact ⟨{
-    full := passages
-    finish := finish
-    approach := approach
-    p := p
-    x := x
-    suffix := suffix
-    contactState := u
-    nextState := v
-    path := path
-    old := old
-    oriented := oriented
-    full_trace := htrace
-    full_simple := hsimple
-    split := hsplit
-    approach_trace := happroach
-    suffix_trace := hafter
-    old_grooves := hgrooves
-    arrive_eq := harrive
-    path_mem := hpath
-    old_mem := hold
-    old_switch := hswitch
-    changed := hchanged
-    oriented_mem := horiented
-    oriented_groove := horientedGroove
-    oriented_switch := horientedSwitch
-    direction := hdirection
-  }⟩
-
-theorem SimpleContinuationChangedContact.approach_simple
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A) :
-    SwitchSimple C.approach := by
-  have hs := C.full_simple
-  unfold SwitchSimple at hs ⊢
-  rw [C.split] at hs
-  simp only [List.map_append, List.map_cons] at hs
-  exact (List.nodup_append.mp hs).1
-
-theorem SimpleContinuationChangedContact.post_reaches
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A) :
-    ∃ q, stepN w (C.approach.length + 1)
-      (e, A.activatedState) = some (q, C.nextState) := by
-  cases C.suffix_trace with
-  | @cons _ _ q _ next _ _ harrive hlink tail =>
-      have hnext : next = C.nextState := by
-        rw [C.arrive_eq] at harrive
-        exact (Prod.mk.inj harrive).2.symm
-      subst next
-      refine ⟨q, ?_⟩
-      rw [stepN_add, C.approach_trace.sound]
-      simp [stepN, step, C.arrive_eq, hlink]
+/-- The partial-continuation contact record is definitionally the sharp
+`PartialSecondRunSharp.ChangedContact` record; all its member lemmas live in
+that namespace. -/
+abbrev SimpleContinuationChangedContact
+    {g e : Nat} (w : Wiring) (A : ManufacturedReflector w g e) :
+    Type :=
+  PartialSecondRunSharp.ChangedContact w A
 
 /-- Coefficient-one history through the first damaging contact.  The first
 reflector and all productive approach writers share the same `N`-coordinate
 budget; the changed post-vector is the only extra singleton. -/
-noncomputable def SimpleContinuationChangedContact.compressedLead
+noncomputable def PartialSecondRunSharp.ChangedContact.compressedLead
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : SimpleContinuationChangedContact w A) (N : Nat) :
@@ -165,7 +50,7 @@ noncomputable def SimpleContinuationChangedContact.compressedLead
         (VectorCount.restrict N A.activatedState) ++
       [VectorCount.restrict N C.nextState])
 
-theorem SimpleContinuationChangedContact.compressedLead_length_le
+theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     {A : ManufacturedReflector w g e}
@@ -180,13 +65,13 @@ theorem SimpleContinuationChangedContact.compressedLead_length_le
   have hcharge := A.reusable_add_continuation_first_writers_le
     hN C.approach_trace C.approach_simple hA C.old_grooves
   have houter := A.exploration_length_le_reusable_add_one
-  unfold SimpleContinuationChangedContact.compressedLead
+  unfold PartialSecondRunSharp.ChangedContact.compressedLead
   rw [List.length_append, List.length_append,
     List.length_erase_of_mem hboundary, A.sharpHistoryCore_length]
   simp [rawFirstWriterHistory]
   omega
 
-theorem SimpleContinuationChangedContact.mem_compressedLead_of_approach
+theorem PartialSecondRunSharp.ChangedContact.mem_compressedLead_of_approach
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : SimpleContinuationChangedContact w A)
@@ -205,7 +90,7 @@ theorem SimpleContinuationChangedContact.mem_compressedLead_of_approach
     apply List.mem_append_left
     exact (List.mem_erase_of_ne hboundary).mpr hm
 
-theorem SimpleContinuationChangedContact.contact_mem_compressedLead
+theorem PartialSecondRunSharp.ChangedContact.contact_mem_compressedLead
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : SimpleContinuationChangedContact w A) :
@@ -215,7 +100,7 @@ theorem SimpleContinuationChangedContact.contact_mem_compressedLead
   simpa [restrictedTonguesAt, tonguesAt,
     C.approach_trace.sound] using hm
 
-theorem SimpleContinuationChangedContact.next_mem_compressedLead
+theorem PartialSecondRunSharp.ChangedContact.next_mem_compressedLead
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : SimpleContinuationChangedContact w A) :
@@ -227,7 +112,7 @@ theorem SimpleContinuationChangedContact.next_mem_compressedLead
 /-- A backward first damaging contact closes immediately into the old
 route-prefix lasso.  Every local vector, including the two contact phases,
 is already in the coefficient-one compressed lead. -/
-theorem SimpleContinuationChangedContact.backward_all_time_zero_novelty
+theorem PartialSecondRunSharp.ChangedContact.backward_all_time_zero_novelty
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : SimpleContinuationChangedContact w A)
@@ -333,7 +218,7 @@ theorem SimpleContinuationChangedContact.backward_all_time_zero_novelty
 
 /-- Absolute coefficient-one bound for the entire original run once the
 first damaging continuation contact points backward. -/
-theorem SimpleContinuationChangedContact.backward_all_run_distinct_le_N_add_three
+theorem PartialSecondRunSharp.ChangedContact.backward_all_run_distinct_le_N_add_three
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     {A : ManufacturedReflector w g e}
@@ -477,8 +362,9 @@ theorem OneReflectorSecondDead.N_add_three_or_forward
       hN D.A D.grooves htrace hsimple hend hfall
         times hliveA hndA
     omega
-  · obtain ⟨C⟩ := D.A.simpleContinuationChangedContact
-      D.grooves htrace hsimple hend
+  · obtain ⟨C⟩ :=
+      PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple
+        D.A D.grooves htrace hsimple hend
     rcases C.direction with hbackward |
         ⟨_hforward, _repaired, _hrepair, _hrestored⟩
     · left
@@ -497,7 +383,7 @@ theorem OneReflectorSecondDead.N_add_three_or_forward
 new restricted vectors after the coefficient-one contact history.  This is
 the partial-continuation analogue of the completed-second-reflector theorem.
 -/
-theorem SimpleContinuationChangedContact.forward_flip_two_novelty
+theorem PartialSecondRunSharp.ChangedContact.forward_flip_two_novelty
     {w : Wiring} {N g e : Nat}
     {R : ManufacturedFlipReflector w g e}
     (C : SimpleContinuationChangedContact w
@@ -515,10 +401,10 @@ theorem SimpleContinuationChangedContact.forward_flip_two_novelty
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
       candy, hentryOld, hrouteSplit, hOldTail,
       hApproachReplay, hApproachGrooved,
-      hApproachForeign, hentryBranch,
+      hApproachForeign, hentryBranch, _hmouthStem,
       hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
       hRpaths, _hCandy, hCandyForeignNew, hLobe, hreach⟩ :=
-    PartialSecondRunSharp.partial_first_forward_contact_active_lead
+    partial_first_forward_contact_active_lead
       (A := ManufacturedReflector.flip R) C.split C.full_simple
       C.approach_trace C.old_grooves C.arrive_eq C.changed
       C.oriented_mem C.oriented_groove C.oriented_switch
@@ -601,253 +487,9 @@ theorem SimpleContinuationChangedContact.forward_flip_two_novelty
     obtain ⟨fresh, hfresh, hmem⟩ := hone
     exact ⟨fresh, by omega, hmem⟩
 
-/-- A forward first-changing contact into a stay reflector is trapped in a
-literal two-phase orbit. -/
-theorem SimpleContinuationChangedContact.forward_stay_two_phase_tail
-    {w : Wiring} {g e : Nat}
-    {R : ManufacturedStayReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.stay R))
-    {repaired : Tongues}
-    (hforward : C.x = C.oriented.2)
-    (hrepair : arrive C.nextState C.oriented.1 =
-      (C.oriented.2, repaired))
-    (hrestored : arrive repaired C.oriented.2 =
-      (C.oriented.1, repaired)) :
-    ∃ outside mouth,
-      stepN w (C.approach.length + 1)
-        (e, (ManufacturedReflector.stay R).activatedState) =
-          some (outside,
-            flipAt C.contactState (mouth / 3)) ∧
-      ∀ d, ∃ port phase,
-        stepN w d
-          (outside, flipAt C.contactState (mouth / 3)) =
-            some (port, phase) ∧
-        (phase = flipAt C.contactState (mouth / 3) ∨
-          phase = C.contactState) := by
-  obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
-      candy, hentryOld, hrouteSplit, hOldTail,
-      hApproachReplay, hApproachGrooved,
-      hApproachForeign, hentryBranch,
-      hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
-      hRpaths, hCandy, hCandyForeign, hLobe, hreach⟩ :=
-    PartialSecondRunSharp.partial_first_forward_contact_active_lead
-      (A := ManufacturedReflector.stay R) C.split C.full_simple
-      C.approach_trace C.old_grooves C.arrive_eq C.changed
-      C.oriented_mem C.oriented_groove C.oriented_switch
-      hforward hrepair hrestored
-  let k := mouth / 3
-  let alternate := flipAt C.contactState k
-  have hCandyFlip : PassagesGrooved alternate candy := by
-    dsimp [alternate, k]
-    exact grooved_after_flip_other hCandy hCandyForeign
-  have hOldRoute :=
-    (ManufacturedReflector.stay R).orientedRoute_trace
-      C.contactState hRpaths
-  have hOldSimple :=
-    (ManufacturedReflector.stay R).orientedRoute_simple C.contactState
-  have hOldGrooved := hOldRoute.grooved_of_switchSimple hOldSimple
-  have hOldForward : arrive C.contactState entry =
-      (mouth, C.contactState) :=
-    groove_forward (hOldGrooved (entry, mouth) hentryOld)
-  have hentryMouthSwitch : entry / 3 = mouth / 3 := by
-    have hswitch := arrive_exit_switch C.contactState entry
-    rw [hOldForward] at hswitch
-    exact hswitch.symm
-  have hallAfter : ∀ d, ∃ port phase,
-      stepN w d (outside, alternate) = some (port, phase) ∧
-      (phase = alternate ∨ phase = C.contactState) := by
-    change (entry, mouth) ∈ R.runway ++ [(R.mouth, R.arm)] at hentryOld
-    rcases List.mem_append.mp hentryOld with hrunway | hcore
-    · obtain ⟨before, after, hsplit⟩ := List.append_of_mem hrunway
-      obtain ⟨D, hDpaths, hAvoid⟩ :=
-        R.suffix_after_runway_passage C.contactState hRpaths
-          hsplit hmouthLink
-      have hAvoid' :
-          (LocalAction.flip k).Avoids D.toSupported.paths := by
-        dsimp [k]
-        simpa [hentryMouthSwitch] using hAvoid
-      have hDalt : PathGrooves D.toSupported.paths alternate := by
-        dsimp [alternate]
-        exact hDpaths.after_avoiding_action hAvoid'
-      let dTravel := D.toSupported.travel
-      let lTravel := candy.length + 2
-      have hDaltEnd :
-          stepN w dTravel (outside, alternate) =
-            some (mouth, alternate) := by
-        dsimp [dTravel]
-        exact (D.toSupported.run alternate hDalt).1
-      have hDstateEnd :
-          stepN w dTravel (outside, C.contactState) =
-            some (mouth, C.contactState) := by
-        dsimp [dTravel]
-        exact (D.toSupported.run C.contactState hDpaths).1
-      have hDaltPhase : ∀ d, d ≤ dTravel → ∃ port phase,
-          stepN w d (outside, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        obtain ⟨port, hrun⟩ := D.travel_state_stepN alternate hDalt (by
-          simpa [dTravel, ManufacturedReflector.toSupported,
-            ManufacturedStayReflector.toSupported] using hd)
-        exact ⟨port, alternate, hrun, Or.inl rfl⟩
-      have hDstatePhase : ∀ d, d ≤ dTravel → ∃ port phase,
-          stepN w d (outside, C.contactState) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        obtain ⟨port, hrun⟩ :=
-          D.travel_state_stepN C.contactState hDpaths (by
-            simpa [dTravel, ManufacturedReflector.toSupported,
-              ManufacturedStayReflector.toSupported] using hd)
-        exact ⟨port, C.contactState, hrun, Or.inr rfl⟩
-      have hReverseEnd :
-          stepN w lTravel (mouth, alternate) =
-            some (outside, C.contactState) := by
-        have h := (hLobe alternate hCandyFlip).1
-        change stepN w lTravel (mouth, alternate) =
-          some (outside, flipAt alternate k) at h
-        dsimp [alternate] at h
-        simpa [flipAt_flipAt] using h
-      have hForwardEnd :
-          stepN w lTravel (mouth, C.contactState) =
-            some (outside, alternate) := by
-        have h := (hLobe C.contactState hCandy).1
-        simpa [lTravel, alternate, k] using h
-      have hReversePhase : ∀ d, d ≤ lTravel → ∃ port phase,
-          stepN w d (mouth, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        dsimp [alternate, k]
-        exact explicit_lobe_reverse_travel_two_phase
-          hentryBranch hentryMouthSwitch hfullGrooved hfullTrace
-          hcrossed hCandyForeign hmouthLink
-          (by simpa [lTravel] using hd)
-      have hForwardPhase : ∀ d, d ≤ lTravel → ∃ port phase,
-          stepN w d (mouth, C.contactState) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        obtain ⟨port, phase, hrun, hphase⟩ :=
-          explicit_lobe_travel_two_phase
-            hfullGrooved hfullTrace hcrossed hmouthLink
-            (by simpa [lTravel] using hd)
-        refine ⟨port, phase, hrun, ?_⟩
-        dsimp [alternate, k]
-        rcases hphase with h | h
-        · exact Or.inr h
-        · exact Or.inl h
-      let half := dTravel + lTravel
-      have hHalfAlt : stepN w half (outside, alternate) =
-          some (outside, C.contactState) := by
-        dsimp [half]
-        rw [stepN_add, hDaltEnd]
-        exact hReverseEnd
-      have hHalfState : stepN w half (outside, C.contactState) =
-          some (outside, alternate) := by
-        dsimp [half]
-        rw [stepN_add, hDstateEnd]
-        exact hForwardEnd
-      have hHalfAltPhase : ∀ d, d ≤ half → ∃ port phase,
-          stepN w d (outside, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        exact stay_twoPhase_concat
-          hDaltEnd hDaltPhase hReversePhase d
-          (by simpa [half] using hd)
-      have hHalfStatePhase : ∀ d, d ≤ half → ∃ port phase,
-          stepN w d (outside, C.contactState) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        exact stay_twoPhase_concat
-          hDstateEnd hDstatePhase hForwardPhase d
-          (by simpa [half] using hd)
-      let period := half + half
-      have hperiod : stepN w period (outside, alternate) =
-          some (outside, alternate) := by
-        dsimp [period]
-        rw [stepN_add, hHalfAlt]
-        exact hHalfState
-      have hwindow : ∀ d, d ≤ period → ∃ port phase,
-          stepN w d (outside, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        exact stay_twoPhase_concat
-          hHalfAlt hHalfAltPhase hHalfStatePhase d
-          (by simpa [period] using hd)
-      have hpositive : 0 < period := by
-        have hdpos := (ManufacturedReflector.stay D).travel_pos
-        dsimp [period, half, dTravel, lTravel]
-        omega
-      exact periodic_two_phase_prefix_tongues
-        hpositive hperiod hwindow
-    · simp only [List.mem_singleton] at hcore
-      have hentryEq : entry = R.mouth := congrArg Prod.fst hcore
-      have hmouthEq : mouth = R.arm := congrArg Prod.snd hcore
-      subst entry
-      subst mouth
-      have houtsideEq : outside = R.arm := by
-        rw [R.selfLink] at hmouthLink
-        exact (Option.some.inj hmouthLink).symm
-      subst outside
-      let lTravel := candy.length + 2
-      have hReverseEnd :
-          stepN w lTravel (R.arm, alternate) =
-            some (R.arm, C.contactState) := by
-        have h := (hLobe alternate hCandyFlip).1
-        change stepN w lTravel (R.arm, alternate) =
-          some (R.arm, flipAt alternate k) at h
-        dsimp [alternate] at h
-        simpa [flipAt_flipAt] using h
-      have hForwardEnd :
-          stepN w lTravel (R.arm, C.contactState) =
-            some (R.arm, alternate) := by
-        have h := (hLobe C.contactState hCandy).1
-        simpa [lTravel, alternate, k] using h
-      have hReversePhase : ∀ d, d ≤ lTravel → ∃ port phase,
-          stepN w d (R.arm, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        dsimp [alternate, k]
-        exact explicit_lobe_reverse_travel_two_phase
-          hentryBranch hentryMouthSwitch hfullGrooved hfullTrace
-          hcrossed hCandyForeign hmouthLink
-          (by simpa [lTravel] using hd)
-      have hForwardPhase : ∀ d, d ≤ lTravel → ∃ port phase,
-          stepN w d (R.arm, C.contactState) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        obtain ⟨port, phase, hrun, hphase⟩ :=
-          explicit_lobe_travel_two_phase
-            hfullGrooved hfullTrace hcrossed hmouthLink
-            (by simpa [lTravel] using hd)
-        refine ⟨port, phase, hrun, ?_⟩
-        dsimp [alternate, k]
-        rcases hphase with h | h
-        · exact Or.inr h
-        · exact Or.inl h
-      let period := lTravel + lTravel
-      have hperiod : stepN w period (R.arm, alternate) =
-          some (R.arm, alternate) := by
-        dsimp [period]
-        rw [stepN_add, hReverseEnd]
-        exact hForwardEnd
-      have hwindow : ∀ d, d ≤ period → ∃ port phase,
-          stepN w d (R.arm, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        exact stay_twoPhase_concat
-          hReverseEnd hReversePhase hForwardPhase d
-          (by simpa [period] using hd)
-      have hpositive : 0 < period := by
-        dsimp [period, lTravel]
-        omega
-      exact periodic_two_phase_prefix_tongues
-        hpositive hperiod hwindow
-  refine ⟨outside, mouth, ?_, ?_⟩
-  · simpa [alternate, k] using hreach
-  · simpa [alternate] using hallAfter
-
 /-- The stay-forward branch contributes no vector beyond the contact pre/post
 vectors already stored in `compressedLead`. -/
-theorem SimpleContinuationChangedContact.forward_stay_zero_novelty
+theorem PartialSecondRunSharp.ChangedContact.forward_stay_zero_novelty
     {w : Wiring} {N g e : Nat}
     {R : ManufacturedStayReflector w g e}
     (C : SimpleContinuationChangedContact w
@@ -910,7 +552,7 @@ theorem SimpleContinuationChangedContact.forward_stay_zero_novelty
 /-- Every first-changing contact of an arbitrary simple continuation has at
 most two post-contact novelty vectors.  Backward contacts are exact retrace
 lassos; forward contacts are the stay/flip splices above. -/
-theorem SimpleContinuationChangedContact.changed_two_novelty
+theorem PartialSecondRunSharp.ChangedContact.changed_two_novelty
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : SimpleContinuationChangedContact w A)

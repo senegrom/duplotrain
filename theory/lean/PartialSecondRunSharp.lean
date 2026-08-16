@@ -130,10 +130,7 @@ structure ChangedContact
   suffix : List Passage
   contactState : Tongues
   nextState : Tongues
-  path : List Passage
-  old : Passage
   oriented : Passage
-  full_trace : PhysicalTrace w (e, A.activatedState) full finish
   full_simple : SwitchSimple full
   split : full = approach ++ (p, x) :: suffix
   approach_trace :
@@ -142,9 +139,6 @@ structure ChangedContact
     PhysicalTrace w (p, contactState) ((p, x) :: suffix) finish
   old_grooves : PathGrooves A.toSupported.paths contactState
   arrive_eq : arrive contactState p = (x, nextState)
-  path_mem : path ∈ A.toSupported.paths
-  old_mem : old ∈ path
-  old_switch : passageSwitch old = p / 3
   changed : nextState (p / 3) ≠ contactState (p / 3)
   oriented_mem : oriented ∈ A.orientedRoute contactState
   oriented_groove :
@@ -194,19 +188,13 @@ theorem ManufacturedReflector.changedContact_of_broken_simple
     suffix := suffix
     contactState := u
     nextState := v
-    path := path
-    old := old
     oriented := oriented
-    full_trace := htrace
     full_simple := hsimple
     split := hsplit
     approach_trace := happroach
     suffix_trace := hafter
     old_grooves := hgrooves
     arrive_eq := harrive
-    path_mem := hpath
-    old_mem := hold
-    old_switch := hswitch
     changed := hchanged
     oriented_mem := horiented
     oriented_groove := horientedGroove
@@ -293,195 +281,6 @@ theorem ChangedContact.next_mem_history
   apply List.mem_append_right
   simp
 
-/-- The completed-reflector forward-splice construction only used the
-second reflector to supply a switch-simple route.  This is the same lemma
-with that route supplied directly, so it applies to a partial second run. -/
-theorem partial_first_forward_contact_active_lead
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {route approach : List Passage} {p x : Nat}
-    {suffix : List Passage} {startState u v : Tongues}
-    {oriented : Passage} {repaired : Tongues}
-    (hsplit : route = approach ++ (p, x) :: suffix)
-    (hfullSimple : SwitchSimple route)
-    (happroach :
-      PhysicalTrace w (e, startState) approach (p, u))
-    (hpaths : PathGrooves A.toSupported.paths u)
-    (harrive : arrive u p = (x, v))
-    (hchanged : v (p / 3) ≠ u (p / 3))
-    (horiented : oriented ∈ A.orientedRoute u)
-    (horientedGroove : arrive u oriented.2 = (oriented.1, u))
-    (horientedSwitch : passageSwitch oriented = p / 3)
-    (hforward : x = oriented.2)
-    (hrepair : arrive v oriented.1 = (oriented.2, repaired))
-    (hrestored :
-      arrive repaired oriented.2 = (oriented.1, repaired)) :
-    ∃ (entry mouth returnPort outside : Nat)
-        (oldPrefix oldTail candy : List Passage),
-      (entry, mouth) ∈ A.orientedRoute u ∧
-      A.orientedRoute u = oldPrefix ++ (entry, mouth) :: oldTail ∧
-      PhysicalTrace w (outside, u) oldTail (A.orientedFinish u, u) ∧
-      PhysicalTrace w (e, u) approach (returnPort, u) ∧
-      PassagesGrooved u approach ∧
-      (∀ passage ∈ approach, passageSwitch passage ≠ mouth / 3) ∧
-      entry % 3 ≠ 0 ∧
-      w.link mouth = some outside ∧
-      entry ≠ returnPort ∧
-      PassagesGrooved u ((mouth, entry) :: candy) ∧
-      PhysicalTrace w (mouth, u) ((mouth, entry) :: candy)
-        (returnPort, u) ∧
-      arrive u returnPort = (mouth, flipAt u (mouth / 3)) ∧
-      PathGrooves A.toSupported.paths u ∧
-      PassagesGrooved u candy ∧
-      (∀ passage ∈ candy, passageSwitch passage ≠ mouth / 3) ∧
-      IsReflector w mouth outside (candy.length + 2)
-        (fun state => PassagesGrooved state candy)
-        (fun state => flipAt state (mouth / 3)) ∧
-      stepN w (approach.length + 1) (e, startState) =
-        some (outside, flipAt u (mouth / 3)) := by
-  rcases oriented with ⟨a, s⟩
-  simp only at horiented horientedGroove hforward hrepair hrestored
-  subst x
-  obtain ⟨hpBranch, hsEq, _hv⟩ :=
-    changed_arrival_is_trailing harrive hchanged
-  have hsStem : s % 3 = 0 := by
-    rw [hsEq]
-    omega
-  have hsp : s / 3 = p / 3 := by
-    rw [hsEq]
-    omega
-  have hsa : s / 3 = a / 3 := by
-    have hswitch := arrive_exit_switch u s
-    rw [horientedGroove] at hswitch
-    exact hswitch.symm
-  have haBranch : a % 3 ≠ 0 := by
-    have haEq : branchPort (s / 3) (u (s / 3)) = a := by
-      unfold arrive at horientedGroove
-      rw [if_pos hsStem] at horientedGroove
-      exact congrArg Prod.fst horientedGroove
-    intro haStem
-    cases hu : u (s / 3) <;>
-      simp [branchPort, hu] at haEq <;> omega
-  have hap : a ≠ p := by
-    intro hEq
-    subst p
-    have holdForward := groove_forward horientedGroove
-    rw [harrive] at holdForward
-    have huv : v = u := congrArg Prod.snd holdForward
-    apply hchanged
-    rw [huv]
-  obtain ⟨oldPrefix, oldTail, hrouteSplit⟩ :=
-    List.append_of_mem horiented
-  have hroute := A.orientedRoute_trace u hpaths
-  have hrouteSimple := A.orientedRoute_simple u
-  have hrouteGrooved := hroute.grooved_of_switchSimple hrouteSimple
-  have hOldPrefixData := simple_grooved_trace_prefix_to_occurrence
-    hroute hrouteSplit hrouteGrooved hrouteSimple
-  have hOldPrefixGrooved : PassagesGrooved u oldPrefix := by
-    intro passage hp
-    exact hrouteGrooved passage (by
-      rw [hrouteSplit]
-      exact List.mem_append_left _ hp)
-  have hApproachSimple : SwitchSimple approach := by
-    have hsimple := hfullSimple
-    unfold SwitchSimple at hsimple ⊢
-    rw [hsplit] at hsimple
-    simp only [List.map_append, List.map_cons] at hsimple
-    exact (List.nodup_append.mp hsimple).1
-  have hApproachGrooved : PassagesGrooved u approach :=
-    happroach.grooved_of_switchSimple hApproachSimple
-  have hApproachForeign :
-      ∀ passage ∈ approach, passageSwitch passage ≠ p / 3 := by
-    have hsimple := hfullSimple
-    unfold SwitchSimple at hsimple
-    rw [hsplit] at hsimple
-    simp only [List.map_append, List.map_cons] at hsimple
-    have hparts := List.nodup_append.mp hsimple
-    intro passage hp hEq
-    have hne := hparts.2.2 (passageSwitch passage)
-      (List.mem_map.mpr ⟨passage, hp, rfl⟩)
-      (passageSwitch (p, s)) (by simp)
-    exact hne (by simpa [passageSwitch] using hEq)
-  let candy := reversePassages oldPrefix ++ approach
-  have hCandyGrooved : PassagesGrooved u candy := by
-    intro passage hp
-    rcases List.mem_append.mp hp with hold | hnew
-    · exact reversePassages_grooved
-        hOldPrefixGrooved passage hold
-    · exact hApproachGrooved passage hnew
-  have hCandyForeign :
-      ∀ passage ∈ candy, passageSwitch passage ≠ s / 3 := by
-    intro passage hp
-    rcases List.mem_append.mp hp with hold | hnew
-    · have hmapped : passageSwitch passage ∈
-          (reversePassages oldPrefix).map passageSwitch :=
-        List.mem_map.mpr ⟨passage, hold, rfl⟩
-      have hmap := map_passageSwitch_reversePassages hOldPrefixData.1
-      rw [hmap] at hmapped
-      have horiginal : passageSwitch passage ∈
-          oldPrefix.map passageSwitch := List.mem_reverse.mp hmapped
-      obtain ⟨old, holdMem, holdEq⟩ := List.mem_map.mp horiginal
-      intro hmouth
-      apply hOldPrefixData.2 old holdMem
-      exact holdEq.trans (hmouth.trans hsa)
-    · intro hmouth
-      apply hApproachForeign passage hnew
-      exact hmouth.trans hsp
-  have hback := physicalTrace_contact_retraces_prefix
-    hOldPrefixData.1 hOldPrefixGrooved A.entryEdge horientedGroove
-  have hforwardTrace := happroach.replay_grooved u hApproachGrooved
-  have hsplice :
-      PhysicalTrace w (s, u) ((s, a) :: candy) (p, u) := by
-    simpa [candy, List.append_assoc] using
-      hback.append hforwardTrace
-  have hSpliceGrooved : PassagesGrooved u ((s, a) :: candy) := by
-    intro passage hpassage
-    rcases List.mem_cons.mp hpassage with hhead | htail
-    · simpa [hhead] using groove_forward horientedGroove
-    · exact hCandyGrooved passage htail
-  have hroute' := hroute
-  rw [hrouteSplit] at hroute'
-  obtain ⟨middle, hOldBefore, hOldAfter⟩ := hroute'.split_append
-  have hMiddle : middle = (a, u) := by
-    have h₁ := hOldBefore.sound
-    have h₂ := hOldPrefixData.1.sound
-    rw [h₂] at h₁
-    exact (Option.some.inj h₁).symm
-  subst middle
-  cases hOldAfter with
-  | @cons _ _ outside _ oldAfter _ _ hOldArrive hmouth hOldRest =>
-      have hOldAfterState : oldAfter = u := by
-        have hforwardOld := groove_forward horientedGroove
-        rw [hOldArrive] at hforwardOld
-        exact congrArg Prod.snd hforwardOld
-      subst oldAfter
-      have hflip : v = flipAt u (s / 3) := by
-        have hv := changed_arrival_eq_flipAt harrive hchanged
-        simpa [hsp] using hv
-      have hone : stepN w 1 (p, u) = some (outside, v) := by
-        simp [stepN, step, harrive, hmouth]
-      have hreach :
-          stepN w (approach.length + 1) (e, startState) =
-            some (outside, flipAt u (s / 3)) := by
-        rw [stepN_add, happroach.sound]
-        simp only [Option.bind_some]
-        rw [hone, hflip]
-      have hcrossed : arrive u p =
-          (s, flipAt u (s / 3)) := by
-        rw [harrive, hflip]
-      refine ⟨a, s, p, outside, oldPrefix, oldTail,
-        candy, horiented, hrouteSplit, hOldRest,
-        hforwardTrace, hApproachGrooved,
-        (by
-          intro passage hpassage
-          simpa [hsp] using hApproachForeign passage hpassage),
-        haBranch, hmouth, hap, hSpliceGrooved,
-        hsplice, hcrossed, hpaths, hCandyGrooved,
-        hCandyForeign, ?_, hreach⟩
-      exact stem_lobe_isReflector_foreign w candy
-        hsStem haBranch hpBranch hsa hsp hap hCandyForeign
-        hsplice.linked hsplice.last_link hmouth
-
 /-- Exact two-phase tail after a changed forward contact with a stay
 reflector, generalized to an arbitrary switch-simple partial route. -/
 theorem ChangedContact.forward_stay_two_phase_tail
@@ -507,7 +306,7 @@ theorem ChangedContact.forward_stay_two_phase_tail
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
       candy, hentryOld, hrouteSplit, hOldTail,
       _hApproachReplay, hApproachGrooved,
-      hApproachForeign, hentryBranch,
+      hApproachForeign, hentryBranch, _hmouthStem,
       hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
       hRpaths, hCandy, hCandyForeign, hLobe, hreach⟩ :=
     partial_first_forward_contact_active_lead

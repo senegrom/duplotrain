@@ -33,30 +33,6 @@ def selectedBranch (u : Tongues) (C : Nat) : Nat :=
   branchPort C (u C)
 
 
-private theorem productive_step_configs
-    {w : Wiring} {N : Nat} {start : Nat × Tongues} {k : Nat}
-    (hprod : RawProductiveAt w N start k) :
-    ∃ cur next,
-      stepN w k start = some cur ∧
-      stepN w (k+1) start = some next ∧
-      step w cur = some next := by
-  cases hnext : stepN w (k+1) start with
-  | none =>
-      have hlive := hprod.1
-      simp [hnext] at hlive
-  | some next =>
-      have hsplit := stepN_add w k 1 start
-      rw [hnext] at hsplit
-      cases hcur : stepN w k start with
-      | none => simp [hcur] at hsplit
-      | some cur =>
-          rw [hcur] at hsplit
-          have hone : stepN w 1 cur = some next := by
-            simpa using hsplit.symm
-          have hstep : step w cur = some next := by
-            simpa [stepN] using hone
-          exact ⟨cur, next, rfl, rfl, hstep⟩
-
 /-- Any successful successor time exposes the corresponding one-step raw
 transition. -/
 theorem live_successor_configs
@@ -126,7 +102,7 @@ theorem rawProductiveAt_changes_writer
       step w cur = some next ∧
       next.2 (cur.1/3) ≠ cur.2 (cur.1/3) := by
   obtain ⟨cur, next, hcur, hnext, hstep⟩ :=
-    productive_step_configs hprod
+    live_successor_configs hprod.1
   have hparts := step_some_parts hstep
   have hwriterLt : cur.1/3 < N := by
     have hraw : rawWriterAt w start k = cur.1/3 := by

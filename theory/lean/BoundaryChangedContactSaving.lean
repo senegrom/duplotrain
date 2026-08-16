@@ -62,7 +62,7 @@ theorem ManufacturedFlipReflector.reserved_ne_action
 is approach-first-written, and the boundary switch is exploration-absent,
 then reusable support, approach writers, action, and boundary occupy
 pairwise distinct ambient coordinates. -/
-theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_action_add_reserved_le
+theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_action_add_reserved_le
     {w : Wiring} {N g e k0 : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -131,14 +131,14 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
     rcases List.mem_append.mp hm with hold | hfresh
     · exact R.action_not_mem_reusable_changedContact hold
     · apply habsent
-      simpa [SimpleContinuationChangedContact.approachFirstWriterSwitches,
+      simpa [PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches,
         writers, times] using hfresh
   have hreservedNotOccupied : Not (k0 ∈ occupied) := by
     intro hm
     rcases List.mem_append.mp hm with hold | hfresh
     · exact R.reserved_not_mem_reusable hreservedExploration hold
     · apply hreservedApproach
-      simpa [SimpleContinuationChangedContact.approachFirstWriterSwitches,
+      simpa [PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches,
         writers, times] using hfresh
   have hactionCons : (R.actionSwitch :: occupied).Nodup := by
     rw [List.nodup_cons]
@@ -175,7 +175,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
 
 /-- Reserving both the action and boundary coordinates lowers the
 changed-contact compressed lead from `N+2` to `N+1`. -/
-theorem SimpleContinuationChangedContact.compressedLead_length_le_N_add_one_of_action_and_reserved_absent
+theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le_N_add_one_of_action_and_reserved_absent
     {w : Wiring} {N g e k0 : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -204,7 +204,7 @@ theorem SimpleContinuationChangedContact.compressedLead_length_le_N_add_one_of_a
   have hcharge :=
     C.reusable_add_approach_writers_add_action_add_reserved_le
       hN hA habsent hk0 hreservedExploration hreservedApproach
-  unfold SimpleContinuationChangedContact.compressedLead
+  unfold PartialSecondRunSharp.ChangedContact.compressedLead
   rw [List.length_append, List.length_append,
     List.length_erase_of_mem hboundary,
     (ManufacturedReflector.flip R).sharpHistoryCore_length]
@@ -217,7 +217,7 @@ first-writes neither the omitted action switch nor the exploration-absent
 boundary switch, the whole original run of a forward-flip changed contact
 carries at most `N+3` distinct restricted tongue vectors — one unit inside
 the unconditional `N+4`, exactly the room the productive boundary needs. -/
-theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three_of_action_and_reserved_absent
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_three_of_action_and_reserved_absent
     {w : Wiring} {N g e k0 : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -260,7 +260,7 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three
     refine ⟨fresh, hfresh, ?_⟩
     intro k hk
     by_cases hfirst : k <= firstTravel
-    · unfold SimpleContinuationChangedContact.compressedLead
+    · unfold PartialSecondRunSharp.ChangedContact.compressedLead
       apply List.mem_append_left
       apply List.mem_append_left
       apply (ManufacturedReflector.flip R).mem_sharpHistoryCore_of_mem
@@ -310,7 +310,7 @@ theorem PartialSecondRunSharp.ChangedContact.stay_saving_all_run_distinct_le_N_a
       (restrictedTonguesAt w N
         (g, (ManufacturedReflector.stay R).baseState))).Nodup) :
     times.length <= N + 3 := by
-  let S := C.toSimpleContinuationChangedContact
+  let S := C
   rcases C.direction with hbackward |
       ⟨hforward, repaired, hrepair, hrestored⟩
   · have hbackwardS : S.x = S.oriented.1 := by
@@ -352,11 +352,11 @@ theorem PartialSecondRunSharp.ChangedContact.flip_saving_le_N_add_three_or_appro
         (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
     times.length <= N + 3 \/
       R.actionSwitch ∈
-        C.toSimpleContinuationChangedContact.approachFirstWriterSwitches N \/
+        C.approachFirstWriterSwitches N \/
       k0 ∈
-        C.toSimpleContinuationChangedContact.approachFirstWriterSwitches N := by
+        C.approachFirstWriterSwitches N := by
   classical
-  let S := C.toSimpleContinuationChangedContact
+  let S := C
   by_cases haction : R.actionSwitch ∈
       S.approachFirstWriterSwitches N
   · exact Or.inr (Or.inl haction)

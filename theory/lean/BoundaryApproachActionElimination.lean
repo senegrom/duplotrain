@@ -18,7 +18,7 @@ namespace GeneralN
 support and from productive first writers in the strict approach, it supplies
 one ambient coordinate independently of whether the old action is itself an
 approach writer. -/
-theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_reserved_le
+theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_reserved_le
     {w : Wiring} {N g e k0 : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -85,7 +85,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_reser
     rcases List.mem_append.mp hm with hold | hfresh
     · exact R.reserved_not_mem_reusable hreservedExploration hold
     · apply hreservedApproach
-      simpa [SimpleContinuationChangedContact.approachFirstWriterSwitches,
+      simpa [PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches,
         writers, times] using hfresh
   have hallNodup : (k0 :: occupied).Nodup := by
     rw [List.nodup_cons]
@@ -112,7 +112,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_reser
 
 /-- Reserving the boundary coordinate alone bounds the changed-contact
 compressed lead by `N+2`, even when the old action is approach-written. -/
-theorem SimpleContinuationChangedContact.compressedLead_length_le_N_add_two_of_reserved_absent
+theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le_N_add_two_of_reserved_absent
     {w : Wiring} {N g e k0 : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -139,7 +139,7 @@ theorem SimpleContinuationChangedContact.compressedLead_length_le_N_add_two_of_r
   have hcharge :=
     C.reusable_add_approach_writers_add_reserved_le
       hN hA hk0 hreservedExploration hreservedApproach
-  unfold SimpleContinuationChangedContact.compressedLead
+  unfold PartialSecondRunSharp.ChangedContact.compressedLead
   rw [List.length_append, List.length_append,
     List.length_erase_of_mem hboundary,
     (ManufacturedReflector.flip R).sharpHistoryCore_length]
@@ -149,7 +149,7 @@ theorem SimpleContinuationChangedContact.compressedLead_length_le_N_add_two_of_r
 
 /-- A one-novelty changed-contact tail plus the boundary-reserved `N+2`
 compressed lead gives the required `N+3` global bound. -/
-theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three_of_one_novelty_and_reserved_absent
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_three_of_one_novelty_and_reserved_absent
     {w : Wiring} {N g e k0 : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -199,7 +199,7 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three
     refine ⟨fresh, hfresh, ?_⟩
     intro k hk
     by_cases hfirst : k <= firstTravel
-    · unfold SimpleContinuationChangedContact.compressedLead
+    · unfold PartialSecondRunSharp.ChangedContact.compressedLead
       apply List.mem_append_left
       apply List.mem_append_left
       apply (ManufacturedReflector.flip R).mem_sharpHistoryCore_of_mem
@@ -224,7 +224,7 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three
 first-written, every changed contact already fits `N+3`.  If the old action is
 first-written, the one-novelty tail and impossibility of the runway residual
 replace the action-coordinate reserve. -/
-theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three_of_reserved_absent
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_three_of_reserved_absent
     {w : Wiring} {N g e k0 : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -268,7 +268,7 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three
         hN hA haction hk0 hreservedExploration hreservedApproach
         times hlive hnd
 
-theorem SimpleContinuationChangedContact.stem_switch_not_mem_approachFirstWriterSwitches
+theorem PartialSecondRunSharp.ChangedContact.stem_switch_not_mem_approachFirstWriterSwitches
     {w : Wiring} {N g e k0 : Nat}
     {R : ManufacturedFlipReflector w g e}
     (C : SimpleContinuationChangedContact w
@@ -276,7 +276,7 @@ theorem SimpleContinuationChangedContact.stem_switch_not_mem_approachFirstWriter
     (hstem : e = 3 * k0) :
     Not (k0 ∈ C.approachFirstWriterSwitches N) := by
   intro hm
-  unfold SimpleContinuationChangedContact.approachFirstWriterSwitches at hm
+  unfold PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches at hm
   obtain ⟨k, hk, hwriter⟩ := List.mem_map.mp hm
   have hkData := mem_rawFirstWriterTimes_iff.mp hk
   have hklt : k < C.approach.length := hkData.1
@@ -338,7 +338,7 @@ theorem SimpleContinuationChangedContact.stem_switch_not_mem_approachFirstWriter
 /-- In the productive-boundary geometry, the shifted run starts at the stem of
 the reserved switch.  Switch simplicity therefore makes the boundary reserve
 automatic, and every changed-contact branch is at most `N+3`. -/
-theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_three_of_stem_reserved
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_three_of_stem_reserved
     {w : Wiring} {N g e k0 : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)

@@ -68,40 +68,6 @@ theorem changedContact_local_novelty_count
   have hhistory := C.history_length_le_N_add_three hN hA
   omega
 
-/-- The sharp and terminal-run changed-contact records contain the same
-physical certificate. -/
-def PartialSecondRunSharp.ChangedContact.toSimpleContinuationChangedContact
-    {w : Wiring} {g e : Nat} {A : ManufacturedReflector w g e}
-    (C : PartialSecondRunSharp.ChangedContact w A) :
-    SimpleContinuationChangedContact w A := {
-  full := C.full
-  finish := C.finish
-  approach := C.approach
-  p := C.p
-  x := C.x
-  suffix := C.suffix
-  contactState := C.contactState
-  nextState := C.nextState
-  path := C.path
-  old := C.old
-  oriented := C.oriented
-  full_trace := C.full_trace
-  full_simple := C.full_simple
-  split := C.split
-  approach_trace := C.approach_trace
-  suffix_trace := C.suffix_trace
-  old_grooves := C.old_grooves
-  arrive_eq := C.arrive_eq
-  path_mem := C.path_mem
-  old_mem := C.old_mem
-  old_switch := C.old_switch
-  changed := C.changed
-  oriented_mem := C.oriented_mem
-  oriented_groove := C.oriented_groove
-  oriented_switch := C.oriented_switch
-  direction := C.direction
-}
-
 /-- Every sharp changed contact is bounded by `N+4`.  Backward contacts and
 stay-reflector contacts already have zero local novelty; the flip-reflector
 case is exactly the runway-retrace theorem. -/
@@ -118,7 +84,7 @@ theorem PartialSecondRunSharp.ChangedContact.all_run_distinct_le_N_add_four
     (hnd : (times.map
       (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
     times.length <= N + 4 := by
-  let S := C.toSimpleContinuationChangedContact
+  let S := C
   rcases C.direction with hbackward |
       ⟨hforward, repaired, hrepair, hrestored⟩
   · have hbackwardS : S.x = S.oriented.1 := by

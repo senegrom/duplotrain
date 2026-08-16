@@ -15,41 +15,6 @@ probe decomposition is bounded by N+3 or less, hence by N+4.
 
 namespace GeneralN
 
-/-- The two contact records in the current proof stack carry the same exact
-physical data. This conversion lets the older terminal-run classifier expose
-the canonical PartialSecondRunSharp.ChangedContact residual. -/
-def SimpleContinuationChangedContact.toSharpChangedContact
-    {w : Wiring} {g e : Nat} {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A) :
-    PartialSecondRunSharp.ChangedContact w A := {
-  full := C.full
-  finish := C.finish
-  approach := C.approach
-  p := C.p
-  x := C.x
-  suffix := C.suffix
-  contactState := C.contactState
-  nextState := C.nextState
-  path := C.path
-  old := C.old
-  oriented := C.oriented
-  full_trace := C.full_trace
-  full_simple := C.full_simple
-  split := C.split
-  approach_trace := C.approach_trace
-  suffix_trace := C.suffix_trace
-  old_grooves := C.old_grooves
-  arrive_eq := C.arrive_eq
-  path_mem := C.path_mem
-  old_mem := C.old_mem
-  old_switch := C.old_switch
-  changed := C.changed
-  oriented_mem := C.oriented_mem
-  oriented_groove := C.oriented_groove
-  oriented_switch := C.oriented_switch
-  direction := C.direction
-}
-
 /-- A literal first damaging contact reached after manufacturing one
 reflector from the original known-edge start. -/
 structure KnownEdgeChangedContact
@@ -140,7 +105,7 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
                 A := C.A
                 grooves := C.grooves
                 base := C.base
-                contact := C.contact.toSharpChangedContact
+                contact := C.contact
               }⟩
         | some secondFinish =>
             rcases first_activated_trace_outcome_sharp_partial

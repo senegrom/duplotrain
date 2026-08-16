@@ -105,7 +105,7 @@ theorem PhysicalTrace.no_strict_return_to_start_port
 
 /-- Productive first-writer coordinates in the strict approach to the first
 support-changing contact. -/
-noncomputable def SimpleContinuationChangedContact.approachFirstWriterSwitches
+noncomputable def PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : SimpleContinuationChangedContact w A) (N : Nat) : List Nat :=
@@ -133,7 +133,7 @@ theorem ManufacturedFlipReflector.action_not_mem_reusable_changedContact
 /-- If the strict approach does not first-write the omitted action switch,
 then reusable support, approach writers, and that reserved switch occupy
 pairwise distinct ambient coordinates. -/
-theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_action_le
+theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_action_le
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -197,7 +197,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
     rcases List.mem_append.mp hm with hold | hfresh
     · exact R.action_not_mem_reusable_changedContact hold
     · apply habsent
-      simpa [SimpleContinuationChangedContact.approachFirstWriterSwitches,
+      simpa [PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches,
         writers, times] using hfresh
   have hallNodup : (R.actionSwitch :: occupied).Nodup := by
     rw [List.nodup_cons]
@@ -224,7 +224,7 @@ theorem SimpleContinuationChangedContact.reusable_add_approach_writers_add_actio
 
 /-- Reserving the flip action coordinate lowers the changed-contact history
 from `N+3` to `N+2`. -/
-theorem SimpleContinuationChangedContact.compressedLead_length_le_N_add_two_of_action_absent
+theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le_N_add_two_of_action_absent
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -247,7 +247,7 @@ theorem SimpleContinuationChangedContact.compressedLead_length_le_N_add_two_of_a
       tonguesAt, stepN]
   have hcharge :=
     C.reusable_add_approach_writers_add_action_le hN hA habsent
-  unfold SimpleContinuationChangedContact.compressedLead
+  unfold PartialSecondRunSharp.ChangedContact.compressedLead
   rw [List.length_append, List.length_append,
     List.length_erase_of_mem hboundary,
     (ManufacturedReflector.flip R).sharpHistoryCore_length]
@@ -259,7 +259,7 @@ theorem SimpleContinuationChangedContact.compressedLead_length_le_N_add_two_of_a
 productively first-write the old reflector's omitted action coordinate, the
 existing two-corner Gray-tail theorem closes the entire original run at
 `N+4`. -/
-theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_four_of_action_absent
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_four_of_action_absent
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -297,7 +297,7 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_four_
     refine ⟨fresh, hfresh, ?_⟩
     intro k hk
     by_cases hfirst : k <= firstTravel
-    · unfold SimpleContinuationChangedContact.compressedLead
+    · unfold PartialSecondRunSharp.ChangedContact.compressedLead
       apply List.mem_append_left
       apply List.mem_append_left
       apply (ManufacturedReflector.flip R).mem_sharpHistoryCore_of_mem
@@ -321,7 +321,7 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_four_
 
 /-- A one-novelty local tail after the changed contact is exactly enough for
 the existing `N+3` compressed lead to give a global `N+4` bound. -/
-theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_four_of_one_novelty
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_four_of_one_novelty
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -353,7 +353,7 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_four_
     refine ⟨fresh, hfresh, ?_⟩
     intro k hk
     by_cases hfirst : k <= firstTravel
-    · unfold SimpleContinuationChangedContact.compressedLead
+    · unfold PartialSecondRunSharp.ChangedContact.compressedLead
       apply List.mem_append_left
       apply List.mem_append_left
       apply A.mem_sharpHistoryCore_of_mem
@@ -372,7 +372,7 @@ theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_four_
   have hlength := C.compressedLead_length_le hN hA
   omega
 
-structure SimpleContinuationChangedContact.RunwayNAddFourResidual
+structure PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual
     {w : Wiring} {N g e : Nat}
     (R : ManufacturedFlipReflector w g e)
     (C : SimpleContinuationChangedContact w
@@ -385,7 +385,7 @@ structure SimpleContinuationChangedContact.RunwayNAddFourResidual
 
 /-- A forward changed contact into a flip reflector has a one-novelty tail,
 unless it produces the exact runway Gray-square residual above. -/
-theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_residual
+theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_residual
     {w : Wiring} {N g e : Nat}
     {R : ManufacturedFlipReflector w g e}
     (C : SimpleContinuationChangedContact w
@@ -405,10 +405,10 @@ theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_resi
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
       candy, hentryOld, hrouteSplit, hOldTail,
       hApproachReplay, hApproachGrooved,
-      hApproachForeign, hentryBranch,
+      hApproachForeign, hentryBranch, _hmouthStem,
       hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
       hRpaths, _hCandy, hCandyForeignNew, hLobe, hreach⟩ :=
-    PartialSecondRunSharp.partial_first_forward_contact_active_lead
+    partial_first_forward_contact_active_lead
       (A := ManufacturedReflector.flip R) C.split C.full_simple
       C.approach_trace C.old_grooves C.arrive_eq C.changed
       C.oriented_mem C.oriented_groove C.oriented_switch
@@ -614,7 +614,7 @@ theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_resi
 /-- **Sharp changed-contact frontier.**  For arbitrary `N`, every changed
 support contact is bounded by `N+4` unless it yields the explicit runway
 Gray-square residual.  No completed second reflector is assumed. -/
-theorem SimpleContinuationChangedContact.changed_N_add_four_or_runway_residual
+theorem PartialSecondRunSharp.ChangedContact.changed_N_add_four_or_runway_residual
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -660,7 +660,7 @@ theorem SimpleContinuationChangedContact.changed_N_add_four_or_runway_residual
 strict approach.  Otherwise the post-action vector would persist to the
 contact, and flipping the action bit back would recover the historical
 pre-action vector, contradicting `old_corner_missing`. -/
-theorem SimpleContinuationChangedContact.RunwayNAddFourResidual.exists_later_productive
+theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.exists_later_productive
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -771,7 +771,7 @@ would occur at both time zero and the return time.  But
 `exists_later_productive` places a productive event strictly between the
 action write and the contact, while a pointwise runway retrace has constant
 tongues throughout that whole interval. -/
-theorem SimpleContinuationChangedContact.RunwayNAddFourResidual.impossible
+theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.impossible
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -910,7 +910,7 @@ theorem SimpleContinuationChangedContact.RunwayNAddFourResidual.impossible
 /-- **Unconditional changed-contact `N+4` theorem.**  The only residual of
 the coefficient-one accounting is excluded by the physical old-runway
 retrace above. -/
-theorem SimpleContinuationChangedContact.changed_all_run_distinct_le_N_add_four
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_four
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)

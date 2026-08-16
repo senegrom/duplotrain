@@ -1380,15 +1380,17 @@ theorem ManufacturedReflector.exploration_trace
   | stay R => exact R.runwayTrace.append R.coreTrace
   | flip R => exact R.runwayTrace.append R.candyTrace
 
-/-- The local passage immediately following a manufactured exploration is
-the repeated-switch passage that activates the reflector. -/
-theorem ManufacturedReflector.return_arrive
+/-- The local return passage of either manufactured-reflector constructor
+contacts the retained runway at its mouth and produces the advertised
+activated state. -/
+theorem ManufacturedReflector.return_arrive_mouth
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e) :
-    ∃ exit, arrive A.preReturn.2 A.preReturn.1 =
-      (exit, A.activatedState) := by
+    arrive A.preReturn.2 A.preReturn.1 =
+      (A.mouthConfig.1, A.activatedState) := by
   cases A with
-  | flip R => exact ⟨R.mouth, R.crossed⟩
+  | flip R =>
+      exact R.crossed
   | stay R =>
       obtain ⟨after, hhead⟩ := R.coreTrace.head_arrive.2
       have hsound := R.coreTrace.sound
@@ -1397,7 +1399,16 @@ theorem ManufacturedReflector.return_arrive
         exact hsound
       have hback := arrive_back R.mouthState R.mouth
       rw [hhead, hafter] at hback
-      exact ⟨R.mouth, hback⟩
+      exact hback
+
+/-- The local passage immediately following a manufactured exploration is
+the repeated-switch passage that activates the reflector. -/
+theorem ManufacturedReflector.return_arrive
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e) :
+    ∃ exit, arrive A.preReturn.2 A.preReturn.1 =
+      (exit, A.activatedState) :=
+  ⟨A.mouthConfig.1, A.return_arrive_mouth⟩
 
 theorem ManufacturedReflector.exploration_simple
     {w : Wiring} {g e : Nat}

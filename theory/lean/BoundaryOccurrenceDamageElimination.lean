@@ -196,7 +196,7 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_length_eq
     (O.doubleReducedContactLead (N := N) C original).length =
       (C.compressedLead N).length := by
   unfold InitialEntryWriterOccurrence.doubleReducedContactLead
-  unfold SimpleContinuationChangedContact.compressedLead
+  unfold PartialSecondRunSharp.ChangedContact.compressedLead
   simp only [List.length_append]
   rw [O.doubleReducedBoundaryHistory_length original hdifferent,
     (ManufacturedReflector.flip R).sharpHistoryCore_length]
@@ -215,7 +215,7 @@ theorem InitialEntryWriterOccurrence.mem_doubleReducedContactLead_of_mem_compres
     {x : List Bool}
     (hx : x ∈ C.compressedLead N) :
     x ∈ O.doubleReducedContactLead (N := N) C original := by
-  unfold SimpleContinuationChangedContact.compressedLead at hx
+  unfold PartialSecondRunSharp.ChangedContact.compressedLead at hx
   unfold InitialEntryWriterOccurrence.doubleReducedContactLead
   rcases List.mem_append.mp hx with hxFirst | hxTail
   · apply List.mem_append_left
@@ -338,7 +338,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_occurrenc
     (hdifferent : O.before.length ≠ R.runway.length)
     (D : PartialSecondRunSharp.ChangedContact w
       (ManufacturedReflector.flip R)) : False := by
-  let C := D.toSimpleContinuationChangedContact
+  let C := D
   have hApathsS : PathGrooves S.A.toSupported.paths
       S.A.activatedState := by
     rw [← S.activated]

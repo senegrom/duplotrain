@@ -1029,6 +1029,77 @@ theorem manufactured_suffix_explicit_lobe_four_phase_tongues
         · simp
         · simp
 
+/-- Disjoint runway actions: from the flipped mouth exit the paired
+double-lobe orbit is periodic. -/
+theorem manufactured_suffix_explicit_lobe_period
+    {w : Wiring} {outside mouth entry : Nat}
+    (C : ManufacturedFlipReflector w outside mouth)
+    (state : Tongues)
+    (hCpaths : PathGrooves C.toSupported.paths state)
+    (hNewAvoidsC : (LocalAction.flip (mouth / 3)).Avoids
+      C.toSupported.paths)
+    {candy : List Passage}
+    (hgrooved : PassagesGrooved state ((mouth, entry) :: candy))
+    (hCandyForeignNew : ∀ passage ∈ candy,
+      passageSwitch passage ≠ mouth / 3)
+    (hCandyForeignOld : ∀ passage ∈ candy,
+      passageSwitch passage ≠ C.actionSwitch)
+    (hLobe : IsReflector w mouth outside (candy.length + 2)
+      (fun current => PassagesGrooved current candy)
+      (fun current => flipAt current (mouth / 3))) :
+    ∃ period, 0 < period ∧
+      stepN w period (outside, flipAt state (mouth / 3)) =
+        some (outside, flipAt state (mouth / 3)) := by
+  let L : SupportedReflector w mouth outside := {
+    travel := candy.length + 2
+    paths := [candy]
+    action := .flip (mouth / 3)
+    run := by
+      intro current hpaths
+      have hCandyCurrent : PassagesGrooved current candy :=
+        hpaths candy (by simp)
+      obtain ⟨hstep, hnext⟩ := hLobe current hCandyCurrent
+      constructor
+      · exact hstep
+      · intro path hp
+        simp only [List.mem_singleton] at hp
+        subst path
+        exact hnext
+  }
+  have hOldAvoidsL : C.toSupported.action.Avoids L.paths := by
+    change (LocalAction.flip C.actionSwitch).Avoids [candy]
+    intro path hp passage hpassage
+    simp only [List.mem_singleton] at hp
+    subst path
+    exact hCandyForeignOld passage hpassage
+  have hCNew : PathGrooves C.toSupported.paths
+      (flipAt state (mouth / 3)) :=
+    hCpaths.after_avoiding_action hNewAvoidsC
+  have hCandy : PassagesGrooved state candy := by
+    intro passage hp
+    exact hgrooved passage (List.mem_cons_of_mem _ hp)
+  have hCandyNew : PassagesGrooved
+      (flipAt state (mouth / 3)) candy :=
+    grooved_after_flip_other hCandy hCandyForeignNew
+  have hLNew : PathGrooves L.paths
+      (flipAt state (mouth / 3)) := by
+    intro path hp
+    simp only [L, List.mem_singleton] at hp
+    subst path
+    exact hCandyNew
+  let period := 2 * (C.toSupported.travel + L.travel)
+  have hperiodPos : 0 < period := by
+    have hCpos := (ManufacturedReflector.flip C).travel_pos
+    dsimp [period, L]
+    omega
+  have hperiod : stepN w period
+      (outside, flipAt state (mouth / 3)) =
+        some (outside, flipAt state (mouth / 3)) := by
+    dsimp [period]
+    exact C.toSupported.paired_period L hOldAvoidsL hNewAvoidsC
+      (flipAt state (mouth / 3)) hCNew hLNew
+  exact ⟨period, hperiodPos, hperiod⟩
+
 /-- The compatible four-phase window repeats forever.  The endpoint period
 comes from the old supported-reflector API; every intermediate vector is
 controlled separately by `manufactured_suffix_explicit_lobe_four_phase_tongues`.
