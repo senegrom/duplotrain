@@ -57,7 +57,7 @@ theorem ManufacturedFlipReflector.action_writer_is_last_productive
   have hactionProd : RawProductiveAt w N start t := by
     simpa [start] using htData.2.1
   obtain ⟨cur, next, writerSwitch, hwriterDef, hcur, hnext,
-      hstep, _hentry, hexit, _hflip, _hback⟩ :=
+      hstep, hexit, _hflip⟩ :=
     rawProductiveAt_is_endpoint_pivot hN hactionProd
   have hwriterSwitch : writerSwitch = R.actionSwitch := by
     exact hwriterDef.trans (by simpa [start] using hwriter)
@@ -757,8 +757,7 @@ theorem manufactured_pair_protected_repair_novelty_outcomes
       exact A.return_change_facing_one_novelty B hA hB
         hsplit hprefix hBcontact hp hreturn.1 hreturn.2
         history hinitialHistorical hpreHistorical times hlive hnd
-    · obtain ⟨oldApproach, fresh, oldSuffix, oldU, oldV, path,
-          _holdSplit, _holdSwitch, _holdTrace, _holdArrive,
+    · obtain ⟨fresh, path,
           hpath, hold, hotherFresh⟩ := hexploration
       have harriveFresh : arrive contact p = (fresh, contact) := by
         simpa [hotherFresh] using harrive
@@ -810,8 +809,8 @@ theorem ManufacturedReflector.FacingForwardMerge.one_novelty_of_preReturn
       (stepN w k (g, B.activatedState)).isSome) :
     NoveltyCoverOn w N (g, B.activatedState) times history 1 := by
   obtain ⟨R, before, p, x, after, contact, fresh,
-      hBeq, hrouteSplit, hprefix, hpaths, _hp, _harrive,
-      _hfreshNe, hcandyMem, hsecond, _hforward⟩ := hmerge.flip_candy
+      hBeq, hrouteSplit, hprefix, hpaths,
+      hcandyMem, hsecond⟩ := hmerge.flip_candy
   subst B
   obtain ⟨candyBefore, candyAfter, hcandySplit⟩ :=
     List.append_of_mem hcandyMem
@@ -956,7 +955,7 @@ theorem ManufacturedReflector.ChangedForwardMerge.impossible_of_preReturn_groove
   have hmem : (p, x) ∈ A.orientedRoute B.activatedState := by
     rw [hsplit]
     exact List.mem_append_right approach List.mem_cons_self
-  obtain ⟨hpBranch, _hxStem, hvPin, _hback⟩ :=
+  obtain ⟨hpBranch, _hxStem, hvPin⟩ :=
     changed_arrival_is_trailing harrive hchanged
   have hprePassage : arrive B.preReturn.2 p =
       (x, B.preReturn.2) :=

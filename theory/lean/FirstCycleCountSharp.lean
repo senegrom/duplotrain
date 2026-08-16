@@ -182,7 +182,6 @@ theorem first_revisit_cycle_phase_or_activated_reflector
       PathGrooves A.toSupported.paths state ∧
       A.baseState = start.2 ∧
       state = A.activatedState ∧
-      stepN w (runway.length + 1) (q, u) = some (e, state) ∧
       (∀ j, j ∉ A.exploration.map passageSwitch →
         state j = start.2 j)) := by
   have hsimpleExcursion : SwitchSimple ((p, x) :: path) := by
@@ -203,7 +202,6 @@ theorem first_revisit_cycle_phase_or_activated_reflector
     simpa [passageSwitch] using hsw
   have hshare : p = q ∨ p = y ∨ x = q ∨ x = y :=
     recorded_passages_share_port holdStem hrepeatStem hsw'
-  have hfar : w.link start.1 = some e := w.symm _ _ hentry
   have hsupport := crossed_revisit_support_grooved
     hrunway hexcursion hsimple hsw hrepeat
   have hpreserves :
@@ -239,9 +237,6 @@ theorem first_revisit_cycle_phase_or_activated_reflector
     exact ⟨(p, x) :: path, u, by simp,
       hstable, hstable, hsimpleExcursion, hphase⟩
   · subst y
-    have hback := hrunway.simple_cross_exit_retraces_prefix
-      hexcursion hsimple hrepeat
-    rw [hfar] at hback
     by_cases hxq : x = q
     · subst q
       have hpathNil := same_exit_excursion_path_nil
@@ -273,7 +268,7 @@ theorem first_revisit_cycle_phase_or_activated_reflector
         selfLink := hself
         entryEdge := hentry
       }
-      refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, hback, ?_⟩
+      refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, ?_⟩
       · change PathGrooves [runway, [(p, x)]] u
         apply pathGrooves_pair.mpr
         exact ⟨(pathGrooves_pair.mp hsupport).1,
@@ -296,7 +291,7 @@ theorem first_revisit_cycle_phase_or_activated_reflector
         arms_ne := hxq
         entryEdge := hentry
       }
-      refine Or.inr ⟨.flip A, v, ?_, rfl, rfl, hback, ?_⟩
+      refine Or.inr ⟨.flip A, v, ?_, rfl, rfl, ?_⟩
       · change PathGrooves [runway, path] v
         exact hsupport
       · simpa [ManufacturedReflector.exploration] using hpreserves
@@ -311,9 +306,6 @@ theorem first_revisit_cycle_phase_or_activated_reflector
     injection hold with hyp huv
     subst y
     subst v
-    have hback := hrunway.simple_cross_exit_retraces_prefix
-      hexcursion hsimple (by simpa using hrepeat)
-    rw [hfar] at hback
     have hpathNil := same_exit_excursion_path_nil
       hexcursion hsimpleExcursion
     subst path
@@ -334,7 +326,7 @@ theorem first_revisit_cycle_phase_or_activated_reflector
       selfLink := hself
       entryEdge := hentry
     }
-    refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, hback, ?_⟩
+    refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, ?_⟩
     · change PathGrooves [runway, [(p, x)]] u
       apply pathGrooves_pair.mpr
       exact ⟨(pathGrooves_pair.mp hsupport).1,
@@ -455,7 +447,6 @@ theorem first_activated_count_outcome_sharp
       times.length ≤ N + 2) ∨
       ∃ (A : ManufacturedReflector w start.1 e)
           (state : Tongues),
-        A.exploration.length + A.runway.length + 1 ≤ 2 * N + 1 ∧
         PathGrooves A.toSupported.paths state ∧
         A.baseState = start.2 ∧
         state = A.activatedState ∧
@@ -499,13 +490,7 @@ theorem first_activated_count_outcome_sharp
       hsimpleCycle hphase times hnd
   · right
     obtain ⟨A, state, hgrooves, hbase, hactivated,
-      _hback, hpreserves⟩ := hreflector
-    have hexplorationLe : A.exploration.length ≤ N :=
-      A.exploration_trace.simple_length_le hN A.exploration_simple
-    have hrunwayLe : A.runway.length ≤ A.exploration.length := by
-      cases A <;>
-        simp [ManufacturedReflector.runway,
-          ManufacturedReflector.exploration]
+      hpreserves⟩ := hreflector
     have hgroovesActivated :
         PathGrooves A.toSupported.paths A.activatedState := by
       rw [← hactivated]
@@ -524,8 +509,7 @@ theorem first_activated_count_outcome_sharp
           A.exploration.length + (A.runway.length + 1) := by omega
       rw [hlen, stepN_add, A.exploration_trace.sound]
       exact hbackExact
-    refine ⟨A, state, ?_, hgrooves, hbase, hactivated, ?_, hpreserves⟩
-    · omega
-    · simpa [hbase, hactivated] using hreachBase
+    refine ⟨A, state, hgrooves, hbase, hactivated, ?_, hpreserves⟩
+    simpa [hbase, hactivated] using hreachBase
 
 end GeneralN

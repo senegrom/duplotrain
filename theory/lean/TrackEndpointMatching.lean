@@ -3,19 +3,17 @@ import TrackFiniteAlternation
 /-!
 # Endpoint/matching semantics of a productive lazy-point pass
 
-For a tongue state `u`, switch `C` selects one internal edge between its stem
-and `selectedBranch u C`.  The other branch, `unmatchedBranch u C`, is the
-endpoint (defect) of that local matching.
+For a tongue state `u`, switch `C` selects one internal edge between its
+stem and `selectedBranch u C`.
 
 The central theorem `rawProductiveAt_is_endpoint_pivot` proves directly from
 `Wiring`/`stepN` that every productive event counted by
-`TrackFiniteAlternation` enters exactly this unmatched endpoint, replaces the
-selected internal edge by the endpoint edge, moves the endpoint to the old
-selected branch, and leaves the traversed edge ready for exact reversal.
+`TrackFiniteAlternation` exits by the writer's stem and flips exactly the
+writer's tongue.
 
-This is the rigorous bridge from tongue-vector accounting to the proposed
-matching/endpoint walk. No periodicity, geometry, or finite-`N` enumeration is
-used.
+This is the rigorous bridge from tongue-vector accounting to the
+matching/endpoint walk. No periodicity, geometry, or finite-`N` enumeration
+is used.
 -/
 
 namespace GeneralN
@@ -33,10 +31,6 @@ theorem restrict_eq_apply
 /-- Branch currently joined to the stem by the selected internal edge. -/
 def selectedBranch (u : Tongues) (C : Nat) : Nat :=
   branchPort C (u C)
-
-/-- The other branch: the local unmatched endpoint/defect. -/
-def unmatchedBranch (u : Tongues) (C : Nat) : Nat :=
-  branchPort C (!(u C))
 
 
 private theorem productive_step_configs
@@ -168,10 +162,8 @@ theorem rawProductiveAt_is_endpoint_pivot
       stepN w k start = some cur ∧
       stepN w (k+1) start = some next ∧
       step w cur = some next ∧
-      cur.1 = unmatchedBranch cur.2 C ∧
       exitPort cur = 3*C ∧
-      next.2 = flipAt cur.2 C ∧
-      arrive next.2 (3*C) = (cur.1, next.2) := by
+      next.2 = flipAt cur.2 C := by
   obtain ⟨cur, next, hcur, hnext, hstep, hchanged⟩ :=
     rawProductiveAt_changes_writer hN hprod
   let C := cur.1/3
@@ -182,28 +174,11 @@ theorem rawProductiveAt_is_endpoint_pivot
     apply Prod.ext
     · rfl
     · exact hparts.2.symm
-  obtain ⟨hbranch, hexit, hpin, hback⟩ :=
+  obtain ⟨_hbranch, hexit, _hpin⟩ :=
     changed_arrival_is_trailing harrive hchanged
   have hflip : next.2 = flipAt cur.2 C := by
     exact changed_arrival_eq_flipAt harrive hchanged
-  have hpinValue : next.2 C = bval cur.1 := by
-    rw [hpin]
-    simp [pin, C]
-  have hopposite : bval cur.1 = !(cur.2 C) := by
-    have hne : bval cur.1 ≠ cur.2 C := by
-      intro heq
-      apply hchanged
-      rw [hpinValue, heq]
-    cases hc : cur.2 C <;> cases hb : bval cur.1 <;> simp_all
-  have hentry : cur.1 = unmatchedBranch cur.2 C := by
-    have hrecover := branchPort_bval hbranch
-    unfold unmatchedBranch
-    rw [← hopposite]
-    exact hrecover.symm
-  refine ⟨cur, next, C, hC, hcur, hnext, hstep, hentry, ?_,
-    hflip, ?_⟩
-  · simpa [C] using hexit
-  · rw [← hexit]
-    exact hback
+  refine ⟨cur, next, C, hC, hcur, hnext, hstep, ?_, hflip⟩
+  simpa [C] using hexit
 
 end GeneralN

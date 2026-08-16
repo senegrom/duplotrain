@@ -125,18 +125,15 @@ theorem changedContact_forward_flip_tail_eventuallyPeriodic
           (e, (ManufacturedReflector.flip R).activatedState) =
         some (outside, state) ∧
       EventuallyPeriodic w (outside, state) := by
-  have hsimple := C.full_simple
-  rw [C.split] at hsimple
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
-      candy, _tailSteps, hentryOld, hrouteSplit, hOldTail,
-      hApproachReplay, _hApproachSimple, hApproachGrooved,
-      hApproachForeign, _hCandyEq, hentryBranch, _hmouthStem,
+      candy, hentryOld, hrouteSplit, hOldTail,
+      hApproachReplay, hApproachGrooved,
+      hApproachForeign, hentryBranch,
       hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
-      hRpaths, hCandy, hCandyForeign, hLobe, hreach,
-      _hcomplete⟩ :=
-    partial_forward_contact_active_lead
-      (A := ManufacturedReflector.flip R)
-      hsimple C.approach_trace C.old_grooves C.arrive_eq C.changed
+      hRpaths, hCandy, hCandyForeign, hLobe, hreach⟩ :=
+    PartialSecondRunSharp.partial_first_forward_contact_active_lead
+      (A := ManufacturedReflector.flip R) C.split C.full_simple
+      C.approach_trace C.old_grooves C.arrive_eq C.changed
       C.oriented_mem C.oriented_groove C.oriented_switch
       hforward hrepair hrestored
   have hperiodic : EventuallyPeriodic w
@@ -226,7 +223,7 @@ theorem ManufacturedReflector.dead_second_run_distinct_le_N_add_two
     (hnd : (times.map
       (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
     times.length ≤ N + 2 := by
-  obtain ⟨finish, passages, _hlength, htrace, hfall⟩ :=
+  obtain ⟨finish, passages, htrace, hfall⟩ :=
     PartialSecondRunSharp.terminal_trace_of_dead hdead
   have hsimple : SwitchSimple passages :=
     ManufacturedReflector.dead_continuation_trace_simple

@@ -30,16 +30,13 @@ theorem PhysicalTrace.first_revisit_trace_or_activated_reflector
           cycle ≠ [] ∧
           PhysicalTrace w atRepeat cycle (atRepeat.1, settled) ∧
           PhysicalTrace w (atRepeat.1, settled) cycle
-            (atRepeat.1, settled) ∧
-          SwitchSimple cycle) ∨
+            (atRepeat.1, settled)) ∨
         ∃ (A : ManufacturedReflector w start.1 entryEdge)
             (state : Tongues) (backSteps : Nat),
           PathGrooves A.toSupported.paths state ∧
           A.baseState = start.2 ∧
           state = A.activatedState ∧
-          stepN w backSteps atRepeat = some (entryEdge, state) ∧
-          (∀ j, j ∉ A.exploration.map passageSwitch →
-            state j = start.2 j)) := by
+          stepN w backSteps atRepeat = some (entryEdge, state)) := by
   obtain ⟨before, repeated, after, hsplit, hsimple, hrepeatMem⟩ :=
     first_revisit_split hnonsimple
   rw [hsplit] at htrace
@@ -71,10 +68,8 @@ theorem PhysicalTrace.first_revisit_trace_or_activated_reflector
   · simpa [hbeforeSplit] using hbeforeTrace.sound
   · rcases hout with hcycle | hreflector
     · exact Or.inl hcycle
-    · obtain ⟨A, state, hA, hbase, hstate, hback,
-          hpreserves⟩ := hreflector
+    · obtain ⟨A, state, hA, hbase, hstate, hback⟩ := hreflector
       exact Or.inr ⟨A, state, runway.length + 1,
-        hA, by simpa using hbase, hstate, hback,
-        by simpa using hpreserves⟩
+        hA, by simpa using hbase, hstate, hback⟩
 
 end GeneralN

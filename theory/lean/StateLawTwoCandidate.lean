@@ -41,8 +41,8 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
       (restrictedTonguesAt w N (g, B.activatedState))).Nodup) :
     times.length ≤ 3 := by
   obtain ⟨R, before, p, x, after, contact, fresh,
-      hB, hrouteSplit, hprefix, hpaths, _hp, _harrive,
-      _hfreshNe, hcandyMem, hsecond, _hforward⟩ :=
+      hB, hrouteSplit, hprefix, hpaths,
+      hcandyMem, hsecond⟩ :=
     hmerge.flip_candy
   subst B
   obtain ⟨candyBefore, candyAfter, hcandySplit⟩ :=

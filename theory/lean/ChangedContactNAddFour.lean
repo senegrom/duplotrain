@@ -402,19 +402,14 @@ theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_resi
       (e, (ManufacturedReflector.flip R).activatedState)
       times (C.compressedLead N) 1 ∨
     Nonempty (C.RunwayNAddFourResidual (N := N) R) := by
-  have hsimple :
-      SwitchSimple (C.approach ++ (C.p, C.x) :: C.suffix) := by
-    rw [← C.split]
-    exact C.full_simple
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
-      candy, tailSteps, hentryOld, hrouteSplit, hOldTail,
-      hApproachReplay, _hApproachSimple, hApproachGrooved,
-      hApproachForeign, _hCandyEq, hentryBranch, _hmouthStem,
+      candy, hentryOld, hrouteSplit, hOldTail,
+      hApproachReplay, hApproachGrooved,
+      hApproachForeign, hentryBranch,
       hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
-      hRpaths, _hCandy, hCandyForeignNew, hLobe, hreach,
-      _hcomplete⟩ :=
-    partial_forward_contact_active_lead
-      (A := ManufacturedReflector.flip R) hsimple
+      hRpaths, _hCandy, hCandyForeignNew, hLobe, hreach⟩ :=
+    PartialSecondRunSharp.partial_first_forward_contact_active_lead
+      (A := ManufacturedReflector.flip R) C.split C.full_simple
       C.approach_trace C.old_grooves C.arrive_eq C.changed
       C.oriented_mem C.oriented_groove C.oriented_switch
       hforward hrepair hrestored
@@ -448,7 +443,7 @@ theorem SimpleContinuationChangedContact.forward_flip_one_novelty_or_runway_resi
   · obtain ⟨before, after, hrunwaySplit⟩ :=
       List.append_of_mem hrunway
     obtain ⟨D, hDAction, hEntryOldNe, hDpaths,
-        hNewAvoidsDRaw, _htravel⟩ :=
+        hNewAvoidsDRaw⟩ :=
       R.suffix_after_runway_passage_with_travel state hRpaths
         hrunwaySplit hmouthLink
     have hentrySwitch : entry / 3 = mouth / 3 := by
@@ -796,7 +791,7 @@ theorem SimpleContinuationChangedContact.RunwayNAddFourResidual.impossible
   have hactionProd : RawProductiveAt w N start actionTime := by
     simpa [start] using hactionData.2.1
   obtain ⟨cur, next, writerSwitch, hwriterDef, hcur, hnext,
-      hstep, _hentry, hexit, _hflip, _hback⟩ :=
+      hstep, hexit, _hflip⟩ :=
     rawProductiveAt_is_endpoint_pivot hN hactionProd
   have hwriterSwitch : writerSwitch = R.actionSwitch := by
     exact hwriterDef.trans (by simpa [start] using hwriter)

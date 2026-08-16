@@ -95,7 +95,7 @@ theorem ManufacturedReflector.repair_prefix_changes_only_protected_return
     simpa [passageSwitch] using hswitch
   have hchangedLocal : v (p / 3) ≠ u (p / 3) := by
     simpa [hswitch'] using hvu
-  obtain ⟨hpBranch, _hxStem, hvPin, _hback⟩ :=
+  obtain ⟨hpBranch, _hxStem, hvPin⟩ :=
     changed_arrival_is_trailing harrive hchangedLocal
   have hvValue : v (p / 3) = bval p := by
     rw [hvPin]

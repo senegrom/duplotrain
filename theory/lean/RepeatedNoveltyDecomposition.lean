@@ -101,7 +101,7 @@ theorem rawProductiveAt_restricted_flip
       VectorCount.restrict N
         (flipAt (tonguesAt w start k) (rawWriterAt w start k)) := by
   obtain ⟨cur, next, C, hC, hcur, hnext, _hstep,
-      _hentry, _hexit, hflip, _hback⟩ :=
+      _hexit, hflip⟩ :=
     rawProductiveAt_is_endpoint_pivot hN hprod
   subst C
   simp [restrictedTonguesAt, tonguesAt, hcur, hnext, hflip]

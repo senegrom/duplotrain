@@ -344,18 +344,18 @@ theorem productive_initial_boundary_N_add_four_or_saving_saturation
           let stateA := Exists.choose hstateData
           have hdata := Exists.choose_spec hstateData
           have hgrooves :
-              PathGrooves A.toSupported.paths stateA := hdata.2.1
-          have hreflectorBase : A.baseState = S.base := hdata.2.2.1
+              PathGrooves A.toSupported.paths stateA := hdata.1
+          have hreflectorBase : A.baseState = S.base := hdata.2.1
           have hactivated : stateA = A.activatedState :=
-            hdata.2.2.2.1
+            hdata.2.2.1
           have hreached : stepN w
               (A.exploration.length + A.runway.length + 1)
               (S.g, S.base) = some (S.e, stateA) :=
-            hdata.2.2.2.2.1
+            hdata.2.2.2.1
           have hpreserves : forall j,
               j ∉ A.exploration.map passageSwitch ->
               stateA j = S.base j :=
-            hdata.2.2.2.2.2
+            hdata.2.2.2.2
           by_cases hmem : S.k0 ∈
               A.exploration.map passageSwitch
           · let O := Classical.choice

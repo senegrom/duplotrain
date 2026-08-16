@@ -125,15 +125,12 @@ theorem first_revisit_cycle_traces_or_activated_reflector
     (exists cycle settled,
       cycle ≠ [] /\
       PhysicalTrace w (q, u) cycle (q, settled) /\
-      PhysicalTrace w (q, settled) cycle (q, settled) /\
-      SwitchSimple cycle) \/
+      PhysicalTrace w (q, settled) cycle (q, settled)) \/
     (exists (A : ManufacturedReflector w start.1 e) (state : Tongues),
       PathGrooves A.toSupported.paths state /\
       A.baseState = start.2 /\
       state = A.activatedState /\
-      stepN w (runway.length + 1) (q, u) = some (e, state) /\
-      (forall j, j ∉ A.exploration.map passageSwitch ->
-        state j = start.2 j)) := by
+      stepN w (runway.length + 1) (q, u) = some (e, state)) := by
   have hsimpleExcursion : SwitchSimple ((p, x) :: path) := by
     unfold SwitchSimple at hsimple ⊢
     simp only [List.map_append] at hsimple
@@ -155,22 +152,6 @@ theorem first_revisit_cycle_traces_or_activated_reflector
   have hfar : w.link start.1 = some e := w.symm _ _ hentry
   have hsupport := crossed_revisit_support_grooved
     hrunway hexcursion hsimple hsw hrepeat
-  have hpreserves :
-      forall j, j ∉ (runway ++ (p, x) :: path).map passageSwitch ->
-        v j = start.2 j := by
-    intro j hforeign
-    have hu := (hrunway.append hexcursion).preserves j (by
-      intro passage hp hEq
-      apply hforeign
-      exact List.mem_map.mpr ⟨passage, hp, hEq⟩)
-    have hjq : j ≠ q / 3 := by
-      intro hEq
-      apply hforeign
-      apply List.mem_map.mpr
-      refine ⟨(p, x), List.mem_append_right runway List.mem_cons_self, ?_⟩
-      simp only [passageSwitch]
-      omega
-    exact (arrive_preserves_other hrepeat hjq).trans hu
   rcases hshare with hpq | hpy | hxq | hxy
   · subst q
     left
@@ -179,7 +160,7 @@ theorem first_revisit_cycle_traces_or_activated_reflector
     have hstable : PhysicalTrace w (p, u) ((p, x) :: path) (p, u) :=
       physicalTrace_grooved_passages w u p x p path
         hexcursion.linked hgrooved hexcursion.last_link
-    exact ⟨(p, x) :: path, u, by simp, hstable, hstable, hsimpleExcursion⟩
+    exact ⟨(p, x) :: path, u, by simp, hstable, hstable⟩
   · subst y
     have hback := hrunway.simple_cross_exit_retraces_prefix
       hexcursion hsimple hrepeat
@@ -215,12 +196,11 @@ theorem first_revisit_cycle_traces_or_activated_reflector
         selfLink := hself
         entryEdge := hentry
       }
-      refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, hback, ?_⟩
+      refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, hback⟩
       change PathGrooves [runway, [(p, x)]] u
       apply pathGrooves_pair.mpr
       exact ⟨(pathGrooves_pair.mp hsupport).1,
         passagesGrooved_singleton.mpr holdGroove⟩
-      simpa [ManufacturedReflector.exploration] using hpreserves
     · let A : ManufacturedFlipReflector w start.1 e := {
         base := start.2
         mouthState := u₀
@@ -238,10 +218,9 @@ theorem first_revisit_cycle_traces_or_activated_reflector
         arms_ne := hxq
         entryEdge := hentry
       }
-      refine Or.inr ⟨.flip A, v, ?_, rfl, rfl, hback, ?_⟩
+      refine Or.inr ⟨.flip A, v, ?_, rfl, rfl, hback⟩
       change PathGrooves [runway, path] v
       exact hsupport
-      simpa [ManufacturedReflector.exploration] using hpreserves
   · subst q
     have hfull := hrunway.append hexcursion
     have hgrooved := hfull.grooved_of_switchSimple hsimple
@@ -276,17 +255,16 @@ theorem first_revisit_cycle_traces_or_activated_reflector
       selfLink := hself
       entryEdge := hentry
     }
-    refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, hback, ?_⟩
+    refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, hback⟩
     change PathGrooves [runway, [(p, x)]] u
     apply pathGrooves_pair.mpr
     exact ⟨(pathGrooves_pair.mp hsupport).1,
       passagesGrooved_singleton.mpr holdGroove⟩
-    simpa [ManufacturedReflector.exploration] using hpreserves
   · subst y
     left
-    obtain ⟨htransient, hstable, hsimpleCycle⟩ :=
+    obtain ⟨htransient, hstable, _⟩ :=
       hexcursion.simple_same_exit_cycle_traces_public hsimpleExcursion hrepeat
     exact ⟨(q, x) :: path, v, by simp,
-      htransient, hstable, hsimpleCycle⟩
+      htransient, hstable⟩
 
 end GeneralN

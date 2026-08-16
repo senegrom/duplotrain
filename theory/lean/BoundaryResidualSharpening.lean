@@ -251,11 +251,11 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
         have hdata := Exists.choose_spec hstateData
         have hBpathsRaw :
             PathGrooves B.toSupported.paths state :=
-          hdata.2.1
+          hdata.1
         have hbase : B.baseState = S.A.activatedState :=
-          hdata.2.2.1
+          hdata.2.1
         have hactivated : state = B.activatedState :=
-          hdata.2.2.2.1
+          hdata.2.2
         have hBpaths :
             PathGrooves B.toSupported.paths B.activatedState := by
           rw [<- hactivated]

@@ -54,10 +54,7 @@ theorem changed_arrival_is_trailing
     {u v : Tongues} {p x : Nat}
     (harrive : arrive u p = (x, v))
     (hchanged : v (p / 3) ≠ u (p / 3)) :
-    p % 3 ≠ 0 ∧ x = 3 * (p / 3) ∧ v = pin u p ∧
-      arrive v x = (p, v) := by
-  have hback := arrive_back u p
-  rw [harrive] at hback
+    p % 3 ≠ 0 ∧ x = 3 * (p / 3) ∧ v = pin u p := by
   by_cases hp : p % 3 = 0
   · have hpair := harrive
     simp only [arrive, hp, if_pos] at hpair
@@ -67,14 +64,14 @@ theorem changed_arrival_is_trailing
     simp only [arrive, hp] at hpair
     have hx : x = 3 * (p / 3) := (congrArg Prod.fst hpair).symm
     have hv : v = pin u p := (congrArg Prod.snd hpair).symm
-    exact ⟨hp, hx, hv, hback⟩
+    exact ⟨hp, hx, hv⟩
 
 theorem changed_arrival_eq_flipAt
     {u v : Tongues} {p x : Nat}
     (harrive : arrive u p = (x, v))
     (hchanged : v (p / 3) ≠ u (p / 3)) :
     v = flipAt u (p / 3) := by
-  obtain ⟨_hp, _hx, hv, _hback⟩ :=
+  obtain ⟨_hp, _hx, hv⟩ :=
     changed_arrival_is_trailing harrive hchanged
   have hpinValue : v (p / 3) = bval p := by
     rw [hv]
@@ -128,7 +125,7 @@ theorem forward_contact_repairs_old_passage
     ∃ repaired,
       arrive v oldEntry = (oldExit, repaired) ∧
       arrive repaired oldExit = (oldEntry, repaired) := by
-  obtain ⟨hfreshBranch, hstem, _hv, _hback⟩ :=
+  obtain ⟨hfreshBranch, hstem, _hv⟩ :=
     changed_arrival_is_trailing hfresh hchanged
   have holdSwitch : oldExit / 3 = oldEntry / 3 := by
     have hs := arrive_exit_switch u oldExit
@@ -1509,61 +1506,6 @@ theorem ManufacturedReflector.orientedRoute_simple
       · simpa [ManufacturedReflector.orientedRoute, hselected] using
           R.reverse_support_simple
 
-/-- The selected one-way route is no longer than the complete out-and-back
-reflector traversal. -/
-theorem ManufacturedReflector.orientedRoute_length_le_travel
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) (state : Tongues) :
-    (A.orientedRoute state).length ≤ A.toSupported.travel := by
-  cases A with
-  | stay R =>
-      simp [ManufacturedReflector.orientedRoute,
-        ManufacturedReflector.toSupported,
-        ManufacturedStayReflector.toSupported]
-      omega
-  | flip R =>
-      by_cases hselected :
-          state R.actionSwitch = bval R.firstArm
-      · simp [ManufacturedReflector.orientedRoute, hselected,
-          ManufacturedReflector.toSupported,
-          ManufacturedFlipReflector.toSupported]
-        omega
-      · simp [ManufacturedReflector.orientedRoute, hselected,
-          ManufacturedReflector.toSupported,
-          ManufacturedFlipReflector.toSupported,
-          reversePassages_length]
-        omega
-
-/-- Cancel any physical prefix of the selected outward route from the full
-reflector run.  The remaining deterministic suffix starts at the exposed
-edge and still reaches the reflector's far boundary with its advertised
-local action. -/
-theorem ManufacturedReflector.complete_after_oriented_prefix
-    {w : Wiring} {g e outside : Nat}
-    (A : ManufacturedReflector w g e) (state : Tongues)
-    (hpaths : PathGrooves A.toSupported.paths state)
-    {lead rest : List Passage}
-    (hsplit : A.orientedRoute state = lead ++ rest)
-    (hprefix : PhysicalTrace w (g, state) lead (outside, state)) :
-    ∃ tailSteps,
-      A.toSupported.travel = lead.length + tailSteps ∧
-      stepN w tailSteps (outside, state) =
-        some (e, A.toSupported.action.apply state) := by
-  have hprefixLeRoute : lead.length ≤
-      (A.orientedRoute state).length := by
-    rw [hsplit]
-    simp
-  have hprefixLeTravel : lead.length ≤ A.toSupported.travel :=
-    Nat.le_trans hprefixLeRoute
-      (A.orientedRoute_length_le_travel state)
-  let tailSteps := A.toSupported.travel - lead.length
-  have hlen : A.toSupported.travel = lead.length + tailSteps := by
-    dsimp [tailSteps]
-    omega
-  have hfull := (A.toSupported.run state hpaths).1
-  refine ⟨tailSteps, hlen, ?_⟩
-  exact suffix_after_physical_prefix hprefix hlen hfull
-
 /-- Every reusable support passage occurs on the selected outward route,
 possibly in the opposite orientation when the candy is traversed backwards.
 -/
@@ -1796,8 +1738,7 @@ theorem PhysicalTrace.first_changed_support_passage
       arrive u p = (x, v) ∧
       path ∈ paths ∧ old ∈ path ∧
       passageSwitch old = p / 3 ∧
-      v (p / 3) ≠ u (p / 3) ∧
-      (x = old.1 ∨ x = old.2) := by
+      v (p / 3) ≠ u (p / 3) := by
   classical
   induction htrace with
   | nil c =>
@@ -1806,14 +1747,9 @@ theorem PhysicalTrace.first_changed_support_passage
       by_cases hhead : ∃ path ∈ paths, ∃ old ∈ path,
           passageSwitch old = p / 3 ∧ v (p / 3) ≠ u (p / 3)
       · obtain ⟨path, hp, old, hold, hswitch, hchanged⟩ := hhead
-        have hgroove := hbase path hp old hold
-        have hsameSwitch : old.1 / 3 = p / 3 := by
-          simpa [passageSwitch] using hswitch
-        have hExit := grooved_contact_exit_dichotomy
-          hgroove harrive hsameSwitch
         exact ⟨[], p, x, passages, u, v, path, old,
           rfl, PhysicalTrace.nil _, hbase, harrive,
-          hp, hold, hswitch, hchanged, hExit⟩
+          hp, hold, hswitch, hchanged⟩
       · have hquiet : ∀ path ∈ paths, ∀ old ∈ path,
             passageSwitch old = p / 3 →
               v (p / 3) = u (p / 3) := by
@@ -1827,11 +1763,11 @@ theorem PhysicalTrace.first_changed_support_passage
             harrive hbase hquiet
         obtain ⟨approach, p₂, x₂, suffix, u₂, v₂, path, old,
             hsplit, hprefix, hgrooves, hlocal,
-            hp, hold, hswitch, hchanged, hExit⟩ :=
+            hp, hold, hswitch, hchanged⟩ :=
           ih hbaseTail hbroken
         refine ⟨(p, x) :: approach, p₂, x₂, suffix,
           u₂, v₂, path, old, ?_, ?_, hgrooves, hlocal,
-          hp, hold, hswitch, hchanged, hExit⟩
+          hp, hold, hswitch, hchanged⟩
         · simp [hsplit]
         · exact PhysicalTrace.cons harrive hlink hprefix
 

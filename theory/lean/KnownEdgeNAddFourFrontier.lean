@@ -107,7 +107,7 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
       · left
         have hshort := hcycleA times hnd
         omega
-      · obtain ⟨A, stateA, _hfirstLe, hA,
+      · obtain ⟨A, stateA, hA,
             hbaseA, hactivatedA, hreachA, _hpreservesA⟩ :=
           hreflectorA
         subst stateA
@@ -167,8 +167,7 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
                 }⟩
             · right
               right
-              obtain ⟨B, stateB, _hsecondLe, hB,
-                  hbaseB, hactivatedB, hreachB, _hpreservesB⟩ :=
+              obtain ⟨B, stateB, hB, hbaseB, hactivatedB⟩ :=
                 hreflectorB
               subst stateB
               exact ⟨{
