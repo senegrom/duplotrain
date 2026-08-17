@@ -97,7 +97,7 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_a
         · exact R.reserved_not_mem_reusable hreservedExploration
         rw [List.mem_singleton] at hs
         subst s
-        exact R.action_not_mem_reusable_changedContact)
+        exact R.action_not_mem_reusable)
     (by intro s hs
         rcases List.mem_cons.mp hs with rfl | hs
         · exact hreservedApproach

@@ -2021,7 +2021,7 @@ theorem ManufacturedStayReflector.suffix_after_runway_passage
 flip reflector.  The candy is oriented according to the current tongue, so
 the shortened reflector is immediately usable in `state`.  Its support is
 foreign to the discarded runway switch. -/
-theorem ManufacturedFlipReflector.suffix_after_runway_passage_with_travel
+theorem ManufacturedFlipReflector.suffix_after_runway_passage
     {w : Wiring} {g e : Nat}
     (R : ManufacturedFlipReflector w e g)
     (state : Tongues)
@@ -2255,24 +2255,6 @@ theorem ManufacturedFlipReflector.suffix_after_runway_passage_with_travel
             [after, reversePassages R.candy]
           exact havoid
 
-/-- Backward-compatible projection of the strengthened runway-suffix
-theorem. -/
-theorem ManufacturedFlipReflector.suffix_after_runway_passage
-    {w : Wiring} {g e : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {before : List Passage} {p x : Nat} {after : List Passage}
-    {outside : Nat}
-    (hsplit : R.runway = before ++ (p, x) :: after)
-    (houtside : w.link x = some outside) :
-    ∃ C : ManufacturedFlipReflector w outside x,
-      C.actionSwitch = R.actionSwitch ∧
-      p / 3 ≠ C.actionSwitch ∧
-      PathGrooves C.toSupported.paths state ∧
-      (LocalAction.flip (p / 3)).Avoids C.toSupported.paths :=
-  R.suffix_after_runway_passage_with_travel state hpaths
-    hsplit houtside
 
 theorem manufactured_flip_arbitrary_lobe_theta_half
     {w : Wiring} {outside mouth entry returnPort : Nat}

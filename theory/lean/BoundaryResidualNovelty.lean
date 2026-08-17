@@ -193,8 +193,8 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_all_run_distinc
       O.doubleReducedTwoHistory B N original :=
     (O.mem_doubleReducedTwoHistory (N := N) B original
       hstay).1
-  have hcount := novelty_cover_count_with_historical_extra
-    (VectorCount.restrict N original) hcover horiginal hnd
+  have hcount := noveltyCoverOn_distinct_count_with_extra
+    hcover horiginal hnd
   omega
 
 /-- A saturated productive boundary cannot contain a fully protected pair

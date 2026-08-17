@@ -1,5 +1,4 @@
 import StateLawNAddFour
-import TrackNoveltyCover
 import StateLawTwoSixUltra
 
 /-!
@@ -104,7 +103,7 @@ theorem arbitrary_start_distinct_le_N_add_four_of_known_edge_and_productive_boun
     times.length <= N + 4 := by
   rcases start with ⟨startPort, startState⟩
   have htimesNodup : times.Nodup :=
-    ultra_nodup_of_map_nodup
+    sample_times_nodup_of_map_nodup
       (restrictedTonguesAt w N (startPort, startState)) hnd
   cases hone : stepN w 1 (startPort, startState) with
   | none =>
@@ -171,7 +170,7 @@ theorem arbitrary_start_distinct_le_N_add_four_of_known_edge_and_productive_boun
                 (restrictedTonguesAt w N
                   (startPort, startState))).Nodup := by
             dsimp [positive]
-            exact ultra_nodup_map_filter _ hnd
+            exact tailsharp_nodup_map_filter _ hnd
           have hshiftedNodup :
               (shifted.map
                 (restrictedTonguesAt w N

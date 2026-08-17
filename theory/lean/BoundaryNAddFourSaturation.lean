@@ -1,5 +1,4 @@
 import StateLawNAddFourTop
-import TripleSelfLinkSimpleCycleClosure
 
 /-!
 # Saturation at the productive `N+4` boundary
@@ -111,35 +110,10 @@ theorem ProductiveBoundaryNAddFourSaturation.false_of_global_history
     intro d hd
     apply List.mem_append_left
     exact hglobal d (S.live d hd)
-  have hcount := novelty_cover_count_with_historical_extra
-    (VectorCount.restrict N S.original) hcover horiginal
-      haugmentedNodup
+  have hcount := noveltyCoverOn_distinct_count_with_extra
+    hcover horiginal haugmentedNodup
   have hsaturated := S.saturated
   omega
-
-theorem saturation_live_distinct_le_of_stepN_none
-    {w : Wiring} {N L : Nat} {start : Nat × Tongues}
-    {times : List Nat}
-    (hnone : stepN w L start = none)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length <= L := by
-  have htimesNodup : times.Nodup :=
-    ultra_nodup_of_map_nodup
-      (restrictedTonguesAt w N start) hnd
-  apply nodup_nat_lt_length htimesNodup
-  intro k hk
-  by_cases hlt : k < L
-  · exact hlt
-  · have hkEq : k = L + (k - L) := by omega
-    have hnoneK : stepN w k start = none := by
-      rw [hkEq, stepN_add, hnone]
-      simp
-    have hkLive := hlive k hk
-    rw [hnoneK] at hkLive
-    simp at hkLive
 
 private theorem saturation_stable_simple_cycle_tail_distinct_le_one
     {w : Wiring} {N g : Nat} {settled : Tongues}
@@ -329,8 +303,8 @@ theorem productive_initial_boundary_N_add_four_or_saving_saturation
       (List.nodup_cons.mp S.distinct).2
     cases hfirst : stepN w (N + 1) (S.g, S.base) with
     | none =>
-        have hshort := saturation_live_distinct_le_of_stepN_none
-          (N := N) hfirst S.live htailNodup
+        have hshort := dead_horizon_live_distinct_le
+          (N := N) hfirst S.times S.live htailNodup
         have hsaturated := S.saturated
         omega
     | some finish =>

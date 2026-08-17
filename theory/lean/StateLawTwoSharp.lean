@@ -1,5 +1,4 @@
 import StateLawTwoCandidate
-import ShortSuffixCount
 
 /-!
 # Sharp coefficient-two state bound

@@ -120,8 +120,8 @@ private theorem two_journeys_history_count_with_extra
   have hcover := A.two_journeys_then_shared_history_novelty_cover
     B hbase hApaths hBpaths history hhistory budget htail
       times hlive (List.nodup_cons.mp hnd).2
-  have hcount := novelty_cover_count_with_historical_extra
-    extra hcover hextra hnd
+  have hcount := noveltyCoverOn_distinct_count_with_extra
+    hcover hextra hnd
   omega
 
 /-- Exact `N+4` bound for an absent productive boundary followed by a stay

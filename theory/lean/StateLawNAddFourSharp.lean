@@ -1,5 +1,4 @@
 import BoundaryApproachWrittenElimination
-import BoundaryOccurrenceDamageElimination
 
 /-!
 # Sharp `N+4` state law

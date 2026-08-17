@@ -1,7 +1,6 @@
 import BoundaryOccurrenceDamageElimination
 import KnownEdgeNAddFourComplete
 import ProductiveBoundaryNAddFourComplete
-import PartialSecondRunSharp
 
 /-!
 # Sharpening the productive-boundary residuals
@@ -354,32 +353,8 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
             have hstay : O.next = O.middle := hOdata.1
             cases hkind : S.A with
             | stay R =>
-                let Ostay : InitialEntryWriterOccurrence
-                    w S.source.g S.source.e S.source.k0
-                      (ManufacturedReflector.stay R) := {
-                  before := O.before
-                  after := O.after
-                  p := O.p
-                  x := O.x
-                  nextPort := O.nextPort
-                  middle := O.middle
-                  next := O.next
-                  split := by simpa [hkind] using O.split
-                  switch_eq := O.switch_eq
-                  before_trace := by
-                    simpa [hkind] using O.before_trace
-                  arrive_eq := O.arrive_eq
-                  link_eq := O.link_eq
-                  reach := by simpa [hkind] using O.reach
-                  prefix_foreign := O.prefix_foreign
-                  prefix_preserves := by
-                    simpa [hkind] using O.prefix_preserves
-                  state_case := O.state_case
-                }
-                have hstayStay : Ostay.next = Ostay.middle := by
-                  exact hstay
-                exact (S.false_of_unchanged_stay_protected_pair
-                  hN R hkind Ostay hstayStay B
+                exact (S.false_of_first_stay_protected_pair
+                  hN R hkind B
                     (by simpa [hkind] using hbase)
                     hBpaths (by simpa [hkind] using hpre)).elim
             | flip R =>

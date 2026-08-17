@@ -1,5 +1,4 @@
 import ReuseForcesReplayClosure
-import TrackFiniteAlternation
 import BoundaryDoubleDuplicate
 
 /-!
@@ -107,23 +106,6 @@ noncomputable def PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitch
   (rawFirstWriterTimes w N (e, A.activatedState)
       C.approach.length).map
     (rawWriterAt w (e, A.activatedState))
-
-/-- The private facing-action switch of a flip reflector is not in its
-reusable support. -/
-theorem ManufacturedFlipReflector.action_not_mem_reusable_changedContact
-    {w : Wiring} {g e : Nat}
-    (R : ManufacturedFlipReflector w g e) :
-    Not (R.actionSwitch ∈
-      (ManufacturedReflector.flip R).reusableSwitches) := by
-  intro hmem
-  change R.actionSwitch ∈
-    ((R.runway ++ R.candy).map passageSwitch) at hmem
-  obtain ⟨passage, hp, hswitch⟩ := List.mem_map.mp hmem
-  rcases List.mem_append.mp hp with hrunway | hcandy
-  · exact (R.support_foreign R.runway (by simp)
-      passage hrunway) hswitch
-  · exact (R.support_foreign R.candy (by simp)
-      passage hcandy) hswitch
 
 /-- Reusable support, approach first-writers, and any duplicate-free list
 of extra switches avoiding both occupy pairwise distinct ambient
@@ -251,7 +233,7 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_a
     (by intro s hs
         rw [List.mem_singleton] at hs
         subst s
-        exact R.action_not_mem_reusable_changedContact)
+        exact R.action_not_mem_reusable)
     (by intro s hs
         rw [List.mem_singleton] at hs
         subst s
@@ -480,7 +462,7 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
       List.append_of_mem hrunway
     obtain ⟨D, hDAction, hEntryOldNe, hDpaths,
         hNewAvoidsDRaw⟩ :=
-      R.suffix_after_runway_passage_with_travel state hRpaths
+      R.suffix_after_runway_passage state hRpaths
         hrunwaySplit hmouthLink
     have hentrySwitch : entry / 3 = mouth / 3 := by
       have hheadGroove : arrive state entry = (mouth, state) :=

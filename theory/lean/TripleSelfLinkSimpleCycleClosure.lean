@@ -1,7 +1,4 @@
 import SharpCertificateClosure
-import GeneralN
-import TrackEndpointMatching
-import RepeatedNoveltyDecomposition
 
 /-!
 # Retaining and closing the simple-cycle self-link branch

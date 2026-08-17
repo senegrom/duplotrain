@@ -1,9 +1,6 @@
 import RunwayHistoricalThree
 import SharpStateLawAssembly
-import TrackEndpointMatching
 import SelfPivotStrictShrink
-import ManufacturedPairNovelty
-import RepeatedNoveltyDecomposition
 
 /-!
 # Closing the sharp certificate from a raw five-frame tail

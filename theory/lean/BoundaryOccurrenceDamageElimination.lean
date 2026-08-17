@@ -317,9 +317,8 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_count
       (O.doubleReducedContactLead (N := N) C original).length + budget := by
   have hcover := O.doubleReducedContactLead_global_cover
     (N := N) C original hstay hA times hlive hlocal
-  exact novelty_cover_count_with_historical_extra
-    (VectorCount.restrict N original) hcover
-      (O.original_mem_doubleReducedContactLead (N := N) C original) hnd
+  exact noveltyCoverOn_distinct_count_with_extra hcover
+    (O.original_mem_doubleReducedContactLead (N := N) C original) hnd
 
 
 /-- A saturated productive boundary cannot contain a changed contact after a

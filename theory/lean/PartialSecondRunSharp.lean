@@ -1,5 +1,3 @@
-import TripleSelfLinkSimpleCycleClosure
-import RunwayHistoricalThree
 import OneReflectorContinuation
 import TraceRetainingFirstRevisit
 

@@ -1,5 +1,3 @@
-import OneReflectorContinuation
-import TraceRetainingFirstRevisit
 import BoundaryNAddFourSaturation
 import PartialSecondRunSharp
 
@@ -440,7 +438,7 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_two_novelty
   · obtain ⟨before, after, hrunwaySplit⟩ := List.append_of_mem hrunway
     obtain ⟨D, _hDAction, hEntryOldNe, hDpaths,
         hNewAvoidsDRaw⟩ :=
-      R.suffix_after_runway_passage_with_travel state hRpaths
+      R.suffix_after_runway_passage state hRpaths
         hrunwaySplit hmouthLink
     have hentrySwitch : entry / 3 = mouth / 3 := by
       have hheadGroove : arrive state entry = (mouth, state) :=
