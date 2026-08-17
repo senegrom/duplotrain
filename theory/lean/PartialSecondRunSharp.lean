@@ -20,7 +20,7 @@ constant.
 
 
 /-!
-# Eventual periodicity supplies raw prefixes of every length
+## Eventual periodicity supplies raw prefixes of every length
 
 Extracted from the removed Mellit support-interaction module: the one
 liveness fact its downstream consumers actually kept using.
@@ -47,10 +47,6 @@ theorem EventuallyPeriodic.stepN_some_all
   have hbound : d ≤ lead + (d + 1) * period := by omega
   exact stepN_prefix_some hbound hfar
 
-end GeneralN
-
-
-namespace GeneralN
 
 /-- Trace-retaining form of the simple-cycle branch of
 `first_activated_count_outcome_sharp`. -/

@@ -20,7 +20,7 @@ under the occurrence saving.
 
 
 /-!
-# Structural dichotomy for an unfinished second journey
+## Structural dichotomy for an unfinished second journey
 
 This file separates the dynamic statement "the second probe does not
 manufacture an opposite reflector" from the coefficient-one accounting
@@ -41,11 +41,9 @@ structure PartialSecondReflectorCompletion
   reflector : ManufacturedReflector w e g
   base : reflector.baseState = A.activatedState
 
-end GeneralN
-
 
 /-!
-# Coordinate charge in the canonical productive-boundary residual
+## Coordinate charge in the canonical productive-boundary residual
 
 This file isolates the remaining canonical branch.  At the unchanged
 canonical occurrence, the initial boundary switch is the omitted action
@@ -60,12 +58,6 @@ repair and the reserved-action charge bound meet at
 residual without claiming the unavailable full-charge equality.
 -/
 
-namespace GeneralN
-
-end GeneralN
-
-
-namespace GeneralN
 
 /-- The refined damage residual: a flip first reflector whose changed
 contact first-writes the omitted action switch or the boundary switch

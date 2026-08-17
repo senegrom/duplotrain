@@ -18,7 +18,7 @@ Under those assumptions the raw arbitrary-start statement
 
 
 /-!
-# The productive arbitrary-start boundary at `N+4`
+## The productive arbitrary-start boundary at `N+4`
 
 The exact raw boundary target is the `N+4` analogue of
 `ProductiveInitialBoundaryCap`.  This file closes the branch in which the
@@ -48,10 +48,7 @@ def ProductiveInitialBoundaryNAddFour (w : Wiring) (N : Nat) : Prop :=
       (VectorCount.restrict N original ::
         times.map (restrictedTonguesAt w N (g, base))).Nodup ->
       times.length + 1 <= N + 4
-end GeneralN
 
-
-namespace GeneralN
 
 private theorem top_nodup_map_eq_of_mem
     {alpha beta : Type} [BEq alpha] [LawfulBEq alpha]

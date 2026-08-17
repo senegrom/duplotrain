@@ -17,7 +17,7 @@ Everything here is symbolic in `N`; no finite enumeration is used.
 
 
 /-!
-# Productive writes cannot happen inside a pointwise retrace
+## Productive writes cannot happen inside a pointwise retrace
 
 A settled retrace window (every depth shows the settled tongue state)
 admits no productive write: the vectors before and after any interior
@@ -69,10 +69,6 @@ theorem productive_not_inside_pointwise_retrace
   simp [restrictedTonguesAt, tonguesAt,
     hbeforeGlobal, hafterGlobal]
 
-end GeneralN
-
-
-namespace GeneralN
 
 /-- A switch-simple physical trace cannot return to its literal starting
 port and then continue.  The raw writer at time zero and at the return time

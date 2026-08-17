@@ -391,7 +391,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
 end GeneralN
 
 /-!
-# Constant protected-repair classification
+## Constant protected-repair classification
 
 The existing classifier erased the physical witnesses of its early backward
 branches and retained only an `N+2` count.  The two lemmas below keep those
@@ -400,6 +400,3 @@ tail has two phases and shares the contact boundary.  Hence each early branch
 has at most three vectors.
 -/
 
-namespace GeneralN
-
-end GeneralN

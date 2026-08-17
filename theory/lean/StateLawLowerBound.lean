@@ -7,8 +7,8 @@ The matching lower bound to `GeneralN.stateLaw`: for every `N ≥ 3` there
 is an `N`-switch wiring, a start, and `N+4` live sample times whose
 restricted tongue vectors are pairwise distinct.
 
-The witness is the family discovered empirically (`FamilyLowerBound.lean`,
-`../tools/bstates.py`): switch `0` is a teardrop (its branches tied, its
+The witness is the family discovered empirically (`../tools/bstates.py`):
+switch `0` is a teardrop (its branches tied, its
 stem wired to switch `1`'s stem), switches `1 … N-3` form a
 branch-to-stem chain, and switches `N-2, N-1` are doubly linked
 (branch1→stem and branch2→branch2).  A cold run started into branch 2 of

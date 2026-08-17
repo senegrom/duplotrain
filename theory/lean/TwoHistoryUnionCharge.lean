@@ -23,7 +23,7 @@ All statements are over `Wiring`, `PhysicalTrace`, and `stepN`, for arbitrary
 
 
 /-!
-# The manufacturing journey reaches the activated state
+## The manufacturing journey reaches the activated state
 
 The one raw `stepN` fact every downstream counting file needs from the
 old Gray-corner module, extracted so the sharp proof does not depend on
@@ -56,10 +56,6 @@ theorem ManufacturedReflector.manufacturing_journey_reaches_activated
   rw [hlen, stepN_add, A.exploration_trace.sound]
   exact hback
 
-end GeneralN
-
-
-namespace GeneralN
 
 theorem nodup_map_nat_of_injective_on_two_history
     {f : Nat → Nat} {xs : List Nat}
