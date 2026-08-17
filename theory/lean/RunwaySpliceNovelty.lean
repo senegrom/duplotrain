@@ -431,9 +431,6 @@ theorem manufactured_flip_arbitrary_lobe_theta_half_three_phase
         · by_cases hcaptureDepth :
               d ≤ before.length + captureTravel
           · let q := d - before.length
-            have hqPos : 1 ≤ q := by
-              dsimp [q]
-              omega
             have hq : q ≤ C.candy.length + 2 + C.runway.length := by
               dsimp [q, captureTravel] at hcaptureDepth ⊢
               omega
@@ -527,7 +524,6 @@ theorem manufactured_flip_arbitrary_lobe_theta_half_three_phase
         exact hsuffix
       refine ⟨faultTravel, ?_, hfaultEnd, ?_⟩
       · dsimp [faultTravel, tailSteps]
-        have hbeforeLe : before.length ≤ candy.length + 1 := by omega
         omega
       · intro d hd
         by_cases hprefixDepth : d ≤ before.length
@@ -535,9 +531,6 @@ theorem manufactured_flip_arbitrary_lobe_theta_half_three_phase
             oldState hbeforeGroovedOld hprefixDepth
           exact ⟨port, oldState, hrun, by simp⟩
         · let r := d - (before.length + 1)
-          have hr : r ≤ tailSteps := by
-            dsimp [r, faultTravel] at hd ⊢
-            omega
           have hdr : d = (before.length + 1) + r := by
             dsimp [r]
             omega
@@ -1089,7 +1082,6 @@ theorem manufactured_suffix_explicit_lobe_period
     exact hCandyNew
   let period := 2 * (C.toSupported.travel + L.travel)
   have hperiodPos : 0 < period := by
-    have hCpos := (ManufacturedReflector.flip C).travel_pos
     dsimp [period, L]
     omega
   have hperiod : stepN w period
@@ -1173,7 +1165,6 @@ theorem manufactured_suffix_explicit_lobe_all_time_four_phase_tongues
     exact hCandyNew
   let period := 2 * (C.toSupported.travel + L.travel)
   have hperiodPos : 0 < period := by
-    have hCpos := (ManufacturedReflector.flip C).travel_pos
     dsimp [period, L]
     omega
   have hperiod : stepN w period

@@ -27,7 +27,7 @@ symbolic in `N`: no finite-instance argument, no Mathlib, no `native_decide`,
 and no `sorry`. The lower bound is also symbolic for `N ≥ 4`; its `N = 3`
 base case is checked by kernel `decide`.
 
-There are 74 self-contained Lean libraries. To check everything:
+There are 73 self-contained Lean libraries. To check everything:
 
 ```
 lake build
@@ -78,8 +78,12 @@ contact, and protected-reflector-pair branches are charged into one shared
 
 The only remaining issue was an arbitrary productive first passage: could
 its time-zero vector be genuinely new on top of the shifted known-edge
-budget? `BoundaryResidualSharpening.lean` reduced that question to four
-constructors. The new closing files eliminate all four:
+budget? `BoundaryResidualSharpening.lean` reduces that question to three
+constructors.  (A fourth candidate — the second manufacture productively
+first-writing the boundary switch — is refuted at the reduction itself: the
+second manufacture starts at that switch's stem, and a switch-simple trace
+from a stem never productively first-writes its own switch.)  The closing
+files eliminate the three:
 
 * `BoundaryApproachActionElimination.lean` proves that a strict simple
   approach from the boundary stem cannot first-write the boundary switch.
@@ -87,9 +91,6 @@ constructors. The new closing files eliminate all four:
   corner, so the reserved boundary coordinate still yields `N + 3`.
 * `BoundaryApproachWrittenElimination.lean` packages that charge to rule out
   the complete approach-written residual.
-* `BoundaryAbsentPresentWriterElimination.lean` proves that the second
-  manufacture, which also starts at the boundary stem, cannot productively
-  first-write that switch. This kills the absent-present writer residual.
 * `BoundaryOccurrenceDamageElimination.lean` handles both remaining support
   damage cases. A canonical unchanged occurrence forces a self-linked first
   reflector whose future has only two action phases, so a global `N+3`

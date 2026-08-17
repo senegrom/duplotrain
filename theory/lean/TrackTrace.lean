@@ -88,7 +88,6 @@ theorem arrive_back (t : Tongues) (p : Nat) :
   · have hstem : 3 * (p / 3) = p := by omega
     cases ht : t (p / 3) with
     | false =>
-      have hbmod : (3 * (p / 3) + 1) % 3 ≠ 0 := by omega
       have hbdiv : (3 * (p / 3) + 1) / 3 = p / 3 := by omega
       have hbval : bval (3 * (p / 3) + 1) = false := by
         unfold bval
@@ -106,7 +105,6 @@ theorem arrive_back (t : Tongues) (p : Nat) :
         simp [arrive, hbdiv, hpin]
       rw [hsecond, hstem]
     | true =>
-      have hbmod : (3 * (p / 3) + 2) % 3 ≠ 0 := by omega
       have hbdiv : (3 * (p / 3) + 2) / 3 = p / 3 := by omega
       have hbval : bval (3 * (p / 3) + 2) = true := by
         unfold bval

@@ -42,7 +42,6 @@ theorem productive_not_inside_pointwise_retrace
     repeatTime + span ≤ openTime := by
   apply Classical.byContradiction
   intro hnot
-  have hopenBeforeEnd : openTime < repeatTime + span := by omega
   let d := openTime - repeatTime
   have hdPositive : 0 < d := by
     dsimp [d]
@@ -184,8 +183,7 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_e
     have hkData := mem_rawFirstWriterTimes_iff.mp (by
       simpa [times] using hk)
     have houtside :=
-      C.approach_trace.productive_writer_not_old_reusable
-        hN (ManufacturedReflector.flip R) C.approach_simple
+      C.approach_trace.productive_writer_not_old_reusable (ManufacturedReflector.flip R) C.approach_simple
         hA C.old_grooves hkData.1 hkData.2.1
     apply houtside
     rw [← hEq]
@@ -528,113 +526,10 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
           times (C.compressedLead N) hentryHistorical hstateHistorical
           holdHistoricalD hleadHistorical
     · right
-      have hActionsNeR : mouth / 3 ≠ R.actionSwitch := by
-        simpa [hDAction] using hActionsNe
       have hmissingR : Not (VectorCount.restrict N
           (flipAt C.contactState R.actionSwitch) ∈
             C.compressedLead N) := by
         simpa [state] using holdHistorical
-      have htailLive : forall d, exists finish,
-          stepN w d (outside,
-            flipAt C.contactState (mouth / 3)) = some finish := by
-        intro d
-        by_cases hcontact : exists passage, passage ∈ candy /\
-            passageSwitch passage = D.actionSwitch
-        · obtain ⟨period, hpositive, hperiod, _hwindow⟩ :=
-            manufactured_flip_arbitrary_lobe_four_phase_period
-              D state hDpaths hNewAvoidsD hentryBranch hentrySwitch
-              hfullGrooved hfullTrace hcrossed hCandyForeignNew hLobe
-              hmouthLink hcontact
-          have hlive := runway_period_stepN_some
-            (d := d) hpositive hperiod
-          simpa [state] using hlive
-        · have hCandyForeignOld : forall passage, passage ∈ candy ->
-              passageSwitch passage ≠ D.actionSwitch := by
-            intro passage hp hEq
-            exact hcontact ⟨passage, hp, hEq⟩
-          let L : SupportedReflector w mouth outside := {
-            travel := candy.length + 2
-            paths := [candy]
-            action := .flip (mouth / 3)
-            run := by
-              intro current hpaths
-              have hCandyCurrent : PassagesGrooved current candy :=
-                hpaths candy (by simp)
-              obtain ⟨hstep, hnext⟩ := hLobe current hCandyCurrent
-              constructor
-              · exact hstep
-              · intro path hp
-                simp only [List.mem_singleton] at hp
-                subst path
-                exact hnext
-          }
-          have hOldAvoidsL : D.toSupported.action.Avoids L.paths := by
-            change (LocalAction.flip D.actionSwitch).Avoids [candy]
-            intro path hp passage hpassage
-            simp only [List.mem_singleton] at hp
-            subst path
-            exact hCandyForeignOld passage hpassage
-          have hDNew : PathGrooves D.toSupported.paths
-              (flipAt state (mouth / 3)) :=
-            hDpaths.after_avoiding_action hNewAvoidsD
-          have hCandy : PassagesGrooved state candy := by
-            intro passage hp
-            exact hfullGrooved passage (List.mem_cons_of_mem _ hp)
-          have hCandyNew : PassagesGrooved
-              (flipAt state (mouth / 3)) candy :=
-            grooved_after_flip_other hCandy hCandyForeignNew
-          have hLNew : PathGrooves L.paths
-              (flipAt state (mouth / 3)) := by
-            intro path hp
-            simp only [L, List.mem_singleton] at hp
-            subst path
-            exact hCandyNew
-          let period := 2 * (D.toSupported.travel + L.travel)
-          have hpositive : 0 < period := by
-            have hDpos := (ManufacturedReflector.flip D).travel_pos
-            dsimp [period, L]
-            omega
-          have hperiod : stepN w period
-              (outside, flipAt state (mouth / 3)) =
-                some (outside, flipAt state (mouth / 3)) := by
-            dsimp [period]
-            exact D.toSupported.paired_period L hOldAvoidsL hNewAvoidsD
-              (flipAt state (mouth / 3)) hDNew hLNew
-          have hlive := runway_period_stepN_some
-            (d := d) hpositive hperiod
-          simpa [state] using hlive
-      have hgray : forall d,
-          tonguesAt w (outside,
-            flipAt C.contactState (mouth / 3)) d ∈
-            [flipAt C.contactState (mouth / 3),
-             flipAt (flipAt C.contactState (mouth / 3)) R.actionSwitch,
-             C.contactState,
-             flipAt C.contactState R.actionSwitch] := by
-        intro d
-        by_cases hcontact : exists passage, passage ∈ candy /\
-            passageSwitch passage = D.actionSwitch
-        · have hp :=
-            manufactured_flip_arbitrary_lobe_all_time_four_phase_tongues
-              D state hDpaths hNewAvoidsD hentryBranch hentrySwitch
-              hfullGrooved hfullTrace hcrossed hCandyForeignNew hLobe
-              hmouthLink hcontact d
-          simpa [state, hDAction] using hp
-        · have hCandyForeignOld : forall passage, passage ∈ candy ->
-              passageSwitch passage ≠ D.actionSwitch := by
-            intro passage hp hEq
-            exact hcontact ⟨passage, hp, hEq⟩
-          have hp :=
-            manufactured_suffix_explicit_lobe_all_time_four_phase_tongues
-              D state hDpaths hNewAvoidsD hActionsNe hentryBranch
-              hentrySwitch hfullGrooved hfullTrace hcrossed
-              hCandyForeignNew hCandyForeignOld hLobe hmouthLink d
-          simp only [List.mem_cons, List.not_mem_nil, or_false] at hp ⊢
-          rcases hp with hp | hp | hp | hp
-          · exact Or.inl (by simpa [state] using hp)
-          · exact Or.inr (Or.inl (by simpa [state, hDAction] using hp))
-          · exact Or.inr (Or.inr (Or.inr
-              (by simpa [state, hDAction] using hp)))
-          · exact Or.inr (Or.inr (Or.inl (by simpa [state] using hp)))
       exact ⟨{
         action_first_written := haction
         old_corner_missing := hmissingR
@@ -704,8 +599,6 @@ contact, and flipping the action bit back would recover the historical
 pre-action vector, contradicting `old_corner_missing`. -/
 theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.exists_later_productive
     {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
     {R : ManufacturedFlipReflector w g e}
     {C : SimpleContinuationChangedContact w
       (ManufacturedReflector.flip R)}
@@ -767,7 +660,7 @@ theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.exists_later
       simpa [restrictedTonguesAt, tonguesAt, C.approach_trace.sound,
         start] using hstable
     have hprod := hactionData.2.1
-    have hflipRaw := rawProductiveAt_restricted_flip hN hprod
+    have hflipRaw := rawProductiveAt_restricted_flip hprod
     have hflip :
         VectorCount.restrict N
             (tonguesAt w start (actionTime + 1)) =
@@ -828,13 +721,13 @@ theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.impossible
     (e, (ManufacturedReflector.flip R).activatedState)
   obtain ⟨actionTime, laterTime, hactionTime, hwriter,
       hactionLater, hlaterContact, hlaterProd⟩ :=
-    F.exists_later_productive hN
+    F.exists_later_productive
   have hactionData := mem_rawFirstWriterTimes_iff.mp hactionTime
   have hactionProd : RawProductiveAt w N start actionTime := by
     simpa [start] using hactionData.2.1
   obtain ⟨cur, next, writerSwitch, hwriterDef, hcur, hnext,
       hstep, hexit, _hflip⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN hactionProd
+    rawProductiveAt_is_endpoint_pivot hactionProd
   have hwriterSwitch : writerSwitch = R.actionSwitch := by
     exact hwriterDef.trans (by simpa [start] using hwriter)
   subst writerSwitch
@@ -908,8 +801,7 @@ theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.impossible
         rw [hcontactSum] at htRight
         exact htRight
       have hnotReusable :=
-        PhysicalTrace.productive_writer_not_old_reusable
-          hN (ManufacturedReflector.flip R) C.approach_trace
+        PhysicalTrace.productive_writer_not_old_reusable (ManufacturedReflector.flip R) C.approach_trace
           C.approach_simple hA C.old_grooves htBound htProd
       apply hnotReusable
       rw [htWriter]

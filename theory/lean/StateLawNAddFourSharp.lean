@@ -1,5 +1,4 @@
 import BoundaryApproachWrittenElimination
-import BoundaryAbsentPresentWriterElimination
 import BoundaryOccurrenceDamageElimination
 
 /-!
@@ -48,9 +47,6 @@ theorem BoundarySharpResidual.impossible
           S.A hA htrace P.reflector.exploration_simple damage
       exact S.false_of_occurrence_changed_contact
         hN O hstay contact
-  | absentPresentWriter R kind absentA P supportGrooved present =>
-      exact BoundarySharpResidual.absentPresentWriter_impossible
-        R kind absentA P supportGrooved present
 
 /-- The productive arbitrary-start boundary fits the exact `N+4` budget. -/
 theorem productiveInitialBoundaryNAddFour

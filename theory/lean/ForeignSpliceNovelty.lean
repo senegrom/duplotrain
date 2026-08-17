@@ -167,7 +167,6 @@ theorem manufactured_flip_candy_splice_approach_foreign_two_phases
     (htail : PhysicalTrace w (outside, state) oldTail
       ((ManufacturedReflector.flip R).orientedFinish state, state))
     (hnotRunway : (entry, mouth) ∉ R.runway)
-    (_hentryBranch : entry % 3 ≠ 0)
     {old : Passage} (hold : old ∈ R.candy)
     (horientation : (entry, mouth) = old ∨
       (entry, mouth) = (old.2, old.1))
@@ -746,7 +745,7 @@ theorem manufactured_flip_candy_splice_approach_foreign_all_two_phases
   intro d
   by_cases hfirst : d <= period
   · exact manufactured_flip_candy_splice_approach_foreign_two_phases
-      R state hpaths hsplit htail hnotRunway hentryBranch hold
+      R state hpaths hsplit htail hnotRunway hold
       horientation hentryGrooved happroach happroachGrooved
       happroachForeignNew happroachForeignOld hcrossed hmouthLink
       (by simpa [period] using hfirst)
@@ -811,10 +810,6 @@ theorem manufactured_flip_candy_splice_approach_contact_two_phases
   have hnewOld : mouth / 3 ≠ R.actionSwitch := by
     intro hEq
     exact hentryOld (hentryNew.trans hEq)
-  have hreturnNew : returnPort / 3 = mouth / 3 := by
-    have hs := arrive_exit_switch state returnPort
-    rw [hcrossed] at hs
-    exact hs.symm
   have hcomm :
       flipAt (flipAt state R.actionSwitch) (mouth / 3) =
         bothState := by

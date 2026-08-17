@@ -175,6 +175,77 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reflector_damage_approach_writt
   exact S.changed_contact_approach_written_of_absent
     hN habsentA D
 
+/-- A switch-simple trace beginning at the stem of `k0` cannot productively
+first-write `k0` during that trace. -/
+theorem stem_switch_not_mem_firstWriterSwitches_of_simple_trace
+    {w : Wiring} {N e k0 : Nat} {state : Tongues}
+    {route : List Passage} {finish : Nat × Tongues}
+    (hstem : e = 3 * k0)
+    (htrace : PhysicalTrace w (e, state) route finish)
+    (hsimple : SwitchSimple route) :
+    Not (k0 ∈
+      (rawFirstWriterTimes w N (e, state) route.length).map
+        (rawWriterAt w (e, state))) := by
+  intro hm
+  obtain ⟨k, hk, hwriter⟩ := List.mem_map.mp hm
+  have hkData := mem_rawFirstWriterTimes_iff.mp hk
+  have hklt : k < route.length := hkData.1
+  have hprod : RawProductiveAt w N (e, state) k := hkData.2.1
+  by_cases hkzero : k = 0
+  · subst k
+    apply hprod.2
+    rcases Option.isSome_iff_exists.mp hprod.1 with ⟨next, hnext⟩
+    have hnextOne : stepN w 1 (e, state) = some next := by
+      simpa using hnext
+    have hemod : e % 3 = 0 := by omega
+    have hediv : e / 3 = k0 := by omega
+    have harrive : arrive state e =
+        (selectedBranch state k0, state) := by
+      simp [arrive, hemod, hediv, selectedBranch]
+    have hnextState : next.2 = state := by
+      simp only [stepN, step, harrive] at hnextOne
+      cases hlink : w.link (selectedBranch state k0) with
+      | none => simp [hlink] at hnextOne
+      | some q =>
+          simp [hlink] at hnextOne
+          exact (Prod.mk.inj hnextOne.symm).2
+    unfold restrictedTonguesAt tonguesAt
+    rw [hnextOne]
+    simp [hnextState, stepN]
+  · have hkpos : 0 < k := by omega
+    have hzeroInside : 0 < route.length := by omega
+    have hzeroWriter :=
+      htrace.rawWriterAt_eq_passageSwitch_getElem
+        (k := 0) hzeroInside
+    have hkWriter :=
+      htrace.rawWriterAt_eq_passageSwitch_getElem
+        (k := k) hklt
+    have hpair := List.pairwise_iff_getElem.mp hsimple
+    have hzeroMap : 0 < (route.map passageSwitch).length := by
+      simpa using hzeroInside
+    have hkMap : k < (route.map passageSwitch).length := by
+      simpa using hklt
+    have hne := hpair 0 k hzeroMap hkMap hkpos
+    apply hne
+    simp only [List.getElem_map]
+    rw [← hzeroWriter, ← hkWriter]
+    calc
+      rawWriterAt w (e, state) 0 = e / 3 := by
+        simp [rawWriterAt, rawEntryAt, stepN]
+      _ = k0 := by omega
+      _ = rawWriterAt w (e, state) k := hwriter.symm
+
+/-- The construction of a manufactured reflector cannot productively
+first-write its starting switch when the incoming port is that switch's
+stem. -/
+theorem ManufacturedReflector.stem_switch_not_mem_constructionFirstWriterSwitches
+    {w : Wiring} {N g e k0 : Nat}
+    (B : ManufacturedReflector w g e)
+    (hstem : g = 3 * k0) :
+    Not (k0 ∈ B.constructionFirstWriterSwitches N) := by
+  exact stem_switch_not_mem_firstWriterSwitches_of_simple_trace
+    hstem B.exploration_trace B.exploration_simple
+
 /-- The sharpened residual set.  Support damage survives only as an
 approach-written flip contact or under the occurrence saving. -/
 inductive BoundarySharpResidual
@@ -197,19 +268,9 @@ inductive BoundarySharpResidual
       (P : PartialSecondReflectorCompletion S.A N)
       (damage : Not (PathGrooves S.A.toSupported.paths
         P.reflector.preReturn.2))
-  | absentPresentWriter
-      (R : ManufacturedFlipReflector w S.source.g S.source.e)
-      (kind : S.A = ManufacturedReflector.flip R)
-      (absentA : Not (S.source.k0 ∈
-        S.A.exploration.map passageSwitch))
-      (P : PartialSecondReflectorCompletion S.A N)
-      (supportGrooved : PathGrooves S.A.toSupported.paths
-        P.reflector.preReturn.2)
-      (present : S.source.k0 ∈
-        P.reflector.constructionFirstWriterSwitches N)
 
 /-- **Sharpened dead/cycle/reflector assembly.**  Every saving residual
-reaches one of the four sharp constructors: the two absent-saving damage
+reaches one of the three sharp constructors: the two absent-saving damage
 branches collapse into the approach-written contact. -/
 theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
     {w : Wiring} {N : Nat}
@@ -290,9 +351,8 @@ theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
                       (by simpa [hkind] using hbase)
                       hBpaths (by simpa [hkind] using hpre)).elim
               | flip R =>
-                  exact ⟨BoundarySharpResidual.absentPresentWriter
-                    R hkind habsent.1 P (by simpa [P] using hpre)
-                      (by simpa [P] using hpresent)⟩
+                  exact ((B.stem_switch_not_mem_constructionFirstWriterSwitches
+                    S.source.stem) hpresent).elim
             case neg =>
               exact (S.false_of_absent_protected_pair_of_second_writer_absent
                 hN habsent.1 B hbase hBpaths hpre hpresent).elim

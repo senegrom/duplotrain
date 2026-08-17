@@ -93,7 +93,6 @@ theorem raw_tongue_change_is_productive_writer
 switch's own tongue. -/
 theorem rawProductiveAt_changes_writer
     {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
     {start : Nat × Tongues} {k : Nat}
     (hprod : RawProductiveAt w N start k) :
     ∃ cur next,
@@ -104,11 +103,6 @@ theorem rawProductiveAt_changes_writer
   obtain ⟨cur, next, hcur, hnext, hstep⟩ :=
     live_successor_configs hprod.1
   have hparts := step_some_parts hstep
-  have hwriterLt : cur.1/3 < N := by
-    have hraw : rawWriterAt w start k = cur.1/3 := by
-      simp [rawWriterAt, rawEntryAt, hcur]
-    rw [← hraw]
-    exact rawProductiveAt_writer_lt hN hprod
   have harrived : next.2 = (arrive cur.2 cur.1).2 := by
     simpa [arrivedTongues] using hparts.2
   have hchanged : next.2 (cur.1/3) ≠ cur.2 (cur.1/3) := by
@@ -119,7 +113,6 @@ theorem rawProductiveAt_changes_writer
       unfold VectorCount.restrict
       apply List.map_congr_left
       intro j hj
-      have hjN : j < N := List.mem_range.mp hj
       by_cases hjWriter : j = cur.1/3
       · simpa [hjWriter] using hsame
       · rw [harrived]
@@ -130,7 +123,6 @@ theorem rawProductiveAt_changes_writer
 
 theorem rawProductiveAt_is_endpoint_pivot
     {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
     {start : Nat × Tongues} {k : Nat}
     (hprod : RawProductiveAt w N start k) :
     ∃ cur next C,
@@ -141,7 +133,7 @@ theorem rawProductiveAt_is_endpoint_pivot
       exitPort cur = 3*C ∧
       next.2 = flipAt cur.2 C := by
   obtain ⟨cur, next, hcur, hnext, hstep, hchanged⟩ :=
-    rawProductiveAt_changes_writer hN hprod
+    rawProductiveAt_changes_writer hprod
   let C := cur.1/3
   have hC : C = rawWriterAt w start k := by
     simp [C, rawWriterAt, rawEntryAt, hcur]

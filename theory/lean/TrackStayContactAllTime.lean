@@ -167,8 +167,7 @@ theorem runway_fault_dichotomy_general_pointwise_stay
       refine ⟨port, phase, ?_, hphase⟩
       rw [hdecomp', stepN_add, hbeforeFlip.sound]
       exact hrun
-  · have hxMouth : x = A.mouth := by omega
-    have hgrooveBack : arrive state x = (p, state) :=
+  · have hgrooveBack : arrive state x = (p, state) :=
       hgrooved (p, x) hmem
     have hforward : arrive state p = (x, state) :=
       groove_forward hgrooveBack

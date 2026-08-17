@@ -22,8 +22,6 @@ namespace GeneralN
 reusable coordinate when the old support is grooved at both endpoints. -/
 theorem PhysicalTrace.productive_writer_not_old_reusable
     {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
     (A : ManufacturedReflector w g e)
     {start finish : Nat × Tongues}
     {passages : List Passage}
@@ -37,7 +35,7 @@ theorem PhysicalTrace.productive_writer_not_old_reusable
   intro hreusable
   have hsurvives :=
     htrace.simple_raw_productive_writer_survives
-      hN hsimple hk hprod
+      hsimple hk hprod
   obtain ⟨path, hpath, old, hold, hswitch⟩ :=
     A.mem_reusableSwitches hreusable
   have hbaseOld := hbase path hpath old hold
@@ -93,8 +91,7 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
     have hkData := mem_rawFirstWriterTimes_iff.mp (by
       simpa [times] using hk)
     have houtside :=
-      htrace.productive_writer_not_old_reusable
-        hN A hsimple hbase hend hkData.1 hkData.2.1
+      htrace.productive_writer_not_old_reusable A hsimple hbase hend hkData.1 hkData.2.1
     apply houtside
     rw [← hEq]
     exact hOld
@@ -307,8 +304,6 @@ theorem simple_lead_one_vector_tail_distinct_le_N_add_three
     (htail : ∀ d, 0 < d → ∃ port,
       stepN w d atRepeat = some (port, settled))
     (times : List Nat)
-    (_hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
     (hnd : (times.map
       (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
     times.length ≤ N + 3 := by

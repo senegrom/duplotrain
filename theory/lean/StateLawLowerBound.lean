@@ -175,8 +175,6 @@ theorem lb_symm {N : Nat} (h3 : 3 ≤ N) :
                       have hchain := lb_link_chain_br2
                         (N := N) (k := p / 3 - 1)
                         (by omega) (by omega)
-                      have hq : 3 * (p / 3 - 1) + 2 =
-                          3 * (p / 3 - 1) + 2 := rfl
                       have hp : 3 * (p / 3 - 1 + 1) = p := by
                         omega
                       rw [hp] at hchain
@@ -311,7 +309,7 @@ theorem lb_stepN_one (w : Wiring) (c : Nat × Tongues) :
 
 /-! ## Tongue transitions -/
 
-theorem lb_TA_succ {N m : Nat} (_hm : m ≤ N - 3) (h4 : 4 ≤ N) :
+theorem lb_TA_succ {N m : Nat} (h4 : 4 ≤ N) :
     (fun j => if j = N - 2 - m then true else lbTA N m j) =
       lbTA N (m + 1) := by
   funext j
@@ -435,7 +433,7 @@ theorem lb_phaseA (h4 : 4 ≤ N) (h3 : 3 ≤ N) {m : Nat}
         exact hthis
       rw [hlink]
       simp only [Option.map_some]
-      rw [lb_TA_succ hm' h4]
+      rw [lb_TA_succ h4]
 
 /-- Reaching the teardrop stem at time `N-2`. -/
 theorem lb_cfg_N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -457,7 +455,7 @@ theorem lb_cfg_N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     simp only [Option.map_some]
     have hT : (fun j => if j = 1 then true else lbTA N (N - 3) j) =
         lbTA N (N - 2) := by
-      have h := lb_TA_succ (N := N) (m := N - 3) (Nat.le_refl _) h4
+      have h := lb_TA_succ (N := N) (m := N - 3) h4
       have hidx : N - 2 - (N - 3) = 1 := by omega
       rw [hidx] at h
       have hsucc : N - 3 + 1 = N - 2 := by omega
@@ -893,7 +891,7 @@ theorem lb_ne_TA_TB (h4 : 4 ≤ N) {m : Nat} (hm : m ≤ N - 2) :
   rw [decide_eq_decide] at hEq
   omega
 
-theorem lb_ne_TA_TC (h4 : 4 ≤ N) {m : Nat} (_hm : m ≤ N - 2) :
+theorem lb_ne_TA_TC (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
       VectorCount.restrict N (lbTC N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
@@ -920,7 +918,7 @@ theorem lb_ne_TA_TE (h4 : 4 ≤ N) {m : Nat} (hm : m ≤ N - 2) :
   rw [decide_eq_decide] at hEq
   omega
 
-theorem lb_ne_TA_TF (h4 : 4 ≤ N) {m : Nat} (_hm : m ≤ N - 2) :
+theorem lb_ne_TA_TF (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
       VectorCount.restrict N (lbTF N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
@@ -1206,7 +1204,7 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
         exact lb_ne_TA_TB h4 (by omega)
       rcases List.mem_cons.mp hbR with h | hbR
       · subst h
-        exact lb_ne_TA_TC h4 (by omega)
+        exact lb_ne_TA_TC h4
       rcases List.mem_cons.mp hbR with h | hbR
       · subst h
         exact lb_ne_TA_TD h4 (by omega)
@@ -1215,7 +1213,7 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
         exact lb_ne_TA_TE h4 (by omega)
       rcases List.mem_cons.mp hbR with h | hbR
       · subst h
-        exact lb_ne_TA_TF h4 (by omega)
+        exact lb_ne_TA_TF h4
       exact absurd hbR (List.not_mem_nil)
 
 /-- **The lower-bound half of the state law, for every `N ≥ 3`.**  The

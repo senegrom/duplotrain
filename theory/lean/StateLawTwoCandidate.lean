@@ -74,13 +74,6 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
       PhysicalTrace w (g, contact) before (p, contact) :=
     hprefix.replay_grooved contact hbeforeGrooved
   let loopSteps := before.length + tailTravel
-  have hlead :
-      stepN w loopSteps
-        (g, (ManufacturedReflector.flip R).activatedState) =
-          some (g, alternate) := by
-    dsimp [loopSteps]
-    rw [stepN_add, hprefix.sound]
-    exact htailContact
   have hcontactToAlternate :
       stepN w loopSteps (g, contact) = some (g, alternate) := by
     dsimp [loopSteps]

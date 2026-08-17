@@ -108,7 +108,6 @@ theorem prefix_then_two_phase_cycle_distinct_le_succ_succ
   have hhistory : history.length ≤ N + 2 := by
     simp [history]
     omega
-  have hcount' : times.length ≤ history.length := by simpa using hcount
   omega
 
 /-- First activation with the sharp `N+2` simple-cycle count. -/

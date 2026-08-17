@@ -604,8 +604,6 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_first_stay_protected_p
   have hAatBase : PathGrooves A.toSupported.paths B.baseState := by
     rw [hbaseA]
     exact hApaths
-  have hpreA : PathGrooves A.toSupported.paths B.preReturn.2 := by
-    simpa [A] using hpre
   have hhistory : forall x,
       List.Mem x (A.sharpConstructionHistory N) \/
         List.Mem x (B.sharpConstructionHistory N) ->

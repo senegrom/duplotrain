@@ -133,7 +133,6 @@ theorem forward_contact_repairs_old_passage
     exact hs.symm
   have hOldBranch : oldEntry % 3 ≠ 0 := by
     intro hOldStem
-    have hOldEq : oldEntry = 3 * (oldEntry / 3) := by omega
     have hsame : oldEntry = oldExit := by omega
     exact (arrive_exit_ne u oldExit) (by rw [hold]; exact hsame)
   have holdForward := groove_forward hold
@@ -867,8 +866,6 @@ theorem ManufacturedFlipReflector.mouth_is_stem
   rw [hold] at holdStem
   have hnewStem := arrive_stem_endpoint A.returnState A.secondArm
   rw [A.crossed] at hnewStem
-  have hfirstSwitch := arrive_exit_switch A.mouthState A.mouth
-  rw [hold] at hfirstSwitch
   have hsecondSwitch :=
     arrive_exit_switch A.returnState A.secondArm
   rw [A.crossed] at hsecondSwitch
@@ -1647,9 +1644,7 @@ theorem same_groove_same_tongue
   change u (p / 3) = v (p / 3)
   have hswitchU := arrive_exit_switch u x
   rw [hu] at hswitchU
-  have hswitchV := arrive_exit_switch v x
-  rw [hv] at hswitchV
-  simp only at hswitchU hswitchV
+  simp only at hswitchU
   by_cases hx : x % 3 = 0
   · unfold arrive at hu hv
     rw [if_pos hx] at hu hv
@@ -2494,8 +2489,7 @@ theorem runway_fault_dichotomy_general
       (A.candy.length + 2 + A.runway.length), ?_⟩
     exact theta_capture_after_unvisited_prefix hprefixData.1
       hforeign hcapture
-  · have hxMouth : x = A.mouth := by omega
-    have htargetMem : (p, x) ∈ runway := hmem
+  · have htargetMem : (p, x) ∈ runway := hmem
     have hgrooveBack : arrive state x = (p, state) :=
       hgrooved (p, x) htargetMem
     have hforward : arrive state p = (x, state) :=

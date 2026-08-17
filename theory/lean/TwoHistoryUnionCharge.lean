@@ -177,8 +177,6 @@ inside a switch-simple physical trace leaves its writer changed at the
 trace endpoint. -/
 theorem PhysicalTrace.simple_raw_productive_writer_survives
     {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
     {start finish : Nat × Tongues}
     {passages : List Passage}
     (htrace : PhysicalTrace w start passages finish)
@@ -200,7 +198,7 @@ theorem PhysicalTrace.simple_raw_productive_writer_survives
   rw [hsplit] at htrace'
   obtain ⟨atOld, hprefix, htail⟩ := htrace'.split_append
   obtain ⟨cur, next, hcur, _hnext, hstep, hchange⟩ :=
-    rawProductiveAt_changes_writer hN hprod
+    rawProductiveAt_changes_writer hprod
   have hprefixSound := hprefix.sound
   rw [List.length_take_of_le (Nat.le_of_lt hk)] at hprefixSound
   have hatOld : atOld = cur := by
@@ -298,8 +296,6 @@ theorem ManufacturedReflector.mem_reusableSwitches
 
 theorem ManufacturedReflector.second_exploration_productive_writer_not_reusable
     {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
     (hbaseGrooves :
@@ -314,7 +310,7 @@ theorem ManufacturedReflector.second_exploration_productive_writer_not_reusable
   intro hreusable
   have hsurvives :=
     B.exploration_trace.simple_raw_productive_writer_survives
-      hN B.exploration_simple hk hprod
+      B.exploration_simple hk hprod
   obtain ⟨path, hpath, old, hold, hswitch⟩ :=
     A.mem_reusableSwitches hreusable
   have hbaseOld := hbaseGrooves path hpath old hold
@@ -416,8 +412,7 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_le
       mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hk)
     have houtside :=
-      A.second_exploration_productive_writer_not_reusable
-        hN B hbaseGrooves hpreGrooves
+      A.second_exploration_productive_writer_not_reusable B hbaseGrooves hpreGrooves
           hkData.1 hkData.2.1
     apply houtside
     rw [← hEq]

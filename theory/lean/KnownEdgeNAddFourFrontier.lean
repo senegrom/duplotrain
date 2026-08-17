@@ -78,9 +78,6 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
         subst stateA
         have hentryB : w.link start.1 = some e :=
           w.symm _ _ hentry
-        have hliveA : ∀ k ∈ times,
-            (stepN w k (start.1, A.baseState)).isSome := by
-          simpa [hbaseA] using hlive
         have hndA : (times.map
             (restrictedTonguesAt w N
               (start.1, A.baseState))).Nodup := by
@@ -117,7 +114,7 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
                 have hsmall :=
                   simple_lead_one_vector_tail_distinct_le_N_add_three
                     hN A hA C.lead_trace C.lead_simple hend
-                    C.positive_settled times hliveA hndA
+                    C.positive_settled times hndA
                 omega
               · right
                 left

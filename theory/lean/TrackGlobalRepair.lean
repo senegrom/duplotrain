@@ -3617,10 +3617,6 @@ theorem manufactured_flip_candy_splice_periodic_of_approach_contact
   have hnewOld : mouth / 3 ≠ R.actionSwitch := by
     intro hEq
     exact hentryOld (hentryNew.trans hEq)
-  have hreturnNew : returnPort / 3 = mouth / 3 := by
-    have hs := arrive_exit_switch state returnPort
-    rw [hcrossed] at hs
-    exact hs.symm
 
   have hcompletionData := R.candy_completion_foreign state hpaths
     hsplit htail hnotRunway hold horientation

@@ -1,6 +1,5 @@
 name = "duplotrain"
 defaultTargets = [
-  "BoundaryAbsentPresentWriterElimination",
   "BoundaryAbsentProtectedPair",
   "BoundaryAbsentSecondWriter",
   "BoundaryApproachActionElimination",
@@ -75,9 +74,6 @@ defaultTargets = [
   "TwoJourneyTailCountSharp",
   "TwoPhasePrefixTailCount"
 ]
-
-[[lean_lib]]
-name = "BoundaryAbsentPresentWriterElimination"
 
 [[lean_lib]]
 name = "BoundaryAbsentProtectedPair"

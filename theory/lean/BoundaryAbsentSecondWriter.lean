@@ -76,8 +76,7 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_add_reserved_le
     have hkData := mem_rawFirstWriterTimes_iff.mp (by
       simpa [times] using hk)
     have houtside :=
-      A.second_exploration_productive_writer_not_reusable
-        hN B hbaseGrooves hpreGrooves
+      A.second_exploration_productive_writer_not_reusable B hbaseGrooves hpreGrooves
           hkData.1 hkData.2.1
     apply houtside
     rw [← hEq]
@@ -159,8 +158,7 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_add_two_reserved
     obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
     have hkData := mem_rawFirstWriterTimes_iff.mp (by
       simpa [times] using hk)
-    have houtside := A.second_exploration_productive_writer_not_reusable
-      hN B hbaseGrooves hpreGrooves hkData.1 hkData.2.1
+    have houtside := A.second_exploration_productive_writer_not_reusable B hbaseGrooves hpreGrooves hkData.1 hkData.2.1
     apply houtside
     rw [← hEq]
     exact hOld

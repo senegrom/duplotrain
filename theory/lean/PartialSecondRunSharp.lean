@@ -448,7 +448,6 @@ theorem ChangedContact.forward_stay_two_phase_tail
           hHalfAlt hHalfAltPhase hHalfStatePhase d
           (by simpa [period] using hd)
       have hpositive : 0 < period := by
-        have hdpos := (ManufacturedReflector.stay D).travel_pos
         dsimp [period, half, dTravel, lTravel]
         omega
       exact periodic_two_phase_prefix_tongues

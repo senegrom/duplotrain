@@ -94,7 +94,6 @@ theorem restrict_flipAt_congr
 writer. -/
 theorem rawProductiveAt_restricted_flip
     {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3*N ∧ q < 3*N)
     {start : Nat × Tongues} {k : Nat}
     (hprod : RawProductiveAt w N start k) :
     restrictedTonguesAt w N start (k+1) =
@@ -102,7 +101,7 @@ theorem rawProductiveAt_restricted_flip
         (flipAt (tonguesAt w start k) (rawWriterAt w start k)) := by
   obtain ⟨cur, next, C, hC, hcur, hnext, _hstep,
       _hexit, hflip⟩ :=
-    rawProductiveAt_is_endpoint_pivot hN hprod
+    rawProductiveAt_is_endpoint_pivot hprod
   subst C
   simp [restrictedTonguesAt, tonguesAt, hcur, hnext, hflip]
 
