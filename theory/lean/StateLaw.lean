@@ -1,13 +1,16 @@
-import GeneralN
+import StateLawNAddFourSharp
+import StateLawLowerBound
+import StateLawSmallN
 
 /-!
-# The state law — the target theorem, in the language of tracks and switches
+# THE STATE LAW: `f(N) = min(2^N, N + 4)`
 
-This file states the actual claim about trains, tracks and switches.
-**`StateLaw` is proved.**  The downstream theorem
-`GeneralN.stateLaw` in `StateLawNAddFourSharp.lean` has exactly this type;
-it is a weakening of the sharp `N + 4` bound proved there.  The proof is
-entirely symbolic in `N`, with no fixed-`N` enumeration.
+The single theorem of this development.  `state_law` says the maximum
+number of distinct switch settings a single train can visit on a layout
+of `N` lazy-point switches is exactly `min(2^N, N + 4)`: no run ever
+samples more pairwise-distinct restricted tongue vectors, and some layout,
+start, and duplicate-free list of live sample times attains the value.
+Every other file exists to support this statement.
 
 ## How to read the statement
 
@@ -15,7 +18,7 @@ entirely symbolic in `N`, with no fixed-`N` enumeration.
   its stem `3*k`, its left branch `3*k+1`, its right branch `3*k+2` —
   and `w.link` records which port is track-connected to which.  It is
   symmetric because physical track is.
-* `hN` says the layout uses only switches `0 … N-1`.
+* The bound `p < 3 * N` says the layout uses only switches `0 … N-1`.
 * A **state** is `(p, u)`: the train entering port `p` with tongue
   vector `u` (`u j` = the tongue of switch `j`).  One `step` applies
   the lazy-point rule, written in `GeneralN.arrive`:
@@ -24,43 +27,83 @@ entirely symbolic in `N`, with no fixed-`N` enumeration.
   pushed to that branch and the train exits by the stem.  Then the
   exit port's track connection gives the next entry port (`none` = the
   train falls off an unconnected end).
-* `stepN w k c0` is the state after `k` steps from `c0`; `hlive` says
+* `stepN w k c0` is the state after `k` steps from `c0`; liveness says
   the train is still on the track at each counted time.
 * `VectorCount.restrict N u` is the list `[u 0, …, u (N-1)]` — the
-  positions of the `N` tongues.
-* `Nodup` says the tongue vectors at the times `ks` are pairwise
-  distinct.
+  positions of the `N` tongues; `Nodup` says the sampled vectors are
+  pairwise distinct.
 
-So `StateLaw` reads: **a single train, on any lazy-point layout with
-`N` switches, starting anywhere, ever sees at most `N + 6` distinct
-switch settings.**  (The sharp constant, proved in
-`StateLawNAddFourSharp.lean`, is `N + 4`.)
+The upper half is `state_law_two_pow` (the finite-state ceiling) with
+`state_law_N_add_four` (the sharp symbolic bound); the attainment half is
+the empty layout at `N = 0`, the teardrop and dogbone witnesses at
+`N = 1, 2`, and the symbolic extremal family from `N = 3` on.
 -/
-
-namespace VectorCount
-
-open GeneralN (Tongues)
-
-/-- The tongue vector restricted to the first `N` switches. -/
-def restrict (N : Nat) (u : Tongues) : List Bool :=
-  (List.range N).map u
-
-end VectorCount
 
 namespace GeneralN
 
-/-- The tongue vector at time `k` of the run from `c0`. -/
-def tonguesAt (w : Wiring) (c0 : Nat × Tongues) (k : Nat) : Tongues :=
-  ((stepN w k c0).getD c0).2
-
-/-- **THE STATE LAW.**  A single train on any `N`-switch
-lazy-point layout visits at most `N + 6` distinct tongue vectors. -/
-def StateLaw : Prop :=
-  ∀ (w : Wiring) (N : Nat),
+/-- `count` is the exact state count for `N` switches: every run on every
+`N`-switch layout samples at most `count` pairwise-distinct restricted
+tongue vectors, and some layout, start, and duplicate-free live sample
+list attains `count`. -/
+def IsExactStateCount (N count : Nat) : Prop :=
+  (∀ (w : Wiring),
     (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) →
     ∀ (c0 : Nat × Tongues) (ks : List Nat),
       (∀ k ∈ ks, (stepN w k c0).isSome) →
       (ks.map fun k => VectorCount.restrict N (tonguesAt w c0 k)).Nodup →
-      ks.length ≤ N + 6
+      ks.length ≤ count) ∧
+  (∃ w : Wiring,
+    (∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N) ∧
+    ∃ (c0 : Nat × Tongues) (ks : List Nat),
+      (∀ k ∈ ks, (stepN w k c0).isSome) ∧
+      (ks.map fun k => VectorCount.restrict N (tonguesAt w c0 k)).Nodup ∧
+      ks.length = count)
+
+/-- `N + 4 ≤ 2^N` from three switches on: the `min` selects `N + 4`. -/
+theorem add_four_le_two_pow : ∀ {N : Nat}, 3 ≤ N → N + 4 ≤ 2 ^ N := by
+  intro N h3
+  induction N with
+  | zero => omega
+  | succ n ih =>
+    rcases Nat.lt_or_ge n 3 with hlt | hge
+    · have hn : n = 2 := by omega
+      subst hn
+      decide
+    · have hn := ih hge
+      rw [Nat.pow_succ]
+      omega
+
+/-- The layout with no track at all: the single witness for `N = 0`. -/
+def emptyWiring : Wiring := ⟨fun _ => none, by intro p q h; cases h⟩
+
+/-- **THE STATE LAW.**  On `N` lazy-point switches the maximum number of
+distinct switch settings a single train can visit is exactly
+`min(2^N, N + 4)`. -/
+theorem state_law (N : Nat) :
+    IsExactStateCount N (min (2 ^ N) (N + 4)) := by
+  constructor
+  · intro w hN c0 ks hlive hnd
+    have hnd' : (ks.map (fun k => VectorCount.restrict N
+        ((stepN w k c0).getD c0).2)).Nodup := hnd
+    exact Nat.le_min.mpr
+      ⟨state_law_two_pow w N c0 ks hnd,
+        state_law_N_add_four w N hN c0 ks hlive hnd'⟩
+  · match N with
+    | 0 =>
+      refine ⟨emptyWiring, ?_, (0, fun _ => false), [0],
+        by decide, by decide, by decide⟩
+      intro p q h
+      cases h
+    | 1 =>
+      obtain ⟨w, hb, c0, ks, hlive, hnd, hlen⟩ := state_law_lower_bound_one
+      exact ⟨w, hb, c0, ks, hlive, hnd, by rw [hlen]; decide⟩
+    | 2 =>
+      obtain ⟨w, hb, c0, ks, hlive, hnd, hlen⟩ := state_law_lower_bound_two
+      exact ⟨w, hb, c0, ks, hlive, hnd, by rw [hlen]; decide⟩
+    | n + 3 =>
+      obtain ⟨w, hb, c0, ks, hlive, hnd, hlen⟩ :=
+        state_law_lower_bound (N := n + 3) (by omega)
+      refine ⟨w, hb, c0, ks, hlive, hnd, ?_⟩
+      rw [hlen, Nat.min_eq_right (add_four_le_two_pow (by omega))]
 
 end GeneralN

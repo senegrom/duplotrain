@@ -1,144 +1,96 @@
-# Formal proofs (Lean 4): the sharp state law
+# Formal proof (Lean 4): the state law
 
-**The state law is sharp.** A single train on any `N`-switch lazy-point
-layout visits at most `N + 4` distinct tongue vectors — and at most `2^N`,
-the finite-state ceiling, which is the binding cap below `N = 3`. Both caps
-are attained: the symbolic family reaches `N + 4` for every `N ≥ 3`, and
-explicit small layouts reach `f(1) = 2` and `f(2) = 4`. Together this
-gives
+**The theorem.** On `N` lazy-point switches the maximum number of distinct
+switch settings a single train can visit is exactly
 
 ```
-f(N) = min(2^N, N + 4)       (N ≥ 1).
+f(N) = min(2^N, N + 4).
 ```
 
-Headline theorems:
+There is one headline theorem, in `StateLaw.lean`, and everything else in
+this directory exists to support it:
 
 ```
-GeneralN.state_law_N_add_four             -- StateLawNAddFourSharp.lean
-GeneralN.knownIncomingEdgeNAddFour        -- KnownEdgeNAddFourComplete.lean
-GeneralN.productiveInitialBoundaryNAddFour -- StateLawNAddFourSharp.lean
-GeneralN.state_law_lower_bound            -- StateLawLowerBound.lean
-GeneralN.state_law_two_pow                -- StateLawSmallN.lean
-GeneralN.state_law_lower_bound_one, _two  -- StateLawSmallN.lean
+GeneralN.state_law :
+    ∀ N, IsExactStateCount N (min (2 ^ N) (N + 4))
 ```
 
-The raw upper-bound statement (`StateLawNAddFour.lean`) is over
-`Wiring`/`stepN`: for every wiring `w` on switches `0 … N-1`, every start
-configuration, and every duplicate-free list of live sample times, the
-sampled restricted tongue vectors number at most `N + 4`. The proof is fully
-symbolic in `N`: no finite-instance argument, no Mathlib, no `native_decide`,
-and no `sorry`. The lower bound is also symbolic for `N ≥ 4`; its `N = 3`
-base case is checked by kernel `decide`. The `2^N` ceiling and its
-`N = 1, 2` witnesses (`StateLawSmallN.lean`) live in the same
-`Wiring`/`stepN` model, with the finite witness runs checked by kernel
-`decide` as well — nothing in the repository uses `native_decide`.
+`IsExactStateCount N count` (same file) says `count` is the exact maximum:
+every run on every `N`-switch layout samples at most `count`
+pairwise-distinct restricted tongue vectors, **and** some layout, start,
+and duplicate-free list of live sample times attains `count`.  The theorem
+is unconditional — `N = 0` is witnessed by the empty layout.
 
-There are 73 self-contained Lean libraries. To check everything:
+To check everything (73 self-contained libraries, no Mathlib):
 
 ```
 lake build
-lake build StateLawAxiomAudit
 ```
 
-`StateLawAxiomAudit.lean` runs `#print axioms` on the headline theorems.
-Every audited theorem — both sharp bounds and the small-`N` legs — depends
-only on `[propext, Classical.choice, Quot.sound]`, the three standard Lean
-axioms, and not on `sorryAx` or `Lean.ofReduceBool`. The
-`state-law-check` workflow repeats the full build and audit on every push to
-`main`.
+The build ends with `StateLawAxiomAudit.lean` printing `#print axioms`
+for the theorem.  Expected output: exactly `[propext, Classical.choice,
+Quot.sound]`, the three standard Lean axioms — no `sorryAx`, no
+`Lean.ofReduceBool` (the few finite checks use kernel `decide`, never
+`native_decide`).  The `state-law-check` workflow repeats the build and
+audit on every push to `main`.
 
 ## How to read the statement
 
-* A **wiring** `w` is a track layout: switch `k` owns three ports — its stem
-  `3*k`, left branch `3*k+1`, and right branch `3*k+2` — while `w.link`
-  records the symmetric physical track connection.
-* `hN` says the layout uses only switches `0 … N-1`.
+* A **wiring** `w` is a track layout: switch `k` owns three ports — its
+  stem `3*k`, left branch `3*k+1`, and right branch `3*k+2` — while
+  `w.link` records the symmetric physical track connection.  The bound
+  `p < 3 * N` says the layout uses only switches `0 … N-1`.
 * `stepN` drives the train one track piece at a time under the lazy-point
   rule: entering at a stem follows the tongue unchanged; entering at a
-  branch exits at the stem and flips the tongue when necessary.
-* `tonguesAt` / `restrictedTonguesAt` read the `N` tongue directions at a
-  given time — the machine state of the layout.
+  branch exits at the stem and flips the tongue when necessary.  A `none`
+  step means the train fell off an unconnected end; liveness asks each
+  sampled time to still be on the track.
+* `VectorCount.restrict N u` reads the `N` tongue directions — the machine
+  state of the layout; `Nodup` makes the sampled vectors pairwise
+  distinct.
 
-## Lower bound
+## Proof shape
 
-`StateLawLowerBound.lean` wires the extremal family symbolically. Switch `0`
-is a teardrop; switches `1 … N-3` form a branch-to-stem chain; and switches
-`N-2, N-1` are doubly linked. A cold run flips the chain down to the
-teardrop, rides back, closes the far switch, and then walks a four-corner
-Gray oscillation on switches `N-2` and `0`.
+**Upper half** — `ks.length ≤ min(2^N, N+4)` is two bounds:
 
-The `N + 4` sample times are
+* `state_law_two_pow` (`StateLawSmallN.lean`): the finite-state ceiling.
+  Restricted vectors are length-`N` boolean lists; their binary values are
+  distinct naturals below `2^N`.  Fully symbolic, no liveness needed.
+* `state_law_N_add_four` (`StateLawNAddFourSharp.lean`): the sharp
+  symbolic `N + 4` bound — the mathematical core of the development.
+  The known-incoming-edge theorem (`KnownEdgeNAddFourComplete.lean`)
+  bounds every shifted run by charging its death, stable-cycle,
+  support-changing contact, and protected-reflector-pair branches into one
+  shared `N`-coordinate construction history.  The remaining question — an
+  arbitrary productive first passage adding a genuinely new time-zero
+  vector — is reduced by `BoundaryResidualSharpening.lean` to three
+  constructors, which `BoundaryApproachActionElimination.lean`,
+  `BoundaryApproachWrittenElimination.lean`, and
+  `BoundaryOccurrenceDamageElimination.lean` eliminate.
 
-```
-0, 1, …, N-2, N, 2N-1, 2N, 3N-1, 4N-1.
-```
+**Attainment half** — a layout reaching the value for every `N`:
 
-Their trajectory is proved by phase inductions and their pairwise
-distinctness by explicit witnessing coordinates.
-
-## Upper bound
-
-The known-incoming-edge core (`knownIncomingEdgeNAddFour`) already bounded
-every shifted run by `N + 4`. Its death, stable-cycle, support-changing
-contact, and protected-reflector-pair branches are charged into one shared
-`N`-coordinate construction history.
-
-The only remaining issue was an arbitrary productive first passage: could
-its time-zero vector be genuinely new on top of the shifted known-edge
-budget? `BoundaryResidualSharpening.lean` reduces that question to three
-constructors.  (A fourth candidate — the second manufacture productively
-first-writing the boundary switch — is refuted at the reduction itself: the
-second manufacture starts at that switch's stem, and a switch-simple trace
-from a stem never productively first-writes its own switch.)  The closing
-files eliminate the three:
-
-* `BoundaryApproachActionElimination.lean` proves that a strict simple
-  approach from the boundary stem cannot first-write the boundary switch.
-  If it first-writes the old flip action instead, the tail has only one new
-  corner, so the reserved boundary coordinate still yields `N + 3`.
-* `BoundaryApproachWrittenElimination.lean` packages that charge to rule out
-  the complete approach-written residual.
-* `BoundaryOccurrenceDamageElimination.lean` handles both remaining support
-  damage cases. A canonical unchanged occurrence forces a self-linked first
-  reflector whose future has only two action phases, so a global `N+3`
-  history contradicts saturation. A noncanonical occurrence gives two
-  duplicate positions in the first manufacturing journey; the double-reduced
-  boundary history has exactly the ordinary compressed lead's length but also
-  contains the arbitrary time-zero vector. The existing zero/two/one-novelty
-  changed-contact classification therefore fits time zero inside `N + 4`.
-
-`StateLawNAddFourSharp.lean` combines these eliminations with
-`productiveInitialBoundaryNAddFour_iff_no_sharp_residual`, then applies the
-exact arbitrary-start wrapper from `StateLawNAddFourTop.lean`.
-
-## Auxiliary files
-
-* `StateLawSmallN.lean` proves the `2^N` finite-state ceiling for every
-  `N` — binary values of restricted vectors are distinct naturals below
-  `2^N` — and attains it at the two legs below the symbolic family's
-  reach: a one-switch teardrop for `f(1) = 2` and the two-switch dogbone
-  Gray square for `f(2) = 4`, both checked by kernel `decide`.
-  (`f(3) = 7` and `f(4) = 8` follow from the symbolic bounds.)
-* `GeneralN.stateLaw` — the historical `N+6` target statement in
-  `StateLaw.lean` — is proved in `StateLawNAddFourSharp.lean` as a
-  direct weakening of the sharp bound.
-
-## Independent open directions
-
-The sharp state-count law itself is closed. The echo-machine programme in
-`../lazy-point-theory.md` still contains open Gray-tail and transient lemmas;
-those would provide a different proof and stronger structural information,
-but are no longer needed for the `N + 4` bound.
+* `N = 0`: the empty layout (`StateLaw.lean`).
+* `N = 1, 2`: the `2^N` leg binds.  A one-switch teardrop visits both
+  states; the two-switch dogbone walks the full Gray square
+  `FF → TF → TT → FT` (`StateLawSmallN.lean`, kernel `decide`).
+* `N ≥ 3`: the `N + 4` leg binds.  `StateLawLowerBound.lean` wires the
+  extremal family symbolically: switch `0` is a teardrop, switches
+  `1 … N-3` a branch-to-stem chain, switches `N-2, N-1` doubly linked.
+  A cold run flips the chain, rides back, closes the far switch, and
+  walks a four-corner Gray oscillation; the `N + 4` sample times
+  `0, 1, …, N-2, N, 2N-1, 2N, 3N-1, 4N-1` are proved live and pairwise
+  distinct by phase inductions.  (Symbolic for `N ≥ 4`; the `N = 3` base
+  case is kernel `decide`.)
 
 ## History
 
-The bound-tightening campaign is now complete:
+The bound-tightening campaign that ended in the sharp constant:
 
 ```
 26N+3 → 24N+5 → 18N+3 → 17N+5 → 15N+7 → 14N+9
 → 8N+7 → 5N+9 → 3N+7 → 2N+9 → N+7 → N+6 → N+5 → N+4.
 ```
 
-The superseded stages and the echo-machine/four-beat-law programme remain
-available in git history; commit `2b75dd8` is the last state before the large
-cleanup of those historical libraries.
+The superseded stages remain in git history; commit `2b75dd8` is the last
+state before the large cleanup of the historical libraries.

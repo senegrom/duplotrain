@@ -1,4 +1,4 @@
-import StateLawNAddFour
+import TrackFiniteAlternation
 import StateLawTwoSixUltra
 
 /-!
@@ -32,6 +32,20 @@ contact is assumed here.
 -/
 
 namespace GeneralN
+
+/-- **THE SHARP STATE-LAW TARGET.**  A single train on any raw lazy-point
+wiring with `N` switches visits at most `N+4` pairwise-distinct restricted
+tongue vectors. -/
+def StateLawNAddFour : Prop :=
+  forall (w : Wiring) (N : Nat),
+    (forall p q, w.link p = some q ->
+      p < 3 * N /\ q < 3 * N) ->
+    forall (start : Nat × Tongues) (times : List Nat),
+      (forall k, k ∈ times -> (stepN w k start).isSome) ->
+      (times.map (fun k => VectorCount.restrict N
+        ((stepN w k start).getD start).2)).Nodup ->
+      times.length <= N + 4
+
 
 /-- The exact productive arbitrary-start boundary target needed by the raw
 `N+4` state law. -/

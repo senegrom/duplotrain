@@ -48,7 +48,6 @@ defaultTargets = [
   "StateLawAxiomAudit",
   "StateLawCoefficientOneTop",
   "StateLawLowerBound",
-  "StateLawNAddFour",
   "StateLawNAddFourSharp",
   "StateLawNAddFourTop",
   "StateLawSmallN",
@@ -72,7 +71,8 @@ defaultTargets = [
   "TripleSelfLinkSimpleCycleClosure",
   "TwoHistoryUnionCharge",
   "TwoJourneyTailCountSharp",
-  "TwoPhasePrefixTailCount"
+  "TwoPhasePrefixTailCount",
+  "VectorCount"
 ]
 
 [[lean_lib]]
@@ -220,9 +220,6 @@ name = "StateLawCoefficientOneTop"
 name = "StateLawLowerBound"
 
 [[lean_lib]]
-name = "StateLawNAddFour"
-
-[[lean_lib]]
 name = "StateLawNAddFourSharp"
 
 [[lean_lib]]
@@ -293,4 +290,7 @@ name = "TwoJourneyTailCountSharp"
 
 [[lean_lib]]
 name = "TwoPhasePrefixTailCount"
+
+[[lean_lib]]
+name = "VectorCount"
 
