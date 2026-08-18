@@ -121,14 +121,19 @@ def teardropLink : Nat → Option Nat
   | 2 => some 0
   | _ => none
 
+/-- The teardrop's edges, exhaustively. -/
+theorem teardropLink_cases (p q : Nat) (h : teardropLink p = some q) :
+    (p, q) = (0, 2) ∨ (p, q) = (2, 0) := by
+  match p, h with
+  | 0, h => cases h; decide
+  | 1, h => cases h
+  | 2, h => cases h; decide
+  | _ + 3, h => cases h
+
 theorem teardrop_symm :
     ∀ p q, teardropLink p = some q → teardropLink q = some p := by
   intro p q h
-  match p, h with
-  | 0, h => cases h; rfl
-  | 1, h => cases h
-  | 2, h => cases h; rfl
-  | _ + 3, h => cases h
+  rcases teardropLink_cases p q h with h' | h' <;> cases h' <;> rfl
 
 def teardropWiring : Wiring := ⟨teardropLink, teardrop_symm⟩
 
@@ -141,16 +146,10 @@ theorem state_law_lower_bound_one :
         (ks.map fun k =>
           VectorCount.restrict 1 (tonguesAt w c0 k)).Nodup ∧
         ks.length = 2 ^ 1 := by
-  refine ⟨teardropWiring, ?_, (2, fun _ => false), [0, 1], ?_, ?_, ?_⟩
-  · intro p q h
-    match p, h with
-    | 0, h => cases h; exact ⟨by omega, by omega⟩
-    | 1, h => cases h
-    | 2, h => cases h; exact ⟨by omega, by omega⟩
-    | _ + 3, h => cases h
-  · decide
-  · decide
-  · decide
+  refine ⟨teardropWiring, ?_, (2, fun _ => false), [0, 1],
+    by decide, by decide, by decide⟩
+  intro p q h
+  rcases teardropLink_cases p q h with h' | h' <;> cases h' <;> decide
 
 /-! ## The dogbone: `2^2 = 4` states on two switches -/
 
@@ -165,17 +164,24 @@ def dogboneLink : Nat → Option Nat
   | 5 => some 4
   | _ => none
 
+/-- The dogbone's edges, exhaustively. -/
+theorem dogboneLink_cases (p q : Nat) (h : dogboneLink p = some q) :
+    (p, q) = (0, 3) ∨ (p, q) = (3, 0) ∨ (p, q) = (1, 2) ∨
+      (p, q) = (2, 1) ∨ (p, q) = (4, 5) ∨ (p, q) = (5, 4) := by
+  match p, h with
+  | 0, h => cases h; decide
+  | 1, h => cases h; decide
+  | 2, h => cases h; decide
+  | 3, h => cases h; decide
+  | 4, h => cases h; decide
+  | 5, h => cases h; decide
+  | _ + 6, h => cases h
+
 theorem dogbone_symm :
     ∀ p q, dogboneLink p = some q → dogboneLink q = some p := by
   intro p q h
-  match p, h with
-  | 0, h => cases h; rfl
-  | 1, h => cases h; rfl
-  | 2, h => cases h; rfl
-  | 3, h => cases h; rfl
-  | 4, h => cases h; rfl
-  | 5, h => cases h; rfl
-  | _ + 6, h => cases h
+  rcases dogboneLink_cases p q h with h' | h' | h' | h' | h' | h' <;>
+    cases h' <;> rfl
 
 def dogboneWiring : Wiring := ⟨dogboneLink, dogbone_symm⟩
 
@@ -189,18 +195,10 @@ theorem state_law_lower_bound_two :
         (ks.map fun k =>
           VectorCount.restrict 2 (tonguesAt w c0 k)).Nodup ∧
         ks.length = 2 ^ 2 := by
-  refine ⟨dogboneWiring, ?_, (0, fun _ => false), [0, 2, 4, 6], ?_, ?_, ?_⟩
-  · intro p q h
-    match p, h with
-    | 0, h => cases h; exact ⟨by omega, by omega⟩
-    | 1, h => cases h; exact ⟨by omega, by omega⟩
-    | 2, h => cases h; exact ⟨by omega, by omega⟩
-    | 3, h => cases h; exact ⟨by omega, by omega⟩
-    | 4, h => cases h; exact ⟨by omega, by omega⟩
-    | 5, h => cases h; exact ⟨by omega, by omega⟩
-    | _ + 6, h => cases h
-  · decide
-  · decide
-  · decide
+  refine ⟨dogboneWiring, ?_, (0, fun _ => false), [0, 2, 4, 6],
+    by decide, by decide, by decide⟩
+  intro p q h
+  rcases dogboneLink_cases p q h with h' | h' | h' | h' | h' | h' <;>
+    cases h' <;> decide
 
 end GeneralN
