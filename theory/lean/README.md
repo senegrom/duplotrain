@@ -1,9 +1,10 @@
 # Formal proofs (Lean 4): the sharp state law
 
 **The state law is sharp.** A single train on any `N`-switch lazy-point
-layout visits at most `N + 4` distinct tongue vectors. For every `N ≥ 3`
-there is a layout on which it visits exactly `N + 4`; the exact small values
-are `f(1) = 2` and `f(2) = 4`. Together with the finite-state ceiling this
+layout visits at most `N + 4` distinct tongue vectors — and at most `2^N`,
+the finite-state ceiling, which is the binding cap below `N = 3`. Both caps
+are attained: the symbolic family reaches `N + 4` for every `N ≥ 3`, and
+explicit small layouts reach `f(1) = 2` and `f(2) = 4`. Together this
 gives
 
 ```
@@ -17,6 +18,8 @@ GeneralN.state_law_N_add_four             -- StateLawNAddFourSharp.lean
 GeneralN.knownIncomingEdgeNAddFour        -- KnownEdgeNAddFourComplete.lean
 GeneralN.productiveInitialBoundaryNAddFour -- StateLawNAddFourSharp.lean
 GeneralN.state_law_lower_bound            -- StateLawLowerBound.lean
+GeneralN.state_law_two_pow                -- StateLawSmallN.lean
+GeneralN.state_law_lower_bound_one, _two  -- StateLawSmallN.lean
 ```
 
 The raw upper-bound statement (`StateLawNAddFour.lean`) is over
@@ -25,7 +28,10 @@ configuration, and every duplicate-free list of live sample times, the
 sampled restricted tongue vectors number at most `N + 4`. The proof is fully
 symbolic in `N`: no finite-instance argument, no Mathlib, no `native_decide`,
 and no `sorry`. The lower bound is also symbolic for `N ≥ 4`; its `N = 3`
-base case is checked by kernel `decide`.
+base case is checked by kernel `decide`. The `2^N` ceiling and its
+`N = 1, 2` witnesses (`StateLawSmallN.lean`) live in the same
+`Wiring`/`stepN` model, with the finite witness runs checked by kernel
+`decide` as well — nothing in the repository uses `native_decide`.
 
 There are 73 self-contained Lean libraries. To check everything:
 
@@ -34,9 +40,10 @@ lake build
 lake build StateLawAxiomAudit
 ```
 
-`StateLawAxiomAudit.lean` runs `#print axioms` on the headline theorems. The
-sharp upper bound depends only on `[propext, Classical.choice, Quot.sound]`,
-the three standard Lean axioms, and not on `sorryAx`. The
+`StateLawAxiomAudit.lean` runs `#print axioms` on the headline theorems.
+Every audited theorem — both sharp bounds and the small-`N` legs — depends
+only on `[propext, Classical.choice, Quot.sound]`, the three standard Lean
+axioms, and not on `sorryAx` or `Lean.ofReduceBool`. The
 `state-law-check` workflow repeats the full build and audit on every push to
 `main`.
 
@@ -106,12 +113,12 @@ exact arbitrary-start wrapper from `StateLawNAddFourTop.lean`.
 
 ## Auxiliary files
 
-* `DuplotrainProofs.lean` exhaustively checks `f(1) = 2` and
-  `f(2) = 4` — the two legs of `min(2^N, N + 4)` below the symbolic
-  family's reach.  These finite results deliberately use
-  `native_decide`; they are separate from the symbolic proofs.
-  (`f(3) = 7` and `f(4) = 8` follow from the symbolic bounds and need
-  no exhaustion.)
+* `StateLawSmallN.lean` proves the `2^N` finite-state ceiling for every
+  `N` — binary values of restricted vectors are distinct naturals below
+  `2^N` — and attains it at the two legs below the symbolic family's
+  reach: a one-switch teardrop for `f(1) = 2` and the two-switch dogbone
+  Gray square for `f(2) = 4`, both checked by kernel `decide`.
+  (`f(3) = 7` and `f(4) = 8` follow from the symbolic bounds.)
 * `GeneralN.stateLaw` — the historical `N+6` target statement in
   `StateLaw.lean` — is proved in `StateLawNAddFourSharp.lean` as a
   direct weakening of the sharp bound.

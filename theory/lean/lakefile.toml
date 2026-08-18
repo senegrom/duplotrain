@@ -14,7 +14,6 @@ defaultTargets = [
   "BoundaryResidualSharpening",
   "ChangedContactNAddFour",
   "CompleteRepairFour",
-  "DuplotrainProofs",
   "EarlyFacingConstant",
   "FacingForwardNovelty",
   "FirstCycleCountSharp",
@@ -52,6 +51,7 @@ defaultTargets = [
   "StateLawNAddFour",
   "StateLawNAddFourSharp",
   "StateLawNAddFourTop",
+  "StateLawSmallN",
   "StateLawTwoCandidate",
   "StateLawTwoSharp",
   "StateLawTwoSixUltra",
@@ -116,9 +116,6 @@ name = "ChangedContactNAddFour"
 
 [[lean_lib]]
 name = "CompleteRepairFour"
-
-[[lean_lib]]
-name = "DuplotrainProofs"
 
 [[lean_lib]]
 name = "EarlyFacingConstant"
@@ -230,6 +227,9 @@ name = "StateLawNAddFourSharp"
 
 [[lean_lib]]
 name = "StateLawNAddFourTop"
+
+[[lean_lib]]
+name = "StateLawSmallN"
 
 [[lean_lib]]
 name = "StateLawTwoCandidate"
