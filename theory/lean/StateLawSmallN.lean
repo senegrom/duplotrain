@@ -118,10 +118,8 @@ theorem state_law_two_pow (w : Wiring) (N : Nat) (c0 : Nat × Tongues)
 
 /-- `N + 4 ≤ 2^N` from three switches on: the `min` selects `N + 4`. -/
 theorem add_four_le_two_pow : ∀ {N : Nat}, 3 ≤ N → N + 4 ≤ 2 ^ N
-  | 0, h => by omega
-  | 1, h => by omega
-  | 2, h => by omega
-  | 3, _ => by decide
+  | 0, h | 1, h | 2, h => by omega
+  | 3, _ => by omega
   | n + 4, _ => by
     have ih := add_four_le_two_pow (N := n + 3) (by omega)
     rw [Nat.pow_succ]
