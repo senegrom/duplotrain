@@ -39,7 +39,7 @@ theorem boolsToNat_lt_two_pow_length :
   | [] => by simp [boolsToNat]
   | b :: rest => by
     have ih := boolsToNat_lt_two_pow_length rest
-    simp only [boolsToNat, List.length_cons, Nat.pow_succ]
+    simp only [boolsToNat, List.length_cons]
     cases b <;> simp <;> omega
 
 theorem boolsToNat_cons_mod (b : Bool) (l : List Bool) :
