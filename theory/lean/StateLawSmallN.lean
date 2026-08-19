@@ -12,10 +12,13 @@ side of `min(2^N, N + 4)`, that is for `N ≥ 3`.  This file completes the
   sampled restricted tongue vectors has length at most `2^N`, for every
   wiring and every start.  (Restricted vectors are length-`N` boolean lists;
   their binary values are distinct naturals below `2^N`.)
-* `state_law_lower_bound_one` — a teardrop on one switch visits `2^1 = 2`
-  distinct vectors.
-* `state_law_lower_bound_two` — the dogbone on two switches walks the full
-  Gray square: `2^2 = 4` distinct vectors.
+* `state_law_lower_bound_zero/_one/_two` — the ceiling is attained below
+  the symbolic family's reach: the empty layout stands on its one vector,
+  a teardrop on one switch visits `2^1 = 2`, and the dogbone on two
+  switches walks the full Gray square, `2^2 = 4`.
+* `add_four_le_two_pow` — `N + 4 ≤ 2^N` from three switches on, so the
+  `min` in the state law selects `N + 4` exactly where the symbolic
+  family takes over.
 
 Together with `state_law_N_add_four` and `state_law_lower_bound` this
 closes `f(N) = min(2^N, N + 4)` for every `N ≥ 1`.  The witness runs are
@@ -112,6 +115,36 @@ theorem state_law_two_pow (w : Wiring) (N : Nat) (c0 : Nat × Tongues)
     rwa [hlenAll l hl] at hlt
   have hcount := nodup_nat_lt_length hndN hltAll
   simpa using hcount
+
+/-- `N + 4 ≤ 2^N` from three switches on: the `min` selects `N + 4`. -/
+theorem add_four_le_two_pow : ∀ {N : Nat}, 3 ≤ N → N + 4 ≤ 2 ^ N
+  | 0, h => by omega
+  | 1, h => by omega
+  | 2, h => by omega
+  | 3, _ => by decide
+  | n + 4, _ => by
+    have ih := add_four_le_two_pow (N := n + 3) (by omega)
+    rw [Nat.pow_succ]
+    omega
+
+/-! ## The empty layout: `2^0 = 1` state on zero switches -/
+
+/-- The layout with no track at all. -/
+def emptyWiring : Wiring := ⟨fun _ => none, by intro p q h; cases h⟩
+
+/-- `f(0) ≥ 1`: the empty layout stands still on its single vector. -/
+theorem state_law_lower_bound_zero :
+    ∃ w : Wiring,
+      (∀ p q, w.link p = some q → p < 3 * 0 ∧ q < 3 * 0) ∧
+      ∃ (c0 : Nat × Tongues) (ks : List Nat),
+        (∀ k ∈ ks, (stepN w k c0).isSome) ∧
+        (ks.map fun k =>
+          VectorCount.restrict 0 (tonguesAt w c0 k)).Nodup ∧
+        ks.length = 2 ^ 0 := by
+  refine ⟨emptyWiring, ?_, (0, fun _ => false), [0],
+    by decide, by decide, by decide⟩
+  intro p q h
+  cases h
 
 /-! ## The teardrop: `2^1 = 2` states on one switch -/
 

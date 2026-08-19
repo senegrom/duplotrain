@@ -70,7 +70,7 @@ audit on every push to `main`.
 
 **Attainment half** — a layout reaching the value for every `N`:
 
-* `N = 0`: the empty layout (`StateLaw.lean`).
+* `N = 0`: the empty layout (`StateLawSmallN.lean`).
 * `N = 1, 2`: the `2^N` leg binds.  A one-switch teardrop visits both
   states; the two-switch dogbone walks the full Gray square
   `FF → TF → TT → FT` (`StateLawSmallN.lean`, kernel `decide`).

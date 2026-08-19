@@ -43,7 +43,7 @@ def StateLawNAddFour : Prop :=
     forall (start : Nat × Tongues) (times : List Nat),
       (forall k, k ∈ times -> (stepN w k start).isSome) ->
       (times.map (fun k => VectorCount.restrict N
-        ((stepN w k start).getD start).2)).Nodup ->
+        (tonguesAt w start k))).Nodup ->
       times.length <= N + 4
 
 

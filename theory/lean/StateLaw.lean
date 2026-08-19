@@ -59,23 +59,6 @@ def IsExactStateCount (N count : Nat) : Prop :=
       (ks.map fun k => VectorCount.restrict N (tonguesAt w c0 k)).Nodup ∧
       ks.length = count)
 
-/-- `N + 4 ≤ 2^N` from three switches on: the `min` selects `N + 4`. -/
-theorem add_four_le_two_pow : ∀ {N : Nat}, 3 ≤ N → N + 4 ≤ 2 ^ N := by
-  intro N h3
-  induction N with
-  | zero => omega
-  | succ n ih =>
-    rcases Nat.lt_or_ge n 3 with hlt | hge
-    · have hn : n = 2 := by omega
-      subst hn
-      decide
-    · have hn := ih hge
-      rw [Nat.pow_succ]
-      omega
-
-/-- The layout with no track at all: the single witness for `N = 0`. -/
-def emptyWiring : Wiring := ⟨fun _ => none, by intro p q h; cases h⟩
-
 /-- **THE STATE LAW.**  On `N` lazy-point switches the maximum number of
 distinct switch settings a single train can visit is exactly
 `min(2^N, N + 4)`. -/
@@ -83,27 +66,18 @@ theorem state_law (N : Nat) :
     IsExactStateCount N (min (2 ^ N) (N + 4)) := by
   constructor
   · intro w hN c0 ks hlive hnd
-    have hnd' : (ks.map (fun k => VectorCount.restrict N
-        ((stepN w k c0).getD c0).2)).Nodup := hnd
     exact Nat.le_min.mpr
       ⟨state_law_two_pow w N c0 ks hnd,
-        state_law_N_add_four w N hN c0 ks hlive hnd'⟩
+        state_law_N_add_four w N hN c0 ks hlive hnd⟩
   · match N with
-    | 0 =>
-      refine ⟨emptyWiring, ?_, (0, fun _ => false), [0],
-        by decide, by decide, by decide⟩
-      intro p q h
-      cases h
-    | 1 =>
-      obtain ⟨w, hb, c0, ks, hlive, hnd, hlen⟩ := state_law_lower_bound_one
-      exact ⟨w, hb, c0, ks, hlive, hnd, by rw [hlen]; decide⟩
-    | 2 =>
-      obtain ⟨w, hb, c0, ks, hlive, hnd, hlen⟩ := state_law_lower_bound_two
-      exact ⟨w, hb, c0, ks, hlive, hnd, by rw [hlen]; decide⟩
+    | 0 => exact (by decide : (2:Nat) ^ 0 = min (2 ^ 0) (0 + 4)) ▸
+        state_law_lower_bound_zero
+    | 1 => exact (by decide : (2:Nat) ^ 1 = min (2 ^ 1) (1 + 4)) ▸
+        state_law_lower_bound_one
+    | 2 => exact (by decide : (2:Nat) ^ 2 = min (2 ^ 2) (2 + 4)) ▸
+        state_law_lower_bound_two
     | n + 3 =>
-      obtain ⟨w, hb, c0, ks, hlive, hnd, hlen⟩ :=
-        state_law_lower_bound (N := n + 3) (by omega)
-      refine ⟨w, hb, c0, ks, hlive, hnd, ?_⟩
-      rw [hlen, Nat.min_eq_right (add_four_le_two_pow (by omega))]
+      exact (Nat.min_eq_right (add_four_le_two_pow (N := n + 3) (by omega))).symm ▸
+        state_law_lower_bound (by omega)
 
 end GeneralN
