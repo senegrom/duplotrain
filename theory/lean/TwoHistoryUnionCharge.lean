@@ -433,7 +433,7 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_le
 /-- The second construction compressed to its initial vector, the post-vector
 of each productive first writer in the switch-simple exploration, and its
 single activated endpoint.  Quiet old-support passages create no entry. -/
-noncomputable def ManufacturedReflector.writerConstructionHistory
+def ManufacturedReflector.writerConstructionHistory
     {w : Wiring} {g e : Nat}
     (B : ManufacturedReflector w g e) (N : Nat) :
     List (List Bool) :=
@@ -617,7 +617,7 @@ theorem ManufacturedReflector.activated_mem_sharpHistoryCore
   apply A.mem_sharpHistoryCore_of_mem
   simp [ManufacturedReflector.sharpConstructionHistory]
 
-noncomputable def ManufacturedReflector.preservedTwoHistoryCore
+def ManufacturedReflector.preservedTwoHistoryCore
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)

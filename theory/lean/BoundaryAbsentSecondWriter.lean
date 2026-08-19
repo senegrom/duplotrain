@@ -22,7 +22,7 @@ namespace GeneralN
 
 /-- Switch coordinates of the productive first writers in a manufactured
 reflector's switch-simple construction. -/
-noncomputable def ManufacturedReflector.constructionFirstWriterSwitches
+def ManufacturedReflector.constructionFirstWriterSwitches
     {w : Wiring} {g e : Nat}
     (B : ManufacturedReflector w g e) (N : Nat) : List Nat :=
   (rawFirstWriterTimes w N (g, B.baseState)

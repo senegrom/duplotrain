@@ -225,7 +225,7 @@ theorem ChangedContact.post_reaches
 
 /-- Coefficient-one history through the contact, including the one changed
 post-contact vector. -/
-noncomputable def ChangedContact.history
+def ChangedContact.history
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : ChangedContact w A) (N : Nat) : List (List Bool) :=

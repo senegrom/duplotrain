@@ -204,7 +204,7 @@ theorem InitialEntryWriterOccurrence.doubleReducedBoundaryHistory_length
 
 /-- Add the second reflector's first-writer history, erasing the shared
 activation boundary once. -/
-noncomputable def InitialEntryWriterOccurrence.doubleReducedTwoHistory
+def InitialEntryWriterOccurrence.doubleReducedTwoHistory
     {w : Wiring} {g e k0 : Nat}
     {R : ManufacturedFlipReflector w g e}
     (O : InitialEntryWriterOccurrence w g e k0

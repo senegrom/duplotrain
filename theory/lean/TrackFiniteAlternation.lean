@@ -63,16 +63,30 @@ def RawRepeatedWriterNovelAt (w : Wiring) (N : Nat)
   ¬ RawFirstWriterAt w N start k ∧
   RawNovelAt w N start k
 
-noncomputable def rawFirstWriterTimes
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : List Nat := by
-  classical
-  exact (List.range K).filter
+instance (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) :
+    Decidable (RawProductiveAt w N start k) := by
+  unfold RawProductiveAt; infer_instance
+
+instance (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) :
+    Decidable (RawFirstWriterAt w N start k) := by
+  unfold RawFirstWriterAt; infer_instance
+
+instance (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) :
+    Decidable (RawNovelAt w N start k) := by
+  unfold RawNovelAt; infer_instance
+
+instance (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) :
+    Decidable (RawRepeatedWriterNovelAt w N start k) := by
+  unfold RawRepeatedWriterNovelAt; infer_instance
+
+def rawFirstWriterTimes
+    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : List Nat :=
+  (List.range K).filter
     (fun k => decide (RawFirstWriterAt w N start k))
 
-noncomputable def rawRepeatedWriterNovelTimes
-    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : List Nat := by
-  classical
-  exact (List.range K).filter
+def rawRepeatedWriterNovelTimes
+    (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : List Nat :=
+  (List.range K).filter
     (fun k => decide (RawRepeatedWriterNovelAt w N start k))
 
 
@@ -175,7 +189,7 @@ theorem rawFirstWriterAt_injective
     · have hgt : j < i := by omega
       exact (hi.2 j hgt hj.1 hwriter.symm).elim
 
-noncomputable def rawFirstWriterHistory
+def rawFirstWriterHistory
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) :
     List (List Bool) :=
   restrictedTonguesAt w N start 0 ::
@@ -183,7 +197,7 @@ noncomputable def rawFirstWriterHistory
       (fun k => restrictedTonguesAt w N start (k+1))
 
 /-- Post-vectors of the repeated-writer novelties. -/
-noncomputable def rawRepeatedWriterFresh
+def rawRepeatedWriterFresh
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) :
     List (List Bool) :=
   (rawRepeatedWriterNovelTimes w N start K).map

@@ -1039,7 +1039,7 @@ theorem ManufacturedFlipReflector.first_action_writer_post_eq_preReturn
 
 /-- The protected pair history with both the shared activation boundary and
 the first reflector's pre-return duplicate erased from the second history. -/
-noncomputable def ManufacturedFlipReflector.firstQuietProtectedHistory
+def ManufacturedFlipReflector.firstQuietProtectedHistory
     {w : Wiring} {g e : Nat}
     (R : ManufacturedFlipReflector w g e)
     (B : ManufacturedReflector w e g)

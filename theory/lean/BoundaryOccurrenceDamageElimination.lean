@@ -151,7 +151,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_canonical_saturation
 
 /-- Replace the first reflector's ordinary one-duplicate core in a changed
 contact lead by the two-duplicate boundary history. -/
-noncomputable def InitialEntryWriterOccurrence.doubleReducedContactLead
+def InitialEntryWriterOccurrence.doubleReducedContactLead
     {w : Wiring} {N g e k0 : Nat}
     {R : ManufacturedFlipReflector w g e}
     (O : InitialEntryWriterOccurrence w g e k0

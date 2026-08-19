@@ -99,7 +99,7 @@ theorem PhysicalTrace.no_strict_return_to_start_port
 
 /-- Productive first-writer coordinates in the strict approach to the first
 support-changing contact. -/
-noncomputable def PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches
+def PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : SimpleContinuationChangedContact w A) (N : Nat) : List Nat :=

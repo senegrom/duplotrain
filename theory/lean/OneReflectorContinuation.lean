@@ -116,7 +116,7 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
 
 /-- Compressed history for one completed reflector and a subsequent
 support-preserving switch-simple continuation. -/
-noncomputable def ManufacturedReflector.continuationHistory
+def ManufacturedReflector.continuationHistory
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
     (N : Nat) (start : Nat × Tongues) (length : Nat) :

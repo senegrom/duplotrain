@@ -37,7 +37,7 @@ abbrev SimpleContinuationChangedContact
 /-- Coefficient-one history through the first damaging contact.  The first
 reflector and all productive approach writers share the same `N`-coordinate
 budget; the changed post-vector is the only extra singleton. -/
-noncomputable def PartialSecondRunSharp.ChangedContact.compressedLead
+def PartialSecondRunSharp.ChangedContact.compressedLead
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : SimpleContinuationChangedContact w A) (N : Nat) :
