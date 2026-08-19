@@ -372,9 +372,8 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
           VectorCount.restrict N phase := by
         simp [restrictedTonguesAt, tonguesAt, hrun]
       rw [hvec]
-      rcases hphase with h | h
-      · simp [history, h]
-      · simp [history, h]
+      rcases hphase with h | h <;>
+        simp [history, h]
     have hcount := noveltyCoverOn_distinct_count hcover htailNodup
     simpa using hcount
   exact two_phase_prefix_then_direct_tail_distinct_le_succ

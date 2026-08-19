@@ -739,9 +739,8 @@ theorem manufactured_flip_candy_splice_approach_foreign_all_two_phases
               (by simpa [period] using hr)
           exact ⟨port, bothState, by
             simpa [bothState, newState] using hlocal, Or.inl rfl⟩) d
-    rcases hphase with rfl | rfl
-    · exact ⟨port, hrun⟩
-    · exact ⟨port, hrun⟩
+    rcases hphase with rfl | rfl <;>
+      exact ⟨port, hrun⟩
   intro d
   by_cases hfirst : d <= period
   · exact manufactured_flip_candy_splice_approach_foreign_two_phases

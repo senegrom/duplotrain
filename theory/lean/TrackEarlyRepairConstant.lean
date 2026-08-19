@@ -67,9 +67,8 @@ theorem backward_contact_tail_distinct_le_two
       exact ⟨port, v, hrun, Or.inl rfl⟩
     obtain ⟨port, phase, hrun, hphase⟩ :=
       periodic_two_phase_prefix_tongues hpositive hperiod hwindow m
-    rcases hphase with h | h
-    · exact ⟨port, by rwa [h] at hrun⟩
-    · exact ⟨port, by rwa [h] at hrun⟩
+    rcases hphase with h | h <;>
+      exact ⟨port, by rwa [h] at hrun⟩
   have hfromU : ∀ m, 1 ≤ m →
       ∃ port, stepN w m (p, u) = some (port, v) := by
     intro m hm

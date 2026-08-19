@@ -1,4 +1,3 @@
-import TrackEndpointMatching
 
 /-!
 # Self-pivot shrinkage and the serial one-shot obstruction

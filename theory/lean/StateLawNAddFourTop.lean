@@ -1,4 +1,3 @@
-import TrackFiniteAlternation
 import StateLawTwoSixUltra
 
 /-!

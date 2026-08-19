@@ -323,8 +323,7 @@ theorem ManufacturedFlipReflector.reverse_candy_suffix_absorbs_twoPhases
           rw [← hlen]
           exact hd)
     obtain ⟨port, phase, hrun, hphase⟩ := hphase
-    rcases hphase with hphase | hphase
-    · exact ⟨port, phase, hrun, Or.inr hphase⟩
-    · exact ⟨port, phase, hrun, Or.inr hphase⟩
+    rcases hphase with hphase | hphase <;>
+      exact ⟨port, phase, hrun, Or.inr hphase⟩
 
 end GeneralN

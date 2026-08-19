@@ -497,9 +497,8 @@ private theorem ManufacturedReflector.return_change_facing_one_novelty
               VectorCount.restrict N phase := by
             simp [restrictedTonguesAt, tonguesAt, hrun]
           rw [hvec]
-          rcases hphaseTail with h | h
-          · simp [tailHistory, h]
-          · simp [tailHistory, h]
+          rcases hphaseTail with h | h <;>
+            simp [tailHistory, h]
         have hcount := noveltyCoverOn_distinct_count hcover htailNodup
         simpa using hcount
       exact two_phase_prefix_then_direct_tail_one_novelty

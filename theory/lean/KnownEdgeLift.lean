@@ -1,6 +1,3 @@
-import TripleSelfLinkSimpleCycleClosure
-import TrackThetaAllTime
-import TrackStayContactAllTime
 import FacingForwardNovelty
 import BoundaryOverlapTailCount
 

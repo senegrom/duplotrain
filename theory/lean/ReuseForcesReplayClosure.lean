@@ -1,4 +1,3 @@
-import SelfPivotStrictShrink
 import RepeatedNoveltyDecomposition
 
 /-!

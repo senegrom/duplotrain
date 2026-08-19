@@ -1018,9 +1018,8 @@ theorem manufactured_suffix_explicit_lobe_four_phase_tongues
         have htongues : tonguesAt w (outside, newState) d = phase := by
           simp [tonguesAt, hrun]
         rw [htongues]
-        rcases hphase with rfl | rfl
-        · simp
-        · simp
+        rcases hphase with rfl | rfl <;>
+          simp
 
 /-- Disjoint runway actions: from the flipped mouth exit the paired
 double-lobe orbit is periodic. -/
