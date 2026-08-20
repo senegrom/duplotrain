@@ -56,9 +56,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_dead_second_probe
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (hdead : stepN w (N + 1)
       (R.source.e, R.A.activatedState) = none) : False := by
-  have hA : PathGrooves R.A.toSupported.paths R.A.activatedState := by
-    rw [← R.activated]
-    exact R.grooves
+  have hA : PathGrooves R.A.toSupported.paths R.A.activatedState := R.grooves
   have hlive : ∀ k ∈ R.source.times,
       (stepN w k (R.source.g, R.A.baseState)).isSome := by
     intro k hk
@@ -92,9 +90,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_preserved_second_cycle
   let core := R.A.continuationHistory N localStart C.lead.length
   let history := VectorCount.restrict N R.source.original ::
     (core ++ [VectorCount.restrict N C.settled])
-  have hA : PathGrooves R.A.toSupported.paths R.A.activatedState := by
-    rw [← R.activated]
-    exact R.grooves
+  have hA : PathGrooves R.A.toSupported.paths R.A.activatedState := R.grooves
   have hreachA : stepN w firstTravel
       (R.source.g, R.A.baseState) = some localStart := by
     simpa [firstTravel, localStart] using
@@ -163,9 +159,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_absent_protected_pair_
       (B.constructionFirstWriterSwitches N) S.source.k0)) :
     False := by
   have hApaths : PathGrooves S.A.toSupported.paths
-      S.A.activatedState := by
-    rw [<- S.activated]
-    exact S.grooves
+      S.A.activatedState := S.grooves
   have hlive : forall k, Membership.mem S.source.times k ->
       (stepN w k (S.source.g, S.A.baseState)).isSome := by
     intro k hk
@@ -311,12 +305,8 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_first_stay_protected_p
     ManufacturedReflector.stay R
   let history := VectorCount.restrict N S.source.original ::
     A.preservedTwoHistoryCore B N
-  have hApathsS : PathGrooves S.A.toSupported.paths
-      S.A.activatedState := by
-    rw [<- S.activated]
-    exact S.grooves
   have hApaths : PathGrooves A.toSupported.paths A.activatedState := by
-    simpa [A, hAeq] using hApathsS
+    simpa [A, hAeq] using S.grooves
   have hAbase : A.baseState = S.source.base := by
     simpa [A, hAeq] using S.reflector_base
   have hbaseA : B.baseState = A.activatedState := by

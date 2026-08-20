@@ -1,15 +1,16 @@
 import BoundaryChangedContactSaving
 
 /-!
-# Eliminating the action-only approach-written residual
+# Changed-contact bound with a reserved boundary stem
 
 When the changed-contact approach first-writes the old flip action, the local
 forward tail has only one fresh corner (the runway alternative is impossible).
 Consequently the exploration-absent boundary coordinate alone supplies the
 missing ambient reserve: the compressed lead is at most `N+2`, and the whole
-changed-contact run is at most `N+3`.  Thus the only approach-written residual
-left by the productive-boundary saving is a first write of the boundary switch
-itself.
+changed-contact run is at most `N+3`.  At the productive boundary the shifted
+run starts at the boundary stem, so switch simplicity also rules out a first
+write of the boundary switch.  Every such changed contact therefore fits
+`N+3`.
 -/
 
 namespace GeneralN
@@ -211,73 +212,6 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_t
         hN hA haction hk0 hreservedExploration hreservedApproach
         times hlive hnd
 
-theorem PartialSecondRunSharp.ChangedContact.stem_switch_not_mem_approachFirstWriterSwitches
-    {w : Wiring} {N g e k0 : Nat}
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hstem : e = 3 * k0) :
-    Not (k0 ∈ C.approachFirstWriterSwitches N) := by
-  intro hm
-  unfold PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches at hm
-  obtain ⟨k, hk, hwriter⟩ := List.mem_map.mp hm
-  have hkData := mem_rawFirstWriterTimes_iff.mp hk
-  have hklt : k < C.approach.length := hkData.1
-  have hprod : RawProductiveAt w N
-      (e, (ManufacturedReflector.flip R).activatedState) k :=
-    hkData.2.1
-  by_cases hkzero : k = 0
-  · subst k
-    apply hprod.2
-    rcases Option.isSome_iff_exists.mp hprod.1 with ⟨next, hnext⟩
-    have hnextOne : stepN w 1
-        (e, (ManufacturedReflector.flip R).activatedState) = some next := by
-      simpa using hnext
-    have hemod : e % 3 = 0 := by omega
-    have hediv : e / 3 = k0 := by omega
-    have harrive : arrive (ManufacturedReflector.flip R).activatedState e =
-        (selectedBranch (ManufacturedReflector.flip R).activatedState k0,
-          (ManufacturedReflector.flip R).activatedState) := by
-      simp [arrive, hemod, hediv, selectedBranch]
-    have hnextState : next.2 =
-        (ManufacturedReflector.flip R).activatedState := by
-      simp only [stepN, step, harrive] at hnextOne
-      cases hlink : w.link
-          (selectedBranch (ManufacturedReflector.flip R).activatedState k0) with
-      | none => simp [hlink] at hnextOne
-      | some q =>
-          simp [hlink] at hnextOne
-          exact (Prod.mk.inj hnextOne.symm).2
-    unfold restrictedTonguesAt tonguesAt
-    rw [hnextOne]
-    simp [hnextState, stepN]
-  · have hkpos : 0 < k := by omega
-    have hzeroInside : 0 < C.approach.length := by omega
-    have hzeroWriter :=
-      C.approach_trace.rawWriterAt_eq_passageSwitch_getElem
-        (k := 0) hzeroInside
-    have hkWriter :=
-      C.approach_trace.rawWriterAt_eq_passageSwitch_getElem
-        (k := k) hklt
-    have hpair := List.pairwise_iff_getElem.mp C.approach_simple
-    have hzeroMap : 0 < (C.approach.map passageSwitch).length := by
-      simpa using hzeroInside
-    have hkMap : k < (C.approach.map passageSwitch).length := by
-      simpa using hklt
-    have hne := hpair 0 k hzeroMap hkMap hkpos
-    apply hne
-    simp only [List.getElem_map]
-    rw [← hzeroWriter, ← hkWriter]
-    calc
-      rawWriterAt w
-          (e, (ManufacturedReflector.flip R).activatedState) 0 =
-          e / 3 := by simp [rawWriterAt, rawEntryAt, stepN]
-      _ = k0 := by omega
-      _ = rawWriterAt w
-          (e, (ManufacturedReflector.flip R).activatedState) k :=
-        hwriter.symm
-
-
 /-- In the productive-boundary geometry, the shifted run starts at the stem of
 the reserved switch.  Switch simplicity therefore makes the boundary reserve
 automatic, and every changed-contact branch is at most `N+3`. -/
@@ -305,7 +239,8 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_t
     times.length <= N + 3 := by
   apply C.changed_all_run_distinct_le_N_add_three_of_reserved_absent
     hN hA hk0 hreservedExploration
-    (C.stem_switch_not_mem_approachFirstWriterSwitches hstem)
+    (stem_switch_not_mem_firstWriterSwitches_of_simple_trace
+      (N := N) hstem C.approach_trace C.approach_simple)
     times hlive hnd
 
 end GeneralN

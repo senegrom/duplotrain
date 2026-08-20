@@ -3,7 +3,6 @@ defaultTargets = [
   "BoundaryAbsentProtectedPair",
   "BoundaryAbsentSecondWriter",
   "BoundaryApproachActionElimination",
-  "BoundaryApproachWrittenElimination",
   "BoundaryCanonicalGeometry",
   "BoundaryChangedContactSaving",
   "BoundaryDoubleDuplicate",
@@ -83,9 +82,6 @@ name = "BoundaryAbsentSecondWriter"
 
 [[lean_lib]]
 name = "BoundaryApproachActionElimination"
-
-[[lean_lib]]
-name = "BoundaryApproachWrittenElimination"
 
 [[lean_lib]]
 name = "BoundaryCanonicalGeometry"

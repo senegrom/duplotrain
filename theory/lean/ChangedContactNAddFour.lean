@@ -97,6 +97,65 @@ theorem PhysicalTrace.no_strict_return_to_start_port
   apply hne
   simpa [hzero, hreturned] using hwriters
 
+/-- A switch-simple trace beginning at the stem of `k0` cannot productively
+first-write `k0` during that trace. -/
+theorem stem_switch_not_mem_firstWriterSwitches_of_simple_trace
+    {w : Wiring} {N e k0 : Nat} {state : Tongues}
+    {route : List Passage} {finish : Nat × Tongues}
+    (hstem : e = 3 * k0)
+    (htrace : PhysicalTrace w (e, state) route finish)
+    (hsimple : SwitchSimple route) :
+    Not (k0 ∈
+      (rawFirstWriterTimes w N (e, state) route.length).map
+        (rawWriterAt w (e, state))) := by
+  subst e
+  intro hm
+  obtain ⟨k, hk, hwriter⟩ := List.mem_map.mp hm
+  have hkData := mem_rawFirstWriterTimes_iff.mp hk
+  have hklt : k < route.length := hkData.1
+  have hprod : RawProductiveAt w N (3 * k0, state) k := hkData.2.1
+  by_cases hkzero : k = 0
+  · subst k
+    apply hprod.2
+    rcases Option.isSome_iff_exists.mp hprod.1 with ⟨next, hnext⟩
+    have hnextOne : stepN w 1 (3 * k0, state) = some next := by
+      simpa using hnext
+    have harrive : arrive state (3 * k0) =
+        (selectedBranch state k0, state) := by
+      simp [arrive, selectedBranch]
+    have hnextState : next.2 = state := by
+      simp only [stepN, step, harrive] at hnextOne
+      cases hlink : w.link (selectedBranch state k0) with
+      | none => simp [hlink] at hnextOne
+      | some q =>
+          simp [hlink] at hnextOne
+          exact (Prod.mk.inj hnextOne.symm).2
+    unfold restrictedTonguesAt tonguesAt
+    rw [hnextOne]
+    simp [hnextState, stepN]
+  · have hkpos : 0 < k := by omega
+    have hzeroInside : 0 < route.length := by omega
+    have hzeroWriter :=
+      htrace.rawWriterAt_eq_passageSwitch_getElem
+        (k := 0) hzeroInside
+    have hkWriter :=
+      htrace.rawWriterAt_eq_passageSwitch_getElem
+        (k := k) hklt
+    have hpair := List.pairwise_iff_getElem.mp hsimple
+    have hzeroMap : 0 < (route.map passageSwitch).length := by
+      simpa using hzeroInside
+    have hkMap : k < (route.map passageSwitch).length := by
+      simpa using hklt
+    have hne := hpair 0 k hzeroMap hkMap hkpos
+    apply hne
+    simp only [List.getElem_map]
+    rw [← hzeroWriter, ← hkWriter]
+    calc
+      rawWriterAt w (3 * k0, state) 0 = (3 * k0) / 3 := by
+        simp [rawWriterAt, rawEntryAt, stepN]
+      _ = k0 := by omega
+      _ = rawWriterAt w (3 * k0, state) k := hwriter.symm
+
 /-- Productive first-writer coordinates in the strict approach to the first
 support-changing contact. -/
 def PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches

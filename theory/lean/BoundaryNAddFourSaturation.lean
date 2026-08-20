@@ -17,8 +17,8 @@ The first-activation geometry sharpens this further.  A productive first
 revisit of the initially written switch closes a switch-simple transient
 lap followed by a stable lap, hence has at most `N+1` vectors and cannot be
 saturated.  Thus the only surviving first-journey configurations are a
-literally absent initial coordinate or a facing occurrence which gives an
-explicit pair of consecutive equal vectors.
+literally absent initial coordinate or a facing occurrence, from which the
+consecutive-vector equality can be derived when needed.
 
 The final theorem is a reduction, not a proof of
 `ProductiveInitialBoundaryNAddFour`: its right-hand side is the strictly
@@ -56,29 +56,17 @@ structure ProductiveBoundaryNAddFourSaturation
 /-- The exact first-journey obstruction left by saturation.  The shifted
 run has manufactured its first reflector.  At the initial switch `k0`,
 either that coordinate is absent from the switch-simple exploration, or
-its unique occurrence is facing: the tongue state is unchanged and the
-two consecutive restricted vectors are literally equal. -/
+its unique occurrence leaves the state unchanged. -/
 structure ProductiveBoundaryNAddFourSavingResidual
     (w : Wiring) (N : Nat) : Type where
   source : ProductiveBoundaryNAddFourSaturation w N
   A : ManufacturedReflector w source.g source.e
-  stateA : Tongues
-  grooves : PathGrooves A.toSupported.paths stateA
+  grooves : PathGrooves A.toSupported.paths A.activatedState
   reflector_base : A.baseState = source.base
-  activated : stateA = A.activatedState
-  reached : stepN w
-    (A.exploration.length + A.runway.length + 1)
-    (source.g, source.base) = some (source.e, stateA)
   saving :
-    ((¬ source.k0 ∈ A.exploration.map passageSwitch) ∧
-      stateA source.k0 = source.base source.k0) ∨
-      (Exists fun O : InitialEntryWriterOccurrence
-          w source.g source.e source.k0 A =>
-        O.next = O.middle ∧
-          restrictedTonguesAt w N (source.g, A.baseState)
-              O.before.length =
-          restrictedTonguesAt w N (source.g, A.baseState)
-              (O.before.length + 1))
+    (¬ source.k0 ∈ A.exploration.map passageSwitch) ∨
+      ∃ O : InitialEntryWriterOccurrence
+          w source.g source.e source.k0 A, O.next = O.middle
 
 theorem ProductiveBoundaryNAddFourSaturation.false_of_global_history
     {w : Wiring} {N : Nat}
@@ -313,40 +301,18 @@ theorem productive_initial_boundary_N_add_four_or_saving_saturation
         · have hshort := hcycle S.times htailNodup
           have hsaturated := S.saturated
           omega
-        · let A := Exists.choose hreflector
-          have hstateData := Exists.choose_spec hreflector
-          let stateA := Exists.choose hstateData
-          have hdata := Exists.choose_spec hstateData
-          have hgrooves :
-              PathGrooves A.toSupported.paths stateA := hdata.1
-          have hreflectorBase : A.baseState = S.base := hdata.2.1
-          have hactivated : stateA = A.activatedState :=
-            hdata.2.2.1
-          have hreached : stepN w
-              (A.exploration.length + A.runway.length + 1)
-              (S.g, S.base) = some (S.e, stateA) :=
-            hdata.2.2.2.1
-          have hpreserves : forall j,
-              j ∉ A.exploration.map passageSwitch ->
-              stateA j = S.base j :=
-            hdata.2.2.2.2
+        · obtain ⟨A, _, hgrooves, hreflectorBase, rfl, _, _⟩ := hreflector
           by_cases hmem : S.k0 ∈
               A.exploration.map passageSwitch
           · let O := Classical.choice
               (first_entry_writer_occurrence_dichotomy A hmem)
             rcases O.state_case with hstay | hflip
-            · have hduplicate :=
-                entry_writer_unchanged_gives_consecutive_duplicate
-                  (N := N) A O hstay
-              exact ⟨{
+            · exact ⟨{
                 source := S
                 A := A
-                stateA := stateA
                 grooves := hgrooves
                 reflector_base := hreflectorBase
-                activated := hactivated
-                reached := hreached
-                saving := Or.inr ⟨O, hstay, hduplicate⟩
+                saving := Or.inr ⟨O, hstay⟩
               }⟩
             · let cycle := O.before ++ [(O.p, O.x)]
               have hcycle :=
@@ -365,12 +331,9 @@ theorem productive_initial_boundary_N_add_four_or_saving_saturation
           · exact ⟨{
               source := S
               A := A
-              stateA := stateA
               grooves := hgrooves
               reflector_base := hreflectorBase
-              activated := hactivated
-              reached := hreached
-              saving := Or.inl ⟨hmem, hpreserves S.k0 hmem⟩
+              saving := Or.inl hmem
             }⟩
 
 end GeneralN

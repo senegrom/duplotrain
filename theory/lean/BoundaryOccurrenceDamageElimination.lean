@@ -70,18 +70,16 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_canonical_saturation
 
   have hgeometry := S.canonical_source_self_link R O hcanonical
   have hge : S.source.g = S.source.e := hgeometry.1
-  have hApathsS : PathGrooves S.A.toSupported.paths
-      S.A.activatedState := by
-    rw [← S.activated]
-    exact S.grooves
   have hApaths : PathGrooves A.toSupported.paths A.activatedState := by
-    simpa [A, hAeq] using hApathsS
+    simpa [A, hAeq] using S.grooves
   have hAbase : A.baseState = S.source.base := by
     simpa [A, hAeq] using S.reflector_base
   have hreach : stepN w firstTravel
       (S.source.g, S.source.base) =
         some (S.source.e, A.activatedState) := by
-    simpa [firstTravel, A, hAeq, S.activated] using S.reached
+    rw [← S.reflector_base]
+    simpa [firstTravel, A, hAeq] using
+      S.A.manufacturing_journey_reaches_activated S.grooves
   have hreachSelf : stepN w firstTravel
       (S.source.g, S.source.base) =
         some (S.source.g, A.activatedState) := by
@@ -338,14 +336,10 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_occurrenc
     (D : PartialSecondRunSharp.ChangedContact w
       (ManufacturedReflector.flip R)) : False := by
   let C := D
-  have hApathsS : PathGrooves S.A.toSupported.paths
-      S.A.activatedState := by
-    rw [← S.activated]
-    exact S.grooves
   have hA : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths
       (ManufacturedReflector.flip R).activatedState := by
-    simpa [hAeq] using hApathsS
+    simpa [hAeq] using S.grooves
   have hAbase : (ManufacturedReflector.flip R).baseState =
       S.source.base := by
     simpa [hAeq] using S.reflector_base
@@ -420,14 +414,10 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_occurrence_changed_con
   generalize hAeq : S.A = A at O hstay D
   cases A with
   | stay R =>
-      have hApathsS : PathGrooves S.A.toSupported.paths
-          S.A.activatedState := by
-        rw [← S.activated]
-        exact S.grooves
       have hA : PathGrooves
           (ManufacturedReflector.stay R).toSupported.paths
           (ManufacturedReflector.stay R).activatedState := by
-        simpa [hAeq] using hApathsS
+        simpa [hAeq] using S.grooves
       have hAbase : (ManufacturedReflector.stay R).baseState =
           S.source.base := by
         simpa [hAeq] using S.reflector_base

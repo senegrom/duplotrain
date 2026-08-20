@@ -63,10 +63,10 @@ audit on every push to `main`.
   support-changing contact, and protected-reflector-pair branches into one
   shared `N`-coordinate construction history.  The remaining question — an
   arbitrary productive first passage adding a genuinely new time-zero
-  vector — is reduced by `BoundaryResidualSharpening.lean` to three
-  constructors, which `BoundaryApproachActionElimination.lean`,
-  `BoundaryApproachWrittenElimination.lean`, and
-  `BoundaryOccurrenceDamageElimination.lean` eliminate.
+  vector — is reduced to one saturated saving residual, which
+  `BoundaryResidualSharpening.lean` eliminates using
+  `BoundaryApproachActionElimination.lean` and
+  `BoundaryOccurrenceDamageElimination.lean`.
 
 **Attainment half** — a layout reaching the value for every `N`:
 

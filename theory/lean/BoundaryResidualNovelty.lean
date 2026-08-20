@@ -218,13 +218,10 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_unchanged
     (hpre : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths B.preReturn.2) :
     False := by
-  have hApathsS : PathGrooves S.A.toSupported.paths S.A.activatedState := by
-    rw [← S.activated]
-    exact S.grooves
   have hApaths : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths
       (ManufacturedReflector.flip R).activatedState := by
-    simpa [hAeq] using hApathsS
+    simpa [hAeq] using S.grooves
   have hAbase : (ManufacturedReflector.flip R).baseState =
       S.source.base := by
     simpa [hAeq] using S.reflector_base

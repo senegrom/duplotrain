@@ -14,9 +14,10 @@ coordinate alongside the reusable support, the approach writers, and the
 reserved action switch, lowering the compressed lead to `N+1` and the
 forward-flip changed-contact run to `N+3`.
 
-The two remaining tight sub-geometries — the flip action or the boundary
-switch productively first-written during the strict approach — are the
-refined residuals the sharp law still has to eliminate.
+`BoundaryApproachActionElimination` handles the remaining action-written
+case.  At the productive boundary, the shifted run begins at the boundary
+stem, so switch simplicity makes the boundary coordinate absent from the
+strict approach automatically.
 -/
 
 namespace GeneralN
@@ -215,12 +216,7 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_t
       hN hA habsent hk0 hreservedExploration hreservedApproach
   omega
 
-/-! ## The keystone dichotomy
-
-A sharp changed contact over a *stay* reflector always fits `N+3`.  Over a
-*flip* reflector with an exploration-absent boundary switch, it fits `N+3`
-unless the strict approach productively first-writes the action switch or
-the boundary switch — the two refined residual geometries. -/
+/-! ## Stay-reflector saving -/
 
 /-- A changed contact over a stay reflector is bounded by `N+3`: backward
 contacts by the compressed-lead theorem, forward contacts by the
@@ -258,46 +254,5 @@ theorem PartialSecondRunSharp.ChangedContact.stay_saving_all_run_distinct_le_N_a
     have hbound := changedContact_local_novelty_count
       hN C hA times hlive hnd hlocal
     omega
-
-/-- **The flip keystone dichotomy.**  A changed contact over a flip
-reflector whose boundary switch is exploration-absent either fits `N+3`
-or productively first-writes the action switch or the boundary switch
-during its strict approach. -/
-theorem PartialSecondRunSharp.ChangedContact.flip_saving_le_N_add_three_or_approach_written
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : PartialSecondRunSharp.ChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (hk0 : k0 < N)
-    (hreservedExploration : Not (k0 ∈
-      (ManufacturedReflector.flip R).exploration.map passageSwitch))
-    (times : List Nat)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
-    times.length <= N + 3 \/
-      R.actionSwitch ∈
-        C.approachFirstWriterSwitches N \/
-      k0 ∈
-        C.approachFirstWriterSwitches N := by
-  classical
-  let S := C
-  by_cases haction : R.actionSwitch ∈
-      S.approachFirstWriterSwitches N
-  · exact Or.inr (Or.inl haction)
-  by_cases hreserved : k0 ∈ S.approachFirstWriterSwitches N
-  · exact Or.inr (Or.inr hreserved)
-  exact Or.inl
-    (S.changed_all_run_distinct_le_N_add_three_of_action_and_reserved_absent
-      hN hA haction hk0 hreservedExploration hreserved
-        times hlive hnd)
 
 end GeneralN

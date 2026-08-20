@@ -1,92 +1,35 @@
 import BoundaryOccurrenceDamageElimination
-import KnownEdgeNAddFourComplete
 import ProductiveBoundaryNAddFourComplete
 
 /-!
-# Sharpening the productive-boundary residuals
+# Eliminating the productive-boundary saving residual
 
-The two support-damage residuals of the productive boundary both expose a sharp changed
-contact of the first reflector: the damaged stable cycle through its
-lead, the damaged opposite reflector through its exploration.  Under the
-*absent* boundary saving the keystone dichotomy
-(`BoundaryChangedContactSaving`) closes every such contact at `N+3` —
-one inside saturation — unless the reflector is a flip whose strict
-approach productively first-writes its action switch or the boundary
-switch.  This file rewires the exact-residual reduction accordingly: the
-two damage constructors survive only in that approach-written form or
-under the occurrence saving.
--/
-
-
-/-!
-## Structural dichotomy for an unfinished second journey
-
-This file separates the dynamic statement "the second probe does not
-manufacture an opposite reflector" from the coefficient-one accounting
-problem.  The dynamic conclusion is exact: the `N+1` probe either dies, or
-reaches a stable switch-simple cycle.  The latter has one settled restricted
-tongue vector at every absolute time after its transient lap.
-
-The statements are over raw `Wiring`, `PhysicalTrace`, and `stepN`; there is
-no finite-`N` evaluation and no hidden completion selector.
+The two support-damage outcomes of the productive boundary both expose the
+same sharp changed contact of the first reflector: the damaged stable cycle
+through its lead, the damaged opposite reflector through its exploration.
+Under the *absent* boundary saving, starting at the boundary stem makes its
+coordinate automatically reserved and closes every such contact at `N+3`.
+Under the occurrence saving, the occurrence replacement closes the same
+contact.  The provenance of the damage therefore need not survive as an
+intermediate residual.
 -/
 
 namespace GeneralN
 
-/-- The literal reflector payload returned by the second `N+1` probe. -/
-structure PartialSecondReflectorCompletion
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) (N : Nat) : Type where
-  reflector : ManufacturedReflector w e g
-  base : reflector.baseState = A.activatedState
 
-
-/-!
-## Coordinate charge in the canonical productive-boundary residual
-
-This file isolates the remaining canonical branch.  At the unchanged
-canonical occurrence, the initial boundary switch is the omitted action
-switch of the first flip reflector.  Full coordinate charge therefore puts
-that switch among the second reflector's productive first writers and the
-present-writer boundary theorem closes the branch.
-
-Saturation alone, however, leaves one exact arithmetic corner: if the action
-is absent from the second first writers, the generic two-novelty protected
-repair and the reserved-action charge bound meet at
-`reusable + secondWriters + 1 = N`.  The final theorem records this tight
-residual without claiming the unavailable full-charge equality.
--/
-
-
-/-- The refined damage residual: a flip first reflector whose changed
-contact first-writes the omitted action switch or the boundary switch
-during its strict approach. -/
-structure BoundaryApproachWrittenResidual
-    {w : Wiring} {N : Nat}
-    (S : ProductiveBoundaryNAddFourSavingResidual w N) : Type where
-  R : ManufacturedFlipReflector w S.source.g S.source.e
-  kind : S.A = ManufacturedReflector.flip R
-  absentExploration : Not (S.source.k0 ∈
-    (ManufacturedReflector.flip R).exploration.map passageSwitch)
-  contact : PartialSecondRunSharp.ChangedContact w
-    (ManufacturedReflector.flip R)
-
-/-- **The keystone applied to a saving residual.**  Under the absent
-boundary saving, any sharp changed contact of the first reflector either
-contradicts saturation or is the refined approach-written residual. -/
-theorem ProductiveBoundaryNAddFourSavingResidual.changed_contact_approach_written_of_absent
+/-- Under the absent boundary saving, every sharp changed contact contradicts
+saturation.  In the flip case the boundary stem makes its coordinate
+automatically reserved from the strict approach. -/
+theorem ProductiveBoundaryNAddFourSavingResidual.false_of_absent_changed_contact
     {w : Wiring} {N : Nat}
     (S : ProductiveBoundaryNAddFourSavingResidual w N)
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
     (habsentA : Not (S.source.k0 ∈
       S.A.exploration.map passageSwitch))
-    (D : PartialSecondRunSharp.ChangedContact w S.A) :
-    Nonempty (BoundaryApproachWrittenResidual S) := by
+    (D : PartialSecondRunSharp.ChangedContact w S.A) : False := by
   have hApaths : PathGrooves S.A.toSupported.paths
-      S.A.activatedState := by
-    rw [<- S.activated]
-    exact S.grooves
+      S.A.activatedState := S.grooves
   have hlive : forall k, k ∈ S.source.times ->
       (stepN w k (S.source.g, S.A.baseState)).isSome := by
     intro k hk
@@ -106,324 +49,88 @@ theorem ProductiveBoundaryNAddFourSavingResidual.changed_contact_approach_writte
       exact absurd hbound (by omega)
   | flip R =>
       rw [hkind] at D hApaths hlive hnd habsentA
-      rcases D.flip_saving_le_N_add_three_or_approach_written
-          hN hApaths S.source.switch_lt habsentA
-            S.source.times hlive hnd with hbound | hwritten
-      · exact absurd hbound (by omega)
-      · exact ⟨{
-          R := R
-          kind := hkind
-          absentExploration := habsentA
-          contact := D
-        }⟩
+      have hbound :=
+        D.changed_all_run_distinct_le_N_add_three_of_stem_reserved
+          hN hApaths S.source.switch_lt S.source.stem
+            habsentA S.source.times hlive hnd
+      exact absurd hbound (by omega)
 
-/-- A support-damaging stable second cycle under the absent saving is the
-approach-written residual. -/
-theorem ProductiveBoundaryNAddFourSavingResidual.cycle_damage_approach_written_of_absent
+/-- Any switch-simple continuation that damages the first reflector's support
+contradicts whichever boundary saving produced the saturated residual. -/
+theorem ProductiveBoundaryNAddFourSavingResidual.false_of_broken_simple
     {w : Wiring} {N : Nat}
     (S : ProductiveBoundaryNAddFourSavingResidual w N)
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
-    (habsentA : Not (S.source.k0 ∈
-      S.A.exploration.map passageSwitch))
-    (C : PartialSecondCycleOutcome w
-      (S.source.e, S.A.activatedState) N)
-    (hdamage : Not
-      (PathGrooves S.A.toSupported.paths C.atRepeat.2)) :
-    Nonempty (BoundaryApproachWrittenResidual S) := by
+    {finish : Nat × Tongues} {passages : List Passage}
+    (htrace : PhysicalTrace w
+      (S.source.e, S.A.activatedState) passages finish)
+    (hsimple : SwitchSimple passages)
+    (hbroken : Not (PathGrooves S.A.toSupported.paths finish.2)) :
+    False := by
   have hApaths : PathGrooves S.A.toSupported.paths
-      S.A.activatedState := by
-    rw [<- S.activated]
-    exact S.grooves
-  obtain ⟨D⟩ := PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple S.A
-    hApaths C.lead_trace C.lead_simple hdamage
-  exact S.changed_contact_approach_written_of_absent
-    hN habsentA D
+      S.A.activatedState := S.grooves
+  obtain ⟨D⟩ :=
+    PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple
+      S.A hApaths htrace hsimple hbroken
+  rcases S.saving with habsent | ⟨O, hstay⟩
+  · exact S.false_of_absent_changed_contact hN habsent D
+  · exact S.false_of_occurrence_changed_contact hN O hstay D
 
-/-- A support-damaging completed opposite reflector under the absent
-saving is the approach-written residual. -/
-theorem ProductiveBoundaryNAddFourSavingResidual.reflector_damage_approach_written_of_absent
+/-- **Final dead/cycle/reflector assembly.**  Every saturated productive
+boundary saving residual is physically impossible. -/
+theorem ProductiveBoundaryNAddFourSavingResidual.impossible
     {w : Wiring} {N : Nat}
     (S : ProductiveBoundaryNAddFourSavingResidual w N)
     (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    (habsentA : Not (S.source.k0 ∈
-      S.A.exploration.map passageSwitch))
-    (P : PartialSecondReflectorCompletion S.A N)
-    (hdamage : Not (PathGrooves S.A.toSupported.paths
-      P.reflector.preReturn.2)) :
-    Nonempty (BoundaryApproachWrittenResidual S) := by
-  have hApaths : PathGrooves S.A.toSupported.paths
-      S.A.activatedState := by
-    rw [<- S.activated]
-    exact S.grooves
-  have htrace : PhysicalTrace w
-      (S.source.e, S.A.activatedState)
-      P.reflector.exploration P.reflector.preReturn := by
-    simpa [P.base] using P.reflector.exploration_trace
-  obtain ⟨D⟩ := PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple S.A
-    hApaths htrace P.reflector.exploration_simple hdamage
-  exact S.changed_contact_approach_written_of_absent
-    hN habsentA D
-
-/-- A switch-simple trace beginning at the stem of `k0` cannot productively
-first-write `k0` during that trace. -/
-theorem stem_switch_not_mem_firstWriterSwitches_of_simple_trace
-    {w : Wiring} {N e k0 : Nat} {state : Tongues}
-    {route : List Passage} {finish : Nat × Tongues}
-    (hstem : e = 3 * k0)
-    (htrace : PhysicalTrace w (e, state) route finish)
-    (hsimple : SwitchSimple route) :
-    Not (k0 ∈
-      (rawFirstWriterTimes w N (e, state) route.length).map
-        (rawWriterAt w (e, state))) := by
-  intro hm
-  obtain ⟨k, hk, hwriter⟩ := List.mem_map.mp hm
-  have hkData := mem_rawFirstWriterTimes_iff.mp hk
-  have hklt : k < route.length := hkData.1
-  have hprod : RawProductiveAt w N (e, state) k := hkData.2.1
-  by_cases hkzero : k = 0
-  · subst k
-    apply hprod.2
-    rcases Option.isSome_iff_exists.mp hprod.1 with ⟨next, hnext⟩
-    have hnextOne : stepN w 1 (e, state) = some next := by
-      simpa using hnext
-    have hemod : e % 3 = 0 := by omega
-    have hediv : e / 3 = k0 := by omega
-    have harrive : arrive state e =
-        (selectedBranch state k0, state) := by
-      simp [arrive, hemod, hediv, selectedBranch]
-    have hnextState : next.2 = state := by
-      simp only [stepN, step, harrive] at hnextOne
-      cases hlink : w.link (selectedBranch state k0) with
-      | none => simp [hlink] at hnextOne
-      | some q =>
-          simp [hlink] at hnextOne
-          exact (Prod.mk.inj hnextOne.symm).2
-    unfold restrictedTonguesAt tonguesAt
-    rw [hnextOne]
-    simp [hnextState, stepN]
-  · have hkpos : 0 < k := by omega
-    have hzeroInside : 0 < route.length := by omega
-    have hzeroWriter :=
-      htrace.rawWriterAt_eq_passageSwitch_getElem
-        (k := 0) hzeroInside
-    have hkWriter :=
-      htrace.rawWriterAt_eq_passageSwitch_getElem
-        (k := k) hklt
-    have hpair := List.pairwise_iff_getElem.mp hsimple
-    have hzeroMap : 0 < (route.map passageSwitch).length := by
-      simpa using hzeroInside
-    have hkMap : k < (route.map passageSwitch).length := by
-      simpa using hklt
-    have hne := hpair 0 k hzeroMap hkMap hkpos
-    apply hne
-    simp only [List.getElem_map]
-    rw [← hzeroWriter, ← hkWriter]
-    calc
-      rawWriterAt w (e, state) 0 = e / 3 := by
-        simp [rawWriterAt, rawEntryAt, stepN]
-      _ = k0 := by omega
-      _ = rawWriterAt w (e, state) k := hwriter.symm
-
-/-- The construction of a manufactured reflector cannot productively
-first-write its starting switch when the incoming port is that switch's
-stem. -/
-theorem ManufacturedReflector.stem_switch_not_mem_constructionFirstWriterSwitches
-    {w : Wiring} {N g e k0 : Nat}
-    (B : ManufacturedReflector w g e)
-    (hstem : g = 3 * k0) :
-    Not (k0 ∈ B.constructionFirstWriterSwitches N) := by
-  exact stem_switch_not_mem_firstWriterSwitches_of_simple_trace
-    hstem B.exploration_trace B.exploration_simple
-
-/-- The sharpened residual set.  Support damage survives only as an
-approach-written flip contact or under the occurrence saving. -/
-inductive BoundarySharpResidual
-    {w : Wiring} {N : Nat}
-    (S : ProductiveBoundaryNAddFourSavingResidual w N) : Type where
-  | approachWritten
-      (D : BoundaryApproachWrittenResidual S)
-  | occurrenceCycleDamage
-      (O : InitialEntryWriterOccurrence w
-        S.source.g S.source.e S.source.k0 S.A)
-      (hstay : O.next = O.middle)
-      (C : PartialSecondCycleOutcome w
-        (S.source.e, S.A.activatedState) N)
-      (damage : Not
-        (PathGrooves S.A.toSupported.paths C.atRepeat.2))
-  | occurrenceReflectorDamage
-      (O : InitialEntryWriterOccurrence w
-        S.source.g S.source.e S.source.k0 S.A)
-      (hstay : O.next = O.middle)
-      (P : PartialSecondReflectorCompletion S.A N)
-      (damage : Not (PathGrooves S.A.toSupported.paths
-        P.reflector.preReturn.2))
-
-/-- **Sharpened dead/cycle/reflector assembly.**  Every saving residual
-reaches one of the three sharp constructors: the two absent-saving damage
-branches collapse into the approach-written contact. -/
-theorem ProductiveBoundaryNAddFourSavingResidual.reduces_to_sharp_residual
-    {w : Wiring} {N : Nat}
-    (S : ProductiveBoundaryNAddFourSavingResidual w N)
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N) :
-    Nonempty (BoundarySharpResidual S) := by
+      p < 3 * N /\ q < 3 * N) : False := by
   cases hprobe :
       stepN w (N + 1) (S.source.e, S.A.activatedState) with
   | none =>
-      exact (S.false_of_dead_second_probe hN hprobe).elim
+      exact S.false_of_dead_second_probe hN hprobe
   | some finish =>
       have hback : w.link S.source.g = some S.source.e :=
         w.symm _ _ S.source.entry
       rcases first_activated_trace_outcome_sharp_partial
-          hN hprobe hback with hcycle | hreflector
+        hN hprobe hback with hcycle | hreflector
       case inl =>
-        let C := Classical.choice hcycle
+        obtain ⟨C⟩ := hcycle
         by_cases hprotected :
             PathGrooves S.A.toSupported.paths C.atRepeat.2
         case pos =>
-          exact (S.false_of_preserved_second_cycle
-            hN C hprotected).elim
+          exact S.false_of_preserved_second_cycle hN C hprotected
         case neg =>
-          rcases S.saving with habsent | hoccurrence
-          case inl =>
-            obtain ⟨D⟩ := S.cycle_damage_approach_written_of_absent
-              hN habsent.1 C hprotected
-            exact ⟨BoundarySharpResidual.approachWritten D⟩
-          case inr =>
-            let O := Classical.choose hoccurrence
-            have hOdata := Classical.choose_spec hoccurrence
-            exact ⟨BoundarySharpResidual.occurrenceCycleDamage
-              O hOdata.1 C hprotected⟩
+          exact S.false_of_broken_simple
+            hN C.lead_trace C.lead_simple hprotected
       case inr =>
-        let B := Exists.choose hreflector
-        have hstateData := Exists.choose_spec hreflector
-        let state := Exists.choose hstateData
-        have hdata := Exists.choose_spec hstateData
-        have hBpathsRaw :
-            PathGrooves B.toSupported.paths state :=
-          hdata.1
-        have hbase : B.baseState = S.A.activatedState :=
-          hdata.2.1
-        have hactivated : state = B.activatedState :=
-          hdata.2.2
-        have hBpaths :
-            PathGrooves B.toSupported.paths B.activatedState := by
-          rw [<- hactivated]
-          exact hBpathsRaw
-        let P : PartialSecondReflectorCompletion S.A N := {
-          reflector := B
-          base := hbase
-        }
+        obtain ⟨B, _, hBpaths, hbase, rfl⟩ := hreflector
         by_cases hpre :
             PathGrooves S.A.toSupported.paths B.preReturn.2
         case neg =>
-          rcases S.saving with habsent | hoccurrence
-          case inl =>
-            obtain ⟨D⟩ := S.reflector_damage_approach_written_of_absent
-              hN habsent.1 P (by simpa [P] using hpre)
-            exact ⟨BoundarySharpResidual.approachWritten D⟩
-          case inr =>
-            let O := Classical.choose hoccurrence
-            have hOdata := Classical.choose_spec hoccurrence
-            exact ⟨BoundarySharpResidual.occurrenceReflectorDamage
-              O hOdata.1 P (by simpa [P] using hpre)⟩
+          exact S.false_of_broken_simple hN
+            (by simpa [hbase] using B.exploration_trace)
+            B.exploration_simple hpre
         case pos =>
-          rcases S.saving with habsent | hoccurrence
+          rcases S.saving with habsent | ⟨O, hstay⟩
           case inl =>
-            by_cases hpresent : Membership.mem
-                (B.constructionFirstWriterSwitches N) S.source.k0
-            case pos =>
-              cases hkind : S.A with
-              | stay R =>
-                  exact (S.false_of_first_stay_protected_pair
-                    hN R hkind B
-                      (by simpa [hkind] using hbase)
-                      hBpaths (by simpa [hkind] using hpre)).elim
-              | flip R =>
-                  exact ((B.stem_switch_not_mem_constructionFirstWriterSwitches
-                    S.source.stem) hpresent).elim
-            case neg =>
-              exact (S.false_of_absent_protected_pair_of_second_writer_absent
-                hN habsent.1 B hbase hBpaths hpre hpresent).elim
+            exact S.false_of_absent_protected_pair_of_second_writer_absent
+              hN habsent B hbase hBpaths hpre
+                (stem_switch_not_mem_firstWriterSwitches_of_simple_trace
+                  (N := N) S.source.stem B.exploration_trace
+                    B.exploration_simple)
           case inr =>
-            let O := Classical.choose hoccurrence
-            have hOdata := Classical.choose_spec hoccurrence
-            have hstay : O.next = O.middle := hOdata.1
-            cases hkind : S.A with
+            generalize hkind : S.A = A at O hstay hbase hpre
+            cases A with
             | stay R =>
-                exact (S.false_of_first_stay_protected_pair
-                  hN R hkind B
-                    (by simpa [hkind] using hbase)
-                    hBpaths (by simpa [hkind] using hpre)).elim
+                exact S.false_of_first_stay_protected_pair
+                  hN R hkind B hbase hBpaths hpre
             | flip R =>
-                let Oflip : InitialEntryWriterOccurrence
-                    w S.source.g S.source.e S.source.k0
-                      (ManufacturedReflector.flip R) := {
-                  before := O.before
-                  after := O.after
-                  p := O.p
-                  x := O.x
-                  nextPort := O.nextPort
-                  middle := O.middle
-                  next := O.next
-                  split := by simpa [hkind] using O.split
-                  switch_eq := O.switch_eq
-                  before_trace := by
-                    simpa [hkind] using O.before_trace
-                  arrive_eq := O.arrive_eq
-                  link_eq := O.link_eq
-                  reach := by simpa [hkind] using O.reach
-                  prefix_foreign := O.prefix_foreign
-                  prefix_preserves := by
-                    simpa [hkind] using O.prefix_preserves
-                  state_case := O.state_case
-                }
-                have hstayFlip : Oflip.next = Oflip.middle := by
-                  exact hstay
                 by_cases hcanonical :
-                    Oflip.before.length = R.runway.length
-                case pos =>
-                  exact (S.false_of_canonical_saturation
-                    hN R hkind Oflip hstayFlip hcanonical).elim
-                case neg =>
-                  exact (S.false_of_noncanonical_unchanged_protected_pair
-                    hN R hkind Oflip hstayFlip hcanonical B
-                      (by simpa [hkind] using hbase)
-                      hBpaths (by simpa [hkind] using hpre)).elim
-
-/-- **The sharpened equivalence.**  The productive boundary theorem — and
-with it the exact `N+4` state law — is equivalent to eliminating the four
-sharp residual constructors. -/
-theorem productiveInitialBoundaryNAddFour_iff_no_sharp_residual
-    {w : Wiring} {N : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N) :
-    ProductiveInitialBoundaryNAddFour w N <->
-      forall S : ProductiveBoundaryNAddFourSavingResidual w N,
-        BoundarySharpResidual S -> False := by
-  constructor
-  case mp =>
-    intro hboundary S _residual
-    have hbound := hboundary S.source.entry S.source.stem
-      S.source.switch_lt S.source.base_flip S.source.times
-        S.source.live S.source.distinct
-    have hsaturated := S.source.saturated
-    omega
-  case mpr =>
-    intro hno
-    unfold ProductiveInitialBoundaryNAddFour
-    intro g e k0 original base hentry hstem hk0 hbase
-      times hlive hnd
-    rcases productive_initial_boundary_N_add_four_or_saving_saturation
-        hN (knownIncomingEdgeNAddFour hN) hentry hstem hk0
-          original base hbase times hlive hnd with hbound | hsaving
-    case inl =>
-      exact hbound
-    case inr =>
-      let S := Classical.choice hsaving
-      exact (hno S
-        (Classical.choice (S.reduces_to_sharp_residual hN))).elim
+                    O.before.length = R.runway.length
+                · exact S.false_of_canonical_saturation
+                    hN R hkind O hstay hcanonical
+                · exact S.false_of_noncanonical_unchanged_protected_pair
+                    hN R hkind O hstay hcanonical B
+                      hbase hBpaths hpre
 
 end GeneralN
