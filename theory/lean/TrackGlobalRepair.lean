@@ -29,7 +29,6 @@ theorem exists_first_satisfying_split
       ∃ before x after,
         xs = before ++ x :: after ∧
         (∀ y ∈ before, ¬ P y) ∧ P x := by
-  classical
   intro xs hexists
   induction xs with
   | nil =>
@@ -176,7 +175,6 @@ theorem PhysicalTrace.repair_preserving_paths_until_conflict
         (finish.1, finalState) ∧
       PassagesGrooved finalState passages ∧
       PathGrooves guardPaths finalState := by
-  classical
   induction htrace generalizing state with
   | nil c =>
       exact Or.inr (Or.inr ⟨state, PhysicalTrace.nil _,

@@ -84,13 +84,10 @@ theorem PartialSecondRunSharp.ChangedContact.all_run_distinct_le_N_add_four
     (hnd : (times.map
       (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
     times.length <= N + 4 := by
-  let S := C
   rcases C.direction with hbackward |
       ⟨hforward, repaired, hrepair, hrestored⟩
-  · have hbackwardS : S.x = S.oriented.1 := by
-      exact hbackward
-    have hsmall := S.backward_all_run_distinct_le_N_add_three
-      hN hA hbackwardS times hlive hnd
+  · have hsmall := C.backward_all_run_distinct_le_N_add_three
+      hN hA hbackward times hlive hnd
     omega
   · cases A with
     | stay R =>
@@ -103,7 +100,7 @@ theorem PartialSecondRunSharp.ChangedContact.all_run_distinct_le_N_add_four
           hN C hA times hlive hnd hlocal
         omega
     | flip R =>
-        exact S.changed_all_run_distinct_le_N_add_four
+        exact C.changed_all_run_distinct_le_N_add_four
           hN hA times hlive hnd
 
 /-- A literal changed-contact residual from the known-edge decomposition is

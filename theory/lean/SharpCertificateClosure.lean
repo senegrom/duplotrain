@@ -148,7 +148,6 @@ theorem PhysicalTrace.rawRepeatedWriterNovelTimes_eq_nil_of_switchSimple
     (htrace : PhysicalTrace w start passages finish)
     (hsimple : SwitchSimple passages) :
     rawRepeatedWriterNovelTimes w N start passages.length = [] := by
-  classical
   cases htimes : rawRepeatedWriterNovelTimes w N start passages.length with
   | nil => rfl
   | cons k rest =>
@@ -173,7 +172,6 @@ theorem PhysicalTrace.restrictedTonguesAt_mem_rawFirstWriterHistory
     ∀ k, k ≤ passages.length →
       restrictedTonguesAt w N start k ∈
         rawFirstWriterHistory w N start passages.length := by
-  classical
   intro k hk
   have hcover := restrictedTonguesAt_mem_finite_writer_cover
     w N start passages.length k hk

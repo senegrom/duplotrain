@@ -49,7 +49,6 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_add_reserved_le
     A.reusableSwitches.length +
         (rawFirstWriterTimes w N (e, B.baseState)
           B.exploration.length).length + 1 <= N := by
-  classical
   let times :=
     rawFirstWriterTimes w N (e, B.baseState)
       B.exploration.length
@@ -134,7 +133,6 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_add_two_reserved
     A.reusableSwitches.length +
         (rawFirstWriterTimes w N (e, B.baseState)
           B.exploration.length).length + 2 ≤ N := by
-  classical
   let times := rawFirstWriterTimes w N (e, B.baseState)
     B.exploration.length
   let writers := times.map (rawWriterAt w (e, B.baseState))

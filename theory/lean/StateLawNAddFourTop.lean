@@ -81,14 +81,9 @@ theorem arbitrary_start_distinct_le_N_add_four_of_known_edge_and_productive_boun
   | none =>
       have hone : stepN w 1 (startPort, startState) = none := by
         simp [stepN, step, harrive, hlink]
-      have hlen : times.length <= 1 :=
-        nodup_nat_lt_length htimesNodup (by
-          intro k hk
-          by_cases hk0 : k = 0
-          · omega
-          · have hkLive := hlive k hk
-            rw [stepN_none_of_none_at_le hone (by omega)] at hkLive
-            simp at hkLive)
+      have hlen :=
+        dead_horizon_live_distinct_le (N := N)
+          hone times hlive hnd
       omega
   | some entry =>
       have hone : stepN w 1 (startPort, startState) =

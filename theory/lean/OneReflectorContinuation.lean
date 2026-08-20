@@ -67,7 +67,6 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
     (hend : PathGrooves A.toSupported.paths finish.2) :
     A.reusableSwitches.length +
       (rawFirstWriterTimes w N start passages.length).length ≤ N := by
-  classical
   let times := rawFirstWriterTimes w N start passages.length
   let writers := times.map (rawWriterAt w start)
   have htimesNodup : times.Nodup := by

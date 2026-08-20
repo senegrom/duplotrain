@@ -34,7 +34,6 @@ theorem manufactured_pair_all_time_action_corners_tongues
     (d : Nat) :
     tonguesAt w (g, state) d ∈
       manufacturedPairActionCorners A B state := by
-  classical
   cases A with
   | stay SA =>
       cases B with

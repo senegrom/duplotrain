@@ -166,6 +166,56 @@ def PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches
       C.approach.length).map
     (rawWriterAt w (e, A.activatedState))
 
+/-- Lift a local novelty cover after the manufacturing journey to a count for
+the complete run.  The only global cost is the compressed lead plus the local
+novelty budget. -/
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_compressedLead_add_budget
+    {w : Wiring} {N g e budget : Nat}
+    {A : ManufacturedReflector w g e}
+    (C : SimpleContinuationChangedContact w A)
+    (hA : PathGrooves A.toSupported.paths A.activatedState)
+    (times : List Nat)
+    (hlive : forall k, k ∈ times ->
+      (stepN w k (g, A.baseState)).isSome)
+    (hnd : (times.map
+      (restrictedTonguesAt w N (g, A.baseState))).Nodup)
+    (hlocal : NoveltyCoverOn w N (e, A.activatedState)
+      (times.map (fun k => k -
+        (A.exploration.length + A.runway.length + 1)))
+      (C.compressedLead N) budget) :
+    times.length <= (C.compressedLead N).length + budget := by
+  let firstTravel := A.exploration.length + A.runway.length + 1
+  let localTimes := times.map (fun k => k - firstTravel)
+  have hreach : stepN w firstTravel (g, A.baseState) =
+      some (e, A.activatedState) := by
+    simpa [firstTravel] using
+      A.manufacturing_journey_reaches_activated hA
+  have hlocal' : NoveltyCoverOn w N (e, A.activatedState)
+      localTimes (C.compressedLead N) budget := by
+    simpa [localTimes, firstTravel] using hlocal
+  obtain ⟨fresh, hfresh, hmem⟩ := hlocal'
+  have hcover : NoveltyCoverOn w N (g, A.baseState)
+      times (C.compressedLead N) budget := by
+    refine ⟨fresh, hfresh, ?_⟩
+    intro k hk
+    by_cases hfirst : k <= firstTravel
+    · unfold PartialSecondRunSharp.ChangedContact.compressedLead
+      apply List.mem_append_left
+      apply List.mem_append_left
+      apply A.mem_sharpHistoryCore_of_mem
+      exact A.manufacturing_journey_mem_sharpHistory hA (by
+        simpa [firstTravel] using hfirst)
+    · let d := k - firstTravel
+      have hdMem : d ∈ localTimes := by
+        dsimp [d, localTimes]
+        exact List.mem_map.mpr ⟨k, hk, rfl⟩
+      have hm := hmem d hdMem
+      have hshift := restrictedTonguesAt_sub_of_reach
+        (N := N) hreach (by omega) (hlive k hk)
+      rw [hshift]
+      exact hm
+  exact noveltyCoverOn_distinct_count hcover hnd
+
 /-- Reusable support, approach first-writers, and any duplicate-free list
 of extra switches avoiding both occupy pairwise distinct ambient
 coordinates. -/
@@ -190,7 +240,6 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_e
         (rawFirstWriterTimes w N
           (e, (ManufacturedReflector.flip R).activatedState)
           C.approach.length).length + extras.length <= N := by
-  classical
   let times := rawFirstWriterTimes w N
     (e, (ManufacturedReflector.flip R).activatedState)
     C.approach.length
@@ -264,10 +313,9 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_e
   rw [hlength] at hbound
   simpa [times] using hbound
 
-/-- If the strict approach does not first-write the omitted action switch,
-then reusable support, approach writers, and that reserved switch occupy
-pairwise distinct ambient coordinates. -/
-theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_action_le
+/-- Every reserve in `extras` removes one unit from the generic `N+3`
+compressed-lead budget. -/
+theorem PartialSecondRunSharp.ChangedContact.compressedLead_add_extras_le_N_add_three
     {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
@@ -277,27 +325,73 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_a
     (hA : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths
       (ManufacturedReflector.flip R).activatedState)
-    (habsent : Not (R.actionSwitch ∈
-      C.approachFirstWriterSwitches N)) :
-    (ManufacturedReflector.flip R).reusableSwitches.length +
-        (rawFirstWriterTimes w N
+    (extras : List Nat)
+    (hextrasNodup : extras.Nodup)
+    (hextrasLt : forall s, s ∈ extras -> s < N)
+    (hextrasReusable : forall s, s ∈ extras ->
+      Not (s ∈ (ManufacturedReflector.flip R).reusableSwitches))
+    (hextrasApproach : forall s, s ∈ extras ->
+      Not (s ∈ C.approachFirstWriterSwitches N)) :
+    (C.compressedLead N).length + extras.length <= N + 3 := by
+  have hboundary :
+      VectorCount.restrict N
+          (ManufacturedReflector.flip R).activatedState ∈
+        rawFirstWriterHistory w N
           (e, (ManufacturedReflector.flip R).activatedState)
-          C.approach.length).length + 1 <= N := by
-  have h := C.reusable_add_approach_writers_add_extras_le hN hA
-    [R.actionSwitch] (by simp)
-    (by intro s hs
-        rw [List.mem_singleton] at hs
-        subst s
-        exact R.action_lt hN)
-    (by intro s hs
-        rw [List.mem_singleton] at hs
-        subst s
-        exact R.action_not_mem_reusable)
-    (by intro s hs
-        rw [List.mem_singleton] at hs
-        subst s
-        exact habsent)
-  simpa using h
+          C.approach.length := by
+    simp [rawFirstWriterHistory, restrictedTonguesAt,
+      tonguesAt, stepN]
+  have hcharge := C.reusable_add_approach_writers_add_extras_le
+    hN hA extras hextrasNodup hextrasLt
+      hextrasReusable hextrasApproach
+  unfold PartialSecondRunSharp.ChangedContact.compressedLead
+  rw [List.length_append, List.length_append,
+    List.length_erase_of_mem hboundary,
+    (ManufacturedReflector.flip R).sharpHistoryCore_length]
+  simp [rawFirstWriterHistory, ManufacturedReflector.exploration,
+    ManufacturedReflector.reusableSwitches] at hcharge ⊢
+  omega
+
+/-- Reserve coordinates and local novelty share one budget equation for the
+complete changed-contact run. -/
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_add_extras_le_N_add_three_add_budget
+    {w : Wiring} {N g e budget : Nat}
+    (hN : forall p q, w.link p = some q ->
+      p < 3 * N /\ q < 3 * N)
+    {R : ManufacturedFlipReflector w g e}
+    (C : SimpleContinuationChangedContact w
+      (ManufacturedReflector.flip R))
+    (hA : PathGrooves
+      (ManufacturedReflector.flip R).toSupported.paths
+      (ManufacturedReflector.flip R).activatedState)
+    (extras : List Nat)
+    (hextrasNodup : extras.Nodup)
+    (hextrasLt : forall s, s ∈ extras -> s < N)
+    (hextrasReusable : forall s, s ∈ extras ->
+      Not (s ∈ (ManufacturedReflector.flip R).reusableSwitches))
+    (hextrasApproach : forall s, s ∈ extras ->
+      Not (s ∈ C.approachFirstWriterSwitches N))
+    (times : List Nat)
+    (hlive : forall k, k ∈ times ->
+      (stepN w k
+        (g, (ManufacturedReflector.flip R).baseState)).isSome)
+    (hnd : (times.map
+      (restrictedTonguesAt w N
+        (g, (ManufacturedReflector.flip R).baseState))).Nodup)
+    (hlocal : NoveltyCoverOn w N
+      (e, (ManufacturedReflector.flip R).activatedState)
+      (times.map (fun k => k -
+        ((ManufacturedReflector.flip R).exploration.length +
+          (ManufacturedReflector.flip R).runway.length + 1)))
+      (C.compressedLead N) budget) :
+    times.length + extras.length <= N + 3 + budget := by
+  have hcount :=
+    C.changed_all_run_distinct_le_compressedLead_add_budget
+      hA times hlive hnd hlocal
+  have hlead := C.compressedLead_add_extras_le_N_add_three
+    hN hA extras hextrasNodup hextrasLt
+      hextrasReusable hextrasApproach
+  omega
 
 /-- Reserving the flip action coordinate lowers the changed-contact history
 from `N+3` to `N+2`. -/
@@ -314,22 +408,21 @@ theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le_N_add_two_
     (habsent : Not (R.actionSwitch ∈
       C.approachFirstWriterSwitches N)) :
     (C.compressedLead N).length <= N + 2 := by
-  have hboundary :
-      VectorCount.restrict N
-          (ManufacturedReflector.flip R).activatedState ∈
-        rawFirstWriterHistory w N
-          (e, (ManufacturedReflector.flip R).activatedState)
-          C.approach.length := by
-    simp [rawFirstWriterHistory, restrictedTonguesAt,
-      tonguesAt, stepN]
-  have hcharge :=
-    C.reusable_add_approach_writers_add_action_le hN hA habsent
-  unfold PartialSecondRunSharp.ChangedContact.compressedLead
-  rw [List.length_append, List.length_append,
-    List.length_erase_of_mem hboundary,
-    (ManufacturedReflector.flip R).sharpHistoryCore_length]
-  simp [rawFirstWriterHistory, ManufacturedReflector.exploration,
-    ManufacturedReflector.reusableSwitches] at hcharge ⊢
+  have hbound := C.compressedLead_add_extras_le_N_add_three
+    hN hA [R.actionSwitch] (by simp)
+    (by intro s hs
+        rw [List.mem_singleton] at hs
+        subst s
+        exact R.action_lt hN)
+    (by intro s hs
+        rw [List.mem_singleton] at hs
+        subst s
+        exact R.action_not_mem_reusable)
+    (by intro s hs
+        rw [List.mem_singleton] at hs
+        subst s
+        exact habsent)
+  simp only [List.length_singleton] at hbound
   omega
 
 /-- **Unconditional `N+4` subcase.**  If the strict approach does not
@@ -356,41 +449,13 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_f
       (restrictedTonguesAt w N
         (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
     times.length <= N + 4 := by
-  let firstTravel :=
-    (ManufacturedReflector.flip R).exploration.length +
-      (ManufacturedReflector.flip R).runway.length + 1
-  let localTimes := times.map (fun k => k - firstTravel)
-  have hreach : stepN w firstTravel
-      (g, (ManufacturedReflector.flip R).baseState) =
-        some (e, (ManufacturedReflector.flip R).activatedState) := by
-    simpa [firstTravel] using
-      (ManufacturedReflector.flip R).manufacturing_journey_reaches_activated
-        hA
-  obtain ⟨fresh, hfresh, hlocal⟩ :=
-    C.changed_two_novelty (N := N) localTimes
-  have hcover : NoveltyCoverOn w N
-      (g, (ManufacturedReflector.flip R).baseState)
-      times (C.compressedLead N) 2 := by
-    refine ⟨fresh, hfresh, ?_⟩
-    intro k hk
-    by_cases hfirst : k <= firstTravel
-    · unfold PartialSecondRunSharp.ChangedContact.compressedLead
-      apply List.mem_append_left
-      apply List.mem_append_left
-      apply (ManufacturedReflector.flip R).mem_sharpHistoryCore_of_mem
-      exact (ManufacturedReflector.flip R).manufacturing_journey_mem_sharpHistory
-        hA (by
-          simpa [firstTravel] using hfirst)
-    · let d := k - firstTravel
-      have hdMem : d ∈ localTimes := by
-        dsimp [d, localTimes]
-        exact List.mem_map.mpr ⟨k, hk, rfl⟩
-      have hm := hlocal d hdMem
-      have hshift := restrictedTonguesAt_sub_of_reach
-        (N := N) hreach (by omega) (hlive k hk)
-      rw [hshift]
-      exact hm
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
+  let localTimes := times.map (fun k => k -
+    ((ManufacturedReflector.flip R).exploration.length +
+      (ManufacturedReflector.flip R).runway.length + 1))
+  have hlocal := C.changed_two_novelty (N := N) localTimes
+  have hcount :=
+    C.changed_all_run_distinct_le_compressedLead_add_budget
+      hA times hlive hnd (by simpa [localTimes] using hlocal)
   have hlength :=
     C.compressedLead_length_le_N_add_two_of_action_absent
       hN hA habsent
@@ -415,37 +480,9 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_f
         (A.exploration.length + A.runway.length + 1)))
       (C.compressedLead N) 1) :
     times.length <= N + 4 := by
-  let firstTravel := A.exploration.length + A.runway.length + 1
-  let localTimes := times.map (fun k => k - firstTravel)
-  have hreach : stepN w firstTravel (g, A.baseState) =
-      some (e, A.activatedState) := by
-    simpa [firstTravel] using
-      A.manufacturing_journey_reaches_activated hA
-  have hlocal' : NoveltyCoverOn w N (e, A.activatedState)
-      localTimes (C.compressedLead N) 1 := by
-    simpa [localTimes, firstTravel] using hlocal
-  obtain ⟨fresh, hfresh, hmem⟩ := hlocal'
-  have hcover : NoveltyCoverOn w N (g, A.baseState)
-      times (C.compressedLead N) 1 := by
-    refine ⟨fresh, hfresh, ?_⟩
-    intro k hk
-    by_cases hfirst : k <= firstTravel
-    · unfold PartialSecondRunSharp.ChangedContact.compressedLead
-      apply List.mem_append_left
-      apply List.mem_append_left
-      apply A.mem_sharpHistoryCore_of_mem
-      exact A.manufacturing_journey_mem_sharpHistory hA (by
-        simpa [firstTravel] using hfirst)
-    · let d := k - firstTravel
-      have hdMem : d ∈ localTimes := by
-        dsimp [d, localTimes]
-        exact List.mem_map.mpr ⟨k, hk, rfl⟩
-      have hm := hmem d hdMem
-      have hshift := restrictedTonguesAt_sub_of_reach
-        (N := N) hreach (by omega) (hlive k hk)
-      rw [hshift]
-      exact hm
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
+  have hcount :=
+    C.changed_all_run_distinct_le_compressedLead_add_budget
+      hA times hlive hnd hlocal
   have hlength := C.compressedLead_length_le hN hA
   omega
 

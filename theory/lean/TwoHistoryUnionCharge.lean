@@ -375,7 +375,6 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_le
     A.reusableSwitches.length +
       (rawFirstWriterTimes w N (e, B.baseState)
         B.exploration.length).length ≤ N := by
-  classical
   let times :=
     rawFirstWriterTimes w N (e, B.baseState)
       B.exploration.length
@@ -449,7 +448,6 @@ theorem ManufacturedReflector.mem_writerConstructionHistory_of_mem_sharp
     {x : List Bool}
     (hx : x ∈ B.sharpConstructionHistory N) :
     x ∈ B.writerConstructionHistory N := by
-  classical
   unfold ManufacturedReflector.sharpConstructionHistory at hx
   rcases List.mem_append.mp hx with hprefix | hactivated
   · obtain ⟨j, hj, rfl⟩ := List.mem_map.mp hprefix

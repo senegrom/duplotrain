@@ -1680,7 +1680,6 @@ theorem PhysicalTrace.changed_switch_has_changed_passage
       PhysicalTrace w start before (p, u) ∧
       arrive u p = (x, v) ∧
       u j = start.2 j ∧ finish.2 j = v j ∧ v j ≠ u j := by
-  classical
   have hjmem : j ∈ passages.map passageSwitch := by
     apply Classical.byContradiction
     intro hnot
@@ -1745,7 +1744,6 @@ theorem PhysicalTrace.first_changed_support_passage
       path ∈ paths ∧ old ∈ path ∧
       passageSwitch old = p / 3 ∧
       v (p / 3) ≠ u (p / 3) := by
-  classical
   induction htrace with
   | nil c =>
       exact absurd hbase hbroken
@@ -2650,7 +2648,6 @@ theorem contact_of_not_avoids_flip
     (hnot : ¬ (LocalAction.flip k).Avoids paths) :
     ∃ path ∈ paths, ∃ passage ∈ path,
       passageSwitch passage = k := by
-  classical
   by_cases hcontact : ∃ path ∈ paths, ∃ passage ∈ path,
       passageSwitch passage = k
   · exact hcontact
@@ -2791,7 +2788,6 @@ theorem manufactured_pair_eventually_periodic
     (hA : PathGrooves A.toSupported.paths state)
     (hB : PathGrooves B.toSupported.paths state) :
     EventuallyPeriodic w (g, state) := by
-  classical
   cases A with
   | stay SA =>
       cases B with

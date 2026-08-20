@@ -473,7 +473,6 @@ theorem manufactured_flip_pair_all_time_four_phase
       phase ∈ [state, flipAt state FA.actionSwitch,
         flipAt state FB.actionSwitch,
         flipAt (flipAt state FA.actionSwitch) FB.actionSwitch] := by
-  classical
   by_cases hAB : (LocalAction.flip FA.actionSwitch).Avoids
       [FB.runway, FB.candy]
   · by_cases hBA : (LocalAction.flip FB.actionSwitch).Avoids

@@ -94,14 +94,12 @@ theorem mem_rawFirstWriterTimes_iff
     {w : Wiring} {N K k : Nat} {start : Nat × Tongues} :
     k ∈ rawFirstWriterTimes w N start K ↔
       k < K ∧ RawFirstWriterAt w N start k := by
-  classical
   simp [rawFirstWriterTimes]
 
 theorem mem_rawRepeatedWriterNovelTimes_iff
     {w : Wiring} {N K k : Nat} {start : Nat × Tongues} :
     k ∈ rawRepeatedWriterNovelTimes w N start K ↔
       k < K ∧ RawRepeatedWriterNovelAt w N start k := by
-  classical
   simp [rawRepeatedWriterNovelTimes]
 
 theorem nodup_filter_nat (p : Nat → Bool) :
@@ -210,7 +208,6 @@ theorem restrictedTonguesAt_mem_finite_writer_cover
       restrictedTonguesAt w N start k ∈
         rawFirstWriterHistory w N start K ++
           rawRepeatedWriterFresh w N start K := by
-  classical
   have main : ∀ bound k, k ≤ bound → bound ≤ K →
       restrictedTonguesAt w N start k ∈
         rawFirstWriterHistory w N start K ++

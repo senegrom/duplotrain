@@ -335,7 +335,6 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_occurrenc
     (hdifferent : O.before.length ≠ R.runway.length)
     (D : PartialSecondRunSharp.ChangedContact w
       (ManufacturedReflector.flip R)) : False := by
-  let C := D
   have hA : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths
       (ManufacturedReflector.flip R).activatedState := by
@@ -358,41 +357,41 @@ theorem ProductiveBoundaryNAddFourSavingResidual.false_of_noncanonical_occurrenc
     ((ManufacturedReflector.flip R).exploration.length +
       (ManufacturedReflector.flip R).runway.length + 1))
   have hsaturated := S.source.saturated
-  rcases C.direction with hbackward |
+  rcases D.direction with hbackward |
       ⟨hforward, repaired, hrepair, hrestored⟩
-  · have hlocal := C.backward_all_time_zero_novelty
+  · have hlocal := D.backward_all_time_zero_novelty
       (N := N) hbackward localTimes
     have hcount := O.doubleReducedContactLead_count
-      (N := N) C S.source.original hstay hA
+      (N := N) D S.source.original hstay hA
         S.source.times hlive hnd (by
           simpa [localTimes] using hlocal)
     have hlengthEq := O.doubleReducedContactLead_length_eq
-      (N := N) C S.source.original hdifferent
-    have hlength := C.compressedLead_length_le hN hA
+      (N := N) D S.source.original hdifferent
+    have hlength := D.compressedLead_length_le hN hA
     omega
   · by_cases haction :
-        R.actionSwitch ∈ C.approachFirstWriterSwitches N
-    · rcases C.forward_flip_one_novelty_or_runway_residual
+        R.actionSwitch ∈ D.approachFirstWriterSwitches N
+    · rcases D.forward_flip_one_novelty_or_runway_residual
           hforward hrepair hrestored haction localTimes with
         hone | hresidual
       · have hcount := O.doubleReducedContactLead_count
-          (N := N) C S.source.original hstay hA
+          (N := N) D S.source.original hstay hA
             S.source.times hlive hnd (by
               simpa [localTimes] using hone)
         have hlengthEq := O.doubleReducedContactLead_length_eq
-          (N := N) C S.source.original hdifferent
-        have hlength := C.compressedLead_length_le hN hA
+          (N := N) D S.source.original hdifferent
+        have hlength := D.compressedLead_length_le hN hA
         omega
       · exact (Classical.choice hresidual).impossible hN hA
-    · have hlocal := C.changed_two_novelty (N := N) localTimes
+    · have hlocal := D.changed_two_novelty (N := N) localTimes
       have hcount := O.doubleReducedContactLead_count
-        (N := N) C S.source.original hstay hA
+        (N := N) D S.source.original hstay hA
           S.source.times hlive hnd (by
             simpa [localTimes] using hlocal)
       have hlengthEq := O.doubleReducedContactLead_length_eq
-        (N := N) C S.source.original hdifferent
+        (N := N) D S.source.original hdifferent
       have hlength :=
-        C.compressedLead_length_le_N_add_two_of_action_absent
+        D.compressedLead_length_le_N_add_two_of_action_absent
           hN hA haction
       omega
 
