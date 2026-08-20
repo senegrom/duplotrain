@@ -39,22 +39,10 @@ theorem boolsToNat_lt_two_pow_length :
   | [] => by simp [boolsToNat]
   | b :: rest => by
     have ih := boolsToNat_lt_two_pow_length rest
-    simp only [boolsToNat, List.length_cons]
-    cases b <;> simp <;> omega
+    grind [boolsToNat]
 
-theorem boolsToNat_cons_mod (b : Bool) (l : List Bool) :
-    boolsToNat (b :: l) % 2 = if b then 1 else 0 := by
-  show ((if b then 1 else 0) + 2 * boolsToNat l) % 2 = _
-  rw [Nat.add_mul_mod_self_left]
-  cases b <;> rfl
-
-theorem boolsToNat_cons_div (b : Bool) (l : List Bool) :
-    boolsToNat (b :: l) / 2 = boolsToNat l := by
-  show ((if b then 1 else 0) + 2 * boolsToNat l) / 2 = _
-  rw [Nat.add_mul_div_left _ _ (by omega : 0 < 2)]
-  cases b <;> simp
-
-/-- On lists of equal length, the binary value is injective. -/
+/-- On lists of equal length, the binary value is injective: the head is
+the value mod 2, the tail its half. -/
 theorem boolsToNat_inj :
     ∀ {l1 l2 : List Bool}, l1.length = l2.length →
       boolsToNat l1 = boolsToNat l2 → l1 = l2
@@ -62,14 +50,8 @@ theorem boolsToNat_inj :
   | [], _ :: _, hlen, _ => by simp at hlen
   | _ :: _, [], hlen, _ => by simp at hlen
   | b1 :: r1, b2 :: r2, hlen, heq => by
-    have hmod := boolsToNat_cons_mod b1 r1
-    rw [heq, boolsToNat_cons_mod b2 r2] at hmod
-    have hb : b1 = b2 := by
-      cases b1 <;> cases b2 <;> simp_all
-    have hdiv := boolsToNat_cons_div b1 r1
-    rw [heq, boolsToNat_cons_div b2 r2] at hdiv
-    have hlen' : r1.length = r2.length := by simpa using hlen
-    rw [hb, boolsToNat_inj hlen' hdiv.symm]
+    have ih := boolsToNat_inj (l1 := r1) (l2 := r2)
+    grind [boolsToNat]
 
 /-- A duplicate-free list of equal-length boolean vectors stays
 duplicate-free under the binary value. -/
@@ -78,17 +60,10 @@ theorem nodup_map_boolsToNat {N : Nat} :
       (ls.map boolsToNat).Nodup
   | [], _, _ => by simp
   | l :: rest, hlen, hnd => by
-    rw [List.map_cons, List.nodup_cons]
-    rw [List.nodup_cons] at hnd
-    refine ⟨?_, nodup_map_boolsToNat
-      (fun x hx => hlen x (List.mem_cons_of_mem _ hx)) hnd.2⟩
-    intro hmem
-    obtain ⟨l', hl', heq⟩ := List.mem_map.mp hmem
-    have hl'l : l' = l :=
-      boolsToNat_inj
-        ((hlen l' (List.mem_cons_of_mem _ hl')).trans
-          (hlen l List.mem_cons_self).symm) heq
-    exact hnd.1 (hl'l ▸ hl')
+    have ih := nodup_map_boolsToNat (N := N) (ls := rest)
+    have hinj := fun (x y : List Bool) (hx : x.length = N)
+      (hy : y.length = N) => boolsToNat_inj (hx.trans hy.symm)
+    grind
 
 /-! ## The finite-state ceiling -/
 
@@ -122,8 +97,7 @@ theorem add_four_le_two_pow : ∀ {N : Nat}, 3 ≤ N → N + 4 ≤ 2 ^ N
   | 3, _ => by omega
   | n + 4, _ => by
     have ih := add_four_le_two_pow (N := n + 3) (by omega)
-    rw [Nat.pow_succ]
-    omega
+    grind
 
 /-! ## The empty layout: `2^0 = 1` state on zero switches -/
 
