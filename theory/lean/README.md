@@ -21,7 +21,7 @@ pairwise-distinct restricted tongue vectors, **and** some layout, start,
 and duplicate-free list of live sample times attains `count`.  The theorem
 is unconditional — `N = 0` is witnessed by the empty layout.
 
-To check everything (73 self-contained libraries, no Mathlib):
+To check everything (71 self-contained libraries, no Mathlib):
 
 ```
 lake build

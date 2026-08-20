@@ -19,7 +19,6 @@ defaultTargets = [
   "FirstReflectorNovelty",
   "ForeignSpliceNovelty",
   "GeneralN",
-  "KnownEdgeLift",
   "KnownEdgeNAddFourChangedClosed",
   "KnownEdgeNAddFourComplete",
   "KnownEdgeNAddFourFrontier",
@@ -130,9 +129,6 @@ name = "ForeignSpliceNovelty"
 
 [[lean_lib]]
 name = "GeneralN"
-
-[[lean_lib]]
-name = "KnownEdgeLift"
 
 [[lean_lib]]
 name = "KnownEdgeNAddFourChangedClosed"

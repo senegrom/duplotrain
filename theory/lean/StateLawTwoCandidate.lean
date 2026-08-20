@@ -1,4 +1,4 @@
-import KnownEdgeLift
+import FacingForwardNovelty
 import FirstCycleCountSharp
 import TrackEarlyRepairConstant
 import EarlyFacingConstant

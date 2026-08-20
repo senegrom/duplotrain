@@ -3,9 +3,19 @@
 Model LEGO® DUPLO® train track and find every layout that **loops nicely** — given the
 pieces you actually own.
 
-The mathematics that grew out of it — the lazy-point switch theorems and the
-Lean 4 proof of the sharp state law `f(N) = min(2^N, N + 4)` — lives in
-[`theory/`](theory/README.md).
+## The state law
+
+The mathematics that grew out of it: how many distinct switch settings can a
+single train ever visit on a layout of `N` lazy-point switches?  Exactly
+
+**f(N) = min(2^N, N + 4)**, for every `N`.
+
+The `2^N` ceiling binds up to two switches (the teardrop and the dogbone
+visit all of them); from three switches on the answer is `N + 4`, attained
+by an explicit teardrop–chain–Gray layout.  The whole law is machine-checked
+as a single Lean 4 theorem, [`GeneralN.state_law`](theory/lean/StateLaw.lean)
+— no Mathlib, no `native_decide`, audited to exactly the three standard
+axioms.  [`theory/`](theory/README.md) is the guide.
 
 ```
 duplotrain solve --curve 12 --straight 4 --use-all -o out
