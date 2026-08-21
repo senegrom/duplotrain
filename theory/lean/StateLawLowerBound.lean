@@ -52,67 +52,53 @@ def lbLink (N p : Nat) : Option Nat :=
 
 theorem lb_link_0 (N : Nat) : lbLink N 0 = some 3 := by
   unfold lbLink
-  rw [if_pos rfl]
+  grind
 
 theorem lb_link_3 (N : Nat) : lbLink N 3 = some 0 := by
   unfold lbLink
-  rw [if_neg (by omega), if_pos rfl]
+  grind
 
 theorem lb_link_1 (N : Nat) : lbLink N 1 = some 2 := by
   unfold lbLink
-  rw [if_neg (by omega), if_neg (by omega), if_pos rfl]
+  grind
 
 theorem lb_link_2 (N : Nat) : lbLink N 2 = some 1 := by
   unfold lbLink
-  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_pos rfl]
+  grind
 
 theorem lb_link_endL1 {N : Nat} (h3 : 3 ≤ N) :
     lbLink N (3 * (N - 2) + 1) = some (3 * (N - 1)) := by
   unfold lbLink
-  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_pos rfl]
+  grind
 
 theorem lb_link_endF {N : Nat} (h3 : 3 ≤ N) :
     lbLink N (3 * (N - 1)) = some (3 * (N - 2) + 1) := by
   unfold lbLink
-  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_neg (by omega), if_pos rfl]
+  grind
 
 theorem lb_link_endL2 {N : Nat} (h3 : 3 ≤ N) :
     lbLink N (3 * (N - 2) + 2) = some (3 * (N - 1) + 2) := by
   unfold lbLink
-  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_pos rfl]
+  grind
 
 theorem lb_link_endF2 {N : Nat} (h3 : 3 ≤ N) :
     lbLink N (3 * (N - 1) + 2) = some (3 * (N - 2) + 2) := by
   unfold lbLink
-  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_pos rfl]
+  grind
 
 theorem lb_link_chain_br2 {N k : Nat} (hk1 : 1 ≤ k)
     (hk3 : k ≤ N - 3) :
     lbLink N (3 * k + 2) = some (3 * (k + 1)) := by
-  unfold lbLink
-  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_neg (by omega), if_pos (by omega)]
   have hdiv : (3 * k + 2) / 3 = k := by omega
-  rw [hdiv]
+  unfold lbLink
+  grind (splits := 12)
 
 theorem lb_link_chain_stem {N k : Nat} (hk2 : 2 ≤ k)
     (hkN : k ≤ N - 2) :
     lbLink N (3 * k) = some (3 * (k - 1) + 2) := by
-  unfold lbLink
-  rw [if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_pos (by omega)]
   have hdiv : (3 * k) / 3 = k := by omega
-  rw [hdiv]
+  unfold lbLink
+  grind (splits := 12)
 
 /-- The family is symmetric for `N ≥ 3`. -/
 theorem lb_symm {N : Nat} (h3 : 3 ≤ N) :
@@ -164,137 +150,118 @@ def lbStart (N : Nat) : Nat × Tongues :=
 
 theorem lb_arrive_stem (t : Tongues) (k : Nat) :
     arrive t (3 * k) = (branchPort k (t k), t) := by
-  unfold arrive
-  have h0 : (3 * k) % 3 = 0 := by omega
-  have hd : (3 * k) / 3 = k := by omega
-  rw [if_pos h0, hd]
+  simp [arrive]
 
 theorem lb_arrive_br2 (t : Tongues) (k : Nat) :
     arrive t (3 * k + 2) =
       (3 * k, fun j => if j = k then true else t j) := by
-  unfold arrive
-  have h2 : (3 * k + 2) % 3 = 2 := by omega
-  have hd : (3 * k + 2) / 3 = k := by omega
-  rw [if_neg (by omega), hd]
-  refine congrArg (Prod.mk (3 * k)) ?_
+  have hdiv : (3 * k + 2) / 3 = k := by omega
+  simp [arrive, hdiv]
   funext j
   unfold pin bval
-  rw [hd, h2]
-  rfl
+  rw [hdiv]
+  simp
 
 theorem lb_arrive_br1 (t : Tongues) (k : Nat) :
     arrive t (3 * k + 1) =
       (3 * k, fun j => if j = k then false else t j) := by
-  unfold arrive
-  have h1 : (3 * k + 1) % 3 = 1 := by omega
-  have hd : (3 * k + 1) / 3 = k := by omega
-  rw [if_neg (by omega), hd]
-  refine congrArg (Prod.mk (3 * k)) ?_
+  have hdiv : (3 * k + 1) / 3 = k := by omega
+  simp [arrive, hdiv]
   funext j
   unfold pin bval
-  rw [hd, h1]
-  rfl
+  rw [hdiv]
+  simp
 
 theorem lb_set_noop {t : Tongues} {k : Nat} (h : t k = true) :
     (fun j => if j = k then true else t j) = t := by
   funext j
-  by_cases hj : j = k
-  · subst hj
-    rw [if_pos rfl, h]
-  · rw [if_neg hj]
+  grind
 
 theorem lb_stepN_one (w : Wiring) (c : Nat × Tongues) :
     stepN w 1 c = step w c := by
-  cases hs : step w c <;> simp [stepN, hs]
+  simp [stepN]
+
+private theorem lb_stepN_br2 {w : Wiring} {t : Tongues} {k q : Nat}
+    (hlink : w.link (3 * k) = some q) :
+    stepN w 1 (3 * k + 2, t) =
+      some (q, fun j => if j = k then true else t j) := by
+  rw [lb_stepN_one]
+  unfold step
+  rw [lb_arrive_br2, hlink]
+  rfl
+
+private theorem lb_stepN_br1 {w : Wiring} {t : Tongues} {k q : Nat}
+    (hlink : w.link (3 * k) = some q) :
+    stepN w 1 (3 * k + 1, t) =
+      some (q, fun j => if j = k then false else t j) := by
+  rw [lb_stepN_one]
+  unfold step
+  rw [lb_arrive_br1, hlink]
+  rfl
+
+private theorem lb_stepN_stem_true {w : Wiring} {t : Tongues} {k q : Nat}
+    (ht : t k = true) (hlink : w.link (3 * k + 2) = some q) :
+    stepN w 1 (3 * k, t) = some (q, t) := by
+  rw [lb_stepN_one]
+  unfold step
+  rw [lb_arrive_stem]
+  simp only []
+  rw [ht]
+  simp only [branchPort, if_true]
+  rw [hlink]
+  rfl
+
+private theorem lb_stepN_stem_false {w : Wiring} {t : Tongues} {k q : Nat}
+    (ht : t k = false) (hlink : w.link (3 * k + 1) = some q) :
+    stepN w 1 (3 * k, t) = some (q, t) := by
+  rw [lb_stepN_one]
+  unfold step
+  rw [lb_arrive_stem]
+  simp only []
+  rw [ht]
+  unfold branchPort
+  simp only [if_neg (Bool.false_ne_true ∘ id)]
+  rw [hlink]
+  rfl
 
 /-! ## Tongue transitions -/
 
-theorem lb_TA_succ {N m : Nat} (h4 : 4 ≤ N) :
+theorem lb_TA_succ {N m : Nat} :
     (fun j => if j = N - 2 - m then true else lbTA N m j) =
       lbTA N (m + 1) := by
   funext j
-  by_cases hj : j = N - 2 - m
-  · subst hj
-    rw [if_pos rfl]
-    unfold lbTA
-    rw [eq_comm, decide_eq_true_eq]
-    omega
-  · rw [if_neg hj]
-    unfold lbTA
-    rw [decide_eq_decide]
-    omega
+  unfold lbTA
+  grind
 
-theorem lb_TA_to_TB {N : Nat} (h4 : 4 ≤ N) :
+theorem lb_TA_to_TB {N : Nat} :
     (fun j => if j = 0 then true else lbTA N (N - 2) j) = lbTB N := by
   funext j
-  by_cases hj : j = 0
-  · subst hj
-    rw [if_pos rfl]
-    unfold lbTB
-    rw [eq_comm, decide_eq_true_eq]
-    omega
-  · rw [if_neg hj]
-    unfold lbTA lbTB
-    rw [decide_eq_decide]
-    omega
+  unfold lbTA lbTB
+  grind
 
-theorem lb_TB_to_TC {N : Nat} (h4 : 4 ≤ N) :
+theorem lb_TB_to_TC {N : Nat} :
     (fun j => if j = N - 1 then true else lbTB N j) = lbTC N := by
   funext j
-  by_cases hj : j = N - 1
-  · subst hj
-    rw [if_pos rfl]
-    unfold lbTC
-    rw [eq_comm, decide_eq_true_eq]
-    omega
-  · rw [if_neg hj]
-    unfold lbTB lbTC
-    rw [decide_eq_decide]
-    omega
+  unfold lbTB lbTC
+  grind
 
-theorem lb_TC_to_TD {N : Nat} (h4 : 4 ≤ N) :
+theorem lb_TC_to_TD {N : Nat} :
     (fun j => if j = N - 2 then false else lbTC N j) = lbTD N := by
   funext j
-  by_cases hj : j = N - 2
-  · subst hj
-    rw [if_pos rfl]
-    unfold lbTD
-    rw [eq_comm]
-    simp only [decide_eq_false_iff_not]
-    omega
-  · rw [if_neg hj]
-    unfold lbTC lbTD
-    rw [decide_eq_decide]
-    omega
+  unfold lbTC lbTD
+  grind
 
-theorem lb_TD_to_TE {N : Nat} (h4 : 4 ≤ N) :
+theorem lb_TD_to_TE {N : Nat} :
     (fun j => if j = 0 then false else lbTD N j) = lbTE N := by
   funext j
-  by_cases hj : j = 0
-  · subst hj
-    rw [if_pos rfl]
-    unfold lbTE
-    rw [eq_comm]
-    simp only [decide_eq_false_iff_not]
-    omega
-  · rw [if_neg hj]
-    unfold lbTD lbTE
-    rw [decide_eq_decide]
-    omega
+  unfold lbTD lbTE
+  grind
 
-theorem lb_TE_to_TF {N : Nat} (h4 : 4 ≤ N) :
+theorem lb_TE_to_TF {N : Nat} (h3 : 3 ≤ N) :
     (fun j => if j = N - 2 then true else lbTE N j) = lbTF N := by
   funext j
-  by_cases hj : j = N - 2
-  · subst hj
-    rw [if_pos rfl]
-    unfold lbTF
-    rw [eq_comm, decide_eq_true_eq]
-    omega
-  · rw [if_neg hj]
-    unfold lbTE lbTF
-    rw [decide_eq_decide]
-    omega
+  unfold lbTE lbTF
+  grind
 
 /-! ## The trajectory -/
 
@@ -303,7 +270,7 @@ section Trajectory
 variable {N : Nat}
 
 /-- Phase A: flipping down the chain. -/
-theorem lb_phaseA (h4 : 4 ≤ N) (h3 : 3 ≤ N) {m : Nat}
+theorem lb_phaseA (h3 : 3 ≤ N) {m : Nat}
     (hm : m ≤ N - 3) :
     stepN (lbWiring N h3) m (lbStart N) =
       some (3 * (N - 2 - m) + 2, lbTA N m) := by
@@ -319,10 +286,6 @@ theorem lb_phaseA (h4 : 4 ≤ N) (h3 : 3 ≤ N) {m : Nat}
         exact stepN_add _ m 1 _
       rw [hone, hstep]
       simp only [Option.bind_some]
-      rw [lb_stepN_one]
-      unfold step
-      rw [lb_arrive_br2]
-      simp only []
       have hlink : (lbWiring N h3).link (3 * (N - 2 - m)) =
           some (3 * (N - 2 - (m + 1)) + 2) := by
         show lbLink N (3 * (N - 2 - m)) = _
@@ -331,9 +294,7 @@ theorem lb_phaseA (h4 : 4 ≤ N) (h3 : 3 ≤ N) {m : Nat}
         have hidx : N - 2 - m - 1 = N - 2 - (m + 1) := by omega
         rw [hidx] at hthis
         exact hthis
-      rw [hlink]
-      simp only [Option.map_some]
-      rw [lb_TA_succ h4]
+      rw [lb_stepN_br2 hlink, lb_TA_succ]
 
 /-- Reaching the teardrop stem at time `N-2`. -/
 theorem lb_cfg_N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -341,27 +302,22 @@ theorem lb_cfg_N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
       some (0, lbTA N (N - 2)) := by
   have hmain : stepN (lbWiring N h3) ((N - 3) + 1) (lbStart N) =
       some (0, lbTA N (N - 2)) := by
-    rw [stepN_add, lb_phaseA h4 h3 (Nat.le_refl _)]
+    rw [stepN_add, lb_phaseA h3 (Nat.le_refl _)]
     simp only [Option.bind_some]
-    rw [lb_stepN_one]
-    unfold step
     have hport : 3 * (N - 2 - (N - 3)) + 2 = 3 * 1 + 2 := by omega
-    rw [hport, lb_arrive_br2]
-    simp only []
+    rw [hport]
     have hlink : (lbWiring N h3).link (3 * 1) = some 0 := by
       show lbLink N 3 = some 0
       exact lb_link_3 N
-    rw [hlink]
-    simp only [Option.map_some]
     have hT : (fun j => if j = 1 then true else lbTA N (N - 3) j) =
         lbTA N (N - 2) := by
-      have h := lb_TA_succ (N := N) (m := N - 3) h4
+      have h := lb_TA_succ (N := N) (m := N - 3)
       have hidx : N - 2 - (N - 3) = 1 := by omega
       rw [hidx] at h
       have hsucc : N - 3 + 1 = N - 2 := by omega
       rw [hsucc] at h
       exact h
-    rw [hT]
+    rw [lb_stepN_br2 hlink, hT]
   have hidx : (N - 3) + 1 = N - 2 := by omega
   rw [hidx] at hmain
   exact hmain
@@ -373,23 +329,16 @@ theorem lb_cfg_N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : N - 1 = (N - 2) + 1 := by omega
   rw [hsplit, stepN_add, lb_cfg_N2 h4 h3]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
   have hzero : (0 : Nat) = 3 * 0 := by omega
-  rw [hzero, lb_arrive_stem]
-  simp only []
+  rw [hzero]
   have hval : lbTA N (N - 2) 0 = false := by
     unfold lbTA
     simp only [decide_eq_false_iff_not]
     omega
-  rw [hval]
-  unfold branchPort
-  simp only [if_neg (Bool.false_ne_true ∘ id)]
   have hlink : (lbWiring N h3).link (3 * 0 + 1) = some 2 := by
     show lbLink N 1 = some 2
     exact lb_link_1 N
-  rw [hlink]
-  simp only [Option.map_some]
+  rw [lb_stepN_stem_false hval hlink]
 
 /-- Closing the teardrop: time `N`. -/
 theorem lb_cfg_N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -399,17 +348,12 @@ theorem lb_cfg_N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
       some (3, lbTB N) := by
     rw [stepN_add, lb_cfg_N1 h4 h3]
     simp only [Option.bind_some]
-    rw [lb_stepN_one]
-    unfold step
     have htwo : (2 : Nat) = 3 * 0 + 2 := by omega
-    rw [htwo, lb_arrive_br2]
-    simp only []
+    rw [htwo]
     have hlink : (lbWiring N h3).link (3 * 0) = some 3 := by
       show lbLink N 0 = some 3
       exact lb_link_0 N
-    rw [hlink]
-    simp only [Option.map_some]
-    rw [lb_TA_to_TB h4]
+    rw [lb_stepN_br2 hlink, lb_TA_to_TB]
   have hidx : (N - 1) + 1 = N := by omega
   rw [hidx] at hmain
   exact hmain
@@ -429,23 +373,15 @@ theorem lb_phaseB (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
       have hone : N + (j + 1) = (N + j) + 1 := by omega
       rw [hone, stepN_add, hstep]
       simp only [Option.bind_some]
-      rw [lb_stepN_one]
-      unfold step
-      rw [lb_arrive_stem]
-      simp only []
       have hval : lbTB N (j + 1) = true := by
         unfold lbTB
         rw [decide_eq_true_eq]
         omega
-      rw [hval]
-      unfold branchPort
-      simp only [if_true]
       have hlink : (lbWiring N h3).link (3 * (j + 1) + 2) =
           some (3 * (j + 1 + 1)) := by
         show lbLink N (3 * (j + 1) + 2) = _
         exact lb_link_chain_br2 (by omega) (by omega)
-      rw [hlink]
-      simp only [Option.map_some]
+      rw [lb_stepN_stem_true hval hlink]
 
 /-- Crossing to the far switch: time `2N-2`. -/
 theorem lb_cfg_2N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -454,24 +390,17 @@ theorem lb_cfg_2N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : 2 * N - 2 = (N + (N - 3)) + 1 := by omega
   rw [hsplit, stepN_add, lb_phaseB h4 h3 (Nat.le_refl _)]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
   have hport : 3 * (N - 3 + 1) = 3 * (N - 2) := by omega
-  rw [hport, lb_arrive_stem]
-  simp only []
+  rw [hport]
   have hval : lbTB N (N - 2) = true := by
     unfold lbTB
     rw [decide_eq_true_eq]
     omega
-  rw [hval]
-  unfold branchPort
-  simp only [if_true]
   have hlink : (lbWiring N h3).link (3 * (N - 2) + 2) =
       some (3 * (N - 1) + 2) := by
     show lbLink N (3 * (N - 2) + 2) = _
     exact lb_link_endL2 h3
-  rw [hlink]
-  simp only [Option.map_some]
+  rw [lb_stepN_stem_true hval hlink]
 
 /-- Closing the far switch: time `2N-1`. -/
 theorem lb_cfg_2N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -480,17 +409,11 @@ theorem lb_cfg_2N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : 2 * N - 1 = (2 * N - 2) + 1 := by omega
   rw [hsplit, stepN_add, lb_cfg_2N2 h4 h3]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
-  rw [lb_arrive_br2]
-  simp only []
   have hlink : (lbWiring N h3).link (3 * (N - 1)) =
       some (3 * (N - 2) + 1) := by
     show lbLink N (3 * (N - 1)) = _
     exact lb_link_endF h3
-  rw [hlink]
-  simp only [Option.map_some]
-  rw [lb_TB_to_TC h4]
+  rw [lb_stepN_br2 hlink, lb_TB_to_TC]
 
 /-- Reopening the near end switch: time `2N`. -/
 theorem lb_cfg_2N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -499,10 +422,6 @@ theorem lb_cfg_2N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : 2 * N = (2 * N - 1) + 1 := by omega
   rw [hsplit, stepN_add, lb_cfg_2N1 h4 h3]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
-  rw [lb_arrive_br1]
-  simp only []
   have hlink : (lbWiring N h3).link (3 * (N - 2)) =
       some (3 * (N - 3) + 2) := by
     show lbLink N (3 * (N - 2)) = _
@@ -511,9 +430,7 @@ theorem lb_cfg_2N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     have hidx : N - 2 - 1 = N - 3 := by omega
     rw [hidx] at hthis
     exact hthis
-  rw [hlink]
-  simp only [Option.map_some]
-  rw [lb_TC_to_TD h4]
+  rw [lb_stepN_br1 hlink, lb_TC_to_TD]
 
 /-- Phase C: gliding back down with the near end switch open. -/
 theorem lb_phaseC (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
@@ -530,17 +447,12 @@ theorem lb_phaseC (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
       have hone : 2 * N + (j + 1) = (2 * N + j) + 1 := by omega
       rw [hone, stepN_add, hstep]
       simp only [Option.bind_some]
-      rw [lb_stepN_one]
-      unfold step
-      rw [lb_arrive_br2]
-      simp only []
       have hnoop : (fun i => if i = N - 3 - j then true
           else lbTD N i) = lbTD N := by
         apply lb_set_noop
         unfold lbTD
         rw [decide_eq_true_eq]
         omega
-      rw [hnoop]
       have hlink : (lbWiring N h3).link (3 * (N - 3 - j)) =
           some (3 * (N - 3 - (j + 1)) + 2) := by
         show lbLink N (3 * (N - 3 - j)) = _
@@ -549,8 +461,8 @@ theorem lb_phaseC (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
         have hidx : N - 3 - j - 1 = N - 3 - (j + 1) := by omega
         rw [hidx] at hthis
         exact hthis
-      rw [hlink]
-      simp only [Option.map_some]
+      simpa only [hnoop] using
+        (lb_stepN_br2 (t := lbTD N) hlink)
 
 /-- Back at the teardrop stem: time `3N-3`. -/
 theorem lb_cfg_3N3 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -559,23 +471,18 @@ theorem lb_cfg_3N3 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : 3 * N - 3 = (2 * N + (N - 4)) + 1 := by omega
   rw [hsplit, stepN_add, lb_phaseC h4 h3 (Nat.le_refl _)]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
   have hport : 3 * (N - 3 - (N - 4)) + 2 = 3 * 1 + 2 := by omega
-  rw [hport, lb_arrive_br2]
-  simp only []
+  rw [hport]
   have hnoop : (fun i => if i = 1 then true else lbTD N i) =
       lbTD N := by
     apply lb_set_noop
     unfold lbTD
     rw [decide_eq_true_eq]
     omega
-  rw [hnoop]
   have hlink : (lbWiring N h3).link (3 * 1) = some 0 := by
     show lbLink N 3 = some 0
     exact lb_link_3 N
-  rw [hlink]
-  simp only [Option.map_some]
+  simpa only [hnoop] using (lb_stepN_br2 (t := lbTD N) hlink)
 
 /-- Through the teardrop the other way: time `3N-2`. -/
 theorem lb_cfg_3N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -584,23 +491,16 @@ theorem lb_cfg_3N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : 3 * N - 2 = (3 * N - 3) + 1 := by omega
   rw [hsplit, stepN_add, lb_cfg_3N3 h4 h3]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
   have hzero : (0 : Nat) = 3 * 0 := by omega
-  rw [hzero, lb_arrive_stem]
-  simp only []
+  rw [hzero]
   have hval : lbTD N 0 = true := by
     unfold lbTD
     rw [decide_eq_true_eq]
     omega
-  rw [hval]
-  unfold branchPort
-  simp only [if_true]
   have hlink : (lbWiring N h3).link (3 * 0 + 2) = some 1 := by
     show lbLink N 2 = some 1
     exact lb_link_2 N
-  rw [hlink]
-  simp only [Option.map_some]
+  rw [lb_stepN_stem_true hval hlink]
 
 /-- Reopening the teardrop: time `3N-1`. -/
 theorem lb_cfg_3N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -609,17 +509,12 @@ theorem lb_cfg_3N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : 3 * N - 1 = (3 * N - 2) + 1 := by omega
   rw [hsplit, stepN_add, lb_cfg_3N2 h4 h3]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
   have hone : (1 : Nat) = 3 * 0 + 1 := by omega
-  rw [hone, lb_arrive_br1]
-  simp only []
+  rw [hone]
   have hlink : (lbWiring N h3).link (3 * 0) = some 3 := by
     show lbLink N 0 = some 3
     exact lb_link_0 N
-  rw [hlink]
-  simp only [Option.map_some]
-  rw [lb_TD_to_TE h4]
+  rw [lb_stepN_br1 hlink, lb_TD_to_TE]
 
 /-- Phase D: riding back up with teardrop and near end both open. -/
 theorem lb_phaseD (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
@@ -637,23 +532,15 @@ theorem lb_phaseD (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
         omega
       rw [hone, stepN_add, hstep]
       simp only [Option.bind_some]
-      rw [lb_stepN_one]
-      unfold step
-      rw [lb_arrive_stem]
-      simp only []
       have hval : lbTE N (j + 1) = true := by
         unfold lbTE
         rw [decide_eq_true_eq]
         omega
-      rw [hval]
-      unfold branchPort
-      simp only [if_true]
       have hlink : (lbWiring N h3).link (3 * (j + 1) + 2) =
           some (3 * (j + 1 + 1)) := by
         show lbLink N (3 * (j + 1) + 2) = _
         exact lb_link_chain_br2 (by omega) (by omega)
-      rw [hlink]
-      simp only [Option.map_some]
+      rw [lb_stepN_stem_true hval hlink]
 
 /-- Deflected at the open near end switch: time `4N-3`. -/
 theorem lb_cfg_4N3 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -662,24 +549,17 @@ theorem lb_cfg_4N3 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : 4 * N - 3 = (3 * N - 1 + (N - 3)) + 1 := by omega
   rw [hsplit, stepN_add, lb_phaseD h4 h3 (Nat.le_refl _)]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
   have hport : 3 * (N - 3 + 1) = 3 * (N - 2) := by omega
-  rw [hport, lb_arrive_stem]
-  simp only []
+  rw [hport]
   have hval : lbTE N (N - 2) = false := by
     unfold lbTE
     simp only [decide_eq_false_iff_not]
     omega
-  rw [hval]
-  unfold branchPort
-  simp only [if_neg (Bool.false_ne_true ∘ id)]
   have hlink : (lbWiring N h3).link (3 * (N - 2) + 1) =
       some (3 * (N - 1)) := by
     show lbLink N (3 * (N - 2) + 1) = _
     exact lb_link_endL1 h3
-  rw [hlink]
-  simp only [Option.map_some]
+  rw [lb_stepN_stem_false hval hlink]
 
 /-- Across the far switch: time `4N-2`. -/
 theorem lb_cfg_4N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -688,23 +568,15 @@ theorem lb_cfg_4N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : 4 * N - 2 = (4 * N - 3) + 1 := by omega
   rw [hsplit, stepN_add, lb_cfg_4N3 h4 h3]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
-  rw [lb_arrive_stem]
-  simp only []
   have hval : lbTE N (N - 1) = true := by
     unfold lbTE
     rw [decide_eq_true_eq]
     omega
-  rw [hval]
-  unfold branchPort
-  simp only [if_true]
   have hlink : (lbWiring N h3).link (3 * (N - 1) + 2) =
       some (3 * (N - 2) + 2) := by
     show lbLink N (3 * (N - 1) + 2) = _
     exact lb_link_endF2 h3
-  rw [hlink]
-  simp only [Option.map_some]
+  rw [lb_stepN_stem_true hval hlink]
 
 /-- Reclosing the near end switch: time `4N-1`. -/
 theorem lb_cfg_4N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -713,10 +585,6 @@ theorem lb_cfg_4N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hsplit : 4 * N - 1 = (4 * N - 2) + 1 := by omega
   rw [hsplit, stepN_add, lb_cfg_4N2 h4 h3]
   simp only [Option.bind_some]
-  rw [lb_stepN_one]
-  unfold step
-  rw [lb_arrive_br2]
-  simp only []
   have hlink : (lbWiring N h3).link (3 * (N - 2)) =
       some (3 * (N - 3) + 2) := by
     show lbLink N (3 * (N - 2)) = _
@@ -725,37 +593,11 @@ theorem lb_cfg_4N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     have hidx : N - 2 - 1 = N - 3 := by omega
     rw [hidx] at hthis
     exact hthis
-  rw [hlink]
-  simp only [Option.map_some]
-  rw [lb_TE_to_TF h4]
+  rw [lb_stepN_br2 hlink, lb_TE_to_TF h3]
 
 end Trajectory
 
 /-! ## Distinctness -/
-
-private theorem lb_map_nodup
-    {α β : Type} [BEq α] [LawfulBEq α]
-    [BEq β] [LawfulBEq β]
-    (f : α → β) :
-    ∀ {xs : List α}, xs.Nodup →
-      (∀ a, a ∈ xs → ∀ b, b ∈ xs → f a = f b → a = b) →
-      (xs.map f).Nodup := by
-  intro xs hnd hinj
-  induction xs with
-  | nil => simp
-  | cons a rest ih =>
-      rw [List.nodup_cons] at hnd
-      simp only [List.map_cons, List.nodup_cons]
-      constructor
-      · intro hm
-        obtain ⟨b, hb, hfb⟩ := List.mem_map.mp hm
-        have hab : a = b := hinj a (by simp) b
-          (List.mem_cons_of_mem _ hb) hfb.symm
-        subst hab
-        exact hnd.1 hb
-      · exact ih hnd.2 (fun x hx y hy =>
-          hinj x (List.mem_cons_of_mem _ hx) y
-            (List.mem_cons_of_mem _ hy))
 
 /-- Restricted vectors differing at a coordinate below `N` are distinct. -/
 theorem lb_restrict_ne {N j : Nat} {u v : Tongues} (hj : j < N)
@@ -763,10 +605,8 @@ theorem lb_restrict_ne {N j : Nat} {u v : Tongues} (hj : j < N)
     VectorCount.restrict N u ≠ VectorCount.restrict N v := by
   intro hEq
   apply h
-  have hcongr := congrArg (fun l => l[j]?) hEq
-  simp only [VectorCount.restrict, List.getElem?_map,
-    List.getElem?_range, hj] at hcongr
-  exact Option.some.inj hcongr
+  simpa [VectorCount.restrict, hj] using
+    congrArg (fun l => l[j]?) hEq
 
 section Distinct
 
@@ -778,144 +618,112 @@ theorem lb_ne_TA_TA (h4 : 4 ≤ N) {m m' : Nat} (hlt : m < m')
       VectorCount.restrict N (lbTA N m') := by
   apply lb_restrict_ne (j := N - 1 - m') (by omega)
   unfold lbTA
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TA_TB (h4 : 4 ≤ N) {m : Nat} (hm : m ≤ N - 2) :
     VectorCount.restrict N (lbTA N m) ≠
       VectorCount.restrict N (lbTB N) := by
   apply lb_restrict_ne (j := 0) (by omega)
   unfold lbTA lbTB
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TA_TC (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
       VectorCount.restrict N (lbTC N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
   unfold lbTA lbTC
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
-theorem lb_ne_TA_TD (h4 : 4 ≤ N) {m : Nat} (hm : m ≤ N - 2) :
+theorem lb_ne_TA_TD (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
       VectorCount.restrict N (lbTD N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
   unfold lbTA lbTD
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
-theorem lb_ne_TA_TE (h4 : 4 ≤ N) {m : Nat} (hm : m ≤ N - 2) :
+theorem lb_ne_TA_TE (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
       VectorCount.restrict N (lbTE N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
   unfold lbTA lbTE
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TA_TF (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
       VectorCount.restrict N (lbTF N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
   unfold lbTA lbTF
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TB_TC (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTB N) ≠
       VectorCount.restrict N (lbTC N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
   unfold lbTB lbTC
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TB_TD (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTB N) ≠
       VectorCount.restrict N (lbTD N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
   unfold lbTB lbTD
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TB_TE (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTB N) ≠
       VectorCount.restrict N (lbTE N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
   unfold lbTB lbTE
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TB_TF (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTB N) ≠
       VectorCount.restrict N (lbTF N) := by
   apply lb_restrict_ne (j := N - 1) (by omega)
   unfold lbTB lbTF
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TC_TD (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTC N) ≠
       VectorCount.restrict N (lbTD N) := by
   apply lb_restrict_ne (j := N - 2) (by omega)
   unfold lbTC lbTD
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TC_TE (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTC N) ≠
       VectorCount.restrict N (lbTE N) := by
   apply lb_restrict_ne (j := N - 2) (by omega)
   unfold lbTC lbTE
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TC_TF (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTC N) ≠
       VectorCount.restrict N (lbTF N) := by
   apply lb_restrict_ne (j := 0) (by omega)
   unfold lbTC lbTF
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TD_TE (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTD N) ≠
       VectorCount.restrict N (lbTE N) := by
   apply lb_restrict_ne (j := 0) (by omega)
   unfold lbTD lbTE
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TD_TF (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTD N) ≠
       VectorCount.restrict N (lbTF N) := by
   apply lb_restrict_ne (j := N - 2) (by omega)
   unfold lbTD lbTF
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 theorem lb_ne_TE_TF (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTE N) ≠
       VectorCount.restrict N (lbTF N) := by
   apply lb_restrict_ne (j := N - 2) (by omega)
   unfold lbTE lbTF
-  intro hEq
-  rw [decide_eq_decide] at hEq
-  omega
+  grind
 
 end Distinct
 
@@ -927,9 +735,7 @@ def lbTimes (N : Nat) : List Nat :=
 
 theorem lb_times_length {N : Nat} (h4 : 4 ≤ N) :
     (lbTimes N).length = N + 4 := by
-  unfold lbTimes
-  simp only [List.length_append, List.length_range,
-    List.length_cons, List.length_nil]
+  simp [lbTimes]
   omega
 
 /-- The vector visited at each chain time. -/
@@ -939,54 +745,10 @@ theorem lb_vector_range {N : Nat} (h4 : 4 ≤ N) (h3 : 3 ≤ N)
       (tonguesAt (lbWiring N h3) (lbStart N) m) =
       VectorCount.restrict N (lbTA N m) := by
   by_cases hcase : m ≤ N - 3
-  · unfold tonguesAt
-    rw [lb_phaseA h4 h3 hcase]
-    rfl
+  · simp [tonguesAt, lb_phaseA h3 hcase]
   · have hm2 : m = N - 2 := by omega
     subst hm2
-    unfold tonguesAt
-    rw [lb_cfg_N2 h4 h3]
-    rfl
-
-theorem lb_vector_N {N : Nat} (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    VectorCount.restrict N
-      (tonguesAt (lbWiring N h3) (lbStart N) N) =
-      VectorCount.restrict N (lbTB N) := by
-  unfold tonguesAt
-  rw [lb_cfg_N h4 h3]
-  rfl
-
-theorem lb_vector_2N1 {N : Nat} (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    VectorCount.restrict N
-      (tonguesAt (lbWiring N h3) (lbStart N) (2 * N - 1)) =
-      VectorCount.restrict N (lbTC N) := by
-  unfold tonguesAt
-  rw [lb_cfg_2N1 h4 h3]
-  rfl
-
-theorem lb_vector_2N {N : Nat} (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    VectorCount.restrict N
-      (tonguesAt (lbWiring N h3) (lbStart N) (2 * N)) =
-      VectorCount.restrict N (lbTD N) := by
-  unfold tonguesAt
-  rw [lb_cfg_2N h4 h3]
-  rfl
-
-theorem lb_vector_3N1 {N : Nat} (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    VectorCount.restrict N
-      (tonguesAt (lbWiring N h3) (lbStart N) (3 * N - 1)) =
-      VectorCount.restrict N (lbTE N) := by
-  unfold tonguesAt
-  rw [lb_cfg_3N1 h4 h3]
-  rfl
-
-theorem lb_vector_4N1 {N : Nat} (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    VectorCount.restrict N
-      (tonguesAt (lbWiring N h3) (lbStart N) (4 * N - 1)) =
-      VectorCount.restrict N (lbTF N) := by
-  unfold tonguesAt
-  rw [lb_cfg_4N1 h4 h3]
-  rfl
+    simp [tonguesAt, lb_cfg_N2 h4 h3]
 
 /-- **The `N+4` lower bound, symbolically, for `N ≥ 4`.** -/
 theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
@@ -1005,24 +767,14 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
     rcases List.mem_append.mp hk with hkr | hks
     · have hm : k < N - 1 := List.mem_range.mp hkr
       by_cases hcase : k ≤ N - 3
-      · rw [lb_phaseA h4 h3 hcase]
-        rfl
+      · simp [lb_phaseA h3 hcase]
       · have hk2 : k = N - 2 := by omega
         subst hk2
-        rw [lb_cfg_N2 h4 h3]
-        rfl
+        simp [lb_cfg_N2 h4 h3]
     · simp only [List.mem_cons, List.not_mem_nil, or_false] at hks
       rcases hks with rfl | rfl | rfl | rfl | rfl
-      · rw [lb_cfg_N h4 h3]
-        rfl
-      · rw [lb_cfg_2N1 h4 h3]
-        rfl
-      · rw [lb_cfg_2N h4 h3]
-        rfl
-      · rw [lb_cfg_3N1 h4 h3]
-        rfl
-      · rw [lb_cfg_4N1 h4 h3]
-        rfl
+      all_goals simp [lb_cfg_N h4 h3, lb_cfg_2N1 h4 h3,
+        lb_cfg_2N h4 h3, lb_cfg_3N1 h4 h3, lb_cfg_4N1 h4 h3]
   · have hmap : (lbTimes N).map (fun k =>
         VectorCount.restrict N
           (tonguesAt (lbWiring N h3) (lbStart N) k)) =
@@ -1052,15 +804,14 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
            VectorCount.restrict N (lbTD N),
            VectorCount.restrict N (lbTE N),
            VectorCount.restrict N (lbTF N)] := by
-        simp only [List.map_cons, List.map_nil]
-        rw [lb_vector_N h4 h3, lb_vector_2N1 h4 h3,
-          lb_vector_2N h4 h3, lb_vector_3N1 h4 h3,
-          lb_vector_4N1 h4 h3]
+        simp [tonguesAt, lb_cfg_N h4 h3, lb_cfg_2N1 h4 h3,
+          lb_cfg_2N h4 h3, lb_cfg_3N1 h4 h3,
+          lb_cfg_4N1 h4 h3]
       rw [hL, hR]
     rw [hmap]
     rw [List.nodup_append]
     refine ⟨?_, ?_, ?_⟩
-    · apply lb_map_nodup _ List.nodup_range
+    · apply nodup_map_of_injective_on_mem
       intro a ha b hb hEq
       have ha' : a < N - 1 := List.mem_range.mp ha
       have hb' : b < N - 1 := List.mem_range.mp hb
@@ -1070,51 +821,22 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
         · exact absurd hEq (lb_ne_TA_TA h4 hlt (by omega))
         · have hlt : b < a := by omega
           exact absurd hEq.symm (lb_ne_TA_TA h4 hlt (by omega))
-    · refine List.nodup_cons.mpr ⟨?_, ?_⟩
-      · intro hmem
-        simp only [List.mem_cons, List.not_mem_nil, or_false] at hmem
-        rcases hmem with h | h | h | h
-        · exact lb_ne_TB_TC h4 h
-        · exact lb_ne_TB_TD h4 h
-        · exact lb_ne_TB_TE h4 h
-        · exact lb_ne_TB_TF h4 h
-      refine List.nodup_cons.mpr ⟨?_, ?_⟩
-      · intro hmem
-        simp only [List.mem_cons, List.not_mem_nil, or_false] at hmem
-        rcases hmem with h | h | h
-        · exact lb_ne_TC_TD h4 h
-        · exact lb_ne_TC_TE h4 h
-        · exact lb_ne_TC_TF h4 h
-      refine List.nodup_cons.mpr ⟨?_, ?_⟩
-      · intro hmem
-        simp only [List.mem_cons, List.not_mem_nil, or_false] at hmem
-        rcases hmem with h | h
-        · exact lb_ne_TD_TE h4 h
-        · exact lb_ne_TD_TF h4 h
-      refine List.nodup_cons.mpr ⟨?_, ?_⟩
-      · intro hmem
-        simp only [List.mem_cons, List.not_mem_nil, or_false] at hmem
-        exact lb_ne_TE_TF h4 hmem
-      exact List.nodup_cons.mpr ⟨by simp, List.nodup_nil⟩
+      exact List.nodup_range
+    · simp [lb_ne_TB_TC h4, lb_ne_TB_TD h4,
+        lb_ne_TB_TE h4, lb_ne_TB_TF h4,
+        lb_ne_TC_TD h4, lb_ne_TC_TE h4,
+        lb_ne_TC_TF h4, lb_ne_TD_TE h4,
+        lb_ne_TD_TF h4, lb_ne_TE_TF h4]
     · intro a haL b hbR
       obtain ⟨m, hm, rfl⟩ := List.mem_map.mp haL
       have hm' : m < N - 1 := List.mem_range.mp hm
-      rcases List.mem_cons.mp hbR with h | hbR
-      · subst h
-        exact lb_ne_TA_TB h4 (by omega)
-      rcases List.mem_cons.mp hbR with h | hbR
-      · subst h
-        exact lb_ne_TA_TC h4
-      rcases List.mem_cons.mp hbR with h | hbR
-      · subst h
-        exact lb_ne_TA_TD h4 (by omega)
-      rcases List.mem_cons.mp hbR with h | hbR
-      · subst h
-        exact lb_ne_TA_TE h4 (by omega)
-      rcases List.mem_cons.mp hbR with h | hbR
-      · subst h
-        exact lb_ne_TA_TF h4
-      exact absurd hbR (List.not_mem_nil)
+      simp only [List.mem_cons, List.not_mem_nil, or_false] at hbR
+      rcases hbR with rfl | rfl | rfl | rfl | rfl
+      · exact lb_ne_TA_TB h4 (by omega)
+      · exact lb_ne_TA_TC h4
+      · exact lb_ne_TA_TD h4
+      · exact lb_ne_TA_TE h4
+      · exact lb_ne_TA_TF h4
 
 /-- **The lower-bound half of the state law, for every `N ≥ 3`.**  The
 teardrop / chain / Gray-end-pair family realizes `N + 4` distinct

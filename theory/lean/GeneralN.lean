@@ -33,6 +33,17 @@ Results (all general-N, no `native_decide`, no `sorry`):
 
 namespace GeneralN
 
+/-- Mapping a function that is injective on a duplicate-free list preserves
+duplicate-freedom. -/
+theorem nodup_map_of_injective_on_mem
+    {α β : Type} {f : α → β} {xs : List α}
+    (hinj : ∀ a, a ∈ xs → ∀ b, b ∈ xs → f a = f b → a = b)
+    (hnd : xs.Nodup) : (xs.map f).Nodup := by
+  change (xs.map f).Pairwise (fun a b => a ≠ b)
+  rw [List.pairwise_map]
+  exact hnd.imp_of_mem fun ha hb hne hEq =>
+    hne (hinj _ ha _ hb hEq)
+
 abbrev Tongues := Nat → Bool
 
 structure Wiring where

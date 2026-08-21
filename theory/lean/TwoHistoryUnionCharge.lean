@@ -55,12 +55,6 @@ theorem ManufacturedReflector.manufacturing_journey_reaches_activated
   exact hback
 
 
-theorem nodup_map_nat_of_injective_on_two_history
-    {f : Nat → Nat} {xs : List Nat}
-    (hinj : ∀ x, x ∈ xs → ∀ y, y ∈ xs → f x = f y → x = y)
-    (hnd : xs.Nodup) : (xs.map f).Nodup :=
-  map_nodup_of_injective_on_mem_self_pivot f hnd hinj
-
 private theorem count_map_range_two_of_eq
     {α : Type} [BEq α] [LawfulBEq α]
     (f : Nat → α) :
@@ -384,7 +378,7 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_le
     exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply nodup_map_nat_of_injective_on_two_history
+    apply nodup_map_of_injective_on_mem
     · intro i hi j hj hEq
       have hiData :=
         mem_rawFirstWriterTimes_iff.mp (by

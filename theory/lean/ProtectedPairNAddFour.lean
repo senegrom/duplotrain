@@ -2082,7 +2082,6 @@ theorem knownEdgeProtectedPairNAddFourLaw :
       PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple
         D.A
       D.A_grooves htrace D.B.exploration_simple hpre
-    let C := S
     have hliveA : ∀ k ∈ times,
         (stepN w k (start.1, D.A.baseState)).isSome := by
       simpa [D.A_base] using hlive
@@ -2090,7 +2089,7 @@ theorem knownEdgeProtectedPairNAddFourLaw :
         (restrictedTonguesAt w N
           (start.1, D.A.baseState))).Nodup := by
       simpa [D.A_base] using hnd
-    exact C.all_run_distinct_le_N_add_four
+    exact S.all_run_distinct_le_N_add_four
       hN D.A_grooves times hliveA hndA
 
 end GeneralN

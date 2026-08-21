@@ -74,7 +74,7 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
     exact nodup_filter_nat _ List.nodup_range
   have hwritersNodup : writers.Nodup := by
     dsimp [writers]
-    apply nodup_map_nat_of_injective_on_two_history
+    apply nodup_map_of_injective_on_mem
     · intro i hi j hj hEq
       have hiData := mem_rawFirstWriterTimes_iff.mp (by
         simpa [times] using hi)

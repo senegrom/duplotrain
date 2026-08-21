@@ -1,6 +1,5 @@
 import RunwayHistoricalThree
 import SharpStateLawAssembly
-import SelfPivotStrictShrink
 
 /-!
 # Closing the sharp certificate from a raw five-frame tail

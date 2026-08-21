@@ -297,29 +297,9 @@ theorem reversePassages_grooved {state : Tongues}
         subst passage
         exact groove_forward (hgrooved head List.mem_cons_self)
 
-theorem mem_reverse_nat {x : Nat} {xs : List Nat} :
-    x ∈ xs.reverse ↔ x ∈ xs := by
-  induction xs with
-  | nil => simp
-  | cons y ys ih =>
-      simp [ih, or_comm]
-
 theorem nodup_reverse_nat {xs : List Nat}
-    (hnd : xs.Nodup) : xs.reverse.Nodup := by
-  induction xs with
-  | nil => simp
-  | cons x xs ih =>
-      rw [List.nodup_cons] at hnd
-      simp only [List.reverse_cons]
-      apply List.nodup_append.mpr
-      refine ⟨ih hnd.2, by simp, ?_⟩
-      intro a ha b hb
-      simp only [List.mem_singleton] at hb
-      subst b
-      intro hax
-      apply hnd.1
-      rw [← hax]
-      exact mem_reverse_nat.mp ha
+    (hnd : xs.Nodup) : xs.reverse.Nodup :=
+  hnd.perm (List.reverse_perm xs).symm
 
 private theorem nodup_prefix_head_reverse_tail
     {pre tail : List Nat} {head : Nat}
@@ -334,14 +314,14 @@ private theorem nodup_prefix_head_reverse_tail
     constructor
     · intro hmem
       apply hheadTail.1
-      exact mem_reverse_nat.mp hmem
+      exact List.mem_reverse.mp hmem
     · exact nodup_reverse_nat hheadTail.2
   · intro a ha b hb
     rcases List.mem_cons.mp hb with hbh | hbt
     · subst b
       exact hparts.2.2 a ha head List.mem_cons_self
     · exact hparts.2.2 a ha b
-        (List.mem_cons_of_mem _ (mem_reverse_nat.mp hbt))
+        (List.mem_cons_of_mem _ (List.mem_reverse.mp hbt))
 
 theorem PhysicalTrace.passage_exit_switch
     {w : Wiring} {start finish : Nat × Tongues}

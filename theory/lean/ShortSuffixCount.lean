@@ -19,21 +19,11 @@ namespace GeneralN
 /-- Pairwise-distinct sampled values force the sample times themselves to be
 pairwise distinct. -/
 theorem sample_times_nodup_of_map_nodup
-    {α : Type} [BEq α] [LawfulBEq α]
-    (f : Nat → α) :
+    {α : Type} (f : Nat → α) :
     ∀ {times : List Nat}, (times.map f).Nodup → times.Nodup := by
-  intro times
-  induction times with
-  | nil => intro _; simp
-  | cons k rest ih =>
-      intro hnd
-      simp only [List.map_cons, List.nodup_cons] at hnd
-      rw [List.nodup_cons]
-      constructor
-      · intro hk
-        apply hnd.1
-        exact List.mem_map.mpr ⟨k, hk, rfl⟩
-      · exact ih hnd.2
+  intro times hnd
+  exact List.Pairwise.of_map f
+    (fun _ _ hne hEq => hne (congrArg f hEq)) hnd
 
 /-- Death is permanent: if a partial run is off-track at `L`, it is off-track
 at every later time. -/

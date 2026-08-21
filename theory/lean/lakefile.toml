@@ -36,7 +36,6 @@ defaultTargets = [
   "RunwayHistoricalOne",
   "RunwayHistoricalThree",
   "RunwaySpliceNovelty",
-  "SelfPivotStrictShrink",
   "SharpCertificateClosure",
   "SharpStateLawAssembly",
   "ShortSuffixCount",
@@ -180,9 +179,6 @@ name = "RunwayHistoricalThree"
 
 [[lean_lib]]
 name = "RunwaySpliceNovelty"
-
-[[lean_lib]]
-name = "SelfPivotStrictShrink"
 
 [[lean_lib]]
 name = "SharpCertificateClosure"

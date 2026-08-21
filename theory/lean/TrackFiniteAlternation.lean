@@ -104,20 +104,8 @@ theorem mem_rawRepeatedWriterNovelTimes_iff
 
 theorem nodup_filter_nat (p : Nat → Bool) :
     ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
-  intro xs
-  induction xs with
-  | nil => intro _; simp
-  | cons x rest ih =>
-      intro hnd
-      rw [List.nodup_cons] at hnd
-      cases hp : p x with
-      | true =>
-          simp only [List.filter_cons, hp, if_true, List.nodup_cons]
-          exact ⟨fun hmem => hnd.1 ((List.mem_filter.mp hmem).1),
-            ih hnd.2⟩
-      | false =>
-          simp only [List.filter_cons, hp]
-          exact ih hnd.2
+  intro xs hnd
+  exact hnd.filter p
 theorem rawNovelAt_productive
     {w : Wiring} {N : Nat} {start : Nat × Tongues} {k : Nat}
     (hnovel : RawNovelAt w N start k) :
