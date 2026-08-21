@@ -118,115 +118,15 @@ theorem lb_link_chain_stem {N k : Nat} (hk2 : 2 ≤ k)
 theorem lb_symm {N : Nat} (h3 : 3 ≤ N) :
     ∀ p q, lbLink N p = some q → lbLink N q = some p := by
   intro p q h
-  unfold lbLink at h
-  split at h
-  · rename_i hp
-    cases h
-    subst hp
-    exact lb_link_3 N
-  · split at h
-    · rename_i hp
-      cases h
-      subst hp
-      exact lb_link_0 N
-    · split at h
-      · rename_i hp
-        cases h
-        subst hp
-        exact lb_link_2 N
-      · split at h
-        · rename_i hp
-          cases h
-          subst hp
-          exact lb_link_1 N
-        · split at h
-          · rename_i hp
-            cases h
-            subst hp
-            exact lb_link_endF h3
-          · split at h
-            · rename_i hp
-              cases h
-              subst hp
-              exact lb_link_endL1 h3
-            · split at h
-              · rename_i hp
-                cases h
-                subst hp
-                exact lb_link_endF2 h3
-              · split at h
-                · rename_i hp
-                  cases h
-                  subst hp
-                  exact lb_link_endL2 h3
-                · split at h
-                  · rename_i hcond
-                    cases h
-                    have hchain := lb_link_chain_stem
-                      (N := N) (k := p / 3 + 1)
-                      (by omega) (by omega)
-                    have hp : 3 * (p / 3 + 1 - 1) + 2 = p := by
-                      omega
-                    rw [hp] at hchain
-                    exact hchain
-                  · split at h
-                    · rename_i hcond
-                      cases h
-                      have hchain := lb_link_chain_br2
-                        (N := N) (k := p / 3 - 1)
-                        (by omega) (by omega)
-                      have hp : 3 * (p / 3 - 1 + 1) = p := by
-                        omega
-                      rw [hp] at hchain
-                      exact hchain
-                    · cases h
+  unfold lbLink at h ⊢
+  grind (splits := 40)
 
 /-- Every linked port lies below `3*N`. -/
 theorem lb_bound {N : Nat} (h3 : 3 ≤ N) :
     ∀ p q, lbLink N p = some q → p < 3 * N ∧ q < 3 * N := by
   intro p q h
   unfold lbLink at h
-  split at h
-  · rename_i hp
-    cases h
-    omega
-  · split at h
-    · rename_i hp
-      cases h
-      omega
-    · split at h
-      · rename_i hp
-        cases h
-        omega
-      · split at h
-        · rename_i hp
-          cases h
-          omega
-        · split at h
-          · rename_i hp
-            cases h
-            omega
-          · split at h
-            · rename_i hp
-              cases h
-              omega
-            · split at h
-              · rename_i hp
-                cases h
-                omega
-              · split at h
-                · rename_i hp
-                  cases h
-                  omega
-                · split at h
-                  · rename_i hcond
-                    cases h
-                    omega
-                  · split at h
-                    · rename_i hcond
-                      cases h
-                      omega
-                    · cases h
+  grind (splits := 40)
 
 /-- The lower-bound wiring. -/
 def lbWiring (N : Nat) (h3 : 3 ≤ N) : Wiring :=
