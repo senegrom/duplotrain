@@ -138,9 +138,12 @@ geometry provably never enters; only the wiring pattern matters.
   switches $0,\dots,N-1$} when every wired port is smaller than $3N$.
 \end{definition}
 
-Nothing forbids $w(p) = p$ (a track loop from a port back to itself) or
-joining two ports of the same switch; both occur in the extremal
-layouts.
+Nothing forbids joining two ports of the same switch (the lobes of
+Section~\ref{sec:small}), nor $w(p) = p$: a port joined to itself makes
+the train re-enter the port it has just left, which is exactly a dead end
+that reverses the train (in the toy, a buffer with a direction-change
+stone).  The upper bound therefore covers reversing terminators, while
+every attainment layout below uses ordinary two-ended track only.
 
 \begin{definition}[Tongues, states, the step]\label{def:step}
   A \emph{tongue vector} is a function $u$ from switches to
@@ -299,12 +302,14 @@ $2$-cube:
   \text{time} & \text{entering port} & \text{vector}\\\midrule
   0 & 0 \text{ (stem }0\text{)} & \Left\Left\\
   2 & 3 \text{ (stem }1\text{)} & \Right\Left\\
-  4 & 0 & \Right\Right\\
-  6 & 1 \text{ (left branch }0\text{)} & \Left\Right
+  4 & 0 \text{ (stem }0\text{)} & \Right\Right\\
+  6 & 3 \text{ (stem }1\text{)} & \Left\Right
 \end{array}
 \]
-All four vectors of two switches appear, so $f(2) = 4 = 2^2$.  The next
-flip returns to $\Left\Left$: the run cycles through the square forever.
+(The odd times enter the lobes' far branches: ports $2, 5, 1, 4$.)  All
+four vectors of two switches appear, so $f(2) = 4 = 2^2$.  The next flip
+returns to $\Left\Left$ at time $8$: the run cycles through the square
+forever.
 
 \section{Attainment for $N \ge 3$: the extremal family}\label{sec:family}
 
@@ -392,24 +397,28 @@ prober, then proved symbolically in $N$).
   facing; each chain switch's tongue now points at the branch the train
   arrived by in Phase~1, so the train retraces the chain \emph{backwards
   by pure facing moves, changing nothing} (the retrace mechanism of
-  Section~\ref{ssec:cascade}), and arrives back at the top in the state
-  it left, at time $2N-2$, entering the left branch of $N-2$.
+  Section~\ref{ssec:cascade}), reaching the stem of switch $N-2$ at time
+  $2N-3$.  Its tongue, set to $\Right$ in Phase~1, sends the train out
+  the right branch, and the right--right link delivers it into the right
+  branch of switch $N-1$ at time $2N-2$.
 
-  \emph{Phase 3 (closing the far switch).}  That trailing entry re-pins
-  $N-2$ (already $\Right$), exits its stem\,---\,but the double link now
-  routes through switch $N-1$: the train enters the stem of $N-1$,
-  \emph{trailing entries along the way set $N-1$ to $\Right$} at time
-  $2N-1$ (all $N$ switches $\Right$), and the right-branch--right-branch
-  link returns it into the right branch of $N-2$ trailing from the other
-  side, whose next passage flips $N-2$ back to $\Left$ at time $2N$.
+  \emph{Phase 3 (closing the far switch).}  That trailing entry sets
+  $N-1$ to $\Right$: at time $2N-1$ all $N$ switches are $\Right$.  The
+  train leaves by the stem of $N-1$, whose link leads into the
+  \emph{left} branch of $N-2$, trailing --- so $N-2$ flips to $\Left$
+  at time $2N$ (the train now heading down the chain again).
 
-  \emph{Phase 4 (the Gray oscillation).}  From here the run settles into
-  a four-corner oscillation on coordinates $N-2$ and $0$: down the
-  (facing, unchanged) chain, around the teardrop lobe --- flipping switch
-  $0$ --- back up, around the double link --- flipping $N-2$ --- and so
-  on.  One full circuit takes $2N-1$ steps and flips exactly one of the
-  two coordinates per half-circuit; times $3N-1$ and $4N-1$ sample the
-  two remaining corners.
+  \emph{Phase 4 (the Gray oscillation).}  From here the run oscillates
+  on the two coordinates $N-2$ and $0$ only: down the chain (trailing
+  entries that change nothing), around the teardrop lobe --- which
+  flips switch $0$ --- back up by facing retrace, and around the double
+  link --- which flips $N-2$: the tongue of $N-2$ decides whether the
+  train arrives at $N-1$ through its stem or its right branch, and
+  either way it returns into the other branch of $N-2$.  Concretely,
+  $0$ flips to $\Left$ at time $3N-1$, $N-2$ back to $\Right$ at $4N-1$,
+  $0$ back to $\Right$ at $5N-2$, and so on with period $3N-1$: the four
+  corners of the square are visited in Gray order, and times $3N-1$ and
+  $4N-1$ sample the two corners not yet seen.
 
   Distinctness is a matter of pointing at one differing coordinate for
   each pair, and the table makes the witness explicit: within Phase~1,
