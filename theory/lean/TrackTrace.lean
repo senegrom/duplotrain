@@ -61,23 +61,7 @@ on departure.  This is Observation 1 of the first-repeated-edge proof. -/
 theorem same_switch_passages_share_port
     (u v : Tongues) (p q : Nat) (hsw : p / 3 = q / 3) :
     p = q ∨ p = (arrive v q).1 ∨
-      (arrive u p).1 = q ∨ (arrive u p).1 = (arrive v q).1 := by
-  rcases arrive_stem_endpoint u p with hp | hx
-  · rcases arrive_stem_endpoint v q with hq | hy
-    · left
-      omega
-    · right
-      left
-      omega
-  · rcases arrive_stem_endpoint v q with hq | hy
-    · right
-      right
-      left
-      omega
-    · right
-      right
-      right
-      omega
+      (arrive u p).1 = q ∨ (arrive u p).1 = (arrive v q).1 := by grind [arrive_stem_endpoint]
 
 /-- **One-switch groove.**  A lazy point is left configured to undo the
 passage just made: entering the exit port immediately afterwards returns to
@@ -647,10 +631,7 @@ theorem groove_transfer {u v : Tongues} {p x : Nat}
 tongue, then `p` routes forward to `x` without changing it either. -/
 theorem groove_forward {u : Tongues} {p x : Nat}
     (hgroove : arrive u x = (p, u)) :
-    arrive u p = (x, u) := by
-  have hback := arrive_back u x
-  rw [hgroove] at hback
-  exact hback
+    arrive u p = (x, u) := by grind [arrive_back]
 
 /-- Along a switch-simple trace, every local groove made by the train is
 still present at the end of the trace. -/

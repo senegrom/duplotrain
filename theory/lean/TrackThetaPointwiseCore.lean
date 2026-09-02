@@ -324,11 +324,7 @@ private theorem theta_repair_tail_phase
         (phase = u ∨ phase = v))
     {r : Nat} (hr : L + r ≤ total) :
     ∃ port phase, stepN w r (q, u) = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  obtain ⟨port, phase, hrun, hphase⟩ := hphases (L + r) hr
-  rw [stepN_add, hmid] at hrun
-  simp only [Option.bind_some] at hrun
-  exact ⟨port, phase, hrun, hphase⟩
+      (phase = u ∨ phase = v) := by grind [stepN_add]
 
 /-- Runway repair, pointwise: three phases throughout. -/
 theorem manufactured_runway_theta_repairs_pointwise
