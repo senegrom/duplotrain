@@ -23,7 +23,7 @@ jobs:
       - name: Audit the axioms of the sharp state law
         run: |
           lake build StateLawAxiomAudit 2>&1 | tee audit.log
-          grep "'GeneralN.state_law_N_add_four' depends on axioms" audit.log
+          grep "'GeneralN.state_law' depends on axioms" audit.log
           if grep -q "sorryAx" audit.log; then
             echo "sorryAx detected" && exit 1
           fi
