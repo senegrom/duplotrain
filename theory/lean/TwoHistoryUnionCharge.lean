@@ -658,19 +658,7 @@ theorem ManufacturedReflector.mem_preservedTwoHistoryCore
     {x : List Bool}
     (hx : x ∈ A.sharpConstructionHistory N ∨
       x ∈ B.sharpConstructionHistory N) :
-    x ∈ A.preservedTwoHistoryCore B N := by
-  rcases hx with hA | hB
-  · apply List.mem_append_left
-    exact A.mem_sharpHistoryCore_of_mem hA
-  · have hBcompressed :=
-      B.mem_writerConstructionHistory_of_mem_sharp hB
-    by_cases hboundary :
-        x = VectorCount.restrict N A.activatedState
-    · subst x
-      apply List.mem_append_left
-      exact A.activated_mem_sharpHistoryCore
-    · apply List.mem_append_right
-      exact (List.mem_erase_of_ne hboundary).mpr hBcompressed
+    x ∈ A.preservedTwoHistoryCore B N := by grind [ManufacturedReflector.activatedState, ManufacturedReflector.activated_mem_sharpHistoryCore, ManufacturedReflector.mem_sharpHistoryCore_of_mem, ManufacturedReflector.mem_writerConstructionHistory_of_mem_sharp, ManufacturedReflector.preservedTwoHistoryCore, ManufacturedReflector.sharpConstructionHistory, ManufacturedReflector.sharpHistoryCore, ManufacturedReflector.writerConstructionHistory, VectorCount.restrict]
 
 
 /-- Exact all-time phase law for a backward old-support contact.  Time zero

@@ -47,35 +47,7 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_one_novelty_of_
       (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
     NoveltyCoverOn w N
       (g, (ManufacturedReflector.flip R).baseState) times
-      (O.doubleReducedTwoHistory B N original) 1 := by
-  let history := O.doubleReducedTwoHistory B N original
-  have hhistoryData := O.mem_doubleReducedTwoHistory
-    (N := N) B original hstay
-  have hhistory : ∀ x,
-      x ∈ (ManufacturedReflector.flip R).sharpConstructionHistory N ∨
-        x ∈ B.sharpConstructionHistory N → x ∈ history := by
-    intro x hx
-    simpa [history] using hhistoryData.2 x hx
-  have hAatBase : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths B.baseState := by
-    rw [hbase]
-    exact hApaths
-  have htail : ∀ tailTimes : List Nat,
-      (∀ k ∈ tailTimes,
-        (stepN w k (g, B.activatedState)).isSome) →
-      (tailTimes.map
-        (restrictedTonguesAt w N (g, B.activatedState))).Nodup →
-      NoveltyCoverOn w N (g, B.activatedState) tailTimes
-        history 1 := by
-    intro tailTimes htailLive htailNodup
-    exact R.protected_repair_one_novelty_over_history_of_action_writer
-      hN B hAatBase hBpaths hpre history hhistory
-        ht hwriter tailTimes htailLive htailNodup
-  have hcover :=
-    (ManufacturedReflector.flip R).two_journeys_then_shared_history_novelty_cover
-      B hbase hApaths hBpaths history hhistory 1 htail
-        times hlive hnd
-  simpa [history] using hcover
+      (O.doubleReducedTwoHistory B N original) 1 := by grind [InitialEntryWriterOccurrence.mem_doubleReducedTwoHistory, ManufacturedFlipReflector.protected_repair_one_novelty_over_history_of_action_writer, ManufacturedReflector.two_journeys_then_shared_history_novelty_cover]
 
 /-- In the noncanonical unchanged-occurrence branch, the double-reduced
 history and the protected repair tail have combined size at most `N + 4`.

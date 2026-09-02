@@ -757,6 +757,54 @@ $N+4$ budget on top of it.
   Lemma~\ref{lem:minside}.
 \end{proof}
 
+\section{Beyond the count: a conjectured structure theorem}
+\label{sec:structure}
+
+The state law counts vectors.  Experiments with an independent simulator
+of the model (a direct port of Definition~\ref{def:step}, used to check
+every table in this paper) suggest that the count is the shadow of a
+sharper \emph{shape}.  Call the vectors of a run, in order of first
+appearance, $v_1, v_2, \dots$.
+
+\begin{center}
+\begin{minipage}{0.92\textwidth}
+  \textbf{Conjecture (square steady state).}  Let $d$ be the number of
+  switches that ever change after the $(N{+}1)$-th distinct vector has
+  appeared.  Then $d \le 2$: from $v_{N+1}$ on, every vector of the run
+  lies in the $d$-dimensional subcube spanned by those $d$ switches ---
+  for $d = 2$, the Gray square $\{v,\ v\oplus a,\ v\oplus b,\
+  v\oplus a\oplus b\}$.  Consequently the run has at most $N + 2^d \le
+  N + 4$ distinct vectors.
+\end{minipage}
+\end{center}
+
+Evidence.  Over \emph{all} symmetric partial pairings of the $3N$ ports
+(self-links included), all start ports, and all initial tongue vectors ---
+$2.1$ million runs at $N = 3$ --- the conjecture holds with every bound
+attained: the maximum count is $7 = N+4$, at most $3$ repeated-writer
+novelties occur, the tail dimension never exceeds $2$, and in the worst
+case the square begins exactly at $v_{N+1}$, so ``$N+1$'' cannot be
+improved to ``$N$''.  Random layouts at $N = 4, 5, 6$ (six hundred
+thousand runs) agree in every respect, with maxima $8, 9, 10$.  The
+dependence $N + 2^d$ is exact in the data: tails of dimension $0, 1, 2$
+reach $N+1$, $N+2$, $N+4$ vectors respectively and no more.
+
+Relation to the formal proof.  In the protected-pair regime the square is
+already a theorem: \lean{manufactured\_flip\_pair\_all\_time\_four\_phase}
+(\file{TrackThetaAllTime.lean}) proves that \emph{at every time} the
+phase of a flip/flip reflector pair is one of the four corners
+$u, u{+}A, u{+}B, u{+}A{+}B$, whatever the supports do.  The two moving
+switches are the mouths of the two reflectors the run manufactures ---
+the dogbone of Section~\ref{sec:small} in its universal form --- and the
+remaining leaves of the probe tree (Section~\ref{ssec:probe}) bound their
+tails by budgets that are, in every case, flips of at most two named
+switches.  A proof of the conjecture along the existing lines would
+therefore restate each leaf's count as a cover by a square; a proof from
+first principles would have to show directly that once the switch-simple
+exploration is spent, the walk can only ever re-write two switches.
+Either would explain \emph{why} the constant is four: it is the size of a
+square.
+
 \section{About the formalisation}\label{sec:formal}
 
 The development lives in \file{theory/lean} of the repository and builds
