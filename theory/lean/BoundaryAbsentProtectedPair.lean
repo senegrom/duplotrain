@@ -44,7 +44,8 @@ theorem ManufacturedReflector.not_mem_reusable_of_not_mem_exploration
     {w : Wiring} {g e k : Nat}
     (A : ManufacturedReflector w g e)
     (hk : Not (List.Mem k (A.exploration.map passageSwitch))) :
-    Not (List.Mem k A.reusableSwitches) := by grind [ManufacturedReflector.mem_exploration_of_mem_reusable]
+    Not (List.Mem k A.reusableSwitches) := by grind [
+      ManufacturedReflector.mem_exploration_of_mem_reusable]
 
 /-- For a stay reflector, one reserved coordinate lowers the complete
 two-construction history core to `N+1`: unlike a flip reflector, a stay

@@ -61,7 +61,8 @@ on departure.  This is Observation 1 of the first-repeated-edge proof. -/
 theorem same_switch_passages_share_port
     (u v : Tongues) (p q : Nat) (hsw : p / 3 = q / 3) :
     p = q ∨ p = (arrive v q).1 ∨
-      (arrive u p).1 = q ∨ (arrive u p).1 = (arrive v q).1 := by grind [arrive_stem_endpoint]
+      (arrive u p).1 = q ∨ (arrive u p).1 = (arrive v q).1 := by grind [
+        arrive_stem_endpoint]
 
 /-- **One-switch groove.**  A lazy point is left configured to undo the
 passage just made: entering the exit port immediately afterwards returns to

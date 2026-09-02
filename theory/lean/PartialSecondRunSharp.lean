@@ -271,7 +271,8 @@ theorem ChangedContact.next_mem_history
     {w : Wiring} {N g e : Nat}
     {A : ManufacturedReflector w g e}
     (C : ChangedContact w A) :
-    VectorCount.restrict N C.nextState ∈ C.history N := by grind [PartialSecondRunSharp.ChangedContact.history, VectorCount.restrict]
+    VectorCount.restrict N C.nextState ∈ C.history N := by grind [
+      PartialSecondRunSharp.ChangedContact.history, VectorCount.restrict]
 
 /-- Exact two-phase tail after a changed forward contact with a stay
 reflector, generalized to an arbitrary switch-simple partial route. -/

@@ -47,7 +47,10 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_one_novelty_of_
       (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
     NoveltyCoverOn w N
       (g, (ManufacturedReflector.flip R).baseState) times
-      (O.doubleReducedTwoHistory B N original) 1 := by grind [InitialEntryWriterOccurrence.mem_doubleReducedTwoHistory, ManufacturedFlipReflector.protected_repair_one_novelty_over_history_of_action_writer, ManufacturedReflector.two_journeys_then_shared_history_novelty_cover]
+      (O.doubleReducedTwoHistory B N original) 1 := by grind [
+        InitialEntryWriterOccurrence.mem_doubleReducedTwoHistory,
+        ManufacturedFlipReflector.protected_repair_one_novelty_over_history_of_action_writer,
+        ManufacturedReflector.two_journeys_then_shared_history_novelty_cover]
 
 /-- In the noncanonical unchanged-occurrence branch, the double-reduced
 history and the protected repair tail have combined size at most `N + 4`.

@@ -213,19 +213,24 @@ theorem lb_TA_succ {N m : Nat} :
       lbTA N (m + 1) := by grind [lbTA]
 
 theorem lb_TA_to_TB {N : Nat} :
-    (fun j => if j = 0 then true else lbTA N (N - 2) j) = lbTB N := by grind [lbTA, lbTB]
+    (fun j => if j = 0 then true else lbTA N (N - 2) j) = lbTB N := by grind [
+      lbTA, lbTB]
 
 theorem lb_TB_to_TC {N : Nat} :
-    (fun j => if j = N - 1 then true else lbTB N j) = lbTC N := by grind [lbTB, lbTC]
+    (fun j => if j = N - 1 then true else lbTB N j) = lbTC N := by grind [lbTB,
+      lbTC]
 
 theorem lb_TC_to_TD {N : Nat} :
-    (fun j => if j = N - 2 then false else lbTC N j) = lbTD N := by grind [lbTC, lbTD]
+    (fun j => if j = N - 2 then false else lbTC N j) = lbTD N := by grind [
+      lbTC, lbTD]
 
 theorem lb_TD_to_TE {N : Nat} :
-    (fun j => if j = 0 then false else lbTD N j) = lbTE N := by grind [lbTD, lbTE]
+    (fun j => if j = 0 then false else lbTD N j) = lbTE N := by grind [lbTD,
+      lbTE]
 
 theorem lb_TE_to_TF {N : Nat} (h3 : 3 ≤ N) :
-    (fun j => if j = N - 2 then true else lbTE N j) = lbTF N := by grind [lbTE, lbTF]
+    (fun j => if j = N - 2 then true else lbTE N j) = lbTF N := by grind [lbTE,
+      lbTF]
 
 /-! ## The trajectory -/
 

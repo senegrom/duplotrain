@@ -1492,7 +1492,9 @@ theorem ManufacturedFlipReflector.completed_protected_route_one_novelty_of_actio
     (hlive : ∀ k ∈ times,
       (stepN w k (g, B.activatedState)).isSome) :
     NoveltyCoverOn w N (g, B.activatedState) times
-      ((ManufacturedReflector.flip R).preservedTwoHistoryCore B N) 1 := by grind [ManufacturedFlipReflector.action_writer_is_last_productive, ManufacturedFlipReflector.completed_protected_route_one_novelty_of_last]
+      ((ManufacturedReflector.flip R).preservedTwoHistoryCore B N) 1 := by grind [
+        ManufacturedFlipReflector.action_writer_is_last_productive,
+        ManufacturedFlipReflector.completed_protected_route_one_novelty_of_last]
 
 /-- Lift a novelty cover for the protected repair tail across the two
 manufacturing journeys.  Every prefix vector is supplied by the shared

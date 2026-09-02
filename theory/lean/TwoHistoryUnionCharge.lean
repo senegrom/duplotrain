@@ -658,7 +658,11 @@ theorem ManufacturedReflector.mem_preservedTwoHistoryCore
     {x : List Bool}
     (hx : x ∈ A.sharpConstructionHistory N ∨
       x ∈ B.sharpConstructionHistory N) :
-    x ∈ A.preservedTwoHistoryCore B N := by grind [ManufacturedReflector.activatedState, ManufacturedReflector.activated_mem_sharpHistoryCore, ManufacturedReflector.mem_sharpHistoryCore_of_mem, ManufacturedReflector.mem_writerConstructionHistory_of_mem_sharp, ManufacturedReflector.preservedTwoHistoryCore, ManufacturedReflector.sharpConstructionHistory, ManufacturedReflector.sharpHistoryCore, ManufacturedReflector.writerConstructionHistory, VectorCount.restrict]
+    x ∈ A.preservedTwoHistoryCore B N := by grind [
+      ManufacturedReflector.mem_sharpHistoryCore_of_mem,
+      ManufacturedReflector.mem_writerConstructionHistory_of_mem_sharp,
+      ManufacturedReflector.preservedTwoHistoryCore,
+      ManufacturedReflector.sharpConstructionHistory]
 
 
 /-- Exact all-time phase law for a backward old-support contact.  Time zero
