@@ -452,16 +452,7 @@ theorem recorded_passages_share_port {a b : Passage}
     (hb : b.1 = 3 * passageSwitch b ∨
       b.2 = 3 * passageSwitch b)
     (hsw : passageSwitch a = passageSwitch b) :
-    a.1 = b.1 ∨ a.1 = b.2 ∨ a.2 = b.1 ∨ a.2 = b.2 := by
-  rcases ha with ha | ha <;> rcases hb with hb | hb
-  · left
-    omega
-  · right; left
-    omega
-  · right; right; left
-    omega
-  · right; right; right
-    omega
+    a.1 = b.1 ∨ a.1 = b.2 ∨ a.2 = b.1 ∨ a.2 = b.2 := by grind
 
 theorem nodup_subset_length_nat {α : Type} [BEq α] [LawfulBEq α]
     {xs pool : List α}

@@ -50,41 +50,25 @@ def lbLink (N p : Nat) : Option Nat :=
     some (3 * (p / 3 - 1) + 2)
   else none
 
-theorem lb_link_0 (N : Nat) : lbLink N 0 = some 3 := by
-  unfold lbLink
-  grind
+theorem lb_link_0 (N : Nat) : lbLink N 0 = some 3 := by grind [lbLink]
 
-theorem lb_link_3 (N : Nat) : lbLink N 3 = some 0 := by
-  unfold lbLink
-  grind
+theorem lb_link_3 (N : Nat) : lbLink N 3 = some 0 := by grind [lbLink]
 
-theorem lb_link_1 (N : Nat) : lbLink N 1 = some 2 := by
-  unfold lbLink
-  grind
+theorem lb_link_1 (N : Nat) : lbLink N 1 = some 2 := by grind [lbLink]
 
-theorem lb_link_2 (N : Nat) : lbLink N 2 = some 1 := by
-  unfold lbLink
-  grind
+theorem lb_link_2 (N : Nat) : lbLink N 2 = some 1 := by grind [lbLink]
 
 theorem lb_link_endL1 {N : Nat} (h3 : 3 ≤ N) :
-    lbLink N (3 * (N - 2) + 1) = some (3 * (N - 1)) := by
-  unfold lbLink
-  grind
+    lbLink N (3 * (N - 2) + 1) = some (3 * (N - 1)) := by grind [lbLink]
 
 theorem lb_link_endF {N : Nat} (h3 : 3 ≤ N) :
-    lbLink N (3 * (N - 1)) = some (3 * (N - 2) + 1) := by
-  unfold lbLink
-  grind
+    lbLink N (3 * (N - 1)) = some (3 * (N - 2) + 1) := by grind [lbLink]
 
 theorem lb_link_endL2 {N : Nat} (h3 : 3 ≤ N) :
-    lbLink N (3 * (N - 2) + 2) = some (3 * (N - 1) + 2) := by
-  unfold lbLink
-  grind
+    lbLink N (3 * (N - 2) + 2) = some (3 * (N - 1) + 2) := by grind [lbLink]
 
 theorem lb_link_endF2 {N : Nat} (h3 : 3 ≤ N) :
-    lbLink N (3 * (N - 1) + 2) = some (3 * (N - 2) + 2) := by
-  unfold lbLink
-  grind
+    lbLink N (3 * (N - 1) + 2) = some (3 * (N - 2) + 2) := by grind [lbLink]
 
 theorem lb_link_chain_br2 {N k : Nat} (hk1 : 1 ≤ k)
     (hk3 : k ≤ N - 3) :
@@ -173,9 +157,7 @@ theorem lb_arrive_br1 (t : Tongues) (k : Nat) :
   simp
 
 theorem lb_set_noop {t : Tongues} {k : Nat} (h : t k = true) :
-    (fun j => if j = k then true else t j) = t := by
-  funext j
-  grind
+    (fun j => if j = k then true else t j) = t := by grind
 
 theorem lb_stepN_one (w : Wiring) (c : Nat × Tongues) :
     stepN w 1 c = step w c := by
@@ -228,40 +210,22 @@ private theorem lb_stepN_stem_false {w : Wiring} {t : Tongues} {k q : Nat}
 
 theorem lb_TA_succ {N m : Nat} :
     (fun j => if j = N - 2 - m then true else lbTA N m j) =
-      lbTA N (m + 1) := by
-  funext j
-  unfold lbTA
-  grind
+      lbTA N (m + 1) := by grind [lbTA]
 
 theorem lb_TA_to_TB {N : Nat} :
-    (fun j => if j = 0 then true else lbTA N (N - 2) j) = lbTB N := by
-  funext j
-  unfold lbTA lbTB
-  grind
+    (fun j => if j = 0 then true else lbTA N (N - 2) j) = lbTB N := by grind [lbTA, lbTB]
 
 theorem lb_TB_to_TC {N : Nat} :
-    (fun j => if j = N - 1 then true else lbTB N j) = lbTC N := by
-  funext j
-  unfold lbTB lbTC
-  grind
+    (fun j => if j = N - 1 then true else lbTB N j) = lbTC N := by grind [lbTB, lbTC]
 
 theorem lb_TC_to_TD {N : Nat} :
-    (fun j => if j = N - 2 then false else lbTC N j) = lbTD N := by
-  funext j
-  unfold lbTC lbTD
-  grind
+    (fun j => if j = N - 2 then false else lbTC N j) = lbTD N := by grind [lbTC, lbTD]
 
 theorem lb_TD_to_TE {N : Nat} :
-    (fun j => if j = 0 then false else lbTD N j) = lbTE N := by
-  funext j
-  unfold lbTD lbTE
-  grind
+    (fun j => if j = 0 then false else lbTD N j) = lbTE N := by grind [lbTD, lbTE]
 
 theorem lb_TE_to_TF {N : Nat} (h3 : 3 ≤ N) :
-    (fun j => if j = N - 2 then true else lbTE N j) = lbTF N := by
-  funext j
-  unfold lbTE lbTF
-  grind
+    (fun j => if j = N - 2 then true else lbTE N j) = lbTF N := by grind [lbTE, lbTF]
 
 /-! ## The trajectory -/
 
@@ -734,9 +698,7 @@ def lbTimes (N : Nat) : List Nat :=
   (List.range (N - 1)) ++ [N, 2 * N - 1, 2 * N, 3 * N - 1, 4 * N - 1]
 
 theorem lb_times_length {N : Nat} (h4 : 4 ≤ N) :
-    (lbTimes N).length = N + 4 := by
-  simp [lbTimes]
-  omega
+    (lbTimes N).length = N + 4 := by grind [lbTimes]
 
 /-- The vector visited at each chain time. -/
 theorem lb_vector_range {N : Nat} (h4 : 4 ≤ N) (h3 : 3 ≤ N)

@@ -103,9 +103,7 @@ theorem mem_rawRepeatedWriterNovelTimes_iff
   simp [rawRepeatedWriterNovelTimes]
 
 theorem nodup_filter_nat (p : Nat → Bool) :
-    ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by
-  intro xs hnd
-  exact hnd.filter p
+    ∀ {xs : List Nat}, xs.Nodup → (xs.filter p).Nodup := by grind
 theorem rawNovelAt_productive
     {w : Wiring} {N : Nat} {start : Nat × Tongues} {k : Nat}
     (hnovel : RawNovelAt w N start k) :

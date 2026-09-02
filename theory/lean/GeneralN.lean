@@ -86,17 +86,7 @@ theorem stepN_add (w : Wiring) (m n : Nat) (c : Nat × Tongues) :
 
 /-- A branch port is recovered from its switch and tongue value. -/
 theorem branchPort_bval {p : Nat} (hp : p % 3 ≠ 0) :
-    branchPort (p / 3) (bval p) = p := by
-  have h3 : p % 3 = 1 ∨ p % 3 = 2 := by omega
-  rcases h3 with h1 | h2
-  · have hb : bval p = false := by unfold bval; rw [h1]; rfl
-    rw [hb]
-    show 3 * (p / 3) + 1 = p
-    omega
-  · have hb : bval p = true := by unfold bval; rw [h2]; rfl
-    rw [hb]
-    show 3 * (p / 3) + 2 = p
-    omega
+    branchPort (p / 3) (bval p) = p := by grind [branchPort, bval]
 
 /-! ## Trailing routes ignore the tongues (T1/T2) -/
 

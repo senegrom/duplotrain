@@ -50,11 +50,7 @@ private theorem mem_doubleReducedTimes_of_ne
     (ht : t < (ManufacturedReflector.flip R).exploration.length + 1)
     (hcanonical : t ≠ R.runway.length + 1)
     (hoccurrence : t ≠ O.before.length + 1) :
-    t ∈ O.doubleReducedTimes := by
-  unfold InitialEntryWriterOccurrence.doubleReducedTimes
-  apply (List.mem_erase_of_ne hoccurrence).mpr
-  apply (List.mem_erase_of_ne hcanonical).mpr
-  exact List.mem_range.mpr ht
+    t ∈ O.doubleReducedTimes := by grind [InitialEntryWriterOccurrence.doubleReducedTimes]
 
 private theorem canonical_pre_mem_doubleReducedTimes
     {w : Wiring} {g e k0 : Nat}

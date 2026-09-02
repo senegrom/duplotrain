@@ -71,22 +71,7 @@ theorem grooved_after_flip_other
 theorem branch_values_opposite {x q : Nat}
     (hxbranch : x % 3 ≠ 0) (hqbranch : q % 3 ≠ 0)
     (hsw : x / 3 = q / 3) (hne : x ≠ q) :
-    bval q = !(bval x) := by
-  have hxmod : x % 3 = 1 ∨ x % 3 = 2 := by omega
-  have hqmod : q % 3 = 1 ∨ q % 3 = 2 := by omega
-  rcases hxmod with hx | hx <;> rcases hqmod with hq | hq
-  · exfalso
-    apply hne
-    omega
-  · unfold bval
-    rw [hx, hq]
-    rfl
-  · unfold bval
-    rw [hx, hq]
-    rfl
-  · exfalso
-    apply hne
-    omega
+    bval q = !(bval x) := by grind [bval]
 
 /-- Pinning a port whose value is opposite to the current tongue is exactly
 `flipAt` on that switch. -/

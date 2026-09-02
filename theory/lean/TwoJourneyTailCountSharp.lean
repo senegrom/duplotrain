@@ -17,8 +17,6 @@ theorem tailsharp_nodup_map_filter
     {α : Type}
     {f : Nat → α} (p : Nat → Bool) :
     ∀ {xs : List Nat},
-      (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by
-  intro xs hnd
-  exact ((List.filter_sublist (p := p) (l := xs)).map f).nodup hnd
+      (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by grind
 
 end GeneralN

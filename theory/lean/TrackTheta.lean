@@ -304,24 +304,7 @@ theorem nodup_reverse_nat {xs : List Nat}
 private theorem nodup_prefix_head_reverse_tail
     {pre tail : List Nat} {head : Nat}
     (hnd : (pre ++ head :: tail).Nodup) :
-    (pre ++ head :: tail.reverse).Nodup := by
-  have hparts := List.nodup_append.mp hnd
-  have hheadTail := hparts.2.1
-  rw [List.nodup_cons] at hheadTail
-  apply List.nodup_append.mpr
-  refine ⟨hparts.1, ?_, ?_⟩
-  · rw [List.nodup_cons]
-    constructor
-    · intro hmem
-      apply hheadTail.1
-      exact List.mem_reverse.mp hmem
-    · exact nodup_reverse_nat hheadTail.2
-  · intro a ha b hb
-    rcases List.mem_cons.mp hb with hbh | hbt
-    · subst b
-      exact hparts.2.2 a ha head List.mem_cons_self
-    · exact hparts.2.2 a ha b
-        (List.mem_cons_of_mem _ (List.mem_reverse.mp hbt))
+    (pre ++ head :: tail.reverse).Nodup := by grind
 
 theorem PhysicalTrace.passage_exit_switch
     {w : Wiring} {start finish : Nat × Tongues}
