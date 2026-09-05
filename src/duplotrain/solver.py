@@ -708,6 +708,22 @@ class SolverConfig:
     #: the general field otherwise; "lattice"/"field" force one, for tests.
     engine: str = "auto"
 
+    def __post_init__(self) -> None:
+        for name in ("slop", "clearance", "collision_spacing"):
+            value = getattr(self, name)
+            if not math.isfinite(value) or value < 0:
+                raise ValueError(f"{name} must be finite and non-negative")
+        if self.collision_spacing == 0:
+            raise ValueError("collision_spacing must be positive")
+        for name, minimum in (("min_pieces", 0), ("max_results", 1), ("max_nodes", 1)):
+            value = getattr(self, name)
+            if type(value) is not int or value < minimum:
+                raise ValueError(f"{name} must be an integer >= {minimum}")
+        if self.max_pieces is not None and (
+            type(self.max_pieces) is not int or self.max_pieces < 1
+        ):
+            raise ValueError("max_pieces must be a positive integer or None")
+
 
 @dataclass
 class SolveStats:
@@ -722,6 +738,10 @@ class SolveStats:
     #: Solutions rejected by the final independent overlap audit.  Always 0 unless
     #: a search-time exemption let an overlap slip through -- a bug worth reporting.
     dropped_overlap: int = 0
+    #: True only after exhausting the entire inventory, not a capped search.
+    complete: bool = False
+    stop_reason: str = "not_started"
+    max_pieces_searched: int = 0
 
 
 @dataclass
@@ -790,16 +810,18 @@ def solve(
         counters describing how the search went.
     """
     cfg = config or SolverConfig()
-    for piece_id in inventory:
+    for piece_id, count in inventory.items():
         if piece_id not in pieces:
             raise ValueError(f"inventory names unknown piece {piece_id!r}")
+        if type(count) is not int or count < 0:
+            raise ValueError(f"inventory count for {piece_id!r} must be a non-negative integer")
 
     if base is None:
         if grow_from is not None or close_onto is not None:
             raise ValueError("grow_from/close_onto only make sense with a base layout")
         base_pids: list[str] = []
     else:
-        opens = base.open_ends()
+        opens = base.connectable_ends()
         if grow_from is None and close_onto is None and len(opens) >= 2:
             grow_from, close_onto = opens[-1], opens[0]
         if grow_from is None or close_onto is None or grow_from == close_onto:
@@ -1227,6 +1249,7 @@ def solve(
     if base is None:
         # Loop mode enumerates everything reachable; one full-depth pass.
         f_limit = depth_limit
+        stats.max_pieces_searched = f_limit
         dfs(eng.start_cursor, 0, 0.0, start_prev)
     else:
         # Completion mode runs IDA*: grow the pieces-needed contour until closures
@@ -1235,11 +1258,21 @@ def solve(
         # each admissible contour stays small and finds the SHORTEST completions
         # first.  Plain iterative deepening without the heuristic was tried and is
         # equally hopeless -- the contour bound is what tames the tree.
-        for f_limit in range(1, depth_limit + 1):  # noqa: B007 (read inside dfs)
+        for f_limit in range(1, depth_limit + 1):
+            stats.max_pieces_searched = f_limit
             if not dfs(eng.start_cursor, 0, 0.0, start_prev):
                 break
             if len(solutions) >= cfg.max_results or stats.aborted:
                 break
+    if stats.aborted:
+        stats.stop_reason = "node_limit"
+    elif len(solutions) >= cfg.max_results:
+        stats.stop_reason = "result_limit"
+    elif depth_limit < total_pieces:
+        stats.stop_reason = "piece_limit"
+    else:
+        stats.complete = True
+        stats.stop_reason = "exhausted"
     stats.duration_s = time.perf_counter() - started
 
     ordered = sorted(

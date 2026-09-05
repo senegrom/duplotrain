@@ -15,12 +15,12 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from fractions import Fraction
 from typing import Any
 
 from .exact import Alg
 from .geometry import Pose
 from .pieces import PieceType
+from .validation import check_layout_json, rational_coefficient
 
 __all__ = ["Placement", "End", "Layout", "layout_to_dict", "layout_from_dict"]
 
@@ -33,7 +33,7 @@ def _alg_to_json(value: Alg) -> list[str]:
 
 
 def _alg_from_json(data: list[str]) -> Alg:
-    a, b, c, d = (Fraction(s) for s in data)
+    a, b, c, d = (rational_coefficient(s) for s in data)
     return Alg(a, b, c, d)
 
 
@@ -426,9 +426,7 @@ def layout_to_dict(layout: Layout) -> dict[str, Any]:
 
 def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -> Layout:
     """Rebuild a layout from :func:`layout_to_dict` output."""
-    fmt = data.get("format", "")
-    if not str(fmt).startswith("duplotrain-layout/"):
-        raise ValueError(f"unrecognised layout format {fmt!r}")
+    check_layout_json(data)
 
     placements = []
     for entry in data["placements"]:
@@ -454,6 +452,8 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
     for ai, ap, bi, bp in data.get("links", []):
         check_end(ai, ap)
         check_end(bi, bp)
+        if ap in placements[ai].piece.sealed or bp in placements[bi].piece.sealed:
+            raise ValueError("sealed faces cannot be linked")
         if (ai, ap) in links or (bi, bp) in links or (ai, ap) == (bi, bp):
             raise ValueError(f"end ({ai}, {ap}) or ({bi}, {bp}) is linked twice")
         links[(ai, ap)] = (bi, bp)
