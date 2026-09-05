@@ -5,6 +5,10 @@ on:
     paths:
       - theory/lean/**
       - .github/workflows/state-law-check.yml
+  pull_request:
+    paths:
+      - theory/lean/**
+      - .github/workflows/state-law-check.yml
   workflow_dispatch:
 jobs:
   lean:
