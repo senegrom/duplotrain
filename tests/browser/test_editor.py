@@ -237,9 +237,17 @@ def test_corrupt_recovery_is_not_overwritten(editor):
     assert not errors
 
 
-def test_built_pyodide_app_boots_and_recovers(browser):
-    """Exercise the real WASM worker under the production CSP, not a transport mock."""
+def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
+    """Exercise WASM over HTTPS under production CSP, using only visible controls.
+
+    Playwright's wait_for_function uses string evaluation that the production CSP
+    correctly forbids. Locator assertions avoid needing unsafe-eval or bypass_csp.
+    HTTPS also preserves upgrade-insecure-requests in WebKit, as on the real site.
+    """
+    import json
     import re
+    import ssl
+    import subprocess
     from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
     from pathlib import Path
 
@@ -250,6 +258,12 @@ def test_built_pyodide_app_boots_and_recovers(browser):
         r'Content-Security-Policy "([^"\n]+)"',
         (Path(dist) / ".htaccess").read_text(),
     ).group(1)
+    cert, key = tmp_path / "cert.pem", tmp_path / "key.pem"
+    subprocess.run([
+        "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+        "-keyout", str(key), "-out", str(cert), "-days", "1",
+        "-subj", "/CN=localhost", "-addext", "subjectAltName=IP:127.0.0.1,DNS:localhost",
+    ], check=True, capture_output=True)
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -260,21 +274,46 @@ def test_built_pyodide_app_boots_and_recovers(browser):
             super().end_headers()
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    tls.load_cert_chain(cert, key)
+    server.socket = tls.wrap_socket(server.socket, server_side=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    context = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True)
+    # Trust only this test's self-signed certificate; keep the actual CSP intact.
+    context = browser.new_context(
+        viewport={"width": 390, "height": 844}, has_touch=True, ignore_https_errors=True,
+    )
     page = context.new_page()
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
+    expect = playwright.expect
+
+    def export_layout():
+        with page.expect_download() as info:
+            page.locator("#export").tap()
+        return json.loads(Path(info.value.path()).read_text())
+
     try:
-        page.goto(f"http://127.0.0.1:{server.server_port}/")
-        page.wait_for_function("typeof S !== 'undefined' && S !== null && !apiBusy", timeout=90000)
-        assert page.evaluate("typeof window.duplotrainApi") == "function"
-        place_straight(page)
-        saved = page.evaluate("S.snapshot")
+        page.goto(f"https://127.0.0.1:{server.server_port}/")
+        expect(page.locator("#status")).to_contain_text("Engine ready", timeout=90000)
+        page.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
+        bounds = page.locator("#canvas").bounding_box()
+        page.touchscreen.tap(bounds["x"] + bounds["width"] / 2,
+                             bounds["y"] + bounds["height"] / 2)
+        expect(page.locator("#undo")).to_be_enabled()
+        owned = page.locator('[data-piece-id="straight"] input')
+        owned.fill("17")
+        owned.press("Tab")
+        expect(page.locator('[data-piece-id="straight"] .count')).to_have_text("16/")
+        expect(owned).to_have_value("17")
+        saved = export_layout()
+        assert len(saved["placements"]) == 1
+        assert saved["placements"][0]["piece"] == "straight"
         page.reload()
-        page.wait_for_function("typeof S !== 'undefined' && S !== null && S.layout.placements.length === 1 && !apiBusy", timeout=90000)
-        assert page.evaluate("S.snapshot") == saved
+        expect(page.locator("#status")).to_contain_text("Engine ready", timeout=90000)
+        expect(owned).to_have_value("17")
+        expect(page.locator('[data-piece-id="straight"] .count')).to_have_text("16/")
+        assert export_layout() == saved
         assert not errors
     finally:
         context.close()
