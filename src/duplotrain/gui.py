@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import math
 import threading
 import webbrowser
 from collections.abc import Mapping
@@ -32,6 +33,8 @@ from .layout import End, Layout, layout_from_dict, layout_to_dict
 from .pieces import PieceType
 from .sets import SETS, inventory_for_sets
 from .solver import Solution, SolverConfig, _moves_for, solve
+from .validation import MAX_JSON_BYTES
+from .validation import check_layout_json as check_layout_json
 
 __all__ = ["Session", "make_server", "run"]
 
@@ -55,67 +58,16 @@ DEFAULT_STONES = {sid: 1 for sid in ACCESSORIES}
 UNLIMITED_COUNT = 999
 
 
-def check_layout_json(data: object) -> None:
-    """Sanity-bound an imported layout dict BEFORE parsing it.
+MAX_INVENTORY_COUNT = 10_000
 
-    ``layout_from_dict`` is exact-arithmetic: a hostile file could otherwise
-    smuggle mile-long coefficient strings (giant integers burn CPU) or a
-    million placements (memory).  In the web build everything runs inside the
-    visitor's own browser sandbox, so this is self-protection, not server
-    protection -- the static host executes nothing; the local server binds
-    127.0.0.1 only.  Raises ValueError with a clean message on anything out
-    of bounds; structural errors beyond these checks still surface as the
-    usual 409s from the parser itself.
-    """
 
-    def fail(msg: str) -> None:
-        raise ValueError(f"import refused: {msg}")
-
-    if not isinstance(data, dict):
-        fail("layout must be a JSON object")
-    if len(str(data.get("format", ""))) > 64:
-        fail("format tag too long")
-    placements = data.get("placements", [])
-    if not isinstance(placements, list) or len(placements) > 1500:
-        fail("too many placements (limit 1500)")
-    for entry in placements:
-        if not isinstance(entry, dict):
-            fail("placement entries must be objects")
-        if len(str(entry.get("piece", ""))) > 40:
-            fail("piece id too long")
-        frame = entry.get("frame")
-        if not isinstance(frame, dict):
-            fail("placement frame missing")
-        for axis in ("x", "y", "z"):
-            coeffs = frame.get(axis, [])
-            if not isinstance(coeffs, list) or len(coeffs) > 4:
-                fail(f"frame {axis} must be up to 4 coefficients")
-            for c in coeffs:
-                if not isinstance(c, (str, int)) or len(str(c)) > 48:
-                    fail(f"frame {axis} coefficient out of bounds")
-        heading = frame.get("heading", 0)
-        if not isinstance(heading, int) or abs(heading) > 10**6:
-            fail("frame heading out of bounds")
-    links = data.get("links", [])
-    if not isinstance(links, list) or len(links) > 6000:
-        fail("too many links")
-    for entry in links:
-        if (
-            not isinstance(entry, list)
-            or len(entry) != 4
-            or any(not isinstance(v, int) or abs(v) > 10**6 for v in entry)
-        ):
-            fail("links must be [i, port, j, port] integer rows")
-    accessories = data.get("accessories", [])
-    if not isinstance(accessories, list) or len(accessories) > 200:
-        fail("too many accessories")
-    for entry in accessories:
-        if not isinstance(entry, list) or not 2 <= len(entry) <= 3:
-            fail("accessory rows must be [index, stone] or [index, stone, port]")
-        if not isinstance(entry[0], int) or len(str(entry[1])) > 40:
-            fail("accessory row out of bounds")
-        if len(entry) == 3 and (not isinstance(entry[2], int) or abs(entry[2]) > 64):
-            fail("accessory port out of bounds")
+def _count(value: object) -> int:
+    """Parse an inventory count without silently truncating fractional values."""
+    if isinstance(value, str) and value.isascii() and value.isdigit() and len(value) <= 5:
+        value = int(value)
+    if type(value) is not int or not 0 <= value <= MAX_INVENTORY_COUNT:
+        raise ValueError(f"counts must be whole numbers from 0 to {MAX_INVENTORY_COUNT}")
+    return value
 
 
 def _signed_degrees(dheading: int) -> int:
@@ -137,6 +89,8 @@ class Session:
     history: list[Layout] = field(default_factory=lambda: [Layout()])
     candidates: list[Solution] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
+    revision: int = 0
+    _candidate_revision: int | None = None
 
     # -- state ------------------------------------------------------------------
 
@@ -165,14 +119,23 @@ class Session:
             for sid in ACCESSORIES
         }
 
+    def _invalidate(self) -> None:
+        self.revision += 1
+        self.candidates = []
+        self._candidate_revision = None
+
     def set_unlimited(self, on: bool) -> None:
-        self.unlimited = bool(on)
+        if type(on) is not bool:
+            raise ValueError("unlimited must be a boolean")
+        if self.unlimited != on:
+            self.unlimited = on
+            self._invalidate()
 
     def _push(self, layout: Layout) -> None:
         self.history.append(layout)
         if len(self.history) > 200:
             del self.history[1:2]
-        self.candidates = []
+        self._invalidate()
 
     # -- serialisation for the front end ----------------------------------------
 
@@ -224,6 +187,40 @@ class Session:
             "size_cm": [round(width / 10, 1), round(height / 10, 1)],
             "piece_counts": layout.piece_counts,
         }
+
+    def snapshot(self) -> dict[str, Any]:
+        """Exact geometry and owned counts; suitable for browser-local recovery."""
+        return {
+            "format": "duplotrain-session/1",
+            "layout": layout_to_dict(self.layout),
+            "inventory": dict(self.inventory),
+            "stones": dict(self.stones),
+            "unlimited": self.unlimited,
+        }
+
+    def restore(self, data: object) -> None:
+        """Restore a validated checkpoint atomically. Never partially mutate on error."""
+        if not isinstance(data, dict) or data.get("format") != "duplotrain-session/1":
+            raise ValueError("unrecognised session format")
+        inventory = self._validated_counts(data.get("inventory"), self.catalog)
+        stones = self._validated_counts(data.get("stones"), ACCESSORIES)
+        unlimited = data.get("unlimited")
+        if type(unlimited) is not bool:
+            raise ValueError("unlimited must be a boolean")
+        layout = layout_from_dict(data.get("layout"), self.catalog)
+        self.inventory, self.stones, self.unlimited = inventory, stones, unlimited
+        self._push(layout)
+
+    @staticmethod
+    def _validated_counts(counts: object, known: Mapping) -> dict[str, int]:
+        if not isinstance(counts, dict):
+            raise ValueError("counts must be a JSON object")
+        out = {}
+        for pid, count in counts.items():
+            if pid not in known:
+                raise ValueError(f"unknown piece {pid!r}")
+            out[pid] = _count(count)
+        return out
 
     def state(self) -> dict[str, Any]:
         palette = []
@@ -301,6 +298,8 @@ class Session:
             ],
             "palette": palette,
             "can_undo": len(self.history) > 1,
+            "revision": self.revision,
+            "snapshot": self.snapshot(),
             "candidates": [self._candidate_json(i, s) for i, s in enumerate(self.candidates)],
         }
 
@@ -313,6 +312,7 @@ class Session:
                 del added[pid]
         return {
             "index": index,
+            "revision": self._candidate_revision,
             "exact": sol.exact,
             "gap": round(sol.gap, 2),
             "kind": sol.kind,
@@ -331,6 +331,10 @@ class Session:
         if self.remaining().get(piece_id, 0) <= 0:
             raise ValueError(f"no {piece_id!r} left in the box (edit the inventory)")
         piece = self.catalog[piece_id]
+        if type(entry) is not int or not 0 <= entry < len(piece.ports) or entry in piece.sealed:
+            raise ValueError("pick a valid, unsealed entry port")
+        if at is not None and at not in self.layout.connectable_ends():
+            raise ValueError("pick an open, unsealed end to attach to")
         if self.layout.placements:
             if at is None:
                 raise ValueError("pick an open end to attach to")
@@ -342,6 +346,9 @@ class Session:
         self._push(layout)
 
     def join(self, a: End, b: End) -> None:
+        opens = self.layout.connectable_ends()
+        if a == b or a not in opens or b not in opens:
+            raise ValueError("pick two distinct open ends to join")
         self._push(self.layout.join(a, b))
 
     def remove_piece(self, placement: int) -> None:
@@ -350,28 +357,27 @@ class Session:
     def undo(self) -> None:
         if len(self.history) > 1:
             self.history.pop()
-            self.candidates = []
+            self._invalidate()
 
     def clear(self) -> None:
         self._push(Layout())
-        self.history = self.history[-1:]
 
     def set_inventory(self, counts: Mapping[str, Any]) -> None:
-        for pid, n in counts.items():
-            if pid in self.catalog:
-                self.inventory[pid] = max(0, int(n))
-            elif pid in ACCESSORIES:
-                self.stones[pid] = max(0, int(n))
-            else:
-                raise ValueError(f"unknown piece {pid!r}")
+        validated = self._validated_counts(counts, {**self.catalog, **ACCESSORIES})
+        inventory, stones = dict(self.inventory), dict(self.stones)
+        for pid, n in validated.items():
+            (inventory if pid in self.catalog else stones)[pid] = n
+        if inventory != self.inventory or stones != self.stones:
+            self.inventory, self.stones = inventory, stones
+            self._invalidate()
 
     def add_set(self, code: str) -> None:
-        """Add one boxed set's pieces and stones to the owned inventory."""
+        """Add one boxed set, applying the same atomic count checks as manual edits."""
         pieces, stones = inventory_for_sets([code])
-        for pid, n in pieces.items():
-            self.inventory[pid] = self.inventory.get(pid, 0) + n
-        for sid, n in stones.items():
-            self.stones[sid] = self.stones.get(sid, 0) + n
+        self.set_inventory({
+            **{pid: self.inventory.get(pid, 0) + n for pid, n in pieces.items()},
+            **{sid: self.stones.get(sid, 0) + n for sid, n in stones.items()},
+        })
 
     def toggle_stone(
         self, placement: int, stone_id: str, at_port: int | None = None
@@ -392,7 +398,9 @@ class Session:
             raise ValueError(f"no {stone_id!r} left (edit the inventory)")
         self._push(self.layout.with_accessory(placement, stone_id, at_port=at_port))
 
-    def _arc_closures(self, grow: End, close: End, max_results: int) -> list[Solution]:
+    def _arc_closures(
+        self, grow: End, close: End, max_results: int, max_pieces: int = 26
+    ) -> list[Solution]:
         """Instant oracle for ring-shaped closures the DFS chronically misses.
 
         Tries every ``leveler + j straights + k same-sign curves + m straights +
@@ -407,6 +415,8 @@ class Session:
         """
         from .solver import _solution_overlaps
 
+        if not all(pid in self.catalog for pid in ("curve", "straight", "ramp", "span")):
+            return []
         remaining = self.remaining()
         base = self.layout
         n_base = len(base)
@@ -422,9 +432,10 @@ class Session:
         units: list[tuple[tuple, float]] = [((), 0.0)]
         for length in (1, 2, 3, 4):
             for combo in itertools.product(("ramp", "span"), repeat=length):
-                for entry_side, sign in ((0, 1.0), (1, -1.0)):
+                for entry_side in (0, 1):
                     seq = tuple((pid, entry_side) for pid in combo)
-                    dz = sign * sum(57.6 if pid == "ramp" else 19.2 for pid in combo)
+                    dz = sum(float(self.catalog[pid].exit_delta(entry_side, 1 - entry_side)[2])
+                             for pid in combo)
                     units.append((seq, dz))
         units.append(
             ((("ramp", 0), ("span", 0), ("span", 1), ("ramp", 1)), 0.0)
@@ -503,6 +514,8 @@ class Session:
                         for m in range(0, 9):
                             if m:
                                 pose = pose.then(*s_delta)
+                            if len(pre) + len(post) + j + k + m > max_pieces:
+                                continue
                             if j + m > remaining.get("straight", 0):
                                 continue
                             if not pre and not post and not k:
@@ -538,6 +551,7 @@ class Session:
         max_results: int,
         reversing: bool = False,
         progress: object = None,
+        max_pieces: int = 26,
     ) -> dict:
         """Search for completions; returns {found, aborted, searched[, reason]}.
 
@@ -548,6 +562,12 @@ class Session:
         inventory otherwise drowns exploring exotic-piece subtrees before
         finding the obvious answer.
         """
+        if type(max_pieces) is not int or not 1 <= max_pieces <= 128:
+            raise ValueError("search depth must be a whole number from 1 to 128")
+        if type(max_results) is not int or not 1 <= max_results <= 50:
+            raise ValueError("max_results must be a whole number from 1 to 50")
+        if not math.isfinite(slop) or slop < 0:
+            raise ValueError("slop must be finite and non-negative")
         opens = self.layout.connectable_ends()
         if grow is None or close is None:
             if len(opens) != 2:
@@ -557,16 +577,19 @@ class Session:
                 )
             grow, close = opens[1], opens[0]
 
+        if grow == close or grow not in opens or close not in opens:
+            raise ValueError("pick two distinct open ends")
+        self.candidates = []
+        self._candidate_revision = self.revision
         remaining = self.remaining()
 
         # Height sanity: if the two ends differ in elevation by more than every
         # climbing piece left in the box can supply, no search can help.
         dz = abs(float(self.layout.pose_of(grow).z) - float(self.layout.pose_of(close).z))
-        if dz > 1e-9:
-            lift = (
-                57.6 * remaining.get("ramp", 0)
-                + 19.2 * remaining.get("span", 0)
-                + 5.6 * remaining.get("slope", 0)
+        if dz > 1e-9 and not reversing:
+            lift = sum(
+                max((abs(float(m.dz)) for m in _moves_for(self.catalog[pid])), default=0.0) * n
+                for pid, n in remaining.items()
             )
             if dz > lift + 1e-6:
                 self.candidates = []
@@ -574,6 +597,9 @@ class Session:
                     "found": 0,
                     "aborted": False,
                     "searched": 0,
+                    "complete": True,
+                    "stop_reason": "height_impossible",
+                    "max_pieces_searched": 0,
                     "reason": (
                         f"impossible: those ends differ by {dz:.0f} mm in height "
                         f"and the remaining pieces can climb at most {lift:.0f} mm "
@@ -582,10 +608,14 @@ class Session:
                 }
 
         if not reversing:
-            arcs = self._arc_closures(grow, close, max_results)
+            arcs = self._arc_closures(grow, close, max_results, max_pieces)
             if arcs:
                 self.candidates = arcs
-                return {"found": len(arcs), "aborted": False, "searched": 0}
+                return {
+                    "found": len(arcs), "aborted": False, "searched": 0,
+                    "complete": False, "stop_reason": "heuristic",
+                    "max_pieces_searched": max_pieces,
+                }
         plain = {
             pid: n
             for pid, n in remaining.items()
@@ -605,7 +635,7 @@ class Session:
                 SolverConfig(
                     slop=slop,
                     min_pieces=1,
-                    max_pieces=26,
+                    max_pieces=max_pieces,
                     max_results=max_results,
                     max_nodes=budget,
                     reversing_loops=reversing,
@@ -622,20 +652,87 @@ class Session:
                 break
         return {
             "found": len(self.candidates),
-            "aborted": aborted and not self.candidates,
+            "aborted": aborted,
             "searched": searched,
+            "complete": result.stats.complete and inventory == full,
+            "stop_reason": (result.stats.stop_reason if inventory == full else "staged_search"),
+            "max_pieces_searched": result.stats.max_pieces_searched,
         }
 
-    def apply_candidate(self, index: int) -> None:
+    def apply_candidate(self, index: int, revision: int | None = None) -> None:
+        if self._candidate_revision != self.revision or (
+            revision is not None and revision != self.revision
+        ):
+            raise ValueError("candidate is stale (solve again)")
         if not 0 <= index < len(self.candidates):
             raise ValueError("no such candidate (solve again)")
         chosen = self.candidates[index].layout
+        used, remaining = self.layout.piece_counts, self.remaining()
+        if any(n - used.get(pid, 0) > remaining.get(pid, 0)
+               for pid, n in chosen.piece_counts.items()):
+            raise ValueError("candidate exceeds the current inventory (solve again)")
         self._push(chosen)
 
 
 # --------------------------------------------------------------------------------------
 # HTTP plumbing
 # --------------------------------------------------------------------------------------
+
+
+class UnknownRouteError(ValueError):
+    """The editor API does not expose this route."""
+
+
+def dispatch_session(
+    session: Session, path: str, body: object, progress: object = None
+) -> dict[str, Any]:
+    """Shared HTTP/Pyodide API. Call with the session lock on threaded hosts."""
+    if not isinstance(body, dict):
+        raise ValueError("request body must be a JSON object")
+    if path == "/api/state":
+        return session.state()
+    if path == "/api/export":
+        return layout_to_dict(session.layout)
+    if path == "/api/attach":
+        at = tuple(body["at"]) if body.get("at") is not None else None
+        session.attach(body["piece"], int(body["entry"]), at)
+    elif path == "/api/join":
+        session.join(tuple(body["a"]), tuple(body["b"]))
+    elif path == "/api/undo":
+        session.undo()
+    elif path == "/api/remove":
+        session.remove_piece(int(body["placement"]))
+    elif path == "/api/clear":
+        session.clear()
+    elif path == "/api/inventory":
+        session.set_inventory(body.get("counts", {}))
+    elif path == "/api/unlimited":
+        session.set_unlimited(body.get("on"))
+    elif path == "/api/add_set":
+        session.add_set(str(body["code"]))
+    elif path == "/api/stone":
+        session.toggle_stone(
+            int(body["placement"]), str(body["id"]),
+            int(body["at_port"]) if body.get("at_port") is not None else None,
+        )
+    elif path == "/api/solve":
+        outcome = session.solve_gap(
+            tuple(body["grow"]) if body.get("grow") else None,
+            tuple(body["close"]) if body.get("close") else None,
+            float(body.get("slop", 0.0)), int(body.get("max_results", 10)),
+            reversing=bool(body.get("reversing", False)), progress=progress,
+            max_pieces=int(body.get("max_pieces", 26)),
+        )
+        return {**outcome, **session.state()}
+    elif path == "/api/apply":
+        session.apply_candidate(int(body["index"]), body.get("revision"))
+    elif path == "/api/import":
+        session._push(layout_from_dict(body.get("data"), session.catalog))
+    elif path == "/api/restore":
+        session.restore(body.get("data"))
+    else:
+        raise UnknownRouteError(f"no route {path}")
+    return session.state()
 
 
 def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
@@ -656,6 +753,8 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
 
         def _body(self) -> dict[str, Any]:
             length = int(self.headers.get("Content-Length") or 0)
+            if not 0 <= length <= MAX_JSON_BYTES:
+                raise ValueError("request body larger than 2 MB or invalid length")
             if not length:
                 return {}
             return json.loads(self.rfile.read(length).decode("utf-8"))
@@ -664,12 +763,9 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             if self.path in ("/", "/index.html"):
                 html = resources.files("duplotrain").joinpath("static/editor.html")
                 self._send(200, html.read_bytes(), "text/html; charset=utf-8")
-            elif self.path == "/api/state":
+            elif self.path in ("/api/state", "/api/export"):
                 with session.lock:
-                    self._json(200, session.state())
-            elif self.path == "/api/export":
-                with session.lock:
-                    self._json(200, layout_to_dict(session.layout))
+                    self._json(200, dispatch_session(session, self.path, {}))
             else:
                 self._json(404, {"error": f"no route {self.path}"})
 
@@ -677,55 +773,12 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             try:
                 body = self._body()
                 with session.lock:
-                    self._dispatch(body)
-            except (ValueError, KeyError, TypeError) as exc:
+                    result = dispatch_session(session, self.path, body)
+                self._json(200, result)
+            except UnknownRouteError as exc:
+                self._json(404, {"error": str(exc)})
+            except (ValueError, KeyError, TypeError, IndexError, OverflowError) as exc:
                 self._json(409, {"error": str(exc)})
-
-        def _dispatch(self, body: dict[str, Any]) -> None:
-            path = self.path
-            if path == "/api/attach":
-                at = tuple(body["at"]) if body.get("at") is not None else None
-                session.attach(body["piece"], int(body["entry"]), at)
-            elif path == "/api/join":
-                session.join(tuple(body["a"]), tuple(body["b"]))
-            elif path == "/api/undo":
-                session.undo()
-            elif path == "/api/remove":
-                session.remove_piece(int(body["placement"]))
-            elif path == "/api/clear":
-                session.clear()
-            elif path == "/api/inventory":
-                session.set_inventory(body.get("counts", {}))
-            elif path == "/api/unlimited":
-                session.set_unlimited(bool(body.get("on")))
-            elif path == "/api/add_set":
-                session.add_set(str(body["code"]))
-            elif path == "/api/stone":
-                session.toggle_stone(
-                    int(body["placement"]),
-                    str(body["id"]),
-                    int(body["at_port"]) if body.get("at_port") is not None else None,
-                )
-            elif path == "/api/solve":
-                outcome = session.solve_gap(
-                    tuple(body["grow"]) if body.get("grow") else None,
-                    tuple(body["close"]) if body.get("close") else None,
-                    float(body.get("slop", 0.0)),
-                    int(body.get("max_results", 10)),
-                    reversing=bool(body.get("reversing", False)),
-                )
-                self._json(200, {**outcome, **session.state()})
-                return
-            elif path == "/api/apply":
-                session.apply_candidate(int(body["index"]))
-            elif path == "/api/import":
-                check_layout_json(body.get("data"))
-                layout = layout_from_dict(body["data"], session.catalog)
-                session._push(layout)
-            else:
-                self._json(404, {"error": f"no route {path}"})
-                return
-            self._json(200, session.state())
 
     return Handler
 

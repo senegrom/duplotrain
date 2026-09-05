@@ -1,35 +1,28 @@
-/* duplotrain engine worker: Pyodide + the Python package, off the UI thread.
- * Messages in:  {id, path, body}  (body: JSON string or null)
- * Messages out: {ready: true} once booted, then {id, res} / {id, err} per call. */
+/* Isolated Pyodide engine; all versioned paths are stamped by build.py. */
 "use strict";
 
-/* __PYODIDE_DIR__ and __ENGINE_ZIP__ are stamped by webapp/build.py: versioned
- * URLs so browsers can cache the big runtime forever yet always pick up a new
- * engine (the old flat names were served immutable and pinned stale engines). */
-importScripts("__PYODIDE_DIR__/pyodide.js");
-
 let dispatch = null;
-
+async function checkedFetch(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Could not load ${url}: HTTP ${response.status}`);
+  return response;
+}
 const booted = (async () => {
-  const pyodide = await loadPyodide({ indexURL: "__PYODIDE_DIR__/" });
-  const zipBuf = await (await fetch("__ENGINE_ZIP__")).arrayBuffer();
+  importScripts("__PYODIDE_DIR__/pyodide.js");
+  const pyodide = await loadPyodide({indexURL: "__PYODIDE_DIR__/"});
+  const zipBuf = await (await checkedFetch("__ENGINE_ZIP__")).arrayBuffer();
   pyodide.FS.mkdirTree("/app");
-  pyodide.unpackArchive(zipBuf, "zip", { extractDir: "/app" });
+  pyodide.unpackArchive(zipBuf, "zip", {extractDir: "/app"});
   pyodide.runPython("import sys; sys.path.insert(0, '/app')");
-  const adapterSrc = await (await fetch("__ADAPTER__")).text();
+  const adapterSrc = await (await checkedFetch("__ADAPTER__")).text();
   pyodide.FS.writeFile("/app/adapter.py", adapterSrc);
   dispatch = pyodide.pyimport("adapter").dispatch;
-  postMessage({ ready: true });
+  postMessage({ready: true});
 })();
-
-booted.catch((err) => postMessage({ bootError: String(err) }));
-
-onmessage = async (event) => {
-  const { id, path, body } = event.data;
+booted.catch(error => postMessage({bootError: String(error)}));
+onmessage = async ({data: {id, path, body}}) => {
   try {
     await booted;
-    postMessage({ id, res: dispatch(path, body) });
-  } catch (err) {
-    postMessage({ id, err: String(err) });
-  }
+    postMessage({id, res: dispatch(path, body)});
+  } catch (error) { postMessage({id, err: String(error)}); }
 };

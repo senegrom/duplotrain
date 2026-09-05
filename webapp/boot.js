@@ -1,85 +1,95 @@
-/* duplotrain web boot: bridge the editor to the Python engine running in a
- * Web Worker (see worker.js), so solving never freezes the page.
- *
- * Installs window.duplotrainApi + window.duplotrainBoot before the editor's own
- * script (app.js) runs; the editor calls duplotrainBoot({refresh, status})
- * instead of its first refresh. */
+/* Bridge the editor to the worker. __BUILD__ is replaced by webapp/build.py. */
 "use strict";
 
 (function () {
   let worker = null;
+  let ready = false;
   let seq = 0;
   const pending = new Map();
 
-  window.duplotrainApi = (path, body) =>
-    new Promise((resolve, reject) => {
-      if (!worker) return reject(new Error("engine still loading"));
-      const id = ++seq;
-      pending.set(id, { resolve, reject });
-      worker.postMessage({
-        id,
-        path,
-        body: body === undefined ? null : JSON.stringify(body),
-      });
-    }).then((res) => {
-      const data = JSON.parse(res);
-      if (data.__error) throw new Error(data.__error);
-      return data;
-    });
+  window.duplotrainApi = (path, body) => new Promise((resolve, reject) => {
+    if (!worker || !ready) return reject(new Error("engine is not ready"));
+    const id = ++seq;
+    try {
+      const encoded = body === undefined ? null : JSON.stringify(body);
+      pending.set(id, {resolve, reject});
+      worker.postMessage({id, path, body: encoded});
+    } catch (error) {
+      pending.delete(id);
+      reject(error);
+    }
+  }).then((res) => {
+    const data = JSON.parse(res);
+    if (data.__error) throw new Error(data.__error);
+    return data;
+  });
 
-  window.duplotrainBoot = async ({ refresh, status }) => {
+  window.duplotrainBoot = async ({refresh, status}) => {
     const overlay = document.createElement("div");
     overlay.style.cssText =
-      "position:fixed;inset:0;background:rgba(244,242,238,.94);z-index:50;" +
+      "position:fixed;inset:0;background:rgba(244,242,238,.96);z-index:50;" +
       "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
       "font:15px/1.6 system-ui;color:#2b2f33;text-align:center;padding:20px";
-    overlay.innerHTML =
-      "<div style='font-size:34px'>🚂</div>" +
-      "<div id='bootmsg'>Loading the track engine…<br>" +
-      "<span style='color:#7a828a;font-size:13px'>(~12 MB once; cached for next time)</span></div>";
+    const msg = document.createElement("div");
+    msg.textContent = "Loading the track engine… (cached on this device for later visits)";
+    overlay.append(msg);
     document.body.append(overlay);
-    const msg = overlay.querySelector("#bootmsg");
-    const fail = (detail) => {
-      msg.innerHTML = "Could not start the engine: <b>" +
-        String(detail).slice(0, 300) + "</b>";
+    let rejectReady;
+    let timer;
+    const fail = (error) => {
+      clearTimeout(timer);
+      ready = false;
+      if (worker) worker.terminate();
+      worker = null;
+      const err = error instanceof Error ? error : new Error(String(error));
+      if (rejectReady) rejectReady(err);
+      for (const call of pending.values()) call.reject(err);
+      pending.clear();
+      // Error text is untrusted; never insert it as HTML.
+      msg.textContent = "Track engine unavailable: " + err.message.slice(0, 300);
+      if (!overlay.isConnected) document.body.append(overlay);
+      if (!overlay.querySelector("button")) {
+        const retry = document.createElement("button");
+        retry.textContent = "Reload and recover autosave";
+        retry.addEventListener("click", () => location.reload());
+        overlay.append(retry);
+      }
     };
-
     try {
-      /* Build-stamped worker URL: a stale cached page can never pair with a
-       * mismatched engine again -- each build fetches its own worker afresh. */
-      worker = new Worker("./worker.js?v=__BUILD__");
-      worker.onerror = (e) => fail(e.message || "worker error");
-      const ready = new Promise((resolve, reject) => {
-        worker.addEventListener("message", function onMsg(event) {
-          if (event.data && event.data.ready) {
-            worker.removeEventListener("message", onMsg);
+      const booted = new Promise((resolve, reject) => {
+        rejectReady = reject;
+        worker = new Worker("./worker.js?v=__BUILD__");
+        worker.onerror = (event) => {
+          event.preventDefault();
+          fail(new Error(event.message || "worker error"));
+        };
+        worker.onmessageerror = () => fail(new Error("invalid worker message"));
+        worker.addEventListener("message", ({data}) => {
+          if (data && data.bootError) { fail(new Error(data.bootError)); return; }
+          if (data && data.ready) {
+            ready = true;
+            clearTimeout(timer);
             resolve();
-          } else if (event.data && event.data.bootError) {
-            reject(new Error(event.data.bootError));
+            return;
           }
+          if (typeof data === "number") {
+            if (pending.size) status(`searching… ${data.toLocaleString()} states explored`);
+            return;
+          }
+          const {id, res, err} = data || {};
+          const call = pending.get(id);
+          if (!call) return;
+          pending.delete(id);
+          if (err) call.reject(new Error(err));
+          else call.resolve(res);
         });
+        timer = setTimeout(() => fail(new Error("engine loading timed out")), 60000);
       });
-      worker.addEventListener("message", (event) => {
-        if (typeof event.data === "number") {
-          // Solve heartbeat: the search is alive, not hung.
-          status(`searching… ${event.data.toLocaleString()} states explored`);
-          return;
-        }
-        const { id, res, err } = event.data || {};
-        const call = pending.get(id);
-        if (!call) return;
-        pending.delete(id);
-        if (err) call.reject(new Error(err));
-        else call.resolve(res);
-      });
-
-      await ready;
-      overlay.remove();
+      await booted;
+      rejectReady = null;
       await refresh();
+      overlay.remove();
       status("Engine ready — runs in your browser · build __BUILD__");
-    } catch (err) {
-      fail(err);
-      console.error(err);
-    }
+    } catch (error) { fail(error); }
   };
 })();

@@ -9,6 +9,7 @@ The flow a parent with a box of DUPLO wants::
 
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 
@@ -20,6 +21,7 @@ from .catalog import default_catalog, load_catalog
 from .layout import layout_from_dict, layout_to_dict
 from .scoring import score_solution
 from .solver import SolverConfig, solve
+from .validation import MAX_JSON_BYTES
 
 console = Console()
 
@@ -236,10 +238,13 @@ def solve_cmd(
     console.print(
         f"[bold]{len(scored)}[/bold] distinct loop(s) found "
         f"({stats.nodes:,} states searched in {stats.duration_s:.1f}s"
-        + (", [red]stopped at node limit[/red]" if stats.aborted else "")
+        + (f", [yellow]stopped: {stats.stop_reason}[/yellow]" if not stats.complete else "")
         + ")"
     )
     if not scored:
+        if not stats.complete:
+            console.print("No loop found within the search limits; a closure may still exist.")
+            return
         console.print(
             "No closed loop fits. Try adding curves (12 make a circle), or allow "
             "forced fits with [bold]--slop 5[/bold]."
@@ -274,14 +279,7 @@ def solve_cmd(
     if out:
         out_dir = Path(out)
         out_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            from .render import render_layout
-        except ImportError:
-            console.print(
-                "[yellow]matplotlib not installed; writing layout JSON only "
-                "(pip install duplotrain[render])[/yellow]"
-            )
-            render_layout = None
+        render_layout = _get_renderer(required=False)
         for rank, (score, sol) in enumerate(scored[:top], start=1):
             stem = out_dir / f"loop_{rank:02d}"
             with open(f"{stem}.json", "w", encoding="utf-8") as fh:
@@ -303,11 +301,30 @@ def solve_cmd(
 main.add_command(solve_cmd, name="solve")
 
 
+def _get_renderer(required: bool = True):
+    try:
+        importlib.import_module("matplotlib")
+    except ModuleNotFoundError as exc:
+        if exc.name != "matplotlib":
+            raise
+        message = "matplotlib not installed; install duplotrain[render] to render images"
+        if required:
+            raise click.ClickException(message) from exc
+        console.print(f"{message}; writing layout JSON only", style="yellow", markup=False)
+        return None
+    from .render import render_layout
+
+    return render_layout
+
+
 def _load_layout(layout_file: str, catalog):
     try:
-        with open(layout_file, encoding="utf-8") as fh:
-            return layout_from_dict(json.load(fh), catalog)
-    except (ValueError, KeyError) as exc:
+        with open(layout_file, "rb") as fh:
+            raw = fh.read(MAX_JSON_BYTES + 1)
+        if len(raw) > MAX_JSON_BYTES:
+            raise ValueError("layout file larger than 2 MB")
+        return layout_from_dict(json.loads(raw.decode("utf-8")), catalog)
+    except (ValueError, KeyError, TypeError, OSError) as exc:
         raise click.ClickException(f"bad layout file: {exc}") from exc
 
 
@@ -322,7 +339,7 @@ def _load_layout(layout_file: str, catalog):
 @click.option("-o", "--out", type=click.Path(dir_okay=False), default=None)
 def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) -> None:
     """Render a saved layout JSON to an image."""
-    from .render import render_layout
+    render_layout = _get_renderer()
 
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
@@ -413,7 +430,7 @@ def gui(port: int, no_browser: bool) -> None:
 @click.option("-o", "--out", type=click.Path(dir_okay=False), default="oval.png")
 def demo(out: str) -> None:
     """Build and render the classic starter oval (12 curves + 4 straights)."""
-    from .render import render_layout
+    render_layout = _get_renderer()
 
     catalog = default_catalog()
     result = solve(

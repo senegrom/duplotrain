@@ -301,3 +301,24 @@ def test_arc_oracle_levels_through_ramps():
     counts = dict(session.candidates[0].layout.piece_counts)
     assert counts["ramp"] == 2  # the descending ramp was added
     assert counts["curve"] == 12
+
+
+@pytest.mark.parametrize("coefficient", ["1e999999999", "1/0"])
+def test_invalid_numeric_import_returns_json_and_preserves_state(server, coefficient):
+    _, before = server("/api/attach", {"piece": "straight", "entry": 0, "at": None})
+    _, data = server("/api/export")
+    data["placements"][0]["frame"]["x"][0] = coefficient
+    status, error = server("/api/import", {"data": data})
+    assert status == 409
+    assert "error" in error
+    _, after = server("/api/state")
+    assert before == after
+
+
+def test_non_object_body_and_invalid_port_return_json(server):
+    status, error = server("/api/inventory", [])
+    assert status == 409
+    assert "object" in error["error"]
+    status, error = server("/api/attach", {"piece": "straight", "entry": -1, "at": None})
+    assert status == 409
+    assert "port" in error["error"]
