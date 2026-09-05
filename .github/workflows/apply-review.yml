@@ -1,0 +1,48 @@
+name: Apply staged review fixes
+on:
+  push:
+    branches: [fix/duplotrain-review]
+    paths:
+      - .github/workflows/apply-review.yml
+      - .review-patch/**
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/duplotrain-review
+      - name: Check the expected revision
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install ruff
+      - name: Apply source edits and lint
+        run: |
+          python .review-patch/backend.py
+          python .review-patch/frontend.py
+          python .review-patch/followthrough.py
+          python -m compileall -q src webapp
+          ruff check src webapp --fix
+      - name: Remove staging files and commit only finished source
+        run: |
+          git rm -r .review-patch .github/workflows/apply-review.yml
+          git add src webapp tests .github README.md pyproject.toml
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix editor recovery, search reporting, validation, mobile controls, and regressions'
+          git push origin HEAD:fix/duplotrain-review
+      - name: Archive applied source
+        run: git archive --format=zip HEAD -o applied-source.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: applied-source
+          path: applied-source.zip
+          retention-days: 3
