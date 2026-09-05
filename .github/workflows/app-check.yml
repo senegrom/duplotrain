@@ -12,7 +12,7 @@ concurrency:
 jobs:
   python:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -36,4 +36,46 @@ jobs:
           cache: pip
       - run: python -m pip install -e '.[dev]'
       - run: ruff check src webapp
-      - run: python -m pytest -m 'not slow'
+      - run: python -m pytest -m 'not slow and not browser'
+  base-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install .
+      - name: Exercise export with genuinely no optional rendering dependency
+        run: |
+          python -c "import importlib.util; assert importlib.util.find_spec('matplotlib') is None"
+          duplotrain solve --curve 12 -o out --top 2
+          python -c "from pathlib import Path; assert list(Path('out').glob('*.json')); assert not list(Path('out').glob('*.png'))"
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -e '.[dev]' playwright
+      - run: python -m playwright install --with-deps ${{ matrix.browser }}
+      - run: node --test tests/web/*.test.cjs
+      - run: python webapp/build.py
+      - run: python -m pytest tests/browser -m browser -v
+        env:
+          DUPLOTRAIN_BROWSER: ${{ matrix.browser }}
+          DUPLOTRAIN_STATIC_DIST: ${{ github.workspace }}/webapp/dist

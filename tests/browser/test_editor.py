@@ -1,0 +1,283 @@
+"""Real Chromium/WebKit tests for the local editor and shared application API."""
+
+import os
+import threading
+
+import pytest
+
+playwright = pytest.importorskip("playwright.sync_api")
+
+from duplotrain.gui import Session, make_server
+from duplotrain.layout import Layout, build_chain
+
+pytestmark = pytest.mark.browser
+
+
+@pytest.fixture(scope="module")
+def browser():
+    with playwright.sync_playwright() as manager:
+        name = os.environ.get("DUPLOTRAIN_BROWSER", "chromium")
+        kwargs = {"headless": True}
+        executable = os.environ.get("DUPLOTRAIN_BROWSER_PATH")
+        if executable:
+            kwargs["executable_path"] = executable
+        instance = getattr(manager, name).launch(**kwargs)
+        yield instance
+        instance.close()
+
+
+@pytest.fixture()
+def editor(browser):
+    session = Session()
+    server = make_server(session, port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    context = browser.new_context(
+        viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True,
+    )
+    page = context.new_page()
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    url = f"http://127.0.0.1:{server.server_port}/"
+    yield page, session, url, errors
+    context.close()
+    server.shutdown()
+    server.server_close()
+    thread.join()
+
+
+def load(page, url):
+    page.goto(url)
+    page.wait_for_function("S !== null && !apiBusy && recoveryAttempted")
+
+
+def wait_count(page, count):
+    page.wait_for_function("count => S.layout.placements.length === count && !apiBusy", arg=count)
+
+
+def place_straight(page):
+    page.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
+    bounds = page.locator("#canvas").bounding_box()
+    page.touchscreen.tap(bounds["x"] + bounds["width"] / 2, bounds["y"] + bounds["height"] / 2)
+    wait_count(page, 1)
+
+
+def test_clear_undo_and_mobile_controls(editor):
+    page, session, url, errors = editor
+    load(page, url)
+    assert page.locator("#canvas").bounding_box()["width"] <= 390
+    assert page.locator("#canvas").bounding_box()["height"] >= 220
+    place_straight(page)
+    page.locator("#clear").tap()
+    wait_count(page, 0)
+    assert page.locator("#undo").is_enabled()
+    page.locator("#undo").tap()
+    wait_count(page, 1)
+    old_scale = page.evaluate("view.scale")
+    page.locator("#zoom-in").tap()
+    assert page.evaluate("view.scale") > old_scale
+    page.locator("#fit").tap()
+    page.locator("#delete-tool").tap()
+    point = page.evaluate("worldToScreen(...S.layout.placements[0].mid)")
+    bounds = page.locator("#canvas").bounding_box()
+    page.touchscreen.tap(bounds["x"] + point[0], bounds["y"] + point[1])
+    wait_count(page, 0)
+    assert not errors
+
+
+def test_reload_recovers_into_a_fresh_engine(editor):
+    page, session, url, errors = editor
+    load(page, url)
+    place_straight(page)
+    count = page.locator('[data-piece-id="straight"] input')
+    count.fill("17")
+    count.press("Tab")
+    page.wait_for_function("S.inventory.owned.straight === 17 && !apiBusy")
+    page.locator("#unlimited").check()
+    page.wait_for_function("S.inventory.unlimited && !apiBusy")
+    saved = page.evaluate("JSON.parse(localStorage.getItem(STORAGE_KEY))")
+    assert saved["inventory"]["straight"] == 17
+    # Simulate a newly created worker/session, leaving browser storage untouched.
+    with session.lock:
+        session.history = [Layout()]
+        session.inventory = dict(Session().inventory)
+        session.stones = dict(Session().stones)
+        session.unlimited = False
+        session.revision = 0
+    page.reload()
+    wait_count(page, 1)
+    page.wait_for_function("S.inventory.unlimited && S.inventory.owned.straight === 17")
+    assert page.evaluate("S.snapshot") == saved
+    assert not errors
+
+
+def test_existing_server_session_is_not_overwritten_by_stale_autosave(editor):
+    page, session, url, errors = editor
+    load(page, url)
+    place_straight(page)
+    session.attach("curve", 0, (0, 1))
+    page.reload()
+    wait_count(page, 2)
+    assert not errors
+
+
+def test_stone_tool_cannot_intercept_solve_endpoint_selection(editor):
+    page, session, url, errors = editor
+    session.attach("switch", 0, None)
+    load(page, url)
+    page.locator("#stones button").filter(has_text="Direction").tap()
+    assert page.evaluate("armedStone !== null")
+    page.locator("#solve").tap()
+    assert page.evaluate("armedStone === null && pickMode.stage === 'grow'")
+    point = page.evaluate("openEndScreenPos()[0]")
+    bounds = page.locator("#canvas").bounding_box()
+    page.touchscreen.tap(bounds["x"] + point["x"], bounds["y"] + point["y"])
+    page.wait_for_function("pickMode.stage === 'close'")
+    assert not session.layout.accessories
+    assert not errors
+
+
+def test_right_click_does_not_place_and_cancelled_drag_does_not_place(editor):
+    page, session, url, errors = editor
+    load(page, url)
+    page.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
+    page.locator("#canvas").click(button="right")
+    assert len(session.layout) == 0
+    bounds = page.locator("#canvas").bounding_box()
+    page.mouse.move(bounds["x"] + 100, bounds["y"] + 150)
+    page.mouse.down()
+    page.evaluate("Array.from(pointers.keys()).forEach(id => canvas.dispatchEvent(new PointerEvent('pointercancel', {pointerId: id})))")
+    page.mouse.up()
+    assert len(session.layout) == 0
+    assert not errors
+
+
+def test_preview_is_required_before_applying_a_candidate(editor):
+    page, session, url, errors = editor
+    session.inventory = {"curve": 12}
+    session.history = [build_chain([(session.catalog["curve"], 0, 1)] * 6)]
+    load(page, url)
+    page.locator("#reversing").uncheck()
+    page.locator("#solve").tap()
+    page.wait_for_selector(".cand")
+    candidate = page.locator(".cand").first
+    assert candidate.get_by_role("button", name="Apply").is_disabled()
+    candidate.get_by_role("button", name="Preview", exact=True).tap()
+    assert page.evaluate("preview !== null")
+    candidate.get_by_role("button", name="Apply").tap()
+    wait_count(page, 12)
+    assert session.layout.is_closed
+    assert not errors
+
+
+def test_inventory_change_removes_suggestions(editor):
+    page, session, url, errors = editor
+    session.inventory = {"curve": 12}
+    session.history = [build_chain([(session.catalog["curve"], 0, 1)] * 6)]
+    load(page, url)
+    page.locator("#reversing").uncheck()
+    page.locator("#solve").tap()
+    page.wait_for_selector(".cand")
+    count = page.locator('[data-piece-id="curve"] input')
+    count.fill("6")
+    count.press("Tab")
+    page.wait_for_function("S.inventory.owned.curve === 6 && !apiBusy")
+    assert page.locator(".cand").count() == 0
+    assert not errors
+
+
+def test_search_limit_message_and_deeper_search(editor):
+    page, session, url, errors = editor
+    session.inventory = {"straight": 34}
+    layout = build_chain([(session.catalog["straight"], 0, 1)] * 34)
+    for index in range(32, 0, -1):
+        layout = layout.remove(index)
+    session.history = [layout]
+    load(page, url)
+    page.locator("#reversing").uncheck()
+    # Same entry point as two selected arrows, with exact endpoint IDs.
+    page.evaluate("runSolve([0, 1], [1, 0])")
+    assert "may still exist" in page.locator("#status").inner_text()
+    assert page.locator("#expand-search").is_visible()
+    page.locator("#expand-search").tap()
+    page.wait_for_selector(".cand")
+    assert len(session.candidates[0].layout) == 34
+    assert not errors
+
+
+def test_pinch_zooms_without_placing_a_piece(editor):
+    if os.environ.get("DUPLOTRAIN_BROWSER", "chromium") != "chromium":
+        pytest.skip("CDP touch injection is Chromium-specific")
+    page, session, url, errors = editor
+    load(page, url)
+    page.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
+    old_scale = page.evaluate("view.scale")
+    cdp = page.context.new_cdp_session(page)
+    for kind, points in [
+        ("touchStart", [{"x": 130, "y": 200}, {"x": 230, "y": 200}]),
+        ("touchMove", [{"x": 90, "y": 200}, {"x": 270, "y": 200}]),
+        ("touchEnd", []),
+    ]:
+        cdp.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": points})
+    assert page.evaluate("view.scale") > old_scale
+    assert len(session.layout) == 0
+    assert not errors
+
+
+def test_corrupt_recovery_is_not_overwritten(editor):
+    page, session, url, errors = editor
+    load(page, url)
+    page.evaluate("autosaveReady = false; localStorage.setItem(STORAGE_KEY, 'not json')")
+    page.reload()
+    page.wait_for_function("recoveryAttempted && !apiBusy")
+    assert "Existing save kept" in page.locator("#save-status").inner_text()
+    assert page.evaluate("localStorage.getItem(STORAGE_KEY)") == "not json"
+    place_straight(page)
+    assert page.evaluate("localStorage.getItem(STORAGE_KEY)") == "not json"
+    assert not errors
+
+
+def test_built_pyodide_app_boots_and_recovers(browser):
+    """Exercise the real WASM worker under the production CSP, not a transport mock."""
+    import re
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+    from pathlib import Path
+
+    dist = os.environ.get("DUPLOTRAIN_STATIC_DIST")
+    if not dist:
+        pytest.skip("set DUPLOTRAIN_STATIC_DIST to a built webapp/dist directory")
+    policy = re.search(
+        r'Content-Security-Policy "([^"\n]+)"',
+        (Path(dist) / ".htaccess").read_text(),
+    ).group(1)
+
+    class Handler(SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=dist, **kwargs)
+
+        def end_headers(self):
+            self.send_header("Content-Security-Policy", policy)
+            super().end_headers()
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    context = browser.new_context(viewport={"width": 390, "height": 844}, has_touch=True)
+    page = context.new_page()
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    try:
+        page.goto(f"http://127.0.0.1:{server.server_port}/")
+        page.wait_for_function("typeof S !== 'undefined' && S !== null && !apiBusy", timeout=90000)
+        assert page.evaluate("typeof window.duplotrainApi") == "function"
+        place_straight(page)
+        saved = page.evaluate("S.snapshot")
+        page.reload()
+        page.wait_for_function("typeof S !== 'undefined' && S !== null && S.layout.placements.length === 1 && !apiBusy", timeout=90000)
+        assert page.evaluate("S.snapshot") == saved
+        assert not errors
+    finally:
+        context.close()
+        server.shutdown()
+        server.server_close()
+        thread.join()
