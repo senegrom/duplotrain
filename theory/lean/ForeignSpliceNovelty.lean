@@ -145,6 +145,20 @@ theorem periodic_two_phase_prefix_tongues
 
 /-! ## The approach-foreign candy splice -/
 
+section
+variable {w : Wiring} {g e outside entry mouth returnPort : Nat}
+  (R : ManufacturedFlipReflector w e g)
+  (state : Tongues)
+  (hpaths : PathGrooves R.toSupported.paths state)
+  {oldPrefix oldTail approach : List Passage}
+  (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
+    oldPrefix ++ (entry, mouth) :: oldTail)
+  (htail : PhysicalTrace w (outside, state) oldTail
+    ((ManufacturedReflector.flip R).orientedFinish state, state))
+  (hnotRunway : (entry, mouth) ∉ R.runway)
+include w g e outside entry mouth returnPort R state hpaths oldPrefix oldTail approach hsplit htail
+  hnotRunway
+
 /-- **Pointwise phase law for the approach-foreign candy splice.**
 
 The old candy completion first carries the newly installed tongue vector and
@@ -157,16 +171,6 @@ the lengths of the three routes.
 older periodicity theorem did not need to retain it in its interface, but a
 pointwise novelty statement necessarily does. -/
 theorem manufactured_flip_candy_splice_approach_foreign_two_phases
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
     {old : Passage} (hold : old ∈ R.candy)
     (horientation : (entry, mouth) = old ∨
       (entry, mouth) = (old.2, old.1))
@@ -354,16 +358,6 @@ theorem manufactured_flip_candy_splice_approach_foreign_two_phases
       simpa [newState, bothState] using hphase
 
 theorem manufactured_flip_candy_splice_approach_foreign_settled_tongues
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
     (hentryBranch : entry % 3 ≠ 0)
     {old : Passage} (hold : old ∈ R.candy)
     (horientation : (entry, mouth) = old ∨
@@ -574,16 +568,6 @@ theorem manufactured_flip_candy_splice_approach_foreign_settled_tongues
 periodicity theorem intentionally hid this configuration behind an
 existential; the pointwise lift needs its port and tongue vector exposed. -/
 theorem manufactured_flip_candy_splice_approach_foreign_lead_endpoint
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
     {old : Passage} (hold : old ∈ R.candy)
     (horientation : (entry, mouth) = old ∨
       (entry, mouth) = (old.2, old.1))
@@ -661,30 +645,24 @@ theorem manufactured_flip_candy_splice_approach_foreign_lead_endpoint
   simpa [completion, List.length_append, reversePassages_length,
     Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using hleadTrace.sound
 
+section
+variable (hentryBranch : entry % 3 ≠ 0)
+  {old : Passage} (hold : old ∈ R.candy)
+  (horientation : (entry, mouth) = old ∨
+    (entry, mouth) = (old.2, old.1))
+  (hentryGrooved : arrive state entry = (mouth, state))
+  (happroach : PhysicalTrace w (g, state) approach
+    (returnPort, state))
+  (happroachGrooved : PassagesGrooved state approach)
+  (happroachForeignNew : ∀ passage ∈ approach,
+    passageSwitch passage ≠ mouth / 3)
+include hentryBranch old hold horientation hentryGrooved happroach happroachGrooved
+  happroachForeignNew
+
 /-- The approach-foreign branch has the same two-vector phase law for all
 future times: one lead macro reaches the doubly-latched state, and every
 subsequent macro is pointwise constant there. -/
 theorem manufactured_flip_candy_splice_approach_foreign_all_two_phases
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
-    (hentryBranch : entry % 3 ≠ 0)
-    {old : Passage} (hold : old ∈ R.candy)
-    (horientation : (entry, mouth) = old ∨
-      (entry, mouth) = (old.2, old.1))
-    (hentryGrooved : arrive state entry = (mouth, state))
-    (happroach : PhysicalTrace w (g, state) approach
-      (returnPort, state))
-    (happroachGrooved : PassagesGrooved state approach)
-    (happroachForeignNew : ∀ passage ∈ approach,
-      passageSwitch passage ≠ mouth / 3)
     (happroachForeignOld : ∀ passage ∈ approach,
       passageSwitch passage ≠ R.actionSwitch)
     (hcrossed : arrive state returnPort =
@@ -759,26 +737,6 @@ theorem manufactured_flip_candy_splice_approach_foreign_all_two_phases
     · rfl
 
 theorem manufactured_flip_candy_splice_approach_contact_two_phases
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
-    (hentryBranch : entry % 3 ≠ 0)
-    {old : Passage} (hold : old ∈ R.candy)
-    (horientation : (entry, mouth) = old ∨
-      (entry, mouth) = (old.2, old.1))
-    (hentryGrooved : arrive state entry = (mouth, state))
-    (happroach : PhysicalTrace w (g, state) approach
-      (returnPort, state))
-    (happroachGrooved : PassagesGrooved state approach)
-    (happroachForeignNew : ∀ passage ∈ approach,
-      passageSwitch passage ≠ mouth / 3)
     (hcrossed : arrive state returnPort =
       (mouth, flipAt state (mouth / 3)))
     (hmouthLink : w.link mouth = some outside)
@@ -1047,26 +1005,6 @@ theorem manufactured_flip_candy_splice_approach_contact_two_phases
           simpa [newState, bothState] using hphase
 
 theorem manufactured_flip_candy_splice_approach_contact_all_two_phases
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
-    (hentryBranch : entry % 3 ≠ 0)
-    {old : Passage} (hold : old ∈ R.candy)
-    (horientation : (entry, mouth) = old ∨
-      (entry, mouth) = (old.2, old.1))
-    (hentryGrooved : arrive state entry = (mouth, state))
-    (happroach : PhysicalTrace w (g, state) approach
-      (returnPort, state))
-    (happroachGrooved : PassagesGrooved state approach)
-    (happroachForeignNew : ∀ passage ∈ approach,
-      passageSwitch passage ≠ mouth / 3)
     (hcrossed : arrive state returnPort =
       (mouth, flipAt state (mouth / 3)))
     (hmouthLink : w.link mouth = some outside)
@@ -1100,6 +1038,10 @@ theorem manufactured_flip_candy_splice_approach_contact_all_two_phases
     horientation hentryGrooved happroach happroachGrooved
     happroachForeignNew hcrossed hmouthLink harms hcontact
     (by simpa [period] using hd)
+
+end
+
+end
 
 theorem noveltyCoverOn_absolute_of_relative_two_phases
     {w : Wiring} {N K localPort : Nat}

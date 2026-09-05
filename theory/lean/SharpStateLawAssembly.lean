@@ -1,4 +1,4 @@
-import FirstReflectorNovelty
+import TrackNoveltyCover
 import RepeatedNoveltyDecomposition
 
 /-!
@@ -8,8 +8,8 @@ This file contains only the final novelty bookkeeping around the physical
 track constructions.  It deliberately separates two questions:
 
 * the arithmetic/trajectory assembly proved here; and
-* the remaining semantic assertion that every raw global-repair trajectory
-  admits the advertised five-vector novelty cover.
+* the physical assertion, proved downstream, that every raw global-repair
+  trajectory admits the advertised five-vector novelty cover.
 
 The budget is exact:
 
@@ -18,11 +18,21 @@ The budget is exact:
 * four vectors for a compatible manufactured-reflector orbit; and
 * one further vector for the strict foreign candy splice.
 
-Thus a certified trajectory has at most `N+6` distinct tongue vectors.  No
-path length or period length occurs in the conclusion.
+Thus a certified trajectory has at most `N+6` distinct tongue vectors — the
+coarse assembly that the sharp `N+4` files refine.  No path length or
+period length occurs in the conclusion.
 -/
 
 namespace GeneralN
+
+/-- The runway is among the support paths retained by a manufactured
+reflector, so a grooved support state grooves the runway itself. -/
+theorem ManufacturedReflector.runway_grooved
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e) {state : Tongues}
+    (hpaths : PathGrooves A.toSupported.paths state) :
+    PassagesGrooved state A.runway :=
+  hpaths A.runway A.runway_mem_support
 
 
 def ManufacturedReflector.sharpConstructionHistory

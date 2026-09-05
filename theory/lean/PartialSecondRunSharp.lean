@@ -6,8 +6,8 @@ import TraceRetainingFirstRevisit
 
 After one completed manufactured reflector, the second `N+1`-step probe has
 three outcomes: death, a tongue-stable simple-cycle capture, or a second
-manufactured reflector.  The last case is already bounded by
-`ManufacturedReflector.two_reflector_all_run_distinct_le_N_add_six`.
+manufactured reflector.  The last case is the protected reflector pair,
+charged separately in `ProtectedPairNAddFour.lean`.
 
 This file treats the other two outcomes without adding the first reflector's
 `N+2` history to a fresh `N+2` history.  All continuation writers are charged
@@ -20,8 +20,7 @@ constant.
 /-!
 ## Eventual periodicity supplies raw prefixes of every length
 
-Extracted from the removed Mellit support-interaction module: the one
-liveness fact its downstream consumers actually kept using.
+The one liveness fact the downstream counting files use.
 -/
 
 namespace GeneralN
@@ -163,7 +162,7 @@ theorem ManufacturedReflector.changedContact_of_broken_simple
   obtain ⟨oriented, horiented, horientedGroove,
       horientedSwitch, hdirection⟩ :=
     A.changed_contact_on_orientedRoute u v hgrooves hpath hold
-      hswitch harrive hchanged
+      hswitch harrive
   have hfull := htrace
   rw [hsplit] at hfull
   obtain ⟨middle, hbefore, hafter⟩ := hfull.split_append

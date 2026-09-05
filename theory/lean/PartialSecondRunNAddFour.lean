@@ -4,8 +4,7 @@ import StateLawCoefficientOneTop
 # The `N+4` partial-second-run frontier
 
 This file sharpens the two non-pair outcomes of the second probe after one
-manufactured reflector.  It deliberately does not alter the older `N+5`
-interfaces.
+manufactured reflector.
 
 The first result is stronger than the requested coefficient: a dead second
 run cannot damage the old supported route at all.  Every possible first
@@ -108,18 +107,21 @@ theorem changedContact_backward_stepN_some_all
   obtain ⟨port, phase, hrun, _hphase⟩ := hall d
   exact ⟨(port, phase), hrun⟩
 
+section
+variable {w : Wiring} {g e : Nat}
+  {R : ManufacturedFlipReflector w g e}
+  (C : ChangedContact w (ManufacturedReflector.flip R))
+  {repaired : Tongues}
+  (hforward : C.x = C.oriented.2)
+  (hrepair :
+    arrive C.nextState C.oriented.1 = (C.oriented.2, repaired))
+  (hrestored :
+    arrive repaired C.oriented.2 = (C.oriented.1, repaired))
+include w g e R C repaired hforward hrepair hrestored
+
 /-- A forward contact into a flip reflector reaches an explicitly periodic
 runway or candy splice. -/
-theorem changedContact_forward_flip_tail_eventuallyPeriodic
-    {w : Wiring} {g e : Nat}
-    {R : ManufacturedFlipReflector w g e}
-    (C : ChangedContact w (ManufacturedReflector.flip R))
-    {repaired : Tongues}
-    (hforward : C.x = C.oriented.2)
-    (hrepair :
-      arrive C.nextState C.oriented.1 = (C.oriented.2, repaired))
-    (hrestored :
-      arrive repaired C.oriented.2 = (C.oriented.1, repaired)) :
+theorem changedContact_forward_flip_tail_eventuallyPeriodic :
     ∃ outside state,
       stepN w (C.approach.length + 1)
           (e, (ManufacturedReflector.flip R).activatedState) =
@@ -166,16 +168,7 @@ theorem changedContact_forward_flip_tail_eventuallyPeriodic
   exact ⟨outside, flipAt C.contactState (mouth / 3), hreach, hperiodic⟩
 
 /-- A forward contact into a flip reflector is live at every later time. -/
-theorem changedContact_forward_flip_stepN_some_all
-    {w : Wiring} {g e : Nat}
-    {R : ManufacturedFlipReflector w g e}
-    (C : ChangedContact w (ManufacturedReflector.flip R))
-    {repaired : Tongues}
-    (hforward : C.x = C.oriented.2)
-    (hrepair :
-      arrive C.nextState C.oriented.1 = (C.oriented.2, repaired))
-    (hrestored :
-      arrive repaired C.oriented.2 = (C.oriented.1, repaired)) :
+theorem changedContact_forward_flip_stepN_some_all :
     ∀ d, ∃ finish,
       stepN w d (e, (ManufacturedReflector.flip R).activatedState) =
         some finish := by
@@ -184,6 +177,8 @@ theorem changedContact_forward_flip_stepN_some_all
       C hforward hrepair hrestored
   apply stepN_some_all_of_reach hreach
   exact hperiodic.stepN_some_all
+
+end
 
 /-- Every first damaging contact after one completed reflector is live
 forever.  This is the key fact omitted by the old dead-run count. -/

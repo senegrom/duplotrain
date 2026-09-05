@@ -1,10 +1,12 @@
 import StateLawTwoCandidate
 
 /-!
-# Sharp coefficient-two state bound
+# Two-novelty bounds for historical lobes
 
-This file tightens the raw general-N bound while keeping the sharper
-N+6 GeneralN.StateLaw explicitly open.
+Once the entering alternate and the base state of a lobe are already
+recorded, a four-phase traversal contributes at most two fresh tongue
+vectors — for the flip of an arbitrary lobe and for the explicit suffix
+lobe alike.  `RunwayHistoricalOne.lean` sharpens these to one.
 -/
 
 namespace GeneralN

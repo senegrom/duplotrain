@@ -66,14 +66,17 @@ private theorem theta_pointwise_arm_values_ne
 
 /-! ## Capture pointwise: the three contact geometries -/
 
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedFlipReflector w g e)
+  (B : ManufacturedFlipReflector w e g)
+  (state : Tongues)
+  (hA : PathGrooves [A.runway, A.candy] state)
+  (hB : PathGrooves [B.runway, B.candy] state)
+include w g e A B state hA hB
+
 /-- Runway capture, pointwise: two phases throughout. -/
 theorem manufactured_runway_theta_capture_pointwise
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, B.candy] state)
     {before after : List Passage} {x : Nat}
     (hoccurs : B.runway = before ++ (A.mouth, x) :: after) :
     ∃ travel,
@@ -168,12 +171,6 @@ theorem manufactured_runway_theta_capture_pointwise
 
 /-- Forward-candy capture, pointwise: two phases throughout. -/
 theorem manufactured_candy_forward_theta_capture_pointwise
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, B.candy] state)
     (hselected : state B.actionSwitch = bval B.firstArm)
     {before after : List Passage} {x : Nat}
     (hoccurs : B.candy = before ++ (A.mouth, x) :: after) :
@@ -235,12 +232,6 @@ theorem manufactured_candy_forward_theta_capture_pointwise
 
 /-- Reverse-candy capture, pointwise: two phases throughout. -/
 theorem manufactured_candy_reverse_theta_capture_pointwise
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, B.candy] state)
     (hselected : state B.actionSwitch = bval B.secondArm)
     {before after : List Passage} {p : Nat}
     (hoccurs : B.candy = before ++ (p, A.mouth) :: after) :
@@ -312,6 +303,8 @@ theorem manufactured_candy_reverse_theta_capture_pointwise
       rw [hdEq, stepN_add, hpreFlip.sound]
       simpa using hrunR
 
+end
+
 /-! ## Repair pointwise: the three contact geometries -/
 
 /-- Shared tail argument: after the one-step repair the walk sits on the
@@ -326,12 +319,15 @@ private theorem theta_repair_tail_phase
     ∃ port phase, stepN w r (q, u) = some (port, phase) ∧
       (phase = u ∨ phase = v) := by grind [stepN_add]
 
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedFlipReflector w g e)
+  (B : ManufacturedFlipReflector w e g)
+  (state : Tongues)
+include w g e A B state
+
 /-- Runway repair, pointwise: three phases throughout. -/
 theorem manufactured_runway_theta_repairs_pointwise
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hB : PathGrooves [B.runway, B.candy] state)
     {before after : List Passage} {p : Nat}
     (hoccurs :
@@ -451,10 +447,6 @@ theorem manufactured_runway_theta_repairs_pointwise
 
 /-- Forward-candy repair, pointwise: three phases throughout. -/
 theorem manufactured_candy_forward_theta_repairs_pointwise
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hB : PathGrooves [B.runway, B.candy] state)
     (hselected : state B.actionSwitch = bval B.firstArm)
     {before after : List Passage} {p : Nat}
@@ -574,10 +566,6 @@ theorem manufactured_candy_forward_theta_repairs_pointwise
 
 /-- Reverse-candy repair, pointwise: three phases throughout. -/
 theorem manufactured_candy_reverse_theta_repairs_pointwise
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hB : PathGrooves [B.runway, B.candy] state)
     (hselected : state B.actionSwitch = bval B.secondArm)
     {before after : List Passage} {x : Nat}
@@ -719,10 +707,6 @@ the flip undone) or the traversal itself repairs the flip (three phases,
 completing with the reflector's own action).  No switch-count hypothesis is
 needed. -/
 theorem manufactured_support_fault_dichotomy_pointwise
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hA : PathGrooves [A.runway, A.candy] state)
     (hB : PathGrooves [B.runway, B.candy] state)
     (hcontact : ∃ path ∈ [B.runway, B.candy],
@@ -811,5 +795,7 @@ theorem manufactured_support_fault_dichotomy_pointwise
         exact manufactured_candy_reverse_theta_capture_pointwise
           A B state hA hB hreverse
             (by simpa [hxMouth] using hoccurs)
+
+end
 
 end GeneralN

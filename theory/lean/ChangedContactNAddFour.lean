@@ -216,26 +216,29 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_compres
       exact hm
   exact noveltyCoverOn_distinct_count hcover hnd
 
+section
+variable {w : Wiring} {N g e : Nat}
+  (hN : forall p q, w.link p = some q ->
+    p < 3 * N /\ q < 3 * N)
+  {R : ManufacturedFlipReflector w g e}
+  (C : SimpleContinuationChangedContact w
+    (ManufacturedReflector.flip R))
+  (hA : PathGrooves
+    (ManufacturedReflector.flip R).toSupported.paths
+    (ManufacturedReflector.flip R).activatedState)
+  (extras : List Nat)
+  (hextrasNodup : extras.Nodup)
+  (hextrasLt : forall s, s ∈ extras -> s < N)
+  (hextrasReusable : forall s, s ∈ extras ->
+    Not (s ∈ (ManufacturedReflector.flip R).reusableSwitches))
+  (hextrasApproach : forall s, s ∈ extras ->
+    Not (s ∈ C.approachFirstWriterSwitches N))
+include w N g e hN R C hA extras hextrasNodup hextrasLt hextrasReusable hextrasApproach
+
 /-- Reusable support, approach first-writers, and any duplicate-free list
 of extra switches avoiding both occupy pairwise distinct ambient
 coordinates. -/
-theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_extras_le
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (extras : List Nat)
-    (hextrasNodup : extras.Nodup)
-    (hextrasLt : forall s, s ∈ extras -> s < N)
-    (hextrasReusable : forall s, s ∈ extras ->
-      Not (s ∈ (ManufacturedReflector.flip R).reusableSwitches))
-    (hextrasApproach : forall s, s ∈ extras ->
-      Not (s ∈ C.approachFirstWriterSwitches N)) :
+theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_extras_le :
     (ManufacturedReflector.flip R).reusableSwitches.length +
         (rawFirstWriterTimes w N
           (e, (ManufacturedReflector.flip R).activatedState)
@@ -315,23 +318,7 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_e
 
 /-- Every reserve in `extras` removes one unit from the generic `N+3`
 compressed-lead budget. -/
-theorem PartialSecondRunSharp.ChangedContact.compressedLead_add_extras_le_N_add_three
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (extras : List Nat)
-    (hextrasNodup : extras.Nodup)
-    (hextrasLt : forall s, s ∈ extras -> s < N)
-    (hextrasReusable : forall s, s ∈ extras ->
-      Not (s ∈ (ManufacturedReflector.flip R).reusableSwitches))
-    (hextrasApproach : forall s, s ∈ extras ->
-      Not (s ∈ C.approachFirstWriterSwitches N)) :
+theorem PartialSecondRunSharp.ChangedContact.compressedLead_add_extras_le_N_add_three :
     (C.compressedLead N).length + extras.length <= N + 3 := by
   have hboundary :
       VectorCount.restrict N
@@ -351,6 +338,8 @@ theorem PartialSecondRunSharp.ChangedContact.compressedLead_add_extras_le_N_add_
   simp [rawFirstWriterHistory, ManufacturedReflector.exploration,
     ManufacturedReflector.reusableSwitches] at hcharge ⊢
   omega
+
+end
 
 /-- Reserve coordinates and local novelty share one budget equation for the
 complete changed-contact run. -/
@@ -393,20 +382,23 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_add_extras_le_N_add
       hextrasReusable hextrasApproach
   omega
 
+section
+variable {w : Wiring} {N g e : Nat}
+  (hN : forall p q, w.link p = some q ->
+    p < 3 * N /\ q < 3 * N)
+  {R : ManufacturedFlipReflector w g e}
+  (C : SimpleContinuationChangedContact w
+    (ManufacturedReflector.flip R))
+  (hA : PathGrooves
+    (ManufacturedReflector.flip R).toSupported.paths
+    (ManufacturedReflector.flip R).activatedState)
+  (habsent : Not (R.actionSwitch ∈
+    C.approachFirstWriterSwitches N))
+include w N g e hN R C hA habsent
+
 /-- Reserving the flip action coordinate lowers the changed-contact history
 from `N+3` to `N+2`. -/
-theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le_N_add_two_of_action_absent
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (habsent : Not (R.actionSwitch ∈
-      C.approachFirstWriterSwitches N)) :
+theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le_N_add_two_of_action_absent :
     (C.compressedLead N).length <= N + 2 := by
   have hbound := C.compressedLead_add_extras_le_N_add_three
     hN hA [R.actionSwitch] (by simp)
@@ -430,17 +422,6 @@ productively first-write the old reflector's omitted action coordinate, the
 existing two-corner Gray-tail theorem closes the entire original run at
 `N+4`. -/
 theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_four_of_action_absent
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (habsent : Not (R.actionSwitch ∈
-      C.approachFirstWriterSwitches N))
     (times : List Nat)
     (hlive : forall k, k ∈ times ->
       (stepN w k
@@ -460,6 +441,8 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_f
     C.compressedLead_length_le_N_add_two_of_action_absent
       hN hA habsent
   omega
+
+end
 
 /-- A one-novelty local tail after the changed contact is exactly enough for
 the existing `N+3` compressed lead to give a global `N+4` bound. -/

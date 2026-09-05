@@ -327,7 +327,7 @@ theorem ManufacturedReflector.protected_changed_contact_periodic_or_forward
   obtain ⟨oriented, horiented, horientedGroove,
       horientedSwitch, hdirection⟩ :=
     B.changed_contact_on_orientedRoute u v hpaths
-      hpath hold hswitch harrive hchanged
+      hpath hold hswitch harrive
   rcases hdirection with hbackward | hforward
   · obtain ⟨recorded, tail, hBsplit⟩ :=
       List.append_of_mem horiented
@@ -3233,21 +3233,24 @@ theorem ManufacturedFlipReflector.oriented_finish_arrive
     simp [ManufacturedReflector.orientedFinish, hselected,
       arrive, R.firstArm_branch, hstem, hpin]
 
+section
+variable {w : Wiring} {g e outside : Nat}
+  (R : ManufacturedFlipReflector w e g)
+  (state : Tongues)
+  (hpaths : PathGrooves R.toSupported.paths state)
+  {oldPrefix oldTail : List Passage} {entry mouth : Nat}
+  (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
+    oldPrefix ++ (entry, mouth) :: oldTail)
+  (htail : PhysicalTrace w (outside, state) oldTail
+    ((ManufacturedReflector.flip R).orientedFinish state, state))
+  (hnotRunway : (entry, mouth) ∉ R.runway)
+include w g e outside R state hpaths oldPrefix oldTail entry mouth hsplit htail hnotRunway
+
 /-- In the candy residual, the untouched selected-route tail followed by the
 trailing old-mouth return and reverse runway completes from the splice's
 outside endpoint to the old boundary.  The entire completion is disjoint
 from the splice switch. -/
 theorem ManufacturedFlipReflector.candy_completion_foreign
-    {w : Wiring} {g e outside : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail : List Passage} {entry mouth : Nat}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
     {old : Passage} (hold : old ∈ R.candy)
     (horientation : (entry, mouth) = old ∨
       (entry, mouth) = (old.2, old.1)) :
@@ -3365,16 +3368,6 @@ theorem ManufacturedFlipReflector.candy_completion_foreign
 the same candy completion is idempotent: the candy tail carries that bit,
 the return passage is now grooved, and the reverse runway leaves it fixed. -/
 theorem ManufacturedFlipReflector.candy_completion_latched
-    {w : Wiring} {g e outside : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail : List Passage} {entry mouth : Nat}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
     (hentryBranch : entry % 3 ≠ 0) :
     let completion := oldTail ++
       (((ManufacturedReflector.flip R).orientedFinish state,
@@ -3411,28 +3404,34 @@ theorem ManufacturedFlipReflector.candy_completion_latched
       dsimp [completion, finish]
       exact htailLatched.append hreturnLatched
 
+end
+
+section
+variable {w : Wiring} {g e outside entry mouth returnPort : Nat}
+  (R : ManufacturedFlipReflector w e g)
+  (state : Tongues)
+  (hpaths : PathGrooves R.toSupported.paths state)
+  {oldPrefix oldTail approach : List Passage}
+  (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
+    oldPrefix ++ (entry, mouth) :: oldTail)
+  (htail : PhysicalTrace w (outside, state) oldTail
+    ((ManufacturedReflector.flip R).orientedFinish state, state))
+  (hnotRunway : (entry, mouth) ∉ R.runway)
+  (hentryBranch : entry % 3 ≠ 0)
+  {old : Passage} (hold : old ∈ R.candy)
+  (horientation : (entry, mouth) = old ∨
+    (entry, mouth) = (old.2, old.1))
+  (hentryGrooved : arrive state entry = (mouth, state))
+  (happroach : PhysicalTrace w (g, state) approach
+    (returnPort, state))
+include w g e outside entry mouth returnPort R state hpaths oldPrefix oldTail approach hsplit htail
+  hnotRunway hentryBranch old hold horientation hentryGrooved happroach
+
 /-- If the fresh approach avoids the old reflector action, a candy splice
 settles after one macro traversal.  The first completion latches the old
 action; thereafter both the old completion and the fresh approach/contact
 carry the two latched tongues unchanged, giving an explicit raw period. -/
 theorem manufactured_flip_candy_splice_periodic_of_approach_foreign
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
-    (hentryBranch : entry % 3 ≠ 0)
-    {old : Passage} (hold : old ∈ R.candy)
-    (horientation : (entry, mouth) = old ∨
-      (entry, mouth) = (old.2, old.1))
-    (hentryGrooved : arrive state entry = (mouth, state))
-    (happroach : PhysicalTrace w (g, state) approach
-      (returnPort, state))
     (happroachForeignNew : ∀ passage ∈ approach,
       passageSwitch passage ≠ mouth / 3)
     (happroachForeignOld : ∀ passage ∈ approach,
@@ -3552,23 +3551,6 @@ It is therefore trailing: from the post-splice state it repairs the old
 action, follows the deterministic suffix, and returns to that same state.
 Prepending the old candy completion gives an explicit positive period. -/
 theorem manufactured_flip_candy_splice_periodic_of_approach_contact
-    {w : Wiring} {g e outside entry mouth returnPort : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state)
-    {oldPrefix oldTail approach : List Passage}
-    (hsplit : (ManufacturedReflector.flip R).orientedRoute state =
-      oldPrefix ++ (entry, mouth) :: oldTail)
-    (htail : PhysicalTrace w (outside, state) oldTail
-      ((ManufacturedReflector.flip R).orientedFinish state, state))
-    (hnotRunway : (entry, mouth) ∉ R.runway)
-    (hentryBranch : entry % 3 ≠ 0)
-    {old : Passage} (hold : old ∈ R.candy)
-    (horientation : (entry, mouth) = old ∨
-      (entry, mouth) = (old.2, old.1))
-    (hentryGrooved : arrive state entry = (mouth, state))
-    (happroach : PhysicalTrace w (g, state) approach
-      (returnPort, state))
     (happroachGrooved : PassagesGrooved state approach)
     (happroachForeignNew : ∀ passage ∈ approach,
       passageSwitch passage ≠ mouth / 3)
@@ -3749,6 +3731,8 @@ theorem manufactured_flip_candy_splice_periodic_of_approach_contact
   · rw [← hcycleLen]
     exact hperiod
 
+end
+
 /-- The final changed-forward splice is periodic whenever the protected old
 reflector is the degenerate identity reflector.  A runway contact leaves a
 strict identity-reflector suffix opposite the newly spliced flip lobe.  A
@@ -3923,15 +3907,18 @@ theorem ManufacturedReflector.ChangedForwardMerge.eventuallyPeriodic
   | stay R => exact hmerge.eventuallyPeriodic_of_stay
   | flip R => exact hmerge.eventuallyPeriodic_of_flip
 
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedReflector w g e)
+  (B : ManufacturedReflector w e g)
+  (hA : PathGrooves A.toSupported.paths B.baseState)
+  (hB : PathGrooves B.toSupported.paths B.activatedState)
+include w g e A B hA hB
+
 /-- Complete repair is periodic, every backward or mouth contact is
 periodic, and the only two forward merges are retained explicitly for the
 closing theorems below. -/
-theorem manufactured_pair_eventuallyPeriodic_or_forward_merges
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hB : PathGrooves B.toSupported.paths B.activatedState) :
+theorem manufactured_pair_eventuallyPeriodic_or_forward_merges :
     EventuallyPeriodic w (g, B.activatedState) ∨
       A.FacingForwardMerge B ∨ A.ChangedForwardMerge B := by
   rcases manufactured_pair_protected_repair_outcomes A B hA hB with
@@ -3948,12 +3935,7 @@ theorem manufactured_pair_eventuallyPeriodic_or_forward_merges
 /-- **Single-residual track reduction.**  The no-change forward merge has an
 explicit period, so protected repair of two manufactured reflectors can fail
 to be periodic only at the state-changing, self-repairing forward splice. -/
-theorem manufactured_pair_eventuallyPeriodic_or_changed_forward_merge
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hB : PathGrooves B.toSupported.paths B.activatedState) :
+theorem manufactured_pair_eventuallyPeriodic_or_changed_forward_merge :
     EventuallyPeriodic w (g, B.activatedState) ∨
       A.ChangedForwardMerge B := by
   rcases manufactured_pair_eventuallyPeriodic_or_forward_merges
@@ -3966,15 +3948,12 @@ theorem manufactured_pair_eventuallyPeriodic_or_changed_forward_merge
 reflector grooved in the second's base state and the second grooved in its
 activated state, the raw train run is eventually periodic.  All complete,
 backward, facing-forward, and changed-forward repair outcomes are closed. -/
-theorem manufactured_pair_protected_repair_eventuallyPeriodic
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hB : PathGrooves B.toSupported.paths B.activatedState) :
+theorem manufactured_pair_protected_repair_eventuallyPeriodic :
     EventuallyPeriodic w (g, B.activatedState) := by
   rcases manufactured_pair_eventuallyPeriodic_or_changed_forward_merge
       A B hA hB with hperiodic | hchanged
   · exact hperiodic
   · exact hchanged.eventuallyPeriodic
+
+end
 end GeneralN

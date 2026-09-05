@@ -21,7 +21,7 @@ side of `min(2^N, N + 4)`, that is for `N ≥ 3`.  This file completes the
   family takes over.
 
 Together with `state_law_N_add_four` and `state_law_lower_bound` this
-closes `f(N) = min(2^N, N + 4)` for every `N ≥ 1`.  The witness runs are
+closes `f(N) = min(2^N, N + 4)` for every `N`.  The witness runs are
 finite and checked by kernel `decide`; no `native_decide` is used.
 -/
 

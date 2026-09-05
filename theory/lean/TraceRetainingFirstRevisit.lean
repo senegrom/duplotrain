@@ -13,8 +13,8 @@ trace with a known incoming edge.
 
 namespace GeneralN
 
-/-- Trace-retaining form of `PhysicalTrace.first_revisit_activated_outcome`.
-The cycle branch keeps both the transient lap and the stable switch-simple
+/-- First revisit of a nonsimple trace with a known incoming edge, keeping
+the traces.  The cycle branch keeps both the transient lap and the stable switch-simple
 lap; the reflector branch keeps the actual manufactured reflector and its
 completed return to the incoming edge. -/
 theorem PhysicalTrace.first_revisit_trace_or_activated_reflector

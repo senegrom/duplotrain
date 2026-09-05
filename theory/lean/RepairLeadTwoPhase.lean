@@ -54,22 +54,25 @@ theorem pathGrooves_agree_at_support_passage
   rw [hgu] at hexit
   simpa [passageSwitch, hexit] using hagree
 
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedReflector w g e)
+  (B : ManufacturedReflector w e g)
+  (hA : PathGrooves A.toSupported.paths B.baseState)
+  (hBstart : PathGrooves B.toSupported.paths B.activatedState)
+  {approach : List Passage} {finishPort : Nat} {contact : Tongues}
+  (hprefix : PhysicalTrace w (g, B.activatedState) approach
+    (finishPort, contact))
+  (hsimple : SwitchSimple approach)
+  (hroute : ∀ passage ∈ approach,
+    passage ∈ A.orientedRoute B.activatedState)
+  (hBcontact : PathGrooves B.toSupported.paths contact)
+include w g e A B hA hBstart approach finishPort contact hprefix hsimple hroute hBcontact
+
 /-- Every net changed coordinate of a switch-simple prefix which follows the
 current repair route while preserving `B`'s support is `B`'s final return
 switch. -/
-theorem ManufacturedReflector.repair_prefix_changes_only_protected_return
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hBstart : PathGrooves B.toSupported.paths B.activatedState)
-    {approach : List Passage} {finishPort : Nat} {contact : Tongues}
-    (hprefix : PhysicalTrace w (g, B.activatedState) approach
-      (finishPort, contact))
-    (hsimple : SwitchSimple approach)
-    (hroute : ∀ passage ∈ approach,
-      passage ∈ A.orientedRoute B.activatedState)
-    (hBcontact : PathGrooves B.toSupported.paths contact) :
+theorem ManufacturedReflector.repair_prefix_changes_only_protected_return :
     ∀ j, contact j ≠ B.activatedState j →
       j = B.preReturn.1 / 3 := by
   obtain ⟨reference, _hreferencePaths, _hrouteEq, _hfinishEq,
@@ -152,19 +155,7 @@ theorem ManufacturedReflector.repair_prefix_changes_only_protected_return
     simpa [hj] using hagree.symm
 
 /-- **Two-phase protected repair lead.** -/
-theorem ManufacturedReflector.repair_prefix_two_phase
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hBstart : PathGrooves B.toSupported.paths B.activatedState)
-    {approach : List Passage} {finishPort : Nat} {contact : Tongues}
-    (hprefix : PhysicalTrace w (g, B.activatedState) approach
-      (finishPort, contact))
-    (hsimple : SwitchSimple approach)
-    (hroute : ∀ passage ∈ approach,
-      passage ∈ A.orientedRoute B.activatedState)
-    (hBcontact : PathGrooves B.toSupported.paths contact) :
+theorem ManufacturedReflector.repair_prefix_two_phase :
     ∀ d, d ≤ approach.length →
       ∃ port phase,
         stepN w d (g, B.activatedState) = some (port, phase) ∧
@@ -172,5 +163,7 @@ theorem ManufacturedReflector.repair_prefix_two_phase
   exact hprefix.two_phase_of_net_changes_only hsimple
     (A.repair_prefix_changes_only_protected_return B hA hBstart
       hprefix hsimple hroute hBcontact)
+
+end
 
 end GeneralN

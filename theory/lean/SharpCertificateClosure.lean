@@ -1,30 +1,33 @@
-import RunwayHistoricalThree
+import RunwaySpliceNovelty
 import SharpStateLawAssembly
 
 /-!
-# Closing the sharp certificate from a raw five-frame tail
+# Raw time shifting and switch-simple traces
 
-This file isolates the exact global-history extraction still needed by the
-sharp state law.  The local runway/candy analysis is already complete:
-`runway_or_candy_absolute_three_novelty` says that, once the construction
-lead is historical, the entire changed-forward tail has at most three fresh
-tongue vectors.
-
-The remaining raw obstruction is therefore very concrete.  Five ordered
-repeated-writer novelties provide five fixed-stem open rerouting frames.  If
-the physical global construction turns those frames into a changed-forward
-tail before the second novelty, the last four post-vectors are all globally
-novel, pairwise distinct, and yet must lie in a list of length at most three.
-That is impossible.
-
-The theorem `knownEdgeFourRepeatedWriterNovelty_of_fiveFrameRunwayExtraction`
-below performs all finite-prefix extraction, time shifting, novelty, and
-counting.  Its sole hypothesis is the remaining geometric statement
-`KnownEdgeFiveFrameRunwayExtraction`, stated over the explicit raw frames.
-There is no residual list-counting assumption in that hypothesis.
+Shifting a run to a reached local start preserves its restricted tongue
+vectors, its liveness, and its raw writer names, and a physical trace names
+the writer of every productive step by its passage switch.  On a
+switch-simple trace no repeated-writer novelty occurs, and every vector of
+the trace already lies in the first-writer history.  These are the
+time-indexed facts the global history extraction of the sharp bound uses.
 -/
 
 namespace GeneralN
+
+/-- Every finite prefix of a positive closed period is live. -/
+theorem runway_period_stepN_some
+    {w : Wiring} {start : Nat × Tongues} {period d : Nat}
+    (hpositive : 0 < period)
+    (hperiod : stepN w period start = some start) :
+    ∃ finish, stepN w d start = some finish := by
+  have hfar : stepN w ((d + 1) * period) start = some start :=
+    stepN_mul_period_pair_novelty hperiod (d + 1)
+  have hbound : d ≤ (d + 1) * period := by
+    have hone : 1 ≤ period := by omega
+    have hmul := Nat.mul_le_mul_left (d + 1) hone
+    simp only [Nat.mul_one] at hmul
+    omega
+  exact stepN_prefix_some hbound hfar
 
 /-- A raw trajectory shifted to a reached configuration has exactly the same
 restricted tongue vectors. -/

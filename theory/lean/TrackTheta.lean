@@ -120,33 +120,11 @@ theorem forward_contact_repairs_old_passage
     {u v : Tongues} {oldEntry oldExit freshEntry : Nat}
     (hold : arrive u oldExit = (oldEntry, u))
     (hfresh : arrive u freshEntry = (oldExit, v))
-    (hswitch : oldEntry / 3 = freshEntry / 3)
-    (hchanged : v (freshEntry / 3) ≠ u (freshEntry / 3)) :
+    (hswitch : oldEntry / 3 = freshEntry / 3) :
     ∃ repaired,
       arrive v oldEntry = (oldExit, repaired) ∧
       arrive repaired oldExit = (oldEntry, repaired) := by
-  obtain ⟨hfreshBranch, hstem, _hv⟩ :=
-    changed_arrival_is_trailing hfresh hchanged
-  have holdSwitch : oldExit / 3 = oldEntry / 3 := by
-    have hs := arrive_exit_switch u oldExit
-    rw [hold] at hs
-    exact hs.symm
-  have hOldBranch : oldEntry % 3 ≠ 0 := by
-    intro hOldStem
-    have hsame : oldEntry = oldExit := by omega
-    exact (arrive_exit_ne u oldExit) (by rw [hold]; exact hsame)
-  have holdForward := groove_forward hold
-  let repaired := (arrive v oldEntry).2
-  have hrepair : arrive v oldEntry = (oldExit, repaired) := by
-    apply Prod.ext
-    · calc
-        (arrive v oldEntry).1 = (arrive u oldEntry).1 :=
-          trailing_arrive_exit_independent hOldBranch
-        _ = oldExit := congrArg Prod.fst holdForward
-    · rfl
-  have hback := arrive_back v oldEntry
-  rw [hrepair] at hback
-  exact ⟨repaired, hrepair, hback⟩
+  grind [arrive_back, arrive_exit_ne, arrive_exit_switch, trailing_arrive_exit_independent]
 
 /-- Degree-three local contact law, stated early for the orientation package:
 a fresh passage through a switch carrying an old groove must exit through one
@@ -158,25 +136,7 @@ theorem grooved_contact_exit_dichotomy
     (hfresh : arrive state freshEntry = (freshExit, next))
     (hswitch : oldEntry / 3 = freshEntry / 3) :
     freshExit = oldEntry ∨ freshExit = oldExit := by
-  have holdSwitch : oldExit / 3 = oldEntry / 3 := by
-    have hs := arrive_exit_switch state oldExit
-    rw [hold] at hs
-    exact hs.symm
-  have hshare := same_switch_passages_share_port
-    state state oldExit freshEntry (holdSwitch.trans hswitch)
-  rw [hold, hfresh] at hshare
-  rcases hshare with hsameEntry | hOldExit | hOldEntry | hsameExit
-  · have hcmp := hold
-    rw [hsameEntry, hfresh] at hcmp
-    injection hcmp with hExit _
-    exact Or.inl hExit
-  · exact Or.inr hOldExit.symm
-  · have hforward := groove_forward hold
-    change oldEntry = freshEntry at hOldEntry
-    rw [hOldEntry, hfresh] at hforward
-    injection hforward with hExit _
-    exact Or.inr hExit
-  · exact Or.inl hsameExit.symm
+  grind [groove_forward, same_switch_passages_share_port]
 
 /-- A complete physical trace can be replayed after flipping a switch absent
 from the trace.  Every intermediate state is simply conjugated by that flip.
@@ -818,11 +778,14 @@ def ManufacturedFlipReflector.toSupported
     obtain ⟨hstep, hnext⟩ := href state (pathGrooves_pair.mp hs)
     exact ⟨hstep, pathGrooves_pair.mpr hnext⟩
 
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedFlipReflector w g e)
+include w g e A
+
 /-- The mouth of every nondegenerate manufactured reflector is the stem of
 its switch. -/
-theorem ManufacturedFlipReflector.mouth_is_stem
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e) :
+theorem ManufacturedFlipReflector.mouth_is_stem :
     A.mouth % 3 = 0 := by
   obtain ⟨oldAfter, hold⟩ := A.candyTrace.head_arrive.2
   have holdStem := arrive_stem_endpoint A.mouthState A.mouth
@@ -844,26 +807,20 @@ theorem ManufacturedFlipReflector.mouth_is_stem
       · apply hpne
         omega
 
-theorem ManufacturedFlipReflector.firstArm_switch
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e) :
+theorem ManufacturedFlipReflector.firstArm_switch :
     A.firstArm / 3 = A.actionSwitch := by
   obtain ⟨after, hhead⟩ := A.candyTrace.head_arrive.2
   have hs := arrive_exit_switch A.mouthState A.mouth
   rw [hhead] at hs
   simpa [ManufacturedFlipReflector.actionSwitch] using hs
 
-theorem ManufacturedFlipReflector.secondArm_switch
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e) :
+theorem ManufacturedFlipReflector.secondArm_switch :
     A.secondArm / 3 = A.actionSwitch := by
   have hs := arrive_exit_switch A.returnState A.secondArm
   rw [A.crossed] at hs
   simpa [ManufacturedFlipReflector.actionSwitch] using hs.symm
 
-theorem ManufacturedFlipReflector.firstArm_branch
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e) :
+theorem ManufacturedFlipReflector.firstArm_branch :
     A.firstArm % 3 ≠ 0 := by
   intro hstem
   have hne := arrive_exit_ne A.mouthState A.mouth
@@ -875,9 +832,7 @@ theorem ManufacturedFlipReflector.firstArm_branch
   apply hne
   omega
 
-theorem ManufacturedFlipReflector.secondArm_branch
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e) :
+theorem ManufacturedFlipReflector.secondArm_branch :
     A.secondArm % 3 ≠ 0 := by
   intro hstem
   have hne := arrive_exit_ne A.returnState A.secondArm
@@ -889,8 +844,6 @@ theorem ManufacturedFlipReflector.secondArm_branch
   omega
 
 theorem ManufacturedFlipReflector.selected_arm
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
     (state : Tongues) :
     state A.actionSwitch = bval A.firstArm ∨
       state A.actionSwitch = bval A.secondArm := by
@@ -903,8 +856,6 @@ theorem ManufacturedFlipReflector.selected_arm
 
 /-- Rebase the manufactured runway to any state satisfying its grooves. -/
 theorem ManufacturedFlipReflector.runway_trace
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
     (state : Tongues)
     (hgrooved : PassagesGrooved state A.runway) :
     PhysicalTrace w (g, state) A.runway (A.mouth, state) := by
@@ -931,8 +882,6 @@ theorem ManufacturedFlipReflector.runway_trace
 /-- Candy traversal in its recorded direction, before the mouth switch is
 pinned on the return arm. -/
 theorem ManufacturedFlipReflector.candy_forward_trace
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
     (state : Tongues)
     (hselected : state A.actionSwitch = bval A.firstArm)
     (hgrooved : PassagesGrooved state A.candy) :
@@ -965,8 +914,6 @@ theorem ManufacturedFlipReflector.candy_forward_trace
 /-- Candy traversal in the opposite direction, with the reverse passage
 list retained explicitly. -/
 theorem ManufacturedFlipReflector.candy_reverse_trace
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
     (state : Tongues)
     (hselected : state A.actionSwitch = bval A.secondArm)
     (hgrooved : PassagesGrooved state A.candy) :
@@ -1019,9 +966,7 @@ theorem ManufacturedFlipReflector.candy_reverse_trace
         hgrooved' hfirstLink
       simpa [hcandy, reversePassages] using hhead.append hreverse
 
-theorem ManufacturedFlipReflector.reverse_support_simple
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e) :
+theorem ManufacturedFlipReflector.reverse_support_simple :
     SwitchSimple
       (A.runway ++
         (A.mouth, A.secondArm) :: reversePassages A.candy) := by
@@ -1040,8 +985,6 @@ theorem ManufacturedFlipReflector.reverse_support_simple
 
 /-- No-change prefix reaching a recorded-direction candy occurrence. -/
 theorem ManufacturedFlipReflector.forward_prefix_to_candy_occurrence
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
     (state : Tongues)
     (hpaths : PathGrooves [A.runway, A.candy] state)
     (hselected : state A.actionSwitch = bval A.firstArm)
@@ -1069,8 +1012,6 @@ theorem ManufacturedFlipReflector.forward_prefix_to_candy_occurrence
 /-- No-change prefix reaching the same candy occurrence when the candy is
 traversed in the opposite direction. -/
 theorem ManufacturedFlipReflector.reverse_prefix_to_candy_occurrence
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
     (state : Tongues)
     (hpaths : PathGrooves [A.runway, A.candy] state)
     (hselected : state A.actionSwitch = bval A.secondArm)
@@ -1107,9 +1048,7 @@ theorem ManufacturedFlipReflector.reverse_prefix_to_candy_occurrence
 
 /-- The lobe mouth is absent from both support paths; its flip is therefore
 the unique possible support fault seen by another reflector. -/
-theorem ManufacturedFlipReflector.support_foreign
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e) :
+theorem ManufacturedFlipReflector.support_foreign :
     ∀ path ∈ [A.runway, A.candy], ∀ passage ∈ path,
       passageSwitch passage ≠ A.actionSwitch := by
   intro path hp
@@ -1141,8 +1080,6 @@ theorem ManufacturedFlipReflector.support_foreign
 
 /-- Core capture, packaged on the retained manufactured-reflector data. -/
 theorem ManufacturedFlipReflector.capture_from_mouth
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
     (state : Tongues)
     (hrunway : PassagesGrooved state A.runway)
     (hcandy : PassagesGrooved state A.candy) :
@@ -1150,6 +1087,8 @@ theorem ManufacturedFlipReflector.capture_from_mouth
       (A.mouth, flipAt state A.actionSwitch) = some (e, state) := by
   exact crossed_revisit_capture_from_mouth w A.runwayTrace A.candyTrace
     A.simple A.crossed A.arms_ne A.entryEdge state hrunway hcandy
+
+end
 
 /-- Degenerate first-revisit reflector: a grooved arm is linked to itself.
 The train traverses the arm out and back, then retraces the runway; its local
@@ -1308,17 +1247,18 @@ def ManufacturedReflector.mouthConfig
   | .stay R => (R.mouth, R.mouthState)
   | .flip R => (R.mouth, R.mouthState)
 
-theorem ManufacturedReflector.runway_trace
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) :
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedReflector w g e)
+include w g e A
+
+theorem ManufacturedReflector.runway_trace :
     PhysicalTrace w (g, A.baseState) A.runway A.mouthConfig := by
   cases A with
   | stay R => exact R.runwayTrace
   | flip R => exact R.runwayTrace
 
-theorem ManufacturedReflector.runway_simple
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) :
+theorem ManufacturedReflector.runway_simple :
     SwitchSimple A.runway := by
   cases A with
   | stay R =>
@@ -1332,9 +1272,7 @@ theorem ManufacturedReflector.runway_simple
       simp only [List.map_append] at hs
       exact (List.nodup_append.mp hs).1
 
-theorem ManufacturedReflector.exploration_trace
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) :
+theorem ManufacturedReflector.exploration_trace :
     PhysicalTrace w (g, A.baseState) A.exploration A.preReturn := by
   cases A with
   | stay R => exact R.runwayTrace.append R.coreTrace
@@ -1343,9 +1281,7 @@ theorem ManufacturedReflector.exploration_trace
 /-- The local return passage of either manufactured-reflector constructor
 contacts the retained runway at its mouth and produces the advertised
 activated state. -/
-theorem ManufacturedReflector.return_arrive_mouth
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) :
+theorem ManufacturedReflector.return_arrive_mouth :
     arrive A.preReturn.2 A.preReturn.1 =
       (A.mouthConfig.1, A.activatedState) := by
   cases A with
@@ -1363,20 +1299,18 @@ theorem ManufacturedReflector.return_arrive_mouth
 
 /-- The local passage immediately following a manufactured exploration is
 the repeated-switch passage that activates the reflector. -/
-theorem ManufacturedReflector.return_arrive
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) :
+theorem ManufacturedReflector.return_arrive :
     ∃ exit, arrive A.preReturn.2 A.preReturn.1 =
       (exit, A.activatedState) :=
   ⟨A.mouthConfig.1, A.return_arrive_mouth⟩
 
-theorem ManufacturedReflector.exploration_simple
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) :
+theorem ManufacturedReflector.exploration_simple :
     SwitchSimple A.exploration := by
   cases A with
   | stay R => exact R.simple
   | flip R => exact R.simple
+
+end
 
 def ManufacturedReflector.toSupported
     {w : Wiring} {g e : Nat}
@@ -1534,8 +1468,7 @@ theorem ManufacturedReflector.changed_contact_on_orientedRoute
     {old : Passage} (hold : old ∈ path)
     {p x : Nat}
     (hswitch : passageSwitch old = p / 3)
-    (hfresh : arrive state p = (x, next))
-    (hchanged : next (p / 3) ≠ state (p / 3)) :
+    (hfresh : arrive state p = (x, next)) :
     ∃ oriented ∈ A.orientedRoute state,
       arrive state oriented.2 = (oriented.1, state) ∧
       passageSwitch oriented = p / 3 ∧
@@ -1574,7 +1507,7 @@ theorem ManufacturedReflector.changed_contact_on_orientedRoute
     refine ⟨hforward, ?_⟩
     exact forward_contact_repairs_old_passage
       horientedGroove (by simpa [hforward] using hfresh)
-      (by simpa [passageSwitch] using horientedSwitch) hchanged
+      (by simpa [passageSwitch] using horientedSwitch)
 
 
 theorem pathGrooves_after_arrive_without_support_change
@@ -1748,11 +1681,14 @@ theorem ManufacturedReflector.entryEdge
   | flip R => exact R.entryEdge
 
 
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedFlipReflector w g e)
+  (B : ManufacturedFlipReflector w e g)
+  (state : Tongues)
+include w g e A B state
+
 theorem manufactured_runway_theta_capture
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hA : PathGrooves [A.runway, A.candy] state)
     (hB : PathGrooves [B.runway, B.candy] state)
     {before after : List Passage} {x : Nat}
@@ -1812,10 +1748,6 @@ runway, it is met trailing-first.  The passage then repairs the old flip and
 the new reflector completes exactly as it would have from the unflipped
 state. -/
 theorem manufactured_runway_theta_repairs
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hB : PathGrooves [B.runway, B.candy] state)
     {before after : List Passage} {p : Nat}
     (hoccurs :
@@ -1906,10 +1838,6 @@ theorem manufactured_runway_theta_repairs
 new runway is necessarily either the captured facing case or the self-healing
 trailing case; degree three leaves no third possibility. -/
 theorem manufactured_runway_fault_dichotomy
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hA : PathGrooves [A.runway, A.candy] state)
     (hB : PathGrooves [B.runway, B.candy] state)
     (passage : Passage)
@@ -1945,10 +1873,6 @@ theorem manufactured_runway_fault_dichotomy
 /-! ## The first theta contact: candy case -/
 
 theorem manufactured_candy_forward_theta_capture
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hA : PathGrooves [A.runway, A.candy] state)
     (hB : PathGrooves [B.runway, B.candy] state)
     (hselected : state B.actionSwitch = bval B.firstArm)
@@ -1975,10 +1899,6 @@ theorem manufactured_candy_forward_theta_capture
     hforeign hcapture
 
 theorem manufactured_candy_reverse_theta_capture
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hA : PathGrooves [A.runway, A.candy] state)
     (hB : PathGrooves [B.runway, B.candy] state)
     (hselected : state B.actionSwitch = bval B.secondArm)
@@ -2006,10 +1926,6 @@ theorem manufactured_candy_reverse_theta_capture
     hforeign hcapture
 
 theorem manufactured_candy_forward_theta_repairs
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hB : PathGrooves [B.runway, B.candy] state)
     (hselected : state B.actionSwitch = bval B.firstArm)
     {before after : List Passage} {p : Nat}
@@ -2091,10 +2007,6 @@ theorem manufactured_candy_forward_theta_repairs
   rwa [hrepairLen] at hrepair
 
 theorem manufactured_candy_reverse_theta_repairs
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hB : PathGrooves [B.runway, B.candy] state)
     (hselected : state B.actionSwitch = bval B.secondArm)
     {before after : List Passage} {x : Nat}
@@ -2186,10 +2098,6 @@ theorem manufactured_candy_reverse_theta_repairs
 whether the recorded path is traversed forward or backward; in either
 direction degree three again leaves exactly capture or self-repair. -/
 theorem manufactured_candy_fault_dichotomy
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hA : PathGrooves [A.runway, A.candy] state)
     (hB : PathGrooves [B.runway, B.candy] state)
     (passage : Passage)
@@ -2232,44 +2140,28 @@ theorem manufactured_candy_fault_dichotomy
       exact manufactured_candy_reverse_theta_capture A B state
         hA hB hreverse (by simpa [hxMouth] using hoccurs)
 
-theorem manufactured_support_fault_dichotomy
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, B.candy] state)
-    (hcontact : ∃ path ∈ [B.runway, B.candy],
-      ∃ passage ∈ path,
-        passageSwitch passage = A.actionSwitch) :
+section
+variable (hA : PathGrooves [A.runway, A.candy] state)
+  (hB : PathGrooves [B.runway, B.candy] state)
+  (hcontact : ∃ path ∈ [B.runway, B.candy],
+    ∃ passage ∈ path,
+      passageSwitch passage = A.actionSwitch)
+include hA hB hcontact
+
+theorem manufactured_support_fault_dichotomy :
     (∃ travel,
       stepN w travel (e, flipAt state A.actionSwitch) =
         some (e, state)) ∨
       stepN w (2 * B.runway.length + B.candy.length + 2)
         (e, flipAt state A.actionSwitch) =
           some (g, flipAt state B.actionSwitch) := by
-  obtain ⟨path, hp, passage, hmem, hsw⟩ := hcontact
-  simp only [List.mem_cons, List.not_mem_nil, or_false] at hp
-  rcases hp with rfl | rfl
-  · exact manufactured_runway_fault_dichotomy A B state hA hB
-      passage hmem hsw
-  · exact manufactured_candy_fault_dichotomy A B state hA hB
-      passage hmem hsw
+  grind [manufactured_candy_fault_dichotomy, manufactured_runway_fault_dichotomy]
 
 /-- One complete macro-step in the one-sided theta case.  Whether the new
 reflector self-repairs or is captured, starting at the old reflector's front
 returns to that same front with exactly the new reflector's action applied.
 -/
-theorem manufactured_theta_half
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, B.candy] state)
-    (hcontact : ∃ path ∈ [B.runway, B.candy],
-      ∃ passage ∈ path,
-        passageSwitch passage = A.actionSwitch) :
+theorem manufactured_theta_half :
     ∃ travel, 0 < travel ∧
       stepN w travel (g, state) =
         some (g, flipAt state B.actionSwitch) := by
@@ -2306,15 +2198,6 @@ theorem manufactured_theta_half
 run twice.  `B`'s local action preserves `A`'s support, and its second
 application restores the original tongue vector. -/
 theorem manufactured_one_sided_theta_period
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, B.candy] state)
-    (hcontact : ∃ path ∈ [B.runway, B.candy],
-      ∃ passage ∈ path,
-        passageSwitch passage = A.actionSwitch)
     (hBA : (LocalAction.flip B.actionSwitch).Avoids
       [A.runway, A.candy]) :
     ∃ travel, 0 < travel ∧
@@ -2335,15 +2218,13 @@ theorem manufactured_one_sided_theta_period
   simp only [Option.bind_some]
   rw [hsecond, flipAt_flipAt]
 
+end
+
 /-- If both lobe mouths lie on the opposite support, the first macro-step
 reaches `flip B state`; from there the symmetric theta fault and the original
 one form a closed cycle.  Thus mutual intersection is not a third dynamical
 component: it is absorbed after one macro-step. -/
 theorem manufactured_two_sided_theta_settles
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
     (hA : PathGrooves [A.runway, A.candy] state)
     (hB : PathGrooves [B.runway, B.candy] state)
     (hAB : ∃ path ∈ [B.runway, B.candy],
@@ -2395,6 +2276,8 @@ theorem manufactured_two_sided_theta_settles
             hlead, ?_⟩
       rw [stepN_add, hreverseRepair]
       exact hforwardRepair
+
+end
 
 /-! ## Degenerate identity reflector intersections -/
 
@@ -2499,16 +2382,19 @@ theorem runway_fault_dichotomy_general
       hsw hpbranch hforward hlink hsuffix
     rwa [← hlen] at hrepair
 
-theorem manufactured_stay_support_fault_dichotomy
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedStayReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, [(B.mouth, B.arm)]] state)
-    (hcontact : ∃ path ∈ [B.runway, [(B.mouth, B.arm)]],
-      ∃ passage ∈ path,
-        passageSwitch passage = A.actionSwitch) :
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedFlipReflector w g e)
+  (B : ManufacturedStayReflector w e g)
+  (state : Tongues)
+  (hA : PathGrooves [A.runway, A.candy] state)
+  (hB : PathGrooves [B.runway, [(B.mouth, B.arm)]] state)
+  (hcontact : ∃ path ∈ [B.runway, [(B.mouth, B.arm)]],
+    ∃ passage ∈ path,
+      passageSwitch passage = A.actionSwitch)
+include w g e A B state hA hB hcontact
+
+theorem manufactured_stay_support_fault_dichotomy :
     (∃ travel,
       stepN w travel (e, flipAt state A.actionSwitch) =
         some (e, state)) ∨
@@ -2566,16 +2452,7 @@ theorem manufactured_stay_support_fault_dichotomy
 /-- A flip reflector followed by a degenerate identity reflector always
 closes after one theta macro-step, whether the supports are disjoint or meet.
 -/
-theorem manufactured_flip_then_stay_theta_period
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedStayReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, [(B.mouth, B.arm)]] state)
-    (hcontact : ∃ path ∈ [B.runway, [(B.mouth, B.arm)]],
-      ∃ passage ∈ path,
-        passageSwitch passage = A.actionSwitch) :
+theorem manufactured_flip_then_stay_theta_period :
     ∃ travel, 0 < travel ∧
       stepN w travel (g, state) = some (g, state) := by
   have hArun := (A.toSupported.run state hA).1
@@ -2603,6 +2480,8 @@ theorem manufactured_flip_then_stay_theta_period
       (2 * B.runway.length + 2), by omega, ?_⟩
     rw [stepN_add, hArun]
     exact hrepair
+
+end
 
 /-! ## Complete composition of two manufactured reflectors -/
 

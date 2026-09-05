@@ -61,15 +61,18 @@ private theorem lasso_all_time_phase
     rw [stepN_add, hcycle]
     simpa using hrunR
 
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedFlipReflector w g e)
+  (B : ManufacturedFlipReflector w e g)
+  (state : Tongues)
+  (hA : PathGrooves [A.runway, A.candy] state)
+  (hB : PathGrooves [B.runway, B.candy] state)
+include w g e A B state hA hB
+
 /-- **Pointwise theta half.**  One macro-step of the theta walk, with a
 three-phase cover at every intermediate time. -/
 theorem manufactured_theta_half_pointwise
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, B.candy] state)
     (hcontact : ∃ path ∈ [B.runway, B.candy],
       ∃ passage ∈ path,
         passageSwitch passage = A.actionSwitch) :
@@ -186,12 +189,6 @@ support touches `A`'s switch but `B`'s action avoids `A`'s support, the
 walk from `(g, state)` is live forever and visits at most four tongue
 vectors, ever. -/
 theorem manufactured_one_sided_theta_all_time_four_phase
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, B.candy] state)
     (hcontact : ∃ path ∈ [B.runway, B.candy],
       ∃ passage ∈ path,
         passageSwitch passage = A.actionSwitch)
@@ -257,12 +254,6 @@ theorem manufactured_one_sided_theta_all_time_four_phase
 support touches the other's switch, the walk from `(g, state)` is live
 forever and visits at most three tongue vectors, ever. -/
 theorem manufactured_two_sided_theta_all_time_three_phase
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, B.candy] state)
     (hAB : ∃ path ∈ [B.runway, B.candy],
       ∃ passage ∈ path,
         passageSwitch passage = A.actionSwitch)
@@ -433,6 +424,8 @@ theorem manufactured_two_sided_theta_all_time_three_phase
           · rcases h with h | h
             · simp [h]
             · simp [h]
+
+end
 
 /-- Liveness at all times from a closed period. -/
 private theorem period_all_time_live

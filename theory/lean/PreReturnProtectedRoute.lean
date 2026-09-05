@@ -3,9 +3,9 @@ import PartialSecondRunSharp
 /-!
 # The protected pre-return facts of a completed opposite pair
 
-The three lemmas the sharp protected-pair closure consumes from the old
-`N+6` assembly, extracted so the sharp proof does not depend on the
-Mellit chain: the pre-return state equals the action-applied activated
+The three facts about a completed opposite pair that the sharp
+protected-pair closure consumes: the pre-return state equals the
+action-applied activated
 state, it is already inside the preserved two-history core, and a
 completed protected route beyond it costs at most two novelties.
 -/

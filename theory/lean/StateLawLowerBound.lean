@@ -3,7 +3,7 @@ import VectorCount
 /-!
 # The `N+4` lower bound, for every `N ≥ 3`
 
-The matching lower bound to `GeneralN.stateLaw`: for every `N ≥ 3` there
+The matching lower bound to `GeneralN.state_law`: for every `N ≥ 3` there
 is an `N`-switch wiring, a start, and `N+4` live sample times whose
 restricted tongue vectors are pairwise distinct.
 
@@ -584,115 +584,83 @@ variable {N : Nat}
 theorem lb_ne_TA_TA (h4 : 4 ≤ N) {m m' : Nat} (hlt : m < m')
     (hm' : m' ≤ N - 2) :
     VectorCount.restrict N (lbTA N m) ≠
-      VectorCount.restrict N (lbTA N m') := by
-  apply lb_restrict_ne (j := N - 1 - m') (by omega)
-  unfold lbTA
-  grind
+      VectorCount.restrict N (lbTA N m') :=
+  lb_restrict_ne (j := N - 1 - m') (by omega) (by unfold lbTA; grind)
 
 theorem lb_ne_TA_TB (h4 : 4 ≤ N) {m : Nat} (hm : m ≤ N - 2) :
     VectorCount.restrict N (lbTA N m) ≠
-      VectorCount.restrict N (lbTB N) := by
-  apply lb_restrict_ne (j := 0) (by omega)
-  unfold lbTA lbTB
-  grind
+      VectorCount.restrict N (lbTB N) :=
+  lb_restrict_ne (j := 0) (by omega) (by unfold lbTA lbTB; grind)
 
 theorem lb_ne_TA_TC (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
-      VectorCount.restrict N (lbTC N) := by
-  apply lb_restrict_ne (j := N - 1) (by omega)
-  unfold lbTA lbTC
-  grind
+      VectorCount.restrict N (lbTC N) :=
+  lb_restrict_ne (j := N - 1) (by omega) (by unfold lbTA lbTC; grind)
 
 theorem lb_ne_TA_TD (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
-      VectorCount.restrict N (lbTD N) := by
-  apply lb_restrict_ne (j := N - 1) (by omega)
-  unfold lbTA lbTD
-  grind
+      VectorCount.restrict N (lbTD N) :=
+  lb_restrict_ne (j := N - 1) (by omega) (by unfold lbTA lbTD; grind)
 
 theorem lb_ne_TA_TE (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
-      VectorCount.restrict N (lbTE N) := by
-  apply lb_restrict_ne (j := N - 1) (by omega)
-  unfold lbTA lbTE
-  grind
+      VectorCount.restrict N (lbTE N) :=
+  lb_restrict_ne (j := N - 1) (by omega) (by unfold lbTA lbTE; grind)
 
 theorem lb_ne_TA_TF (h4 : 4 ≤ N) {m : Nat} :
     VectorCount.restrict N (lbTA N m) ≠
-      VectorCount.restrict N (lbTF N) := by
-  apply lb_restrict_ne (j := N - 1) (by omega)
-  unfold lbTA lbTF
-  grind
+      VectorCount.restrict N (lbTF N) :=
+  lb_restrict_ne (j := N - 1) (by omega) (by unfold lbTA lbTF; grind)
 
 theorem lb_ne_TB_TC (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTB N) ≠
-      VectorCount.restrict N (lbTC N) := by
-  apply lb_restrict_ne (j := N - 1) (by omega)
-  unfold lbTB lbTC
-  grind
+      VectorCount.restrict N (lbTC N) :=
+  lb_restrict_ne (j := N - 1) (by omega) (by unfold lbTB lbTC; grind)
 
 theorem lb_ne_TB_TD (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTB N) ≠
-      VectorCount.restrict N (lbTD N) := by
-  apply lb_restrict_ne (j := N - 1) (by omega)
-  unfold lbTB lbTD
-  grind
+      VectorCount.restrict N (lbTD N) :=
+  lb_restrict_ne (j := N - 1) (by omega) (by unfold lbTB lbTD; grind)
 
 theorem lb_ne_TB_TE (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTB N) ≠
-      VectorCount.restrict N (lbTE N) := by
-  apply lb_restrict_ne (j := N - 1) (by omega)
-  unfold lbTB lbTE
-  grind
+      VectorCount.restrict N (lbTE N) :=
+  lb_restrict_ne (j := N - 1) (by omega) (by unfold lbTB lbTE; grind)
 
 theorem lb_ne_TB_TF (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTB N) ≠
-      VectorCount.restrict N (lbTF N) := by
-  apply lb_restrict_ne (j := N - 1) (by omega)
-  unfold lbTB lbTF
-  grind
+      VectorCount.restrict N (lbTF N) :=
+  lb_restrict_ne (j := N - 1) (by omega) (by unfold lbTB lbTF; grind)
 
 theorem lb_ne_TC_TD (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTC N) ≠
-      VectorCount.restrict N (lbTD N) := by
-  apply lb_restrict_ne (j := N - 2) (by omega)
-  unfold lbTC lbTD
-  grind
+      VectorCount.restrict N (lbTD N) :=
+  lb_restrict_ne (j := N - 2) (by omega) (by unfold lbTC lbTD; grind)
 
 theorem lb_ne_TC_TE (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTC N) ≠
-      VectorCount.restrict N (lbTE N) := by
-  apply lb_restrict_ne (j := N - 2) (by omega)
-  unfold lbTC lbTE
-  grind
+      VectorCount.restrict N (lbTE N) :=
+  lb_restrict_ne (j := N - 2) (by omega) (by unfold lbTC lbTE; grind)
 
 theorem lb_ne_TC_TF (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTC N) ≠
-      VectorCount.restrict N (lbTF N) := by
-  apply lb_restrict_ne (j := 0) (by omega)
-  unfold lbTC lbTF
-  grind
+      VectorCount.restrict N (lbTF N) :=
+  lb_restrict_ne (j := 0) (by omega) (by unfold lbTC lbTF; grind)
 
 theorem lb_ne_TD_TE (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTD N) ≠
-      VectorCount.restrict N (lbTE N) := by
-  apply lb_restrict_ne (j := 0) (by omega)
-  unfold lbTD lbTE
-  grind
+      VectorCount.restrict N (lbTE N) :=
+  lb_restrict_ne (j := 0) (by omega) (by unfold lbTD lbTE; grind)
 
 theorem lb_ne_TD_TF (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTD N) ≠
-      VectorCount.restrict N (lbTF N) := by
-  apply lb_restrict_ne (j := N - 2) (by omega)
-  unfold lbTD lbTF
-  grind
+      VectorCount.restrict N (lbTF N) :=
+  lb_restrict_ne (j := N - 2) (by omega) (by unfold lbTD lbTF; grind)
 
 theorem lb_ne_TE_TF (h4 : 4 ≤ N) :
     VectorCount.restrict N (lbTE N) ≠
-      VectorCount.restrict N (lbTF N) := by
-  apply lb_restrict_ne (j := N - 2) (by omega)
-  unfold lbTE lbTF
-  grind
+      VectorCount.restrict N (lbTF N) :=
+  lb_restrict_ne (j := N - 2) (by omega) (by unfold lbTE lbTF; grind)
 
 end Distinct
 

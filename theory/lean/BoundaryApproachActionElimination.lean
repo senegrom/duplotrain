@@ -15,30 +15,36 @@ write of the boundary switch.  Every such changed contact therefore fits
 
 namespace GeneralN
 
+section
+variable {w : Wiring} {N g e k0 : Nat}
+  (hN : forall p q, w.link p = some q ->
+    p < 3 * N /\ q < 3 * N)
+  {R : ManufacturedFlipReflector w g e}
+  (C : SimpleContinuationChangedContact w
+    (ManufacturedReflector.flip R))
+  (hA : PathGrooves
+    (ManufacturedReflector.flip R).toSupported.paths
+    (ManufacturedReflector.flip R).activatedState)
+  (hk0 : k0 < N)
+include w N g e k0 hN R C hA hk0
+
+section
+variable (hreservedExploration : Not (k0 ∈
+    (ManufacturedReflector.flip R).exploration.map passageSwitch))
+  (hreservedApproach : Not (k0 ∈
+    C.approachFirstWriterSwitches N))
+  (times : List Nat)
+  (hlive : forall k, k ∈ times ->
+    (stepN w k
+      (g, (ManufacturedReflector.flip R).baseState)).isSome)
+  (hnd : (times.map
+    (restrictedTonguesAt w N
+      (g, (ManufacturedReflector.flip R).baseState))).Nodup)
+include hreservedExploration hreservedApproach times hlive hnd
+
 /-- A one-novelty changed-contact tail plus the boundary-reserved `N+2`
 compressed lead gives the required `N+3` global bound. -/
 theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_three_of_one_novelty_and_reserved_absent
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (hk0 : k0 < N)
-    (hreservedExploration : Not (k0 ∈
-      (ManufacturedReflector.flip R).exploration.map passageSwitch))
-    (hreservedApproach : Not (k0 ∈
-      C.approachFirstWriterSwitches N))
-    (times : List Nat)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).baseState))).Nodup)
     (hlocal : NoveltyCoverOn w N
       (e, (ManufacturedReflector.flip R).activatedState)
       (times.map (fun k => k -
@@ -69,28 +75,7 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_t
 first-written, every changed contact already fits `N+3`.  If the old action is
 first-written, the one-novelty tail and impossibility of the runway residual
 replace the action-coordinate reserve. -/
-theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_three_of_reserved_absent
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (hk0 : k0 < N)
-    (hreservedExploration : Not (k0 ∈
-      (ManufacturedReflector.flip R).exploration.map passageSwitch))
-    (hreservedApproach : Not (k0 ∈
-      C.approachFirstWriterSwitches N))
-    (times : List Nat)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
+theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_three_of_reserved_absent :
     times.length <= N + 3 := by
   rcases C.direction with hbackward |
       ⟨hforward, repaired, hrepair, hrestored⟩
@@ -113,20 +98,12 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_t
         hN hA haction hk0 hreservedExploration hreservedApproach
         times hlive hnd
 
+end
+
 /-- In the productive-boundary geometry, the shifted run starts at the stem of
 the reserved switch.  Switch simplicity therefore makes the boundary reserve
 automatic, and every changed-contact branch is at most `N+3`. -/
 theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_three_of_stem_reserved
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (hk0 : k0 < N)
     (hstem : e = 3 * k0)
     (hreservedExploration : Not (k0 ∈
       (ManufacturedReflector.flip R).exploration.map passageSwitch))
@@ -143,5 +120,7 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_t
     (stem_switch_not_mem_firstWriterSwitches_of_simple_trace
       (N := N) hstem C.approach_trace C.approach_simple)
     times hlive hnd
+
+end
 
 end GeneralN

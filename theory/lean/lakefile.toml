@@ -16,11 +16,9 @@ defaultTargets = [
   "EarlyFacingConstant",
   "FacingForwardNovelty",
   "FirstCycleCountSharp",
-  "FirstReflectorNovelty",
   "ForeignSpliceNovelty",
   "GeneralN",
   "KnownEdgeNAddFourChangedClosed",
-  "KnownEdgeNAddFourComplete",
   "KnownEdgeNAddFourFrontier",
   "ManufacturedPairNovelty",
   "OneReflectorContinuation",
@@ -34,7 +32,6 @@ defaultTargets = [
   "RepeatedNoveltyDecomposition",
   "ReuseForcesReplayClosure",
   "RunwayHistoricalOne",
-  "RunwayHistoricalThree",
   "RunwaySpliceNovelty",
   "SharpCertificateClosure",
   "SharpStateLawAssembly",
@@ -67,7 +64,6 @@ defaultTargets = [
   "TrackTrace",
   "TripleSelfLinkSimpleCycleClosure",
   "TwoHistoryUnionCharge",
-  "TwoJourneyTailCountSharp",
   "TwoPhasePrefixTailCount",
   "VectorCount"
 ]
@@ -121,9 +117,6 @@ name = "FacingForwardNovelty"
 name = "FirstCycleCountSharp"
 
 [[lean_lib]]
-name = "FirstReflectorNovelty"
-
-[[lean_lib]]
 name = "ForeignSpliceNovelty"
 
 [[lean_lib]]
@@ -131,9 +124,6 @@ name = "GeneralN"
 
 [[lean_lib]]
 name = "KnownEdgeNAddFourChangedClosed"
-
-[[lean_lib]]
-name = "KnownEdgeNAddFourComplete"
 
 [[lean_lib]]
 name = "KnownEdgeNAddFourFrontier"
@@ -173,9 +163,6 @@ name = "ReuseForcesReplayClosure"
 
 [[lean_lib]]
 name = "RunwayHistoricalOne"
-
-[[lean_lib]]
-name = "RunwayHistoricalThree"
 
 [[lean_lib]]
 name = "RunwaySpliceNovelty"
@@ -272,9 +259,6 @@ name = "TripleSelfLinkSimpleCycleClosure"
 
 [[lean_lib]]
 name = "TwoHistoryUnionCharge"
-
-[[lean_lib]]
-name = "TwoJourneyTailCountSharp"
 
 [[lean_lib]]
 name = "TwoPhasePrefixTailCount"

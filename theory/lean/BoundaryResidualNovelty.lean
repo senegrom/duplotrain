@@ -15,18 +15,21 @@ Either way the complete cover has size at most `N + 4`.
 
 namespace GeneralN
 
+section
+variable {w : Wiring} {N g e k0 : Nat}
+  (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+  {R : ManufacturedFlipReflector w g e}
+  (O : InitialEntryWriterOccurrence w g e k0
+    (ManufacturedReflector.flip R))
+  (B : ManufacturedReflector w e g)
+  (original : Tongues)
+  (hstay : O.next = O.middle)
+include w N g e k0 hN R O B original hstay
+
 /-- If the old action switch is a productive first writer of the second
 construction, every selected live time of the complete run is represented
 by the double-reduced two-journey history plus at most one fresh vector. -/
 theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_one_novelty_of_action_writer
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (O : InitialEntryWriterOccurrence w g e k0
-      (ManufacturedReflector.flip R))
-    (B : ManufacturedReflector w e g)
-    (original : Tongues)
-    (hstay : O.next = O.middle)
     (hbase : B.baseState =
       (ManufacturedReflector.flip R).activatedState)
     (hApaths : PathGrooves
@@ -52,32 +55,27 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_one_novelty_of_
         ManufacturedFlipReflector.protected_repair_one_novelty_over_history_of_action_writer,
         ManufacturedReflector.two_journeys_then_shared_history_novelty_cover]
 
+section
+variable (hdifferent : O.before.length ≠ R.runway.length)
+  (hbase : B.baseState =
+    (ManufacturedReflector.flip R).activatedState)
+  (hApaths : PathGrooves
+    (ManufacturedReflector.flip R).toSupported.paths
+    (ManufacturedReflector.flip R).activatedState)
+  (hBpaths : PathGrooves B.toSupported.paths B.activatedState)
+  (hpre : PathGrooves
+    (ManufacturedReflector.flip R).toSupported.paths B.preReturn.2)
+  (times : List Nat)
+  (hlive : ∀ k ∈ times,
+    (stepN w k
+      (g, (ManufacturedReflector.flip R).baseState)).isSome)
+include hdifferent hbase hApaths hBpaths hpre times hlive
+
 /-- In the noncanonical unchanged-occurrence branch, the double-reduced
 history and the protected repair tail have combined size at most `N + 4`.
 The result is a cover, not merely a cardinality estimate, so it can be used
 with an independently known historical boundary vector. -/
 theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_cover
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (O : InitialEntryWriterOccurrence w g e k0
-      (ManufacturedReflector.flip R))
-    (B : ManufacturedReflector w e g)
-    (original : Tongues)
-    (hstay : O.next = O.middle)
-    (hdifferent : O.before.length ≠ R.runway.length)
-    (hbase : B.baseState =
-      (ManufacturedReflector.flip R).activatedState)
-    (hApaths : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (hBpaths : PathGrooves B.toSupported.paths B.activatedState)
-    (hpre : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths B.preReturn.2)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
     (hnd : (times.map (restrictedTonguesAt w N
       (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
     ∃ budget,
@@ -135,27 +133,6 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_cover
 /-- Exact arbitrary-boundary count for the noncanonical unchanged
 occurrence followed by a fully protected opposite reflector. -/
 theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_all_run_distinct_le_N_add_four
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (O : InitialEntryWriterOccurrence w g e k0
-      (ManufacturedReflector.flip R))
-    (B : ManufacturedReflector w e g)
-    (original : Tongues)
-    (hstay : O.next = O.middle)
-    (hdifferent : O.before.length ≠ R.runway.length)
-    (hbase : B.baseState =
-      (ManufacturedReflector.flip R).activatedState)
-    (hApaths : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (hBpaths : PathGrooves B.toSupported.paths B.activatedState)
-    (hpre : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths B.preReturn.2)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
     (hnd : (VectorCount.restrict N original ::
       times.map (restrictedTonguesAt w N
         (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
@@ -171,6 +148,10 @@ theorem InitialEntryWriterOccurrence.noncanonical_protected_pair_all_run_distinc
   have hcount := noveltyCoverOn_distinct_count_with_extra
     hcover horiginal hnd
   omega
+
+end
+
+end
 
 /-- A saturated productive boundary cannot contain a fully protected pair
 after a noncanonical unchanged occurrence.  This is the contradiction form

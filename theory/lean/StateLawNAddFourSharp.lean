@@ -1,5 +1,5 @@
 import BoundaryResidualSharpening
-import KnownEdgeNAddFourComplete
+import ProtectedPairNAddFour
 
 /-!
 # Sharp `N+4` state law
@@ -11,6 +11,18 @@ that the time-zero vector of a productive first passage is always historical.
 -/
 
 namespace GeneralN
+
+/-- A train whose incoming track edge is known visits at most `N + 4`
+pairwise-distinct restricted tongue vectors.  This is unconditional over raw
+finite lazy-point wirings. -/
+theorem knownIncomingEdgeNAddFour
+    {w : Wiring} {N : Nat}
+    (hN : forall p q, w.link p = some q ->
+      p < 3 * N /\ q < 3 * N) :
+    KnownIncomingEdgeNAddFour w N := by
+  intro e start hentry times hlive hnd
+  exact known_edge_all_run_distinct_le_N_add_four_of_protected_pair
+    knownEdgeProtectedPairNAddFourLaw hN hentry times hlive hnd
 
 /-- The productive arbitrary-start boundary fits the exact `N+4` budget. -/
 theorem productiveInitialBoundaryNAddFour

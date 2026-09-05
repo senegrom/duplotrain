@@ -3,11 +3,11 @@ import RepeatedNoveltyDecomposition
 /-!
 # What reuse of a discarded curve port really forces
 
-`ReusedNovelStrictShrinkPortForcesReplay` asks for a *global* tongue-vector
-replay when two strict self-shrinks discard the same physical curve port.
-The local curve argument does not, by itself, freeze switches outside the
-discarded component.  This file therefore proves the strongest raw
-consequence available before any such global-freezing theorem is supplied.
+When two strict self-shrinks discard the same physical curve port, a
+*global* tongue-vector replay would be the ideal conclusion, but the local
+curve argument does not, by itself, freeze switches outside the discarded
+component.  This file proves the strongest raw consequence available
+without any global-freezing hypothesis.
 
 If a port is absent immediately after one shrink and belongs to the train
 curve again before a later shrink, there is a first step restoring that
@@ -24,8 +24,7 @@ does not replay the first-restoration vector, some represented coordinate
 which differs between them has a named productive writer in the intervening
 raw interval.  Thus outside activity is not silently assumed away.
 
-Everything here is general in `N` and stated over `Wiring`/`stepN`.  The file
-does **not** assert `ReusedNovelStrictShrinkPortForcesReplay` or `StateLaw`.
+Everything here is general in `N` and stated over `Wiring`/`stepN`.
 -/
 
 namespace GeneralN

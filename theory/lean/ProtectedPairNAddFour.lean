@@ -544,7 +544,7 @@ private theorem ManufacturedReflector.protected_changed_contact_one_or_forward
   obtain ⟨oriented, horiented, horientedGroove,
       horientedSwitch, hdirection⟩ :=
     B.changed_contact_on_orientedRoute u v hpaths
-      hpath hold hswitch harrive hchanged
+      hpath hold hswitch harrive
   rcases hdirection with hbackward | hforward
   · obtain ⟨recorded, tail, hBsplit⟩ := List.append_of_mem horiented
     have hBroute := B.orientedRoute_trace u hpaths
@@ -1050,10 +1050,13 @@ def ManufacturedFlipReflector.firstQuietProtectedHistory
       (VectorCount.restrict N
         (ManufacturedReflector.flip R).preReturn.2)
 
+section
+variable {w : Wiring} {N g e : Nat}
+include w N g e
+
 /-- The doubly compressed history still represents both manufacturing
 journeys. -/
 theorem ManufacturedFlipReflector.mem_firstQuietProtectedHistory
-    {w : Wiring} {N g e : Nat}
     (R : ManufacturedFlipReflector w g e)
     (B : ManufacturedReflector w e g)
     {x : List Bool}
@@ -1084,7 +1087,6 @@ theorem ManufacturedFlipReflector.mem_firstQuietProtectedHistory
 construction, the doubly compressed construction cover has size at most
 `N+2`. -/
 theorem ManufacturedFlipReflector.firstQuietProtectedHistory_length_le_N_add_two
-    {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (R : ManufacturedFlipReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -1163,7 +1165,6 @@ already to the second reflector's uncompressed construction history.  This
 form lets boundary arguments use their own smaller two-journey history
 instead of the canonical `preservedTwoHistoryCore`. -/
 theorem ManufacturedFlipReflector.flipped_preReturn_mem_second_sharp_of_last
-    {w : Wiring} {N g e : Nat}
     (R : ManufacturedFlipReflector w g e)
     (B : ManufacturedReflector w e g)
     {t : Nat}
@@ -1224,7 +1225,6 @@ theorem ManufacturedFlipReflector.flipped_preReturn_mem_second_sharp_of_last
 the second exploration, flipping that mouth in the second pre-return vector
 recovers the historical pre-write vector. -/
 theorem ManufacturedFlipReflector.flipped_preReturn_mem_preservedHistory_of_last
-    {w : Wiring} {N g e : Nat}
     (R : ManufacturedFlipReflector w g e)
     (B : ManufacturedReflector w e g)
     {t : Nat}
@@ -1244,7 +1244,6 @@ theorem ManufacturedFlipReflector.flipped_preReturn_mem_preservedHistory_of_last
 which of the two repair phases is final, this historical vector is one of
 the two nominally fresh Gray-square corners. -/
 theorem ManufacturedReflector.completed_protected_route_one_novelty_of_action_preReturn
-    {w : Wiring} {N g e : Nat}
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
     (hA : PathGrooves A.toSupported.paths B.baseState)
@@ -1425,7 +1424,6 @@ theorem ManufacturedReflector.completed_protected_route_one_novelty_of_action_pr
 productive writer therefore lowers the repair tail from two fresh vectors
 to one. -/
 theorem ManufacturedFlipReflector.completed_protected_route_one_novelty_of_last
-    {w : Wiring} {N g e : Nat}
     (R : ManufacturedFlipReflector w g e)
     (B : ManufacturedReflector w e g)
     (hA : PathGrooves
@@ -1467,7 +1465,6 @@ old action switch is productively written by the second construction.  The
 physical endpoint-groove argument above supplies the former `hlast`
 hypothesis. -/
 theorem ManufacturedFlipReflector.completed_protected_route_one_novelty_of_action_writer
-    {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (R : ManufacturedFlipReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -1496,33 +1493,35 @@ theorem ManufacturedFlipReflector.completed_protected_route_one_novelty_of_actio
         ManufacturedFlipReflector.action_writer_is_last_productive,
         ManufacturedFlipReflector.completed_protected_route_one_novelty_of_last]
 
+section
+variable (A : ManufacturedReflector w g e)
+  (B : ManufacturedReflector w e g)
+  (hbase : B.baseState = A.activatedState)
+  (hApaths : PathGrooves A.toSupported.paths A.activatedState)
+  (hBpaths : PathGrooves B.toSupported.paths B.activatedState)
+  (history : List (List Bool))
+  (hhistory : ∀ x,
+    x ∈ A.sharpConstructionHistory N ∨
+      x ∈ B.sharpConstructionHistory N → x ∈ history)
+  (budget : Nat)
+  (htail : ∀ tailTimes : List Nat,
+    (∀ k ∈ tailTimes,
+      (stepN w k (g, B.activatedState)).isSome) →
+    (tailTimes.map
+      (restrictedTonguesAt w N (g, B.activatedState))).Nodup →
+    NoveltyCoverOn w N (g, B.activatedState) tailTimes
+      history budget)
+  (times : List Nat)
+  (hlive : ∀ k ∈ times,
+    (stepN w k (g, A.baseState)).isSome)
+  (hnd : (times.map
+    (restrictedTonguesAt w N (g, A.baseState))).Nodup)
+include A B hbase hApaths hBpaths history hhistory budget htail times hlive hnd
+
 /-- Lift a novelty cover for the protected repair tail across the two
 manufacturing journeys.  Every prefix vector is supplied by the shared
 history; only the shifted tail spends the given novelty budget. -/
-theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_cover
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbase : B.baseState = A.activatedState)
-    (hApaths : PathGrooves A.toSupported.paths A.activatedState)
-    (hBpaths : PathGrooves B.toSupported.paths B.activatedState)
-    (history : List (List Bool))
-    (hhistory : ∀ x,
-      x ∈ A.sharpConstructionHistory N ∨
-        x ∈ B.sharpConstructionHistory N → x ∈ history)
-    (budget : Nat)
-    (htail : ∀ tailTimes : List Nat,
-      (∀ k ∈ tailTimes,
-        (stepN w k (g, B.activatedState)).isSome) →
-      (tailTimes.map
-        (restrictedTonguesAt w N (g, B.activatedState))).Nodup →
-      NoveltyCoverOn w N (g, B.activatedState) tailTimes
-        history budget)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
+theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_cover :
     NoveltyCoverOn w N (g, A.baseState) times history budget := by
   let firstTravel := A.exploration.length + A.runway.length + 1
   let secondTravel := B.exploration.length + B.runway.length + 1
@@ -1657,37 +1656,15 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_cover
 
 /-- Generic two-journey bookkeeping over an arbitrary shared history: the
 counting form of the novelty cover above. -/
-theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_count
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbase : B.baseState = A.activatedState)
-    (hApaths : PathGrooves A.toSupported.paths A.activatedState)
-    (hBpaths : PathGrooves B.toSupported.paths B.activatedState)
-    (history : List (List Bool))
-    (hhistory : ∀ x,
-      x ∈ A.sharpConstructionHistory N ∨
-        x ∈ B.sharpConstructionHistory N → x ∈ history)
-    (budget : Nat)
-    (htail : ∀ tailTimes : List Nat,
-      (∀ k ∈ tailTimes,
-        (stepN w k (g, B.activatedState)).isSome) →
-      (tailTimes.map
-        (restrictedTonguesAt w N (g, B.activatedState))).Nodup →
-      NoveltyCoverOn w N (g, B.activatedState) tailTimes
-        history budget)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
+theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_count :
     times.length ≤ history.length + budget :=
   noveltyCoverOn_distinct_count
     (A.two_journeys_then_shared_history_novelty_cover B hbase hApaths
       hBpaths history hhistory budget htail times hlive hnd) hnd
 
+end
+
 theorem ManufacturedStayReflector.protectedHistory_length_le_N_add_two
-    {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (R : ManufacturedStayReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -1723,7 +1700,6 @@ productive first writer of the second construction with a strictly earlier
 productive event.  Thus the residual is not an unspecified cardinality
 gap: it is exactly an interior writer-order obstruction. -/
 theorem protected_pair_history_N_add_two_or_prior_action_writer
-    {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -1792,7 +1768,6 @@ theorem protected_pair_history_N_add_two_or_prior_action_writer
           simpa [hkind] using hm
 
 theorem ManufacturedReflector.preReturn_grooved_protected_pair_all_run_distinct_le_N_add_four
-    {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -1923,7 +1898,6 @@ journeys.  Unlike the top-level counting theorem, this statement keeps the
 history abstract so a productive-boundary proof can substitute a smaller
 history containing its pre-passage vector. -/
 theorem ManufacturedReflector.protected_repair_two_novelty_over_history
-    {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q -> p < 3 * N /\ q < 3 * N)
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -1975,7 +1949,6 @@ theorem ManufacturedReflector.protected_repair_two_novelty_over_history
 of the second construction, every protected repair continuation has only one
 fresh vector over any history representing both construction journeys. -/
 theorem ManufacturedFlipReflector.protected_repair_one_novelty_over_history_of_action_writer
-    {w : Wiring} {N g e : Nat}
     (hN : forall p q, w.link p = some q -> p < 3 * N /\ q < 3 * N)
     (R : ManufacturedFlipReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -2037,6 +2010,8 @@ theorem ManufacturedFlipReflector.protected_repair_one_novelty_over_history_of_a
     exact (ManufacturedReflector.flip R).completed_protected_route_one_novelty_of_action_preReturn
       B hA hB hrepair hAfinal hBfinal history
         hinitialHistorical hpreHistorical haPreHistorical times hlive
+
+end
 
 /-- The literal fully-protected residual exposed by the known-edge probe is
 bounded by the direct protected-pair theorem above. -/

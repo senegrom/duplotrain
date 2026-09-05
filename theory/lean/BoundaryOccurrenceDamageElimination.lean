@@ -165,15 +165,18 @@ def InitialEntryWriterOccurrence.doubleReducedContactLead
           (ManufacturedReflector.flip R).activatedState) ++
       [VectorCount.restrict N C.nextState])
 
+section
+variable {w : Wiring} {N g e k0 : Nat}
+  {R : ManufacturedFlipReflector w g e}
+  (O : InitialEntryWriterOccurrence w g e k0
+    (ManufacturedReflector.flip R))
+  (C : SimpleContinuationChangedContact w
+    (ManufacturedReflector.flip R))
+  (original : Tongues)
+include w N g e k0 R O C original
+
 /-- The replacement lead contains the arbitrary boundary vector. -/
-theorem InitialEntryWriterOccurrence.original_mem_doubleReducedContactLead
-    {w : Wiring} {N g e k0 : Nat}
-    {R : ManufacturedFlipReflector w g e}
-    (O : InitialEntryWriterOccurrence w g e k0
-      (ManufacturedReflector.flip R))
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (original : Tongues) :
+theorem InitialEntryWriterOccurrence.original_mem_doubleReducedContactLead :
     VectorCount.restrict N original ∈
       O.doubleReducedContactLead (N := N) C original := by
   unfold InitialEntryWriterOccurrence.doubleReducedContactLead
@@ -183,13 +186,6 @@ theorem InitialEntryWriterOccurrence.original_mem_doubleReducedContactLead
 /-- A noncanonical occurrence replacement has exactly the same size as the
 ordinary compressed changed-contact lead. -/
 theorem InitialEntryWriterOccurrence.doubleReducedContactLead_length_eq
-    {w : Wiring} {N g e k0 : Nat}
-    {R : ManufacturedFlipReflector w g e}
-    (O : InitialEntryWriterOccurrence w g e k0
-      (ManufacturedReflector.flip R))
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (original : Tongues)
     (hdifferent : O.before.length ≠ R.runway.length) :
     (O.doubleReducedContactLead (N := N) C original).length =
       (C.compressedLead N).length := by
@@ -202,13 +198,6 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_length_eq
 /-- Every ordinary compressed-lead vector is retained by the occurrence
 replacement. -/
 theorem InitialEntryWriterOccurrence.mem_doubleReducedContactLead_of_mem_compressedLead
-    {w : Wiring} {N g e k0 : Nat}
-    {R : ManufacturedFlipReflector w g e}
-    (O : InitialEntryWriterOccurrence w g e k0
-      (ManufacturedReflector.flip R))
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (original : Tongues)
     (hstay : O.next = O.middle)
     {x : List Bool}
     (hx : x ∈ C.compressedLead N) :
@@ -222,24 +211,29 @@ theorem InitialEntryWriterOccurrence.mem_doubleReducedContactLead_of_mem_compres
     exact List.mem_of_mem_erase hxFirst
   · exact List.mem_append_right _ hxTail
 
+end
+
+section
+variable {w : Wiring} {N g e k0 budget : Nat}
+  {R : ManufacturedFlipReflector w g e}
+  (O : InitialEntryWriterOccurrence w g e k0
+    (ManufacturedReflector.flip R))
+  (C : SimpleContinuationChangedContact w
+    (ManufacturedReflector.flip R))
+  (original : Tongues)
+  (hstay : O.next = O.middle)
+  (hA : PathGrooves
+    (ManufacturedReflector.flip R).toSupported.paths
+    (ManufacturedReflector.flip R).activatedState)
+  (times : List Nat)
+  (hlive : ∀ k ∈ times,
+    (stepN w k
+      (g, (ManufacturedReflector.flip R).baseState)).isSome)
+include w N g e k0 budget R O C original hstay hA times hlive
+
 /-- A local novelty cover over the ordinary compressed lead lifts across the
 first manufacturing journey to the boundary-replacement lead. -/
 theorem InitialEntryWriterOccurrence.doubleReducedContactLead_global_cover
-    {w : Wiring} {N g e k0 budget : Nat}
-    {R : ManufacturedFlipReflector w g e}
-    (O : InitialEntryWriterOccurrence w g e k0
-      (ManufacturedReflector.flip R))
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (original : Tongues)
-    (hstay : O.next = O.middle)
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
     (hlocal : NoveltyCoverOn w N
       (e, (ManufacturedReflector.flip R).activatedState)
       (times.map (fun k => k -
@@ -287,21 +281,6 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_global_cover
 /-- Count the arbitrary boundary vector together with a changed-contact run
 using the occurrence replacement lead. -/
 theorem InitialEntryWriterOccurrence.doubleReducedContactLead_count
-    {w : Wiring} {N g e k0 budget : Nat}
-    {R : ManufacturedFlipReflector w g e}
-    (O : InitialEntryWriterOccurrence w g e k0
-      (ManufacturedReflector.flip R))
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (original : Tongues)
-    (hstay : O.next = O.middle)
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
     (hnd : (VectorCount.restrict N original ::
       times.map (restrictedTonguesAt w N
         (g, (ManufacturedReflector.flip R).baseState))).Nodup)
@@ -317,6 +296,8 @@ theorem InitialEntryWriterOccurrence.doubleReducedContactLead_count
     (N := N) C original hstay hA times hlive hlocal
   exact noveltyCoverOn_distinct_count_with_extra hcover
     (O.original_mem_doubleReducedContactLead (N := N) C original) hnd
+
+end
 
 
 /-- A saturated productive boundary cannot contain a changed contact after a

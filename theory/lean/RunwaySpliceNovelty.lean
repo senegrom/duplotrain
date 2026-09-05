@@ -3,9 +3,9 @@ import ForeignSpliceNovelty
 /-!
 # Pointwise novelty of the runway splice
 
-This file treats the branch left explicit by
-`ManufacturedReflector.ChangedForwardMerge.runway_or_candy_absolute_one_novelty`.
-The selected old passage lies on the runway of a manufactured flip reflector.
+This file treats the runway case of the changed-forward splice (the candy
+case is `ForeignSpliceNovelty.lean`): the selected old passage lies on the
+runway of a manufactured flip reflector.
 The untouched strict suffix is therefore itself a manufactured reflector,
 while the changed-forward splice supplies an opposite explicit lobe.
 
@@ -294,6 +294,13 @@ theorem ManufacturedFlipReflector.capture_from_mouth_two_phase
       rw [hdq, stepN_add, hbefore.sound]
       exact hrun'
 
+section
+variable {w : Wiring} {outside mouth entry returnPort : Nat}
+  (C : ManufacturedFlipReflector w outside mouth)
+  (state : Tongues)
+  (hCpaths : PathGrooves C.toSupported.paths state)
+include w outside mouth entry returnPort C state hCpaths
+
 /-- Pointwise strengthening of the arbitrary-lobe theta half.  The old
 manufactured reflector first exposes `state` and its own action state.  The
 first old-action contact on the new lobe then either captures through the old
@@ -301,10 +308,6 @@ mouth or repairs trailing-first; in both cases every remaining intermediate
 vector is `state` or the new lobe state.  Thus the complete half has exactly
 the three advertised possible phases. -/
 theorem manufactured_flip_arbitrary_lobe_theta_half_three_phase
-    {w : Wiring} {outside mouth entry returnPort : Nat}
-    (C : ManufacturedFlipReflector w outside mouth)
-    (state : Tongues)
-    (hCpaths : PathGrooves C.toSupported.paths state)
     {candy : List Passage}
     (hgrooved : PassagesGrooved state ((mouth, entry) :: candy))
     (htrace : PhysicalTrace w (mouth, state)
@@ -605,32 +608,32 @@ theorem manufactured_flip_arbitrary_lobe_theta_half_three_phase
         · subst phase
           simp [newState]
 
+section
+variable (hNewAvoidsC : (LocalAction.flip (mouth / 3)).Avoids
+    C.toSupported.paths)
+  {candy : List Passage}
+  (hentryBranch : entry % 3 ≠ 0)
+  (hentrySwitch : entry / 3 = mouth / 3)
+  (hgrooved : PassagesGrooved state ((mouth, entry) :: candy))
+  (htrace : PhysicalTrace w (mouth, state)
+    ((mouth, entry) :: candy) (returnPort, state))
+  (hcrossed : arrive state returnPort =
+    (mouth, flipAt state (mouth / 3)))
+  (hCandyForeign : ∀ passage ∈ candy,
+    passageSwitch passage ≠ mouth / 3)
+  (hLobe : IsReflector w mouth outside (candy.length + 2)
+    (fun current => PassagesGrooved current candy)
+    (fun current => flipAt current (mouth / 3)))
+  (hmouthLink : w.link mouth = some outside)
+  (hcontact : ∃ passage ∈ candy,
+    passageSwitch passage = C.actionSwitch)
+include hNewAvoidsC candy hentryBranch hentrySwitch hgrooved htrace hcrossed hCandyForeign hLobe
+  hmouthLink hcontact
+
 /-- The intersecting-action theta construction has a genuine period whose
 *entire* timeline lies in the four Gray corners.  This is the pointwise fact
 missing from the endpoint-only arbitrary-lobe period theorem. -/
-theorem manufactured_flip_arbitrary_lobe_four_phase_period
-    {w : Wiring} {outside mouth entry returnPort : Nat}
-    (C : ManufacturedFlipReflector w outside mouth)
-    (state : Tongues)
-    (hCpaths : PathGrooves C.toSupported.paths state)
-    (hNewAvoidsC : (LocalAction.flip (mouth / 3)).Avoids
-      C.toSupported.paths)
-    {candy : List Passage}
-    (hentryBranch : entry % 3 ≠ 0)
-    (hentrySwitch : entry / 3 = mouth / 3)
-    (hgrooved : PassagesGrooved state ((mouth, entry) :: candy))
-    (htrace : PhysicalTrace w (mouth, state)
-      ((mouth, entry) :: candy) (returnPort, state))
-    (hcrossed : arrive state returnPort =
-      (mouth, flipAt state (mouth / 3)))
-    (hCandyForeign : ∀ passage ∈ candy,
-      passageSwitch passage ≠ mouth / 3)
-    (hLobe : IsReflector w mouth outside (candy.length + 2)
-      (fun current => PassagesGrooved current candy)
-      (fun current => flipAt current (mouth / 3)))
-    (hmouthLink : w.link mouth = some outside)
-    (hcontact : ∃ passage ∈ candy,
-      passageSwitch passage = C.actionSwitch) :
+theorem manufactured_flip_arbitrary_lobe_four_phase_period :
     ∃ period, 0 < period ∧
       stepN w period (outside, flipAt state (mouth / 3)) =
         some (outside, flipAt state (mouth / 3)) ∧
@@ -753,28 +756,6 @@ theorem manufactured_flip_arbitrary_lobe_four_phase_period
 /-- The four-corner bound for an intersecting-action runway splice holds at
 every future time, not just during one theta period. -/
 theorem manufactured_flip_arbitrary_lobe_all_time_four_phase_tongues
-    {w : Wiring} {outside mouth entry returnPort : Nat}
-    (C : ManufacturedFlipReflector w outside mouth)
-    (state : Tongues)
-    (hCpaths : PathGrooves C.toSupported.paths state)
-    (hNewAvoidsC : (LocalAction.flip (mouth / 3)).Avoids
-      C.toSupported.paths)
-    {candy : List Passage}
-    (hentryBranch : entry % 3 ≠ 0)
-    (hentrySwitch : entry / 3 = mouth / 3)
-    (hgrooved : PassagesGrooved state ((mouth, entry) :: candy))
-    (htrace : PhysicalTrace w (mouth, state)
-      ((mouth, entry) :: candy) (returnPort, state))
-    (hcrossed : arrive state returnPort =
-      (mouth, flipAt state (mouth / 3)))
-    (hCandyForeign : ∀ passage ∈ candy,
-      passageSwitch passage ≠ mouth / 3)
-    (hLobe : IsReflector w mouth outside (candy.length + 2)
-      (fun current => PassagesGrooved current candy)
-      (fun current => flipAt current (mouth / 3)))
-    (hmouthLink : w.link mouth = some outside)
-    (hcontact : ∃ passage ∈ candy,
-      passageSwitch passage = C.actionSwitch)
     (d : Nat) :
     tonguesAt w (outside, flipAt state (mouth / 3)) d ∈
       [flipAt state (mouth / 3),
@@ -807,6 +788,8 @@ theorem manufactured_flip_arbitrary_lobe_all_time_four_phase_tongues
   rw [hsame]
   exact hwindow r (Nat.le_of_lt hr)
 
+end
+
 /-- **Four pointwise phases for the compatible runway suffix and splice
 lobe.**  This is the arbitrary-candy analogue of
 `manufactured_pair_four_phase_tongues`: the old side is the manufactured
@@ -817,10 +800,6 @@ The only compatibility premise not already supplied by the suffix theorem is
 `hCandyForeignOld`: the new candy must avoid the old suffix's action switch.
 -/
 theorem manufactured_suffix_explicit_lobe_four_phase_tongues
-    {w : Wiring} {outside mouth entry returnPort : Nat}
-    (C : ManufacturedFlipReflector w outside mouth)
-    (state : Tongues)
-    (hCpaths : PathGrooves C.toSupported.paths state)
     (hNewAvoidsC : (LocalAction.flip (mouth / 3)).Avoids
       C.toSupported.paths)
     (hActionsNe : mouth / 3 ≠ C.actionSwitch)
@@ -1020,6 +999,8 @@ theorem manufactured_suffix_explicit_lobe_four_phase_tongues
         rw [htongues]
         rcases hphase with rfl | rfl <;>
           simp
+
+end
 
 /-- Disjoint runway actions: from the flipped mouth exit the paired
 double-lobe orbit is periodic. -/

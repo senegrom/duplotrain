@@ -23,9 +23,8 @@ All statements are over `Wiring`, `PhysicalTrace`, and `stepN`, for arbitrary
 /-!
 ## The manufacturing journey reaches the activated state
 
-The one raw `stepN` fact every downstream counting file needs from the
-old Gray-corner module, extracted so the sharp proof does not depend on
-the Mellit corridor.
+The one raw `stepN` fact every downstream counting file needs about the
+canonical manufacturing journey.
 -/
 
 namespace GeneralN

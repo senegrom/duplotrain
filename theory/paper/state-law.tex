@@ -529,8 +529,7 @@ switches, some switch is eventually revisited; the analysis of the
 
 The state-side consequences are the first two entries of the budget:
 
-\begin{lemma}[Construction history; \file{FirstReflectorNovelty.lean},
-  \file{SharpStateLawAssembly.lean}]\label{lem:history}
+\begin{lemma}[Construction history; \file{SharpStateLawAssembly.lean}]\label{lem:history}
   The complete first manufacturing journey --- switch-simple exploration,
   contact, and reverse runway --- exhibits at most $N+2$ distinct
   restricted vectors: the at most $N+1$ vectors along the switch-simple
@@ -585,7 +584,7 @@ overlapping histories are never paid twice: when a second manufactured
 exploration follows a first, the union of the two construction histories,
 with their shared boundary vector erased, still fits the frame
 (\file{TwoHistoryUnionCharge.lean},
-\file{TwoJourneyTailCountSharp.lean}).
+\file{BoundaryOverlapTailCount.lean}).
 
 \subsection{The probe tree after one reflector}\label{ssec:probe}
 
@@ -658,7 +657,7 @@ Packaging the closed tree gives the keystone:
 
 \begin{theorem}[Known incoming edge;
   \lean{knownIncomingEdgeNAddFour},
-  \file{KnownEdgeNAddFourComplete.lean}]\label{thm:knownedge}
+  \file{StateLawNAddFourSharp.lean}]\label{thm:knownedge}
   If the start is entered over a wired edge, every duplicate-free list of
   live sample times with pairwise-distinct restricted vectors has length
   at most $N+4$.
@@ -850,7 +849,7 @@ Points worth recording:
   \file{StateLawSmallN.lean} & $2^N$ ceiling; empty/teardrop/dogbone\\
   \file{StateLawLowerBound.lean} & the extremal family, $N \ge 3$\\
   \file{StateLawNAddFourTop.lean} & arbitrary-start bookkeeping\\
-  \file{KnownEdgeNAddFourComplete.lean} & the known-edge $N+4$ theorem\\
+  \file{StateLawNAddFourSharp.lean} & the known-edge theorem and the sharp $N+4$ bound\\
   \file{TrackTrace.lean}, \file{TrackTheta.lean} & traces, reflectors,
     theta engine\\
   \file{StateLawAxiomAudit.lean} & the axiom audit\\

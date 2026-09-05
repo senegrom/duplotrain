@@ -21,7 +21,7 @@ pairwise-distinct restricted tongue vectors, **and** some layout, start,
 and duplicate-free list of live sample times attains `count`.  The theorem
 is unconditional — `N = 0` is witnessed by the empty layout.
 
-To check everything (70 self-contained libraries, no Mathlib):
+To check everything (66 self-contained libraries, no Mathlib):
 
 ```
 lake build
@@ -58,7 +58,7 @@ audit on every push to `main`.
   distinct naturals below `2^N`.  Fully symbolic, no liveness needed.
 * `state_law_N_add_four` (`StateLawNAddFourSharp.lean`): the sharp
   symbolic `N + 4` bound — the mathematical core of the development.
-  The known-incoming-edge theorem (`KnownEdgeNAddFourComplete.lean`)
+  The known-incoming-edge theorem (`knownIncomingEdgeNAddFour`, same file)
   bounds every shifted run by charging its death, stable-cycle,
   support-changing contact, and protected-reflector-pair branches into one
   shared `N`-coordinate construction history.  The remaining question — an

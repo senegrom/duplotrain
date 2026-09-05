@@ -1,4 +1,4 @@
-import TwoJourneyTailCountSharp
+import SharpStateLawAssembly
 
 /-!
 # Boundary-aware direct-tail counting
@@ -10,6 +10,13 @@ vector exactly compared with naïvely adding the two cardinality bounds.
 -/
 
 namespace GeneralN
+
+/-- Filtering sample times keeps their mapped values duplicate-free. -/
+theorem tailsharp_nodup_map_filter
+    {α : Type}
+    {f : Nat → α} (p : Nat → Bool) :
+    ∀ {xs : List Nat},
+      (xs.map f).Nodup → ((xs.filter p).map f).Nodup := by grind
 
 /-- Cover-level form of boundary overlap. The boundary vector is already
 historical, so a suffix with direct cap cap contributes at most cap-1 fresh

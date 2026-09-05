@@ -24,9 +24,9 @@ The flip-label argument is formalised in two stages.
 
 Thus the artificial word `1,...,N,1,...,N` cannot remain an unstructured
 source of `N` repeated novelties: after its first repeated event, each next
-rerouter exposes a crossing frame.  The remaining global theorem is to map
-the raw crossing/nesting alternatives to the already proved restoration and
-reflector novelty bounds.  No finite-`N` exhaustion is used here.
+rerouter exposes a crossing frame.  Mapping the raw crossing/nesting
+alternatives to the restoration and reflector novelty bounds is done
+downstream.  No finite-`N` exhaustion is used here.
 -/
 
 namespace GeneralN

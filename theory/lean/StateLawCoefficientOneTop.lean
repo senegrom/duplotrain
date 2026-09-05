@@ -69,10 +69,13 @@ theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le
   simp [rawFirstWriterHistory]
   omega
 
+section
+variable {w : Wiring} {N g e : Nat}
+  {A : ManufacturedReflector w g e}
+  (C : SimpleContinuationChangedContact w A)
+include w N g e A C
+
 theorem PartialSecondRunSharp.ChangedContact.mem_compressedLead_of_approach
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A)
     {j : Nat} (hj : j ≤ C.approach.length) :
     restrictedTonguesAt w N (e, A.activatedState) j ∈
       C.compressedLead N := by
@@ -88,20 +91,14 @@ theorem PartialSecondRunSharp.ChangedContact.mem_compressedLead_of_approach
     apply List.mem_append_left
     exact (List.mem_erase_of_ne hboundary).mpr hm
 
-theorem PartialSecondRunSharp.ChangedContact.contact_mem_compressedLead
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A) :
+theorem PartialSecondRunSharp.ChangedContact.contact_mem_compressedLead :
     VectorCount.restrict N C.contactState ∈ C.compressedLead N := by
   have hm := C.mem_compressedLead_of_approach
     (N := N) (j := C.approach.length) (Nat.le_refl _)
   simpa [restrictedTonguesAt, tonguesAt,
     C.approach_trace.sound] using hm
 
-theorem PartialSecondRunSharp.ChangedContact.next_mem_compressedLead
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A) :
+theorem PartialSecondRunSharp.ChangedContact.next_mem_compressedLead :
     VectorCount.restrict N C.nextState ∈ C.compressedLead N := by
   apply List.mem_append_right
   apply List.mem_append_right
@@ -111,9 +108,6 @@ theorem PartialSecondRunSharp.ChangedContact.next_mem_compressedLead
 route-prefix lasso.  Every local vector, including the two contact phases,
 is already in the coefficient-one compressed lead. -/
 theorem PartialSecondRunSharp.ChangedContact.backward_all_time_zero_novelty
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A)
     (hbackward : C.x = C.oriented.1)
     (times : List Nat) :
     NoveltyCoverOn w N (e, A.activatedState)
@@ -213,6 +207,8 @@ theorem PartialSecondRunSharp.ChangedContact.backward_all_time_zero_novelty
     rcases hphase with h | h
     · simpa [h] using C.contact_mem_compressedLead (N := N)
     · simpa [h] using C.next_mem_compressedLead (N := N)
+
+end
 
 /-- Absolute coefficient-one bound for the entire original run once the
 first damaging continuation contact points backward. -/

@@ -263,17 +263,20 @@ theorem runway_fault_dichotomy_general_pointwise_stay
       rw [hdecomp', stepN_add, hmidFlip]
       exact hrunAbs
 
+section
+variable {w : Wiring} {g e : Nat}
+  (A : ManufacturedFlipReflector w g e)
+  (B : ManufacturedStayReflector w e g)
+  (state : Tongues)
+  (hA : PathGrooves [A.runway, A.candy] state)
+  (hB : PathGrooves [B.runway, [(B.mouth, B.arm)]] state)
+  (hcontact : ∃ path ∈ [B.runway, [(B.mouth, B.arm)]],
+    ∃ passage ∈ path,
+      passageSwitch passage = A.actionSwitch)
+include w g e A B state hA hB hcontact
+
 /-- Pointwise disturbed-support dichotomy for a stay reflector. -/
-theorem manufactured_stay_support_fault_dichotomy_pointwise
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedStayReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, [(B.mouth, B.arm)]] state)
-    (hcontact : ∃ path ∈ [B.runway, [(B.mouth, B.arm)]],
-      ∃ passage ∈ path,
-        passageSwitch passage = A.actionSwitch) :
+theorem manufactured_stay_support_fault_dichotomy_pointwise :
     (∃ travel,
       stepN w travel (e, flipAt state A.actionSwitch) =
         some (e, state) ∧
@@ -342,16 +345,7 @@ theorem manufactured_stay_support_fault_dichotomy_pointwise
 
 /-- A flip reflector followed by an intersecting stay reflector has exactly
 its original and action-flipped tongue phases for all time. -/
-theorem manufactured_flip_then_stay_all_time_two_phase
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e)
-    (B : ManufacturedStayReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    (hB : PathGrooves [B.runway, [(B.mouth, B.arm)]] state)
-    (hcontact : ∃ path ∈ [B.runway, [(B.mouth, B.arm)]],
-      ∃ passage ∈ path,
-        passageSwitch passage = A.actionSwitch) :
+theorem manufactured_flip_then_stay_all_time_two_phase :
     ∀ d, ∃ port phase,
       stepN w d (g, state) = some (port, phase) ∧
         (phase = state ∨ phase = flipAt state A.actionSwitch) := by
@@ -434,6 +428,8 @@ theorem manufactured_flip_then_stay_all_time_two_phase
       omega
     exact periodic_two_phase_prefix_tongues
       hpositive hperiod hwindow
+
+end
 
 /-- The opposite orientation, with the stay traversal first, has the same two
 absolute phases. -/

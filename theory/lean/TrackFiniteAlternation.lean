@@ -12,17 +12,12 @@ Its writer is the switch entered at the start of that step. A writer is
 productive event of the same switch whose resulting restricted tongue vector
 has never occurred at any earlier raw time.
 
-The exact remaining structural claim is that there are at most five such
-events. The theorem `stateLaw_of_fiveRepeatedWriterNovelty` below proves,
-without any further dynamical assumption, that this claim implies the open
-`GeneralN.StateLaw` bound `N + 6`:
-
-* one initial vector;
-* at most `N` first productive writers;
-* at most five repeated-writer novelties.
-
-Thus the constant-five claim is not called a lemma hiding another important
-gap: it is named as the complete remaining endpoint/matching theorem.
+`restrictedTonguesAt_mem_finite_writer_cover` below shows that every
+visited vector is the initial vector, the post-vector of a first productive
+write, or a repeated-writer novelty, so a run's distinct vectors are
+bounded by `1 + (first writers) + (repeated-writer novelties)`, with at
+most `N` first writers.  Bounding the repeated-writer novelties is the
+work of the rest of the development.
 -/
 
 namespace GeneralN

@@ -1,34 +1,18 @@
 /-!
-# General-N lazy-point theory, formalised
+# The lazy-point model
 
-No exhaustion in this file: every theorem is proved for an ARBITRARY number
-of switches and arbitrary wirings, by structural induction.
-
-Model.  Ports are naturals: switch `k` owns stem `3k`, left branch `3k+1`,
-right branch `3k+2`.  A wiring is a symmetric partial pairing of ports (the
-plain-track edges; geometry provably never enters).  Tongues are
-`Nat → Bool` (`false` = Left).  A configuration is the port the train is
-about to enter plus the tongues; `step` performs the lazy-point rule --
-facing (enter stem) exits by the tongue and leaves it alone, trailing
-(enter branch) pins the tongue and exits the stem -- then follows the exit
-port's edge (`none` = capped/unwired: the run ends).
-
-Results (all general-N, no `native_decide`, no `sorry`):
-
-* `trailing_route` / `trailing_route_independent` -- a trailing pass's exit
-  route never reads the tongues: cascades are wiring-determined (T1/T2 of
-  ../lazy-point-theory.md).
-* `descent_sound` -- a `Descent` (a trailing cascade carrying its wiring
-  facts) is executed faithfully by the dynamics.
-* `descent_pins` / `descent_noop` / `descent_sound_noop` -- a cascade's
-  tongue effect is exactly its pins; re-running it over already-agreeing
-  tongues is a no-op.
-* `retrace` (T3, the key lemma) -- entering the LAST cascade switch's stem
-  with any tongues agreeing with the cascade's pins, the walk performs pure
-  facing moves that traverse the cascade BACKWARDS, leaves every tongue
-  untouched, and emerges over the cascade's original entry edge.  This is
-  the mechanism that forces the bounce and caps every cycle at the dogbone
-  Gray square.
+Ports are naturals: switch `k` owns stem `3k`, left branch `3k+1`, right
+branch `3k+2`.  A `Wiring` is a symmetric partial pairing of ports (the
+plain-track edges; geometry never enters).  `Tongues` are `Nat → Bool`
+(`false` = left).  A configuration is the port the train is about to enter
+plus the tongues.  `arrive` performs the lazy-point rule — facing (enter a
+stem) exits by the tongue's branch and moves no tongue, trailing (enter a
+branch) pins that tongue and exits the stem — and `step` follows the exit
+port's edge (`none` = capped or unwired: the run ends).  `stepN` iterates,
+`flipAt` flips one tongue, and `IsReflector` names a track section that
+returns the train to a fixed exit with a predictable tongue effect.
+Everything downstream is proved for an arbitrary number of switches and an
+arbitrary wiring.
 -/
 
 namespace GeneralN
@@ -88,8 +72,7 @@ theorem stepN_add (w : Wiring) (m n : Nat) (c : Nat × Tongues) :
 theorem branchPort_bval {p : Nat} (hp : p % 3 ≠ 0) :
     branchPort (p / 3) (bval p) = p := by grind [branchPort, bval]
 
-/-! ## Trailing routes ignore the tongues (T1/T2) -/
-
+/-! ## Tongue algebra -/
 
 theorem pin_of_agrees {u : Tongues} {b : Nat} (h : u (b / 3) = bval b) :
     pin u b = u := by
@@ -119,7 +102,8 @@ theorem flipAt_comm {u : Tongues} {a b : Nat} (hab : a ≠ b) :
     · simp [hjb, Ne.symm hab]
     · simp [hja, hjb]
 
-
+/-- A track section that returns every admissible tongue state `S` to exit
+`e` after `k` steps from entry `g`, acting on the tongues as `τ`. -/
 def IsReflector (w : Wiring) (g e k : Nat)
     (S : Tongues → Prop) (τ : Tongues → Tongues) : Prop :=
   ∀ u, S u → stepN w k (g, u) = some (e, τ u) ∧ S (τ u)

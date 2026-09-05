@@ -16,16 +16,19 @@ physical consequences; they do not use a finite-instance argument.
 
 namespace GeneralN
 
+section
+variable {w : Wiring} {N : Nat}
+  (S : ProductiveBoundaryNAddFourSavingResidual w N)
+  (R : ManufacturedFlipReflector w S.source.g S.source.e)
+  (O : InitialEntryWriterOccurrence
+    w S.source.g S.source.e S.source.k0
+      (ManufacturedReflector.flip R))
+  (hcanonical : O.before.length = R.runway.length)
+include w N S R O hcanonical
+
 /-- At the canonical unchanged occurrence, the manufactured mouth is exactly
 the source entry stem. -/
-theorem ProductiveBoundaryNAddFourSavingResidual.canonical_mouth_eq_entry
-    {w : Wiring} {N : Nat}
-    (S : ProductiveBoundaryNAddFourSavingResidual w N)
-    (R : ManufacturedFlipReflector w S.source.g S.source.e)
-    (O : InitialEntryWriterOccurrence
-      w S.source.g S.source.e S.source.k0
-        (ManufacturedReflector.flip R))
-    (hcanonical : O.before.length = R.runway.length) :
+theorem ProductiveBoundaryNAddFourSavingResidual.canonical_mouth_eq_entry :
     R.mouth = S.source.e := by
   have hk0 : S.source.k0 = R.actionSwitch :=
     O.switch_eq_action_of_before_length_eq_runway hcanonical
@@ -38,14 +41,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.canonical_mouth_eq_entry
 Any nonempty runway would start at `g` and, by symmetry of the source entry
 edge, have its last exit at the same port `g`, contradicting switch-simplicity.
 -/
-theorem ProductiveBoundaryNAddFourSavingResidual.canonical_runway_eq_nil
-    {w : Wiring} {N : Nat}
-    (S : ProductiveBoundaryNAddFourSavingResidual w N)
-    (R : ManufacturedFlipReflector w S.source.g S.source.e)
-    (O : InitialEntryWriterOccurrence
-      w S.source.g S.source.e S.source.k0
-        (ManufacturedReflector.flip R))
-    (hcanonical : O.before.length = R.runway.length) :
+theorem ProductiveBoundaryNAddFourSavingResidual.canonical_runway_eq_nil :
     R.runway = [] := by
   have hmouth : R.mouth = S.source.e :=
     S.canonical_mouth_eq_entry R O hcanonical
@@ -78,14 +74,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.canonical_runway_eq_nil
 
 /-- The canonical source is a literal self-linked stem: its two named ports
 coincide, and the wiring pairs that port with itself. -/
-theorem ProductiveBoundaryNAddFourSavingResidual.canonical_source_self_link
-    {w : Wiring} {N : Nat}
-    (S : ProductiveBoundaryNAddFourSavingResidual w N)
-    (R : ManufacturedFlipReflector w S.source.g S.source.e)
-    (O : InitialEntryWriterOccurrence
-      w S.source.g S.source.e S.source.k0
-        (ManufacturedReflector.flip R))
-    (hcanonical : O.before.length = R.runway.length) :
+theorem ProductiveBoundaryNAddFourSavingResidual.canonical_source_self_link :
     S.source.g = S.source.e /\
       w.link S.source.e = some S.source.e := by
   have hrunway := S.canonical_runway_eq_nil R O hcanonical
@@ -100,5 +89,7 @@ theorem ProductiveBoundaryNAddFourSavingResidual.canonical_source_self_link
   constructor
   · exact hge
   · simpa [hge] using S.source.entry
+
+end
 
 end GeneralN
