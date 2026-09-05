@@ -10,8 +10,8 @@ sleepers) is geometrically a plain straight and is counted as one.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Iterable, Mapping
 
 __all__ = ["TrainSet", "SETS", "inventory_for_sets"]
 

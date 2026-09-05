@@ -5,7 +5,6 @@ and lattice engines on every solver mode, so the fast path can never silently ch
 an answer.
 """
 
-import math
 
 import pytest
 
@@ -13,10 +12,9 @@ from duplotrain.catalog import default_catalog
 from duplotrain.exact import Alg
 from duplotrain.geometry import ORIGIN, Pose, degrees_to_steps
 from duplotrain.lattice import (
+    ROT_COS_SIN,
     SCALE,
     LatticePoint,
-    LatticePose,
-    ROT_COS_SIN,
     from_alg_xy,
     z_from_alg,
 )
@@ -102,14 +100,15 @@ def _run_both(catalog, inventory, config_kwargs, **solve_kwargs):
     assert sorted(s.signature for s in field.solutions) == sorted(
         s.signature for s in lattice.solutions
     )
-    for f, l in zip(
+    for f, lat in zip(
         sorted(field.solutions, key=lambda s: s.signature),
         sorted(lattice.solutions, key=lambda s: s.signature),
+        strict=True,
     ):
-        assert f.exact == l.exact
-        assert f.gap == pytest.approx(l.gap, abs=1e-9)
-        assert f.kind == l.kind
-        assert f.layout.piece_counts == l.layout.piece_counts
+        assert f.exact == lat.exact
+        assert f.gap == pytest.approx(lat.gap, abs=1e-9)
+        assert f.kind == lat.kind
+        assert f.layout.piece_counts == lat.layout.piece_counts
     return results
 
 

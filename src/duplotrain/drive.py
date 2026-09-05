@@ -26,8 +26,8 @@ provably periodic.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Mapping
 
 from .layout import End, Layout
 
@@ -139,6 +139,16 @@ def drive(
     seen: dict[tuple, int] = {}
     reversals = 0
 
+    def finish(outcome: str, here: int) -> DriveReport:
+        return DriveReport(
+            outcome=outcome,
+            steps=tuple(steps),
+            cycle_start=None,
+            reversals=reversals,
+            visited=frozenset(p for p, _e, _x in steps) | {here},
+            final_switch_states=dict(states),
+        )
+
     for _ in range(MAX_STEPS):
         key = (placement, entered, tuple(sorted(states.items())))
         if key in seen:
@@ -155,22 +165,12 @@ def drive(
         piece = layout.placements[placement].piece
         stones = stones_by_placement.get(placement, ())
 
-        def finish(outcome: str) -> DriveReport:
-            return DriveReport(
-                outcome=outcome,
-                steps=tuple(steps),
-                cycle_start=None,
-                reversals=reversals,
-                visited=frozenset(p for p, _e, _x in steps) | {placement},
-                final_switch_states=dict(states),
-            )
-
         # Mid-piece stones trigger on every pass.  A stone positioned at a port face
         # only acts on trains RUNNING INTO that face; a train setting off away from
         # it starts past the trigger (DUPLO locos are longer than anything beyond),
         # so entering *via* that port leaves it silent.
         if any(sid == STOP_STONE and pos is None for sid, pos in stones):
-            return finish("stopped")
+            return finish("stopped", placement)
 
         if any(sid == DIRECTION_STONE and pos is None for sid, pos in stones):
             # One reversal per pass: in, trigger, back out the way it came.
@@ -179,7 +179,7 @@ def drive(
         else:
             options = [exit_port for exit_port, _route in piece.transit(entered)]
             if not options:
-                return finish("derailed")  # entered a dead route (cannot happen today)
+                return finish("derailed", placement)  # a dead route (cannot happen today)
             if len(options) > 1:
                 # Facing move: follow the tongue (fall back to the first branch if
                 # the recorded state isn't one of these options).
@@ -195,7 +195,7 @@ def drive(
                     states[placement] = entered
             # Face stones at the port the train is heading for.
             if any(sid == STOP_STONE and pos == exit_port for sid, pos in stones):
-                return finish("stopped")
+                return finish("stopped", placement)
             if any(
                 sid == DIRECTION_STONE and pos == exit_port and pos != entered
                 for sid, pos in stones
@@ -206,10 +206,10 @@ def drive(
         steps.append((placement, entered, exit_port))
 
         if exit_port in piece.sealed:
-            return finish("buffered")
+            return finish("buffered", placement)
         link = layout.links.get((placement, exit_port))
         if link is None:
-            return finish("derailed")
+            return finish("derailed", placement)
         placement, entered = link
 
     raise RuntimeError("drive() exceeded MAX_STEPS; state space should be finite")

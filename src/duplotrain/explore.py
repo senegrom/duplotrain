@@ -24,14 +24,14 @@ families with today's pieces:
 
 from __future__ import annotations
 
-from typing import Iterator, Mapping
+from collections.abc import Iterator, Mapping
 
 from .catalog import STONE_MOUNTS
 from .drive import LoopClassification, classify
 from .geometry import HEADING_STEPS, cos_sin
 from .layout import Layout
 from .pieces import PieceType
-from .solver import SolverConfig, Solution, solve
+from .solver import Solution, SolverConfig, solve
 
 __all__ = [
     "congruence_key",
@@ -241,7 +241,7 @@ def make_dogbone(
     teardrop: Solution,
     pieces: Mapping[str, PieceType],
     bar_straights: int = 2,
-    bar: "list[tuple[str, int, int]] | None" = None,
+    bar: list[tuple[str, int, int]] | None = None,
 ) -> Layout:
     """Grow a solver-found teardrop into a dogbone: the stone-free perfect layout.
 

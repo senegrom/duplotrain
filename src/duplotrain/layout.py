@@ -13,9 +13,10 @@ for speed and only builds a ``Layout`` once a candidate is worth keeping.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any, Iterable, Iterator, Mapping
+from typing import Any
 
 from .exact import Alg
 from .geometry import Pose
@@ -443,8 +444,18 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
         )
         placements.append(Placement(pieces[piece_id], frame))
 
+    def check_end(index: int, port: int) -> None:
+        if not 0 <= index < len(placements):
+            raise ValueError(f"layout refers to placement {index}, which does not exist")
+        if not 0 <= port < len(placements[index].piece.ports):
+            raise ValueError(f"placement {index} has no port {port}")
+
     links: dict[End, End] = {}
     for ai, ap, bi, bp in data.get("links", []):
+        check_end(ai, ap)
+        check_end(bi, bp)
+        if (ai, ap) in links or (bi, bp) in links or (ai, ap) == (bi, bp):
+            raise ValueError(f"end ({ai}, {ap}) or ({bi}, {bp}) is linked twice")
         links[(ai, ap)] = (bi, bp)
         links[(bi, bp)] = (ai, ap)
     accessories = tuple(
@@ -453,6 +464,8 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
         else (int(entry[0]), str(entry[1]), int(entry[2]))
         for entry in data.get("accessories", [])
     )
+    for entry in accessories:
+        check_end(entry[0], entry[2] if len(entry) > 2 else 0)
     return Layout(tuple(placements), links, accessories)
 
 

@@ -128,7 +128,7 @@ def classify_wiring(n, edges, caps):
                 seen_ports = set()
                 while out[0] == "cap":
                     if back_port in seen_ports:
-                        return None, tongues  #永 stuck between caps: no edge
+                        return None, tongues  # stuck between caps: no edge
                     seen_ports.add(back_port)
                     back_port, tongues = arrive(back_port, tongues, swept)
                     out = conn[back_port]
@@ -143,7 +143,6 @@ def classify_wiring(n, edges, caps):
         seen_states = {}
         swept_trace = []
         pos, tongues = start_pos, start_tongues
-        swept = set()
         while True:
             key = (pos, tongues)
             if key in seen_states:

@@ -12,7 +12,8 @@ it (it is an optional dependency, installed via ``duplotrain[render]``).
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from .layout import Layout
 
@@ -57,7 +58,7 @@ def elevation_color(z: float) -> str:
     elif z >= stops[-1][0]:
         r, g, b = stops[-1][1]
     else:
-        for (z0, c0), (z1, c1) in zip(stops, stops[1:]):
+        for (z0, c0), (z1, c1) in zip(stops, stops[1:], strict=False):
             if z <= z1:
                 t = (z - z0) / (z1 - z0)
                 r, g, b = (
@@ -88,7 +89,7 @@ def _offset(
         normals.append((-dy / norm, dx / norm))
     return [
         (x + nx * distance, y + ny * distance)
-        for (x, y), (nx, ny) in zip(line, normals)
+        for (x, y), (nx, ny) in zip(line, normals, strict=True)
     ]
 
 
@@ -103,9 +104,9 @@ def render_layout(
     layout: Layout,
     path: str | None = None,
     title: str | None = None,
-    ax: "Axes | None" = None,
+    ax: Axes | None = None,
     dpi: int = 150,
-) -> "Figure":
+) -> Figure:
     """Draw *layout*; save to *path* if given, and return the figure."""
     import matplotlib
 
@@ -138,7 +139,7 @@ def render_layout(
         # One zorder band per piece: an elevated deck (ballast ~1.8) must paint over a
         # ground piece's rails (~1.5), not thread between another piece's layers.
         band = 1 + mean_z / 100.0
-        for line3d, line in zip(lines3d, lines):
+        for line3d, line in zip(lines3d, lines, strict=True):
             climbs = max(z for _x, _y, z in line3d) - min(z for _x, _y, z in line3d)
             if climbs > 1.0 or line3d[0][2] > 1.0:
                 # Elevation gradient: short chunks, each tinted by its own height.
@@ -181,14 +182,15 @@ def render_layout(
             z = band + 0.5
             # Sleepers.
             total = sum(
-                math.hypot(bx - ax_, by - ay) for (ax_, ay), (bx, by) in zip(line, line[1:])
+                math.hypot(bx - ax_, by - ay)
+                for (ax_, ay), (bx, by) in zip(line, line[1:], strict=False)
             )
             n_sleepers = max(2, int(total // 30))
             for i in range(n_sleepers):
                 t = (i + 0.5) / n_sleepers
                 target = t * total
                 run = 0.0
-                for (x0, y0), (x1, y1) in zip(line, line[1:]):
+                for (x0, y0), (x1, y1) in zip(line, line[1:], strict=False):
                     seg = math.hypot(x1 - x0, y1 - y0)
                     if run + seg >= target and seg > 0:
                         u = (target - run) / seg

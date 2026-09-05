@@ -20,8 +20,8 @@ i.e. up to rotation, translation and reflection of the embedded track.
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 from .explore import congruence_key
 from .geometry import ORIGIN
@@ -194,7 +194,7 @@ def enumerate_networks(
 
     def rebuild() -> Layout:
         layout = Layout()
-        for (pid, entry, at), joins in zip(attach_trace, join_trace_all):
+        for (pid, entry, at), joins in zip(attach_trace, join_trace_all, strict=True):
             piece = pieces[pid]
             if at is None:
                 layout, _ = layout.with_piece(piece, piece.frame_for(entry, ORIGIN))

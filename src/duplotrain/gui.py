@@ -20,10 +20,11 @@ import itertools
 import json
 import threading
 import webbrowser
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
-from typing import Any, Mapping
+from typing import Any
 
 from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
 from .geometry import steps_to_degrees

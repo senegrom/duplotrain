@@ -23,9 +23,10 @@ closure test.  Writing it as an exact field element keeps the test honest.
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import Any, Iterable, Literal, Sequence
+from typing import Any, Literal
 
 from .exact import Alg, alg
 from .geometry import HEADING_STEPS, Pose, cos_sin, degrees_to_steps
@@ -419,7 +420,7 @@ def _derive_ports_and_routes(
             raise ValueError(
                 f"piece declares {len(names)} port names but has {len(ports)} ports"
             )
-        ports = [Port(name=n, pose=p.pose) for n, p in zip(names, ports)]
+        ports = [Port(name=n, pose=p.pose) for n, p in zip(names, ports, strict=True)]
     return tuple(ports), tuple(routes)
 
 

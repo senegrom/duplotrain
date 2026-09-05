@@ -19,12 +19,13 @@ truly close (ovals, S-bends, 90-degree lattice layouts) then test closed with no
 epsilon, and layouts that only *look* closed (the classic "Regel 3" builds, which are
 4.59 mm short) are honestly reported as forced fits.
 
-No built-in piece is provisional any more: the crossing, switch and bridge numbers were
-settled by parsing the LDraw part files and BlueBrick's measured connection library
-(cross-calibrated against each other and against part weights and photographs).  The
-bridge's *vertical* split (57.6 mm ramp + 19.2 mm arch to a 76.8 mm crest) is derived
-from brick-integer constraints and part bounding heights rather than a published
-figure -- the most likely number to move if someone puts callipers on the real part.
+The crossing, switch and bridge plan geometry were settled by parsing the LDraw part
+files and BlueBrick's measured connection library (cross-calibrated against each
+other and against part weights and photographs).  The bridge's *vertical* split
+(57.6 mm ramp + 19.2 mm arch to a 76.8 mm crest) is derived from brick-integer
+constraints and part bounding heights rather than a published figure -- the most
+likely number to move if someone puts callipers on the real part -- so the bridge
+parts, the slight slope and the off-ramp stay flagged ``provisional``.
 Override any piece by loading a user catalogue on top -- same JSON schema, matching ids
 replace the built-ins.
 """

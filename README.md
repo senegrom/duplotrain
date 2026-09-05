@@ -63,6 +63,7 @@ and the LDraw part library:
 | `span`           | 6393    | 192 mm arch rising a further 19.2 mm to the 76.8 mm crest  |
 | `buffer`         | 35967   | 64 mm track-end bumper; its far face is sealed and can never mate |
 | `slope`          | 35966   | 256 mm "slight slope" from 10875 (rise ~5.6 mm, unverified) |
+| `offramp`        | 4785    | 96 mm off-ramp to the floor from 10425; its floor side is sealed (provisional) |
 
 Connectors are genderless (a jigsaw tab **and** socket at every end), so any end mates
 with any end and one physical curve serves as both the left and the right turn — the
@@ -114,7 +115,8 @@ duplotrain demo                                       # the classic oval
 ```
 
 `--set` knows the 2018 wave (10874 Steam Train, 10875 Cargo Train, 10872 Bridge &
-Tracks, 10882 Track pack) with verified per-set piece counts — repeat a flag to own a
+Tracks, 10882 Track pack) and the 2024 sets (10425 Tunnel, 10426 Bridge expansion)
+with per-set piece counts from the published inventories — repeat a flag to own a
 set twice. Sets also contribute their **action stones** (below).
 
 ## Action stones and reversing loops

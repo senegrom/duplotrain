@@ -30,8 +30,8 @@ from __future__ import annotations
 
 import math
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, Sequence
 
 from .collision import DEFAULT_CLEARANCE, CollisionField
 from .exact import Alg
@@ -1166,7 +1166,7 @@ def solve(
         # Try homeward moves first: irrelevant to completeness, decisive for how fast
         # the obvious completion of a small gap is found.
         candidates.sort(key=lambda c: (c[0], c[1], c[2], c[3], c[4]))
-        for _heuristic, _rank_, pid, entry, exit_port, next_cursor in candidates:
+        for _heuristic, _prio, pid, entry, exit_port, next_cursor in candidates:
             piece = pieces[pid]
             frame = eng.frame(pid, entry, cursor)
             hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
@@ -1235,7 +1235,7 @@ def solve(
         # each admissible contour stays small and finds the SHORTEST completions
         # first.  Plain iterative deepening without the heuristic was tried and is
         # equally hopeless -- the contour bound is what tames the tree.
-        for f_limit in range(1, depth_limit + 1):
+        for f_limit in range(1, depth_limit + 1):  # noqa: B007 (read inside dfs)
             if not dfs(eng.start_cursor, 0, 0.0, start_prev):
                 break
             if len(solutions) >= cfg.max_results or stats.aborted:

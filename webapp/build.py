@@ -93,11 +93,19 @@ def build_source_zip() -> bytes:
 
 #: The site serves apps under a strict CSP; this scoped override only adds what
 #: Pyodide needs (wasm compilation) and keeps scripts external-only.
+_CSP = (
+    "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; "
+    "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
+    "connect-src 'self'; worker-src 'self' blob:; object-src 'none'; "
+    "base-uri 'self'; form-action 'self'; frame-ancestors 'none'; "
+    "manifest-src 'self'; upgrade-insecure-requests"
+)
+
 HTACCESS = """\
 # duplotrain: Pyodide needs 'wasm-unsafe-eval' to compile its WebAssembly.
 # All scripts stay external and same-origin (no 'unsafe-inline' for scripts).
 <IfModule mod_headers.c>
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'; upgrade-insecure-requests"
+  Header always set Content-Security-Policy "__CSP__"
 
   # Mutable names (the page, scripts, adapter) revalidate on every visit so
   # engine fixes actually reach returning visitors; 304s make this cheap.
@@ -112,7 +120,7 @@ HTACCESS = """\
 </IfModule>
 
 AddType application/wasm .wasm
-"""
+""".replace("__CSP__", _CSP)
 
 #: Dropped into the versioned pyodide-<version>/ directory: its URL changes on
 #: upgrade, so its contents may cache forever.

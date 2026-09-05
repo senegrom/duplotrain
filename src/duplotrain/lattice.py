@@ -63,19 +63,19 @@ class LatticePoint:
         self.c = c
         self.d = d
 
-    def rotated(self, steps: int) -> "LatticePoint":
+    def rotated(self, steps: int) -> LatticePoint:
         """Rotate by ``steps`` * 30 degrees (integer arithmetic only)."""
         a, b, c, d = self.a, self.b, self.c, self.d
         for _ in range(steps % 12):
             a, b, c, d = -d, a, b + d, c
         return LatticePoint(a, b, c, d)
 
-    def __add__(self, other: "LatticePoint") -> "LatticePoint":
+    def __add__(self, other: LatticePoint) -> LatticePoint:
         return LatticePoint(
             self.a + other.a, self.b + other.b, self.c + other.c, self.d + other.d
         )
 
-    def __sub__(self, other: "LatticePoint") -> "LatticePoint":
+    def __sub__(self, other: LatticePoint) -> LatticePoint:
         return LatticePoint(
             self.a - other.a, self.b - other.b, self.c - other.c, self.d - other.d
         )
@@ -117,7 +117,7 @@ class LatticePose:
         self.z = z
         self.heading = heading % 12
 
-    def then(self, delta: LatticePoint, dz: int, turn: int) -> "LatticePose":
+    def then(self, delta: LatticePoint, dz: int, turn: int) -> LatticePose:
         return LatticePose(
             self.p + delta.rotated(self.heading), self.z + dz, self.heading + turn
         )
@@ -133,12 +133,12 @@ class LatticePose:
     def __hash__(self) -> int:
         return hash(self.key())
 
-    def distance_to(self, other: "LatticePose") -> float:
+    def distance_to(self, other: LatticePose) -> float:
         ax, ay = self.p.xy()
         bx, by = other.p.xy()
         return math.hypot(ax - bx, ay - by)
 
-    def connects_to(self, other: "LatticePose") -> bool:
+    def connects_to(self, other: LatticePose) -> bool:
         """Same point and height, opposite headings -- the exact mating test."""
         return (
             self.p.key() == other.p.key()

@@ -21,13 +21,13 @@ from .explore import (
     find_perfect_networks,
     make_dogbone,
 )
-from .networks import NetworkConfig, enumerate_networks
 from .geometry import ORIGIN, Pose
 from .layout import Layout, Placement, build_chain, layout_from_dict, layout_to_dict
+from .networks import NetworkConfig, enumerate_networks
 from .pieces import PieceType, parse_piece, parse_pieces
 from .scoring import ScoreWeights, score_solution
 from .sets import SETS, inventory_for_sets
-from .solver import Solution, SolveResult, SolverConfig, solve
+from .solver import Solution, SolverConfig, SolveResult, solve
 
 __version__ = "0.1.0"
 
