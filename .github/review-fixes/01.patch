@@ -1,0 +1,270 @@
+diff --git a/README.md b/README.md
+index b7408b7..eb3bf56 100644
+--- a/README.md
++++ b/README.md
+@@ -320,8 +320,8 @@ python -m pytest -m "not slow"              # skip the ~2 min full-enumeration p
+ python -m pytest -m "not slow and not browser"  # what application CI runs first
+ ```
+ 
+-Tests marked `browser` need playwright plus a downloaded browser; they skip when
+-either is missing. See *Editor recovery and application checks* below for the
++Tests marked `browser` need playwright plus a downloaded browser. Missing defaults
++skip locally; explicit browser paths and all browser startup failures in CI fail. See *Editor recovery and application checks* below for the
+ full local command sequence.
+ 
+ The suite covers the number field, the pose lattice, piece derivation, the documented
+@@ -383,3 +383,25 @@ Application CI runs these checks on pushes and pull requests, including a clean
+ installation without matplotlib. The independent Lean workflow checks proof changes.
+ Package license metadata reads the repository's LICENSE file (GNU AGPL v3), rather
+ than declaring an inconsistent MIT license.
++
++### Autosave conflicts and geometric checks
++
++Autosave checkpoints carry unique revisions. Web Locks serialize cross-tab writes;
++a tab that detects another writer pauses autosave and asks you to export its work
++before reloading. Redrawing or closing a stale tab never rewrites a newer checkpoint.
++Previous saves migrate read-only into a new storage key, isolated from tabs still
++running the old editor. When safe locking or storage is unavailable, the editor
++warns you to export instead. Saves remain browser-local, not a backup service.
++
++`duplotrain check layout.json` checks the geometry of every recorded joint, not
++just whether all connectors have link records. It exits 1 for empty/open layouts,
++non-exact joints, and incompatible headings, elevations, or connector plates.
++`--slop 5` explicitly accepts up to 5 mm of **total** planar joint gap in a fully
++linked layout, with a forced-fit warning; it never excuses elevation or heading
++errors and is not a physical-fit guarantee. Collisions away from joints are not
++checked by this command. The editor recomputes joint warnings after import and
++reload, so exported forced fits cannot silently become “exact” layouts.
++
++Browser CI requires Playwright and its binaries (`DUPLOTRAIN_REQUIRE_BROWSER=1`).
++Only absent, unconfigured defaults may skip locally; crashes and bad custom paths
++are errors. Dependabot checks Python and GitHub Actions dependencies weekly.
+diff --git a/src/duplotrain/cli.py b/src/duplotrain/cli.py
+index 753a903..d464643 100644
+--- a/src/duplotrain/cli.py
++++ b/src/duplotrain/cli.py
+@@ -11,6 +11,7 @@ from __future__ import annotations
+ 
+ import importlib
+ import json
++import math
+ from pathlib import Path
+ 
+ import click
+@@ -356,8 +357,18 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
+     multiple=True,
+     type=click.Path(exists=True),
+ )
+-def check(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
+-    """Report whether a saved layout is closed, and where the gaps are."""
++@click.option(
++    "--slop", type=click.FloatRange(min=0), default=0.0, show_default=True,
++    help="Accept this total planar joint gap in mm; never ignores height or heading errors.",
++)
++def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None:
++    """Check recorded joints and closure. Exit 1 for open or unacceptable layouts.
++
++    A positive --slop accepts a forced fit within that total planar gap budget,
++    not an exact closure or a guarantee that physical track will fit.
++    """
++    if not math.isfinite(slop):
++        raise click.BadParameter("must be finite", param_hint="--slop")
+     catalog = _catalog(catalog_paths)
+     layout = _load_layout(layout_file, catalog)
+     width, height = layout.size()
+@@ -365,13 +376,42 @@ def check(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
+         f"{len(layout)} pieces, {layout.track_length() / 10:.0f} cm of track, "
+         f"{width / 10:.0f} x {height / 10:.0f} cm footprint"
+     )
+-    if layout.is_closed:
+-        console.print("[green]Fully closed: every connector is mated.[/green]")
++    issues = layout.joint_issues()
++    if layout.is_closed and not issues:
++        console.print("[green]Fully closed: every connector is exactly mated.[/green]")
++        console.print("Joint geometry checked; collisions elsewhere are not checked.")
+         return
+-    open_ends = layout.open_ends()
+-    console.print(f"[yellow]{len(open_ends)} open end(s).[/yellow]")
+-    for a, b, gap in layout.gaps()[:5]:
+-        console.print(f"  {a} <-> {b}: gap {gap:.1f} mm")
++    if layout.is_closed:
++        console.print("[yellow]Fully linked, but not exactly closed.[/yellow]")
++    else:
++        console.print(f"[yellow]{len(layout.connectable_ends())} open end(s).[/yellow]")
++        if not len(layout):
++            console.print("Empty layout; no closed track.")
++        for a, b, gap in layout.gaps()[:5]:
++            if not layout.is_sealed(a) and not layout.is_sealed(b):
++                console.print(f"  Open ends {a} <-> {b}: gap {gap:.6g} mm")
++    for joint in issues:
++        a, b = tuple(joint["a"]), tuple(joint["b"])
++        console.print(
++            f"  Joint {a} <-> {b}: {', '.join(joint['problems'])}; "
++            f"planar gap {joint['gap_mm']:.6g} mm, "
++            f"height difference {joint['height_mm']:.6g} mm, "
++            f"heading error {joint['heading_error_deg']} deg"
++        )
++    if issues:
++        total_gap = sum(joint["gap_mm"] for joint in issues)
++        planar_only = all(joint["problems"] == ["planar gap"] for joint in issues)
++        if planar_only:
++            console.print(f"Forced fit: total planar gap {total_gap:.6g} mm.")
++            if layout.is_closed and slop > 0 and total_gap <= slop:
++                console.print(
++                    f"Within requested slop budget {slop:g} mm; physical fit not verified."
++                )
++                return
++            console.print(f"Not accepted as closed within slop budget {slop:g} mm.")
++        else:
++            console.print("[red]Incompatible joint(s); planar slop cannot repair these.[/red]")
++    raise click.exceptions.Exit(1)
+ 
+ 
+ @main.command(name="classify")
+diff --git a/src/duplotrain/gui.py b/src/duplotrain/gui.py
+index af8d0ab..ff991ab 100644
+--- a/src/duplotrain/gui.py
++++ b/src/duplotrain/gui.py
+@@ -181,9 +181,12 @@ class Session:
+                 }
+             )
+         width, height = layout.size()
++        joint_issues = layout.joint_issues()
+         return {
+             "placements": placements,
+-            "closed": layout.is_closed,
++            "closed": layout.is_closed,  # topological, retained for API compatibility
++            "exactly_closed": layout.is_closed and not joint_issues,
++            "joint_issues": joint_issues,
+             "size_cm": [round(width / 10, 1), round(height / 10, 1)],
+             "piece_counts": layout.piece_counts,
+         }
+diff --git a/src/duplotrain/layout.py b/src/duplotrain/layout.py
+index 2cec1d5..d81ab94 100644
+--- a/src/duplotrain/layout.py
++++ b/src/duplotrain/layout.py
+@@ -18,7 +18,7 @@ from dataclasses import dataclass
+ from typing import Any
+ 
+ from .exact import Alg
+-from .geometry import Pose
++from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose
+ from .pieces import PieceType
+ from .validation import check_layout_json, rational_coefficient
+ 
+@@ -139,10 +139,49 @@ class Layout:
+         """True when every real connector is mated -- no loose ends anywhere.
+ 
+         Sealed faces (buffer bumpers) are not connectors, so a siding properly
+-        terminated by a buffer stop does not count as loose.
++        terminated by a buffer stop does not count as loose. This is topological:
++        use :meth:`joint_issues` as well before claiming exact geometric closure.
+         """
+         return bool(self.placements) and not self.connectable_ends()
+ 
++    def joint_issues(self) -> list[dict[str, Any]]:
++        """Audit each recorded joint once, independently of topological closure.
++
++        Nonzero planar gaps may be deliberate forced fits; importing them is
++        allowed, but they must never be called exact. Elevation/heading mismatches
++        and incompatible connector bodies cannot be excused by planar slop.
++        This checks joints, not collisions elsewhere along the pieces.
++        """
++        issues = []
++        for a, b in sorted(self.links.items()):
++            if a >= b:
++                continue
++            pa, pb = self.pose_of(a), self.pose_of(b)
++            half_turn = HEADING_STEPS // 2
++            heading_error = (pa.heading - pb.heading - half_turn) % HEADING_STEPS
++            heading_error = min(heading_error, HEADING_STEPS - heading_error)
++            problems = []
++            if not pa.same_point(pb):
++                problems.append("planar gap")
++            if pa.z != pb.z:
++                problems.append("elevation mismatch")
++            if heading_error:
++                problems.append("heading mismatch")
++            if self.is_sealed(a) or self.is_sealed(b):
++                problems.append("sealed face")
++            if (self.placements[a[0]].piece.end_overhang > 0
++                    and self.placements[b[0]].piece.end_overhang > 0):
++                problems.append("overlapping connector plates")
++            if problems:
++                issues.append({
++                    "a": list(a), "b": list(b),
++                    "gap_mm": pa.distance_to(pb),
++                    "height_mm": abs(float(pa.z - pb.z)),
++                    "heading_error_deg": heading_error * DEGREES_PER_STEP,
++                    "problems": problems,
++                })
++        return issues
++
+     @property
+     def piece_counts(self) -> dict[str, int]:
+         counts: dict[str, int] = {}
+diff --git a/src/duplotrain/static/editor.html b/src/duplotrain/static/editor.html
+index 0e4f86c..96aca38 100644
+--- a/src/duplotrain/static/editor.html
++++ b/src/duplotrain/static/editor.html
+@@ -154,7 +154,6 @@ let solving = false;
+ let lastSolve = null;
+ let recoveryAttempted = false;
+ let autosaveReady = false;
+-const STORAGE_KEY = "duplotrain-session/1:" + location.pathname;
+ 
+ // Tool changes are exclusive: a stone can never intercept an endpoint pick.
+ function selectTool({piece = null, stone = null, pick = null, remove = false} = {}) {
+@@ -167,19 +166,121 @@ function selectTool({piece = null, stone = null, pick = null, remove = false} =
+   button.setAttribute("aria-pressed", String(remove));
+ }
+ 
+-function saveSession() {
+-  if (!autosaveReady || !S || !S.snapshot) return;
++// ---------- Checkpoint persistence ----------
++// Use a new key so a still-open tab running the old, unconditional writer cannot
++// overwrite new checkpoints. The previous key is read once for migration only.
++const STORAGE_KEY = "duplotrain-session/2:" + location.pathname;
++const LEGACY_STORAGE_KEY = "duplotrain-session/1:" + location.pathname;
++const CHECKPOINT_FORMAT = "duplotrain-checkpoint/1";
++let savedCheckpoint = null;       // exact revision this tab read or last committed
++let lastSavedSnapshot = null;     // ignore redraws and other non-mutating actions
++
++function saveNotice(message, error = false) {
+   const notice = document.getElementById("save-status");
++  notice.textContent = message;
++  notice.className = error ? "err" : "";
++}
++
++function pauseAutosave() {
++  autosaveReady = false;
++  saveNotice("Another tab changed the saved session. Autosave paused here; " +
++             "export JSON to keep this tab's work before reloading.", true);
++}
++
++function decodeCheckpoint(raw, legacy = false) {
++  if (raw.length > 2 * 1024 * 1024) throw new Error("saved session is too large");
++  const record = JSON.parse(raw);
++  if (!legacy && (!record || record.format !== CHECKPOINT_FORMAT ||
++                  typeof record.revision !== "string" || !record.revision ||
++                  record.revision.length > 128)) {
++    throw new Error("unrecognised checkpoint format");
++  }
++  const snapshot = legacy ? record : record.snapshot;
++  if (!snapshot || snapshot.format !== "duplotrain-session/1") {
++    throw new Error("unrecognised session format");
++  }
++  return snapshot;
++}
++
++async function initializeRecovery() {
++  try {
++    savedCheckpoint = localStorage.getItem(STORAGE_KEY);
++    const legacy = savedCheckpoint === null;
++    const raw = legacy ? localStorage.getItem(LEGACY_STORAGE_KEY) : savedCheckpoint;
++    if (raw !== null) {
++      const snapshot = decodeCheckpoint(raw, legacy);
++      lastSavedSnapshot = JSON.stringify(snapshot);
++      // A running local server is authoritative; restore only a fresh engine.
++      if (S.revision === 0) S = await api("/api/restore", {data: snapshot});
++    }
