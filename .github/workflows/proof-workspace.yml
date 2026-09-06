@@ -1,0 +1,36 @@
+name: Prepare proof workspace
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/proof-workspace.yml]
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install the pinned Lean toolchain and check the current proof
+        working-directory: theory/lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+          export PATH="$HOME/.elan/bin:$PATH"
+          lake build
+      - name: Bundle local proof-checking tools and source
+        working-directory: theory/lean
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          toolchain="$(lean --print-prefix)"
+          tar --exclude='*.a' --exclude='*.ilean' --exclude='*.olean.server' -C "$toolchain" -czf "$GITHUB_WORKSPACE/lean-workspace.tar.gz" bin/lean bin/lake lib
+          tar -czf "$GITHUB_WORKSPACE/proof-sources.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pinned-proof-workspace
+          path: |
+            lean-workspace.tar.gz
+            proof-sources.tar.gz
+          retention-days: 1
+          compression-level: 0
