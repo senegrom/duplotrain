@@ -26,7 +26,7 @@ The toolchain is pinned in `lean-toolchain`; no Mathlib is required.
 
 ```
 lake build StateLawAxiomAudit  # the headline theorem and its dependencies
-lake build                    # all 68 retained libraries, including the old boundary route
+lake build                    # every library in the tree
 ```
 
 `StateLawAxiomAudit.lean` checks the exact `#print axioms` output with
@@ -158,6 +158,7 @@ comments and blanks, not just proof tactics.
 | Before the capping reduction (`392ae27`) | 65 | 27,846 |
 | After capping (`2e928b6` has the same proof) | 56 | 25,882 |
 | After the shared-history and endpoint reductions | 53 | 24,104 |
+| After deleting what left the closure | 52 | 23,706 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -166,13 +167,16 @@ imports, not merely whitespace compression or a change to the theorem.
 The substantial trace/reflector classification still remains; this is not
 a replacement of the whole upper bound by a one-paragraph proof.
 
-Five more historical modules leave the headline theorem's import path:
-`StateLawNAddFourTop`, `StateLawTwoSixUltra`, `BoundaryNAddFourSaturation`,
-`BoundaryAbsentSecondWriter`, and `BoundaryDoubleDuplicate`. Two small
-modules (`StateLawBounds` and `ReservedHistoryCharge`) hold the shared
-statements and counting facts they previously supplied transitively. Old
-modules still compile, using compatibility imports where appropriate.
-The earlier capping reduction had already bypassed nine other modules.
+Two small modules (`StateLawBounds` and `ReservedHistoryCharge`) hold the
+shared statements and counting facts that the removed modules previously
+supplied transitively.
+
+The fifteen modules the two reductions took off the import path have been
+deleted, along with the declarations inside retained modules whose only
+users were in them. The tree is exactly the closure of `state_law`: every
+module is imported, every import edge is load-bearing, and every
+declaration except the headline theorem has a consumer. Git history holds
+the superseded proofs.
 
 `StateLaw.lean`, the `2^N` ceiling, the attainment construction, the wiring
 model, and the exact axiom audit are unchanged. No `sorry`, additional
@@ -197,6 +201,5 @@ The bound-tightening campaign reached
 ```
 
 Commit `2b75dd8` is the last state before the earlier cleanup of historical
-libraries. The capping reduction above was added on 6 September 2026.
-The paper in `../paper/` describes the earlier upper-bound organisation;
-this guide and the Lean sources describe the current shorter proof.
+libraries. The capping and shared-history reductions were added on
+6 September 2026; the superseded modules were deleted the same day.

@@ -60,22 +60,6 @@ theorem ManufacturedReflector.preReturn_eq_action_activated
         exact hpinAfter.symm.trans hpin
       rw [hcross, flipAt_flipAt]
 
-/-- The pre-return vector of the second construction is retained by the
-coefficient-one two-history core. -/
-theorem ManufacturedReflector.preReturn_mem_preservedTwoHistoryCore
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g) :
-    VectorCount.restrict N B.preReturn.2 ∈
-      A.preservedTwoHistoryCore B N := by
-  apply A.mem_preservedTwoHistoryCore B
-  right
-  unfold ManufacturedReflector.sharpConstructionHistory
-  apply List.mem_append_left
-  apply List.mem_map.mpr
-  refine ⟨B.exploration.length, List.mem_range.mpr (by omega), ?_⟩
-  have hreach := B.exploration_trace.sound
-  simp [restrictedTonguesAt, tonguesAt, hreach]
 
 /-- In the completed-repair branch, the activated and pre-return vectors are
 two opposite corners of the restored pair's Gray square.  The other two

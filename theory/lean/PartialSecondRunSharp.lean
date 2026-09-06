@@ -593,54 +593,6 @@ theorem terminal_trace_of_dead
           rw [stepN_add, hprev] at hdead
           simpa [stepN] using hdead
 
-/-- A doomed continuation after a completed reflector cannot repeat a
-switch: either first-revisit outcome would make the run live forever. -/
-theorem ManufacturedReflector.dead_continuation_trace_simple
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    (hdead : stepN w (N + 1) (e, A.activatedState) = none)
-    {finish : Nat × Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w (e, A.activatedState) passages finish) :
-    SwitchSimple passages := by
-  apply Classical.byContradiction
-  intro hnonsimple
-  have hentry : w.link g = some e := w.symm _ _ A.entryEdge
-  obtain ⟨atRepeat, visited, hvisited, hcycle | hreflector⟩ :=
-    htrace.first_revisit_trace_or_activated_reflector
-      hnonsimple hentry
-  · obtain ⟨cycle, settled, hnonempty, htransient,
-        hstable⟩ := hcycle
-    have hpositive : 0 < cycle.length := by
-      cases cycle with
-      | nil => exact (hnonempty rfl).elim
-      | cons _ _ => simp
-    have hsettles : SettlesOnSimpleCycle w atRepeat :=
-      ⟨cycle.length, settled, hpositive,
-        htransient.sound, hstable.sound⟩
-    have hperiodic : EventuallyPeriodic w (e, A.activatedState) :=
-      eventuallyPeriodic_of_reaches_simple_cycle hvisited hsettles
-    obtain ⟨later, hlater⟩ := hperiodic.stepN_some_all (N + 1)
-    rw [hdead] at hlater
-    cases hlater
-  · obtain ⟨B, state, backSteps, hB, hbase,
-        hactivated, hback⟩ := hreflector
-    subst state
-    have hAatBase : PathGrooves A.toSupported.paths B.baseState := by
-      rw [hbase]
-      exact hA
-    have htail : EventuallyPeriodic w (g, B.activatedState) :=
-      manufactured_pair_protected_repair_eventuallyPeriodic
-        A B hAatBase hB
-    have hreachPair : stepN w (visited + backSteps)
-        (e, A.activatedState) = some (g, B.activatedState) := by
-      rw [stepN_add, hvisited]
-      exact hback
-    have hperiodic : EventuallyPeriodic w (e, A.activatedState) :=
-      EventuallyPeriodic.prepend hreachPair htail
-    obtain ⟨later, hlater⟩ := hperiodic.stepN_some_all (N + 1)
-    rw [hdead] at hlater
-    cases hlater
 
 end PartialSecondRunSharp
 end GeneralN

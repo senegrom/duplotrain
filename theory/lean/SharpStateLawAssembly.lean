@@ -1,4 +1,3 @@
-import TrackNoveltyCover
 import RepeatedNoveltyDecomposition
 
 /-!

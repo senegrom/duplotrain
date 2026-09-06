@@ -19,6 +19,9 @@
 
 \newcommand{\lean}[1]{\texttt{#1}}
 \newcommand{\file}[1]{\textsf{#1}}
+% Long Lean identifiers are unbreakable; let TeX stretch a line rather than
+% push one past the margin.
+\setlength{\emergencystretch}{3em}
 \newcommand{\stepN}{\mathrm{step}}
 \newcommand{\Left}{\mathsf{L}}
 \newcommand{\Right}{\mathsf{R}}
@@ -594,7 +597,6 @@ Section~\ref{ssec:boundary}).  The first-revisit dichotomy
 (Lemma~\ref{lem:dichotomy}) and a second probe of $N+1$ raw steps after
 the first reflector generate a finite tree of outcomes, each closed by
 its own count (files \file{PartialSecondRunSharp.lean},
-\file{PartialSecondRunNAddFour.lean},
 \file{OneReflectorContinuation.lean},
 \file{FirstCycleCountSharp.lean}):
 
@@ -663,73 +665,50 @@ Packaging the closed tree gives the keystone:
   at most $N+4$.
 \end{theorem}
 
-\subsection{Arbitrary starts and the productive boundary}
+\subsection{Arbitrary starts, by completing the start port}
 \label{ssec:boundary}
 
-A general start need not arrive over an edge --- the train may simply be
-placed at a port.  Consider its very first passage
-(\file{StateLawNAddFourTop.lean}).  If that passage is \emph{quiet}
-(changes no restricted tongue --- a facing entry, or a trailing entry
-that re-pins), then from time $1$ on the run has a known incoming edge,
-and the time-zero vector equals the time-one vector, so
-Theorem~\ref{thm:knownedge} absorbs it.  The only danger is a
-\emph{productive first passage}: the train is dropped into a branch of
-some switch $k_0$ and its very first move flips $k_0$, so the original
-vector $u$ exists only at time zero, and the shifted run --- which starts
-at $u$ with $k_0$ flipped, over a known edge --- might use its full
-$N+4$ budget on top of it.
+A general start need not arrive over an edge: the train may simply be
+placed at a port, so Theorem~\ref{thm:knownedge} does not apply directly.
+Rather than shift the run forward and pay separately for the vector it
+leaves behind at time zero, complete the wiring so that the hypothesis
+holds of the original run.
 
-\begin{proposition}[Productive boundary;
-  \lean{ProductiveInitialBoundaryNAddFour},
-  \file{StateLawNAddFourSharp.lean}]\label{prop:boundary}
-  The time-zero vector of a productive first passage is never an extra
-  state: the shifted run together with the original vector still fits in
-  $N+4$.
-\end{proposition}
+The model admits self-links --- a port joined to itself is a reversing
+dead end --- and the known-edge theorem is uniform over all raw finite
+wirings, so a cap is a legitimate wiring and costs no switch.
 
-\begin{proof}[Sketch]
-  Suppose adjoining $u$ exceeds the budget.  Then the shifted run is
-  \emph{saturated}: it attains all $N+4$ of its vectors, every one of its
-  live vectors is among the sampled ones, and $u$ itself never occurs on
-  it (\file{BoundaryNAddFourSaturation.lean}).  Saturation is a very
-  rigid situation, and the geometry of the first journey narrows it to
-  two \emph{savings}, each worth the one missing unit:
-  \begin{itemize}
-  \item \emph{Absent saving.}  The boundary switch $k_0$ never occurs in
-    the first manufactured exploration.  Then $k_0$ is a genuinely unused
-    coordinate of the first support; if it is also absent from the second
-    construction's productive first writers, adjoining $u$ is paid by
-    this reserved coordinate outright
-    (\file{BoundaryAbsentSecondWriter.lean},
-    \file{BoundaryAbsentProtectedPair.lean}).
-  \item \emph{Occurrence saving.}  The initially written switch is met
-    again, unchanged, inside the first journey.  A canonical such
-    occurrence forces, via the entry-edge symmetry, an empty runway and a
-    literal self-link (\file{BoundaryCanonicalGeometry.lean}); a
-    noncanonical one supplies a \emph{second} repeated vector in the
-    first journey, and erasing both repetitions makes room to insert $u$
-    into the history at no cost (\file{BoundaryDoubleDuplicate.lean},
-    \file{BoundaryResidualNovelty.lean},
-    \file{BoundaryOccurrenceDamageElimination.lean}).
-  \end{itemize}
-  What remains after the savings are spent are the support-damage
-  outcomes, and both expose \emph{the same} sharp changed contact of the
-  first reflector --- the damaged stable cycle through its lead, the
-  damaged opposite reflector through its exploration.  Under the absent
-  saving, the shifted run begins at the boundary switch's own stem, so
-  switch-simplicity makes $k_0$ automatically reserved along the strict
-  approach and closes every such contact at $N+3$
-  (\file{BoundaryChangedContactSaving.lean},
-  \file{BoundaryApproachActionElimination.lean}); under the occurrence
-  saving, the occurrence replacement closes the same contact
-  (\file{BoundaryResidualSharpening.lean}).  Together with the outright
-  eliminations of the short outcomes (a dead second probe and a preserved
-  second cycle are too small to saturate,
-  \file{ProductiveBoundaryNAddFourComplete.lean}), every saturated
-  configuration is contradictory, which proves the proposition.
+\begin{lemma}[Capping a free port;
+  \lean{Wiring.capFreePort}, \file{StateLawNAddFourSharp.lean}]
+  \label{lem:cap}
+  If $w$ leaves port $p$ unwired, then joining $p$ to itself yields a
+  wiring $v$ that agrees with $w$ on every edge of $w$.
+\end{lemma}
+
+\begin{proof}
+  Symmetry is the only condition to check.  At $p$ the new edge is its
+  own reverse.  Away from $p$, an edge of $v$ is an edge of $w$, and its
+  far end cannot be $p$: symmetry of $w$ would then give $w$ an edge out
+  of $p$, which it has none.  Every edge of $w$ survives for the same
+  reason.
 \end{proof}
 
-\begin{theorem}[Sharp upper bound; \lean{state\_law\_N\_add\_four}]
+\begin{lemma}[Extension preserves live runs;
+  \lean{stepN\_preserved\_by\_wiring\_extension},
+  \file{StateLawNAddFourSharp.lean}]\label{lem:extend}
+  If every edge of $w$ is an edge of $v$, then every run of $w$ that is
+  still alive after $n$ steps runs identically in $v$.
+\end{lemma}
+
+\begin{proof}
+  Induction on $n$.  A surviving step follows an edge of $w$, which is
+  unchanged in $v$, and the tongue update reads only the entry port.  The
+  statement is deliberately silent about what happens after the original
+  run dies, which is the only place the new cap can be reached.
+\end{proof}
+
+\begin{theorem}[Sharp upper bound; \lean{state\_law\_N\_add\_four},
+  \file{StateLawNAddFourSharp.lean}]
   \label{thm:upper}
   For every wiring on switches $0,\dots,N-1$, every start, and every
   duplicate-free list of live sample times with pairwise-distinct
@@ -737,10 +716,23 @@ $N+4$ budget on top of it.
 \end{theorem}
 
 \begin{proof}
-  Split the samples at time zero.  A quiet first passage reduces to
-  Theorem~\ref{thm:knownedge} directly; a productive first passage is
-  Proposition~\ref{prop:boundary}.  (\file{StateLawNAddFourTop.lean}
-  performs this bookkeeping exactly.)
+  Let the start be at port $p$.
+
+  If $p \ge 3N$, then the exit port of the first move lies on the same
+  switch as $p$, so it too is at least $3N$ and the port bound leaves it
+  unwired.  The run therefore dies at its first step, only time zero can
+  be live, and the list has length at most $1 \le N+4$.
+
+  If $p < 3N$ and $w$ wires $p$, symmetry supplies an edge into $p$ and
+  Theorem~\ref{thm:knownedge} applies to the run as it stands.
+
+  If $p < 3N$ and $p$ is unwired, cap it (Lemma~\ref{lem:cap}).  The
+  capped wiring still uses only switches $0,\dots,N-1$, since the added
+  edge joins $p$ to itself.  By Lemma~\ref{lem:extend} every sampled time
+  is still live and carries the same restricted vector, so the sampled
+  vectors remain pairwise distinct; and in the capped wiring $p$ has an
+  incoming edge, namely its own.  Theorem~\ref{thm:knownedge} then bounds
+  the original list, time zero included, by $N+4$.
 \end{proof}
 
 \section{Assembly}\label{sec:assembly}
@@ -841,15 +833,15 @@ Points worth recording:
 \end{itemize}
 
 \begin{center}
-\begin{tabular}{ll}
+\begin{tabular}{@{}p{0.42\textwidth}p{0.52\textwidth}@{}}
   \toprule
   entry point & contents\\
   \midrule
   \file{StateLaw.lean} & the theorem and its statement language\\
   \file{StateLawSmallN.lean} & $2^N$ ceiling; empty/teardrop/dogbone\\
   \file{StateLawLowerBound.lean} & the extremal family, $N \ge 3$\\
-  \file{StateLawNAddFourTop.lean} & arbitrary-start bookkeeping\\
-  \file{StateLawNAddFourSharp.lean} & the known-edge theorem and the sharp $N+4$ bound\\
+  \file{StateLawNAddFourSharp.lean} & the known-edge theorem, the start
+    capping, and the sharp $N+4$ bound\\
   \file{TrackTrace.lean}, \file{TrackTheta.lean} & traces, reflectors,
     theta engine\\
   \file{StateLawAxiomAudit.lean} & the axiom audit\\

@@ -56,30 +56,6 @@ theorem noveltyCoverOn_distinct_count
   omega
 
 
-/-- The with-extra form: one additional historical vector is counted on top
-of a cover, provided the extended sample list is duplicate-free. -/
-theorem noveltyCoverOn_distinct_count_with_extra
-    {w : Wiring} {N : Nat} {start : Nat × Tongues}
-    {times : List Nat} {history : List (List Bool)} {budget : Nat}
-    (hcover : NoveltyCoverOn w N start times history budget)
-    {extra : List Bool} (hextra : extra ∈ history)
-    (hnd : (extra :: times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length + 1 ≤ history.length + budget := by
-  obtain ⟨fresh, hfreshLength, hmem⟩ := hcover
-  have hsubset :
-      ∀ x ∈ extra :: times.map (restrictedTonguesAt w N start),
-        x ∈ history ++ fresh := by
-    intro x hx
-    rcases List.mem_cons.mp hx with rfl | hx
-    · exact List.mem_append_left _ hextra
-    · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hx
-      exact hmem k hk
-  have hbound := nodup_subset_length_nat hnd hsubset
-  simp only [List.length_cons, List.length_map,
-    List.length_append] at hbound
-  omega
-
-
 theorem completed_retrace_at_vector_mem_history_or_contact
     {w : Wiring} {g e p oldEntry : Nat}
     {base mouthState u v : Tongues}

@@ -2,17 +2,7 @@ name = "duplotrain"
 defaultTargets = [
   "ReservedHistoryCharge",
   "StateLawBounds",
-  "BoundaryAbsentProtectedPair",
-  "BoundaryAbsentSecondWriter",
-  "BoundaryApproachActionElimination",
-  "BoundaryCanonicalGeometry",
-  "BoundaryChangedContactSaving",
-  "BoundaryDoubleDuplicate",
-  "BoundaryNAddFourSaturation",
-  "BoundaryOccurrenceDamageElimination",
   "BoundaryOverlapTailCount",
-  "BoundaryResidualNovelty",
-  "BoundaryResidualSharpening",
   "ChangedContactNAddFour",
   "CompleteRepairFour",
   "EarlyFacingConstant",
@@ -25,14 +15,11 @@ defaultTargets = [
   "ManufacturedPairNovelty",
   "OneReflectorContinuation",
   "PairActionCorners",
-  "PartialSecondRunNAddFour",
   "PartialSecondRunSharp",
   "PreReturnProtectedRoute",
-  "ProductiveBoundaryNAddFourComplete",
   "ProtectedPairNAddFour",
   "RepairLeadTwoPhase",
   "RepeatedNoveltyDecomposition",
-  "ReuseForcesReplayClosure",
   "RunwayHistoricalOne",
   "RunwaySpliceNovelty",
   "SharpCertificateClosure",
@@ -45,11 +32,9 @@ defaultTargets = [
   "StateLawCoefficientOneTop",
   "StateLawLowerBound",
   "StateLawNAddFourSharp",
-  "StateLawNAddFourTop",
   "StateLawSmallN",
   "StateLawTwoCandidate",
   "StateLawTwoSharp",
-  "StateLawTwoSixUltra",
   "TraceRetainingFirstRevisit",
   "TrackEarlyRepairConstant",
   "TrackEndpointMatching",
@@ -71,37 +56,7 @@ defaultTargets = [
 ]
 
 [[lean_lib]]
-name = "BoundaryAbsentProtectedPair"
-
-[[lean_lib]]
-name = "BoundaryAbsentSecondWriter"
-
-[[lean_lib]]
-name = "BoundaryApproachActionElimination"
-
-[[lean_lib]]
-name = "BoundaryCanonicalGeometry"
-
-[[lean_lib]]
-name = "BoundaryChangedContactSaving"
-
-[[lean_lib]]
-name = "BoundaryDoubleDuplicate"
-
-[[lean_lib]]
-name = "BoundaryNAddFourSaturation"
-
-[[lean_lib]]
-name = "BoundaryOccurrenceDamageElimination"
-
-[[lean_lib]]
 name = "BoundaryOverlapTailCount"
-
-[[lean_lib]]
-name = "BoundaryResidualNovelty"
-
-[[lean_lib]]
-name = "BoundaryResidualSharpening"
 
 [[lean_lib]]
 name = "ChangedContactNAddFour"
@@ -140,16 +95,10 @@ name = "OneReflectorContinuation"
 name = "PairActionCorners"
 
 [[lean_lib]]
-name = "PartialSecondRunNAddFour"
-
-[[lean_lib]]
 name = "PartialSecondRunSharp"
 
 [[lean_lib]]
 name = "PreReturnProtectedRoute"
-
-[[lean_lib]]
-name = "ProductiveBoundaryNAddFourComplete"
 
 [[lean_lib]]
 name = "ProtectedPairNAddFour"
@@ -159,9 +108,6 @@ name = "RepairLeadTwoPhase"
 
 [[lean_lib]]
 name = "RepeatedNoveltyDecomposition"
-
-[[lean_lib]]
-name = "ReuseForcesReplayClosure"
 
 [[lean_lib]]
 name = "RunwayHistoricalOne"
@@ -200,9 +146,6 @@ name = "StateLawLowerBound"
 name = "StateLawNAddFourSharp"
 
 [[lean_lib]]
-name = "StateLawNAddFourTop"
-
-[[lean_lib]]
 name = "StateLawSmallN"
 
 [[lean_lib]]
@@ -210,9 +153,6 @@ name = "StateLawTwoCandidate"
 
 [[lean_lib]]
 name = "StateLawTwoSharp"
-
-[[lean_lib]]
-name = "StateLawTwoSixUltra"
 
 [[lean_lib]]
 name = "TraceRetainingFirstRevisit"

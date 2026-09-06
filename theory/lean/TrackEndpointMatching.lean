@@ -28,10 +28,6 @@ theorem restrict_eq_apply
   simpa [VectorCount.restrict, List.getElem?_map,
     List.getElem?_range hC] using hget
 
-/-- Branch currently joined to the stem by the selected internal edge. -/
-def selectedBranch (u : Tongues) (C : Nat) : Nat :=
-  branchPort C (u C)
-
 
 /-- Any successful successor time exposes the corresponding one-step raw
 transition. -/
@@ -57,37 +53,6 @@ theorem live_successor_configs
             simpa [stepN] using hone
           exact ⟨cur, next, rfl, rfl, hstep⟩
 
-/-- If one represented tongue changes across a successful raw step, that
-step is productive and its writer is exactly that switch. -/
-theorem raw_tongue_change_is_productive_writer
-    {w : Wiring} {N C : Nat} (hC : C < N)
-    {start : Nat × Tongues} {k : Nat}
-    {cur next : Nat × Tongues}
-    (hcur : stepN w k start = some cur)
-    (hnext : stepN w (k+1) start = some next)
-    (hstep : step w cur = some next)
-    (hchange : next.2 C ≠ cur.2 C) :
-    RawProductiveAt w N start k ∧ rawWriterAt w start k = C := by
-  have hparts := step_some_parts hstep
-  have harrived : next.2 = (arrive cur.2 cur.1).2 := by
-    simpa [arrivedTongues] using hparts.2
-  have hwriter : cur.1/3 = C := by
-    apply Classical.byContradiction
-    intro hne
-    apply hchange
-    rw [harrived]
-    exact arrive_preserves_other rfl (Ne.symm hne)
-  have hvectorChange : restrictedTonguesAt w N start (k+1) ≠
-      restrictedTonguesAt w N start k := by
-    intro hEq
-    have hfull : VectorCount.restrict N next.2 =
-        VectorCount.restrict N cur.2 := by
-      simpa [restrictedTonguesAt, tonguesAt, hcur, hnext] using hEq
-    have hbit := restrict_eq_apply hfull hC
-    exact hchange hbit
-  constructor
-  · exact ⟨by simp [hnext], hvectorChange⟩
-  · simp [rawWriterAt, rawEntryAt, hcur, hwriter]
 
 /-- Restricted-vector productivity is a genuine change of the entered
 switch's own tongue. -/
