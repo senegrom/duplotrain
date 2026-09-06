@@ -1,0 +1,34 @@
+diff --git a/src/duplotrain/solver.py b/src/duplotrain/solver.py
+index ca8d59d..bc85db2 100644
+--- a/src/duplotrain/solver.py
++++ b/src/duplotrain/solver.py
+@@ -32,6 +32,7 @@ import math
+ import time
+ from collections.abc import Mapping, Sequence
+ from dataclasses import dataclass
++from functools import lru_cache
+ 
+ from .collision import DEFAULT_CLEARANCE, CollisionField
+ from .exact import Alg
+@@ -97,6 +98,12 @@ def _moves_for(piece: PieceType) -> list[Move]:
+     Traversals through a sealed face are excluded: a buffer stop can terminate track
+     but can never be part of a route, so the loop search never places one.
+     """
++    return list(_cached_moves(piece))
++
++
++@lru_cache(maxsize=128)
++def _cached_moves(piece: PieceType) -> tuple[Move, ...]:
++    """Retain only bounded immutable catalogue metadata, never solver state."""
+     moves: list[Move] = []
+     for (entry, exit_port), representative in _canonical_traversals(piece).items():
+         if (entry, exit_port) != representative:
+@@ -105,7 +112,7 @@ def _moves_for(piece: PieceType) -> list[Move]:
+             continue
+         dx, dy, dz, dheading = piece.exit_delta(entry, exit_port)
+         moves.append(Move(piece.id, entry, exit_port, dx, dy, dz, dheading))
+-    return moves
++    return tuple(moves)
+ 
+ 
+ def _mirror_ports(piece: PieceType) -> dict[int, int | None]:

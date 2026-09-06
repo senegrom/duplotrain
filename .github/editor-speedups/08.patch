@@ -1,0 +1,65 @@
+diff --git a/tests/browser/test_editor.py b/tests/browser/test_editor.py
+index 9758cfc..c380955 100644
+--- a/tests/browser/test_editor.py
++++ b/tests/browser/test_editor.py
+@@ -406,3 +406,60 @@ def test_stale_tab_refreshes_without_replaying_a_delete(editor):
+         assert not errors
+     finally:
+         other.close()
++
++
++def test_redraw_preserves_control_identity_focus_and_unsubmitted_inventory(editor):
++    page, _session, url, errors = editor
++    load(page, url)
++    field = page.locator('[data-piece-id="straight"] input')
++    field.focus()
++    field.fill("321")
++    page.evaluate("""() => {
++      window.retainedInput = document.activeElement;
++      window.retainedSet = document.querySelector('#sets button');
++      window.retainedStone = document.querySelector('#stones button');
++      // A round trip supplies new objects even when the catalogue is unchanged.
++      S = JSON.parse(JSON.stringify(S));
++      redraw();
++    }""")
++    assert field.input_value() == "321"
++    assert page.evaluate("document.activeElement === window.retainedInput")
++    assert page.evaluate("document.querySelector('#sets button') === window.retainedSet")
++    assert page.evaluate("document.querySelector('#stones button') === window.retainedStone")
++    field.press("Tab")
++    page.wait_for_function("S.inventory.owned.straight === 321 && !apiBusy")
++    assert page.evaluate("document.querySelector('[data-piece-id=straight] input') "
++                         "=== window.retainedInput")
++    # Visibility changes in unlimited mode must not detach/duplicate the input.
++    page.locator("#unlimited").check()
++    page.wait_for_function("S.inventory.unlimited && !apiBusy")
++    assert not field.is_visible()
++    page.locator("#unlimited").uncheck()
++    page.wait_for_function("!S.inventory.unlimited && !apiBusy")
++    assert field.is_visible() and field.input_value() == "321"
++    assert not errors
++
++
++def test_candidate_preview_selection_preserves_card_and_button_identity(editor):
++    page, session, url, errors = editor
++    session.inventory = {"curve": 12}
++    session.history = [build_chain([(session.catalog["curve"], 0, 1)] * 6)]
++    load(page, url)
++    page.locator("#reversing").uncheck()
++    page.locator("#solve").tap()
++    page.wait_for_selector(".cand")
++    page.evaluate("window.retainedCard = document.querySelector('.cand'); "
++                  "window.retainedPreview = window.retainedCard.querySelector('button')")
++    card = page.locator(".cand").first
++    card.get_by_role("button", name="Preview", exact=True).tap()
++    assert page.evaluate("document.querySelector('.cand') === window.retainedCard")
++    assert page.evaluate("document.querySelector('.cand button') === window.retainedPreview")
++    assert card.get_by_role("button", name="Apply").is_enabled()
++    page.evaluate("redraw()")
++    assert page.evaluate("document.querySelector('.cand') === window.retainedCard")
++    assert card.get_by_role("button", name="Previewing").get_attribute("aria-pressed") == "true"
++    card.get_by_role("button", name="Apply").tap()
++    wait_count(page, 12)
++    assert session.layout.is_closed
++    assert page.locator(".cand").count() == 0
++    assert not errors
