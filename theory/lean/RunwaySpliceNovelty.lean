@@ -135,44 +135,6 @@ theorem explicit_lobe_reverse_two_phase_after_foreign_flip
     hentryBranch hentrySwitch hgroovedK htraceK hcrossedK
     hCandyForeignMouth hmouthLink hd
 
-/-- Entering a manufactured flip reflector at its mouth with the action
-tongue already flipped exposes only the flipped vector and the restored base
-vector.  This is the pointwise strengthening of `capture_from_mouth`. -/
-theorem ManufacturedFlipReflector.capture_from_mouth_two_phase
-    {w : Wiring} {g e : Nat}
-    (C : ManufacturedFlipReflector w g e)
-    (state : Tongues)
-    (hrunway : PassagesGrooved state C.runway)
-    (hcandy : PassagesGrooved state C.candy)
-    {d : Nat}
-    (hd : d <= C.candy.length + 2 + C.runway.length) :
-    exists port phase,
-      stepN w d (C.mouth, flipAt state C.actionSwitch) =
-          some (port, phase) /\
-        (phase = flipAt state C.actionSwitch \/ phase = state) := by
-  let A := ManufacturedReflector.flip C
-  have hpaths : PathGrooves A.toSupported.paths state :=
-    pathGrooves_pair.mpr ⟨hrunway, hcandy⟩
-  have hflipped := hpaths.after_avoiding_action A.action_avoids_own_support
-  have hrunwayFlip : PassagesGrooved (flipAt state C.actionSwitch) C.runway :=
-    (pathGrooves_pair.mp hflipped).1
-  have hle : C.runway.length + d ≤ A.toSupported.travel := by
-    change C.runway.length + d ≤ 2 * C.runway.length + C.candy.length + 2
-    omega
-  obtain ⟨⟨port, phase⟩, hr⟩ := stepN_prefix_some hle (A.toSupported.run _ hflipped).1
-  change stepN w (C.runway.length + d) (g, flipAt state C.actionSwitch) =
-    some (port, phase) at hr
-  have hp := A.travel_two_phase_tongues _ hflipped hle
-  have hphase : phase = flipAt state C.actionSwitch ∨ phase = state := by
-    change tonguesAt w (g, flipAt state C.actionSwitch) (C.runway.length + d) =
-      flipAt state C.actionSwitch ∨
-      tonguesAt w (g, flipAt state C.actionSwitch) (C.runway.length + d) =
-        flipAt (flipAt state C.actionSwitch) C.actionSwitch at hp
-    simpa [tonguesAt, hr, flipAt_flipAt] using hp
-  have hreach : stepN w C.runway.length (g, flipAt state C.actionSwitch) =
-      some (C.mouth, flipAt state C.actionSwitch) := (C.runway_trace _ hrunwayFlip).sound
-  rw [stepN_add, hreach] at hr
-  exact ⟨port, phase, hr, hphase⟩
 
 section
 variable {w : Wiring} {outside mouth entry returnPort : Nat}
@@ -672,7 +634,7 @@ end
 
 /-- **Four pointwise phases for the compatible runway suffix and splice
 lobe.**  This is the arbitrary-candy analogue of
-`manufactured_pair_four_phase_tongues`: the old side is the manufactured
+`manufactured_pair_all_time_four_phase_tongues`: the old side is the manufactured
 strict runway suffix, while the new side is the explicit lobe exported by
 `spliced_lobe_reflector`.
 

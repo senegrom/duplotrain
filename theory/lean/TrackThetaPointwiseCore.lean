@@ -12,28 +12,6 @@ The same argument handles runway, forward-candy, and reverse-candy contacts.
 
 namespace GeneralN
 
-/-- Covered positive-length excursions suffice for an all-time cover.
-The invariant is required only at excursion boundaries; intermediate states
-need satisfy only `allowed`. Neither periodicity nor finite state is needed. -/
-theorem stepN_covered_of_progress
-    {w : Wiring} (invariant : Nat × Tongues → Prop) (allowed : Tongues → Prop)
-    (progress : ∀ start, invariant start → ∃ travel finish,
-      0 < travel ∧ stepN w travel start = some finish ∧ invariant finish ∧
-      ∀ d, d ≤ travel → ∃ port phase,
-        stepN w d start = some (port, phase) ∧ allowed phase)
-    {start : Nat × Tongues} (hstart : invariant start) (d : Nat) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧ allowed phase := by
-  induction d using Nat.strongRecOn generalizing start with
-  | ind d ih =>
-      obtain ⟨travel, finish, hpos, hreach, hfinish, hcover⟩ := progress start hstart
-      by_cases hpre : d ≤ travel
-      · exact hcover d hpre
-      · obtain ⟨port, phase, hr, hp⟩ := ih (d - travel) (by omega) hfinish
-        refine ⟨port, phase, ?_, hp⟩
-        have heq : d = travel + (d - travel) := by omega
-        rw [heq, stepN_add, hreach]
-        exact hr
-
 /-- Restoring a genuinely flipped tongue cannot take zero steps. -/
 theorem stepN_flip_restore_pos
     {w : Wiring} {p q j travel : Nat} {state : Tongues}
@@ -45,17 +23,6 @@ theorem stepN_flip_restore_pos
       have hbit := congrFun hv j
       simp [flipAt] at hbit
   | succ n => omega
-
-/-- A manufactured traversal has only its incoming and outgoing vectors. -/
-theorem ManufacturedReflector.travel_two_phase_stepN
-    {w : Wiring} {g e : Nat} (B : ManufacturedReflector w g e)
-    (state : Tongues) (hB : PathGrooves B.toSupported.paths state)
-    {d : Nat} (hd : d ≤ B.toSupported.travel) :
-    ∃ port phase, stepN w d (g, state) = some (port, phase) ∧
-      (phase = state ∨ phase = B.toSupported.action.apply state) := by
-  obtain ⟨⟨port, phase⟩, hrun⟩ := stepN_prefix_some hd (B.toSupported.run state hB).1
-  have hphase := B.travel_two_phase_tongues state hB hd
-  exact ⟨port, phase, hrun, by simpa [tonguesAt, hrun] using hphase⟩
 
 /-- Compatibility interface for flip traversals. -/
 theorem ManufacturedFlipReflector.travel_two_phase_stepN

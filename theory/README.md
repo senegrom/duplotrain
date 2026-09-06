@@ -41,3 +41,11 @@ the shared-history budgets, and the trace-reuse arguments. Build with
 
 **`switch_ceiling_proof.py`** is the perfection exhaustion engine used by
 `tests/test_switch_ceiling.py`.
+
+The latest reduction closes spatial routes under a one-bit tongue invariant,
+rather than splitting candy splices into approach-contact and approach-foreign
+period cases. Avoiding reflector pairs likewise close a four-corner action
+orbit without a four-leg timing calculation. The retained Lean development is
+17,752 lines in 53 files, with the headline statement and exact axiom audit
+unchanged. The paper omits the standalone elementary `2^N` ceiling section;
+its one-line observation and the formal ceiling theorem remain.

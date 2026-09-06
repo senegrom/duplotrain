@@ -257,10 +257,6 @@ theorem reversePassages_grooved {state : Tongues}
         subst passage
         exact groove_forward (hgrooved head List.mem_cons_self)
 
-theorem nodup_reverse_nat {xs : List Nat}
-    (hnd : xs.Nodup) : xs.reverse.Nodup :=
-  hnd.perm (List.reverse_perm xs).symm
-
 private theorem nodup_prefix_head_reverse_tail
     {pre tail : List Nat} {head : Nat}
     (hnd : (pre ++ head :: tail).Nodup) :
@@ -476,34 +472,6 @@ theorem theta_capture_after_unvisited_prefix
   have hprefixFlip := hprefix.flip_unvisited hforeign
   rw [stepN_add, hprefixFlip.sound]
   exact hcapture
-
-theorem flipped_prefix_trailing_then
-    {w : Wiring} {e p x q k tailSteps : Nat}
-    {u : Tongues} {before : List Passage}
-    {finish : Nat × Tongues}
-    (hprefix : PhysicalTrace w (e, u) before (p, u))
-    (hforeign : ∀ passage ∈ before,
-      passageSwitch passage ≠ k)
-    (hk : p / 3 = k)
-    (hpbranch : p % 3 ≠ 0)
-    (hgroove : arrive u p = (x, u))
-    (hlink : w.link x = some q)
-    (hsuffix : stepN w tailSteps (q, u) = some finish) :
-    stepN w (before.length + 1 + tailSteps)
-      (e, flipAt u k) = some finish := by
-  have hprefixFlip := hprefix.flip_unvisited hforeign
-  have hrepair : arrive (flipAt u k) p = (x, u) := by
-    rw [← hk]
-    exact flipped_passage_forward_trailing hgroove hpbranch
-  have hone : stepN w 1 (p, flipAt u k) = some (q, u) := by
-    simp [stepN, step, hrepair, hlink]
-  have hlen : before.length + 1 + tailSteps =
-      before.length + (1 + tailSteps) := by omega
-  rw [hlen]
-  rw [stepN_add, hprefixFlip.sound]
-  simp only [Option.bind_some]
-  rw [stepN_add, hone]
-  exact hsuffix
 
 theorem suffix_after_physical_prefix
     {w : Wiring} {start middle finish : Nat × Tongues}
@@ -1019,20 +987,6 @@ theorem ManufacturedReflector.runway_trace :
   | stay R => exact R.runwayTrace
   | flip R => exact R.runwayTrace
 
-theorem ManufacturedReflector.runway_simple :
-    SwitchSimple A.runway := by
-  cases A with
-  | stay R =>
-      have hs := R.simple
-      unfold SwitchSimple at hs ⊢
-      simp only [List.map_append] at hs
-      exact (List.nodup_append.mp hs).1
-  | flip R =>
-      have hs := R.simple
-      unfold SwitchSimple at hs ⊢
-      simp only [List.map_append] at hs
-      exact (List.nodup_append.mp hs).1
-
 theorem ManufacturedReflector.exploration_trace :
     PhysicalTrace w (g, A.baseState) A.exploration A.preReturn := by
   cases A with
@@ -1116,6 +1070,57 @@ def ManufacturedReflector.orientedFinish
         R.secondArm
       else
         R.firstArm
+
+/-- The selected far candy arm is the opposite branch, so its trailing
+arrival applies the reflector action. This local fact also supplies the
+head of the full return trace. -/
+theorem ManufacturedFlipReflector.oriented_finish_arrive
+    {w : Wiring} {g e : Nat}
+    (R : ManufacturedFlipReflector w e g)
+    (state : Tongues) :
+    arrive state
+      ((ManufacturedReflector.flip R).orientedFinish state) =
+        (R.mouth, flipAt state R.actionSwitch) := by
+  by_cases hselected :
+      state R.actionSwitch = bval R.firstArm
+  · have hopp : bval R.secondArm = !(state R.actionSwitch) := by
+      rw [hselected]
+      exact branch_values_opposite R.firstArm_branch
+        R.secondArm_branch
+        (R.firstArm_switch.trans R.secondArm_switch.symm)
+        R.arms_ne
+    have hpin : pin state R.secondArm =
+        flipAt state R.actionSwitch :=
+      pin_eq_flipAt R.secondArm_switch hopp
+    have hstem : 3 * (R.secondArm / 3) = R.mouth := by
+      have hm := R.mouth_is_stem
+      have hs := R.secondArm_switch
+      unfold ManufacturedFlipReflector.actionSwitch at hs
+      omega
+    simp [ManufacturedReflector.orientedFinish, hselected,
+      arrive, R.secondArm_branch, hstem, hpin]
+  · have hsecond :
+        state R.actionSwitch = bval R.secondArm := by
+      rcases R.selected_arm state with hfirst | hsecond
+      · exact absurd hfirst hselected
+      · exact hsecond
+    have hopp : bval R.firstArm = !(state R.actionSwitch) := by
+      rw [hsecond]
+      exact branch_values_opposite R.secondArm_branch
+        R.firstArm_branch
+        (R.secondArm_switch.trans R.firstArm_switch.symm)
+        (Ne.symm R.arms_ne)
+    have hpin : pin state R.firstArm =
+        flipAt state R.actionSwitch :=
+      pin_eq_flipAt R.firstArm_switch hopp
+    have hstem : 3 * (R.firstArm / 3) = R.mouth := by
+      have hm := R.mouth_is_stem
+      have hs := R.firstArm_switch
+      unfold ManufacturedFlipReflector.actionSwitch at hs
+      omega
+    simp [ManufacturedReflector.orientedFinish, hselected,
+      arrive, R.firstArm_branch, hstem, hpin]
+
 
 theorem ManufacturedReflector.orientedRoute_trace
     {w : Wiring} {g e : Nat}
@@ -1468,19 +1473,5 @@ theorem ManufacturedReflector.travel_pos
   | flip R =>
       change 0 < 2 * R.runway.length + R.candy.length + 2
       omega
-
-/-- Eventual periodicity stated directly on raw train configurations. -/
-def EventuallyPeriodic (w : Wiring) (start : Nat × Tongues) : Prop :=
-  ∃ lead period settled,
-    0 < period ∧
-    stepN w lead start = some settled ∧
-    stepN w period settled = some settled
-
-theorem eventuallyPeriodic_of_period
-    {w : Wiring} {start : Nat × Tongues} {period : Nat}
-    (hpos : 0 < period)
-    (hperiod : stepN w period start = some start) :
-    EventuallyPeriodic w start := by
-  exact ⟨0, period, start, hpos, by simp [stepN], hperiod⟩
 
 end GeneralN

@@ -158,7 +158,8 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
             stepN w d (R.mouth, alternate) = some (port, phase) ∧
               (phase = alternate ∨ phase = contact) := by
           intro d hd
-          exact R.capture_from_mouth_twoPhases contact hpaths hsecond d
+          exact R.capture_from_mouth_two_phase contact
+            (pathGrooves_pair.mp hpaths).1 (pathGrooves_pair.mp hpaths).2
             (by simpa [captureSteps] using hd)
         have htoContact :
             stepN w (prior.length + captureSteps) (g, alternate) =

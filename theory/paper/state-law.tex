@@ -53,8 +53,8 @@
   layout.  The whole law is machine-checked as a single Lean~4 theorem,
   \lean{GeneralN.state\_law}, built without Mathlib, whose axiom audit is
   exactly the three standard Lean axioms.  This document is a
-  human-readable rendering of that proof: complete for the model, the
-  $2^N$ ceiling, and every attainment construction, and a structured
+  human-readable rendering of that proof: complete for the model and
+  every attainment construction, and a structured
   account of the sharp $N+4$ upper bound.
 \end{abstract}
 
@@ -99,7 +99,7 @@ bounds
 \[ 26N{+}3 \to 24N{+}5 \to 18N{+}3 \to \cdots \to 2N{+}9 \to N{+}7 \to
    N{+}6 \to N{+}5 \to N{+}4 \]
 was tightened until the constructive lower bound was met.  The final
-development (19,194 lines of Lean~4 in 53 files, using no
+development (17,752 lines of Lean~4 in 53 files, using no
 external mathematics library) proves the single statement
 \begin{center}
   \lean{GeneralN.state\_law :\ }$\forall N$,
@@ -112,8 +112,7 @@ computations are checked by the proof kernel itself.
 
 \paragraph{What this document is.}
 Sections~\ref{sec:model}--\ref{sec:family} are complete human
-mathematics: the model, the ceiling $f(N) \le 2^N$, the resolution of the
-minimum, and all attainment constructions, each of which a reader can
+mathematics: the model and all attainment constructions, each of which a reader can
 verify by hand.  Section~\ref{sec:upper} renders the sharp upper bound
 $f(N) \le N+4$ --- by far the deep half, the majority of the formal development
 --- as a structured account: the objects, the main lemmas, and the
@@ -196,37 +195,6 @@ condition: $N = 0$ is witnessed by the empty layout.
   statement about every finite observation of the run and the lower bound
   an explicit finite certificate.
 \end{remark}
-
-\section{The ceiling: $f(N) \le 2^N$}\label{sec:ceiling}
-
-\begin{proposition}[Finite-state ceiling; \lean{state\_law\_two\_pow}]
-  \label{prop:ceiling}
-  For every wiring, every start, and every list of sample times whose
-  restricted tongue vectors are pairwise distinct, the list has length at
-  most $2^N$.  (No liveness assumption is needed.)
-\end{proposition}
-
-\begin{proof}
-  Send a boolean list $b_0 b_1 \cdots b_{m-1}$ to its little-endian
-  binary value $\sum_i b_i 2^i$.  On lists of a fixed length $m$ this map
-  is injective --- the head is the value mod~$2$, the tail is its half,
-  and induction finishes --- and its values are smaller than $2^m$.
-  Restricted vectors all have length $N$, so pairwise-distinct restricted
-  vectors map to pairwise-distinct naturals below $2^N$, and there are at
-  most $2^N$ of those.
-\end{proof}
-
-The minimum in the state law changes sides at $N = 3$:
-
-\begin{lemma}[\lean{add\_four\_le\_two\_pow}]\label{lem:minside}
-  $N + 4 \le 2^N$ for every $N \ge 3$; hence
-  $\min(2^N, N+4) = N+4$ for $N \ge 3$, while
-  $\min(2^N, N+4) = 2^N$ for $N \le 2$.
-\end{lemma}
-
-\begin{proof}
-  $3 + 4 = 7 \le 8 = 2^3$, and doubling grows faster than adding one.
-\end{proof}
 
 \section{Attainment for $N \le 2$}\label{sec:small}
 
@@ -749,6 +717,35 @@ The normal and capture-or-repair excursions close this invariant and
 expose only $u,u^A,u^B$. Thus no case-specific period computation is
 needed (\file{TrackThetaAllTime.lean}).
 
+\subsection{Closed spatial routes and one variable tongue}
+
+For a strict splice inside the old reflector's loop, the new splice tongue
+is latched. The remaining spatial lap consists of the old loop completion,
+the reverse runway, the fresh approach, and the final splice contact. Only
+the old reflector's action tongue can vary. The facing-approach contradiction
+already proved in \file{TrackGlobalRepair.lean} shows that the lap never
+enters that variable switch through its stem. A branch entry may set the
+variable tongue, but its exit is always the stem. Every other passage is
+grooved in both possible vectors.
+
+Therefore both values of the variable tongue follow the same spatial lap,
+and each passage preserves the same two-vector family. The recorded starting
+and finishing tongues of the lap need not agree. Induction replays any
+recorded route in a passage-local invariant; the positive-length progress
+principle then repeats a closed spatial route indefinitely. This gives the
+all-time two-vector bound directly
+(\file{TrackTrace.lean}, \file{ForeignSpliceNovelty.lean}). There is no need
+to distinguish approaches that avoid the old action from approaches that
+repair it, or to construct their separate transient and periodic windows.
+
+The same progress principle also simplifies an avoiding pair of reflectors.
+Their two commuting involutions preserve the four-corner orbit
+$\{u,Au,BAu,Bu\}$ and both groove supports. At each boundary, the next
+reflector traversal stays in that orbit because it exposes only its incoming
+and outgoing vector. Closing this boundary invariant proves the all-time
+four-vector cover without a four-leg timing calculation
+(\file{ManufacturedPairNovelty.lean}).
+
 \subsection{Reuse recorded witnesses and trace suffixes}
 
 The construction state stored in a manufactured reflector is not the
@@ -765,21 +762,19 @@ More generally, grooved trace replay is state-independent. A contact
 exiting through a recorded trace's endpoint retraces it and leaves over
 its incoming edge: induction reverses the tail and then the head.
 This one fact covers reverse loops, reverse arbitrary lobes, and final
-runway returns, including empty paths. A split at a passage absent from
-a prefix must occur in the suffix; this elementary list observation
-replaces further orientation-specific splitting arguments.
+runway returns, including empty paths.
 
 \section{Assembly}\label{sec:assembly}
 
 \begin{proof}[Proof of Theorem~\ref{thm:main}]
-  \emph{Upper bound:} a duplicate-free sample list is bounded by $2^N$
-  (Proposition~\ref{prop:ceiling}) and by $N+4$
+  \emph{Upper bound:} there are only $2^N$ Boolean tongue vectors,
+  and a duplicate-free sample list is also bounded by $N+4$
   (Theorem~\ref{thm:upper}), hence by their minimum.
   \emph{Attainment:} for $N = 0$ the empty layout, for $N = 1$ the
   teardrop, for $N = 2$ the dogbone (Section~\ref{sec:small}), each
   attaining $2^N = \min(2^N, N+4)$; for $N \ge 3$ the extremal family
-  (Theorem~\ref{thm:lower}) attains $N+4$, which is the minimum by
-  Lemma~\ref{lem:minside}.
+  (Theorem~\ref{thm:lower}) attains $N+4$, which is the minimum since
+  $N+4 \le 2^N$ for $N \ge 3$.
 \end{proof}
 
 \section{Beyond the count: a conjectured structure theorem}

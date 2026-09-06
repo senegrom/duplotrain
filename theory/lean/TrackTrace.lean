@@ -185,6 +185,79 @@ theorem PhysicalTrace.sound {w : Wiring} {start finish : Nat × Tongues}
   | @cons p x q u v passages finish harrive hlink tail ih =>
       simp [stepN, step, harrive, hlink, ih]
 
+/-- Replay a recorded spatial route in any tongue invariant that each of its
+passages preserves. The recorded tongue states are only witnesses for its
+track links; they need not satisfy the invariant. -/
+theorem PhysicalTrace.replay_preserving
+    {w : Wiring} {start finish : Nat × Tongues} {route : List Passage}
+    (htrace : PhysicalTrace w start route finish)
+    (allowed : Tongues → Prop)
+    (hlocal : ∀ passage ∈ route, ∀ u, allowed u →
+      ∃ v, arrive u passage.1 = (passage.2, v) ∧ allowed v)
+    {u : Tongues} (hu : allowed u) :
+    ∃ v, PhysicalTrace w (start.1, u) route (finish.1, v) ∧ allowed v ∧
+      ∀ d, d ≤ route.length → ∃ port phase,
+        stepN w d (start.1, u) = some (port, phase) ∧ allowed phase := by
+  induction htrace generalizing u with
+  | nil c =>
+      refine ⟨u, PhysicalTrace.nil _, hu, ?_⟩
+      intro d hd
+      have : d = 0 := by simpa using hd
+      subst d
+      exact ⟨c.1, u, rfl, hu⟩
+  | @cons p x q old next route finish harrive hlink tail ih =>
+      obtain ⟨middle, hstep, hm⟩ := hlocal (p, x) List.mem_cons_self u hu
+      obtain ⟨v, htail, hv, hcover⟩ := ih
+        (fun passage hp => hlocal passage (List.mem_cons_of_mem _ hp)) hm
+      refine ⟨v, PhysicalTrace.cons hstep hlink htail, hv, ?_⟩
+      intro d hd
+      cases d with
+      | zero => exact ⟨p, u, rfl, hu⟩
+      | succ d =>
+          obtain ⟨port, phase, hr, hp⟩ := hcover d (by simpa using hd)
+          exact ⟨port, phase, by simpa [stepN, step, hstep, hlink] using hr, hp⟩
+
+/-- Covered positive-length excursions suffice for an all-time cover.
+The invariant is required only at excursion boundaries; intermediate states
+need satisfy only `allowed`. Neither periodicity nor finite state is needed. -/
+theorem stepN_covered_of_progress
+    {w : Wiring} (invariant : Nat × Tongues → Prop) (allowed : Tongues → Prop)
+    (progress : ∀ start, invariant start → ∃ travel finish,
+      0 < travel ∧ stepN w travel start = some finish ∧ invariant finish ∧
+      ∀ d, d ≤ travel → ∃ port phase,
+        stepN w d start = some (port, phase) ∧ allowed phase)
+    {start : Nat × Tongues} (hstart : invariant start) (d : Nat) :
+    ∃ port phase, stepN w d start = some (port, phase) ∧ allowed phase := by
+  induction d using Nat.strongRecOn generalizing start with
+  | ind d ih =>
+      obtain ⟨travel, finish, hpos, hreach, hfinish, hcover⟩ := progress start hstart
+      by_cases hpre : d ≤ travel
+      · exact hcover d hpre
+      · obtain ⟨port, phase, hr, hp⟩ := ih (d - travel) (by omega) hfinish
+        refine ⟨port, phase, ?_, hp⟩
+        have heq : d = travel + (d - travel) := by omega
+        rw [heq, stepN_add, hreach]
+        exact hr
+
+/-- A closed spatial route whose passages preserve a tongue invariant can be
+repeated indefinitely from any state in that invariant. Its recorded initial
+and final tongue vectors need not agree: no dynamical period is required. -/
+theorem PhysicalTrace.spatial_loop_invariant
+    {w : Wiring} {p : Nat} {u v initial : Tongues} {route : List Passage}
+    (htrace : PhysicalTrace w (p, u) route (p, v))
+    (allowed : Tongues → Prop) (hpositive : 0 < route.length)
+    (hlocal : ∀ passage ∈ route, ∀ state, allowed state →
+      ∃ next, arrive state passage.1 = (passage.2, next) ∧ allowed next)
+    (hinitial : allowed initial) (d : Nat) :
+    ∃ port phase, stepN w d (p, initial) = some (port, phase) ∧ allowed phase := by
+  apply stepN_covered_of_progress
+    (fun c => c.1 = p ∧ allowed c.2) allowed ?_ ⟨rfl, hinitial⟩ d
+  intro start hs
+  rcases start with ⟨q, state⟩
+  rcases hs with ⟨rfl, hstate⟩
+  obtain ⟨next, hr, hn, hcover⟩ := htrace.replay_preserving allowed hlocal hstate
+  exact ⟨route.length, (q, next), hpositive, hr.sound, ⟨rfl, hn⟩, hcover⟩
+
 /-- The passage list extracted from a physical trace is linked. -/
 theorem PhysicalTrace.linked {w : Wiring} {start finish : Nat × Tongues}
     {passages : List Passage}

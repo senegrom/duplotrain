@@ -244,13 +244,41 @@ reverse arbitrary lobes, and the final reverse-runway return all reuse
 by induction on the recorded trace: reverse the tail, then prepend its
 original head in reverse. Empty paths are handled once by the base case.
 
-Finally, a split at a passage not in a runway must lie after the runway.
-`split_after_prefix_of_not_mem` proves this as a plain list fact, without
-switch simplicity or coordinate-counting machinery. Applied to the selected
-outward route, it removes separate forward/reverse-candy cases from the
-facing-approach contradiction and the remaining-tail foreignness proof.
-Neither the old unique-key-split proof nor the separate linked-list retrace
-construction is required any longer.
+## Spatial-loop invariants replace the candy-splice case split
+
+The strict candy splice has a stronger invariant than eventual periodicity.
+After its new tongue is latched, the remaining spatial lap is the old candy
+completion, reverse runway, fresh approach, and final splice contact. Only
+the old reflector's action tongue can vary. The existing facing-approach
+contradiction proves that the lap never enters that variable switch through
+its stem. Branch entry may pin its tongue but cannot change the exit port;
+all other passages remain grooved. Thus either value of the old action follows
+the same spatial route and stays within the same two-vector family.
+
+`PhysicalTrace.replay_preserving` in `TrackTrace.lean` replays any recorded
+route in a passage-local tongue invariant. The recorded states serve only as
+witnesses for the route's track links; they need not satisfy that invariant.
+`PhysicalTrace.spatial_loop_invariant` repeats a positive-length spatial lap,
+whose recorded endpoint tongues need not equal its starting tongues. It uses
+`stepN_covered_of_progress`, now in the trace core, rather than a period.
+
+`manufactured_flip_candy_splice_all_two_phases` applies this to the one-bit
+family. It replaces the separate approach-foreign and approach-contact
+branches, their endpoint constructions, settled-state proofs, and all-time
+period reductions. `EventuallyPeriodic` and its remaining construction-only
+helpers are no longer used and have been removed. This does not assert that
+the full development is free of period arguments: other bounds still use them.
+
+The avoiding-reflector pair now uses the same progress principle. Its two
+commuting involutions preserve the four-corner action orbit and both groove
+supports. At either boundary, traverse the corresponding reflector; every
+intermediate state is the incoming or outgoing corner. This proves the
+all-time four-vector cover directly, replacing the four-leg window and
+modulo-period calculation in `ManufacturedPairNovelty.lean`.
+
+The general capture-phase law and the selected far-arm arrival fact are also
+shared at their earliest required layer. The formerly duplicated facing-case
+capture theorem and newly unused support lemmas have been deleted.
 
 ## Dependency and source reductions
 
@@ -267,6 +295,7 @@ comments and blanks, not just proof tactics.
 | After total-wiring completion | 52 | 21,342 |
 | After selected-route, boundary-invariant and suffix-capture reductions | 52 | 19,841 |
 | After witness trimming and trace reuse | 52 | 19,175 |
+| After spatial-loop and action-orbit invariants | 52 | 17,733 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -282,10 +311,12 @@ net of its new completion module. The module count stays unchanged because
 The selected-route, boundary-invariant, and suffix-capture pass removes a
 further **1,501 Lean source lines**, including the cost of its new generic
 lemmas. That candidate had **19,860 total Lean lines** including the 19-line audit.
-Witness trimming and trace reuse remove a further **666 lines**, leaving
-**19,194 lines** in 53 files. The accumulated reduction from the reviewed
-`b10aadd` baseline of 23,725 lines is **4,531 lines**. Counts include all new
-helper proofs, comments and blank lines, not just deleted code.
+Witness trimming and trace reuse removed a further **666 lines**, leaving
+19,194 lines. Spatial-loop and action-orbit invariants remove another
+**1,442 lines**, leaving **17,752 lines in 53 files**, including the 19-line
+axiom audit. The accumulated reduction from the reviewed `b10aadd` baseline
+of 23,725 lines is **5,973 lines**. Counts include all new helper proofs,
+comments and blank lines, not just deleted code.
 
 Two small modules (`StateLawBounds` and `ReservedHistoryCharge`) hold the
 shared statements and counting facts that the removed modules previously
