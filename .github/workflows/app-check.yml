@@ -35,9 +35,7 @@ jobs:
           python-version: ${{ matrix.python }}
           cache: pip
       - run: python -m pip install -e '.[dev]'
-      - run: >-
-          ruff check src webapp tests/browser
-          tests/test_http_security.py tests/test_build_security.py
+      - run: ruff check src webapp tests
       - run: python -m pytest -m 'not slow and not browser'
   base-install:
     runs-on: ubuntu-latest

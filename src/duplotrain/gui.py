@@ -762,8 +762,47 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
         def _json(self, status: int, data: Any) -> None:
             self._send(status, json.dumps(data).encode("utf-8"), "application/json")
 
+        #: Discard at most this much of a rejected body, for at most this long.
+        DRAIN_BYTES = 64 * 1024
+        DRAIN_SECONDS = 0.25
+
+        def _drain_body(self) -> None:
+            """Discard a rejected request's body before the connection closes.
+
+            Closing a socket that still holds unread bytes is an abortive close,
+            and the reset discards the response written just before it, so the
+            client reports a connection error instead of reading the refusal.
+
+            Never wait on a body that was promised but not sent: a declared
+            length is not evidence that the bytes are coming, so the drain is
+            bounded in both size and time and gives up rather than blocking.
+            """
+            lengths = self.headers.get_all("Content-Length", [])
+            if self.headers.get_all("Transfer-Encoding") or len(lengths) != 1:
+                return
+            raw = lengths[0]
+            if not (raw.isascii() and raw.isdigit() and len(raw) <= 10):
+                return
+            remaining = min(int(raw), self.DRAIN_BYTES)
+            previous = self.connection.gettimeout()
+            try:
+                self.connection.settimeout(self.DRAIN_SECONDS)
+                while remaining > 0:
+                    chunk = self.rfile.read(min(remaining, 4096))
+                    if not chunk:
+                        return
+                    remaining -= len(chunk)
+            except OSError:
+                return
+            finally:
+                try:
+                    self.connection.settimeout(previous)
+                except OSError:
+                    pass
+
         def _reject(self, status: int, message: str) -> bool:
             # Do not reuse a connection with an unread, rejected request body.
+            self._drain_body()
             self.close_connection = True
             self._json(status, {"error": message})
             return False
