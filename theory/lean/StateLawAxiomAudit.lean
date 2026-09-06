@@ -3,13 +3,16 @@ import StateLaw
 /-!
 # Axiom audit for the state law
 
-`#print axioms` on the single theorem.  The expected output is at most
-the three standard Lean axioms (`propext`, `Classical.choice`,
-`Quot.sound`) — in particular **no** `sorryAx` and no
-`Lean.ofReduceBool` (kernel `decide` only, never `native_decide`).
+Check the exact transitive axiom list, not merely the absence of `sorryAx`.
+The guard fails compilation if an unexpected axiom appears. A separate
+print retains the diagnostic consumed by the CI log check.
 -/
 
 namespace GeneralN
+
+/-- info: 'GeneralN.state_law' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms state_law
 
 #print axioms state_law
 

@@ -1,23 +1,30 @@
 # Theory: the lazy-point switch problem
 
-The mathematical side of the project: how many distinct switch settings
-can a single train visit on a layout of N lazy Y-switches?  The answer is
-machine-checked as a single Lean theorem:
+How many distinct switch settings can a single train visit on a wiring
+of `N` lazy Y-switches? The exact answer is machine-checked in Lean:
 
 **f(N) = min(2^N, N + 4).**
 
-Contents:
+**`lean/`** contains the proof, with no Mathlib or `native_decide`.
+`StateLaw.lean` states `GeneralN.state_law`; `lean/README.md` explains the
+model, proof structure, and verification commands. From `lean/`, run
+`lake build StateLawAxiomAudit` to check the headline theorem and its exact
+axiom list, or `lake build` to check all retained libraries. The toolchain
+is pinned.
 
-* **`lean/`** — the machine-checked proof (Lean 4, no Mathlib, no
-  `native_decide`).  `StateLaw.lean` states the one headline theorem
-  `GeneralN.state_law`; every other file supports it.  `lean/README.md`
-  is the guide.  Build from `lean/` with `lake build` (elan; toolchain
-  pinned); the build ends by auditing the theorem's axioms.
-* **`paper/state-law.pdf`** — the human-readable proof: a 12-page paper
-  extracted from the Lean development (complete for the model, the `2^N`
-  ceiling, and every attainment construction; a structured account of the
-  sharp `N+4` upper bound).  Source in `paper/state-law.tex`; build with
-  `tectonic state-law.tex`.
-* **`switch_ceiling_proof.py`** — the perfection exhaustion engine
-  (no perfect layout has ≥ 3 switches), used by
-  `tests/test_switch_ceiling.py`.
+The arbitrary-start upper-bound argument was simplified on 6 September
+2026: cap an unwired starting port with a self-link, preserve every live
+configuration under wiring extension, and apply the known-incoming-edge
+bound without shifting time zero. This removes nine modules from the
+headline theorem's dependency path; their earlier proofs remain available
+and buildable for comparison. The theorem statement and attainment
+constructions are unchanged.
+
+**`paper/state-law.pdf`**, with source in `paper/state-law.tex`, presents
+the model, the `2^N` ceiling, attainment constructions, and a structured
+account of the earlier sharp upper-bound proof. It predates the capping
+simplification; use `lean/README.md` for that reduction. Build the paper
+with `tectonic state-law.tex`.
+
+**`switch_ceiling_proof.py`** is the perfection exhaustion engine used by
+`tests/test_switch_ceiling.py`.
