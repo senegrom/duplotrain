@@ -1,7 +1,6 @@
 """Local missing-browser skips must not turn CI failures into green checks."""
 
 import os
-from pathlib import Path
 
 import pytest
 
@@ -11,15 +10,25 @@ def required_browser() -> bool:
 
 
 def launch_browser(browser_type):
+    """Launch, or skip only when the browser is genuinely not downloaded.
+
+    ``browser_type.executable_path`` names one build directory and is not a
+    reliable presence test: playwright may launch a different installed build,
+    so probing that path skipped browser tests on machines where they pass.
+    """
+    from playwright.sync_api import Error  # only reached once playwright imported
+
     executable = os.environ.get("DUPLOTRAIN_BROWSER_PATH")
-    if (not executable and not required_browser()
-            and not Path(browser_type.executable_path).is_file()):
-        pytest.skip(f"{browser_type.name} not installed; run python -m playwright install")
     kwargs = {"headless": True}
     if executable:
         kwargs["executable_path"] = executable
-    # Unexpected startup errors (crashes, missing OS libraries, bad paths) fail.
-    return browser_type.launch(**kwargs)
+    try:
+        return browser_type.launch(**kwargs)
+    except Error as exc:
+        # Unexpected startup errors (crashes, missing OS libraries) still fail.
+        if required_browser() or "Executable doesn't exist" not in str(exc):
+            raise
+        pytest.skip(f"{browser_type.name} not installed; run python -m playwright install")
 
 
 @pytest.fixture(scope="module")

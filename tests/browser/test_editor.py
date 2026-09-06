@@ -38,7 +38,12 @@ def load(page, url):
 
 
 def wait_count(page, count):
-    page.wait_for_function("count => S.layout.placements.length === count && !apiBusy", arg=count)
+    # S is null until the first refresh resolves, and playwright treats a thrown
+    # predicate as a hard error rather than "not ready yet", so guard the reload race.
+    page.wait_for_function(
+        "count => S !== null && S.layout.placements.length === count && !apiBusy",
+        arg=count,
+    )
 
 
 def place_straight(page):

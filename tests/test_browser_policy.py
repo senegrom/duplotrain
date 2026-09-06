@@ -1,7 +1,14 @@
-"""Test skip/failure policy without needing a browser or Playwright installed."""
+"""Test skip/failure policy without needing a browser or Playwright installed.
+
+Availability is decided by attempting the launch, not by probing
+``executable_path``: that path names one build directory and playwright may
+launch a different installed build, which silently skipped the whole browser
+suite on machines where it passes.
+"""
 
 import builtins
 import importlib.util
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -21,24 +28,50 @@ def local_env(monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
 
+class FakePlaywrightError(Exception):
+    """Stands in for playwright.sync_api.Error."""
+
+
+def missing_executable(path):
+    return FakePlaywrightError(
+        f"BrowserType.launch: Executable doesn't exist at {path}"
+    )
+
+
 def browser_type(path, error=None):
     return SimpleNamespace(
         name="chromium", executable_path=str(path), launch=Mock(side_effect=error)
     )
 
 
+@pytest.fixture(autouse=True)
+def fake_playwright_error(monkeypatch):
+    """launch_browser imports Error lazily; give it one we can raise."""
+    module = SimpleNamespace(Error=FakePlaywrightError)
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", module)
+
+
 def test_absent_default_browser_skips_locally(local_env, tmp_path):
-    browser = browser_type(tmp_path / "missing")
+    path = tmp_path / "missing"
+    browser = browser_type(path, missing_executable(path))
     with pytest.raises(pytest.skip.Exception, match="not installed"):
         policy.launch_browser(browser)
-    browser.launch.assert_not_called()
+    browser.launch.assert_called_once()
+
+
+def test_reported_path_absent_but_browser_launches(local_env, tmp_path):
+    """The regression: playwright reports a path it does not launch from."""
+    browser = browser_type(tmp_path / "never-created")
+    assert policy.launch_browser(browser) is browser.launch.return_value
+    browser.launch.assert_called_once_with(headless=True)
 
 
 @pytest.mark.parametrize("flag", ["CI", "DUPLOTRAIN_REQUIRE_BROWSER"])
 def test_absent_browser_fails_in_ci(local_env, monkeypatch, tmp_path, flag):
     monkeypatch.setenv(flag, "1")
-    browser = browser_type(tmp_path / "missing", RuntimeError("executable missing"))
-    with pytest.raises(RuntimeError, match="executable missing"):
+    path = tmp_path / "missing"
+    browser = browser_type(path, missing_executable(path))
+    with pytest.raises(FakePlaywrightError, match="Executable doesn't exist"):
         policy.launch_browser(browser)
     browser.launch.assert_called_once()
 
