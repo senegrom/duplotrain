@@ -389,24 +389,8 @@ private theorem ManufacturedReflector.return_change_facing_one_novelty
       have happroachContact : PhysicalTrace w
           (g, contact) approach (R.mouth, contact) :=
         happroach.replay_grooved contact happroachGrooved
-      have hforeign : ∀ passage ∈ approach,
-          passageSwitch passage ≠ R.actionSwitch := by
-        have hsimple :=
-          A.orientedRoute_simple
-            (ManufacturedReflector.flip R).activatedState
-        unfold SwitchSimple at hsimple
-        rw [hrouteSplit] at hsimple
-        simp only [List.map_append, List.map_cons] at hsimple
-        have hparts := List.nodup_append.mp hsimple
-        intro passage hpassage hEq
-        have hne := hparts.2.2 (passageSwitch passage)
-          (List.mem_map.mpr ⟨passage, hpassage, rfl⟩)
-          (passageSwitch (R.mouth, x)) (by simp)
-        apply hne
-        simpa [passageSwitch,
-          ManufacturedFlipReflector.actionSwitch] using hEq
       have hall := R.facing_mouth_tail_two_phase
-        happroachContact happroachSimple hforeign hpaths
+        happroachContact happroachGrooved hpaths
       have htail : ∀ tailTimes : List Nat,
           (∀ d ∈ tailTimes,
             (stepN w d (R.mouth, contact)).isSome) →

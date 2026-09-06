@@ -15,20 +15,6 @@ pair. Positive-length traversals then give the all-time cover directly.
 
 namespace GeneralN
 
-/-- Every prefix of a live finite run is itself live. -/
-theorem stepN_prefix_some
-    {w : Wiring} {start finish : Nat × Tongues} {d K : Nat}
-    (hd : d ≤ K) (hfinish : stepN w K start = some finish) :
-    ∃ middle, stepN w d start = some middle := by
-  let rest := K - d
-  have hsplit : K = d + rest := by
-    dsimp [rest]
-    omega
-  rw [hsplit, stepN_add] at hfinish
-  cases hprefix : stepN w d start with
-  | none => simp [hprefix] at hfinish
-  | some middle => exact ⟨middle, rfl⟩
-
 /-- Reaching a configuration shifts `tonguesAt` by the travel time whenever
 the queried suffix is live (so the two `getD` defaults are irrelevant). -/
 theorem tonguesAt_add_of_reaches

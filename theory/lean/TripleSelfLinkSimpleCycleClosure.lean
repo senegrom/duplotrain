@@ -75,24 +75,12 @@ theorem PhysicalTrace.simple_same_exit_cycle_traces_with_phase
     physicalTrace_grooved_passages w v q x q rest
       hnewLinked hnewGrooved hfinal
   have htransient : PhysicalTrace w (q, u) ((q, x) :: rest) (q, v) := by
-    cases rest with
-    | nil =>
-        exact PhysicalTrace.cons hnext
-          (by simpa [lastPassageExit] using hfinal)
-          (PhysicalTrace.nil (q, v))
-    | cons passage rest =>
-        rcases passage with ⟨r, y⟩
-        have hxy : w.link x = some r := holdLinked.1
-        have htailLinked : LinkedPassages w ((r, y) :: rest) :=
-          hnewLinked.2
-        have htailGrooved : PassagesGrooved v ((r, y) :: rest) := by
-          intro passage hp
-          exact hnewGrooved passage (List.mem_cons_of_mem _ hp)
-        have htailFinal : w.link (lastPassageExit y rest) = some q := by
-          simpa [lastPassageExit] using hfinal
-        exact PhysicalTrace.cons hnext hxy
-          (physicalTrace_grooved_passages w v r y q rest
-            htailLinked htailGrooved htailFinal)
+    cases hstable with
+    | @cons _ _ next _ nextState _ _ ha hl tail =>
+        have heq : nextState = v := by
+          have hf := groove_forward hheadNew
+          exact congrArg Prod.snd (ha.symm.trans hf)
+        exact PhysicalTrace.cons hnext hl (by simpa only [heq] using tail)
   have hsimpleCycle : SwitchSimple ((q, x) :: rest) := by
     unfold SwitchSimple
     simp only [List.map_cons, passageSwitch]
@@ -109,132 +97,14 @@ theorem PhysicalTrace.simple_same_exit_cycle_traces_with_phase
       exact ha
     · exact hsimple.2
   have hphase : ∀ d, d ≤ ((q, x) :: rest).length → ∃ port phase,
-      stepN w d (q, u) = some (port, phase) ∧
-        (phase = u ∨ phase = v) := by
+      stepN w d (q, u) = some (port, phase) ∧ (phase = u ∨ phase = v) := by
     intro d hd
     cases d with
-    | zero =>
-        exact ⟨q, u, by simp [stepN], Or.inl rfl⟩
+    | zero => exact ⟨q, u, rfl, Or.inl rfl⟩
     | succ n =>
-        have hn : n ≤ rest.length := by simp at hd; omega
-        cases rest with
-        | nil =>
-            have hn0 : n = 0 := by simp at hn; omega
-            subst n
-            have hlink : w.link x = some q := by
-              simpa [lastPassageExit] using hfinal
-            refine ⟨q, v, ?_, Or.inr rfl⟩
-            simp [stepN, step, hnext, hlink]
-        | cons passage tail =>
-            rcases passage with ⟨r, y⟩
-            have hlink : w.link x = some r := holdLinked.1
-            have hone : stepN w 1 (q, u) = some (r, v) := by
-              simp [stepN, step, hnext, hlink]
-            have htailTrace : PhysicalTrace w (r, v)
-                ((r, y) :: tail) (q, v) := by
-              cases htransient with
-              | @cons _ _ q' _ v' _ _ harrive hlink' htail =>
-                  have hq' : q' = r := by
-                    have := Option.some.inj (hlink'.symm.trans hlink)
-                    exact this
-                  have hv' : v' = v := by
-                    have hh := harrive.symm.trans hnext
-                    exact congrArg Prod.snd hh
-                  simpa [hq', hv'] using htail
-            have htailGrooved : PassagesGrooved v ((r, y) :: tail) := by
-              intro old hold
-              exact hnewGrooved old (List.mem_cons_of_mem _ hold)
-            obtain ⟨port, hrun⟩ :=
-              htailTrace.grooved_prefix_tongues v htailGrooved hn
-            refine ⟨port, v, ?_, Or.inr rfl⟩
-            rw [show n + 1 = 1 + n by omega, stepN_add, hone]
-            simpa using hrun
+        obtain ⟨port, hr⟩ := hstable.grooved_prefix_tongues v hnewGrooved hd
+        exact ⟨port, v, (stepN_after_arrival hnext (by omega)).trans hr, Or.inr rfl⟩
   exact ⟨htransient, hstable, hsimpleCycle, hphase⟩
-
-/-- During the transient same-exit lap, every positive-depth configuration
-already has the final settled tongue vector. -/
-theorem PhysicalTrace.simple_same_exit_cycle_positive_prefix
-    {w : Wiring} {p x q : Nat} {u₀ u v : Tongues}
-    {rest : List Passage}
-    (htrace : PhysicalTrace w (p, u₀) ((p, x) :: rest) (q, u))
-    (hsimple : SwitchSimple ((p, x) :: rest))
-    (hnext : arrive u q = (x, v)) :
-    ∀ d, 0 < d → d ≤ ((q, x) :: rest).length →
-      ∃ port, stepN w d (q, u) = some (port, v) := by
-  obtain ⟨htransient, hstable, hsimpleCycle, _⟩ :=
-    htrace.simple_same_exit_cycle_traces_with_phase hsimple hnext
-  have htransient' : PhysicalTrace w (q, u)
-      ([(q, x)] ++ rest) (q, v) := by
-    simpa using htransient
-  obtain ⟨middle, hfirst, htail⟩ := htransient'.split_append
-  have hone : stepN w 1 (q, u) = some middle := by
-    simpa using hfirst.sound
-  have honeStep : step w (q, u) = some middle := by
-    simpa [stepN] using hone
-  have hmiddleTongues : middle.2 = v := by
-    have hparts := step_some_parts honeStep
-    calc
-      middle.2 = arrivedTongues (q, u) := hparts.2
-      _ = v := by simp [arrivedTongues, hnext]
-  have hmiddle : middle = (middle.1, v) := by
-    apply Prod.ext
-    · rfl
-    · exact hmiddleTongues
-  rw [hmiddle] at hone htail
-  have hstableGrooved :
-      PassagesGrooved v ((q, x) :: rest) :=
-    hstable.grooved_of_switchSimple hsimpleCycle
-  have htailGrooved : PassagesGrooved v rest := by
-    intro passage hp
-    exact hstableGrooved passage (List.mem_cons_of_mem _ hp)
-  intro d hpositive hd
-  cases d with
-  | zero => omega
-  | succ n =>
-      have hn : n ≤ rest.length := by
-        simpa using hd
-      obtain ⟨port, hrun⟩ :=
-        htail.grooved_prefix_tongues v htailGrooved hn
-      refine ⟨port, ?_⟩
-      rw [show n + 1 = 1 + n by omega, stepN_add, hone]
-      exact hrun
-
-/-- A stable switch-simple lap runs forever with its settled tongue vector at
-every local time. -/
-theorem PhysicalTrace.stable_simple_cycle_all_time
-    {w : Wiring} {q : Nat} {v : Tongues}
-    {cycle : List Passage}
-    (hnonempty : cycle ≠ [])
-    (hstable : PhysicalTrace w (q, v) cycle (q, v))
-    (hsimple : SwitchSimple cycle) :
-    ∀ d, ∃ port, stepN w d (q, v) = some (port, v) := by
-  let period := cycle.length
-  have hperiodPositive : 0 < period := by
-    dsimp [period]
-    cases cycle with
-    | nil => exact (hnonempty rfl).elim
-    | cons head tail => simp
-  have hgrooved : PassagesGrooved v cycle :=
-    hstable.grooved_of_switchSimple hsimple
-  intro d
-  let laps := d / period
-  let offset := d % period
-  have hoffsetLt : offset < period := by
-    dsimp [offset]
-    exact Nat.mod_lt d hperiodPositive
-  have hdecomp : d = laps * period + offset := by
-    dsimp [laps, offset]
-    have hdiv := Nat.div_add_mod d period
-    rw [Nat.mul_comm period (d / period)] at hdiv
-    exact hdiv.symm
-  have hlaps : stepN w (laps * period) (q, v) = some (q, v) :=
-    stepN_mul_period_pair_novelty hstable.sound laps
-  obtain ⟨port, hoffset⟩ :=
-    hstable.grooved_prefix_tongues v hgrooved
-      (Nat.le_of_lt hoffsetLt)
-  refine ⟨port, ?_⟩
-  rw [hdecomp, stepN_add, hlaps]
-  exact hoffset
 
 /-- The same-exit first-revisit orbit has exactly the settled tongue vector at
 every positive local time, not merely after one complete transient lap. -/
@@ -245,25 +115,12 @@ theorem PhysicalTrace.simple_same_exit_cycle_all_positive
     (hsimple : SwitchSimple ((p, x) :: rest))
     (hnext : arrive u q = (x, v)) :
     ∀ d, 0 < d → ∃ port, stepN w d (q, u) = some (port, v) := by
-  obtain ⟨htransient, hstable, hsimpleCycle, _⟩ :=
+  obtain ⟨_htransient, hstable, hsimpleCycle, _⟩ :=
     htrace.simple_same_exit_cycle_traces_with_phase hsimple hnext
-  let cycle : List Passage := (q, x) :: rest
-  have hnonempty : cycle ≠ [] := by simp [cycle]
   intro d hpositive
-  by_cases hfirstLap : d ≤ cycle.length
-  · exact htrace.simple_same_exit_cycle_positive_prefix
-      hsimple hnext d hpositive (by simpa [cycle] using hfirstLap)
-  · let tailTime := d - cycle.length
-    have hsum : d = cycle.length + tailTime := by
-      dsimp [tailTime]
-      omega
-    obtain ⟨port, htail⟩ :=
-      hstable.stable_simple_cycle_all_time hnonempty hsimpleCycle tailTime
-    have hfirstLapRun : stepN w cycle.length (q, u) = some (q, v) := by
-      simpa [cycle] using htransient.sound
-    refine ⟨port, ?_⟩
-    rw [hsum, stepN_add, hfirstLapRun]
-    exact htail
+  obtain ⟨port, hr⟩ := hstable.grooved_loop_all_time (by simp)
+    (hstable.grooved_of_switchSimple hsimpleCycle) d
+  exact ⟨port, (stepN_after_arrival hnext hpositive).trans hr⟩
 
 /-- Trace-retaining form of the activated first-revisit normal form. -/
 theorem first_revisit_cycle_traces_or_activated_reflector
@@ -349,7 +206,7 @@ theorem first_revisit_cycle_traces_or_activated_reflector
       exact ⟨port, u, hrun, Or.inl rfl⟩
     have hall : forall d, exists port,
         stepN w d (p, u) = some (port, u) :=
-      hstable.stable_simple_cycle_all_time (by simp) hsimpleExcursion
+      hstable.grooved_loop_all_time (by simp) hgrooved
     exact ⟨(p, x) :: path, u, by simp, hstable, hstable,
       hsimpleExcursion, hphase, fun d _ => hall d⟩
   · subst y

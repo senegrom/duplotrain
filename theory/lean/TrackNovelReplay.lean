@@ -39,6 +39,55 @@ theorem PhysicalTrace.grooved_prefix_tongues
   rw [List.length_take_of_le hd] at hsound
   exact ⟨middle.1, hsound⟩
 
+/-- Any nonempty closed spatial route grooved at `state` runs forever with
+that vector. The recorded witness need not be simple or have equal endpoints. -/
+theorem PhysicalTrace.grooved_loop_all_time
+    {w : Wiring} {p : Nat} {u v state : Tongues} {route : List Passage}
+    (htrace : PhysicalTrace w (p, u) route (p, v))
+    (hpositive : 0 < route.length) (hgrooved : PassagesGrooved state route)
+    (d : Nat) : ∃ port, stepN w d (p, state) = some (port, state) := by
+  obtain ⟨port, phase, hr, hp⟩ := htrace.spatial_loop_invariant
+    (fun current => current = state) hpositive
+    (by
+      intro passage hmem current heq
+      subst current
+      exact ⟨state, groove_forward (hgrooved passage hmem), rfl⟩) rfl d
+  exact ⟨port, by simpa only [hp] using hr⟩
+
+/-- A backward contact and replay close a grooved loop at the post-contact
+vector. The original run synchronizes with that stable loop at its first
+step; no transient-lap or modular-time analysis is needed. -/
+theorem backward_contact_all_time_two_phase
+    {w : Wiring} {g e p oldEntry : Nat}
+    {oldBase oldEnd u v : Tongues} {recorded approach : List Passage}
+    (hrecorded : PhysicalTrace w (g, oldBase) recorded (oldEntry, oldEnd))
+    (hrecordedGrooved : PassagesGrooved v recorded)
+    (hentry : w.link e = some g)
+    (hcontact : arrive u p = (oldEntry, v))
+    (happroach : PhysicalTrace w (e, u) approach (p, u))
+    (happroachGrooved : PassagesGrooved v approach) :
+    ∀ m, ∃ port phase, stepN w m (p, u) = some (port, phase) ∧
+      (phase = u ∨ phase = v) := by
+  have hback := physicalTrace_contact_retraces_prefix
+    hrecorded hrecordedGrooved hentry hcontact
+  have hforward := happroach.replay_grooved v happroachGrooved
+  let cycle := (p, oldEntry) :: reversePassages recorded ++ approach
+  have hcycle : PhysicalTrace w (p, u) cycle (p, v) := by
+    simpa [cycle, List.append_assoc] using hback.append hforward
+  have hgrooved : PassagesGrooved v cycle := by
+    intro passage hp
+    rcases List.mem_cons.mp hp with rfl | hp
+    · simpa only [hcontact] using arrive_back u p
+    · rcases List.mem_append.mp hp with hp | hp
+      · exact reversePassages_grooved hrecordedGrooved passage hp
+      · exact happroachGrooved passage hp
+  intro m
+  cases m with
+  | zero => exact ⟨p, u, rfl, Or.inl rfl⟩
+  | succ n =>
+      obtain ⟨port, hr⟩ := hcycle.grooved_loop_all_time (by simp [cycle]) hgrooved (n + 1)
+      exact ⟨port, v, (stepN_after_arrival hcontact (by omega)).trans hr, Or.inr rfl⟩
+
 /-- Pointwise completed-retrace novelty theorem.
 
 At depth zero the original tongue vector is still present.  At every depth
@@ -76,41 +125,15 @@ theorem physicalTrace_contact_retraces_prefix_pointwise
   | zero =>
       exact ⟨p, by simp [stepN]⟩
   | succ n =>
-      have hn : n ≤ recorded.length := by omega
-      have hback := physicalTrace_contact_retraces_prefix
-        hrecorded hgrooved hentry hcontact
-      have hback' : PhysicalTrace w (p, u)
-          ([(p, oldEntry)] ++ reversePassages recorded) (e, v) := by
-        simpa using hback
-      obtain ⟨middle, hfirst, hreverse⟩ := hback'.split_append
-      have hone : stepN w 1 (p, u) = some middle := by
-        simpa using hfirst.sound
-      have honeStep : step w (p, u) = some middle := by
-        simpa [stepN] using hone
-      have hmiddleTongues : middle.2 = v := by
-        have hparts := step_some_parts honeStep
-        calc
-          middle.2 = arrivedTongues (p, u) := hparts.2
-          _ = v := by simp [arrivedTongues, hcontact]
-      have hmiddle : middle = (middle.1, v) := by
-        apply Prod.ext
-        · rfl
-        · exact hmiddleTongues
-      rw [hmiddle] at hone hreverse
-      have hreverseGrooved :
-          PassagesGrooved v (reversePassages recorded) :=
-        reversePassages_grooved hgrooved
-      have hnReverse : n ≤ (reversePassages recorded).length := by
-        rw [reversePassages_length]
-        exact hn
-      obtain ⟨port, htail⟩ :=
-        hreverse.grooved_prefix_tongues v hreverseGrooved hnReverse
-      refine ⟨port, ?_⟩
-      have hsum : n + 1 = 1 + n := by omega
-      have hrun : stepN w (n + 1) (p, u) = some (port, v) := by
-        rw [hsum, stepN_add, hone]
-        exact htail
-      simpa using hrun
+      have hback := physicalTrace_contact_retraces_prefix hrecorded hgrooved hentry hcontact
+      have hallGrooved : PassagesGrooved v ((p, oldEntry) :: reversePassages recorded) := by
+        intro passage hp
+        rcases List.mem_cons.mp hp with rfl | hp
+        · simpa only [hcontact] using arrive_back u p
+        · exact reversePassages_grooved hgrooved passage hp
+      obtain ⟨port, hr⟩ := hback.grooved_prefix_tongues v hallGrooved
+        (by simpa only [List.length_cons, reversePassages_length] using hd)
+      exact ⟨port, by simpa using (stepN_after_arrival hcontact (by omega)).trans hr⟩
 
 /-- Positive-time projection of
 `physicalTrace_contact_retraces_prefix_pointwise`: every configuration from

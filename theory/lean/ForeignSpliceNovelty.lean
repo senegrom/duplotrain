@@ -16,68 +16,6 @@ Everything is over raw `Wiring` / `stepN`; no finite-switch bound is needed.
 
 namespace GeneralN
 
-/-- A grooved trace, one changing passage, and another grooved trace expose
-only the two endpoint tongue vectors at every intermediate time. -/
-theorem PhysicalTrace.one_change_prefix_tongues
-    {w : Wiring} {startPort p x q finishPort : Nat}
-    {u v : Tongues} {before after : List Passage}
-    (hbefore : PhysicalTrace w (startPort, u) before (p, u))
-    (hbeforeGrooved : PassagesGrooved u before)
-    (hchange : PhysicalTrace w (p, u) [(p, x)] (q, v))
-    (hafter : PhysicalTrace w (q, v) after (finishPort, v))
-    (hafterGrooved : PassagesGrooved v after)
-    {d : Nat} (hd : d <= before.length + 1 + after.length) :
-    exists port phase,
-      stepN w d (startPort, u) = some (port, phase) /\
-        (phase = u \/ phase = v) := by
-  by_cases hprefix : d <= before.length
-  · obtain ⟨port, hrun⟩ :=
-      hbefore.grooved_prefix_tongues u hbeforeGrooved hprefix
-    exact ⟨port, u, hrun, Or.inl rfl⟩
-  · let r := d - (before.length + 1)
-    have hr : r <= after.length := by
-      dsimp [r]
-      omega
-    have hdecomp : d = before.length + (1 + r) := by
-      dsimp [r]
-      omega
-    obtain ⟨port, htail⟩ :=
-      hafter.grooved_prefix_tongues v hafterGrooved hr
-    have hone : stepN w 1 (p, u) = some (q, v) := by
-      simpa using hchange.sound
-    have hrest : stepN w (1 + r) (p, u) = some (port, v) := by
-      rw [stepN_add, hone]
-      exact htail
-    refine ⟨port, v, ?_, Or.inr rfl⟩
-    rw [hdecomp, stepN_add, hbefore.sound]
-    exact hrest
-
-theorem periodic_two_phase_prefix_tongues
-    {w : Wiring} {startPort : Nat} {u v : Tongues} {period : Nat}
-    (hpositive : 0 < period)
-    (hperiod : stepN w period (startPort, u) =
-      some (startPort, u))
-    (hwindow : ∀ d, d <= period → ∃ port phase,
-      stepN w d (startPort, u) = some (port, phase) ∧
-        (phase = u ∨ phase = v)) :
-    ∀ d, ∃ port phase,
-      stepN w d (startPort, u) = some (port, phase) ∧
-        (phase = u ∨ phase = v) := by
-  intro d
-  let q := d / period
-  let r := d % period
-  have hr : r <= period := Nat.le_of_lt (Nat.mod_lt d hpositive)
-  obtain ⟨port, phase, hlocal, hphase⟩ := hwindow r hr
-  have hdecomp : d = q * period + r := by
-    dsimp [q, r]
-    have h := Nat.mod_add_div d period
-    rw [Nat.mul_comm period (d / period)] at h
-    omega
-  refine ⟨port, phase, ?_, hphase⟩
-  rw [hdecomp, stepN_add,
-    stepN_mul_period_pair_novelty hperiod q]
-  exact hlocal
-
 /-- A grooved route that never faces the variable switch preserves its
 one-bit family. Branch entries may set that bit but cannot select a different
 exit; all other passages leave the entire tongue vector unchanged. -/

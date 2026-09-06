@@ -217,6 +217,20 @@ theorem PhysicalTrace.replay_preserving
           obtain ⟨port, phase, hr, hp⟩ := hcover d (by simpa using hd)
           exact ⟨port, phase, by simpa [stepN, step, hstep, hlink] using hr, hp⟩
 
+/-- Every prefix of a live finite run is itself live. -/
+theorem stepN_prefix_some
+    {w : Wiring} {start finish : Nat × Tongues} {d K : Nat}
+    (hd : d ≤ K) (hfinish : stepN w K start = some finish) :
+    ∃ middle, stepN w d start = some middle := by
+  let rest := K - d
+  have hsplit : K = d + rest := by
+    dsimp [rest]
+    omega
+  rw [hsplit, stepN_add] at hfinish
+  cases hprefix : stepN w d start with
+  | none => simp [hprefix] at hfinish
+  | some middle => exact ⟨middle, rfl⟩
+
 /-- Pointwise covers compose at a reached configuration. -/
 theorem stepN_cover_append
     {w : Wiring} {start middle : Nat × Tongues} {left right : Nat}
@@ -775,6 +789,19 @@ tongue, then `p` routes forward to `x` without changing it either. -/
 theorem groove_forward {u : Tongues} {p x : Nat}
     (hgroove : arrive u x = (p, u)) :
     arrive u p = (x, u) := by grind [arrive_back]
+
+/-- The first arrival already installs its stable local groove. Repeating
+that arrival from its post-vector has the same successor, so both runs agree
+at every positive time, even after leaving the original route. -/
+theorem stepN_after_arrival
+    {w : Wiring} {p x d : Nat} {u v : Tongues}
+    (harrive : arrive u p = (x, v)) (hpos : 0 < d) :
+    stepN w d (p, u) = stepN w d (p, v) := by
+  have hstable : arrive v p = (x, v) :=
+    groove_forward (by simpa only [harrive] using arrive_back u p)
+  cases d with
+  | zero => omega
+  | succ n => simp only [stepN, step, harrive, hstable]
 
 /-- Along a switch-simple trace, every local groove made by the train is
 still present at the end of the trace. -/

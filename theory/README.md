@@ -26,9 +26,9 @@ excursions instead of enumerated contact periods. Capture is a suffix of
 ordinary traversal. Shortened reflectors reuse their original construction
 witnesses rather than rebuilding them in the later tongue state.
 
-The retained development has 53 Lean files and 16,992 source lines,
+The retained development has 53 Lean files and 16,077 source lines,
 including its 19-line axiom audit; the headline import closure has 52
-modules and 16,973 lines. Source lines include comments and blank lines.
+modules and 16,058 lines. Source lines include comments and blank lines.
 The theorem statement, model, finite-state ceiling, attainment constructions,
 and exact axiom audit are unchanged. Git history retains superseded proofs.
 
@@ -50,3 +50,10 @@ first-contact theorem handles both arbitrary routes with repeated switches
 and the switch-simple manufactured routes. The paper and Lean guide describe
 these reductions; the elementary `2^N` ceiling remains a one-line observation
 in the paper's assembly rather than a standalone section.
+
+A grooved approach followed by any positive return inside a two-vector cover
+now closes one common repair invariant, even when the approach meets the
+action switch. Backward contacts and same-exit cycles synchronize after their
+first arrival with an already-grooved spatial loop, avoiding transient-lap and
+period calculations. The endpoint-coordinate law also supplies one-change
+phase bounds and productive-writer survival directly.

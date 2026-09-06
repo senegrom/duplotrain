@@ -316,6 +316,40 @@ Gray corners. `stepN_covered_of_progress` supplies all-time liveness and the
 phase cover directly. The obsolete excursion-length upper bound, four-leg
 windows, periods, and the period-based liveness helper have been removed.
 
+## Grooved returns and first-arrival synchronization
+
+`ManufacturedFlipReflector.grooved_return_two_phase` closes a two-vector cover
+around a grooved reference approach and a positive return. The return need only
+come back to the reference boundary, preserve that cover at every intermediate
+time, and work for either allowed input vector. It may take different durations
+or return different phases. Starting at either boundary in either phase is safe.
+
+On the undisturbed vector the approach replays. A disturbed approach either
+avoids the action switch and replays with the fault, captures at its first stem
+contact, or repairs at its first branch contact and synchronizes with the
+reference continuation. Each outcome gives a positive covered excursion. The
+existing progress induction proves all-time liveness and the two-vector bound.
+The approach need not be switch-simple or avoid the action switch. This replaces
+the three period constructions in `StateLawTwoCandidate` and strengthens the
+final-mouth theorem in `EarlyFacingConstant` to require only a grooved approach.
+
+The cycle cases use a different synchronization: if `arrive u p = (x, v)`,
+then `arrive v p = (x, v)` as well. Hence `stepN_after_arrival` identifies the
+complete runs from `(p, u)` and `(p, v)` at every **positive** time. It makes no
+claim that either run is globally constant. `PhysicalTrace.grooved_loop_all_time`
+provides the latter fact when the post-arrival vector grooves a nonempty closed
+spatial trace. Backward contacts and same-exit cycles combine these two facts:
+time zero is the original vector; every positive time is the settled one. There
+is no separate transient lap, stable period, or modulo-time proof. The pointwise
+reverse-trace theorem uses the same first-arrival synchronization.
+
+Finally, the existing endpoint-coordinate law replaces two more inductions. On
+a switch-simple trace, an intermediate coordinate is one of its endpoint values.
+If the endpoints differ only at one coordinate, every intermediate **vector**
+is an endpoint vector. If a productive writer instead agreed at the endpoints,
+its two adjacent values would both equal that common value, a contradiction.
+Neither consequence needs a new analysis of the physical trace.
+
 ## Dependency and source reductions
 
 The transitive local-source closure of `StateLaw` includes the theorem's
@@ -333,6 +367,7 @@ comments and blanks, not just proof tactics.
 | After witness trimming and trace reuse | 52 | 19,175 |
 | After spatial-loop and action-orbit invariants | 52 | 17,733 |
 | After shared lobe contracts and first-contact excursions | 52 | 16,973 |
+| After grooved-return and first-arrival synchronization | 52 | 16,058 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -397,3 +432,10 @@ lines**, reducing the development from 17,752 to **16,992 lines** in 53 files
 (including the unchanged 19-line audit). Counts include every new helper and
 all comments and blank lines. The headline theorem, model, finite-state
 ceiling, attainment construction, and exact audit are unchanged.
+
+The grooved-return, first-arrival synchronization, and endpoint-reuse pass
+removes **915 retained Lean source lines**, from 16,992 to **16,077** in
+53 files, including the unchanged audit. This is net of all new general lemmas.
+The protected theorem, model, ceiling, attainment and axiom-audit files are
+byte-for-byte unchanged. All 418 explicitly declared public source theorems
+remain in the headline theorem's kernel dependency closure.

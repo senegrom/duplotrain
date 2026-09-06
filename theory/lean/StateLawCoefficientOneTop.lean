@@ -160,7 +160,7 @@ theorem PartialSecondRunSharp.ChangedContact.backward_all_time_zero_novelty
         (C.oriented.1, C.nextState) := by
     simpa [hbackward] using C.arrive_eq
   have hall :=
-    backward_contact_all_time_two_phase_two_history
+    backward_contact_all_time_two_phase
       hrecorded hrecordedNext A.entryEdge hcontact
       happroachReplay happroachNext
   let K := C.approach.length

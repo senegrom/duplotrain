@@ -12,21 +12,6 @@ all remaining motion is grooved in the original vector.
 
 namespace GeneralN
 
-theorem stay_twoPhase_concat
-    {w : Wiring} {start middle : Nat × Tongues}
-    {left right : Nat} {u v : Tongues}
-    (hleft : stepN w left start = some middle)
-    (hleftPhase : ∀ d, d ≤ left → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (hrightPhase : ∀ d, d ≤ right → ∃ port phase,
-      stepN w d middle = some (port, phase) ∧
-        (phase = u ∨ phase = v))
-    (d : Nat) (hd : d ≤ left + right) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) :=
-  stepN_cover_append hleft hleftPhase hrightPhase d hd
-
 /-- A complete manufactured stay-reflector traversal carries its incoming
 vector at every intermediate time. -/
 theorem ManufacturedStayReflector.travel_state_stepN

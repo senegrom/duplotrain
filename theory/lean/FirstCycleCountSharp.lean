@@ -33,27 +33,9 @@ theorem prefix_then_two_phase_cycle_distinct_le_succ_succ
     (times : List Nat)
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ N + 2 := by
-  have hpositive : 0 < cycle.length := by
-    cases cycle with
-    | nil => exact (hnonempty rfl).elim
-    | cons passage rest => simp
-  have hperiod : stepN w cycle.length (atRepeat.1, settled) =
-      some (atRepeat.1, settled) := hstable.sound
-  have hgrooved : PassagesGrooved settled cycle :=
-    hstable.grooved_of_switchSimple hsimple
-  have hsettledAll : ∀ d, ∃ port,
-      stepN w d (atRepeat.1, settled) = some (port, settled) := by
-    intro d
-    have hwindow : ∀ r, r ≤ cycle.length → ∃ port phase,
-        stepN w r (atRepeat.1, settled) = some (port, phase) ∧
-          (phase = settled ∨ phase = settled) := by
-      intro r hr
-      obtain ⟨port, hrun⟩ :=
-        hstable.grooved_prefix_tongues settled hgrooved hr
-      exact ⟨port, settled, hrun, Or.inl rfl⟩
-    obtain ⟨port, phase, hrun, hphase⟩ :=
-      periodic_two_phase_prefix_tongues hpositive hperiod hwindow d
-    exact ⟨port, by rcases hphase with h | h <;> rwa [h] at hrun⟩
+  have hpositive : 0 < cycle.length := List.length_pos_iff.mpr hnonempty
+  have hsettledAll := hstable.grooved_loop_all_time hpositive
+    (hstable.grooved_of_switchSimple hsimple)
   let history := ((List.range (L + 1)).map
     (restrictedTonguesAt w N start)) ++
       [VectorCount.restrict N settled]

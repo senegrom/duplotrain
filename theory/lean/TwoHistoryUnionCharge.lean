@@ -95,132 +95,30 @@ private theorem mem_erase_of_count_two
     rw [List.count_erase_self]
     omega
   · exact (List.mem_erase_of_ne hyx).mpr hy
-/-- In a switch-simple trace, a productive passage leaves a permanent
-change at its switch.  Simplicity excludes that switch from both the strict
-prefix and strict suffix, so neither side can hide or repair the write. -/
-theorem PhysicalTrace.simple_changed_passage_survives
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages before after : List Passage}
-    {p x : Nat} {u v : Tongues}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    (hsplit : passages = before ++ (p, x) :: after)
-    (hprefix : PhysicalTrace w start before (p, u))
-    (harrive : arrive u p = (x, v))
-    (hchanged :
-      v (passageSwitch (p, x)) ≠ u (passageSwitch (p, x))) :
-    finish.2 (passageSwitch (p, x)) ≠
-      start.2 (passageSwitch (p, x)) := by
-  have htrace' := htrace
-  have hsimple' := hsimple
-  rw [hsplit] at htrace' hsimple'
-  obtain ⟨middle, hbefore, hrest⟩ := htrace'.split_append
-  have hmiddle : middle = (p, u) := by
-    have hactual := hbefore.sound
-    have hgiven := hprefix.sound
-    rw [hgiven] at hactual
-    exact (Option.some.inj hactual).symm
-  subst middle
-  cases hrest with
-  | @cons _ _ q _ v' _ _ harrive' _hlink hafter =>
-      have hv' : v' = v := by
-        rw [harrive] at harrive'
-        exact (Prod.mk.inj harrive').2.symm
-      subst v'
-      unfold SwitchSimple at hsimple'
-      simp only [List.map_append, List.map_cons] at hsimple'
-      have hparts := List.nodup_append.mp hsimple'
-      have hprefixForeign :
-          ∀ prior ∈ before,
-            passageSwitch prior ≠ passageSwitch (p, x) := by
-        intro prior hprior hEq
-        have hne := hparts.2.2 (passageSwitch prior)
-          (List.mem_map.mpr ⟨prior, hprior, rfl⟩)
-          (passageSwitch (p, x)) (by simp)
-        exact hne hEq
-      have hsuffixForeign :
-          ∀ later ∈ after,
-            passageSwitch later ≠ passageSwitch (p, x) := by
-        have hheadTail := hparts.2.1
-        rw [List.nodup_cons] at hheadTail
-        intro later hlater hEq
-        apply hheadTail.1
-        exact List.mem_map.mpr ⟨later, hlater, hEq⟩
-      have hu := hprefix.preserves
-        (passageSwitch (p, x)) hprefixForeign
-      have hv := hafter.preserves
-        (passageSwitch (p, x)) hsuffixForeign
-      intro hfinish
-      apply hchanged
-      calc
-        v (passageSwitch (p, x)) =
-            finish.2 (passageSwitch (p, x)) := hv.symm
-        _ = start.2 (passageSwitch (p, x)) := hfinish
-        _ = u (passageSwitch (p, x)) := hu.symm
-
-/-- Raw-time form of
-`PhysicalTrace.simple_changed_passage_survives`: every productive event
-inside a switch-simple physical trace leaves its writer changed at the
-trace endpoint. -/
+/-- A productive event in a switch-simple trace permanently changes its
+writer. Otherwise both adjacent prefix values would equal the common endpoint
+value, contradicting productivity. No passage reconstruction is needed. -/
 theorem PhysicalTrace.simple_raw_productive_writer_survives
     {w : Wiring} {N : Nat}
-    {start finish : Nat × Tongues}
-    {passages : List Passage}
+    {start finish : Nat × Tongues} {passages : List Passage}
     (htrace : PhysicalTrace w start passages finish)
     (hsimple : SwitchSimple passages)
     {k : Nat} (hk : k < passages.length)
     (hprod : RawProductiveAt w N start k) :
     finish.2 (rawWriterAt w start k) ≠
       start.2 (rawWriterAt w start k) := by
-  let old : Passage := passages[k]
-  have hsplit :
-      passages =
-        passages.take k ++ old :: passages.drop (k + 1) := by
-    calc
-      passages = passages.take k ++ passages.drop k :=
-        (List.take_append_drop k passages).symm
-      _ = passages.take k ++ old :: passages.drop (k + 1) := by
-        rw [List.drop_eq_getElem_cons hk]
-  have htrace' := htrace
-  rw [hsplit] at htrace'
-  obtain ⟨atOld, hprefix, htail⟩ := htrace'.split_append
-  obtain ⟨cur, next, hcur, _hnext, hstep, hchange⟩ :=
+  obtain ⟨cur, next, hcur, hnext, _hstep, hchange⟩ :=
     rawProductiveAt_changes_writer hprod
-  have hprefixSound := hprefix.sound
-  rw [List.length_take_of_le (Nat.le_of_lt hk)] at hprefixSound
-  have hatOld : atOld = cur := by
-    rw [hcur] at hprefixSound
-    exact (Option.some.inj hprefixSound).symm
-  subst atOld
-  have hhead := htail.head_arrive
-  have hentry : cur.1 = old.1 := hhead.1
-  obtain ⟨afterOld, harriveOld⟩ := hhead.2
-  have harriveOld' :
-      arrive cur.2 old.1 = (old.2, afterOld) := by
-    simpa [old] using harriveOld
-  have hnextTongue : next.2 = afterOld := by
-    calc
-      next.2 = (arrive cur.2 cur.1).2 :=
-        (step_some_parts hstep).2
-      _ = afterOld := by
-        rw [hentry, harriveOld']
-  have harriveProductive :
-      arrive cur.2 old.1 = (old.2, next.2) := by
-    rw [harriveOld', hnextTongue]
-  have hprefix' :
-      PhysicalTrace w start (passages.take k)
-        (old.1, cur.2) := by
-    simpa [← hentry] using hprefix
-  have hchangedOld :
-      next.2 (passageSwitch old) ≠
-        cur.2 (passageSwitch old) := by
-    simpa [passageSwitch, ← hentry] using hchange
-  have hsurvives :=
-    htrace.simple_changed_passage_survives hsimple hsplit
-      hprefix' harriveProductive hchangedOld
-  have hwriter :=
-    htrace.rawWriterAt_eq_passageSwitch_getElem hk
-  simpa [old, hwriter] using hsurvives
+  have hwriter : rawWriterAt w start k = cur.1 / 3 := by
+    simp [rawWriterAt, rawEntryAt, hcur]
+  rw [hwriter]
+  intro heq
+  have hpre := htrace.prefix_coordinate_eq_endpoint hsimple (Nat.le_of_lt hk)
+    hcur (cur.1 / 3)
+  have hpost := htrace.prefix_coordinate_eq_endpoint hsimple (by omega)
+    hnext (cur.1 / 3)
+  rw [heq] at hpre hpost
+  exact hchange ((hpost.elim id id).trans (hpre.elim id id).symm)
 
 def ManufacturedReflector.reusableSwitches
     {w : Wiring} {g e : Nat}
@@ -688,126 +586,6 @@ theorem ManufacturedReflector.mem_preservedTwoHistoryCore
       ManufacturedReflector.preservedTwoHistoryCore,
       ManufacturedReflector.sharpConstructionHistory]
 
-
-/-- Exact all-time phase law for a backward old-support contact.  Time zero
-has the incoming state; every positive time has the settled post-contact
-state. -/
-theorem backward_contact_all_time_two_phase_two_history
-    {w : Wiring} {g e p oldEntry : Nat}
-    {oldBase oldEnd u v : Tongues}
-    {recorded approach : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, oldBase) recorded (oldEntry, oldEnd))
-    (hrecordedGrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    (happroach : PhysicalTrace w (e, u) approach (p, u))
-    (happroachGrooved : PassagesGrooved v approach) :
-    ∀ m, ∃ port phase,
-      stepN w m (p, u) = some (port, phase) ∧
-        (phase = u ∨ phase = v) := by
-  have hback := physicalTrace_contact_retraces_prefix
-    hrecorded hrecordedGrooved hentry hcontact
-  have hforward :=
-    happroach.replay_grooved v happroachGrooved
-  let cycle := (p, oldEntry) ::
-    reversePassages recorded ++ approach
-  have hcycle :
-      PhysicalTrace w (p, u) cycle (p, v) := by
-    dsimp [cycle]
-    simpa [List.append_assoc] using hback.append hforward
-  have hheadGrooved : arrive v oldEntry = (p, v) := by
-    have hbackLocal := arrive_back u p
-    rwa [hcontact] at hbackLocal
-  have hallGrooved : PassagesGrooved v cycle := by
-    intro passage hp
-    dsimp [cycle] at hp
-    rcases List.mem_cons.mp hp with hhead | htail
-    · simpa [hhead] using hheadGrooved
-    · rcases List.mem_append.mp htail with hold | hnew
-      · exact reversePassages_grooved
-          hrecordedGrooved passage hold
-      · exact happroachGrooved passage hnew
-  have hperiod :
-      stepN w cycle.length (p, v) = some (p, v) := by
-    dsimp [cycle]
-    exact run_grooved_passages w v p oldEntry p
-      (reversePassages recorded ++ approach)
-      hcycle.linked hallGrooved hcycle.last_link
-  have hcycleV : PhysicalTrace w (p, v) cycle (p, v) :=
-    hcycle.replay_grooved v hallGrooved
-  have hpositive : 0 < cycle.length := by
-    dsimp [cycle]
-    simp
-  have hallV : ∀ m, ∃ port,
-      stepN w m (p, v) = some (port, v) := by
-    intro m
-    have hwindow : ∀ d, d ≤ cycle.length → ∃ port phase,
-        stepN w d (p, v) = some (port, phase) ∧
-          (phase = v ∨ phase = v) := by
-      intro d hd
-      obtain ⟨port, hrun⟩ :=
-        hcycleV.grooved_prefix_tongues v hallGrooved hd
-      exact ⟨port, v, hrun, Or.inl rfl⟩
-    obtain ⟨port, phase, hrun, hphase⟩ :=
-      periodic_two_phase_prefix_tongues
-        hpositive hperiod hwindow m
-    rcases hphase with h | h <;>
-      exact ⟨port, by rwa [h] at hrun⟩
-  have hfromU : ∀ m, 1 ≤ m → ∃ port,
-      stepN w m (p, u) = some (port, v) := by
-    intro m hm
-    cases hback with
-    | @cons _ _ q₀ _ v' _ _ harrive' hlink htailBack =>
-        have hv' : v' = v := by
-          have h := harrive'.symm.trans hcontact
-          exact congrArg Prod.snd h
-        rw [hv'] at harrive' htailBack
-        have htail := htailBack.append hforward
-        have hone :
-            stepN w 1 (p, u) = some (q₀, v) := by
-          simp [stepN, step, harrive', hlink]
-        let m' := m - 1
-        have hmEq : m = 1 + m' := by
-          dsimp [m']
-          omega
-        have htailGrooved :
-            PassagesGrooved v
-              (reversePassages recorded ++ approach) := by
-          intro passage hp
-          exact hallGrooved passage
-            (List.mem_cons_of_mem _ hp)
-        by_cases hfirst :
-            m' ≤ (reversePassages recorded ++ approach).length
-        · obtain ⟨port, hrun⟩ :=
-            htail.grooved_prefix_tongues
-              v htailGrooved hfirst
-          refine ⟨port, ?_⟩
-          rw [hmEq, stepN_add, hone]
-          simpa using hrun
-        · let m'' := m' -
-              (reversePassages recorded ++ approach).length
-          have hm'Eq : m' =
-              (reversePassages recorded ++ approach).length +
-                m'' := by
-            dsimp [m'']
-            omega
-          obtain ⟨port, hrun⟩ := hallV m''
-          refine ⟨port, ?_⟩
-          rw [hmEq, stepN_add, hone]
-          simp only [Option.bind_some]
-          rw [hm'Eq, stepN_add]
-          have htailV :=
-            htail.replay_grooved v htailGrooved
-          rw [htailV.sound]
-          simpa using hrun
-  intro m
-  cases m with
-  | zero =>
-      exact ⟨p, u, by simp [stepN], Or.inl rfl⟩
-  | succ m =>
-      obtain ⟨port, hrun⟩ := hfromU (m + 1) (by omega)
-      exact ⟨port, v, hrun, Or.inr rfl⟩
 
 /-- The facing action mouth of a flip reflector is not part of its reusable
 support. -/

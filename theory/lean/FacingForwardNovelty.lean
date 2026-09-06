@@ -146,53 +146,21 @@ theorem ManufacturedFlipReflector.reverse_candy_suffix_absorbs_twoPhases
     exact hrepair
   have hreturnContact := physicalTrace_contact_retraces_prefix
     R.runwayTrace hrunwayAlternate R.entryEdge hfirstContact
-  have hreturnContact' : PhysicalTrace w (R.firstArm, contact)
-      ([(R.firstArm, R.mouth)] ++ reversePassages R.runway)
-      (g, alternate) := by
-    simpa using hreturnContact
-  obtain ⟨contactMiddle, hcontactChange, hcontactAfter⟩ :=
-    hreturnContact'.split_append
-  have hcontactMiddleTongues : contactMiddle.2 = alternate := by
-    have hone : step w (R.firstArm, contact) = some contactMiddle := by
-      simpa [stepN] using hcontactChange.sound
-    have hparts := step_some_parts hone
-    calc
-      contactMiddle.2 = arrivedTongues (R.firstArm, contact) := hparts.2
-      _ = alternate := by simp [arrivedTongues, hfirstContact]
-  have hcontactMiddle : contactMiddle = (contactMiddle.1, alternate) := by
-    apply Prod.ext
-    · rfl
-    · exact hcontactMiddleTongues
-  rw [hcontactMiddle] at hcontactChange hcontactAfter
-  have hreturnAfterGrooved :
-      PassagesGrooved alternate (reversePassages R.runway) :=
-    reversePassages_grooved hrunwayAlternate
-
-  have hreturnAlternate :
-      PhysicalTrace w (R.firstArm, alternate)
-        ((R.firstArm, R.mouth) :: reversePassages R.runway)
-        (g, alternate) :=
-    physicalTrace_contact_retraces_prefix R.runwayTrace
-      hrunwayAlternate R.entryEdge hfirstGrooveAlternate
-  have hreturnAlternate' : PhysicalTrace w (R.firstArm, alternate)
-      ([(R.firstArm, R.mouth)] ++ reversePassages R.runway)
-      (g, alternate) := by
-    simpa using hreturnAlternate
-  obtain ⟨alternateMiddle, halternateChange, halternateAfter⟩ :=
-    hreturnAlternate'.split_append
-  have halternateMiddleTongues : alternateMiddle.2 = alternate := by
-    have hone : step w (R.firstArm, alternate) = some alternateMiddle := by
-      simpa [stepN] using halternateChange.sound
-    have hparts := step_some_parts hone
-    calc
-      alternateMiddle.2 = arrivedTongues (R.firstArm, alternate) := hparts.2
-      _ = alternate := by simp [arrivedTongues, hfirstGrooveAlternate]
-  have halternateMiddle : alternateMiddle =
-      (alternateMiddle.1, alternate) := by
-    apply Prod.ext
-    · rfl
-    · exact halternateMiddleTongues
-  rw [halternateMiddle] at halternateChange halternateAfter
+  have hreturnAlternate := physicalTrace_contact_retraces_prefix
+    R.runwayTrace hrunwayAlternate R.entryEdge hfirstGrooveAlternate
+  have hreturnCover : ∀ current,
+      (current = contact ∨ current = alternate) →
+      arrive current R.firstArm = (R.mouth, alternate) →
+      ∀ d, d ≤ R.runway.length + 1 → ∃ port phase,
+        stepN w d (R.firstArm, current) = some (port, phase) ∧
+          (phase = contact ∨ phase = alternate) := by
+    intro current hs ha d hd
+    obtain ⟨port, hr⟩ := (physicalTrace_contact_retraces_prefix_pointwise
+      R.runwayTrace hrunwayAlternate R.entryEdge ha).2 d hd
+    refine ⟨port, _, hr, ?_⟩
+    split
+    · exact hs
+    · exact Or.inr rfl
 
   let journey := candyTail ++
     (R.firstArm, R.mouth) :: reversePassages R.runway
@@ -222,30 +190,24 @@ theorem ManufacturedFlipReflector.reverse_candy_suffix_absorbs_twoPhases
     rw [hjourneyLen]
     omega
   · intro d hd
-    have hlen : journey.length =
-        candyTail.length + 1 + (reversePassages R.runway).length := by
-      dsimp [journey]
-      simp only [List.length_append, List.length_cons]
-      omega
-    have hphase := PhysicalTrace.one_change_prefix_tongues
-      htailContact htailContactGrooved hcontactChange hcontactAfter
-        hreturnAfterGrooved (d := d) (by
-          rw [← hlen]
-          exact hd)
-    exact hphase
+    have hlead : ∀ t, t ≤ candyTail.length → ∃ port phase,
+        stepN w t (p, contact) = some (port, phase) ∧
+          (phase = contact ∨ phase = alternate) := by
+      intro t ht
+      obtain ⟨port, hr⟩ := htailContact.grooved_prefix_tongues contact htailContactGrooved ht
+      exact ⟨port, contact, hr, Or.inl rfl⟩
+    exact stepN_cover_append htailContact.sound hlead
+      (hreturnCover contact (Or.inl rfl) hfirstContact) d
+      (by simpa [journey, reversePassages_length, Nat.add_assoc] using hd)
   · intro d hd
-    have hlen : journey.length =
-        candyTail.length + 1 + (reversePassages R.runway).length := by
-      dsimp [journey]
-      simp only [List.length_append, List.length_cons]
-      omega
-    have hphase := PhysicalTrace.one_change_prefix_tongues
-      htailAlternate htailAlternateGrooved halternateChange
-        halternateAfter hreturnAfterGrooved (d := d) (by
-          rw [← hlen]
-          exact hd)
-    obtain ⟨port, phase, hrun, hphase⟩ := hphase
-    rcases hphase with hphase | hphase <;>
-      exact ⟨port, phase, hrun, Or.inr hphase⟩
+    have hlead : ∀ t, t ≤ candyTail.length → ∃ port phase,
+        stepN w t (p, alternate) = some (port, phase) ∧
+          (phase = contact ∨ phase = alternate) := by
+      intro t ht
+      obtain ⟨port, hr⟩ := htailAlternate.grooved_prefix_tongues alternate htailAlternateGrooved ht
+      exact ⟨port, alternate, hr, Or.inr rfl⟩
+    exact stepN_cover_append htailAlternate.sound hlead
+      (hreturnCover alternate (Or.inr rfl) hfirstGrooveAlternate) d
+      (by simpa [journey, reversePassages_length, Nat.add_assoc] using hd)
 
 end GeneralN

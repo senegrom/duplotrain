@@ -557,6 +557,15 @@ with their shared boundary vector erased, still fits the frame
 (\file{TwoHistoryUnionCharge.lean},
 \file{BoundaryOverlapTailCount.lean}).
 
+The endpoint-coordinate law also shortens this bookkeeping. On a
+switch-simple trace, each intermediate coordinate equals its initial or final
+value. Thus a productive writer cannot agree at the two endpoints: its values
+immediately before and after the write would both equal that common value.
+If the endpoints differ only at one coordinate, every intermediate vector is
+one of the endpoints, since all other coordinates are fixed and the remaining
+coordinate selects an endpoint
+(\file{TwoHistoryUnionCharge.lean}, \file{SimpleTraceOneNetChange.lean}).
+
 \subsection{The probe tree after one reflector}\label{ssec:probe}
 
 Assume now the wiring is total on the first $N$ switches and the run's
@@ -746,6 +755,30 @@ is needed for liveness
 (\file{ManufacturedPairNovelty.lean}, \file{RunwaySpliceNovelty.lean},
 \file{PartialSecondRunSharp.lean}).
 
+A further common repair invariant needs only a grooved reference approach
+from $e$ to $p$ and a positive return from $p$ to $e$ within
+$S=\{u,\operatorname{flip}_k(u)\}$, valid for either input phase. An
+undisturbed approach replays. A disturbed approach either avoids $k$ and
+replays with that fault, captures at its first stem contact, or synchronizes
+at its first branch contact with the reference approach and return. These
+positive covered excursions close the boundary invariant
+$\{e,p\}\times S$. Neither simplicity nor avoidance of $k$ is required for
+the approach. This replaces the separate capture, repair and avoidance period
+proofs for the protected facing exits
+(\file{TrackThetaPointwiseCore.lean}, \file{StateLawTwoCandidate.lean},
+\file{EarlyFacingConstant.lean}).
+
+Backward contacts and same-exit cycles use first-arrival synchronization
+instead. If $\operatorname{arrive}(u,p)=(x,v)$, the local switch law gives
+$\operatorname{arrive}(v,p)=(x,v)$ too: both starts have the same complete
+successor and therefore the same configuration at every positive time. A
+nonempty closed spatial route grooved by $v$ replays forever without changing
+$v$, even if its interior repeats switches. When the contact supplies such a
+route, the original run consequently has vector $u$ at time zero and $v$ at
+every positive time. There is no need to analyse a transient lap and then
+reduce time modulo a stable period
+(\file{TrackNovelReplay.lean}, \file{TripleSelfLinkSimpleCycleClosure.lean}).
+
 \subsection{Closed spatial routes and one variable tongue}
 
 For a strict splice inside the old reflector's loop, the new splice tongue
@@ -854,6 +887,7 @@ exploration is spent, the walk can only ever re-write two switches.
 Either would explain \emph{why} the constant is four: it is the size of a
 square.
 
+\clearpage
 \section{About the formalisation}\label{sec:formal}
 
 The development in \file{theory/lean} builds with Lean~4.32.2 and no
