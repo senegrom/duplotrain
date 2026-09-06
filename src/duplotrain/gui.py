@@ -740,6 +740,10 @@ def dispatch_session(
 
 def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
+        def setup(self) -> None:
+            super().setup()
+            self.connection.settimeout(10)
+
         def log_message(self, fmt: str, *args: Any) -> None:  # quiet
             pass
 
@@ -748,21 +752,72 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(payload)))
             self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
+            self.send_header("Content-Security-Policy", "frame-ancestors 'none'")
+            self.send_header("Cross-Origin-Resource-Policy", "same-origin")
             self.end_headers()
             self.wfile.write(payload)
 
         def _json(self, status: int, data: Any) -> None:
             self._send(status, json.dumps(data).encode("utf-8"), "application/json")
 
+        def _reject(self, status: int, message: str) -> bool:
+            # Do not reuse a connection with an unread, rejected request body.
+            self.close_connection = True
+            self._json(status, {"error": message})
+            return False
+
+        def _trusted_request(self) -> bool:
+            # Binding to loopback alone does not stop CSRF or DNS rebinding.
+            # Compare authorities literally: no suffix matching, DNS resolution,
+            # forwarded headers, userinfo, alternative IP spellings or other ports.
+            port = self.server.server_port
+            allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+            if port == 80:
+                allowed_hosts.update({"127.0.0.1", "localhost"})
+            hosts = self.headers.get_all("Host", [])
+            if len(hosts) != 1 or hosts[0].lower() not in allowed_hosts:
+                return self._reject(403, "invalid local editor host")
+            origins = self.headers.get_all("Origin", [])
+            if origins and (len(origins) != 1 or origins[0] != f"http://{hosts[0].lower()}"):
+                return self._reject(403, "cross-origin editor request forbidden")
+            sites = self.headers.get_all("Sec-Fetch-Site", [])
+            if (self.command == "POST" or self.path.startswith("/api/")) and sites:
+                if len(sites) != 1 or sites[0] not in ("same-origin", "none"):
+                    return self._reject(403, "cross-site editor request forbidden")
+            # Non-browser local clients need not send Origin/Fetch Metadata.
+            # Requiring non-simple JSON even for an empty POST closes the browser
+            # fallback: HTML forms/no-cors fetch cannot send it without preflight.
+            # We deliberately never grant CORS/preflight access.
+            if self.command == "POST":
+                types = self.headers.get_all("Content-Type", [])
+                if len(types) != 1 or types[0].split(";", 1)[0].strip().lower() != (
+                    "application/json"
+                ):
+                    return self._reject(415, "editor requests require application/json")
+            return True
+
         def _body(self) -> dict[str, Any]:
-            length = int(self.headers.get("Content-Length") or 0)
-            if not 0 <= length <= MAX_JSON_BYTES:
-                raise ValueError("request body larger than 2 MB or invalid length")
+            lengths = self.headers.get_all("Content-Length", [])
+            if self.headers.get_all("Transfer-Encoding") or len(lengths) > 1:
+                raise ValueError("unsupported or ambiguous request framing")
+            raw_length = lengths[0] if lengths else "0"
+            if not (raw_length.isascii() and raw_length.isdigit() and len(raw_length) <= 10):
+                raise ValueError("invalid request length")
+            length = int(raw_length)
+            if length > MAX_JSON_BYTES:
+                raise ValueError("request body larger than 2 MB")
             if not length:
                 return {}
-            return json.loads(self.rfile.read(length).decode("utf-8"))
+            payload = self.rfile.read(length)
+            if len(payload) != length:
+                raise ValueError("incomplete request body")
+            return json.loads(payload.decode("utf-8"))
 
         def do_GET(self) -> None:  # noqa: N802 (http.server API)
+            if not self._trusted_request():
+                return
             if self.path in ("/", "/index.html"):
                 html = resources.files("duplotrain").joinpath("static/editor.html")
                 self._send(200, html.read_bytes(), "text/html; charset=utf-8")
@@ -773,6 +828,8 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 self._json(404, {"error": f"no route {self.path}"})
 
         def do_POST(self) -> None:  # noqa: N802
+            if not self._trusted_request():
+                return
             try:
                 body = self._body()
                 with session.lock:
@@ -780,8 +837,15 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 self._json(200, result)
             except UnknownRouteError as exc:
                 self._json(404, {"error": str(exc)})
-            except (ValueError, KeyError, TypeError, IndexError, OverflowError) as exc:
-                self._json(409, {"error": str(exc)})
+            except TimeoutError:
+                self._reject(408, "request body timed out")
+            except (
+                ValueError, KeyError, TypeError, IndexError, OverflowError, RecursionError
+            ) as exc:
+                self._reject(409, str(exc))
+
+        def do_OPTIONS(self) -> None:  # noqa: N802
+            self._reject(403, "cross-origin editor access is not enabled")
 
     return Handler
 

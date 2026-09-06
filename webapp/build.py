@@ -26,6 +26,7 @@ import io
 import shutil
 import sys
 import tarfile
+import tempfile
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -46,30 +47,81 @@ PYODIDE_FILES = [
 ]
 
 
+# Reviewed release-asset SHA-256, not a checksum fetched alongside the download.
+# Source: https://api.github.com/repos/pyodide/pyodide/releases/assets/261126997
+# Add a reviewed digest here before using --pyodide-version for another release.
+PYODIDE_SHA256 = {
+    "0.27.7": "9bc8f127db6c590b191b9aee754022cb41b1a36c7bac233776c11c5ecb541be8",
+}
+MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
+MAX_RUNTIME_BYTES = 128 * 1024 * 1024
+
+
 def fetch_pyodide(version: str) -> Path:
-    """Download (once) and unpack the Pyodide core release into vendor/."""
+    """Verify the cached/downloaded archive on every build, then unpack it.
+
+    Never trust loose vendor files (including pre-checksum caches). Re-extract
+    from verified bytes so a modified cached runtime cannot enter the build.
+    """
+    expected = PYODIDE_SHA256.get(version)
+    if expected is None:
+        raise SystemExit(f"no reviewed Pyodide checksum for {version!r}; update PYODIDE_SHA256")
     target = VENDOR / f"pyodide-{version}"
-    if all((target / name).exists() for name in PYODIDE_FILES):
-        print(f"pyodide {version}: cached in {target}")
-        return target
-    url = (
-        "https://github.com/pyodide/pyodide/releases/download/"
-        f"{version}/pyodide-core-{version}.tar.bz2"
-    )
-    print(f"downloading {url} ...")
-    with urllib.request.urlopen(url) as response:
-        data = response.read()
-    print(f"  {len(data) / 1e6:.1f} MB; unpacking")
-    target.mkdir(parents=True, exist_ok=True)
+    archive = VENDOR / f"pyodide-core-{version}.tar.bz2"
+    if archive.exists():
+        with archive.open("rb") as source:
+            data = source.read(MAX_ARCHIVE_BYTES + 1)
+    else:
+        url = (
+            "https://github.com/pyodide/pyodide/releases/download/"
+            f"{version}/pyodide-core-{version}.tar.bz2"
+        )
+        print(f"downloading {url} ...")
+        with urllib.request.urlopen(url, timeout=30) as response:
+            data = response.read(MAX_ARCHIVE_BYTES + 1)
+    if len(data) > MAX_ARCHIVE_BYTES:
+        raise SystemExit("Pyodide archive exceeds the download size limit")
+    if hashlib.sha256(data).hexdigest() != expected:
+        raise SystemExit(f"Pyodide {version} checksum mismatch; remove {archive} and retry")
+
+    # Read only regular, allowlisted basenames; never extract archive paths or
+    # links. Validate all entries before changing the vendor directory.
+    payloads: dict[str, bytes] = {}
+    total = 0
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:bz2") as tar:
-        for member in tar.getmembers():
+        for member in tar:
             name = Path(member.name).name
-            if member.isfile() and name in PYODIDE_FILES:
-                payload = tar.extractfile(member).read()
-                (target / name).write_bytes(payload)
-    missing = [n for n in PYODIDE_FILES if not (target / n).exists()]
+            if name not in PYODIDE_FILES:
+                continue
+            if not member.isfile() or name in payloads:
+                raise SystemExit(f"invalid or duplicate Pyodide file: {name}")
+            total += member.size
+            if member.size < 0 or total > MAX_RUNTIME_BYTES:
+                raise SystemExit("Pyodide runtime exceeds the extraction size limit")
+            stream = tar.extractfile(member)
+            if stream is None:
+                raise SystemExit(f"cannot read Pyodide file: {name}")
+            with stream:
+                payloads[name] = stream.read()
+    missing = sorted(set(PYODIDE_FILES) - payloads.keys())
     if missing:
         raise SystemExit(f"pyodide release lacked expected files: {missing}")
+
+    VENDOR.mkdir(parents=True, exist_ok=True)
+    if not archive.exists():
+        # Publish only a complete verified cache, even after an interrupted build.
+        with tempfile.NamedTemporaryFile(dir=VENDOR, delete=False) as tmp:
+            temporary = Path(tmp.name)
+            try:
+                tmp.write(data)
+                tmp.close()
+                temporary.replace(archive)
+            finally:
+                temporary.unlink(missing_ok=True)
+    target.mkdir(parents=True, exist_ok=True)
+    for name, payload in payloads.items():
+        (target / name).write_bytes(payload)
+    print(f"pyodide {version}: SHA-256 verified; unpacked into {target}")
     return target
 
 
@@ -177,8 +229,11 @@ def _stamp_file(source: Path, dest: Path, replacements: dict[str, str]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pyodide-version", default="0.27.7")
+    parser.add_argument("--pyodide-version", default="0.27.7", choices=sorted(PYODIDE_SHA256))
     args = parser.parse_args()
+
+    # Verify dependencies before changing an existing deployable build.
+    pyodide_dir = fetch_pyodide(args.pyodide_version)
 
     # Refresh in place: OneDrive/Windows often hold transient locks on the big
     # pyodide directory, so overwrite rather than rmtree.
@@ -218,7 +273,6 @@ def main() -> None:
     )
     shutil.copy2(WEBAPP / "adapter.py", DIST / "adapter.py")
 
-    pyodide_dir = fetch_pyodide(args.pyodide_version)
     dest = DIST / pyodide_dirname
     dest.mkdir(exist_ok=True)
     for name in PYODIDE_FILES:
