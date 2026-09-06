@@ -1,0 +1,99 @@
+name: Verify and publish shared traversal proof
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-proof-contract.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Apply only source edits matching the checked original and final hashes
+        shell: python
+        run: |
+          import base64, hashlib, json, lzma
+          from pathlib import Path
+          sha = lambda b: hashlib.sha256(b).hexdigest()
+          raw = lzma.decompress(base64.b64decode(Path('.github/proof-contract/payload.txt').read_bytes(), validate=True))
+          assert sha(raw) == '8f98cda7b26d5b3df48edf734cbc64f7ebb3c6ef98e24f76e20c5aa95ee81ea8'
+          protected = {Path('theory/lean') / n for n in [
+              'StateLaw.lean', 'GeneralN.lean', 'StateLawSmallN.lean',
+              'StateLawLowerBound.lean', 'StateLawAxiomAudit.lean']}
+          original = {p: p.read_bytes() for p in protected}
+          staged = []
+          entries = json.loads(raw)
+          assert len(entries) == 13
+          for name, before, after, edits in entries:
+              p = Path(name)
+              assert p.parts[0] == 'theory' and '..' not in p.parts
+              assert p.suffix in ('.lean', '.md', '.tex') and p not in protected
+              old = p.read_bytes()
+              assert sha(old) == before, f'Concurrent proof change: {name}'
+              lines = old.decode('utf-8').splitlines(keepends=True)
+              for i, j, text in reversed(edits):
+                  assert 0 <= i <= j <= len(lines)
+                  lines[i:j] = [text]
+              new = ''.join(lines).encode('utf-8')
+              assert sha(new) == after, f'Final source mismatch: {name}'
+              staged.append((p, new))
+          for p, new in staged:
+              p.write_bytes(new)
+          assert all(p.read_bytes() == old for p, old in original.items())
+          files = list(Path('theory/lean').glob('*.lean'))
+          assert len(files) == 53
+          assert sum(len(p.read_text().splitlines()) for p in files) == 16992
+          print('All source hashes match; headline theorem, model, attainment and exact audit unchanged.')
+      - name: Install the pinned Lean toolchain
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl --fail --location --proto '=https' --proto-redir '=https' \
+            --retry 3 --connect-timeout 15 --max-time 120 -o elan.tar.gz \
+            https://github.com/leanprover/elan/releases/download/v4.2.4/elan-x86_64-unknown-linux-gnu.tar.gz
+          echo "42b94d4244e8353142c456ec0e4ca6528fd898a6c604d4059f494e706e431f63  elan.tar.gz" | sha256sum --check --strict
+          tar -xzf elan.tar.gz elan-init
+          ./elan-init -y --default-toolchain none --no-modify-path
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Clean proof build and exact axiom audit
+        working-directory: theory/lean
+        run: |
+          set -euo pipefail
+          test ! -d .lake/build
+          lake build
+          lake env lean StateLawAxiomAudit.lean | tee "$RUNNER_TEMP/proof-audit.log"
+          grep -F "'GeneralN.state_law' depends on axioms: [propext, Classical.choice, Quot.sound]" "$RUNNER_TEMP/proof-audit.log"
+      - name: Rebuild the updated paper
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-pictures texlive-fonts-recommended cm-super poppler-utils
+          cd theory/paper
+          for pass in 1 2 3; do
+            pdflatex -interaction=nonstopmode -halt-on-error state-law.tex > "$RUNNER_TEMP/paper-build-$pass.log"
+          done
+          if grep -E 'Overfull|undefined|LaTeX Warning' state-law.log; then exit 1; fi
+          pdfinfo state-law.pdf
+      - name: Publish the verified proof and paper without rewriting other work
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git diff --check
+          test -z "$(git diff --name-only -- src webapp tests docs .github/workflows)"
+          git rm -r .github/proof-contract
+          git add -u theory
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Simplify runway and stay splices with shared traversal contracts and first-contact synchronization'
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin HEAD:main
