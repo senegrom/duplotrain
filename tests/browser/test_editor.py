@@ -7,8 +7,8 @@ import pytest
 
 playwright = pytest.importorskip("playwright.sync_api")
 
-from duplotrain.gui import Session, make_server
-from duplotrain.layout import Layout, build_chain
+from duplotrain.gui import Session, make_server  # noqa: E402
+from duplotrain.layout import Layout, build_chain  # noqa: E402
 
 pytestmark = pytest.mark.browser
 
@@ -21,7 +21,10 @@ def browser():
         executable = os.environ.get("DUPLOTRAIN_BROWSER_PATH")
         if executable:
             kwargs["executable_path"] = executable
-        instance = getattr(manager, name).launch(**kwargs)
+        try:
+            instance = getattr(manager, name).launch(**kwargs)
+        except playwright.Error as exc:  # binary not downloaded
+            pytest.skip(f"{name} is unavailable: {exc}")
         yield instance
         instance.close()
 
@@ -146,7 +149,8 @@ def test_right_click_does_not_place_and_cancelled_drag_does_not_place(editor):
     bounds = page.locator("#canvas").bounding_box()
     page.mouse.move(bounds["x"] + 100, bounds["y"] + 150)
     page.mouse.down()
-    page.evaluate("Array.from(pointers.keys()).forEach(id => canvas.dispatchEvent(new PointerEvent('pointercancel', {pointerId: id})))")
+    page.evaluate("Array.from(pointers.keys()).forEach(id => canvas.dispatchEvent("
+                  "new PointerEvent('pointercancel', {pointerId: id})))")
     page.mouse.up()
     assert len(session.layout) == 0
     assert not errors

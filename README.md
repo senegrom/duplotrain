@@ -315,9 +315,14 @@ is where a Rust core would slot in.
 ## Tests
 
 ```
-python -m pytest                  # everything
-python -m pytest -m "not slow"    # skip the ~2 min full-enumeration proofs
+python -m pytest                            # everything installed browsers allow
+python -m pytest -m "not slow"              # skip the ~2 min full-enumeration proofs
+python -m pytest -m "not slow and not browser"  # what application CI runs first
 ```
+
+Tests marked `browser` need playwright plus a downloaded browser; they skip when
+either is missing. See *Editor recovery and application checks* below for the
+full local command sequence.
 
 The suite covers the number field, the pose lattice, piece derivation, the documented
 geometric identities (the `L,R,R,L` snake equals four straights exactly; `R,R,L,L`
