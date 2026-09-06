@@ -3,11 +3,12 @@ import RunwaySpliceNovelty
 /-!
 # A support fault on the selected route
 
-Normalize the reflector's outward route once. Before its unique contact
+Normalize the reflector's outward route once. Before its first contact
 with the disturbed switch the flipped and undisturbed walks differ only
 at that switch. A stem entry invokes the other reflector's capture; a
 branch entry repairs the tongue and merges into the undisturbed walk.
-The same argument handles runway, forward-candy, and reverse-candy contacts.
+The shared first-contact law also handles arbitrary grooved lobes, without
+requiring their routes to be switch-simple.
 -/
 
 namespace GeneralN
@@ -40,77 +41,6 @@ theorem ManufacturedReflector.orientedRoute_length_le_travel
     (state : Tongues) : (B.orientedRoute state).length ≤ B.toSupported.travel := by
   rw [B.travel_eq_oriented_add state]
   omega
-
-/-- Prepending a constant-tongue trace preserves a two-phase cover. -/
-theorem PhysicalTrace.prepend_two_phase
-    {w : Wiring} {s p q L : Nat} {u v : Tongues} {lead : List Passage}
-    (hprefix : PhysicalTrace w (s, u) lead (p, u))
-    (hgrooved : PassagesGrooved u lead)
-    (hend : stepN w L (p, u) = some (q, v))
-    (hphases : ∀ d, d ≤ L → ∃ port phase,
-      stepN w d (p, u) = some (port, phase) ∧
-        (phase = u ∨ phase = v)) :
-    stepN w (lead.length + L) (s, u) = some (q, v) ∧
-      ∀ d, d ≤ lead.length + L → ∃ port phase,
-        stepN w d (s, u) = some (port, phase) ∧
-          (phase = u ∨ phase = v) := by
-  constructor
-  · rw [stepN_add, hprefix.sound]
-    exact hend
-  · intro d hd
-    by_cases hpre : d ≤ lead.length
-    · obtain ⟨port, hp⟩ := hprefix.grooved_prefix_tongues u hgrooved hpre
-      exact ⟨port, u, hp, Or.inl rfl⟩
-    · have hle : d - lead.length ≤ L := by omega
-      obtain ⟨port, phase, hr, hv⟩ := hphases _ hle
-      refine ⟨port, phase, ?_, hv⟩
-      have heq : d = lead.length + (d - lead.length) := by omega
-      rw [heq, stepN_add, hprefix.sound]
-      exact hr
-
-/-- A trailing contact repairs a single fault and synchronizes the walks.
-Before the repair only the disturbed state is seen; after it the two
-configurations agree at every time, even beyond the reference trace. -/
-theorem PhysicalTrace.trailing_fault_merges
-    {w : Wiring} {s p x : Nat} {u : Tongues} {finish : Nat × Tongues}
-    {route before after : List Passage}
-    (htrace : PhysicalTrace w (s, u) route finish)
-    (hgrooved : PassagesGrooved u route)
-    (hsimple : SwitchSimple route)
-    (hoccurs : route = before ++ (p, x) :: after)
-    (hbranch : p % 3 ≠ 0) :
-    (∀ d, d ≤ before.length → ∃ port,
-      stepN w d (s, flipAt u (p / 3)) = some (port, flipAt u (p / 3))) ∧
-    (∀ d, before.length + 1 ≤ d →
-      stepN w d (s, flipAt u (p / 3)) = stepN w d (s, u)) := by
-  obtain ⟨hprefix, hforeign⟩ := simple_grooved_trace_prefix_to_occurrence
-    htrace hoccurs hgrooved hsimple
-  have hpreGrooved : PassagesGrooved u before := by
-    intro passage hp
-    apply hgrooved passage
-    rw [hoccurs]
-    exact List.mem_append_left _ hp
-  have hflip : PhysicalTrace w (s, flipAt u (p / 3)) before
-      (p, flipAt u (p / 3)) := hprefix.flip_unvisited hforeign
-  have hpreFlip := grooved_after_flip_other hpreGrooved hforeign
-  have hgroove : arrive u x = (p, u) := by
-    apply hgrooved (p, x)
-    rw [hoccurs]
-    exact List.mem_append_right _ List.mem_cons_self
-  have hforward := groove_forward hgroove
-  have hlocal := flipped_passage_forward_trailing hforward hbranch
-  have hmerged : stepN w (before.length + 1) (s, flipAt u (p / 3)) =
-      stepN w (before.length + 1) (s, u) := by
-    rw [stepN_add w before.length 1, stepN_add w before.length 1,
-      hprefix.sound, hflip.sound]
-    simp [stepN, step, hlocal, hforward]
-  constructor
-  · intro d hd
-    exact hflip.grooved_prefix_tongues _ hpreFlip hd
-  · intro d hd
-    have heq : d = (before.length + 1) + (d - (before.length + 1)) := by omega
-    rw [heq, stepN_add w (before.length + 1),
-      stepN_add w (before.length + 1), hmerged]
 
 /-- The pointwise support-fault dichotomy is a stem/branch split on the
 actual selected route, not a case split on where that route was stored. -/
@@ -151,45 +81,19 @@ theorem ManufacturedReflector.support_fault_dichotomy_pointwise
     · have hsame := arrive_exit_switch state old.2
       rw [holdGroove] at hsame
       exact hsame.symm.trans hsw
-  rcases passage with ⟨p, x⟩
-  obtain ⟨before, after, hoccurs⟩ := List.append_of_mem hmem
-  change p / 3 = A.actionSwitch at hswitch
-  by_cases hstem : p % 3 = 0
-  · have hmouth : p = A.mouth := by
-      have hm := A.mouth_is_stem
-      unfold ManufacturedFlipReflector.actionSwitch at hswitch
-      omega
-    subst p
-    obtain ⟨hprefix, hforeign⟩ := simple_grooved_trace_prefix_to_occurrence
-      htrace hoccurs hgrooved hsimple
-    have hpreGrooved : PassagesGrooved state before := by
-      intro passage hp
-      exact hgrooved passage (by rw [hoccurs]; exact List.mem_append_left _ hp)
-    have hprefixFlip : PhysicalTrace w (e, flipAt state A.actionSwitch) before
-        (A.mouth, flipAt state A.actionSwitch) := hprefix.flip_unvisited hforeign
-    have hpreFlip := grooved_after_flip_other hpreGrooved hforeign
-    have hcapture := A.capture_from_mouth state
-      (pathGrooves_pair.mp hA).1 (pathGrooves_pair.mp hA).2
-    exact Or.inl ⟨before.length + (A.candy.length + 2 + A.runway.length),
-      hprefixFlip.prepend_two_phase hpreFlip hcapture
-        (fun _ hd => A.capture_from_mouth_two_phase state
-          (pathGrooves_pair.mp hA).1 (pathGrooves_pair.mp hA).2 hd)⟩
-  · have hmerge := htrace.trailing_fault_merges hgrooved hsimple hoccurs hstem
-    rw [hswitch] at hmerge
-    have hrouteLen := B.orientedRoute_length_le_travel state
-    have hrepairLe : before.length + 1 ≤ B.toSupported.travel := by
-      rw [hoccurs, List.length_append, List.length_cons] at hrouteLen
-      omega
-    right
-    constructor
-    · rw [hmerge.2 _ hrepairLe]
-      exact (B.toSupported.run state hB).1
-    · intro d hd
-      by_cases hpre : d ≤ before.length
-      · obtain ⟨port, hr⟩ := hmerge.1 d hpre
-        exact ⟨port, flipAt state A.actionSwitch, hr, Or.inl rfl⟩
-      · obtain ⟨port, phase, hr, hv⟩ := B.travel_two_phase_stepN state hB hd
-        exact ⟨port, phase, (hmerge.2 d (by omega)).trans hr, Or.inr hv⟩
+  rcases A.grooved_route_fault state hA htrace hgrooved
+      ⟨passage, hmem, hswitch⟩ with hcapture | hrepair
+  · exact Or.inl hcapture
+  · obtain ⟨cutoff, hcutoff, hpre, hmerge⟩ := hrepair
+    have hle : cutoff ≤ B.toSupported.travel :=
+      Nat.le_trans hcutoff (B.orientedRoute_length_le_travel state)
+    refine Or.inr ⟨(hmerge _ hle).trans (B.toSupported.run state hB).1, ?_⟩
+    intro d hd
+    by_cases hearly : d < cutoff
+    · obtain ⟨port, hr⟩ := hpre d hearly
+      exact ⟨port, _, hr, Or.inl rfl⟩
+    · obtain ⟨port, phase, hr, hv⟩ := B.travel_two_phase_stepN state hB hd
+      exact ⟨port, phase, (hmerge d (by omega)).trans hr, Or.inr hv⟩
 
 /-- Flip/flip specialization of the selected-route theorem. -/
 theorem manufactured_support_fault_dichotomy_pointwise

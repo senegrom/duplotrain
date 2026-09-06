@@ -457,32 +457,6 @@ theorem flipped_passage_forward_trailing
     · simp [hj]
   simp [arrive, hpbranch, hrestore, hx]
 
-/-- A trace prefix which does not visit `k` is unchanged by flipping `k`;
-if its endpoint is the old lobe's mouth, append the mouth-capture and obtain
-an exact return to the prefix's starting port. -/
-theorem theta_capture_after_unvisited_prefix
-    {w : Wiring} {e p k cap : Nat} {u : Tongues}
-    {before : List Passage}
-    (hprefix : PhysicalTrace w (e, u) before (p, u))
-    (hforeign : ∀ passage ∈ before,
-      passageSwitch passage ≠ k)
-    (hcapture : stepN w cap (p, flipAt u k) = some (e, u)) :
-    stepN w (before.length + cap) (e, flipAt u k) =
-      some (e, u) := by
-  have hprefixFlip := hprefix.flip_unvisited hforeign
-  rw [stepN_add, hprefixFlip.sound]
-  exact hcapture
-
-theorem suffix_after_physical_prefix
-    {w : Wiring} {start middle finish : Nat × Tongues}
-    {passages : List Passage} {total tail : Nat}
-    (hprefix : PhysicalTrace w start passages middle)
-    (hlen : total = passages.length + tail)
-    (hfull : stepN w total start = some finish) :
-    stepN w tail middle = some finish := by
-  rw [hlen, stepN_add, hprefix.sound] at hfull
-  exact hfull
-
 /-- After the crossed passage at a first revisit, every groove away from the
 revisited switch survives.  In particular, the simple runway and the candy
 interior are simultaneously grooved in the state in which the train starts

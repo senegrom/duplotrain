@@ -229,6 +229,79 @@ theorem stepN_mul_period_pair_novelty
 /-- The two local actions preserve their four-corner orbit and both groove
 supports. Alternate positive-length traversals inside that invariant; there
 is no need to calculate a four-leg time window or reduce time modulo a period. -/
+theorem SupportedReflector.pair_all_time_four_phase
+    {w : Wiring} {g e : Nat}
+    (A : SupportedReflector w g e)
+    (B : SupportedReflector w e g)
+    (hApos : 0 < A.travel) (hBpos : 0 < B.travel)
+    (hAtwo : ∀ state, PathGrooves A.paths state → ∀ d, d ≤ A.travel →
+      ∃ port phase, stepN w d (g, state) = some (port, phase) ∧
+        (phase = state ∨ phase = A.action.apply state))
+    (hBtwo : ∀ state, PathGrooves B.paths state → ∀ d, d ≤ B.travel →
+      ∃ port phase, stepN w d (e, state) = some (port, phase) ∧
+        (phase = state ∨ phase = B.action.apply state))
+    (state : Tongues)
+    (hA : PathGrooves A.paths state)
+    (hB : PathGrooves B.paths state)
+    (hAB : A.action.Avoids B.paths)
+    (hBA : B.action.Avoids A.paths)
+    (d : Nat) :
+    ∃ port phase, stepN w d (g, state) = some (port, phase) ∧
+    phase ∈
+      [state,
+       A.action.apply state,
+       B.action.apply (A.action.apply state),
+       A.action.apply
+         (B.action.apply (A.action.apply state))] := by
+  let a := A.action
+  let b := B.action
+  let safe := fun u => u ∈ [state, a.apply state, b.apply (a.apply state), b.apply state]
+  have hfour : a.apply (b.apply (a.apply state)) = b.apply state := by
+    rw [a.commute b, a.involutive]
+  have hsafeA : ∀ u, safe u → safe (a.apply u) := by
+    intro u hu
+    simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
+    rcases hu with rfl | rfl | rfl | rfl <;>
+      simp [safe, a.involutive, hfour, a.commute b]
+  have hsafeB : ∀ u, safe u → safe (b.apply u) := by
+    intro u hu
+    simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
+    rcases hu with rfl | rfl | rfl | rfl <;> simp [safe, b.involutive]
+  let boundary := fun c : Nat × Tongues =>
+    (c.1 = g ∨ c.1 = e) ∧ safe c.2 ∧
+      PathGrooves A.paths c.2 ∧ PathGrooves B.paths c.2
+  have hprogress : ∀ start, boundary start → ∃ travel finish,
+      0 < travel ∧ stepN w travel start = some finish ∧ boundary finish ∧
+      ∀ t, t ≤ travel → ∃ port phase,
+        stepN w t start = some (port, phase) ∧ safe phase := by
+    intro ⟨p, u⟩ ⟨hp, hu, huA, huB⟩
+    dsimp only at hp hu huA huB
+    rcases hp with hp | hp
+    · subst p
+      refine ⟨A.travel, (e, a.apply u), hApos,
+        (A.run u huA).1,
+        ⟨Or.inr rfl, hsafeA u hu,
+          (A.run u huA).2,
+          huB.after_avoiding_action hAB⟩, ?_⟩
+      intro t ht
+      obtain ⟨port, phase, hr, hv⟩ := hAtwo u huA t ht
+      exact ⟨port, phase, hr, hv.elim (fun h => h.symm ▸ hu) (fun h => h.symm ▸ hsafeA u hu)⟩
+    · subst p
+      refine ⟨B.travel, (g, b.apply u), hBpos,
+        (B.run u huB).1,
+        ⟨Or.inl rfl, hsafeB u hu, huA.after_avoiding_action hBA,
+          (B.run u huB).2⟩, ?_⟩
+      intro t ht
+      obtain ⟨port, phase, hr, hv⟩ := hBtwo u huB t ht
+      exact ⟨port, phase, hr, hv.elim (fun h => h.symm ▸ hu) (fun h => h.symm ▸ hsafeB u hu)⟩
+  obtain ⟨port, phase, hr, hs⟩ := stepN_covered_of_progress boundary safe hprogress
+    (start := (g, state)) ⟨Or.inl rfl, by simp [safe], hA, hB⟩ d
+  refine ⟨port, phase, hr, ?_⟩
+  change phase ∈ [state, a.apply state, b.apply (a.apply state),
+    a.apply (b.apply (a.apply state))]
+  simpa only [hfour] using hs
+
+/-- Manufactured reflectors supply the abstract pair law with their two-phase traversals. -/
 theorem manufactured_pair_all_time_four_phase_tongues
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
@@ -245,51 +318,11 @@ theorem manufactured_pair_all_time_four_phase_tongues
        B.toSupported.action.apply (A.toSupported.action.apply state),
        A.toSupported.action.apply
          (B.toSupported.action.apply (A.toSupported.action.apply state))] := by
-  let a := A.toSupported.action
-  let b := B.toSupported.action
-  let safe := fun u => u ∈ [state, a.apply state, b.apply (a.apply state), b.apply state]
-  have hfour : a.apply (b.apply (a.apply state)) = b.apply state := by
-    rw [a.commute b, a.involutive]
-  have hsafeA : ∀ u, safe u → safe (a.apply u) := by
-    intro u hu
-    simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
-    rcases hu with rfl | rfl | rfl | rfl <;>
-      simp [safe, a.involutive, hfour, a.commute b]
-  have hsafeB : ∀ u, safe u → safe (b.apply u) := by
-    intro u hu
-    simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
-    rcases hu with rfl | rfl | rfl | rfl <;> simp [safe, b.involutive]
-  let boundary := fun c : Nat × Tongues =>
-    (c.1 = g ∨ c.1 = e) ∧ safe c.2 ∧
-      PathGrooves A.toSupported.paths c.2 ∧ PathGrooves B.toSupported.paths c.2
-  have hprogress : ∀ start, boundary start → ∃ travel finish,
-      0 < travel ∧ stepN w travel start = some finish ∧ boundary finish ∧
-      ∀ t, t ≤ travel → ∃ port phase,
-        stepN w t start = some (port, phase) ∧ safe phase := by
-    intro ⟨p, u⟩ ⟨hp, hu, huA, huB⟩
-    dsimp only at hp hu huA huB
-    rcases hp with hp | hp
-    · subst p
-      refine ⟨A.toSupported.travel, (e, a.apply u), A.travel_pos,
-        (A.toSupported.run u huA).1,
-        ⟨Or.inr rfl, hsafeA u hu,
-          huA.after_avoiding_action A.action_avoids_own_support,
-          huB.after_avoiding_action hAB⟩, ?_⟩
-      intro t ht
-      obtain ⟨port, phase, hr, hv⟩ := A.travel_two_phase_stepN u huA ht
-      exact ⟨port, phase, hr, hv.elim (fun h => h.symm ▸ hu) (fun h => h.symm ▸ hsafeA u hu)⟩
-    · subst p
-      refine ⟨B.toSupported.travel, (g, b.apply u), B.travel_pos,
-        (B.toSupported.run u huB).1,
-        ⟨Or.inl rfl, hsafeB u hu, huA.after_avoiding_action hBA,
-          huB.after_avoiding_action B.action_avoids_own_support⟩, ?_⟩
-      intro t ht
-      obtain ⟨port, phase, hr, hv⟩ := B.travel_two_phase_stepN u huB ht
-      exact ⟨port, phase, hr, hv.elim (fun h => h.symm ▸ hu) (fun h => h.symm ▸ hsafeB u hu)⟩
-  obtain ⟨port, phase, hr, hs⟩ := stepN_covered_of_progress boundary safe hprogress
-    (start := (g, state)) ⟨Or.inl rfl, by simp [safe], hA, hB⟩ d
-  change tonguesAt w (g, state) d ∈ [state, a.apply state, b.apply (a.apply state),
-    a.apply (b.apply (a.apply state))]
-  simpa only [tonguesAt, hr, Option.getD_some, hfour] using hs
+  obtain ⟨port, phase, hr, hs⟩ := A.toSupported.pair_all_time_four_phase B.toSupported
+    A.travel_pos B.travel_pos
+    (fun u hu _ ht => A.travel_two_phase_stepN u hu ht)
+    (fun u hu _ ht => B.travel_two_phase_stepN u hu ht)
+    state hA hB hAB hBA d
+  simpa [tonguesAt, hr] using hs
 
 end GeneralN

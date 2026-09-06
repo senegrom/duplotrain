@@ -26,10 +26,9 @@ excursions instead of enumerated contact periods. Capture is a suffix of
 ordinary traversal. Shortened reflectors reuse their original construction
 witnesses rather than rebuilding them in the later tongue state.
 
-The retained development has 53 Lean files and 19,194 source lines,
+The retained development has 53 Lean files and 16,992 source lines,
 including its 19-line axiom audit; the headline import closure has 52
-modules and 19,175 lines. That is 4,531 fewer lines than the reviewed
-23,725-line baseline. Source lines include comments and blank lines.
+modules and 16,973 lines. Source lines include comments and blank lines.
 The theorem statement, model, finite-state ceiling, attainment constructions,
 and exact axiom audit are unchanged. Git history retains superseded proofs.
 
@@ -42,10 +41,12 @@ the shared-history budgets, and the trace-reuse arguments. Build with
 **`switch_ceiling_proof.py`** is the perfection exhaustion engine used by
 `tests/test_switch_ceiling.py`.
 
-The latest reduction closes spatial routes under a one-bit tongue invariant,
-rather than splitting candy splices into approach-contact and approach-foreign
-period cases. Avoiding reflector pairs likewise close a four-corner action
-orbit without a four-leg timing calculation. The retained Lean development is
-17,752 lines in 53 files, with the headline statement and exact axiom audit
-unchanged. The paper omits the standalone elementary `2^N` ceiling section;
-its one-line observation and the formal ceiling theorem remain.
+Spatial loops use a one-bit invariant instead of contact/avoidance period
+cases. The general two-phase reflector contract now also handles arbitrary
+grooved lobes and stay-reflector splices. Their four-corner (or collapsed
+two-corner) orbit is preserved by positive excursions, which provide both
+liveness and pointwise phase bounds without calculating periods. One shared
+first-contact theorem handles both arbitrary routes with repeated switches
+and the switch-simple manufactured routes. The paper and Lean guide describe
+these reductions; the elementary `2^N` ceiling remains a one-line observation
+in the paper's assembly rather than a standalone section.

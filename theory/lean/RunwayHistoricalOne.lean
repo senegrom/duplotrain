@@ -84,10 +84,9 @@ theorem manufactured_flip_arbitrary_lobe_absolute_one_novelty
     (hlead : ∀ j ∈ times, j < K →
       restrictedTonguesAt w N start j ∈ history) :
     NoveltyCoverOn w N start times history 1 := by
-  obtain ⟨period, hperiodPositive, hperiod, _hwindow⟩ :=
-    manufactured_flip_arbitrary_lobe_four_phase_period C state hCpaths
-      hNewAvoidsC hentryBranch hentrySwitch hgrooved htrace hcrossed
-      hCandyForeign hLobe hmouthLink hcontact
+  have hcover := manufactured_flip_arbitrary_lobe_all_time_four_phase C state hCpaths
+    hNewAvoidsC hentryBranch hentrySwitch hgrooved htrace hcrossed
+    hCandyForeign hLobe hmouthLink hcontact
   apply absolute_one_novelty_of_historical_first_third_fourth_four_phase
     (u := flipAt state (mouth / 3))
     (v₁ := flipAt (flipAt state (mouth / 3)) C.actionSwitch)
@@ -95,12 +94,11 @@ theorem manufactured_flip_arbitrary_lobe_absolute_one_novelty
     (v₃ := flipAt state C.actionSwitch)
     hreach
   · intro d
-    exact runway_period_stepN_some hperiodPositive hperiod
+    obtain ⟨port, phase, hr, _⟩ := hcover d
+    exact ⟨(port, phase), hr⟩
   · intro d
-    exact manufactured_flip_arbitrary_lobe_all_time_four_phase_tongues
-      C state hCpaths hNewAvoidsC hentryBranch hentrySwitch
-      hgrooved htrace hcrossed hCandyForeign hLobe hmouthLink
-      hcontact d
+    obtain ⟨port, phase, hr, hs⟩ := hcover d
+    simpa [tonguesAt, hr] using hs
   · exact hentryHistorical
   · exact hstateHistorical
   · exact holdHistorical
@@ -144,9 +142,9 @@ theorem manufactured_suffix_explicit_lobe_absolute_one_novelty
     (hlead : ∀ j ∈ times, j < K →
       restrictedTonguesAt w N start j ∈ history) :
     NoveltyCoverOn w N start times history 1 := by
-  obtain ⟨period, hperiodPos, hperiod⟩ :=
-    manufactured_suffix_explicit_lobe_period C state hCpaths
-      hNewAvoidsC hgrooved hCandyForeignNew hCandyForeignOld hLobe
+  have hcover := manufactured_suffix_explicit_lobe_all_time_four_phase
+    C state hCpaths hNewAvoidsC hActionsNe hentryBranch hentrySwitch
+    hgrooved htrace hcrossed hCandyForeignNew hCandyForeignOld hLobe hmouthLink
   apply absolute_one_novelty_of_historical_first_third_fourth_four_phase
     (u := flipAt state (mouth / 3))
     (v₁ := flipAt (flipAt state (mouth / 3)) C.actionSwitch)
@@ -154,12 +152,11 @@ theorem manufactured_suffix_explicit_lobe_absolute_one_novelty
     (v₃ := state)
     hreach
   · intro d
-    exact runway_period_stepN_some hperiodPos hperiod
+    obtain ⟨port, phase, hr, _⟩ := hcover d
+    exact ⟨(port, phase), hr⟩
   · intro d
-    exact manufactured_suffix_explicit_lobe_all_time_four_phase_tongues
-      C state hCpaths hNewAvoidsC hActionsNe hentryBranch
-      hentrySwitch hgrooved htrace hcrossed hCandyForeignNew
-      hCandyForeignOld hLobe hmouthLink d
+    obtain ⟨port, phase, hr, hs⟩ := hcover d
+    simpa [tonguesAt, hr] using hs
   · exact hentryHistorical
   · exact holdHistorical
   · exact hstateHistorical

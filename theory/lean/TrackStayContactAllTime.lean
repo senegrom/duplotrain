@@ -24,20 +24,8 @@ theorem stay_twoPhase_concat
         (phase = u ∨ phase = v))
     (d : Nat) (hd : d ≤ left + right) :
     ∃ port phase, stepN w d start = some (port, phase) ∧
-      (phase = u ∨ phase = v) := by
-  by_cases hdl : d ≤ left
-  · exact hleftPhase d hdl
-  · let r := d - left
-    have hr : r ≤ right := by
-      dsimp [r]
-      omega
-    have hdecomp : d = left + r := by
-      dsimp [r]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hrightPhase r hr
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdecomp, stepN_add, hleft]
-    exact hrun
+      (phase = u ∨ phase = v) :=
+  stepN_cover_append hleft hleftPhase hrightPhase d hd
 
 /-- A complete manufactured stay-reflector traversal carries its incoming
 vector at every intermediate time. -/

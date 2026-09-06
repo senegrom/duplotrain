@@ -286,208 +286,68 @@ theorem ChangedContact.forward_stay_two_phase_tail
       C.split C.full_simple C.approach_trace C.old_grooves
       C.arrive_eq C.changed C.oriented_mem C.oriented_groove
       C.oriented_switch hforward hrepair hrestored
-  let k := mouth / 3
-  let alternate := flipAt C.contactState k
-  have hCandyFlip : PassagesGrooved alternate candy := by
-    dsimp [alternate, k]
-    exact grooved_after_flip_other hCandy hCandyForeign
-  have hOldRoute :=
-    (ManufacturedReflector.stay R).orientedRoute_trace
-      C.contactState hRpaths
-  have hOldSimple :=
-    (ManufacturedReflector.stay R).orientedRoute_simple C.contactState
-  have hOldGrooved := hOldRoute.grooved_of_switchSimple hOldSimple
-  have hOldForward : arrive C.contactState entry =
-      (mouth, C.contactState) :=
-    groove_forward (hOldGrooved (entry, mouth) hentryOld)
+  have hOldRoute := (ManufacturedReflector.stay R).orientedRoute_trace C.contactState hRpaths
+  have hOldGrooved := hOldRoute.grooved_of_switchSimple
+    ((ManufacturedReflector.stay R).orientedRoute_simple C.contactState)
+  have hOldForward := groove_forward (hOldGrooved (entry, mouth) hentryOld)
   have hentryMouthSwitch : entry / 3 = mouth / 3 := by
-    have hswitch := arrive_exit_switch C.contactState entry
-    rw [hOldForward] at hswitch
-    exact hswitch.symm
-  have hallAfter : ∀ d, ∃ port phase,
-      stepN w d (outside, alternate) = some (port, phase) ∧
-      (phase = alternate ∨ phase = C.contactState) := by
-    change (entry, mouth) ∈ R.runway ++ [(R.mouth, R.arm)] at hentryOld
-    rcases List.mem_append.mp hentryOld with hrunway | hcore
-    · obtain ⟨before, after, hsplit⟩ := List.append_of_mem hrunway
-      obtain ⟨D, hDpaths, hAvoid⟩ :=
-        R.suffix_after_runway_passage
-          C.contactState hRpaths hsplit hmouthLink
-      have hAvoid' :
-          (LocalAction.flip k).Avoids D.toSupported.paths := by
-        dsimp [k]
-        simpa [hentryMouthSwitch] using hAvoid
-      have hDalt : PathGrooves D.toSupported.paths alternate := by
-        dsimp [alternate]
-        exact hDpaths.after_avoiding_action hAvoid'
-      let dTravel := D.toSupported.travel
-      let lTravel := candy.length + 2
-      have hDaltEnd : stepN w dTravel (outside, alternate) =
-          some (mouth, alternate) := by
-        dsimp [dTravel]
-        exact (D.toSupported.run alternate hDalt).1
-      have hDstateEnd : stepN w dTravel (outside, C.contactState) =
-          some (mouth, C.contactState) := by
-        dsimp [dTravel]
-        exact (D.toSupported.run C.contactState hDpaths).1
-      have hDaltPhase : ∀ d, d ≤ dTravel → ∃ port phase,
-          stepN w d (outside, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        obtain ⟨port, hrun⟩ :=
-          D.travel_state_stepN alternate hDalt (by
-            simpa [dTravel, ManufacturedReflector.toSupported,
-              ManufacturedStayReflector.toSupported] using hd)
-        exact ⟨port, alternate, hrun, Or.inl rfl⟩
-      have hDstatePhase : ∀ d, d ≤ dTravel → ∃ port phase,
-          stepN w d (outside, C.contactState) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        obtain ⟨port, hrun⟩ :=
-          D.travel_state_stepN C.contactState hDpaths (by
-            simpa [dTravel, ManufacturedReflector.toSupported,
-              ManufacturedStayReflector.toSupported] using hd)
-        exact ⟨port, C.contactState, hrun, Or.inr rfl⟩
-      have hReverseEnd : stepN w lTravel (mouth, alternate) =
-          some (outside, C.contactState) := by
-        have h := (hLobe alternate hCandyFlip).1
-        change stepN w lTravel (mouth, alternate) =
-          some (outside, flipAt alternate k) at h
-        dsimp [alternate] at h
-        simpa [flipAt_flipAt] using h
-      have hForwardEnd : stepN w lTravel (mouth, C.contactState) =
-          some (outside, alternate) := by
-        have h := (hLobe C.contactState hCandy).1
-        simpa [lTravel, alternate, k] using h
-      have hReversePhase : ∀ d, d ≤ lTravel → ∃ port phase,
-          stepN w d (mouth, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        dsimp [alternate, k]
-        exact explicit_lobe_reverse_travel_two_phase
-          hentryBranch hentryMouthSwitch hfullGrooved hfullTrace
-          hcrossed hCandyForeign hmouthLink
-          (by simpa [lTravel] using hd)
-      have hForwardPhase : ∀ d, d ≤ lTravel → ∃ port phase,
-          stepN w d (mouth, C.contactState) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        obtain ⟨port, phase, hrun, hphase⟩ :=
-          explicit_lobe_travel_two_phase
-            hfullGrooved hfullTrace hcrossed hmouthLink
-            (by simpa [lTravel] using hd)
-        refine ⟨port, phase, hrun, ?_⟩
-        dsimp [alternate, k]
-        rcases hphase with h | h
-        · exact Or.inr h
-        · exact Or.inl h
-      let half := dTravel + lTravel
-      have hHalfAlt : stepN w half (outside, alternate) =
-          some (outside, C.contactState) := by
-        dsimp [half]
-        rw [stepN_add, hDaltEnd]
-        exact hReverseEnd
-      have hHalfState : stepN w half (outside, C.contactState) =
-          some (outside, alternate) := by
-        dsimp [half]
-        rw [stepN_add, hDstateEnd]
-        exact hForwardEnd
-      have hHalfAltPhase : ∀ d, d ≤ half → ∃ port phase,
-          stepN w d (outside, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        exact GeneralN.stay_twoPhase_concat
-          hDaltEnd hDaltPhase hReversePhase d
-          (by simpa [half] using hd)
-      have hHalfStatePhase : ∀ d, d ≤ half → ∃ port phase,
-          stepN w d (outside, C.contactState) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        exact GeneralN.stay_twoPhase_concat
-          hDstateEnd hDstatePhase hForwardPhase d
-          (by simpa [half] using hd)
-      let period := half + half
-      have hperiod : stepN w period (outside, alternate) =
-          some (outside, alternate) := by
-        dsimp [period]
-        rw [stepN_add, hHalfAlt]
-        exact hHalfState
-      have hwindow : ∀ d, d ≤ period → ∃ port phase,
-          stepN w d (outside, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        exact GeneralN.stay_twoPhase_concat
-          hHalfAlt hHalfAltPhase hHalfStatePhase d
-          (by simpa [period] using hd)
-      have hpositive : 0 < period := by
-        dsimp [period, half, dTravel, lTravel]
-        omega
-      exact periodic_two_phase_prefix_tongues
-        hpositive hperiod hwindow
-    · simp only [List.mem_singleton] at hcore
-      have hentryEq : entry = R.mouth := congrArg Prod.fst hcore
-      have hmouthEq : mouth = R.arm := congrArg Prod.snd hcore
-      subst entry
-      subst mouth
-      have houtsideEq : outside = R.arm := by
-        rw [R.selfLink] at hmouthLink
-        exact (Option.some.inj hmouthLink).symm
-      subst outside
-      let lTravel := candy.length + 2
-      have hReverseEnd : stepN w lTravel (R.arm, alternate) =
-          some (R.arm, C.contactState) := by
-        have h := (hLobe alternate hCandyFlip).1
-        change stepN w lTravel (R.arm, alternate) =
-          some (R.arm, flipAt alternate k) at h
-        dsimp [alternate] at h
-        simpa [flipAt_flipAt] using h
-      have hForwardEnd : stepN w lTravel (R.arm, C.contactState) =
-          some (R.arm, alternate) := by
-        have h := (hLobe C.contactState hCandy).1
-        simpa [lTravel, alternate, k] using h
-      have hReversePhase : ∀ d, d ≤ lTravel → ∃ port phase,
-          stepN w d (R.arm, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        dsimp [alternate, k]
-        exact explicit_lobe_reverse_travel_two_phase
-          hentryBranch hentryMouthSwitch hfullGrooved hfullTrace
-          hcrossed hCandyForeign hmouthLink
-          (by simpa [lTravel] using hd)
-      have hForwardPhase : ∀ d, d ≤ lTravel → ∃ port phase,
-          stepN w d (R.arm, C.contactState) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        obtain ⟨port, phase, hrun, hphase⟩ :=
-          explicit_lobe_travel_two_phase
-            hfullGrooved hfullTrace hcrossed hmouthLink
-            (by simpa [lTravel] using hd)
-        refine ⟨port, phase, hrun, ?_⟩
-        dsimp [alternate, k]
-        rcases hphase with h | h
-        · exact Or.inr h
-        · exact Or.inl h
-      let period := lTravel + lTravel
-      have hperiod : stepN w period (R.arm, alternate) =
-          some (R.arm, alternate) := by
-        dsimp [period]
-        rw [stepN_add, hReverseEnd]
-        exact hForwardEnd
-      have hwindow : ∀ d, d ≤ period → ∃ port phase,
-          stepN w d (R.arm, alternate) = some (port, phase) ∧
-          (phase = alternate ∨ phase = C.contactState) := by
-        intro d hd
-        exact GeneralN.stay_twoPhase_concat
-          hReverseEnd hReversePhase hForwardPhase d
-          (by simpa [period] using hd)
-      have hpositive : 0 < period := by
-        dsimp [period, lTravel]
-        omega
-      exact periodic_two_phase_prefix_tongues
-        hpositive hperiod hwindow
-  refine ⟨outside, mouth, ?_, ?_⟩
-  · simpa [alternate, k] using hreach
-  · simpa [alternate] using hallAfter
+    have hs := arrive_exit_switch C.contactState entry
+    rw [hOldForward] at hs
+    exact hs.symm
+  let L : SupportedReflector w mouth outside := {
+    travel := candy.length + 2
+    paths := [candy]
+    action := .flip (mouth / 3)
+    run := by simpa [IsReflector, PathGrooves, LocalAction.apply] using hLobe
+  }
+  let alternate := flipAt C.contactState (mouth / 3)
+  have hLalt : PathGrooves L.paths alternate := by
+    simpa [L, PathGrooves, alternate] using grooved_after_flip_other hCandy hCandyForeign
+  have htwo : ∀ u, PathGrooves L.paths u → ∀ t, t ≤ L.travel →
+      ∃ port phase, stepN w t (mouth, u) = some (port, phase) ∧
+        (phase = u ∨ phase = L.action.apply u) := by
+    intro u hu t ht
+    exact explicit_lobe_two_phase_at hentryBranch hentryMouthSwitch hfullGrooved
+      hfullTrace hcrossed hCandyForeign hmouthLink u (hu candy (by simp [L])) ht
+  refine ⟨outside, mouth, hreach, ?_⟩
+  change (entry, mouth) ∈ R.runway ++ [(R.mouth, R.arm)] at hentryOld
+  rcases List.mem_append.mp hentryOld with hrunway | hcore
+  · obtain ⟨before, after, hsplit⟩ := List.append_of_mem hrunway
+    obtain ⟨D, hDpaths, hAvoid⟩ :=
+      R.suffix_after_runway_passage C.contactState hRpaths hsplit hmouthLink
+    have hAvoid' : L.action.Avoids D.toSupported.paths := by
+      simpa only [hentryMouthSwitch] using hAvoid
+    have hDalt := hDpaths.after_avoiding_action hAvoid'
+    intro d
+    have hcover := D.toSupported.pair_all_time_four_phase L
+      (ManufacturedReflector.stay D).travel_pos (by dsimp [L]; omega)
+      (fun u hu _ ht => (ManufacturedReflector.stay D).travel_two_phase_stepN u hu ht)
+      htwo alternate hDalt hLalt (by trivial) hAvoid' d
+    simpa [L, ManufacturedStayReflector.toSupported, LocalAction.apply,
+      alternate, flipAt_flipAt] using hcover
+  · have hmouthEq : mouth = R.arm := congrArg Prod.snd (List.mem_singleton.mp hcore)
+    have houtsideEq : outside = mouth := by
+      rw [hmouthEq, R.selfLink] at hmouthLink
+      exact (Option.some.inj hmouthLink).symm.trans hmouthEq.symm
+    subst outside
+    have hAvoid : L.action.Avoids L.paths := by
+      intro path hp passage hm
+      have heq : path = candy := by simpa [L] using hp
+      subst path
+      exact hCandyForeign passage hm
+    intro d
+    have hcover := L.pair_all_time_four_phase L
+      (by dsimp [L]; omega) (by dsimp [L]; omega)
+      htwo htwo alternate hLalt hLalt hAvoid hAvoid d
+    obtain ⟨port, phase, hr, hs⟩ := hcover
+    refine ⟨port, phase, hr, ?_⟩
+    simp only [L, LocalAction.apply, alternate, flipAt_flipAt,
+      List.mem_cons, List.not_mem_nil, or_false] at hs
+    rcases hs with h | h | h | h
+    · exact Or.inl h
+    · exact Or.inr h
+    · exact Or.inl h
+    · exact Or.inr h
 
 /-- Both all-time phases in the stay-forward case are already the contact
 pre-vector and the explicitly stored post-vector. -/

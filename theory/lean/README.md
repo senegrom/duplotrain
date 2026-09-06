@@ -159,7 +159,8 @@ switch bound nor extraction of a later productive writer.
 `TrackThetaPointwiseCore.lean` now treats a disturbed traversal using the
 single selected outward route (`orientedRoute`). Every retained support
 passage appears on that route in the orientation the train actually takes.
-Switch simplicity puts the disturbed coordinate at one unique contact.
+The shared first-contact theorem selects the first occurrence of the disturbed
+coordinate; it does not require the entire reference route to be switch-simple.
 Before it, the route is grooved and avoids that coordinate, so the original
 and disturbed runs have the same ports and differ only at that coordinate.
 
@@ -173,10 +174,11 @@ Only two local cases remain, for either a flip or a stay reflector:
   that step. Determinism then makes their configurations equal at every
   subsequent time, even beyond the reference route.
 
-The reusable theorem `PhysicalTrace.trailing_fault_merges` states that last
-synchronization explicitly. There are no separate runway, forward-candy,
+The shared theorem `ManufacturedFlipReflector.grooved_route_fault` states
+that synchronization explicitly, even for reference routes with repeated switches. There are no separate runway, forward-candy,
 and reverse-candy repair/capture proofs. The generic
-`ManufacturedReflector.support_fault_dichotomy_pointwise` specializes directly
+`ManufacturedReflector.support_fault_dichotomy_pointwise` specializes the
+shared route theorem directly
 to flip/flip and flip/stay contacts, without adding a finite-switch or
 totality assumption to the local theorem.
 
@@ -280,6 +282,40 @@ The general capture-phase law and the selected far-arm arrival fact are also
 shared at their earliest required layer. The formerly duplicated facing-case
 capture theorem and newly unused support lemmas have been deleted.
 
+## Arbitrary lobes share the reflector invariant
+
+The four-corner theorem is now `SupportedReflector.pair_all_time_four_phase`.
+Its hypotheses require positive traversal lengths, preservation of the other
+support, and a pointwise incoming/outgoing-vector contract for each reflector.
+It does not depend on how the reflectors were manufactured. The result returns
+a live configuration and its phase at every time, so consumers no longer need
+a separate period just to obtain liveness.
+
+`explicit_lobe_two_phase_at` supplies the same contract for an arbitrary
+mouth-free grooved lobe. Pin the current mouth tongue to the recorded entry
+arm. The current vector equals that pinned vector or its mouth flip; the
+forward and reverse recorded routes cover both cases. This is uniform over
+all current states grooving the interior, even when the interior repeats
+switches. The disjoint-action runway splice is consequently an instance of
+the abstract pair theorem, as is the stay-reflector splice, whose action orbit
+collapses to two vectors. The self-linked boundary case is the same lobe
+composed with itself, not an additional period construction.
+
+For intersecting actions, `ManufacturedFlipReflector.grooved_route_fault`
+selects the first contact on any grooved reference route. The prefix avoids
+the disturbed coordinate. Stem entry captures and returns to the reference
+boundary; branch entry repairs the bit and synchronizes the complete
+configuration for every subsequent time. No restriction on later repetitions
+is required. This replaces the separately coded arbitrary-lobe and
+switch-simple contact analyses.
+
+The intersecting runway splice alternates covered positive excursions between
+`(outside, state)` and `(outside, flipAt state (mouth / 3))`. Each excursion
+exposes its base, old-action, or lobe-action vector. Their union is the four
+Gray corners. `stepN_covered_of_progress` supplies all-time liveness and the
+phase cover directly. The obsolete excursion-length upper bound, four-leg
+windows, periods, and the period-based liveness helper have been removed.
+
 ## Dependency and source reductions
 
 The transitive local-source closure of `StateLaw` includes the theorem's
@@ -296,6 +332,7 @@ comments and blanks, not just proof tactics.
 | After selected-route, boundary-invariant and suffix-capture reductions | 52 | 19,841 |
 | After witness trimming and trace reuse | 52 | 19,175 |
 | After spatial-loop and action-orbit invariants | 52 | 17,733 |
+| After shared lobe contracts and first-contact excursions | 52 | 16,973 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -354,3 +391,9 @@ The bound-tightening campaign reached
 Commit `2b75dd8` is the last state before the earlier cleanup of historical
 libraries. The capping and shared-history reductions were added on
 6 September 2026; the superseded modules were deleted the same day.
+
+The shared lobe-contract pass removes another **760 retained Lean source
+lines**, reducing the development from 17,752 to **16,992 lines** in 53 files
+(including the unchanged 19-line audit). Counts include every new helper and
+all comments and blank lines. The headline theorem, model, finite-state
+ceiling, attainment construction, and exact audit are unchanged.

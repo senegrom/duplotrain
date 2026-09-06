@@ -693,14 +693,14 @@ no switch. No totality premise is added to the headline theorem.
 \subsection{Selected routes and boundary invariants}
 
 A reflector's selected outward route already encodes the direction in
-which its loop is traversed. A single disturbed support coordinate is
-encountered once along that switch-simple route. Before contact it is
-untouched. At a branch entry the lazy-point rule restores the reference
+which its loop is traversed. The first occurrence of a disturbed support coordinate suffices for the
+contact argument; the general route theorem allows later repetitions of any
+switch. Before that first contact the disturbed coordinate is untouched. At a branch entry the lazy-point rule restores the reference
 value; after that passage both runs have the same full configuration,
 so determinism identifies every subsequent state. At a stem entry the
 mouth-capture law applies. There is no separate runway, forward-loop,
 or reverse-loop contact classification
-(\file{TrackThetaPointwiseCore.lean}).
+(\file{RunwaySpliceNovelty.lean}, \file{TrackThetaPointwiseCore.lean}).
 
 For all-time covers it is enough to close a boundary invariant under
 positive-length excursions whose intermediate tongue vectors belong to
@@ -716,6 +716,35 @@ boundaries are
 The normal and capture-or-repair excursions close this invariant and
 expose only $u,u^A,u^B$. Thus no case-specific period computation is
 needed (\file{TrackThetaAllTime.lean}).
+
+The same argument applies when the opposite component is an arbitrary
+lobe rather than a manufactured reflector. If its interior grooves are
+preserved by the old action, both components satisfy one common contract:
+each positive-length traversal exposes only its incoming and outgoing
+vectors and preserves the opposite support. Their commuting involutions
+preserve the four-corner orbit. The invariant theorem depends only on this
+contract, not on a particular construction or on simplicity of the lobe.
+
+To verify that contract for an arbitrary mouth-free lobe, pin the current
+mouth tongue to its recorded entry branch. The current vector equals that
+pinned vector or its single mouth flip; the recorded forward and reverse
+routes give the two cases. All other currently grooved coordinates are
+unchanged. A stay reflector has identity action, so its corresponding orbit
+collapses to two vectors; the self-linked boundary uses the same lobe on
+both sides of the abstract pair.
+
+When the old action instead occurs inside the arbitrary lobe, the shared
+first-contact theorem yields capture or synchronization with the reference
+run. One old-reflector traversal followed by this capture-or-repair
+continuation gives a positive excursion from $(g,u)$ to $(g,u^B)$, exposing
+only $u,u^A,u^B$. Reverse the lobe in $u^B$ to obtain an excursion back,
+exposing only $u^B,u^{AB},u$. Closing these two boundary states proves the
+four-vector cover. No upper bound on excursion length, explicit period, or
+modulo-time calculation is needed. Both runway cases provide a live
+configuration at every time directly, so no separate periodicity argument
+is needed for liveness
+(\file{ManufacturedPairNovelty.lean}, \file{RunwaySpliceNovelty.lean},
+\file{PartialSecondRunSharp.lean}).
 
 \subsection{Closed spatial routes and one variable tongue}
 
@@ -827,39 +856,27 @@ square.
 
 \section{About the formalisation}\label{sec:formal}
 
-The development lives in \file{theory/lean} of the repository and builds
-with Lean~4 (toolchain 4.32.2) and no external library:
+The development in \file{theory/lean} builds with Lean~4.32.2 and no
+external library. Run \texttt{lake build} to compile all 53 Lean files;
+\file{StateLawAxiomAudit.lean} checks the exact transitive axiom list of
+\lean{GeneralN.state\_law}:
 \begin{center}
-  \texttt{lake build}
-\end{center}
-compiles all 53 Lean files and ends by printing the axiom audit of the
-single theorem:
-\begin{center}
-  \lean{GeneralN.state\_law} depends on axioms:
   \lean{[propext, Classical.choice, Quot.sound]}.
 \end{center}
-Points worth recording:
 
-\begin{itemize}
-\item \emph{One theorem.}  \lean{state\_law} in \file{StateLaw.lean} is
-  the only headline statement; every other declaration is reachable
-  support --- the tree is mechanically verified to be exactly the
-  theorem's dependency closure.
-\item \emph{Trusted base.}  The three axioms are Lean's standard ones.
-  There is no \lean{sorry} and no \lean{native\_decide}: the finite
-  witness runs of Section~\ref{sec:small} and the $N = 3$ base of
-  Theorem~\ref{thm:lower} are evaluated by the proof kernel
-  (\lean{decide}).  No definition uses choice to produce data (the
-  development contains no \lean{noncomputable} declaration); classical
-  reasoning appears only as excluded middle inside proofs.
-\item \emph{Symbolic in $N$.}  The upper bound and the $N \ge 4$ lower
-  bound contain no finite-instance argument: all inductions are
-  structural in the trace or in $N$.
-\item \emph{Provenance.}  The extremal family was found by an empirical
-  state-count prober; the geometry of the physical pieces never enters
-  the proofs, which is itself a (machine-checked) modelling statement:
-  plain track only transports the train between ports.
-\end{itemize}
+There is one headline theorem, in \file{StateLaw.lean}. Every explicitly
+declared public support theorem is used in its kernel dependency closure.
+There is no \lean{sorry} or \lean{native\_decide}: the finite witness runs
+of Section~\ref{sec:small} and the $N=3$ base of
+Theorem~\ref{thm:lower} are checked by kernel \lean{decide}.
+No definition uses choice to produce data; there is no
+\lean{noncomputable} declaration. Classical reasoning occurs only in proofs.
+The upper bound and the $N\ge4$ attainment proof are symbolic in $N$,
+with structural induction rather than finite-instance enumeration.
+
+The extremal family was found empirically. Physical track geometry never
+enters the formal dynamics: ordinary track merely transports the train
+between switch ports. The main source entry points are:
 
 \begin{center}
 \begin{tabular}{@{}p{0.42\textwidth}p{0.52\textwidth}@{}}

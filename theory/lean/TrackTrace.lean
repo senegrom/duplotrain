@@ -217,6 +217,26 @@ theorem PhysicalTrace.replay_preserving
           obtain ⟨port, phase, hr, hp⟩ := hcover d (by simpa using hd)
           exact ⟨port, phase, by simpa [stepN, step, hstep, hlink] using hr, hp⟩
 
+/-- Pointwise covers compose at a reached configuration. -/
+theorem stepN_cover_append
+    {w : Wiring} {start middle : Nat × Tongues} {left right : Nat}
+    {allowed : Tongues → Prop}
+    (hreach : stepN w left start = some middle)
+    (hleft : ∀ d, d ≤ left → ∃ port phase,
+      stepN w d start = some (port, phase) ∧ allowed phase)
+    (hright : ∀ d, d ≤ right → ∃ port phase,
+      stepN w d middle = some (port, phase) ∧ allowed phase) :
+    ∀ d, d ≤ left + right → ∃ port phase,
+      stepN w d start = some (port, phase) ∧ allowed phase := by
+  intro d hd
+  by_cases hpre : d ≤ left
+  · exact hleft d hpre
+  · obtain ⟨port, phase, hr, hs⟩ := hright (d - left) (by omega)
+    refine ⟨port, phase, ?_, hs⟩
+    have heq : d = left + (d - left) := by omega
+    rw [heq, stepN_add, hreach]
+    exact hr
+
 /-- Covered positive-length excursions suffice for an all-time cover.
 The invariant is required only at excursion boundaries; intermediate states
 need satisfy only `allowed`. Neither periodicity nor finite state is needed. -/
