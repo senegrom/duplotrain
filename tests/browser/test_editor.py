@@ -377,3 +377,32 @@ def test_imported_forced_fit_stays_visible_after_reload(editor):
     assert "not exactly closed" in page.locator("#status").inner_text()
     assert "Forced fit" in page.locator("#status").inner_text()
     assert not errors
+
+
+def test_stale_tab_refreshes_without_replaying_a_delete(editor):
+    page, session, url, errors = editor
+    session.attach("straight", 0, None)
+    session.attach("curve", 0, (0, 1))
+    session.attach("switch", 0, (1, 1))
+    load(page, url)
+    other = page.context.new_page()
+    other.on("pageerror", lambda error: errors.append(str(error)))
+    try:
+        load(other, url)
+        other.evaluate("async () => { S = await api('/api/remove', {placement: 0}); redraw(); }")
+        # This tab still displays the curve at index 1. Its old index must not
+        # remove the switch now occupying index 1 on the shared server.
+        assert page.evaluate("S.layout.placements[1].piece") == "curve"
+        page.locator("#delete-tool").tap()
+        point = page.evaluate("worldToScreen(...S.layout.placements[1].mid)")
+        bounds = page.locator("#canvas").bounding_box()
+        page.touchscreen.tap(bounds["x"] + point[0], bounds["y"] + point[1])
+        wait_count(page, 2)
+        assert [p.piece.id for p in session.layout] == ["curve", "switch"]
+        assert page.evaluate("S.layout.placements.map(p => p.piece)") == ["curve", "switch"]
+        assert page.evaluate("S.revision") == session.revision
+        assert page.evaluate("deleting") is False
+        assert "not applied" in page.locator("#status").inner_text()
+        assert not errors
+    finally:
+        other.close()

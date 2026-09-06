@@ -137,7 +137,8 @@ def test_same_origin_and_non_browser_json_clients_work(local_editor, host, brows
     headers = [("Host", f"{host}:{port}"), ("Content-Type", "application/json; charset=utf-8")]
     if browser_headers:
         headers += [("Origin", f"http://{host}:{port}"), ("Sec-Fetch-Site", "same-origin")]
-    assert request(port, headers=headers)[0] == 200
+    body = json.dumps({"revision": session.revision}).encode()
+    assert request(port, headers=headers, body=body)[0] == 200
     assert not session.layout.placements
 
 

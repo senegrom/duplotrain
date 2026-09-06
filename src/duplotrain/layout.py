@@ -130,6 +130,24 @@ class Layout:
         """Open ends something could actually plug into."""
         return [end for end in self.open_ends() if not self.is_sealed(end)]
 
+    def matable_pairs(self) -> list[tuple[End, End]]:
+        """Exactly coincident, oppositely facing open ends, in endpoint order.
+
+        Index each exact pose once instead of reconstructing it for every pair.
+        Work is linear in the number of ends plus the number of matching pairs
+        (apart from hash-table costs). No floating-point tolerance is introduced.
+        """
+        poses = [(end, self.pose_of(end)) for end in self.connectable_ends()]
+        by_pose: dict[Pose, list[End]] = {}
+        for end, pose in poses:
+            by_pose.setdefault(pose, []).append(end)
+        return [
+            (a, b)
+            for a, pose in poses
+            for b in by_pose.get(pose.reversed(), ())
+            if a < b
+        ]
+
     def pose_of(self, end: End) -> Pose:
         i, p = end
         return self.placements[i].port_pose(p)

@@ -128,13 +128,34 @@ const api = async (path, body) => {
   apiBusy = true;
   document.body.classList.add("busy");
   try {
+    if (body !== undefined && path !== "/api/state" && path !== "/api/export") {
+      // Capture the state the user acted on; never fill in a newer revision
+      // after an await. Preserve an explicit candidate revision as well.
+      body = {revision: S && S.revision, ...body};
+    }
     if (window.duplotrainApi) return await window.duplotrainApi(path, body);
     const res = await fetch(path, body === undefined ? {} : {
       method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || res.statusText);
+    if (!res.ok) {
+      const error = new Error(data.error || res.statusText);
+      error.code = data.code;
+      error.state = data.state;
+      throw error;
+    }
     return data;
+  } catch (error) {
+    if (error.code === "stale_revision" && error.state) {
+      S = error.state;
+      selectTool();
+      selectedCandidate = null;
+      preview = null;
+      lastSolve = null;
+      el("expand-search").hidden = true;
+      redraw();
+    }
+    throw error; // Refresh only: never replay a stale deletion/attachment.
   } finally {
     apiBusy = false;
     document.body.classList.remove("busy");
@@ -866,6 +887,7 @@ async function runSolve(grow, close) {
       reversing: el("reversing").checked,
     });
     pickMode = null;
+    lastSolve = {grow, close, revision: S.revision};
     redraw();
     if (!S.candidates.length) {
       if (S.reason)

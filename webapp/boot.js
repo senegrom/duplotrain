@@ -20,7 +20,12 @@
     }
   }).then((res) => {
     const data = JSON.parse(res);
-    if (data.__error) throw new Error(data.__error);
+    if (data.__error) {
+      const error = new Error(data.__error);
+      error.code = data.code;
+      error.state = data.state;
+      throw error;
+    }
     return data;
   });
 

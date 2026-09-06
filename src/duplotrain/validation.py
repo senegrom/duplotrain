@@ -6,6 +6,10 @@ from fractions import Fraction
 
 MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_PLACEMENTS = 1500
+MAX_ACCESSORIES = 200
+MAX_LINKS = 6000
+# Leave room for the request/checkpoint envelope around a saved session.
+MAX_SNAPSHOT_BYTES = MAX_JSON_BYTES - 1024
 MAX_COEFFICIENT_LENGTH = 48
 
 
@@ -69,15 +73,15 @@ def check_layout_json(data: object) -> None:
         if type(heading) is not int or abs(heading) > 10**6:
             raise ValueError("frame heading out of bounds")
     links = data.get("links", [])
-    if not isinstance(links, list) or len(links) > 6000:
-        raise ValueError("links must be a list (limit 6000)")
+    if not isinstance(links, list) or len(links) > MAX_LINKS:
+        raise ValueError(f"links must be a list (limit {MAX_LINKS})")
     for entry in links:
         if (not isinstance(entry, list) or len(entry) != 4
                 or any(type(v) is not int or abs(v) > 10**6 for v in entry)):
             raise ValueError("links must be [i, port, j, port] integer rows")
     accessories = data.get("accessories", [])
-    if not isinstance(accessories, list) or len(accessories) > 200:
-        raise ValueError("accessories must be a list (limit 200)")
+    if not isinstance(accessories, list) or len(accessories) > MAX_ACCESSORIES:
+        raise ValueError(f"accessories must be a list (limit {MAX_ACCESSORIES})")
     for entry in accessories:
         if not isinstance(entry, list) or not 2 <= len(entry) <= 3:
             raise ValueError("accessory rows must be [index, stone] or [index, stone, port]")

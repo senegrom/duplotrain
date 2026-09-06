@@ -94,7 +94,7 @@ def test_session_recovery_round_trips_geometry_inventory_and_stones():
     source.set_unlimited(True)
     checkpoint = json.loads(json.dumps(source.snapshot()))
     restored = Session()
-    dispatch_session(restored, "/api/restore", {"data": checkpoint})
+    dispatch_session(restored, "/api/restore", {"data": checkpoint, "revision": 0})
     assert restored.snapshot() == checkpoint
     assert restored.layout == source.layout
     assert restored.candidates == []
@@ -202,5 +202,6 @@ def test_pyodide_adapter_uses_same_validation_and_recovery():
     for body in ("not JSON", "[]", '{"data": null}'):
         assert "__error" in json.loads(adapter.dispatch("/api/restore", body))
     source = half_circle_session().snapshot()
-    result = json.loads(adapter.dispatch("/api/restore", json.dumps({"data": source})))
+    body = json.dumps({"data": source, "revision": 0})
+    result = json.loads(adapter.dispatch("/api/restore", body))
     assert result["snapshot"] == source

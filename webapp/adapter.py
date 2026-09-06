@@ -2,7 +2,7 @@
 
 import json
 
-from duplotrain.gui import Session, dispatch_session
+from duplotrain.gui import RevisionConflictError, Session, dispatch_session
 from duplotrain.validation import MAX_JSON_BYTES
 
 session = Session()
@@ -24,5 +24,9 @@ def dispatch(path: str, body_json: str | None) -> str:
             raise ValueError("request body larger than 2 MB")
         body = json.loads(body_json) if body_json else {}
         return json.dumps(dispatch_session(session, path, body, progress=_progress))
-    except (ValueError, KeyError, TypeError, IndexError, OverflowError) as exc:
+    except RevisionConflictError as exc:
+        return json.dumps({
+            "__error": str(exc), "code": "stale_revision", "state": session.state(),
+        })
+    except (ValueError, KeyError, TypeError, IndexError, OverflowError, RecursionError) as exc:
         return json.dumps({"__error": str(exc)})

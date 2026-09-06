@@ -17,7 +17,12 @@ def server():
     thread.start()
     base = f"http://127.0.0.1:{srv.server_port}"
 
+    revision = 0
+
     def call(path, body=None):
+        nonlocal revision
+        if isinstance(body, dict):
+            body = {"revision": revision, **body}
         if body is None:
             req = urllib.request.Request(base + path)
         else:
@@ -29,7 +34,9 @@ def server():
             )
         try:
             with urllib.request.urlopen(req) as res:
-                return res.status, json.loads(res.read())
+                data = json.loads(res.read())
+                revision = data.get("revision", revision)
+                return res.status, data
         except urllib.error.HTTPError as exc:
             return exc.code, json.loads(exc.read())
 

@@ -25,6 +25,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
+from time import monotonic
 from typing import Any
 
 from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
@@ -33,7 +34,7 @@ from .layout import End, Layout, layout_from_dict, layout_to_dict
 from .pieces import PieceType
 from .sets import SETS, inventory_for_sets
 from .solver import Solution, SolverConfig, _moves_for, solve
-from .validation import MAX_JSON_BYTES
+from .validation import MAX_JSON_BYTES, MAX_SNAPSHOT_BYTES
 from .validation import check_layout_json as check_layout_json
 
 __all__ = ["Session", "make_server", "run"]
@@ -128,10 +129,21 @@ class Session:
         if type(on) is not bool:
             raise ValueError("unlimited must be a boolean")
         if self.unlimited != on:
+            self._check_snapshot({**self.snapshot(), "unlimited": on})
             self.unlimited = on
             self._invalidate()
 
+    @staticmethod
+    def _check_snapshot(snapshot: dict[str, Any]) -> None:
+        """An accepted edit must be readable by our own import/recovery parser."""
+        check_layout_json(snapshot["layout"])
+        # ASCII escaping and default whitespace bound the smaller browser JSON
+        # representation too; reserve space for its versioned save envelope.
+        if len(json.dumps(snapshot, ensure_ascii=True).encode("utf-8")) > MAX_SNAPSHOT_BYTES:
+            raise ValueError("session is too large to save; remove pieces before adding more")
+
     def _push(self, layout: Layout) -> None:
+        self._check_snapshot(self.snapshot(layout=layout))
         self.history.append(layout)
         if len(self.history) > 200:
             del self.history[1:2]
@@ -191,11 +203,11 @@ class Session:
             "piece_counts": layout.piece_counts,
         }
 
-    def snapshot(self) -> dict[str, Any]:
+    def snapshot(self, *, layout: Layout | None = None) -> dict[str, Any]:
         """Exact geometry and owned counts; suitable for browser-local recovery."""
         return {
             "format": "duplotrain-session/1",
-            "layout": layout_to_dict(self.layout),
+            "layout": layout_to_dict(self.layout if layout is None else layout),
             "inventory": dict(self.inventory),
             "stones": dict(self.stones),
             "unlimited": self.unlimited,
@@ -211,8 +223,13 @@ class Session:
         if type(unlimited) is not bool:
             raise ValueError("unlimited must be a boolean")
         layout = layout_from_dict(data.get("layout"), self.catalog)
-        self.inventory, self.stones, self.unlimited = inventory, stones, unlimited
+        self._check_snapshot({
+            **self.snapshot(layout=layout),
+            "inventory": inventory, "stones": stones, "unlimited": unlimited,
+        })
+        # _push may reject geometry/size; do not change owned counts beforehand.
         self._push(layout)
+        self.inventory, self.stones, self.unlimited = inventory, stones, unlimited
 
     @staticmethod
     def _validated_counts(counts: object, known: Mapping) -> dict[str, int]:
@@ -269,12 +286,7 @@ class Session:
                     "variants": variants,
                 }
             )
-        mates = []
-        opens = self.layout.connectable_ends()
-        for i, a in enumerate(opens):
-            for b in opens[i + 1 :]:
-                if self.layout.pose_of(a).connects_to(self.layout.pose_of(b)):
-                    mates.append([list(a), list(b)])
+        mates = [[list(a), list(b)] for a, b in self.layout.matable_pairs()]
         return {
             "layout": self._layout_json(self.layout),
             "open_ends": [list(end) for end in self.layout.connectable_ends()],
@@ -371,6 +383,7 @@ class Session:
         for pid, n in validated.items():
             (inventory if pid in self.catalog else stones)[pid] = n
         if inventory != self.inventory or stones != self.stones:
+            self._check_snapshot({**self.snapshot(), "inventory": inventory, "stones": stones})
             self.inventory, self.stones = inventory, stones
             self._invalidate()
 
@@ -582,7 +595,10 @@ class Session:
 
         if grow == close or grow not in opens or close not in opens:
             raise ValueError("pick two distinct open ends")
-        self.candidates = []
+        # Candidate indices change on every search, even on unchanged geometry.
+        # Give the result list its own revision so another tab cannot apply an
+        # index from the previous search to this one.
+        self._invalidate()
         self._candidate_revision = self.revision
         remaining = self.remaining()
 
@@ -686,6 +702,17 @@ class UnknownRouteError(ValueError):
     """The editor API does not expose this route."""
 
 
+class RevisionConflictError(ValueError):
+    """The client is attempting to edit a state it has not seen."""
+
+
+MUTATING_ROUTES = frozenset({
+    "/api/attach", "/api/join", "/api/undo", "/api/remove", "/api/clear",
+    "/api/inventory", "/api/unlimited", "/api/add_set", "/api/stone",
+    "/api/solve", "/api/apply", "/api/import", "/api/restore",
+})
+
+
 def dispatch_session(
     session: Session, path: str, body: object, progress: object = None
 ) -> dict[str, Any]:
@@ -696,6 +723,14 @@ def dispatch_session(
         return session.state()
     if path == "/api/export":
         return layout_to_dict(session.layout)
+    if path not in MUTATING_ROUTES:
+        raise UnknownRouteError(f"no route {path}")
+    revision = body.get("revision")
+    if type(revision) is not int or revision != session.revision:
+        raise RevisionConflictError(
+            "The session changed in another tab, or this page is out of date. "
+            "Your action was not applied. Review the refreshed layout and try again."
+        )
     if path == "/api/attach":
         at = tuple(body["at"]) if body.get("at") is not None else None
         session.attach(body["piece"], int(body["entry"]), at)
@@ -740,9 +775,11 @@ def dispatch_session(
 
 def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
+        BODY_SECONDS = 10.0
+
         def setup(self) -> None:
             super().setup()
-            self.connection.settimeout(10)
+            self.connection.settimeout(self.BODY_SECONDS)
 
         def log_message(self, fmt: str, *args: Any) -> None:  # quiet
             pass
@@ -783,12 +820,24 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             raw = lengths[0]
             if not (raw.isascii() and raw.isdigit() and len(raw) <= 10):
                 return
-            remaining = min(int(raw), self.DRAIN_BYTES)
+            if getattr(self, "_body_read_failed", False):
+                return  # A timed-out buffered socket is no longer readable.
+            remaining = min(
+                max(0, int(raw) - getattr(self, "_body_bytes_read", 0)), self.DRAIN_BYTES
+            )
+            if not remaining:
+                return
             previous = self.connection.gettimeout()
+            deadline = monotonic() + self.DRAIN_SECONDS
             try:
-                self.connection.settimeout(self.DRAIN_SECONDS)
                 while remaining > 0:
-                    chunk = self.rfile.read(min(remaining, 4096))
+                    time_left = deadline - monotonic()
+                    if time_left <= 0:
+                        return
+                    self.connection.settimeout(time_left)
+                    # read() can perform many raw reads as bytes trickle in.
+                    # read1() returns after at most one, letting us recheck time.
+                    chunk = self.rfile.read1(min(remaining, 4096))
                     if not chunk:
                         return
                     remaining -= len(chunk)
@@ -849,9 +898,25 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 raise ValueError("request body larger than 2 MB")
             if not length:
                 return {}
-            payload = self.rfile.read(length)
-            if len(payload) != length:
-                raise ValueError("incomplete request body")
+            payload = bytearray()
+            previous = self.connection.gettimeout()
+            deadline = monotonic() + self.BODY_SECONDS
+            try:
+                while len(payload) < length:
+                    time_left = deadline - monotonic()
+                    if time_left <= 0:
+                        raise TimeoutError("request body timed out")
+                    self.connection.settimeout(time_left)
+                    chunk = self.rfile.read1(min(length - len(payload), 64 * 1024))
+                    if not chunk:
+                        raise ValueError("incomplete request body")
+                    payload.extend(chunk)
+                    self._body_bytes_read = len(payload)
+            except OSError:
+                self._body_read_failed = True
+                raise
+            finally:
+                self.connection.settimeout(previous)
             return json.loads(payload.decode("utf-8"))
 
         def do_GET(self) -> None:  # noqa: N802 (http.server API)
@@ -867,6 +932,8 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 self._json(404, {"error": f"no route {self.path}"})
 
         def do_POST(self) -> None:  # noqa: N802
+            self._body_bytes_read = 0
+            self._body_read_failed = False
             if not self._trusted_request():
                 return
             try:
@@ -874,6 +941,12 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 with session.lock:
                     result = dispatch_session(session, self.path, body)
                 self._json(200, result)
+            except RevisionConflictError as exc:
+                # The comparison above happened under the same lock as edits.
+                # Return current state, but never replay the rejected mutation.
+                with session.lock:
+                    current = session.state()
+                self._json(409, {"error": str(exc), "code": "stale_revision", "state": current})
             except UnknownRouteError as exc:
                 self._json(404, {"error": str(exc)})
             except TimeoutError:

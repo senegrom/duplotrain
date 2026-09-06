@@ -46,3 +46,35 @@ an expected checksum from an untrusted download during the build itself.
 `tests/test_build_security.py` checks tampered downloads/caches, unsafe archive
 members, unknown versions, and the workflow hardening invariants without network
 access. The browser CI jobs additionally build and test the actual pinned runtime.
+
+## Editor consistency and recoverable saves
+
+Every mutating API route (including solve and restore) requires an integer
+`revision` copied from the state the client actually displayed. The HTTP server
+checks it under the same session lock as the mutation. Missing, malformed or
+stale revisions receive HTTP 409 with `code: "stale_revision"` and the current
+`state`, without changing the session. Read-only state/export requests do not
+require a revision. Non-browser JSON clients must follow this contract too.
+
+The editor refreshes from a conflict response and clears old tools/previews,
+but never automatically retries the rejected action against newly indexed
+pieces. The shared Pyodide dispatcher uses the same revision check. Each new
+search also advances the revision because candidate indices can change even
+when the layout does not. Revisions prevent stale edits; they are not credentials.
+
+Before committing an edit, the session validates its proposed snapshot with the
+same layout limits as import/recovery (1,500 pieces and 200 action stones), plus
+a byte budget with room for the save/request envelope. This applies to manual
+placement, solver candidate application and restore, as well as inventory
+changes. An edit that crosses a limit is rejected without changing history,
+revision, inventory or saved state. Unlimited inventory does not bypass these
+recovery limits. Exporting, removing pieces/stones and undoing remain available.
+
+Request bodies use an absolute 10-second read deadline. Rejected-body cleanup
+has a separate absolute 0.25-second deadline and 64 KiB cap, and skips bytes
+already consumed. Single-read buffering lets the deadline be rechecked even
+when a client continually trickles bytes; timeouts do not restart per chunk.
+
+Open-end mate discovery indexes exact positions and opposite headings once per
+endpoint, instead of comparing every pair. Elevation and the exact algebraic
+coordinates remain part of the key; there is no approximate snapping tolerance.

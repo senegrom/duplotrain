@@ -101,3 +101,18 @@ test("worker boot reports failed runtime requests instead of unpacking HTTP erro
   assert.equal(messages.length, 1);
   assert.match(messages[0].bootError, /HTTP 404/);
 });
+
+test("adapter conflicts preserve their code and current state through the worker bridge", async () => {
+  const h = harness();
+  await boot(h);
+  const promise = h.window.duplotrainApi("/api/remove", {placement: 1, revision: 3});
+  h.workers[0].emit({id: h.workers[0].sent[0].id, res: JSON.stringify({
+    __error: "Your action was not applied", code: "stale_revision", state: {revision: 4},
+  })});
+  await assert.rejects(promise, error => {
+    assert.equal(error.code, "stale_revision");
+    assert.equal(error.state.revision, 4);
+    assert.match(error.message, /not applied/);
+    return true;
+  });
+});
