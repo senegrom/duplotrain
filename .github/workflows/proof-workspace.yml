@@ -5,36 +5,25 @@ on:
     paths: [.github/workflows/proof-workspace.yml]
 permissions:
   contents: read
-  actions: read
 jobs:
   bundle:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: pinned-proof-workspace
-          run-id: 34020920692
-          github-token: ${{ github.token }}
-      - name: Split the verified workspace without changing its contents
-        run: split -b 240M -d lean-workspace.tar.gz lean-part-
+          persist-credentials: false
+      - name: Install the exact pinned toolchain
+        working-directory: theory/lean
+        run: |
+          curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh -s -- -y --default-toolchain none
+          export PATH="$HOME/.elan/bin:$PATH"
+          lean --version
+          cd "$(lean --print-prefix)"
+          find lib -name '*.olean.server' -print0 | tar --null -T - -czf "$GITHUB_WORKSPACE/lean-server-interfaces.tar.gz"
       - uses: actions/upload-artifact@v4
         with:
-          name: lean-part-00
-          path: |
-            lean-part-00
-            proof-sources.tar.gz
-          retention-days: 1
-          compression-level: 0
-      - uses: actions/upload-artifact@v4
-        with:
-          name: lean-part-01
-          path: lean-part-01
-          retention-days: 1
-          compression-level: 0
-      - uses: actions/upload-artifact@v4
-        with:
-          name: lean-part-02
-          path: lean-part-02
+          name: lean-server-interfaces
+          path: lean-server-interfaces.tar.gz
           retention-days: 1
           compression-level: 0
