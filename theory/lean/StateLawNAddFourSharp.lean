@@ -38,7 +38,7 @@ def Wiring.capFreePort (w : Wiring) (p : Nat)
     change (if b = p then some p else w.link b) = some a
     by_cases ha : a = p
     · subst a
-      simp only [if_pos rfl, Option.some.injEq] at hab
+      simp at hab
       subst b
       simp
     · rw [if_neg ha] at hab
