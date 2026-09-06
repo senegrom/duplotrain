@@ -1,5 +1,5 @@
 import ReuseForcesReplayClosure
-import BoundaryDoubleDuplicate
+import StateLawCoefficientOneTop
 
 /-!
 # The changed-contact `N+4` frontier
@@ -765,7 +765,7 @@ action write and the contact, while a pointwise runway retrace has constant
 tongues throughout that whole interval. -/
 theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.impossible
     {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
+    (_hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
     {R : ManufacturedFlipReflector w g e}
     {C : SimpleContinuationChangedContact w
@@ -802,70 +802,13 @@ theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.impossible
         · exact hparts.2.symm
       _ = (R.mouth, next.2) := by
         rw [hexit, hwriterSwitch, hmouth]
-  let contactSpan := C.approach.length - (actionTime + 1)
-  have hcontactSum :
-      actionTime + 1 + contactSpan = C.approach.length := by
-    dsimp [contactSpan]
-    omega
-  have hcontactReach :
-      stepN w (actionTime + 1 + contactSpan) start =
-        some (C.p, C.contactState) := by
-    rw [hcontactSum]
-    simpa [start] using C.approach_trace.sound
   have hpostRunwayGrooved : PassagesGrooved next.2 R.runway := by
-    intro passage hpassage
-    have hcontactGroove :
-        arrive C.contactState passage.2 =
-          (passage.1, C.contactState) :=
-      C.old_grooves R.runway (by
-        change R.runway ∈ [R.runway, R.candy]
-        exact List.mem_cons_self) passage hpassage
-    have hexitSwitch :
-        passage.2 / 3 = passageSwitch passage := by
-      have hs := arrive_exit_switch C.contactState passage.2
-      rw [hcontactGroove] at hs
-      simpa [passageSwitch] using hs.symm
-    have hmemReusable : passageSwitch passage ∈
-        (ManufacturedReflector.flip R).reusableSwitches := by
-      change passageSwitch passage ∈
-        (R.runway ++ R.candy).map passageSwitch
-      apply List.mem_map.mpr
-      exact ⟨passage, List.mem_append_left _ hpassage, rfl⟩
-    have hswitchLt : passageSwitch passage < N :=
-      (ManufacturedReflector.flip R).reusableSwitch_lt
-        hN hmemReusable
-    have hbit :
-        next.2 (passageSwitch passage) =
-          C.contactState (passageSwitch passage) := by
-      apply Classical.byContradiction
-      intro hne
-      have hcontactNe :
-          C.contactState (passageSwitch passage) ≠
-            next.2 (passageSwitch passage) := by
-        intro heq
-        exact hne heq.symm
-      have hchange :
-          (tonguesAt w start
-              (actionTime + 1 + contactSpan))
-                (passageSwitch passage) ≠
-            (tonguesAt w start (actionTime + 1))
-                (passageSwitch passage) := by
-        simpa [tonguesAt, hcontactReach, hnext] using hcontactNe
-      obtain ⟨t, htLeft, htRight, htProd, htWriter⟩ :=
-        changed_coordinate_has_writer_between
-          hswitchLt hcontactReach hchange
-      have htBound : t < C.approach.length := by
-        rw [hcontactSum] at htRight
-        exact htRight
-      have hnotReusable :=
-        PhysicalTrace.productive_writer_not_old_reusable (ManufacturedReflector.flip R) C.approach_trace
-          C.approach_simple hA C.old_grooves htBound htProd
-      apply hnotReusable
-      rw [htWriter]
-      exact hmemReusable
-    apply groove_transfer hcontactGroove
-    rw [hexitSwitch]
-    exact hbit
+    have hpostPaths := C.approach_trace.pathGrooves_at_prefix_of_endpoints
+      C.approach_simple hA C.old_grooves
+      (k := actionTime + 1) (by omega) (by simpa [start] using hnext)
+    exact hpostPaths R.runway (by
+      change R.runway ∈ [R.runway, R.candy]
+      exact List.mem_cons_self)
   have hpointwise :=
     (physicalTrace_contact_retraces_prefix_pointwise
       R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive).2

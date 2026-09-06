@@ -1,4 +1,5 @@
 import StateLawTwoSixUltra
+import StateLawBounds
 
 /-!
 # Exact top-level lift for the `N+4` state law
@@ -16,20 +17,6 @@ Under those assumptions the raw arbitrary-start statement
 
 namespace GeneralN
 
-/-- **THE SHARP STATE-LAW TARGET.**  A single train on any raw lazy-point
-wiring with `N` switches visits at most `N+4` pairwise-distinct restricted
-tongue vectors. -/
-def StateLawNAddFour : Prop :=
-  forall (w : Wiring) (N : Nat),
-    (forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N) ->
-    forall (start : Nat × Tongues) (times : List Nat),
-      (forall k, k ∈ times -> (stepN w k start).isSome) ->
-      (times.map (fun k => VectorCount.restrict N
-        (tonguesAt w start k))).Nodup ->
-      times.length <= N + 4
-
-
 /-- The exact productive arbitrary-start boundary target needed by the raw
 `N+4` state law. -/
 def ProductiveInitialBoundaryNAddFour (w : Wiring) (N : Nat) : Prop :=
@@ -45,17 +32,6 @@ def ProductiveInitialBoundaryNAddFour (w : Wiring) (N : Nat) : Prop :=
         times.map (restrictedTonguesAt w N (g, base))).Nodup ->
       times.length + 1 <= N + 4
 
-
-/-- The exact `N+4` hypothesis for a run whose incoming edge is known. -/
-def KnownIncomingEdgeNAddFour (w : Wiring) (N : Nat) : Prop :=
-  forall {e : Nat} {localStart : Nat × Tongues},
-    w.link e = some localStart.1 ->
-    forall localTimes : List Nat,
-      (forall k, k ∈ localTimes ->
-        (stepN w k localStart).isSome) ->
-      (localTimes.map
-        (restrictedTonguesAt w N localStart)).Nodup ->
-      localTimes.length <= N + 4
 
 /-- Exact arbitrary-start lift.  A quiet first passage is absorbed into the
 known-edge run by adjoining its time zero.  A productive first passage is

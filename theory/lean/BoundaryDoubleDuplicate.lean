@@ -381,35 +381,4 @@ theorem InitialEntryWriterOccurrence.switch_eq_action_of_before_length_eq_runway
     _ = R.actionSwitch := by
       rfl
 
-/-- The facing action mouth of a flip reflector is not part of its reusable
-support. -/
-theorem ManufacturedFlipReflector.action_not_mem_reusable
-    {w : Wiring} {g e : Nat}
-    (R : ManufacturedFlipReflector w g e) :
-    R.actionSwitch ∉
-      (ManufacturedReflector.flip R).reusableSwitches := by
-  intro hmem
-  change R.actionSwitch ∈
-    ((R.runway ++ R.candy).map passageSwitch) at hmem
-  obtain ⟨passage, hpassage, hswitch⟩ := List.mem_map.mp hmem
-  rcases List.mem_append.mp hpassage with hrunway | hcandy
-  · exact (R.support_foreign R.runway (by simp)
-      passage hrunway) hswitch
-  · exact (R.support_foreign R.candy (by simp)
-      passage hcandy) hswitch
-
-/-- The omitted action mouth is one of the counted finite switches. -/
-theorem ManufacturedFlipReflector.action_lt
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (R : ManufacturedFlipReflector w g e) :
-    R.actionSwitch < N := by
-  have hlt :=
-    (ManufacturedReflector.flip R).exploration_trace.switch_lt
-      hN (R.mouth, R.firstArm) (by
-        simp [ManufacturedReflector.exploration])
-  simpa [passageSwitch,
-    ManufacturedFlipReflector.actionSwitch] using hlt
-
 end GeneralN

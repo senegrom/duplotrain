@@ -26,7 +26,7 @@ The toolchain is pinned in `lean-toolchain`; no Mathlib is required.
 
 ```
 lake build StateLawAxiomAudit  # the headline theorem and its dependencies
-lake build                    # all 66 retained libraries, including the old boundary route
+lake build                    # all 68 retained libraries, including the old boundary route
 ```
 
 `StateLawAxiomAudit.lean` checks the exact `#print axioms` output with
@@ -52,7 +52,7 @@ entering a branch sets the tongue to that branch and exits the stem.
 `step` then follows the outgoing track edge. An absent edge ends the run.
 `stepN` iterates this rule, and `VectorCount.restrict N u` reads the first
 `N` tongue directions. The theorem counts distinct vectors at live sample
- times, not distinct train positions or elapsed steps.
+times, not distinct train positions or elapsed steps.
 
 ## Upper bound: keep time zero instead of shifting it
 
@@ -90,35 +90,93 @@ ends. It deliberately makes no claim about the continuation after death.
 times are shifted, no switch is added, and the theorem statement is unchanged.
 The former productive-boundary saturation proof is no longer required.
 
-### Dependency reduction
+## Protected pair: one history, two budgets
 
-Relative to `392ae27`, the transitive local-source closure of `StateLaw`
-(including itself, excluding the separate audit module) changes as follows:
+The next reduction is inside the known-incoming-edge proof, in
+`ProtectedPairNAddFour.lean`. Let `A` be the first manufactured reflector
+and `B` the opposite second reflector. Once the old paths are grooved at
+both endpoints of `B`'s construction, use just the canonical history
+`A.preservedTwoHistoryCore B N` in every branch.
 
-| Measure | Before | After |
+For a stay reflector `A`, that history has at most `N+2` entries and the
+repair tail has at most two fresh vectors. For a flip reflector, inspect
+its action coordinate (the tongue it flips on reflection):
+
+* **Absent from `B`'s productive first writers:** the coordinate is outside
+  both the old reusable support and the new writers. Reserving it saves one
+  history entry, again giving at most `N+2`, with at most two fresh tail vectors.
+* **Present among those writers:** the history has at most `N+3` entries.
+  Writing that coordinate causes a constant-tongue retrace to the second
+  construction's start; switch simplicity forces it to be the last productive
+  writer. Its pre-write state recovers a nominally fresh corner of the final
+  Gray-square motion, so the repair tail adds at most one fresh vector.
+
+Thus the arithmetic is `(N+2)+2 = (N+3)+1 = N+4`. The earlier split between
+"first productive writer" and "an earlier writer exists" is unnecessary.
+The doubly-erased history and its separate coverage and counting lemmas
+have been removed. The existing generic tail lemmas work directly with the
+same history, including the boundary configurations.
+
+### One reservation lemma instead of repeated coordinate counting
+
+`TwoHistoryUnionCharge.lean` now proves a common coordinate certificate:
+the old reusable switches and `B`'s productive first-writer switches form
+a duplicate-free list below `N`. `ReservedHistoryCharge.lean` appends any
+duplicate-free list of reserved switches disjoint from that list, obtaining
+
+```
+old reusable coordinates + new productive writers + reserved coordinates <= N.
+```
+
+The zero-, one-, and two-reservation counts reuse that certificate rather
+than independently reproving injectivity, disjointness, and the ambient bound.
+One- and two-reservation interfaces remain available to the older proof.
+
+### Endpoint agreement controls every intermediate state
+
+`PhysicalTrace.prefix_coordinate_eq_endpoint` in `TrackTrace.lean` is a
+small general observation: on a switch-simple trace, each intermediate
+tongue value is either its starting value or its finishing value. Split
+the trace at that intermediate point. Switch simplicity means a coordinate
+cannot occur in both halves. The half not containing it preserves its value.
+
+Consequently paths grooved at both endpoints stay grooved at every
+intermediate configuration. `OneReflectorContinuation.lean` packages that
+consequence as `PhysicalTrace.pathGrooves_at_prefix_of_endpoints`.
+Two repeated contradiction proofs in the protected-pair and changed-contact
+arguments now use this direct lemma. The new facts require neither a finite
+switch bound nor extraction of a later productive writer.
+
+## Dependency and source reductions
+
+The transitive local-source closure of `StateLaw` includes the theorem's
+own module but excludes the separate audit module. Source lines count
+comments and blanks, not just proof tactics.
+
+| Stage | Modules | Source lines |
 | --- | ---: | ---: |
-| Modules | 65 | 56 |
-| Source lines, including comments and blanks | 27,846 | 25,882 |
+| Before the capping reduction (`392ae27`) | 65 | 27,846 |
+| After capping (`2e928b6` has the same proof) | 56 | 25,882 |
+| After the shared-history and endpoint reductions | 53 | 24,104 |
 
-Nine modules, totalling 2,047 lines, leave that dependency path; the new
-wrapper adds 83 lines, giving a net reduction of 1,964 lines. This is a
-simpler final reduction, not a replacement of the known-edge core by a
-one-paragraph proof.
+The second pass removes a further **1,778 lines** from this dependency
+closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
+from **2,068 to 1,587 lines**. These are smaller arguments and cleaner
+imports, not merely whitespace compression or a change to the theorem.
+The substantial trace/reflector classification still remains; this is not
+a replacement of the whole upper bound by a one-paragraph proof.
 
-The following modules remain in the checkout for comparison and are still
-checked by `lake build`, but `StateLaw` no longer imports them transitively:
+Five more historical modules leave the headline theorem's import path:
+`StateLawNAddFourTop`, `StateLawTwoSixUltra`, `BoundaryNAddFourSaturation`,
+`BoundaryAbsentSecondWriter`, and `BoundaryDoubleDuplicate`. Two small
+modules (`StateLawBounds` and `ReservedHistoryCharge`) hold the shared
+statements and counting facts they previously supplied transitively. Old
+modules still compile, using compatibility imports where appropriate.
+The earlier capping reduction had already bypassed nine other modules.
 
-```
-BoundaryAbsentProtectedPair
-BoundaryApproachActionElimination
-BoundaryCanonicalGeometry
-BoundaryChangedContactSaving
-BoundaryOccurrenceDamageElimination
-BoundaryResidualNovelty
-BoundaryResidualSharpening
-PartialSecondRunNAddFour
-ProductiveBoundaryNAddFourComplete
-```
+`StateLaw.lean`, the `2^N` ceiling, the attainment construction, the wiring
+model, and the exact axiom audit are unchanged. No `sorry`, additional
+axiom, or `native_decide` is introduced by these reductions.
 
 ## Attainment: unchanged
 
@@ -141,4 +199,4 @@ The bound-tightening campaign reached
 Commit `2b75dd8` is the last state before the earlier cleanup of historical
 libraries. The capping reduction above was added on 6 September 2026.
 The paper in `../paper/` describes the earlier upper-bound organisation;
-this guide and the Lean sources describe the shorter arbitrary-start reduction.
+this guide and the Lean sources describe the current shorter proof.

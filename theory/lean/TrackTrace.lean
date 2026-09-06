@@ -387,6 +387,40 @@ theorem PhysicalTrace.preserves {w : Wiring}
         exact hforeign passage (List.mem_cons_of_mem _ hp)
       exact (ih htailForeign).trans hv
 
+/-- Along a switch-simple trace, each intermediate tongue is either its
+initial or final value: a switch cannot be visited in both halves of a split.
+This needs neither a finite-wiring bound nor a productive-writer argument. -/
+theorem PhysicalTrace.prefix_coordinate_eq_endpoint {w : Wiring}
+    {start finish middle : Nat × Tongues} {passages : List Passage}
+    (htrace : PhysicalTrace w start passages finish)
+    (hsimple : SwitchSimple passages) {k : Nat}
+    (hk : k ≤ passages.length) (hrun : stepN w k start = some middle)
+    (j : Nat) : middle.2 j = start.2 j ∨ middle.2 j = finish.2 j := by
+  have hsplit : PhysicalTrace w start
+      (passages.take k ++ passages.drop k) finish := by
+    simpa only [List.take_append_drop] using htrace
+  obtain ⟨mid, hleft, hright⟩ := hsplit.split_append
+  have hmid : mid = middle := by
+    have hsound := hleft.sound
+    rw [List.length_take_of_le hk, hrun] at hsound
+    exact (Option.some.inj hsound).symm
+  subst mid
+  have hnd : ((passages.take k).map passageSwitch ++
+      (passages.drop k).map passageSwitch).Nodup := by
+    rw [← List.map_append, List.take_append_drop]
+    exact hsimple
+  by_cases hprefix : j ∈ (passages.take k).map passageSwitch
+  · right
+    symm
+    apply hright.preserves
+    intro passage hp heq
+    exact (List.nodup_append.mp hnd).2.2 j hprefix j
+      (List.mem_map.mpr ⟨passage, hp, heq⟩) rfl
+  · left
+    apply hleft.preserves
+    intro passage hp heq
+    exact hprefix (List.mem_map.mpr ⟨passage, hp, heq⟩)
+
 /-- Every switch in a live trace is one of the `N` switches named by a
 finite-wiring bound. -/
 theorem PhysicalTrace.switch_lt {w : Wiring} {N : Nat}

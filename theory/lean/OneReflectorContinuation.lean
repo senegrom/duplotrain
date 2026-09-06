@@ -18,6 +18,26 @@ the same set of `N` switch coordinates.
 
 namespace GeneralN
 
+/-- A switch-simple trace grooved at both endpoints stays grooved at every
+intermediate configuration. Each relevant tongue equals an endpoint value,
+and the two endpoint values agree because they groove the same passage. -/
+theorem PhysicalTrace.pathGrooves_at_prefix_of_endpoints {w : Wiring}
+    {start finish middle : Nat × Tongues} {passages : List Passage}
+    {paths : List (List Passage)}
+    (htrace : PhysicalTrace w start passages finish)
+    (hsimple : SwitchSimple passages)
+    (hbase : PathGrooves paths start.2) (hend : PathGrooves paths finish.2)
+    {k : Nat} (hk : k ≤ passages.length)
+    (hrun : stepN w k start = some middle) : PathGrooves paths middle.2 := by
+  intro path hpath passage hpassage
+  have hg0 := hbase path hpath passage hpassage
+  have hg1 := hend path hpath passage hpassage
+  apply groove_transfer hg1
+  rcases htrace.prefix_coordinate_eq_endpoint hsimple hk hrun (passage.2 / 3)
+      with h | h
+  · exact h.trans (grooved_states_agree_on_passage hg0 hg1)
+  · exact h
+
 /-- A productive passage in a switch-simple continuation cannot write an old
 reusable coordinate when the old support is grooved at both endpoints. -/
 theorem PhysicalTrace.productive_writer_not_old_reusable

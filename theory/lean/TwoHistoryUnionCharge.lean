@@ -351,11 +351,19 @@ theorem ManufacturedReflector.reusableSwitch_lt
       · exact List.mem_append_right R.runway
           (List.mem_cons_of_mem _ hcandy)
 
-/-- Coefficient-one coordinate charge in the groove-preserved branch.
-The first reflector's reusable switches and all productive first writers of
-the second simple exploration are disjoint and together occupy at most the
-`N` available switch coordinates. -/
-theorem ManufacturedReflector.reusable_add_second_first_writers_le
+/-- Switch coordinates of the productive first writers in a manufactured
+reflector's switch-simple construction. -/
+def ManufacturedReflector.constructionFirstWriterSwitches
+    {w : Wiring} {g e : Nat}
+    (B : ManufacturedReflector w g e) (N : Nat) : List Nat :=
+  (rawFirstWriterTimes w N (g, B.baseState)
+      B.exploration.length).map
+    (rawWriterAt w (g, B.baseState))
+
+/-- The old reusable support and the second construction's productive
+first writers form a single duplicate-free list of coordinates below `N`.
+All ordinary and reserved-coordinate counts use this same certificate. -/
+theorem ManufacturedReflector.sharedConstructionCoordinates
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →
       p < 3 * N ∧ q < 3 * N)
@@ -365,9 +373,8 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_le
       PathGrooves A.toSupported.paths B.baseState)
     (hpreGrooves :
       PathGrooves A.toSupported.paths B.preReturn.2) :
-    A.reusableSwitches.length +
-      (rawFirstWriterTimes w N (e, B.baseState)
-        B.exploration.length).length ≤ N := by
+    (A.reusableSwitches ++ B.constructionFirstWriterSwitches N).Nodup ∧
+      (∀ j ∈ A.reusableSwitches ++ B.constructionFirstWriterSwitches N, j < N) := by
   let times :=
     rawFirstWriterTimes w N (e, B.baseState)
       B.exploration.length
@@ -417,11 +424,29 @@ theorem ManufacturedReflector.reusable_add_second_first_writers_le
         mem_rawFirstWriterTimes_iff.mp (by
           simpa [times] using hk)
       exact rawProductiveAt_writer_lt hN hkData.2.1
-  have hbound := nodup_nat_lt_length hnd hlt
-  have hlength :
-      A.reusableSwitches.length + times.length ≤ N := by
-    simpa [switches, writers] using hbound
-  simpa [times] using hlength
+  exact ⟨hnd, hlt⟩
+
+/-- Coefficient-one coordinate charge in the groove-preserved branch.
+The first reflector's reusable switches and all productive first writers of
+the second simple exploration are disjoint and together occupy at most the
+`N` available switch coordinates. -/
+theorem ManufacturedReflector.reusable_add_second_first_writers_le
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbaseGrooves :
+      PathGrooves A.toSupported.paths B.baseState)
+    (hpreGrooves :
+      PathGrooves A.toSupported.paths B.preReturn.2) :
+    A.reusableSwitches.length +
+      (rawFirstWriterTimes w N (e, B.baseState)
+        B.exploration.length).length ≤ N := by
+  obtain ⟨hnd, hlt⟩ := A.sharedConstructionCoordinates hN B hbaseGrooves hpreGrooves
+  simpa [ManufacturedReflector.constructionFirstWriterSwitches] using
+    nodup_nat_lt_length hnd hlt
+
 /-- The second construction compressed to its initial vector, the post-vector
 of each productive first writer in the switch-simple exploration, and its
 single activated endpoint.  Quiet old-support passages create no entry. -/
@@ -783,5 +808,36 @@ theorem backward_contact_all_time_two_phase_two_history
   | succ m =>
       obtain ⟨port, hrun⟩ := hfromU (m + 1) (by omega)
       exact ⟨port, v, hrun, Or.inr rfl⟩
+
+/-- The facing action mouth of a flip reflector is not part of its reusable
+support. -/
+theorem ManufacturedFlipReflector.action_not_mem_reusable
+    {w : Wiring} {g e : Nat}
+    (R : ManufacturedFlipReflector w g e) :
+    R.actionSwitch ∉
+      (ManufacturedReflector.flip R).reusableSwitches := by
+  intro hmem
+  change R.actionSwitch ∈
+    ((R.runway ++ R.candy).map passageSwitch) at hmem
+  obtain ⟨passage, hpassage, hswitch⟩ := List.mem_map.mp hmem
+  rcases List.mem_append.mp hpassage with hrunway | hcandy
+  · exact (R.support_foreign R.runway (by simp)
+      passage hrunway) hswitch
+  · exact (R.support_foreign R.candy (by simp)
+      passage hcandy) hswitch
+
+/-- The omitted action mouth is one of the counted finite switches. -/
+theorem ManufacturedFlipReflector.action_lt
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (R : ManufacturedFlipReflector w g e) :
+    R.actionSwitch < N := by
+  have hlt :=
+    (ManufacturedReflector.flip R).exploration_trace.switch_lt
+      hN (R.mouth, R.firstArm) (by
+        simp [ManufacturedReflector.exploration])
+  simpa [passageSwitch,
+    ManufacturedFlipReflector.actionSwitch] using hlt
 
 end GeneralN
