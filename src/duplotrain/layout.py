@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 
 from .exact import Alg
@@ -37,6 +38,12 @@ def _alg_from_json(data: list[str]) -> Alg:
     return Alg(a, b, c, d)
 
 
+@lru_cache(maxsize=4096)
+def _port_pose(frame: Pose, local: Pose) -> Pose:
+    """Bounded exact transform cache; retains no Layout, Session or PieceType."""
+    return frame.then(local.x, local.y, local.z, local.heading)
+
+
 @dataclass(frozen=True, slots=True)
 class Placement:
     """One piece, positioned in world space.
@@ -52,7 +59,7 @@ class Placement:
     def port_pose(self, port: int) -> Pose:
         """World pose of one of this piece's connectors (heading points outward)."""
         local = self.piece.ports[port].pose
-        return self.frame.then(local.x, local.y, local.z, local.heading)
+        return _port_pose(self.frame, local)
 
     def centrelines(self, spacing: float = 8.0) -> list[list[tuple[float, float, float]]]:
         """Every route through the piece, sampled in world coordinates."""

@@ -638,59 +638,84 @@ function refreshStatus() {
   el("undo").disabled = solving || !S.can_undo;
 }
 
+// Retain controls while their catalogue structure is unchanged. In particular,
+// redrawing geometry must not discard focus or an unsubmitted inventory value.
+let paletteKey = null, setKey = null, stoneKey = null, candidateKey = null;
+let paletteRows = [], stoneRows = [], candidateRows = [];
+
 function renderPalette() {
-  const pal = el("palette");
-  pal.innerHTML = "";
+  const key = JSON.stringify(S.palette);
+  if (key !== paletteKey) {
+    const pal = el("palette");
+    pal.replaceChildren();
+    paletteRows = S.palette.map(piece => {
+      const div = document.createElement("div");
+      div.className = "piece";
+      div.dataset.pieceId = piece.id;
+      const row = document.createElement("div");
+      row.className = "row";
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = piece.name + (piece.provisional ? " ⚠" : "");
+      const count = document.createElement("span");
+      count.className = "count";
+      const label = document.createElement("span");
+      const input = document.createElement("input");
+      input.type = "number"; input.min = 0; input.max = 10000; input.step = 1;
+      input.setAttribute("aria-label", `${piece.name} owned`);
+      input.title = "how many you own";
+      input.addEventListener("change", async () => {
+        try { S = await api("/api/inventory", { counts: { [piece.id]: input.value } }); redraw(); }
+        catch (e) { status(e.message, "err"); }
+      });
+      count.append(label, input);
+      row.append(name, count);
+      const vs = document.createElement("div");
+      vs.className = "variants";
+      const buttons = piece.variants.map(v => {
+        const b = document.createElement("button");
+        b.textContent = v.label;
+        b.addEventListener("click", () => {
+          const same = armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit;
+          selectTool(same ? {} : {
+            piece: {piece: piece.id, pieceName: piece.name, entry: v.entry, exit: v.exit, label: v.label},
+          });
+          renderPalette(); renderStones(); refreshStatus(); draw();
+        });
+        vs.append(b);
+        return {button: b, variant: v};
+      });
+      div.append(row, vs);
+      pal.append(div);
+      return {id: piece.id, label, input, buttons, owned: null};
+    });
+    paletteKey = key;
+  }
   const unlimited = !!S.inventory.unlimited;
   el("unlimited").checked = unlimited;
-  for (const piece of S.palette) {
-    const remaining = S.inventory.remaining[piece.id] ?? 0;
-    const owned = S.inventory.owned[piece.id] ?? 0;
-    const div = document.createElement("div");
-    div.className = "piece";
-    div.dataset.pieceId = piece.id;
-    const row = document.createElement("div");
-    row.className = "row";
-    row.innerHTML = `<span class="name">${piece.name}${piece.provisional ? " ⚠" : ""}</span>`;
-    const count = document.createElement("span");
-    count.className = "count";
-    const input = document.createElement("input");
-    input.type = "number"; input.min = 0; input.max = 10000; input.step = 1; input.value = owned;
-    input.setAttribute("aria-label", `${piece.name} owned`);
-    input.title = "how many you own";
-    input.addEventListener("change", async () => {
-      try { S = await api("/api/inventory", { counts: { [piece.id]: input.value } }); redraw(); }
-      catch (e) { status(e.message, "err"); }
-    });
-    if (unlimited) count.append("∞");
-    else { count.append(`${remaining}/`); count.append(input); }
-    row.append(count);
-    div.append(row);
-    const vs = document.createElement("div");
-    vs.className = "variants";
-    for (const v of piece.variants) {
-      const b = document.createElement("button");
-      b.textContent = v.label;
-      b.disabled = !unlimited && remaining <= 0;
-      if (armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit)
-        b.classList.add("armed");
-      b.addEventListener("click", () => {
-        const same = armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit;
-        selectTool(same ? {} : {
-          piece: {piece: piece.id, pieceName: piece.name, entry: v.entry, exit: v.exit, label: v.label},
-        });
-        renderPalette(); renderStones(); refreshStatus(); draw();
-      });
-      vs.append(b);
+  for (const row of paletteRows) {
+    const remaining = S.inventory.remaining[row.id] ?? 0;
+    const owned = S.inventory.owned[row.id] ?? 0;
+    const label = unlimited ? "∞" : `${remaining}/`;
+    if (row.label.textContent !== label) row.label.textContent = label;
+    row.input.hidden = unlimited;
+    if (row.owned !== owned) {
+      row.input.value = owned;
+      row.owned = owned;
     }
-    div.append(vs);
-    pal.append(div);
+    for (const {button, variant: v} of row.buttons) {
+      button.disabled = !unlimited && remaining <= 0;
+      button.classList.toggle("armed", !!armed && armed.piece === row.id &&
+                             armed.entry === v.entry && armed.exit === v.exit);
+    }
   }
 }
 
 function renderSets() {
+  const key = JSON.stringify(S.sets || []);
+  if (key === setKey) return;
   const box = el("sets");
-  box.innerHTML = "";
+  box.replaceChildren();
   for (const s of (S.sets || [])) {
     const b = document.createElement("button");
     b.textContent = `+ ${s.code}`;
@@ -702,81 +727,103 @@ function renderSets() {
     });
     box.append(b);
   }
+  setKey = key;
 }
 
 function renderStones() {
-  const box = el("stones");
-  box.innerHTML = "";
-  const unlimited = !!S.inventory.unlimited;
-  for (const [sid, info] of Object.entries(S.stones.catalog)) {
-    const remaining = S.stones.remaining[sid] ?? 0;
-    const b = document.createElement("button");
-    b.textContent = `${info.name.replace(" stone", "")} ×${unlimited ? "∞" : remaining}`;
-    b.title = `${info.effect} — click a straight to clip on / off`;
-    b.style.borderLeft = `14px solid ${info.color}`;
-    if (armedStone === sid) b.classList.add("armed");
-    b.disabled = !unlimited && remaining <= 0 && armedStone !== sid;
-    b.addEventListener("click", () => {
-      selectTool(armedStone === sid ? {} : {stone: sid});
-      renderPalette(); renderStones(); refreshStatus(); draw();
+  const key = JSON.stringify(S.stones.catalog);
+  if (key !== stoneKey) {
+    const box = el("stones");
+    box.replaceChildren();
+    stoneRows = Object.entries(S.stones.catalog).map(([sid, info]) => {
+      const b = document.createElement("button");
+      b.title = `${info.effect} — click a straight to clip on / off`;
+      b.style.borderLeft = `14px solid ${info.color}`;
+      b.addEventListener("click", () => {
+        selectTool(armedStone === sid ? {} : {stone: sid});
+        renderPalette(); renderStones(); refreshStatus(); draw();
+      });
+      box.append(b);
+      return {sid, name: info.name.replace(" stone", ""), button: b};
     });
-    box.append(b);
+    stoneKey = key;
+  }
+  const unlimited = !!S.inventory.unlimited;
+  for (const {sid, name, button} of stoneRows) {
+    const remaining = S.stones.remaining[sid] ?? 0;
+    const label = `${name} ×${unlimited ? "∞" : remaining}`;
+    if (button.textContent !== label) button.textContent = label;
+    button.classList.toggle("armed", armedStone === sid);
+    button.disabled = !unlimited && remaining <= 0 && armedStone !== sid;
   }
 }
 
 function renderCandidates() {
-  const box = el("cands");
-  box.replaceChildren();
   const candidates = S.candidates || [];
   const key = (c) => `${c.revision}:${c.index}`;
   const selected = candidates.find(c => key(c) === selectedCandidate);
   if (!selected) selectedCandidate = null;
   preview = selected ? selected.preview : null;
-  for (const c of candidates) {
-    const div = document.createElement("div");
-    div.className = "cand";
-    div.dataset.candidateIndex = c.index;
-    const description = document.createElement("div");
-    const closure = document.createElement("span");
-    closure.className = c.exact ? "exact" : "gap";
-    closure.textContent = c.exact ? "exact" : `forced ${c.gap} mm`;
-    const added = Object.entries(c.added).map(([k, n]) => `${n}×${k}`).join(" ") || "nothing";
-    description.append(closure, `${c.kind === "reversing" ? " reversing (↔ stone on tail)" : ""} — add ${added}`,
-      ` (${c.size_cm[0]}×${c.size_cm[1]} cm${c.open_stubs ? `, ${c.open_stubs} stubs` : ""})`);
-    div.append(description);
-    const buttons = document.createElement("div");
-    buttons.className = "buttons";
-    const show = document.createElement("button");
-    show.textContent = key(c) === selectedCandidate ? "Previewing" : "Preview";
-    show.setAttribute("aria-pressed", String(key(c) === selectedCandidate));
-    show.addEventListener("click", () => {
-      selectedCandidate = key(c);
-      renderCandidates();
-      draw();
+  // Previews can be large: compare only the card's metadata, not its geometry.
+  const cards = JSON.stringify(candidates.map(({preview, ...card}) => card));
+  if (cards !== candidateKey) {
+    const box = el("cands");
+    box.replaceChildren();
+    candidateRows = candidates.map(c => {
+      const div = document.createElement("div");
+      div.className = "cand";
+      div.dataset.candidateIndex = c.index;
+      const description = document.createElement("div");
+      const closure = document.createElement("span");
+      closure.className = c.exact ? "exact" : "gap";
+      closure.textContent = c.exact ? "exact" : `forced ${c.gap} mm`;
+      const added = Object.entries(c.added).map(([k, n]) => `${n}×${k}`).join(" ") || "nothing";
+      description.append(closure, `${c.kind === "reversing" ? " reversing (↔ stone on tail)" : ""} — add ${added}`,
+        ` (${c.size_cm[0]}×${c.size_cm[1]} cm${c.open_stubs ? `, ${c.open_stubs} stubs` : ""})`);
+      div.append(description);
+      const buttons = document.createElement("div");
+      buttons.className = "buttons";
+      const show = document.createElement("button");
+      const apply = document.createElement("button");
+      apply.textContent = "Apply";
+      const row = {candidate: c, show, apply};
+      show.addEventListener("click", () => {
+        selectedCandidate = key(row.candidate);
+        renderCandidates();
+        draw();
+      });
+      apply.addEventListener("click", async () => {
+        try {
+          const current = row.candidate;
+          S = await api("/api/apply", {index: current.index, revision: current.revision});
+          selectedCandidate = null;
+          fitted = false;
+          redraw();
+        } catch (e) { status(e.message, "err"); }
+      });
+      buttons.append(show, apply);
+      div.append(buttons);
+      div.addEventListener("pointerenter", (event) => {
+        if (event.pointerType !== "touch") { preview = row.candidate.preview; draw(); }
+      });
+      div.addEventListener("pointerleave", () => {
+        const chosen = (S.candidates || []).find(candidate => key(candidate) === selectedCandidate);
+        preview = chosen ? chosen.preview : null;
+        draw();
+      });
+      box.append(div);
+      return row;
     });
-    const apply = document.createElement("button");
-    apply.textContent = "Apply";
-    apply.disabled = key(c) !== selectedCandidate;
-    apply.addEventListener("click", async () => {
-      try {
-        S = await api("/api/apply", {index: c.index, revision: c.revision});
-        selectedCandidate = null;
-        fitted = false;
-        redraw();
-      } catch (e) { status(e.message, "err"); }
-    });
-    buttons.append(show, apply);
-    div.append(buttons);
-    div.addEventListener("pointerenter", (event) => {
-      if (event.pointerType !== "touch") { preview = c.preview; draw(); }
-    });
-    div.addEventListener("pointerleave", () => {
-      const chosen = candidates.find(candidate => key(candidate) === selectedCandidate);
-      preview = chosen ? chosen.preview : null;
-      draw();
-    });
-    box.append(div);
+    candidateKey = cards;
   }
+  candidateRows.forEach((row, i) => {
+    row.candidate = candidates[i];
+    const active = key(row.candidate) === selectedCandidate;
+    const label = active ? "Previewing" : "Preview";
+    if (row.show.textContent !== label) row.show.textContent = label;
+    row.show.setAttribute("aria-pressed", String(active));
+    row.apply.disabled = !active;
+  });
 }
 
 function redraw() {

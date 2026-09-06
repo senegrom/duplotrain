@@ -26,6 +26,7 @@ import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
+from functools import lru_cache
 from typing import Any, Literal
 
 from .exact import Alg, alg
@@ -348,11 +349,21 @@ class PieceType:
         return self.paths[route.path_index].sample(spacing)
 
     def all_centrelines(self, spacing: float = 8.0) -> list[list[tuple[float, float, float]]]:
-        return [p.sample(spacing) for p in self.paths]
+        # Cache immutable samples, never the caller's mutable outer/inner lists.
+        # Geometry (not a catalogue id) is the key, so custom pieces cannot alias.
+        return [list(line) for line in _sample_paths(self.paths, spacing)]
 
     def span(self) -> float:
         """Longest path length through the piece, in mm."""
         return max((p.length() for p in self.paths), default=0.0)
+
+
+@lru_cache(maxsize=128)
+def _sample_paths(
+    paths: tuple[Path, ...], spacing: float
+) -> tuple[tuple[tuple[float, float, float], ...], ...]:
+    """Bounded local geometry cache shared by rendering and collision checks."""
+    return tuple(tuple(path.sample(spacing)) for path in paths)
 
 
 # --------------------------------------------------------------------------------------
