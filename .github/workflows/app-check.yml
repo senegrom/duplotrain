@@ -24,7 +24,7 @@ jobs:
       - name: Archive the exact source under test
         if: matrix.python == '3.12'
         run: git archive --format=zip HEAD -o source-under-test.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: matrix.python == '3.12'
         with:
           name: source-under-test
