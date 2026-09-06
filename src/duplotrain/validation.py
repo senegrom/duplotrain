@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
-import re
 from fractions import Fraction
 
 MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_PLACEMENTS = 1500
 MAX_COEFFICIENT_LENGTH = 48
-_RATIONAL = re.compile(r"[+-]?[0-9]+(?:/[+-]?[0-9]+)?\Z", re.ASCII)
+
+
+def _signed_decimal(text: str) -> bool:
+    """An optional sign followed by ASCII digits, with no regex backtracking."""
+    digits = text[1:] if text.startswith(("+", "-")) else text
+    return bool(digits) and digits.isascii() and digits.isdigit()
 
 
 def rational_coefficient(value: object) -> Fraction:
@@ -22,9 +26,12 @@ def rational_coefficient(value: object) -> Fraction:
     if isinstance(value, int) and value.bit_length() > 160:
         raise ValueError("frame coefficient too large")
     text = str(value)
-    if len(text) > MAX_COEFFICIENT_LENGTH or not _RATIONAL.fullmatch(text):
+    # Reject long input before scanning or converting either component.
+    if len(text) > MAX_COEFFICIENT_LENGTH:
         raise ValueError("frame coefficients must be bounded integers or n/d strings")
     numerator, sep, denominator = text.partition("/")
+    if not _signed_decimal(numerator) or (sep and not _signed_decimal(denominator)):
+        raise ValueError("frame coefficients must be bounded integers or n/d strings")
     den = int(denominator) if sep else 1
     if den == 0:
         raise ValueError("frame coefficient denominator must not be zero")
