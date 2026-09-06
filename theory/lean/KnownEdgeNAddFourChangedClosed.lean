@@ -133,6 +133,7 @@ theorem known_edge_N_add_four_or_protected_pair
     {w : Wiring} {N e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
+    (htotal : ∀ p, p < 3 * N → ∃ q, w.link p = some q)
     {start : Nat × Tongues}
     (hentry : w.link e = some start.1)
     (times : List Nat)
@@ -142,7 +143,7 @@ theorem known_edge_N_add_four_or_protected_pair
     times.length <= N + 4 ∨
       Nonempty (KnownEdgeProtectedPair w e start) := by
   rcases known_edge_N_add_four_or_changed_contact_or_protected_pair
-      hN hentry times hlive hnd with hsmall | hchanged | hpair
+      hN htotal hentry times hlive hnd with hsmall | hchanged | hpair
   · exact Or.inl hsmall
   · obtain ⟨D⟩ := hchanged
     exact Or.inl (D.all_run_distinct_le_N_add_four
@@ -176,6 +177,7 @@ theorem known_edge_all_run_distinct_le_N_add_four_of_protected_pair
     {w : Wiring} {N e : Nat}
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
+    (htotal : ∀ p, p < 3 * N → ∃ q, w.link p = some q)
     {start : Nat × Tongues}
     (hentry : w.link e = some start.1)
     (times : List Nat)
@@ -184,7 +186,7 @@ theorem known_edge_all_run_distinct_le_N_add_four_of_protected_pair
       (restrictedTonguesAt w N start)).Nodup) :
     times.length <= N + 4 := by
   rcases known_edge_N_add_four_or_protected_pair
-      hN hentry times hlive hnd with hsmall | hpair
+      hN htotal hentry times hlive hnd with hsmall | hpair
   · exact hsmall
   · exact hpairLaw hN (Classical.choice hpair) times hlive hnd
 

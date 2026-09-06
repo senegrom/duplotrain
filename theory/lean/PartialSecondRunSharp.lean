@@ -1,5 +1,5 @@
 import OneReflectorContinuation
-import TraceRetainingFirstRevisit
+import TripleSelfLinkSimpleCycleClosure
 
 /-!
 # Sharp partial second-run accounting
@@ -24,26 +24,6 @@ The one liveness fact the downstream counting files use.
 -/
 
 namespace GeneralN
-
-/-- Eventual periodicity supplies successful raw prefixes of every length. -/
-theorem EventuallyPeriodic.stepN_some_all
-    {w : Wiring} {start : Nat × Tongues}
-    (H : EventuallyPeriodic w start) (d : Nat) :
-    ∃ finish, stepN w d start = some finish := by
-  obtain ⟨lead, period, settled, hpositive, hsettled, hperiod⟩ := H
-  have hcycles :
-      stepN w ((d + 1) * period) settled = some settled :=
-    stepN_mul_period_pair_novelty hperiod (d + 1)
-  have hfar :
-      stepN w (lead + (d + 1) * period) start = some settled := by
-    rw [stepN_add, hsettled]
-    exact hcycles
-  have hone : 1 ≤ period := by omega
-  have hmul := Nat.mul_le_mul_left (d + 1) hone
-  simp only [Nat.mul_one] at hmul
-  have hbound : d ≤ lead + (d + 1) * period := by omega
-  exact stepN_prefix_some hbound hfar
-
 
 /-- Trace-retaining form of the simple-cycle branch of
 `first_activated_count_outcome_sharp`. -/
@@ -568,31 +548,6 @@ theorem ChangedContact.forward_stay_all_time_zero_novelty
     rcases hphase with h | h
     · simpa [alternate, h] using hentryHistorical
     · simpa [h] using hstateHistorical
-
-/-- Every finite dead run has a literal final live physical trace. -/
-theorem terminal_trace_of_dead
-    {w : Wiring} {start : Nat × Tongues} :
-    ∀ {L : Nat}, stepN w L start = none →
-      ∃ finish passages,
-        PhysicalTrace w start passages finish ∧
-        step w finish = none := by
-  intro L
-  induction L with
-  | zero =>
-      intro hdead
-      simp [stepN] at hdead
-  | succ n ih =>
-      intro hdead
-      cases hprev : stepN w n start with
-      | none => exact ih hprev
-      | some finish =>
-          obtain ⟨passages, _hlength, htrace⟩ :=
-            physicalTrace_of_stepN w hprev
-          refine ⟨finish, passages, htrace, ?_⟩
-          change stepN w (n + 1) start = none at hdead
-          rw [stepN_add, hprev] at hdead
-          simpa [stepN] using hdead
-
 
 end PartialSecondRunSharp
 end GeneralN

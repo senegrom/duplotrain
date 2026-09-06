@@ -1,19 +1,12 @@
 import TwoHistoryUnionCharge
 
 /-!
-# One-reflector continuation at coefficient one
+# Coordinate preservation and continuation after a reflector
 
-This file treats two genuine branches after exactly one manufactured
-reflector has been completed.
-
-* A support-preserving switch-simple continuation that falls off on its next
-  raw step exposes at most `N+2` restricted tongue vectors.
-* A support-preserving switch-simple lead followed by a one-vector cycle tail
-  exposes at most `N+3` vectors.
-
-Both statements use one joint coordinate charge: old reusable support
-switches and productive first writers of the continuation fit together in
-the same set of `N` switch coordinates.
+A switch-simple trace whose endpoints agree on a groove preserves that
+groove throughout. Combine this with construction histories to count a
+simple continuation into a stable cycle or another reflector. Dead-end
+continuations need no dedicated bound after total-wiring completion.
 -/
 
 namespace GeneralN
@@ -240,73 +233,6 @@ theorem ManufacturedReflector.journey_then_continuation_mem
     exact A.mem_continuationHistory
       (N := N) (finish := finish) (passages := passages)
       htrace hsimple hd
-
-/-- A completed reflector followed by a support-preserving simple
-continuation which falls off on its next step has at most `N+2` distinct
-restricted tongue vectors on the entire raw run. -/
-theorem preserved_simple_fall_distinct_le_N_add_two
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    {finish : Nat × Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w (e, A.activatedState) passages finish)
-    (hsimple : SwitchSimple passages)
-    (hend : PathGrooves A.toSupported.paths finish.2)
-    (hfall : step w finish = none)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    times.length ≤ N + 2 := by
-  let firstTravel := A.exploration.length + A.runway.length + 1
-  let localStart : Nat × Tongues := (e, A.activatedState)
-  let lastLive := firstTravel + passages.length
-  let history :=
-    A.continuationHistory N localStart passages.length
-  have hreachA : stepN w firstTravel (g, A.baseState) =
-      some localStart := by
-    simpa [firstTravel, localStart] using
-      A.manufacturing_journey_reaches_activated hA
-  have hlocalDead :
-      stepN w (passages.length + 1) localStart = none := by
-    rw [stepN_add, htrace.sound]
-    simpa [stepN] using hfall
-  have hglobalDead :
-      stepN w (lastLive + 1) (g, A.baseState) = none := by
-    have htime :
-        lastLive + 1 = firstTravel + (passages.length + 1) := by
-      dsimp [lastLive]
-      omega
-    rw [htime, stepN_add, hreachA]
-    exact hlocalDead
-  have htimes : ∀ k ∈ times, k ≤ lastLive := by
-    intro k hk
-    by_cases hle : k ≤ lastLive
-    · exact hle
-    · have hdeadAtK :
-          stepN w k (g, A.baseState) = none :=
-        stepN_none_of_none_at_le hglobalDead (by omega)
-      have hkLive := hlive k hk
-      rw [hdeadAtK] at hkLive
-      simp at hkLive
-  have hcover :
-      NoveltyCoverOn w N (g, A.baseState) times history 0 := by
-    refine ⟨[], by simp, ?_⟩
-    intro k hk
-    simp only [List.append_nil]
-    dsimp [history]
-    apply A.journey_then_continuation_mem hA htrace hsimple
-    simpa [lastLive, firstTravel] using htimes k hk
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  have hlength :
-      history.length ≤ N + 2 := by
-    dsimp [history, localStart]
-    exact A.continuationHistory_length_le
-      hN rfl htrace hsimple hA hend
-  omega
 
 theorem simple_lead_one_vector_tail_distinct_le_N_add_three
     {w : Wiring} {N g e : Nat}

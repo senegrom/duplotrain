@@ -1,5 +1,6 @@
 name = "duplotrain"
 defaultTargets = [
+  "WiringCompletion",
   "ReservedHistoryCharge",
   "StateLawBounds",
   "BoundaryOverlapTailCount",
@@ -35,7 +36,6 @@ defaultTargets = [
   "StateLawSmallN",
   "StateLawTwoCandidate",
   "StateLawTwoSharp",
-  "TraceRetainingFirstRevisit",
   "TrackEarlyRepairConstant",
   "TrackEndpointMatching",
   "TrackFiniteAlternation",
@@ -154,8 +154,6 @@ name = "StateLawTwoCandidate"
 [[lean_lib]]
 name = "StateLawTwoSharp"
 
-[[lean_lib]]
-name = "TraceRetainingFirstRevisit"
 
 [[lean_lib]]
 name = "TrackEarlyRepairConstant"
@@ -214,3 +212,6 @@ name = "StateLawBounds"
 
 [[lean_lib]]
 name = "ReservedHistoryCharge"
+
+[[lean_lib]]
+name = "WiringCompletion"

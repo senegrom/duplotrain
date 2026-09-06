@@ -215,6 +215,21 @@ theorem PhysicalTrace.split_append {w : Wiring}
           obtain ⟨middle, hleft, hright⟩ := ih tail
           exact ⟨middle, PhysicalTrace.cons harrive hlink hleft, hright⟩
 
+/-- A suffix after a named passage retains its original recorded tongue state.
+No re-grooving or switch-simplicity assumption is needed to trim a witness. -/
+theorem PhysicalTrace.suffix_after_passage {w : Wiring}
+    {start finish : Nat × Tongues} {before after : List Passage}
+    {p x outside : Nat}
+    (h : PhysicalTrace w start (before ++ (p, x) :: after) finish)
+    (houtside : w.link x = some outside) :
+    ∃ state, PhysicalTrace w (outside, state) after finish := by
+  obtain ⟨middle, _, hrest⟩ := h.split_append
+  cases hrest with
+  | @cons _ _ next _ state _ _ _ hlink tail =>
+      have hnext : next = outside := Option.some.inj (hlink.symm.trans houtside)
+      subst next
+      exact ⟨state, tail⟩
+
 /-- Concatenate two physical traces. -/
 theorem PhysicalTrace.append {w : Wiring}
     {start middle finish : Nat × Tongues}
@@ -864,13 +879,6 @@ theorem PhysicalTrace.simple_cross_exit_retraces_prefix {w : Wiring}
       rw [hlen, stepN_add, hone]
       simp only [Option.bind_some]
       rw [hback, hstart]
-
-/-- A configuration settles on a tongue-stable simple cycle after one lap. -/
-def SettlesOnSimpleCycle (w : Wiring) (c : Nat × Tongues) : Prop :=
-  ∃ (period : Nat) (settled : Tongues),
-    0 < period ∧
-    stepN w period c = some (c.1, settled) ∧
-    stepN w period (c.1, settled) = some (c.1, settled)
 
 theorem retrace_linked_passages
     (w : Wiring) (u : Tongues) (p x ell : Nat) (rest : List Passage)

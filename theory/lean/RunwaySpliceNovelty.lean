@@ -150,149 +150,29 @@ theorem ManufacturedFlipReflector.capture_from_mouth_two_phase
       stepN w d (C.mouth, flipAt state C.actionSwitch) =
           some (port, phase) /\
         (phase = flipAt state C.actionSwitch \/ phase = state) := by
-  have hCandyForeign : ∀ passage ∈ C.candy,
-      passageSwitch passage ≠ C.actionSwitch := by
-    exact C.support_foreign C.candy (by simp)
-  have hcandyFlip : PassagesGrooved (flipAt state C.actionSwitch)
-      C.candy := grooved_after_flip_other hcandy hCandyForeign
-  rcases C.selected_arm state with hfirst | hsecond
-  · have hselectedFlip :
-        (flipAt state C.actionSwitch) C.actionSwitch =
-          bval C.secondArm := by
-      have hopp := branch_values_opposite C.firstArm_branch
-        C.secondArm_branch
-        (C.firstArm_switch.trans C.secondArm_switch.symm)
-        C.arms_ne
-      simp [flipAt, hfirst, hopp]
-    have hbefore := C.candy_reverse_trace
-      (flipAt state C.actionSwitch) hselectedFlip hcandyFlip
-    have hbeforeSimple : SwitchSimple
-        ((C.mouth, C.secondArm) :: reversePassages C.candy) := by
-      have hs := C.reverse_support_simple
-      unfold SwitchSimple at hs ⊢
-      simp only [List.map_append] at hs
-      exact (List.nodup_append.mp hs).2.1
-    have hbeforeGrooved : PassagesGrooved
-        (flipAt state C.actionSwitch)
-        ((C.mouth, C.secondArm) :: reversePassages C.candy) :=
-      hbefore.grooved_of_switchSimple hbeforeSimple
-    have hfirstGroove : arrive state C.firstArm = (C.mouth, state) := by
-      have htrace := C.candy_forward_trace state hfirst hcandy
-      have hsimple : SwitchSimple
-          ((C.mouth, C.firstArm) :: C.candy) := by
-        have hs := C.simple
-        unfold SwitchSimple at hs ⊢
-        simp only [List.map_append] at hs
-        exact (List.nodup_append.mp hs).2.1
-      exact (htrace.grooved_of_switchSimple hsimple)
-        (C.mouth, C.firstArm) List.mem_cons_self
-    have hcontact : arrive (flipAt state C.actionSwitch) C.firstArm =
-        (C.mouth, state) := by
-      have hrepair := flipped_passage_forward_trailing
-        hfirstGroove C.firstArm_branch
-      simpa [C.firstArm_switch] using hrepair
-    have hback := physicalTrace_contact_retraces_prefix_pointwise
-      C.runwayTrace hrunway C.entryEdge hcontact
-    have hbeforeLen :
-        ((C.mouth, C.secondArm) ::
-          reversePassages C.candy).length = C.candy.length + 1 := by
-      simp [reversePassages_length]
-    by_cases hbeforeDepth :
-        d <= ((C.mouth, C.secondArm) ::
-          reversePassages C.candy).length
-    · obtain ⟨port, hrun⟩ := hbefore.grooved_prefix_tongues
-        (flipAt state C.actionSwitch) hbeforeGrooved hbeforeDepth
-      exact ⟨port, flipAt state C.actionSwitch, hrun, Or.inl rfl⟩
-    · rw [hbeforeLen] at hbeforeDepth
-      let q := d - (C.candy.length + 1)
-      have hqPos : 1 <= q := by
-        dsimp [q]
-        omega
-      have hq : q <= C.runway.length + 1 := by
-        dsimp [q]
-        omega
-      have hdq : d = ((C.mouth, C.secondArm) ::
-          reversePassages C.candy).length + q := by
-        rw [hbeforeLen]
-        dsimp [q]
-        omega
-      obtain ⟨port, hrun⟩ := hback.2 q hq
-      have hq0 : q ≠ 0 := by omega
-      have hrun' : stepN w q
-          (C.firstArm, flipAt state C.actionSwitch) =
-            some (port, state) := by
-        simpa [hq0] using hrun
-      refine ⟨port, state, ?_, Or.inr rfl⟩
-      rw [hdq, stepN_add, hbefore.sound]
-      exact hrun'
-  · have hselectedFlip :
-        (flipAt state C.actionSwitch) C.actionSwitch =
-          bval C.firstArm := by
-      have hopp := branch_values_opposite C.secondArm_branch
-        C.firstArm_branch
-        (C.secondArm_switch.trans C.firstArm_switch.symm)
-        (Ne.symm C.arms_ne)
-      simp [flipAt, hsecond, hopp]
-    have hbefore := C.candy_forward_trace
-      (flipAt state C.actionSwitch) hselectedFlip hcandyFlip
-    have hbeforeSimple : SwitchSimple
-        ((C.mouth, C.firstArm) :: C.candy) := by
-      have hs := C.simple
-      unfold SwitchSimple at hs ⊢
-      simp only [List.map_append] at hs
-      exact (List.nodup_append.mp hs).2.1
-    have hbeforeGrooved : PassagesGrooved
-        (flipAt state C.actionSwitch)
-        ((C.mouth, C.firstArm) :: C.candy) :=
-      hbefore.grooved_of_switchSimple hbeforeSimple
-    have hsecondGroove : arrive state C.secondArm =
-        (C.mouth, state) := by
-      have htrace := C.candy_reverse_trace state hsecond hcandy
-      have hsimple : SwitchSimple
-          ((C.mouth, C.secondArm) :: reversePassages C.candy) := by
-        have hs := C.reverse_support_simple
-        unfold SwitchSimple at hs ⊢
-        simp only [List.map_append] at hs
-        exact (List.nodup_append.mp hs).2.1
-      exact (htrace.grooved_of_switchSimple hsimple)
-        (C.mouth, C.secondArm) List.mem_cons_self
-    have hcontact : arrive (flipAt state C.actionSwitch) C.secondArm =
-        (C.mouth, state) := by
-      have hrepair := flipped_passage_forward_trailing
-        hsecondGroove C.secondArm_branch
-      simpa [C.secondArm_switch] using hrepair
-    have hback := physicalTrace_contact_retraces_prefix_pointwise
-      C.runwayTrace hrunway C.entryEdge hcontact
-    have hbeforeLen :
-        ((C.mouth, C.firstArm) :: C.candy).length =
-          C.candy.length + 1 := by
-      simp
-    by_cases hbeforeDepth :
-        d <= ((C.mouth, C.firstArm) :: C.candy).length
-    · obtain ⟨port, hrun⟩ := hbefore.grooved_prefix_tongues
-        (flipAt state C.actionSwitch) hbeforeGrooved hbeforeDepth
-      exact ⟨port, flipAt state C.actionSwitch, hrun, Or.inl rfl⟩
-    · rw [hbeforeLen] at hbeforeDepth
-      let q := d - (C.candy.length + 1)
-      have hqPos : 1 <= q := by
-        dsimp [q]
-        omega
-      have hq : q <= C.runway.length + 1 := by
-        dsimp [q]
-        omega
-      have hdq : d = ((C.mouth, C.firstArm) :: C.candy).length + q := by
-        rw [hbeforeLen]
-        dsimp [q]
-        omega
-      obtain ⟨port, hrun⟩ := hback.2 q hq
-      have hq0 : q ≠ 0 := by omega
-      have hrun' : stepN w q
-          (C.secondArm, flipAt state C.actionSwitch) =
-            some (port, state) := by
-        simpa [hq0] using hrun
-      refine ⟨port, state, ?_, Or.inr rfl⟩
-      rw [hdq, stepN_add, hbefore.sound]
-      exact hrun'
+  let A := ManufacturedReflector.flip C
+  have hpaths : PathGrooves A.toSupported.paths state :=
+    pathGrooves_pair.mpr ⟨hrunway, hcandy⟩
+  have hflipped := hpaths.after_avoiding_action A.action_avoids_own_support
+  have hrunwayFlip : PassagesGrooved (flipAt state C.actionSwitch) C.runway :=
+    (pathGrooves_pair.mp hflipped).1
+  have hle : C.runway.length + d ≤ A.toSupported.travel := by
+    change C.runway.length + d ≤ 2 * C.runway.length + C.candy.length + 2
+    omega
+  obtain ⟨⟨port, phase⟩, hr⟩ := stepN_prefix_some hle (A.toSupported.run _ hflipped).1
+  change stepN w (C.runway.length + d) (g, flipAt state C.actionSwitch) =
+    some (port, phase) at hr
+  have hp := A.travel_two_phase_tongues _ hflipped hle
+  have hphase : phase = flipAt state C.actionSwitch ∨ phase = state := by
+    change tonguesAt w (g, flipAt state C.actionSwitch) (C.runway.length + d) =
+      flipAt state C.actionSwitch ∨
+      tonguesAt w (g, flipAt state C.actionSwitch) (C.runway.length + d) =
+        flipAt (flipAt state C.actionSwitch) C.actionSwitch at hp
+    simpa [tonguesAt, hr, flipAt_flipAt] using hp
+  have hreach : stepN w C.runway.length (g, flipAt state C.actionSwitch) =
+      some (C.mouth, flipAt state C.actionSwitch) := (C.runway_trace _ hrunwayFlip).sound
+  rw [stepN_add, hreach] at hr
+  exact ⟨port, phase, hr, hphase⟩
 
 section
 variable {w : Wiring} {outside mouth entry returnPort : Nat}

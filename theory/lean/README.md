@@ -54,41 +54,48 @@ entering a branch sets the tongue to that branch and exits the stem.
 `N` tongue directions. The theorem counts distinct vectors at live sample
 times, not distinct train positions or elapsed steps.
 
-## Upper bound: keep time zero instead of shifting it
+## Upper bound: complete the wiring and keep time zero
 
 The `2^N` ceiling is `state_law_two_pow` in `StateLawSmallN.lean`: the
 restricted vectors are length-`N` Boolean lists.
 
-The substantial dynamical result is the known-incoming-edge `N+4` bound:
-`knownIncomingEdgeNAddFour`, derived from `ProtectedPairNAddFour.lean`.
-It applies to every initial tongue assignment whenever the starting port
-has an incoming edge. Its construction-history and reflector arguments
-remain the core of the proof.
+The substantial dynamical result is the known-incoming-edge `N+4` bound,
+derived from `ProtectedPairNAddFour.lean`. Its internal entry point now
+assumes a bounded **total** wiring: every port below `3*N` has a partner.
+Its construction-history and pointwise reflector arguments remain the
+core of the proof, but both `N+1`-step exploration probes are automatically
+live. The former dead-probe classification is unnecessary.
 
-The reduction from arbitrary starts is now much simpler. It is implemented
-in `StateLawNAddFourSharp.lean`:
+`StateLawNAddFourSharp.lean` reduces arbitrary starts and partial wirings
+to this setting using `WiringCompletion.lean`:
 
-1. If the starting port `p` is wired, symmetry supplies the incoming edge.
-   Apply the known-edge theorem to the original run and original sample times.
-2. If `p < 3*N` is unwired, add only the self-link `p -> p`. No other port
-   could previously point to `p`, by symmetry, so the extended wiring is
-   still symmetric and still uses only the same `N` switches.
-3. Every live configuration of the original run is unchanged in the
-   extended wiring. Induct on the number of steps: each successful original
-   step uses an existing edge, and those edges are unchanged. The new cap
-   can affect the run only where the old run would end. Apply the known-edge
-   theorem to the extension and transfer the identical sampled vectors back.
-4. If the starting port is outside the first `N` switches, its outgoing
-   port is on that same switch and cannot be linked. Only time zero can be
-   live, contributing at most one vector.
+1. Complete every free port below `3*N` with the self-link `p -> p`.
+   Symmetry is preserved because no old edge can point to a free port.
+   All existing links and initial tongue values remain unchanged; no
+   switch is added.
+2. Every live configuration of the original run is unchanged in the
+   completion. Induct on the number of steps: each successful original
+   step uses an existing edge, which has been preserved.
+3. For an in-range start, symmetry supplies an incoming edge in the total
+   completion. Apply the total-wiring bound and transfer the identical
+   sample vectors back, at exactly their original sample times.
+4. An out-of-range start cannot make a live first step: its outgoing port
+   lies on that same out-of-range switch and cannot be linked. Thus only
+   time zero can contribute, giving at most one vector.
 
-The key reusable lemma is `stepN_preserved_by_wiring_extension`: extending
-a wiring preserves every configuration reached before the original run
-ends. It deliberately makes no claim about the continuation after death.
+The reusable lemma `stepN_preserved_by_wiring_extension` deliberately makes
+no assertion that termination is preserved: the completion may continue
+where the old run ended. Only originally live samples are transferred.
 
-**There is no extra time-zero charge.** Neither the start nor the sample
-times are shifted, no switch is added, and the theorem statement is unchanged.
-The former productive-boundary saturation proof is no longer required.
+**No extra time-zero charge or totality assumption is added to the headline
+theorem.** Totality is proved for the comparison wiring, not imposed on the
+original one. This is an upper-bound comparison within the abstract model,
+not a claim that a physical unwired end already acts as a reversing cap.
+
+Completing just the starting port was the first reduction. Completing all
+free ports additionally removes `OneReflectorSecondDead` and the general
+eventual-periodicity detour that was used only to exclude dead continuations.
+The pointwise cycle and repair facts still used for state counting remain.
 
 ## Protected pair: one history, two budgets
 
@@ -130,7 +137,7 @@ old reusable coordinates + new productive writers + reserved coordinates <= N.
 
 The zero-, one-, and two-reservation counts reuse that certificate rather
 than independently reproving injectivity, disjointness, and the ambient bound.
-One- and two-reservation interfaces remain available to the older proof.
+The remaining reservation interfaces are used by the active proof.
 
 ### Endpoint agreement controls every intermediate state
 
@@ -147,6 +154,104 @@ Two repeated contradiction proofs in the protected-pair and changed-contact
 arguments now use this direct lemma. The new facts require neither a finite
 switch bound nor extraction of a later productive writer.
 
+## Selected-route fault analysis: one stem/branch split
+
+`TrackThetaPointwiseCore.lean` now treats a disturbed traversal using the
+single selected outward route (`orientedRoute`). Every retained support
+passage appears on that route in the orientation the train actually takes.
+Switch simplicity puts the disturbed coordinate at one unique contact.
+Before it, the route is grooved and avoids that coordinate, so the original
+and disturbed runs have the same ports and differ only at that coordinate.
+
+Only two local cases remain, for either a flip or a stay reflector:
+
+* **Stem entry:** the contact is the first reflector's mouth. Its existing
+  capture law returns the disturbed run to the boundary, restoring the
+  flipped tongue. Prepending the constant prefix creates no new phase.
+* **Branch entry:** the lazy-point rule pins the tongue to the entering
+  branch, repairing the fault. Both runs reach the same configuration after
+  that step. Determinism then makes their configurations equal at every
+  subsequent time, even beyond the reference route.
+
+The reusable theorem `PhysicalTrace.trailing_fault_merges` states that last
+synchronization explicitly. There are no separate runway, forward-candy,
+and reverse-candy repair/capture proofs. The generic
+`ManufacturedReflector.support_fault_dichotomy_pointwise` specializes directly
+to flip/flip and flip/stay contacts, without adding a finite-switch or
+totality assumption to the local theorem.
+
+## Boundary invariants instead of explicit contact periods
+
+For the all-time contact covers, it is enough to supply a positive-length
+excursion from each allowed boundary configuration to another allowed
+boundary configuration, with every intermediate tongue vector in the
+claimed cover. `stepN_covered_of_progress` proves the general statement by
+strong induction on the queried time. A query inside an excursion uses its
+cover; a later query subtracts a strictly positive duration and continues
+from the next invariant boundary. Neither eventual periodicity nor a finite
+boundary set is required by this general lemma.
+
+For mutual flip/flip contact, write `uA = flipAt u A.actionSwitch` and
+`uB = flipAt u B.actionSwitch`. The boundary invariant consists of
+
+```
+(g,u), (e,uA), (g,uB), (e,u).
+```
+
+Normal traversals connect `(g,u)` to `(e,uA)` and `(e,u)` to `(g,uB)`.
+From `(e,uA)`, the fault theorem either captures to `(e,u)` or repairs to
+`(g,uB)`; the opposite disturbed traversal either captures to `(g,u)` or
+repairs to `(e,uA)`. Each excursion exposes only `u`, `uA`, or `uB`.
+Captures have positive length because time zero cannot restore a genuinely
+flipped tongue. This proves the three-vector cover directly, without the
+previous case-specific lead and period calculations.
+
+The one-sided contact proof uses two boundary configurations and a four-vector
+cover. The flip/stay proof uses three boundary configurations and a two-vector
+cover. Ordinary periodicity results still needed elsewhere are retained;
+this removes the contact-specific period construction, not every use of
+periodicity from the development.
+
+## Capture is a suffix of ordinary traversal
+
+Start an ordinary flip-reflector traversal with its action tongue flipped.
+The runway is still grooved because that action coordinate is outside its
+support. After the runway, the run is exactly at the mouth in the disturbed
+state. The remainder is therefore the capture run; the ordinary traversal's
+second flip restores the original tongue vector. The endpoint capture law
+and its pointwise two-phase law now follow by removing this unchanged
+runway prefix. They no longer repeat the forward/reverse-arm analysis.
+
+## Trim construction witnesses; do not reconstruct them
+
+A manufactured reflector contains a recorded construction trace, but its
+ordinary traversal theorem works in **any** state satisfying its support
+grooves. These are different roles: the witness's original tongue states
+need not equal the later state in which the reflector is used.
+
+To cut off a runway prefix, `PhysicalTrace.suffix_after_passage` extracts
+the original suffix and its recorded initial tongue state. The shorter
+reflector reuses the original mouth, candy, terminal states and crossing
+proof. Switch simplicity passes to the suffix, and its support is a subset
+of the old support. Hence it remains grooved in the later state, and avoids
+the discarded switch. Both flip and stay witnesses use this construction;
+there is no need to reorient the candy or rebuild its terminal crossing.
+
+The same principle removes redundant nil/nonempty path cases. Ordinary
+runway replay is `PhysicalTrace.replay_grooved`. Reverse candy traversal,
+reverse arbitrary lobes, and the final reverse-runway return all reuse
+`physicalTrace_contact_retraces_prefix`. That theorem now follows directly
+by induction on the recorded trace: reverse the tail, then prepend its
+original head in reverse. Empty paths are handled once by the base case.
+
+Finally, a split at a passage not in a runway must lie after the runway.
+`split_after_prefix_of_not_mem` proves this as a plain list fact, without
+switch simplicity or coordinate-counting machinery. Applied to the selected
+outward route, it removes separate forward/reverse-candy cases from the
+facing-approach contradiction and the remaining-tail foreignness proof.
+Neither the old unique-key-split proof nor the separate linked-list retrace
+construction is required any longer.
+
 ## Dependency and source reductions
 
 The transitive local-source closure of `StateLaw` includes the theorem's
@@ -159,6 +264,9 @@ comments and blanks, not just proof tactics.
 | After capping (`2e928b6` has the same proof) | 56 | 25,882 |
 | After the shared-history and endpoint reductions | 53 | 24,104 |
 | After deleting what left the closure | 52 | 23,706 |
+| After total-wiring completion | 52 | 21,342 |
+| After selected-route, boundary-invariant and suffix-capture reductions | 52 | 19,841 |
+| After witness trimming and trace reuse | 52 | 19,175 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -167,16 +275,28 @@ imports, not merely whitespace compression or a change to the theorem.
 The substantial trace/reflector classification still remains; this is not
 a replacement of the whole upper bound by a one-paragraph proof.
 
+The total-completion pass removes another **2,364 Lean source lines**,
+net of its new completion module. The module count stays unchanged because
+`WiringCompletion` replaces the now-unused `TraceRetainingFirstRevisit`.
+
+The selected-route, boundary-invariant, and suffix-capture pass removes a
+further **1,501 Lean source lines**, including the cost of its new generic
+lemmas. That candidate had **19,860 total Lean lines** including the 19-line audit.
+Witness trimming and trace reuse remove a further **666 lines**, leaving
+**19,194 lines** in 53 files. The accumulated reduction from the reviewed
+`b10aadd` baseline of 23,725 lines is **4,531 lines**. Counts include all new
+helper proofs, comments and blank lines, not just deleted code.
+
 Two small modules (`StateLawBounds` and `ReservedHistoryCharge`) hold the
 shared statements and counting facts that the removed modules previously
 supplied transitively.
 
 The fifteen modules the two reductions took off the import path have been
 deleted, along with the declarations inside retained modules whose only
-users were in them. The tree is exactly the closure of `state_law`: every
-module is imported, every import edge is load-bearing, and every
-declaration except the headline theorem has a consumer. Git history holds
-the superseded proofs.
+users were in them. The tree contains the headline theorem, its local import closure, and the
+separate axiom audit. The total-completion reduction additionally removes
+the obsolete trace-retaining dead-probe wrapper. Git history holds the
+superseded proofs.
 
 `StateLaw.lean`, the `2^N` ceiling, the attainment construction, the wiring
 model, and the exact axiom audit are unchanged. No `sorry`, additional

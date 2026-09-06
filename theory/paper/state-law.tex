@@ -36,13 +36,13 @@
     theorem of that development, and the sharp upper bound
     (Section~\ref{sec:upper}) is presented as a faithful account of the
     formal argument rather than an independent proof.}}
-\date{August 2026}
+\date{6 September 2026}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-  A single train drives forever over a layout of $N$ three-way switches
+  A single train travels over a layout of $N$ three-way switches
   with \emph{lazy points}: entering at the stem, the train follows the
   current tongue and moves nothing; entering at a branch, it forces the
   tongue to that branch and leaves by the stem.  How many distinct
@@ -99,7 +99,7 @@ bounds
 \[ 26N{+}3 \to 24N{+}5 \to 18N{+}3 \to \cdots \to 2N{+}9 \to N{+}7 \to
    N{+}6 \to N{+}5 \to N{+}4 \]
 was tightened until the constructive lower bound was met.  The final
-development (about $28{,}500$ lines of Lean~4 in $70$ files, using no
+development (19,194 lines of Lean~4 in 53 files, using no
 external mathematics library) proves the single statement
 \begin{center}
   \lean{GeneralN.state\_law :\ }$\forall N$,
@@ -115,7 +115,7 @@ Sections~\ref{sec:model}--\ref{sec:family} are complete human
 mathematics: the model, the ceiling $f(N) \le 2^N$, the resolution of the
 minimum, and all attainment constructions, each of which a reader can
 verify by hand.  Section~\ref{sec:upper} renders the sharp upper bound
-$f(N) \le N+4$ --- by far the deep half, roughly $25{,}000$ formal lines
+$f(N) \le N+4$ --- by far the deep half, the majority of the formal development
 --- as a structured account: the objects, the main lemmas, and the
 charging argument, with enough proof for each step that the shape of the
 mathematics is visible, and with pointers into the formal text, which
@@ -591,9 +591,10 @@ with their shared boundary vector erased, still fits the frame
 
 \subsection{The probe tree after one reflector}\label{ssec:probe}
 
-Assume now the run's \emph{incoming edge is known}: it entered its start
-over a wired edge (the general start is lifted in
-Section~\ref{ssec:boundary}).  The first-revisit dichotomy
+Assume now the wiring is total on the first $N$ switches and the run's
+\emph{incoming edge is known}. Section~\ref{ssec:boundary} constructs
+such a comparison wiring for every original partial wiring, preserving
+all originally live configurations. Totality makes both probes live.  The first-revisit dichotomy
 (Lemma~\ref{lem:dichotomy}) and a second probe of $N+1$ raw steps after
 the first reflector generate a finite tree of outcomes, each closed by
 its own count (files \file{PartialSecondRunSharp.lean},
@@ -605,11 +606,8 @@ its own count (files \file{PartialSecondRunSharp.lean},
   \toprule
   outcome & count & mechanism\\
   \midrule
-  death before any revisit & $\le N+1$ & switch-simple prefix\\
   settles on a simple cycle & $\le N+2$ &
     transient $+$ repeat and settled vectors\\
-  reflector, then dead probe & $\le N+2$ &
-    dead runs cannot damage the support\\
   reflector, then stable cycle & $\le N+3$ &
     joint charge of support and writers\\
   reflector, then changed contact & $\le N+4$ & Lemma~\ref{lem:contact}\\
@@ -639,72 +637,69 @@ $N+3$ or less.
 \begin{lemma}[Protected pair; \file{ProtectedPairNAddFour.lean},
   \file{PreReturnProtectedRoute.lean}, \file{CompleteRepairFour.lean}]
   \label{lem:pair}
-  Suppose the second probe manufactures a second reflector opposite the
-  first, with each action avoiding the other's support (the
-  \emph{protected pair}).  The two construction histories overlap: either
-  the first reflector's omitted facing mouth is the second construction's
-  first productive writer --- then its post-write vector duplicates the
-  first reflector's pre-return vector, and erasing the duplicate gives an
-  $N+2$ construction cover, to which the protected repair tail adds at
-  most two novelties (Lemma~\ref{lem:phases}) --- or the overlap analysis
-  degrades gracefully through the explicitly enumerated remaining cases
-  (repair leads have two phases,
-  \file{RepairLeadTwoPhase.lean}; facing-forward and backward-contact
-  futures cost a constant, \file{FacingForwardNovelty.lean},
-  \file{TrackEarlyRepairConstant.lean},
-  \file{StateLawTwoCandidate.lean}).  Every case totals at most $N+4$.
+  Suppose the second probe manufactures an opposite reflector, with the
+  old support grooved at both endpoints of the second construction.
+  Use the same canonical construction history in every case. If the old
+  reflector is a stay reflector, that history has at most $N+2$ entries
+  and the repair tail adds at most two fresh vectors. For a flip reflector,
+  split only on whether its private action coordinate occurs among the
+  second construction's productive first writers. If absent, reserve that
+  coordinate: again the budget is $(N+2)+2$. If present, its write forces a
+  constant-tongue retrace and is the last productive writer. Its recorded
+  pre-write state accounts for a nominally fresh tail corner, giving
+  $(N+3)+1$. In every case the total is at most $N+4$; the earlier
+  first-writer-order subdivision and doubly-erased history are unnecessary.
 \end{lemma}
 
 Packaging the closed tree gives the keystone:
 
 \begin{theorem}[Known incoming edge;
-  \lean{knownIncomingEdgeNAddFour},
+  \lean{totalKnownIncomingEdgeNAddFour},
   \file{StateLawNAddFourSharp.lean}]\label{thm:knownedge}
-  If the start is entered over a wired edge, every duplicate-free list of
+  On a wiring total below $3N$, if the start is entered over a wired edge,
+  every duplicate-free list of
   live sample times with pairwise-distinct restricted vectors has length
   at most $N+4$.
 \end{theorem}
 
-\subsection{Arbitrary starts, by completing the start port}
+\subsection{Arbitrary starts, by completing every free port}
 \label{ssec:boundary}
 
-A general start need not arrive over an edge: the train may simply be
-placed at a port, so Theorem~\ref{thm:knownedge} does not apply directly.
-Rather than shift the run forward and pay separately for the vector it
-leaves behind at time zero, complete the wiring so that the hypothesis
-holds of the original run.
+A general start need not arrive over an edge, and a partial wiring may let
+its run fall off. Both complications can be removed in one comparison.
+The abstract model admits self-links, so completing an unwired port costs
+no switch. No totality premise is added to the headline theorem.
 
-The model admits self-links --- a port joined to itself is a reversing
-dead end --- and the known-edge theorem is uniform over all raw finite
-wirings, so a cap is a legitimate wiring and costs no switch.
-
-\begin{lemma}[Capping a free port;
-  \lean{Wiring.capFreePort}, \file{StateLawNAddFourSharp.lean}]
+\begin{lemma}[Total completion; \file{WiringCompletion.lean}]
   \label{lem:cap}
-  If $w$ leaves port $p$ unwired, then joining $p$ to itself yields a
-  wiring $v$ that agrees with $w$ on every edge of $w$.
+  For any wiring $w$ using only switches $0,\dots,N-1$, define $v$ by
+  preserving every existing edge and setting $v(p)=p$ at every unwired
+  port $p<3N$. Then $v$ is a symmetric wiring using the same switches,
+  every port below $3N$ has a partner, and every in-range start has a live
+  configuration after any finite number of steps.
 \end{lemma}
 
 \begin{proof}
-  Symmetry is the only condition to check.  At $p$ the new edge is its
-  own reverse.  Away from $p$, an edge of $v$ is an edge of $w$, and its
-  far end cannot be $p$: symmetry of $w$ would then give $w$ an edge out
-  of $p$, which it has none.  Every edge of $w$ survives for the same
-  reason.
+  No old edge can point to a free port: symmetry of $w$ would make that
+  port wired already. The new self-links therefore preserve symmetry and
+  do not modify any old edge. Their endpoints are below $3N$. A local
+  passage exits on the same switch as it entered, hence remains in range;
+  its exit now always has a partner, also in range. Induction gives
+  liveness at every finite time.
 \end{proof}
 
 \begin{lemma}[Extension preserves live runs;
   \lean{stepN\_preserved\_by\_wiring\_extension},
-  \file{StateLawNAddFourSharp.lean}]\label{lem:extend}
-  If every edge of $w$ is an edge of $v$, then every run of $w$ that is
-  still alive after $n$ steps runs identically in $v$.
+  \file{WiringCompletion.lean}]\label{lem:extend}
+  If every edge of $w$ is an edge of $v$, every configuration reached
+  after $n$ live steps in $w$ is reached at exactly time $n$ in $v$.
 \end{lemma}
 
 \begin{proof}
-  Induction on $n$.  A surviving step follows an edge of $w$, which is
-  unchanged in $v$, and the tongue update reads only the entry port.  The
-  statement is deliberately silent about what happens after the original
-  run dies, which is the only place the new cap can be reached.
+  Induct on $n$. A successful original step follows an unchanged edge,
+  with the same local tongue update. The statement makes no claim about
+  the continuation after the original run dies, which is where the
+  completion may begin to differ.
 \end{proof}
 
 \begin{theorem}[Sharp upper bound; \lean{state\_law\_N\_add\_four},
@@ -716,24 +711,63 @@ wirings, so a cap is a legitimate wiring and costs no switch.
 \end{theorem}
 
 \begin{proof}
-  Let the start be at port $p$.
-
-  If $p \ge 3N$, then the exit port of the first move lies on the same
-  switch as $p$, so it too is at least $3N$ and the port bound leaves it
-  unwired.  The run therefore dies at its first step, only time zero can
-  be live, and the list has length at most $1 \le N+4$.
-
-  If $p < 3N$ and $w$ wires $p$, symmetry supplies an edge into $p$ and
-  Theorem~\ref{thm:knownedge} applies to the run as it stands.
-
-  If $p < 3N$ and $p$ is unwired, cap it (Lemma~\ref{lem:cap}).  The
-  capped wiring still uses only switches $0,\dots,N-1$, since the added
-  edge joins $p$ to itself.  By Lemma~\ref{lem:extend} every sampled time
-  is still live and carries the same restricted vector, so the sampled
-  vectors remain pairwise distinct; and in the capped wiring $p$ has an
-  incoming edge, namely its own.  Theorem~\ref{thm:knownedge} then bounds
-  the original list, time zero included, by $N+4$.
+  If the starting port $p$ is at least $3N$, its first exit is on the same
+  out-of-range switch and cannot be wired. Only time zero can be live,
+  contributing at most one vector. Otherwise complete every free port by
+  Lemma~\ref{lem:cap}. The completed wiring is total, symmetry supplies an
+  incoming edge at the original starting port, and
+  Theorem~\ref{thm:knownedge} applies. By Lemma~\ref{lem:extend}, every
+  original live sample carries the identical vector at the identical
+  time in the completion. Transfer its $N+4$ bound back to the original
+  sample list, including time zero.
 \end{proof}
+
+\subsection{Selected routes and boundary invariants}
+
+A reflector's selected outward route already encodes the direction in
+which its loop is traversed. A single disturbed support coordinate is
+encountered once along that switch-simple route. Before contact it is
+untouched. At a branch entry the lazy-point rule restores the reference
+value; after that passage both runs have the same full configuration,
+so determinism identifies every subsequent state. At a stem entry the
+mouth-capture law applies. There is no separate runway, forward-loop,
+or reverse-loop contact classification
+(\file{TrackThetaPointwiseCore.lean}).
+
+For all-time covers it is enough to close a boundary invariant under
+positive-length excursions whose intermediate tongue vectors belong to
+the claimed cover. Strong induction on the queried time proves the
+claim: a query inside the first excursion uses its local cover; a later
+query subtracts the strictly positive duration and continues at the next
+invariant boundary. For mutually contacting flip reflectors the four
+boundaries are
+\[
+ (g,u),\quad(e,u^A),\quad(g,u^B),\quad(e,u),
+ \qquad u^A=\operatorname{flip}_A(u),\quad u^B=\operatorname{flip}_B(u).
+\]
+The normal and capture-or-repair excursions close this invariant and
+expose only $u,u^A,u^B$. Thus no case-specific period computation is
+needed (\file{TrackThetaAllTime.lean}).
+
+\subsection{Reuse recorded witnesses and trace suffixes}
+
+The construction state stored in a manufactured reflector is not the
+later state in which its support is grooved. Its traversal law already
+works in any such later state. Trimming a runway can therefore retain the
+original loop trace, mouth, terminal states, and crossing proof, replacing
+only the runway prefix and its initial state and incoming edge.
+Switch simplicity passes to the suffix, and its smaller support remains
+grooved in the later state. Rebuilding the witness in that later state,
+including a new forward/reverse loop split, is unnecessary
+(\file{TrackGlobalRepair.lean}).
+
+More generally, grooved trace replay is state-independent. A contact
+exiting through a recorded trace's endpoint retraces it and leaves over
+its incoming edge: induction reverses the tail and then the head.
+This one fact covers reverse loops, reverse arbitrary lobes, and final
+runway returns, including empty paths. A split at a passage absent from
+a prefix must occur in the suffix; this elementary list observation
+replaces further orientation-specific splitting arguments.
 
 \section{Assembly}\label{sec:assembly}
 
@@ -803,7 +837,7 @@ with Lean~4 (toolchain 4.32.2) and no external library:
 \begin{center}
   \texttt{lake build}
 \end{center}
-compiles all $70$ files and ends by printing the axiom audit of the
+compiles all 53 Lean files and ends by printing the axiom audit of the
 single theorem:
 \begin{center}
   \lean{GeneralN.state\_law} depends on axioms:
@@ -840,8 +874,8 @@ Points worth recording:
   \file{StateLaw.lean} & the theorem and its statement language\\
   \file{StateLawSmallN.lean} & $2^N$ ceiling; empty/teardrop/dogbone\\
   \file{StateLawLowerBound.lean} & the extremal family, $N \ge 3$\\
-  \file{StateLawNAddFourSharp.lean} & the known-edge theorem, the start
-    capping, and the sharp $N+4$ bound\\
+  \file{StateLawNAddFourSharp.lean} & the total known-edge theorem and the sharp $N+4$ bound\\
+  \file{WiringCompletion.lean} & total completion and preservation of live runs\\
   \file{TrackTrace.lean}, \file{TrackTheta.lean} & traces, reflectors,
     theta engine\\
   \file{StateLawAxiomAudit.lean} & the axiom audit\\

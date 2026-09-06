@@ -3,7 +3,7 @@ import TrackThetaPointwiseCore
 /-!
 # All-time phase covers for theta-intersecting reflector pairs
 
-Composing the pointwise dichotomy around the theta cycles yields absolute
+Closing a boundary invariant under positive-length excursions yields absolute
 phase covers: a one-sided theta intersection visits at most **four** tongue
 vectors at *every* time, a mutual intersection at most **three**.  Together
 with `manufactured_pair_all_time_four_phase_tongues` (the avoiding case)
@@ -13,53 +13,13 @@ flip/flip pair, however its supports intersect, by the same four vectors
 
     state, state+A, state+B, state+A+B.
 
-All statements carry liveness (`stepN … = some …`), so they compose under
-time shifts.  No switch-count hypothesis appears: the covers are blind to
-path lengths.
+The contact cases use covered positive-length excursions, not explicit periods.
+All statements carry liveness (`stepN … = some …`) and compose under time shifts.
+No switch-count hypothesis appears: phase covers are independent of path lengths.
 -/
 
 namespace GeneralN
 
-/-- Any lasso whose lead and cycle windows are phase-covered is
-phase-covered (and live) at every absolute time. -/
-private theorem lasso_all_time_phase
-    {w : Wiring} {start settled : Nat × Tongues} {lead period : Nat}
-    {phases : List Tongues}
-    (hpos : 0 < period)
-    (hsettle : stepN w lead start = some settled)
-    (hperiod : stepN w period settled = some settled)
-    (hleadPhase : ∀ d, d ≤ lead → ∃ port phase,
-      stepN w d start = some (port, phase) ∧ phase ∈ phases)
-    (hcyclePhase : ∀ r, r ≤ period → ∃ port phase,
-      stepN w r settled = some (port, phase) ∧ phase ∈ phases)
-    (d : Nat) :
-    ∃ port phase, stepN w d start = some (port, phase) ∧
-      phase ∈ phases := by
-  by_cases hdlead : d ≤ lead
-  · exact hleadPhase d hdlead
-  · let k := d - lead
-    let q := k / period
-    let r := k % period
-    have hr : r < period := by
-      dsimp [r]
-      exact Nat.mod_lt _ hpos
-    have hkEq : k = q * period + r := by
-      dsimp [q, r]
-      have hdiv := Nat.div_add_mod k period
-      rw [Nat.mul_comm period (k / period)] at hdiv
-      omega
-    have hdEq : d = lead + (q * period + r) := by
-      rw [← hkEq]
-      dsimp [k]
-      omega
-    have hcycle := stepN_mul_period_pair_novelty hperiod q
-    obtain ⟨port, phase, hrunR, hphase⟩ :=
-      hcyclePhase r (Nat.le_of_lt hr)
-    refine ⟨port, phase, ?_, hphase⟩
-    rw [hdEq, stepN_add, hsettle]
-    simp only [Option.bind_some]
-    rw [stepN_add, hcycle]
-    simpa using hrunR
 
 section
 variable {w : Wiring} {g e : Nat}
@@ -199,56 +159,32 @@ theorem manufactured_one_sided_theta_all_time_four_phase
       phase ∈ [state, flipAt state A.actionSwitch,
         flipAt state B.actionSwitch,
         flipAt (flipAt state B.actionSwitch) A.actionSwitch] := by
-  obtain ⟨t1, ht1pos, ht1end, ht1phases⟩ :=
-    manufactured_theta_half_pointwise A B state hA hB hcontact
-  have hA' : PathGrooves [A.runway, A.candy]
-      (flipAt state B.actionSwitch) :=
-    hA.after_avoiding_action hBA
-  have hB' : PathGrooves [B.runway, B.candy]
-      (flipAt state B.actionSwitch) :=
-    (B.toSupported.run state hB).2
-  obtain ⟨t2, ht2pos, ht2end, ht2phases⟩ :=
-    manufactured_theta_half_pointwise A B
-      (flipAt state B.actionSwitch) hA' hB' hcontact
-  have ht2end' : stepN w t2 (g, flipAt state B.actionSwitch) =
-      some (g, state) := by
-    rw [flipAt_flipAt] at ht2end
-    exact ht2end
-  have hperiod : stepN w (t1 + t2) (g, state) = some (g, state) := by
-    rw [stepN_add, ht1end]
-    simpa using ht2end'
-  refine lasso_all_time_phase (lead := 0) (settled := (g, state))
-    (by omega) (by simp [stepN]) hperiod ?_ ?_ d
-  · intro dd hdd
-    have hdd0 : dd = 0 := by omega
-    subst hdd0
-    exact ⟨g, state, by simp [stepN], by simp⟩
-  · intro r hr
-    by_cases hr1 : r ≤ t1
-    · obtain ⟨port, phase, hrun, hphase⟩ := ht1phases r hr1
-      refine ⟨port, phase, hrun, ?_⟩
-      rcases hphase with h | h
-      · simp [h]
-      · rcases h with h | h
-        · simp [h]
-        · simp [h]
-    · let rr := r - t1
-      have hrrle : rr ≤ t2 := by
-        dsimp [rr]
-        omega
-      have hrEq : r = t1 + rr := by
-        dsimp [rr]
-        omega
-      obtain ⟨port, phase, hrunR, hphase⟩ := ht2phases rr hrrle
-      refine ⟨port, phase, ?_, ?_⟩
-      · rw [hrEq, stepN_add, ht1end]
-        simpa using hrunR
-      · rcases hphase with h | h
-        · simp [h]
-        · rcases h with h | h
-          · simp [h]
-          · rw [flipAt_flipAt] at h
-            simp [h]
+  let safe := fun phase => phase ∈ [state, flipAt state A.actionSwitch,
+    flipAt state B.actionSwitch, flipAt (flipAt state B.actionSwitch) A.actionSwitch]
+  let boundary := fun c => c = (g, state) ∨ c = (g, flipAt state B.actionSwitch)
+  have hprogress : ∀ start, boundary start → ∃ travel finish,
+      0 < travel ∧ stepN w travel start = some finish ∧ boundary finish ∧
+      ∀ t, t ≤ travel → ∃ port phase,
+        stepN w t start = some (port, phase) ∧ safe phase := by
+    intro start hs
+    rcases hs with rfl | rfl
+    · obtain ⟨travel, hpos, hr, hp⟩ :=
+        manufactured_theta_half_pointwise A B state hA hB hcontact
+      refine ⟨travel, (g, flipAt state B.actionSwitch), hpos, hr, Or.inr rfl, ?_⟩
+      intro t ht
+      obtain ⟨port, phase, hr, hv⟩ := hp t ht
+      exact ⟨port, phase, hr, by rcases hv with rfl | rfl | rfl <;> simp [safe]⟩
+    · have hA' := hA.after_avoiding_action hBA
+      have hB' := (B.toSupported.run state hB).2
+      obtain ⟨travel, hpos, hr, hp⟩ := manufactured_theta_half_pointwise A B
+        (flipAt state B.actionSwitch) hA' hB' hcontact
+      rw [flipAt_flipAt] at hr
+      refine ⟨travel, (g, state), hpos, hr, Or.inl rfl, ?_⟩
+      intro t ht
+      obtain ⟨port, phase, hr, hv⟩ := hp t ht
+      exact ⟨port, phase, hr, by
+        rcases hv with rfl | rfl | rfl <;> simp [safe, flipAt_flipAt]⟩
+  exact stepN_covered_of_progress boundary safe hprogress (Or.inl rfl) d
 
 /-- **Mutual theta intersection: absolute three-phase law.**  If each
 support touches the other's switch, the walk from `(g, state)` is live
@@ -264,166 +200,53 @@ theorem manufactured_two_sided_theta_all_time_three_phase
     ∃ port phase, stepN w d (g, state) = some (port, phase) ∧
       phase ∈ [state, flipAt state A.actionSwitch,
         flipAt state B.actionSwitch] := by
-  obtain ⟨lead, hleadPos, hleadEnd, hleadPhases⟩ :=
-    manufactured_theta_half_pointwise A B state hA hB hAB
-  have hleadPhases' : ∀ dd, dd ≤ lead → ∃ port phase,
-      stepN w dd (g, state) = some (port, phase) ∧
-      phase ∈ [state, flipAt state A.actionSwitch,
-        flipAt state B.actionSwitch] := by
-    intro dd hdd
-    obtain ⟨port, phase, hrun, hphase⟩ := hleadPhases dd hdd
-    refine ⟨port, phase, hrun, ?_⟩
-    rcases hphase with h | h
-    · simp [h]
-    · rcases h with h | h
-      · simp [h]
-      · simp [h]
-  rcases manufactured_support_fault_dichotomy_pointwise
-      B A state hB hA hBA with hrevCap | hrevRep
-  · obtain ⟨revCap, hrevEnd, hrevPhases⟩ := hrevCap
-    have hperiod : stepN w (lead + revCap) (g, state) =
-        some (g, state) := by
-      rw [stepN_add, hleadEnd]
-      simpa using hrevEnd
-    refine lasso_all_time_phase (lead := 0) (settled := (g, state))
-      (by omega) (by simp [stepN]) hperiod ?_ ?_ d
-    · intro dd hdd
-      have hdd0 : dd = 0 := by omega
-      subst hdd0
-      exact ⟨g, state, by simp [stepN], by simp⟩
-    · intro r hr
-      by_cases hr1 : r ≤ lead
-      · exact hleadPhases' r hr1
-      · let rr := r - lead
-        have hrrle : rr ≤ revCap := by
-          dsimp [rr]
-          omega
-        have hrEq : r = lead + rr := by
-          dsimp [rr]
-          omega
-        obtain ⟨port, phase, hrunR, hphase⟩ := hrevPhases rr hrrle
-        refine ⟨port, phase, ?_, ?_⟩
-        · rw [hrEq, stepN_add, hleadEnd]
-          simpa using hrunR
-        · rcases hphase with h | h
-          · simp [h]
-          · simp [h]
-  · obtain ⟨hrevRepEnd, hrevRepPhases⟩ := hrevRep
-    have hrevRepPhases' : ∀ r,
-        r ≤ 2 * A.runway.length + A.candy.length + 2 →
-        ∃ port phase,
-          stepN w r (g, flipAt state B.actionSwitch) =
-            some (port, phase) ∧
-          phase ∈ [state, flipAt state A.actionSwitch,
-            flipAt state B.actionSwitch] := by
-      intro r hrle
-      obtain ⟨port, phase, hrunR, hphase⟩ := hrevRepPhases r hrle
-      refine ⟨port, phase, hrunR, ?_⟩
-      rcases hphase with h | h
-      · simp [h]
-      · rcases h with h | h
-        · simp [h]
-        · simp [h]
-    rcases manufactured_support_fault_dichotomy_pointwise
-        A B state hA hB hAB with hfwdCap | hfwdRep
-    · obtain ⟨fwdCap, hfwdEnd, hfwdPhases⟩ := hfwdCap
-      have hBrun := (B.toSupported.run state hB).1
-      change stepN w (2 * B.runway.length + B.candy.length + 2)
-        (e, state) = some (g, flipAt state B.actionSwitch) at hBrun
-      have hperiodS : stepN w
-          ((2 * A.runway.length + A.candy.length + 2) + fwdCap +
-            (2 * B.runway.length + B.candy.length + 2))
-          (g, flipAt state B.actionSwitch) =
-            some (g, flipAt state B.actionSwitch) := by
-        have hlen : (2 * A.runway.length + A.candy.length + 2) +
-            fwdCap + (2 * B.runway.length + B.candy.length + 2) =
-            (2 * A.runway.length + A.candy.length + 2) +
-              (fwdCap +
-                (2 * B.runway.length + B.candy.length + 2)) := by
-          omega
-        rw [hlen, stepN_add, hrevRepEnd]
-        simp only [Option.bind_some]
-        rw [stepN_add, hfwdEnd]
-        simpa using hBrun
-      refine lasso_all_time_phase (lead := lead)
-        (settled := (g, flipAt state B.actionSwitch))
-        (by omega) hleadEnd hperiodS hleadPhases' ?_ d
-      intro r hr
-      by_cases hr1 : r ≤ 2 * A.runway.length + A.candy.length + 2
-      · exact hrevRepPhases' r hr1
-      · by_cases hr2 : r ≤
-            (2 * A.runway.length + A.candy.length + 2) + fwdCap
-        · let rr := r - (2 * A.runway.length + A.candy.length + 2)
-          have hrrle : rr ≤ fwdCap := by
-            dsimp [rr]
-            omega
-          have hrEq : r =
-              (2 * A.runway.length + A.candy.length + 2) + rr := by
-            dsimp [rr]
-            omega
-          obtain ⟨port, phase, hrunR, hphase⟩ := hfwdPhases rr hrrle
-          refine ⟨port, phase, ?_, ?_⟩
-          · rw [hrEq, stepN_add, hrevRepEnd]
-            simpa using hrunR
-          · rcases hphase with h | h
-            · simp [h]
-            · simp [h]
-        · let rr := r -
-            ((2 * A.runway.length + A.candy.length + 2) + fwdCap)
-          have hrrle : rr ≤
-              2 * B.runway.length + B.candy.length + 2 := by
-            dsimp [rr]
-            omega
-          have hrEq : r =
-              ((2 * A.runway.length + A.candy.length + 2) + fwdCap) +
-                rr := by
-            dsimp [rr]
-            omega
-          have hmid : stepN w
-              ((2 * A.runway.length + A.candy.length + 2) + fwdCap)
-              (g, flipAt state B.actionSwitch) = some (e, state) := by
-            rw [stepN_add, hrevRepEnd]
-            simpa using hfwdEnd
-          obtain ⟨port, phase, hrunR, hphase⟩ :=
-            B.travel_two_phase_stepN state hB hrrle
-          refine ⟨port, phase, ?_, ?_⟩
-          · rw [hrEq, stepN_add, hmid]
-            simpa using hrunR
-          · rcases hphase with h | h
-            · simp [h]
-            · simp [h]
-    · obtain ⟨hfwdRepEnd, hfwdRepPhases⟩ := hfwdRep
-      have hperiodS : stepN w
-          ((2 * A.runway.length + A.candy.length + 2) +
-            (2 * B.runway.length + B.candy.length + 2))
-          (g, flipAt state B.actionSwitch) =
-            some (g, flipAt state B.actionSwitch) := by
-        rw [stepN_add, hrevRepEnd]
-        simpa using hfwdRepEnd
-      refine lasso_all_time_phase (lead := lead)
-        (settled := (g, flipAt state B.actionSwitch))
-        (by omega) hleadEnd hperiodS hleadPhases' ?_ d
-      intro r hr
-      by_cases hr1 : r ≤ 2 * A.runway.length + A.candy.length + 2
-      · exact hrevRepPhases' r hr1
-      · let rr := r - (2 * A.runway.length + A.candy.length + 2)
-        have hrrle : rr ≤
-            2 * B.runway.length + B.candy.length + 2 := by
-          dsimp [rr]
-          omega
-        have hrEq : r =
-            (2 * A.runway.length + A.candy.length + 2) + rr := by
-          dsimp [rr]
-          omega
-        obtain ⟨port, phase, hrunR, hphase⟩ := hfwdRepPhases rr hrrle
-        refine ⟨port, phase, ?_, ?_⟩
-        · rw [hrEq, stepN_add, hrevRepEnd]
-          simpa using hrunR
-        · rcases hphase with h | h
-          · simp [h]
-          · rcases h with h | h
-            · simp [h]
-            · simp [h]
+  let safe := fun phase => phase ∈
+    [state, flipAt state A.actionSwitch, flipAt state B.actionSwitch]
+  let boundary := fun c => c = (g, state) ∨ c = (e, flipAt state A.actionSwitch) ∨
+    c = (g, flipAt state B.actionSwitch) ∨ c = (e, state)
+  have hprogress : ∀ start, boundary start → ∃ travel finish,
+      0 < travel ∧ stepN w travel start = some finish ∧ boundary finish ∧
+      ∀ t, t ≤ travel → ∃ port phase,
+        stepN w t start = some (port, phase) ∧ safe phase := by
+    intro start hs
+    rcases hs with rfl | rfl | rfl | rfl
+    · refine ⟨A.toSupported.travel, (e, flipAt state A.actionSwitch),
+        (ManufacturedReflector.flip A).travel_pos, (A.toSupported.run state hA).1,
+        Or.inr (Or.inl rfl), ?_⟩
+      intro t ht
+      obtain ⟨port, phase, hr, hp⟩ := A.travel_two_phase_stepN state hA ht
+      exact ⟨port, phase, hr, by rcases hp with rfl | rfl <;> simp [safe]⟩
+    · rcases manufactured_support_fault_dichotomy_pointwise A B state hA hB hAB with
+        ⟨travel, hr, hp⟩ | ⟨hr, hp⟩
+      · refine ⟨travel, (e, state), stepN_flip_restore_pos hr, hr,
+          Or.inr (Or.inr (Or.inr rfl)), ?_⟩
+        intro t ht
+        obtain ⟨port, phase, ht, hv⟩ := hp t ht
+        exact ⟨port, phase, ht, by rcases hv with rfl | rfl <;> simp [safe]⟩
+      · refine ⟨B.toSupported.travel, (g, flipAt state B.actionSwitch),
+          (ManufacturedReflector.flip B).travel_pos, hr,
+          Or.inr (Or.inr (Or.inl rfl)), ?_⟩
+        intro t ht
+        obtain ⟨port, phase, ht, hv⟩ := hp t ht
+        exact ⟨port, phase, ht, by rcases hv with rfl | rfl | rfl <;> simp [safe]⟩
+    · rcases manufactured_support_fault_dichotomy_pointwise B A state hB hA hBA with
+        ⟨travel, hr, hp⟩ | ⟨hr, hp⟩
+      · refine ⟨travel, (g, state), stepN_flip_restore_pos hr, hr, Or.inl rfl, ?_⟩
+        intro t ht
+        obtain ⟨port, phase, ht, hv⟩ := hp t ht
+        exact ⟨port, phase, ht, by rcases hv with rfl | rfl <;> simp [safe]⟩
+      · refine ⟨A.toSupported.travel, (e, flipAt state A.actionSwitch),
+          (ManufacturedReflector.flip A).travel_pos, hr, Or.inr (Or.inl rfl), ?_⟩
+        intro t ht
+        obtain ⟨port, phase, ht, hv⟩ := hp t ht
+        exact ⟨port, phase, ht, by rcases hv with rfl | rfl | rfl <;> simp [safe]⟩
+    · refine ⟨B.toSupported.travel, (g, flipAt state B.actionSwitch),
+        (ManufacturedReflector.flip B).travel_pos, (B.toSupported.run state hB).1,
+        Or.inr (Or.inr (Or.inl rfl)), ?_⟩
+      intro t ht
+      obtain ⟨port, phase, hr, hp⟩ := B.travel_two_phase_stepN state hB ht
+      exact ⟨port, phase, hr, by rcases hp with rfl | rfl <;> simp [safe]⟩
+  exact stepN_covered_of_progress boundary safe hprogress (Or.inl rfl) d
 
 end
 

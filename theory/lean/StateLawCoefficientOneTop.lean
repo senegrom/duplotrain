@@ -1,29 +1,15 @@
 import PartialSecondRunSharp
 
 /-!
-# Coefficient-one top-level assembly
+# Coefficient-one continuation bounds
 
-This file is deliberately separate from the shared construction files.  It
-contains the final assembly work and, until the last two branches are closed,
-states those branches explicitly rather than hiding them behind an assumed
-result.
-
-The first bridge below is useful independently: after one manufactured
-reflector, any switch-simple continuation which leaves that reflector's
-support grooved can be charged together with the first construction in a
-single `N`-coordinate budget.
+Assemble cycle, changed-contact, and two-reflector continuation bounds.
+The sharp known-edge frontier works on total wirings, so the former
+`OneReflectorSecondDead` classification and its periodicity contradiction
+are no longer needed.
 -/
 
 namespace GeneralN
-
-/-- The second run falls before the second sharp first-revisit horizon. -/
-structure OneReflectorSecondDead
-    (w : Wiring) (N e : Nat) (start : Nat × Tongues) : Type where
-  A : ManufacturedReflector w start.1 e
-  grooves : PathGrooves A.toSupported.paths A.activatedState
-  base : A.baseState = start.2
-  dead : stepN w (N + 1) (e, A.activatedState) = none
-
 
 /-- The partial-continuation contact record is definitionally the sharp
 `PartialSecondRunSharp.ChangedContact` record; all its member lemmas live in
@@ -260,117 +246,6 @@ theorem PartialSecondRunSharp.ChangedContact.backward_all_run_distinct_le_N_add_
   have hcount := noveltyCoverOn_distinct_count hcover hnd
   have hlength := C.compressedLead_length_le hN hA
   omega
-
-/-- A physical prefix of the doomed second run cannot repeat a switch.
-The cycle alternative is non-falling.  The reflector alternative completes
-an opposite pair, whose protected-repair theorem is also non-falling. -/
-theorem OneReflectorSecondDead.trace_simple
-    {w : Wiring} {N e : Nat} {start : Nat × Tongues}
-    (D : OneReflectorSecondDead w N e start)
-    {finish : Nat × Tongues} {passages : List Passage}
-    (htrace : PhysicalTrace w (e, D.A.activatedState) passages finish) :
-    SwitchSimple passages := by
-  apply Classical.byContradiction
-  intro hnonsimple
-  have hentry : w.link start.1 = some e :=
-    w.symm _ _ D.A.entryEdge
-  obtain ⟨atRepeat, visited, hvisited, hcycle | hreflector⟩ :=
-    htrace.first_revisit_trace_or_activated_reflector
-      hnonsimple hentry
-  · obtain ⟨cycle, settled, hnonempty, htransient,
-        hstable⟩ := hcycle
-    have hpositive : 0 < cycle.length := by
-      cases cycle with
-      | nil => exact (hnonempty rfl).elim
-      | cons _ _ => simp
-    have hsettles : SettlesOnSimpleCycle w atRepeat :=
-      ⟨cycle.length, settled, hpositive,
-        htransient.sound, hstable.sound⟩
-    have hperiodic : EventuallyPeriodic w
-        (e, D.A.activatedState) :=
-      eventuallyPeriodic_of_reaches_simple_cycle hvisited hsettles
-    obtain ⟨later, hlater⟩ :=
-      hperiodic.stepN_some_all (N + 1)
-    rw [D.dead] at hlater
-    cases hlater
-  · obtain ⟨B, state, backSteps, hB, hbase,
-        hactivated, hback⟩ := hreflector
-    subst state
-    have hAatBase :
-        PathGrooves D.A.toSupported.paths B.baseState := by
-      rw [hbase]
-      exact D.grooves
-    have htail : EventuallyPeriodic w
-        (start.1, B.activatedState) :=
-      manufactured_pair_protected_repair_eventuallyPeriodic
-        D.A B hAatBase hB
-    have hreachPair : stepN w (visited + backSteps)
-        (e, D.A.activatedState) =
-          some (start.1, B.activatedState) := by
-      rw [stepN_add, hvisited]
-      exact hback
-    have hperiodic : EventuallyPeriodic w
-        (e, D.A.activatedState) :=
-      EventuallyPeriodic.prepend hreachPair htail
-    obtain ⟨later, hlater⟩ :=
-      hperiodic.stepN_some_all (N + 1)
-    rw [D.dead] at hlater
-    cases hlater
-
-/-- The one exact forward-contact certificate shared by both unfinished
-second-run outcomes.  No completed second reflector is assumed. -/
-structure OneReflectorForwardContact
-    (w : Wiring) (N e : Nat) (start : Nat × Tongues) : Type where
-  A : ManufacturedReflector w start.1 e
-  grooves : PathGrooves A.toSupported.paths A.activatedState
-  base : A.baseState = start.2
-  contact : SimpleContinuationChangedContact w A
-
-/-- The early-death branch is coefficient one unless its terminal simple
-trace contains the same exact forward self-repairing contact.  Preserved
-support costs `N+2`; a backward first damage costs `N+3`. -/
-theorem OneReflectorSecondDead.N_add_three_or_forward
-    {w : Wiring} {N e : Nat} {start : Nat × Tongues}
-    (D : OneReflectorSecondDead w N e start)
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 3 ∨
-      Nonempty (OneReflectorForwardContact w N e start) := by
-  obtain ⟨finish, passages, htrace, hfall⟩ :=
-    PartialSecondRunSharp.terminal_trace_of_dead D.dead
-  have hsimple : SwitchSimple passages := D.trace_simple htrace
-  have hliveA : ∀ k ∈ times,
-      (stepN w k (start.1, D.A.baseState)).isSome := by
-    simpa [D.base] using hlive
-  have hndA : (times.map
-      (restrictedTonguesAt w N
-        (start.1, D.A.baseState))).Nodup := by
-    simpa [D.base] using hnd
-  by_cases hend : PathGrooves D.A.toSupported.paths finish.2
-  · left
-    have htwo := preserved_simple_fall_distinct_le_N_add_two
-      hN D.A D.grooves htrace hsimple hend hfall
-        times hliveA hndA
-    omega
-  · obtain ⟨C⟩ :=
-      PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple
-        D.A D.grooves htrace hsimple hend
-    rcases C.direction with hbackward |
-        ⟨_hforward, _repaired, _hrepair, _hrestored⟩
-    · left
-      exact C.backward_all_run_distinct_le_N_add_three
-        hN D.grooves hbackward times hliveA hndA
-    · right
-      exact ⟨{
-        A := D.A
-        grooves := D.grooves
-        base := D.base
-        contact := C
-      }⟩
-
 
 /-- A forward first-changing contact into a flip reflector has at most two
 new restricted vectors after the coefficient-one contact history.  This is

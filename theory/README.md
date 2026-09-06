@@ -9,26 +9,35 @@ of `N` lazy Y-switches? The exact answer is machine-checked in Lean:
 `StateLaw.lean` states `GeneralN.state_law`; `lean/README.md` explains the
 model, proof structure, and verification commands. From `lean/`, run
 `lake build StateLawAxiomAudit` to check the headline theorem and its exact
-axiom list, or `lake build` to check every library. The toolchain
-is pinned.
+axiom list, or `lake build` to check every library. The toolchain is pinned.
 
-Two proof simplifications were made on 6 September 2026. First, cap an
-unwired starting port and apply the known-incoming-edge bound without
-shifting time zero. Second, use one canonical protected-pair history and
-split only on whether the old action coordinate is used by the second
-construction. A general reserved-coordinate count and a switch-simple
-endpoint-agreement lemma replace repeated counting and contradiction
-arguments. The headline dependency closure is now 53 modules / 24,104
-source lines, down from 65 / 27,846 before the two passes. The modules the
-two passes took off that path have been deleted, so the tree is exactly
-the theorem's closure; git history holds the superseded proofs. The
-theorem, model, and attainment constructions are unchanged. See
-`lean/README.md` for the arguments and measurement conventions.
+## Proof simplifications
+
+The upper bound first completes every free port on the existing switches
+with a self-link. This preserves every original live configuration and
+makes the finite exploration probes automatically live, without shifting
+time zero or imposing totality on the original wiring.
+
+Inside the dynamical argument, one shared construction history supports
+the two budgets `(N+2)+2` and `(N+3)+1`. Disturbed traversals are analysed on
+the selected outward route, leaving only stem capture versus branch repair.
+All-time phase covers use boundary invariants under positive-length
+excursions instead of enumerated contact periods. Capture is a suffix of
+ordinary traversal. Shortened reflectors reuse their original construction
+witnesses rather than rebuilding them in the later tongue state.
+
+The retained development has 53 Lean files and 19,194 source lines,
+including its 19-line axiom audit; the headline import closure has 52
+modules and 19,175 lines. That is 4,531 fewer lines than the reviewed
+23,725-line baseline. Source lines include comments and blank lines.
+The theorem statement, model, finite-state ceiling, attainment constructions,
+and exact axiom audit are unchanged. Git history retains superseded proofs.
 
 **`paper/state-law.pdf`**, with source in `paper/state-law.tex`, presents
 the model, the `2^N` ceiling, attainment constructions, and a structured
-account of the sharp upper bound, including the capping argument for an
-arbitrary start. Build it with `tectonic state-law.tex`.
+account of the simplified sharp upper bound. It includes total completion,
+the shared-history budgets, and the trace-reuse arguments. Build with
+`tectonic state-law.tex`, or run `pdflatex state-law.tex` twice.
 
 **`switch_ceiling_proof.py`** is the perfection exhaustion engine used by
 `tests/test_switch_ceiling.py`.
