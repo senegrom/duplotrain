@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import math
 from pathlib import Path
 
 import click
@@ -356,8 +357,18 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
     multiple=True,
     type=click.Path(exists=True),
 )
-def check(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
-    """Report whether a saved layout is closed, and where the gaps are."""
+@click.option(
+    "--slop", type=click.FloatRange(min=0), default=0.0, show_default=True,
+    help="Accept this total planar joint gap in mm; never ignores height or heading errors.",
+)
+def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None:
+    """Check recorded joints and closure. Exit 1 for open or unacceptable layouts.
+
+    A positive --slop accepts a forced fit within that total planar gap budget,
+    not an exact closure or a guarantee that physical track will fit.
+    """
+    if not math.isfinite(slop):
+        raise click.BadParameter("must be finite", param_hint="--slop")
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
     width, height = layout.size()
@@ -365,13 +376,42 @@ def check(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
         f"{len(layout)} pieces, {layout.track_length() / 10:.0f} cm of track, "
         f"{width / 10:.0f} x {height / 10:.0f} cm footprint"
     )
-    if layout.is_closed:
-        console.print("[green]Fully closed: every connector is mated.[/green]")
+    issues = layout.joint_issues()
+    if layout.is_closed and not issues:
+        console.print("[green]Fully closed: every connector is exactly mated.[/green]")
+        console.print("Joint geometry checked; collisions elsewhere are not checked.")
         return
-    open_ends = layout.open_ends()
-    console.print(f"[yellow]{len(open_ends)} open end(s).[/yellow]")
-    for a, b, gap in layout.gaps()[:5]:
-        console.print(f"  {a} <-> {b}: gap {gap:.1f} mm")
+    if layout.is_closed:
+        console.print("[yellow]Fully linked, but not exactly closed.[/yellow]")
+    else:
+        console.print(f"[yellow]{len(layout.connectable_ends())} open end(s).[/yellow]")
+        if not len(layout):
+            console.print("Empty layout; no closed track.")
+        for a, b, gap in layout.gaps()[:5]:
+            if not layout.is_sealed(a) and not layout.is_sealed(b):
+                console.print(f"  Open ends {a} <-> {b}: gap {gap:.6g} mm")
+    for joint in issues:
+        a, b = tuple(joint["a"]), tuple(joint["b"])
+        console.print(
+            f"  Joint {a} <-> {b}: {', '.join(joint['problems'])}; "
+            f"planar gap {joint['gap_mm']:.6g} mm, "
+            f"height difference {joint['height_mm']:.6g} mm, "
+            f"heading error {joint['heading_error_deg']} deg"
+        )
+    if issues:
+        total_gap = sum(joint["gap_mm"] for joint in issues)
+        planar_only = all(joint["problems"] == ["planar gap"] for joint in issues)
+        if planar_only:
+            console.print(f"Forced fit: total planar gap {total_gap:.6g} mm.")
+            if layout.is_closed and slop > 0 and total_gap <= slop:
+                console.print(
+                    f"Within requested slop budget {slop:g} mm; physical fit not verified."
+                )
+                return
+            console.print(f"Not accepted as closed within slop budget {slop:g} mm.")
+        else:
+            console.print("[red]Incompatible joint(s); planar slop cannot repair these.[/red]")
+    raise click.exceptions.Exit(1)
 
 
 @main.command(name="classify")

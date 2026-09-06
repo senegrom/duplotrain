@@ -24,7 +24,7 @@
     return data;
   });
 
-  window.duplotrainBoot = async ({refresh, status}) => {
+  window.duplotrainBoot = async ({refresh, status, readyStatus = status}) => {
     const overlay = document.createElement("div");
     overlay.style.cssText =
       "position:fixed;inset:0;background:rgba(244,242,238,.96);z-index:50;" +
@@ -89,7 +89,7 @@
       rejectReady = null;
       await refresh();
       overlay.remove();
-      status("Engine ready — runs in your browser · build __BUILD__");
+      readyStatus("Engine ready — runs in your browser · build __BUILD__");
     } catch (error) { fail(error); }
   };
 })();

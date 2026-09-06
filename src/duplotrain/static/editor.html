@@ -154,7 +154,6 @@ let solving = false;
 let lastSolve = null;
 let recoveryAttempted = false;
 let autosaveReady = false;
-const STORAGE_KEY = "duplotrain-session/1:" + location.pathname;
 
 // Tool changes are exclusive: a stone can never intercept an endpoint pick.
 function selectTool({piece = null, stone = null, pick = null, remove = false} = {}) {
@@ -167,18 +166,120 @@ function selectTool({piece = null, stone = null, pick = null, remove = false} = 
   button.setAttribute("aria-pressed", String(remove));
 }
 
-function saveSession() {
-  if (!autosaveReady || !S || !S.snapshot) return;
+// ---------- Checkpoint persistence ----------
+// Use a new key so a still-open tab running the old, unconditional writer cannot
+// overwrite new checkpoints. The previous key is read once for migration only.
+const STORAGE_KEY = "duplotrain-session/2:" + location.pathname;
+const LEGACY_STORAGE_KEY = "duplotrain-session/1:" + location.pathname;
+const CHECKPOINT_FORMAT = "duplotrain-checkpoint/1";
+let savedCheckpoint = null;       // exact revision this tab read or last committed
+let lastSavedSnapshot = null;     // ignore redraws and other non-mutating actions
+
+function saveNotice(message, error = false) {
   const notice = document.getElementById("save-status");
+  notice.textContent = message;
+  notice.className = error ? "err" : "";
+}
+
+function pauseAutosave() {
+  autosaveReady = false;
+  saveNotice("Another tab changed the saved session. Autosave paused here; " +
+             "export JSON to keep this tab's work before reloading.", true);
+}
+
+function decodeCheckpoint(raw, legacy = false) {
+  if (raw.length > 2 * 1024 * 1024) throw new Error("saved session is too large");
+  const record = JSON.parse(raw);
+  if (!legacy && (!record || record.format !== CHECKPOINT_FORMAT ||
+                  typeof record.revision !== "string" || !record.revision ||
+                  record.revision.length > 128)) {
+    throw new Error("unrecognised checkpoint format");
+  }
+  const snapshot = legacy ? record : record.snapshot;
+  if (!snapshot || snapshot.format !== "duplotrain-session/1") {
+    throw new Error("unrecognised session format");
+  }
+  return snapshot;
+}
+
+async function initializeRecovery() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(S.snapshot));
-    notice.textContent = "Autosaved on this device · Export JSON for a portable layout copy.";
-    notice.className = "";
-  } catch (_error) {
-    notice.textContent = "Autosave unavailable — export JSON before closing this page.";
-    notice.className = "err";
+    savedCheckpoint = localStorage.getItem(STORAGE_KEY);
+    const legacy = savedCheckpoint === null;
+    const raw = legacy ? localStorage.getItem(LEGACY_STORAGE_KEY) : savedCheckpoint;
+    if (raw !== null) {
+      const snapshot = decodeCheckpoint(raw, legacy);
+      lastSavedSnapshot = JSON.stringify(snapshot);
+      // A running local server is authoritative; restore only a fresh engine.
+      if (S.revision === 0) S = await api("/api/restore", {data: snapshot});
+    }
+    autosaveReady = true;
+  } catch (error) {
+    // Never overwrite unreadable data, or fall back past a corrupt new save.
+    autosaveReady = false;
+    saveNotice(`Recovery unavailable: ${error.message}. Existing save kept; export new work.`, true);
   }
 }
+
+async function saveSession() {
+  if (!autosaveReady || !S || !S.snapshot) return;
+  // localStorage alone has no atomic compare-and-swap. All writers use the same
+  // origin-scoped Web Lock, and recheck the checkpoint *inside* that lock.
+  if (!navigator.locks) {
+    autosaveReady = false;
+    saveNotice("Safe autosave unavailable in this browser or connection; export JSON before closing.", true);
+    return;
+  }
+  try {
+    await navigator.locks.request(STORAGE_KEY, () => {
+      if (!autosaveReady) return;
+      if (localStorage.getItem(STORAGE_KEY) !== savedCheckpoint) {
+        pauseAutosave();
+        return;
+      }
+      // Read the latest state when this queued lock is granted, not an earlier
+      // snapshot captured while another save was in flight.
+      const snapshot = JSON.stringify(S.snapshot);
+      if (savedCheckpoint !== null && snapshot === lastSavedSnapshot) {
+        saveNotice("Autosaved on this device · Export JSON for a portable layout copy.");
+        return;
+      }
+      const checkpoint = JSON.stringify({
+        format: CHECKPOINT_FORMAT, revision: crypto.randomUUID(), snapshot: S.snapshot,
+      });
+      if (checkpoint.length > 2 * 1024 * 1024) throw new Error("session is too large to autosave");
+      localStorage.setItem(STORAGE_KEY, checkpoint);
+      savedCheckpoint = checkpoint;
+      lastSavedSnapshot = snapshot;
+      saveNotice("Autosaved on this device · Export JSON for a portable layout copy.");
+    });
+  } catch (_error) {
+    autosaveReady = false;
+    saveNotice("Autosave unavailable — export JSON before closing this page.", true);
+  }
+}
+
+window.addEventListener("storage", (event) => {
+  if (!autosaveReady || (event.key !== null && event.key !== STORAGE_KEY)) return;
+  try {
+    // Read current storage: an event describing an older revision may be delayed.
+    if (localStorage.getItem(STORAGE_KEY) !== savedCheckpoint) pauseAutosave();
+  } catch (_error) {
+    autosaveReady = false;
+    saveNotice("Autosave unavailable — export JSON before closing this page.", true);
+  }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) saveSession();
+});
+window.addEventListener("beforeunload", (event) => {
+  if (S && S.snapshot && JSON.stringify(S.snapshot) !== lastSavedSnapshot) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+// No pagehide/unload write: an exiting stale tab must never replace a checkpoint.
+// ---------- End checkpoint persistence ----------
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -190,7 +291,6 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
-window.addEventListener("pagehide", saveSession);
 
 function worldToScreen(x, y) {
   return [ (x - view.x) * view.scale + canvas.clientWidth / 2,
@@ -483,7 +583,20 @@ function refreshStatus() {
   if (!S) return;
   const n = S.layout.placements.length;
   const opens = S.open_ends.length;
-  if (S.layout.closed && n) {
+  const issues = S.layout.joint_issues || [];
+  if (issues.length) {
+    const first = issues[0];
+    const forced = issues.every(joint => joint.problems.length === 1 &&
+                                         joint.problems[0] === "planar gap");
+    const gap = issues.reduce((sum, joint) => sum + joint.gap_mm, 0);
+    status((S.layout.closed ? "Fully linked, but not exactly closed. " : `${opens} open end(s). `) +
+           (forced ? `Forced fit: ${gap.toPrecision(4)} mm total planar gap; physical fit not verified. `
+                   : "Incompatible joint geometry. ") +
+           `${issues.length} joint(s) need attention. ` +
+           `Joint ${first.a.join(":")} ↔ ${first.b.join(":")}: ` +
+           `${first.problems.join(", ")}; height difference ${first.height_mm.toPrecision(4)} mm, ` +
+           `heading error ${first.heading_error_deg}°.`, "err");
+  } else if (S.layout.exactly_closed && n) {
     status(`Closed! ${n} pieces, ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`, "closed");
   } else if (pickMode) {
     status(pickMode.stage === "grow" ? "Pick the end to GROW from (click a red arrow)"
@@ -660,20 +773,7 @@ async function refresh() {
   S = await api("/api/state");
   if (!recoveryAttempted) {
     recoveryAttempted = true;
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      // A running local server is authoritative; only restore into a fresh engine.
-      if (saved && S.revision === 0) {
-        if (saved.length > 2 * 1024 * 1024) throw new Error("saved session is too large");
-        S = await api("/api/restore", {data: JSON.parse(saved)});
-      }
-      autosaveReady = true;
-    } catch (error) {
-      // Do not overwrite a checkpoint that we could not recover.
-      const notice = el("save-status");
-      notice.textContent = `Recovery unavailable: ${error.message}. Existing save kept; export new work.`;
-      notice.className = "err";
-    }
+    await initializeRecovery();
   }
   redraw();
 }
@@ -722,7 +822,7 @@ el("importfile").addEventListener("change", async (e) => {
     S = await api("/api/import", { data });
     fitted = false;
     redraw();
-    status(`imported ${S.layout.placements.length} pieces.`);
+    if (!S.layout.joint_issues.length) status(`imported ${S.layout.placements.length} pieces.`);
   } catch (err) {
     status(`import refused: ${err.message}`, "err");
   }
@@ -950,7 +1050,9 @@ el("unlimited").addEventListener("change", async (e) => {
 
 resize();
 if (window.duplotrainBoot) {
-  window.duplotrainBoot({ refresh, status });
+  window.duplotrainBoot({ refresh, status, readyStatus: (message) => {
+    if (!S.layout.joint_issues.length) status(message);
+  }});
 } else {
   refresh().catch(e => status(e.message, "err"));
 }

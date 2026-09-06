@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .exact import Alg
-from .geometry import Pose
+from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose
 from .pieces import PieceType
 from .validation import check_layout_json, rational_coefficient
 
@@ -139,9 +139,48 @@ class Layout:
         """True when every real connector is mated -- no loose ends anywhere.
 
         Sealed faces (buffer bumpers) are not connectors, so a siding properly
-        terminated by a buffer stop does not count as loose.
+        terminated by a buffer stop does not count as loose. This is topological:
+        use :meth:`joint_issues` as well before claiming exact geometric closure.
         """
         return bool(self.placements) and not self.connectable_ends()
+
+    def joint_issues(self) -> list[dict[str, Any]]:
+        """Audit each recorded joint once, independently of topological closure.
+
+        Nonzero planar gaps may be deliberate forced fits; importing them is
+        allowed, but they must never be called exact. Elevation/heading mismatches
+        and incompatible connector bodies cannot be excused by planar slop.
+        This checks joints, not collisions elsewhere along the pieces.
+        """
+        issues = []
+        for a, b in sorted(self.links.items()):
+            if a >= b:
+                continue
+            pa, pb = self.pose_of(a), self.pose_of(b)
+            half_turn = HEADING_STEPS // 2
+            heading_error = (pa.heading - pb.heading - half_turn) % HEADING_STEPS
+            heading_error = min(heading_error, HEADING_STEPS - heading_error)
+            problems = []
+            if not pa.same_point(pb):
+                problems.append("planar gap")
+            if pa.z != pb.z:
+                problems.append("elevation mismatch")
+            if heading_error:
+                problems.append("heading mismatch")
+            if self.is_sealed(a) or self.is_sealed(b):
+                problems.append("sealed face")
+            if (self.placements[a[0]].piece.end_overhang > 0
+                    and self.placements[b[0]].piece.end_overhang > 0):
+                problems.append("overlapping connector plates")
+            if problems:
+                issues.append({
+                    "a": list(a), "b": list(b),
+                    "gap_mm": pa.distance_to(pb),
+                    "height_mm": abs(float(pa.z - pb.z)),
+                    "heading_error_deg": heading_error * DEGREES_PER_STEP,
+                    "problems": problems,
+                })
+        return issues
 
     @property
     def piece_counts(self) -> dict[str, int]:

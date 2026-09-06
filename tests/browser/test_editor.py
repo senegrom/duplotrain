@@ -5,28 +5,10 @@ import threading
 
 import pytest
 
-playwright = pytest.importorskip("playwright.sync_api")
-
-from duplotrain.gui import Session, make_server  # noqa: E402
-from duplotrain.layout import Layout, build_chain  # noqa: E402
+from duplotrain.gui import Session, make_server
+from duplotrain.layout import Layout, build_chain
 
 pytestmark = pytest.mark.browser
-
-
-@pytest.fixture(scope="module")
-def browser():
-    with playwright.sync_playwright() as manager:
-        name = os.environ.get("DUPLOTRAIN_BROWSER", "chromium")
-        kwargs = {"headless": True}
-        executable = os.environ.get("DUPLOTRAIN_BROWSER_PATH")
-        if executable:
-            kwargs["executable_path"] = executable
-        try:
-            instance = getattr(manager, name).launch(**kwargs)
-        except playwright.Error as exc:  # binary not downloaded
-            pytest.skip(f"{name} is unavailable: {exc}")
-        yield instance
-        instance.close()
 
 
 @pytest.fixture()
@@ -52,6 +34,7 @@ def editor(browser):
 def load(page, url):
     page.goto(url)
     page.wait_for_function("S !== null && !apiBusy && recoveryAttempted")
+    page.evaluate("saveSession()")
 
 
 def wait_count(page, count):
@@ -98,7 +81,8 @@ def test_reload_recovers_into_a_fresh_engine(editor):
     page.wait_for_function("S.inventory.owned.straight === 17 && !apiBusy")
     page.locator("#unlimited").check()
     page.wait_for_function("S.inventory.unlimited && !apiBusy")
-    saved = page.evaluate("JSON.parse(localStorage.getItem(STORAGE_KEY))")
+    page.evaluate("saveSession()")
+    saved = page.evaluate("JSON.parse(localStorage.getItem(STORAGE_KEY)).snapshot")
     assert saved["inventory"]["straight"] == 17
     # Simulate a newly created worker/session, leaving browser storage untouched.
     with session.lock:
@@ -290,7 +274,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
     page = context.new_page()
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
-    expect = playwright.expect
+    from playwright.sync_api import expect
 
     def export_layout():
         with page.expect_download() as info:
@@ -318,9 +302,72 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         expect(owned).to_have_value("17")
         expect(page.locator('[data-piece-id="straight"] .count')).to_have_text("16/")
         assert export_layout() == saved
+        saved["links"] = [[0, 0, 0, 1]]  # deliberately forced, 128 mm gap
+        page.locator("#importfile").set_input_files({
+            "name": "forced.json", "mimeType": "application/json",
+            "buffer": json.dumps(saved).encode(),
+        })
+        expect(page.locator("#status")).to_contain_text("not exactly closed")
+        expect(page.locator("#save-status")).to_contain_text("Autosaved")
+        assert export_layout() == saved
+        page.reload()
+        expect(page.locator("#status")).to_contain_text("not exactly closed", timeout=90000)
+        assert export_layout() == saved
         assert not errors
     finally:
         context.close()
         server.shutdown()
         server.server_close()
         thread.join()
+
+
+def test_stale_tab_cannot_overwrite_newer_autosave_on_close(editor):
+    page, session, url, errors = editor
+    load(page, url)
+    newer = page.context.new_page()
+    try:
+        load(newer, url)
+        place_straight(newer)
+        newer.evaluate("saveSession()")
+        checkpoint = newer.evaluate("localStorage.getItem(STORAGE_KEY)")
+        page.wait_for_function("!autosaveReady")
+        assert "Another tab" in page.locator("#save-status").inner_text()
+        newer.close()
+        # Exercise the previous failure path, then close the actually stale page.
+        page.evaluate("window.dispatchEvent(new Event('pagehide'))")
+        page.evaluate("saveSession()")
+        assert page.evaluate("localStorage.getItem(STORAGE_KEY)") == checkpoint
+        observer = page.context.new_page()
+        load(observer, url)
+        assert observer.evaluate("localStorage.getItem(STORAGE_KEY)") == checkpoint
+        page.close()
+        assert observer.evaluate("localStorage.getItem(STORAGE_KEY)") == checkpoint
+        observer.close()
+        assert not errors
+    finally:
+        if not newer.is_closed():
+            newer.close()
+
+
+def test_imported_forced_fit_stays_visible_after_reload(editor):
+    import json
+
+    from duplotrain.layout import layout_to_dict
+
+    page, session, url, errors = editor
+    layout = build_chain([(session.catalog["straight"], 0, 1)])
+    layout = layout.join(*layout.connectable_ends(), force=True)
+    load(page, url)
+    page.locator("#importfile").set_input_files({
+        "name": "forced.json", "mimeType": "application/json",
+        "buffer": json.dumps(layout_to_dict(layout)).encode(),
+    })
+    wait_count(page, 1)
+    assert "not exactly closed" in page.locator("#status").inner_text()
+    assert "128" in page.locator("#status").inner_text()
+    page.evaluate("saveSession()")
+    page.reload()
+    wait_count(page, 1)
+    assert "not exactly closed" in page.locator("#status").inner_text()
+    assert "Forced fit" in page.locator("#status").inner_text()
+    assert not errors

@@ -320,8 +320,8 @@ python -m pytest -m "not slow"              # skip the ~2 min full-enumeration p
 python -m pytest -m "not slow and not browser"  # what application CI runs first
 ```
 
-Tests marked `browser` need playwright plus a downloaded browser; they skip when
-either is missing. See *Editor recovery and application checks* below for the
+Tests marked `browser` need playwright plus a downloaded browser. Missing defaults
+skip locally; explicit browser paths and all browser startup failures in CI fail. See *Editor recovery and application checks* below for the
 full local command sequence.
 
 The suite covers the number field, the pose lattice, piece derivation, the documented
@@ -383,3 +383,25 @@ Application CI runs these checks on pushes and pull requests, including a clean 
 installation without matplotlib. The independent Lean workflow checks proof changes.
 Package license metadata reads the repository's LICENSE file (GNU AGPL v3), rather
 than declaring an inconsistent MIT license.
+
+### Autosave conflicts and geometric checks
+
+Autosave checkpoints carry unique revisions. Web Locks serialize cross-tab writes;
+a tab that detects another writer pauses autosave and asks you to export its work
+before reloading. Redrawing or closing a stale tab never rewrites a newer checkpoint.
+Previous saves migrate read-only into a new storage key, isolated from tabs still
+running the old editor. When safe locking or storage is unavailable, the editor
+warns you to export instead. Saves remain browser-local, not a backup service.
+
+`duplotrain check layout.json` checks the geometry of every recorded joint, not
+just whether all connectors have link records. It exits 1 for empty/open layouts,
+non-exact joints, and incompatible headings, elevations, or connector plates.
+`--slop 5` explicitly accepts up to 5 mm of **total** planar joint gap in a fully
+linked layout, with a forced-fit warning; it never excuses elevation or heading
+errors and is not a physical-fit guarantee. Collisions away from joints are not
+checked by this command. The editor recomputes joint warnings after import and
+reload, so exported forced fits cannot silently become “exact” layouts.
+
+Browser CI requires Playwright and its binaries (`DUPLOTRAIN_REQUIRE_BROWSER=1`).
+Only absent, unconfigured defaults may skip locally; crashes and bad custom paths
+are errors. Dependabot checks Python and GitHub Actions dependencies weekly.

@@ -181,9 +181,12 @@ class Session:
                 }
             )
         width, height = layout.size()
+        joint_issues = layout.joint_issues()
         return {
             "placements": placements,
-            "closed": layout.is_closed,
+            "closed": layout.is_closed,  # topological, retained for API compatibility
+            "exactly_closed": layout.is_closed and not joint_issues,
+            "joint_issues": joint_issues,
             "size_cm": [round(width / 10, 1), round(height / 10, 1)],
             "piece_counts": layout.piece_counts,
         }
