@@ -1,3 +1,4 @@
+# gate v2: hash-locked applier is present
 name: Verify and publish editor optimization
 on:
   push:
