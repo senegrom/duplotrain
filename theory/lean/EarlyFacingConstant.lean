@@ -57,7 +57,7 @@ theorem two_phase_prefix_then_direct_tail_distinct_le_succ
     simp [history, endpointVector]
   have hcount := noveltyCoverOn_distinct_count
     (boundary_history_then_direct_tail_cover hreach history hprefixCover hboundary
-      htail hcapPos times hlive hnd) hnd
+      htail times hlive hnd) hnd
   have hhistory : history.length = 2 := by simp [history]
   rw [hhistory] at hcount
   omega

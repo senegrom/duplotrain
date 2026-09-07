@@ -44,105 +44,38 @@ theorem manufactured_theta_half_pointwise
         (phase = state ∨ phase = flipAt state A.actionSwitch ∨
           phase = flipAt state B.actionSwitch) := by
   have hArun := (A.toSupported.run state hA).1
-  change stepN w (2 * A.runway.length + A.candy.length + 2)
-    (g, state) = some (e, flipAt state A.actionSwitch) at hArun
+  change stepN w A.toSupported.travel (g, state) =
+    some (e, flipAt state A.actionSwitch) at hArun
+  have hpos : 0 < A.toSupported.travel := (ManufacturedReflector.flip A).travel_pos
+  have hAcover : ∀ d, d ≤ A.toSupported.travel → ∃ port phase,
+      stepN w d (g, state) = some (port, phase) ∧
+        (phase = state ∨ phase = flipAt state A.actionSwitch ∨
+          phase = flipAt state B.actionSwitch) := by
+    intro d hd
+    obtain ⟨port, phase, hr, hp⟩ := A.travel_two_phase_stepN state hA hd
+    exact ⟨port, phase, hr, by grind⟩
   rcases manufactured_support_fault_dichotomy_pointwise
-      A B state hA hB hcontact with hcap | hrep
-  · obtain ⟨cap, hcapEnd, hcapPhases⟩ := hcap
-    have hBrun := (B.toSupported.run state hB).1
-    change stepN w (2 * B.runway.length + B.candy.length + 2)
-      (e, state) = some (g, flipAt state B.actionSwitch) at hBrun
-    refine ⟨(2 * A.runway.length + A.candy.length + 2) + cap +
-      (2 * B.runway.length + B.candy.length + 2), by omega, ?_, ?_⟩
-    · have hlen : (2 * A.runway.length + A.candy.length + 2) + cap +
-          (2 * B.runway.length + B.candy.length + 2) =
-          (2 * A.runway.length + A.candy.length + 2) +
-            (cap + (2 * B.runway.length + B.candy.length + 2)) := by
-        omega
-      rw [hlen, stepN_add, hArun]
-      simp only [Option.bind_some]
-      rw [stepN_add, hcapEnd]
-      simpa using hBrun
-    · intro d hd
-      by_cases hd1 : d ≤ 2 * A.runway.length + A.candy.length + 2
-      · obtain ⟨port, phase, hrun, hphase⟩ :=
-          A.travel_two_phase_stepN state hA hd1
-        refine ⟨port, phase, hrun, ?_⟩
-        rcases hphase with h | h
-        · exact Or.inl h
-        · exact Or.inr (Or.inl h)
-      · by_cases hd2 : d ≤
-            (2 * A.runway.length + A.candy.length + 2) + cap
-        · let rdepth := d - (2 * A.runway.length + A.candy.length + 2)
-          have hrle : rdepth ≤ cap := by
-            dsimp [rdepth]
-            omega
-          have hdEq : d =
-              (2 * A.runway.length + A.candy.length + 2) + rdepth := by
-            dsimp [rdepth]
-            omega
-          obtain ⟨port, phase, hrunR, hphase⟩ := hcapPhases rdepth hrle
-          refine ⟨port, phase, ?_, ?_⟩
-          · rw [hdEq, stepN_add, hArun]
-            simpa using hrunR
-          · rcases hphase with h | h
-            · exact Or.inr (Or.inl h)
-            · exact Or.inl h
-        · let rdepth := d -
-            ((2 * A.runway.length + A.candy.length + 2) + cap)
-          have hrle : rdepth ≤
-              2 * B.runway.length + B.candy.length + 2 := by
-            dsimp [rdepth]
-            omega
-          have hdEq : d =
-              ((2 * A.runway.length + A.candy.length + 2) + cap) +
-                rdepth := by
-            dsimp [rdepth]
-            omega
-          have hmid : stepN w
-              ((2 * A.runway.length + A.candy.length + 2) + cap)
-              (g, state) = some (e, state) := by
-            rw [stepN_add, hArun]
-            simpa using hcapEnd
-          obtain ⟨port, phase, hrunR, hphase⟩ :=
-            B.travel_two_phase_stepN state hB hrle
-          refine ⟨port, phase, ?_, ?_⟩
-          · rw [hdEq, stepN_add, hmid]
-            simpa using hrunR
-          · rcases hphase with h | h
-            · exact Or.inl h
-            · exact Or.inr (Or.inr h)
-  · obtain ⟨hrepEnd, hrepPhases⟩ := hrep
-    refine ⟨(2 * A.runway.length + A.candy.length + 2) +
-      (2 * B.runway.length + B.candy.length + 2), by omega, ?_, ?_⟩
-    · rw [stepN_add, hArun]
-      simpa using hrepEnd
-    · intro d hd
-      by_cases hd1 : d ≤ 2 * A.runway.length + A.candy.length + 2
-      · obtain ⟨port, phase, hrun, hphase⟩ :=
-          A.travel_two_phase_stepN state hA hd1
-        refine ⟨port, phase, hrun, ?_⟩
-        rcases hphase with h | h
-        · exact Or.inl h
-        · exact Or.inr (Or.inl h)
-      · let rdepth := d - (2 * A.runway.length + A.candy.length + 2)
-        have hrle : rdepth ≤
-            2 * B.runway.length + B.candy.length + 2 := by
-          dsimp [rdepth]
-          omega
-        have hdEq : d =
-            (2 * A.runway.length + A.candy.length + 2) + rdepth := by
-          dsimp [rdepth]
-          omega
-        obtain ⟨port, phase, hrunR, hphase⟩ := hrepPhases rdepth hrle
-        refine ⟨port, phase, ?_, ?_⟩
-        · rw [hdEq, stepN_add, hArun]
-          simpa using hrunR
-        · rcases hphase with h | h
-          · exact Or.inr (Or.inl h)
-          · rcases h with h | h
-            · exact Or.inl h
-            · exact Or.inr (Or.inr h)
+      A B state hA hB hcontact with ⟨cap, hc, hp⟩ | ⟨hr, hp⟩
+  · have hBrun := (B.toSupported.run state hB).1
+    change stepN w B.toSupported.travel (e, state) =
+      some (g, flipAt state B.actionSwitch) at hBrun
+    refine ⟨A.toSupported.travel + (cap + B.toSupported.travel), by omega, ?_, ?_⟩
+    · simp only [stepN_add, hArun, hc, Option.bind_some]; exact hBrun
+    · apply stepN_cover_append hArun hAcover
+      apply stepN_cover_append hc
+      · intro d hd
+        obtain ⟨port, phase, hr, hv⟩ := hp d hd
+        exact ⟨port, phase, hr, by grind⟩
+      · intro d hd
+        obtain ⟨port, phase, hr, hv⟩ := B.travel_two_phase_stepN state hB hd
+        exact ⟨port, phase, hr, by grind⟩
+  · refine ⟨A.toSupported.travel + B.toSupported.travel, by omega, ?_, ?_⟩
+    · rw [stepN_add, hArun]; exact hr
+    · apply stepN_cover_append hArun hAcover
+      intro d hd
+      obtain ⟨port, phase, hr, hv⟩ := hp d hd
+      exact ⟨port, phase, hr, by grind⟩
+
 
 /-- **One-sided theta intersection: absolute four-phase law.**  If `B`'s
 support touches `A`'s switch but `B`'s action avoids `A`'s support, the

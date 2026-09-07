@@ -40,68 +40,26 @@ theorem ManufacturedReflector.repair_prefix_contact_eq_activated_or_preReturn
     B hA hBstart hprefix hsimple hroute hBcontact
   cases B with
   | stay R =>
-      change contact = R.returnState ∨ contact = R.returnState
-      have hchanges' : ∀ j, contact j ≠ R.returnState j →
-          j = R.arm / 3 := by
-        intro j hj
-        have h := hchanges j (by
-          change contact j ≠ R.returnState j
-          exact hj)
-        change j = R.arm / 3 at h
-        exact h
-      have hrelation :
-          R.returnState = contact ∨
-            R.returnState = flipAt contact (R.arm / 3) :=
-        tongues_eq_or_eq_flipAt_of_changes_only
-          (u := R.returnState) (v := contact)
-          (k := R.arm / 3) hchanges'
-      rcases hrelation with heq | hflip
-      · exact Or.inl heq.symm
-      · have hcoreStart : arrive R.returnState R.arm =
-            (R.mouth, R.returnState) :=
-          passagesGrooved_singleton.mp (pathGrooves_pair.mp hBstart).2
-        have hcoreContact : arrive contact R.arm =
-            (R.mouth, contact) :=
-          passagesGrooved_singleton.mp (pathGrooves_pair.mp hBcontact).2
-        have hkeyAgree :
-            R.returnState (R.arm / 3) = contact (R.arm / 3) :=
-          grooved_states_agree_on_passage hcoreStart hcoreContact
-        have hk := congrFun hflip (R.arm / 3)
-        rw [hkeyAgree] at hk
-        cases hval : contact (R.arm / 3) <;>
-          simp [flipAt, hval] at hk
+      left
+      have hkey := grooved_states_agree_on_passage
+        (passagesGrooved_singleton.mp (pathGrooves_pair.mp hBstart).2)
+        (passagesGrooved_singleton.mp (pathGrooves_pair.mp hBcontact).2)
+      funext j
+      by_cases hj : contact j = R.returnState j
+      · exact hj
+      · have hs := hchanges j hj
+        change j = R.arm / 3 at hs
+        exact hs ▸ hkey.symm
   | flip R =>
       change contact = R.afterReturn ∨ contact = R.returnState
-      have hchanges' : ∀ j, contact j ≠ R.afterReturn j →
-          j = R.actionSwitch := by
-        intro j hj
-        have h := hchanges j (by
-          change contact j ≠ R.afterReturn j
-          exact hj)
-        change j = R.secondArm / 3 at h
-        exact h.trans R.secondArm_switch
-      have hrelation :
-          R.afterReturn = contact ∨
-            R.afterReturn = flipAt contact R.actionSwitch :=
-        tongues_eq_or_eq_flipAt_of_changes_only
-          (u := R.afterReturn) (v := contact)
-          (k := R.actionSwitch) hchanges'
-      rcases hrelation with heq | hflip
+      have hrelation := tongues_eq_or_eq_flipAt_of_changes_only
+        (u := R.afterReturn) (v := contact) (k := R.actionSwitch)
+        (fun j hj => (hchanges j hj).trans R.secondArm_switch)
+      have hpre := (ManufacturedReflector.flip R).preReturn_eq_action_activated
+      change R.returnState = flipAt R.afterReturn R.actionSwitch at hpre
+      rcases hrelation with heq | heq
       · exact Or.inl heq.symm
-      · right
-        have hpre : R.returnState =
-            flipAt R.afterReturn R.actionSwitch := by
-          simpa [ManufacturedReflector.preReturn,
-            ManufacturedReflector.activatedState,
-            ManufacturedReflector.toSupported,
-            ManufacturedFlipReflector.toSupported,
-            LocalAction.apply] using
-              (ManufacturedReflector.flip R).preReturn_eq_action_activated
-        calc
-          contact = flipAt (flipAt contact R.actionSwitch)
-              R.actionSwitch := by rw [flipAt_flipAt]
-          _ = flipAt R.afterReturn R.actionSwitch := by rw [hflip]
-          _ = R.returnState := hpre.symm
+      · right; rw [hpre, heq, flipAt_flipAt]
 
 /-- A historical two-phase prefix followed by an all-time two-phase tail
 has at most one fresh vector.  The shared boundary phase is charged only once. -/
@@ -125,7 +83,7 @@ theorem two_phase_prefix_then_two_phase_tail_one_novelty
     obtain ⟨port, phase, hr, hp⟩ := htail d
     exact ⟨port, phase, hr, by simpa using hp⟩
   · intro phase hp
-    simp only [List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] at hp
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hp
     rcases hp with rfl | rfl
     · exact List.mem_append_left _ hv
     · exact List.mem_append_right _ (by simp)
@@ -162,68 +120,30 @@ private theorem direct_three_tail_one_novelty_of_two_historical_witnesses
     simp [f, restrictedTonguesAt, tonguesAt, hrun₁]
   have hf₂ : f d₂ = VectorCount.restrict N u₂ := by
     simp [f, restrictedTonguesAt, tonguesAt, hrun₂]
-  have hd₁Live : (stepN w d₁ start).isSome := by
-    rw [hrun₁]
-    simp
-  have hd₂Live : (stepN w d₂ start).isSome := by
-    rw [hrun₂]
-    simp
-  by_cases hnew : ∃ k, k ∈ times ∧ f k ∉ history
-  · obtain ⟨k₀, hk₀, hk₀New⟩ := hnew
+  by_cases hnew : ∃ k ∈ times, f k ∉ history
+  · obtain ⟨k₀, hk₀, hnew₀⟩ := hnew
     refine ⟨[f k₀], by simp, ?_⟩
     intro k hk
-    by_cases hkHist : f k ∈ history
-    · exact List.mem_append_left _ hkHist
-    · apply List.mem_append_right
-      simp only [List.mem_singleton]
-      apply Classical.byContradiction
-      intro hkNe
-      have hf₁Hist : f d₁ ∈ history := by simpa [hf₁] using hhist₁
-      have hf₂Hist : f d₂ ∈ history := by simpa [hf₂] using hhist₂
-      have h₁₂ : f d₁ ≠ f d₂ := by simpa [hf₁, hf₂] using hne
-      have h₁₀ : f d₁ ≠ f k₀ := by
-        intro heq
-        apply hk₀New
-        rw [← heq]
-        exact hf₁Hist
-      have h₂₀ : f d₂ ≠ f k₀ := by
-        intro heq
-        apply hk₀New
-        rw [← heq]
-        exact hf₂Hist
-      have h₁k : f d₁ ≠ f k := by
-        intro heq
-        apply hkHist
-        rw [← heq]
-        exact hf₁Hist
-      have h₂k : f d₂ ≠ f k := by
-        intro heq
-        apply hkHist
-        rw [← heq]
-        exact hf₂Hist
-      have h₀k : f k₀ ≠ f k := by
-        intro heq
-        exact hkNe heq.symm
-      have hndFour :
-          ([d₁, d₂, k₀, k].map f).Nodup := by
-        simp [h₁₂, h₁₀, h₂₀, h₁k, h₂k, h₀k]
-      have hfourLive : ∀ j ∈ [d₁, d₂, k₀, k],
-          (stepN w j start).isSome := by
-        intro j hj
-        simp at hj
-        rcases hj with rfl | rfl | rfl | rfl
-        · exact hd₁Live
-        · exact hd₂Live
-        · exact hlive _ hk₀
-        · exact hlive _ hk
-      have hbound := hthree [d₁, d₂, k₀, k] hfourLive hndFour
-      simp at hbound
-  · refine ⟨[], by simp, ?_⟩
-    intro k hk
-    simp only [List.append_nil]
-    apply Classical.byContradiction
-    intro hkNot
-    exact hnew ⟨k, hk, hkNot⟩
+    by_cases hh : f k ∈ history
+    · exact List.mem_append_left _ hh
+    · have heq : f k = f k₀ := by
+        apply Classical.byContradiction
+        intro hne₀
+        have hnd : ([d₁, d₂, k₀, k].map f).Nodup := by
+          simp only [List.map_cons, List.map_nil, List.nodup_cons, List.mem_cons,
+            List.not_mem_nil, List.nodup_nil]
+          grind
+        have hbound := hthree [d₁, d₂, k₀, k] (by
+          intro j hj
+          simp only [List.mem_cons, List.not_mem_nil, or_false] at hj
+          rcases hj with rfl | rfl | rfl | rfl
+          · simp [hrun₁]
+          · simp [hrun₂]
+          · exact hlive _ hk₀
+          · exact hlive _ hk) hnd
+        simp at hbound
+      exact List.mem_append_right _ (by simpa only [List.mem_singleton] using heq)
+  · exact ⟨[], by simp, by simpa [f] using hnew⟩
 
 /-- Flipping a represented switch changes the restricted tongue vector. -/
 private theorem restrict_flipAt_ne_of_lt
@@ -334,13 +254,9 @@ private theorem ManufacturedReflector.protected_changed_contact_one_or_forward
       (times.map (restrictedTonguesAt w N
         (g, B.activatedState))).Nodup →
       NoveltyCoverOn w N (g, B.activatedState) times history 1) ∨
-      ∃ oriented repaired,
-        oriented ∈ B.orientedRoute u ∧
+      ∃ oriented, oriented ∈ B.orientedRoute u ∧
         arrive u oriented.2 = (oriented.1, u) ∧
-        passageSwitch oriented = p / 3 ∧
-        x = oriented.2 ∧
-        arrive v oriented.1 = (oriented.2, repaired) ∧
-        arrive repaired oriented.2 = (oriented.1, repaired) := by
+        passageSwitch oriented = p / 3 ∧ x = oriented.2 := by
   obtain ⟨oriented, horiented, horientedGroove,
       horientedSwitch, hdirection⟩ :=
     B.changed_contact_on_orientedRoute u v hpaths
@@ -417,10 +333,7 @@ private theorem ManufacturedReflector.protected_changed_contact_one_or_forward
     intro times _ _
     exact two_phase_prefix_then_two_phase_tail_one_novelty
       happroach.sound hphase rfl history hinitialHistorical huHistorical hall times
-  · right
-    obtain ⟨hforwardExit, repaired, hrepair, hgroove⟩ := hforward
-    exact ⟨oriented, repaired, horiented, horientedGroove,
-      horientedSwitch, hforwardExit, hrepair, hgroove⟩
+  · exact Or.inr ⟨oriented, horiented, horientedGroove, horientedSwitch, hforward⟩
 
 /-- A backward no-change protected contact costs one fresh vector over the
 activated/pre-return history; otherwise the exact facing-forward merge is
@@ -563,14 +476,12 @@ theorem manufactured_pair_protected_repair_novelty_outcomes
           hsplit hprefix hBu harrive hpath hold hswitch hchange
           history hinitialHistorical hpreHistorical with hcount | hforward
       · exact Or.inl hcount
-      · obtain ⟨oriented, repaired, horiented, horientedGroove,
-            horientedSwitch, hforwardExit, hrepair, hgroove⟩ := hforward
+      · obtain ⟨oriented, horiented, horientedGroove, horientedSwitch, hforwardExit⟩ := hforward
         exact Or.inr (Or.inr (Or.inl
           ⟨approach, p, x, suffix, u, v, path, old,
-            oriented, repaired, hsplit, hprefix, hBu, harrive,
+            oriented, hsplit, hprefix, hBu, harrive,
             hpath, hold, hswitch, hchange, horiented,
-            horientedGroove, horientedSwitch, hforwardExit,
-            hrepair, hgroove⟩))
+            horientedGroove, horientedSwitch, hforwardExit⟩))
     · exact Or.inr (Or.inr (Or.inr hcomplete))
 
 /-- A facing-forward merge has at most one fresh vector over the activated
@@ -720,10 +631,8 @@ theorem ManufacturedReflector.ChangedForwardMerge.impossible_of_preReturn_groove
     (hpre : PathGrooves A.toSupported.paths B.preReturn.2)
     (hmerge : A.ChangedForwardMerge B) : False := by
   obtain ⟨approach, p, x, suffix, u, v, path, old,
-      oriented, repaired, hsplit, _hprefix, hBu, harrive,
-      hpath, hold, hswitch, hchanged, _horiented,
-      _horientedGroove, _horientedSwitch, _hforward,
-      _hrepair, _hrestored⟩ := hmerge
+      oriented, hsplit, _hprefix, hBu, harrive, hpath, hold, hswitch, hchanged,
+      _horiented, _horientedGroove, _horientedSwitch, _hforward⟩ := hmerge
   have hmem : (p, x) ∈ A.orientedRoute B.activatedState := by
     rw [hsplit]
     exact List.mem_append_right approach List.mem_cons_self

@@ -28,16 +28,7 @@ theorem arrive_flip_other {u v : Tongues} {p x k : Nat}
     (hpk : p / 3 ≠ k) :
     arrive (flipAt u k) p = (x, flipAt v k) := by
   unfold arrive at harrive ⊢
-  by_cases hp : p % 3 = 0
-  · rw [if_pos hp] at harrive ⊢
-    injection harrive with hx hv
-    subst x
-    subst v
-    simp [flipAt, hpk]
-  · rw [if_neg hp] at harrive ⊢
-    injection harrive with hx hv
-    subst x
-    rw [pin_flip_other hpk, hv]
+  split at harrive <;> cases harrive <;> simp_all [flipAt, pin_flip_other]
 
 /-- A passage which genuinely changes its switch is necessarily trailing:
 its entry is a branch, its exit is the stem, and immediately re-entering
@@ -56,50 +47,36 @@ theorem changed_arrival_eq_flipAt
     (harrive : arrive u p = (x, v))
     (hchanged : v (p / 3) ≠ u (p / 3)) :
     v = flipAt u (p / 3) := by
-  obtain ⟨_hp, _hx, hv⟩ :=
-    changed_arrival_is_trailing harrive hchanged
-  have hpinValue : v (p / 3) = bval p := by
-    rw [hv]
-    simp [pin]
-  have hopposite : bval p = !(u (p / 3)) := by
-    cases hu : u (p / 3) <;> cases hb : bval p <;>
-      simp_all
-  exact hv.trans (pin_eq_flipAt rfl hopposite)
+  obtain ⟨_, _, rfl⟩ := changed_arrival_is_trailing harrive hchanged
+  apply pin_eq_flipAt rfl
+  simp only [pin] at hchanged
+  cases hu : u (p / 3) <;> cases hb : bval p <;> simp_all
 
 theorem trailing_arrive_exit_independent
     {u v : Tongues} {p : Nat} (hp : p % 3 ≠ 0) :
-    (arrive u p).1 = (arrive v p).1 := by
-  simp [arrive, hp]
+    (arrive u p).1 = (arrive v p).1 := by simp [arrive, hp]
 
-theorem physicalTrace_passages_prefix_comparable
-    {w : Wiring} {start finishA finishB : Nat × Tongues}
-    {left right : List Passage}
+/-- Deterministic traces from one configuration coincide until one ends;
+the remainder is itself a trace from that endpoint. -/
+theorem physicalTrace_prefix_comparable_with_endpoints
+    {w : Wiring} {start finishA finishB : Nat × Tongues} {left right : List Passage}
     (hleft : PhysicalTrace w start left finishA)
     (hright : PhysicalTrace w start right finishB) :
-    (∃ suffix, right = left ++ suffix) ∨
-      (∃ suffix, left = right ++ suffix) := by
+    (∃ suffix, right = left ++ suffix ∧ PhysicalTrace w finishA suffix finishB) ∨
+    (∃ suffix, left = right ++ suffix ∧ PhysicalTrace w finishB suffix finishA) := by
   induction hleft generalizing right finishB with
-  | nil c =>
-      exact Or.inl ⟨right, by simp⟩
+  | nil c => exact Or.inl ⟨right, rfl, hright⟩
   | @cons p x q u v rest finishA harrive hlink tail ih =>
       cases hright with
-      | nil =>
-          exact Or.inr ⟨(p, x) :: rest, by simp⟩
+      | nil => exact Or.inr ⟨_, rfl, PhysicalTrace.cons harrive hlink tail⟩
       | @cons _ x₂ q₂ _ v₂ right finishB harrive₂ hlink₂ tail₂ =>
-          have hlocal : (x, v) = (x₂, v₂) :=
-            harrive.symm.trans harrive₂
-          injection hlocal with hx hv
-          subst x₂
-          subst v₂
-          have hnext : q = q₂ := by
-            rw [hlink] at hlink₂
-            injection hlink₂
+          have hlocal : (x, v) = (x₂, v₂) := harrive.symm.trans harrive₂
+          cases hlocal
+          have hnext : q = q₂ := by grind
           subst q₂
-          rcases ih tail₂ with hprefix | hprefix
-          · obtain ⟨suffix, hsuffix⟩ := hprefix
-            exact Or.inl ⟨suffix, by simp [hsuffix]⟩
-          · obtain ⟨suffix, hsuffix⟩ := hprefix
-            exact Or.inr ⟨suffix, by simp [hsuffix]⟩
+          rcases ih tail₂ with ⟨suffix, hs, ht⟩ | ⟨suffix, hs, ht⟩
+          · exact Or.inl ⟨suffix, by simp [hs], ht⟩
+          · exact Or.inr ⟨suffix, by simp [hs], ht⟩
 
 /-- A complete physical trace can be replayed after flipping a switch absent
 from the trace.  Every intermediate state is simply conjugated by that flip.
@@ -159,74 +136,8 @@ theorem map_passageSwitch_reversePassages
   exact List.map_congr_left fun passage hp =>
     htrace.passage_exit_switch passage (List.mem_reverse.mp hp)
 
-theorem linked_prefix_of_append {w : Wiring}
-    {left right : List Passage}
-    (hlinked : LinkedPassages w (left ++ right)) :
-    LinkedPassages w left := by
-  induction left with
-  | nil => trivial
-  | cons a tail ih =>
-      cases tail with
-      | nil => trivial
-      | cons b rest =>
-          change w.link a.2 = some b.1 ∧
-            LinkedPassages w (b :: rest) at ⊢
-          change w.link a.2 = some b.1 ∧
-            LinkedPassages w ((b :: rest) ++ right) at hlinked
-          exact ⟨hlinked.1, ih hlinked.2⟩
-
-theorem linked_boundary_of_append {w : Wiring}
-    {g a p x : Nat} {before after : List Passage}
-    (hlinked : LinkedPassages w
-      (((g, a) :: before) ++ (p, x) :: after)) :
-    w.link (lastPassageExit a before) = some p := by
-  induction before generalizing g a with
-  | nil =>
-      exact hlinked.1
-  | cons passage before ih =>
-      rcases passage with ⟨r, y⟩
-      have htail : LinkedPassages w
-          (((r, y) :: before) ++ (p, x) :: after) := hlinked.2
-      simpa [lastPassageExit] using ih htail
-
-/-- A nonempty prefix before an occurrence in a simple grooved path reaches
-that occurrence without changing tongues, and does not visit its switch. -/
-theorem simple_grooved_prefix_to_occurrence
-    {w : Wiring} {u : Tongues}
-    {g a p x : Nat} {before after : List Passage}
-    (hlinked : LinkedPassages w
-      (((g, a) :: before) ++ (p, x) :: after))
-    (hgrooved : PassagesGrooved u
-      (((g, a) :: before) ++ (p, x) :: after))
-    (hsimple : SwitchSimple
-      (((g, a) :: before) ++ (p, x) :: after)) :
-    PhysicalTrace w (g, u) ((g, a) :: before) (p, u) ∧
-      (∀ passage ∈ (g, a) :: before,
-        passageSwitch passage ≠ passageSwitch (p, x)) := by
-  have hprefixLinked : LinkedPassages w ((g, a) :: before) :=
-    linked_prefix_of_append hlinked
-  have hprefixGrooved : PassagesGrooved u ((g, a) :: before) := by
-    intro passage hp
-    exact hgrooved passage (List.mem_append_left _ hp)
-  have hboundary : w.link (lastPassageExit a before) = some p :=
-    linked_boundary_of_append hlinked
-  have htrace := physicalTrace_grooved_passages w u g a p before
-    hprefixLinked hprefixGrooved hboundary
-  have hforeign : ∀ passage ∈ (g, a) :: before,
-      passageSwitch passage ≠ passageSwitch (p, x) := by
-    unfold SwitchSimple at hsimple
-    simp only [List.map_append, List.map_cons] at hsimple
-    have hparts := List.nodup_append.mp hsimple
-    intro passage hp hEq
-    have hne := hparts.2.2 (passageSwitch passage)
-      (List.mem_map.mpr ⟨passage, hp, rfl⟩)
-      (passageSwitch (p, x)) (by simp)
-    exact hne hEq
-  exact ⟨htrace, hforeign⟩
-
-/-- Empty-prefix wrapper around `simple_grooved_prefix_to_occurrence`.  A
-static trace supplies the path's starting port; the returned trace is rebased
-to any tongue vector under which the path is grooved. -/
+/-- A grooved prefix reaches the named passage without changing tongues;
+switch simplicity excludes that passage's switch from the prefix. -/
 theorem simple_grooved_trace_prefix_to_occurrence
     {w : Wiring} {e : Nat} {base u : Tongues}
     {path before after : List Passage} {p x : Nat}
@@ -238,35 +149,9 @@ theorem simple_grooved_trace_prefix_to_occurrence
     PhysicalTrace w (e, u) before (p, u) ∧
       (∀ passage ∈ before,
         passageSwitch passage ≠ passageSwitch (p, x)) := by
-  have hlinked : LinkedPassages w
-      (before ++ (p, x) :: after) := by
-    rw [← hoccurs]
-    exact hstatic.linked
-  have hgrooved' : PassagesGrooved u
-      (before ++ (p, x) :: after) := by
-    rwa [← hoccurs]
-  have hsimple' : SwitchSimple
-      (before ++ (p, x) :: after) := by
-    rwa [← hoccurs]
-  cases before with
-  | nil =>
-      have htrace := hstatic
-      rw [hoccurs] at htrace
-      have hstart : e = p := htrace.head_arrive.1
-      constructor
-      · simpa [hstart] using (PhysicalTrace.nil (e, u))
-      · intro passage hp
-        cases hp
-  | cons passage before =>
-      rcases passage with ⟨g, a⟩
-      have hdata := simple_grooved_prefix_to_occurrence
-        hlinked hgrooved' hsimple'
-      have htrace := hstatic
-      rw [hoccurs] at htrace
-      have hstart : e = g := htrace.head_arrive.1
-      constructor
-      · simpa [hstart] using hdata.1
-      · exact hdata.2
+  subst path
+  obtain ⟨_, _, hprefix, _⟩ := hstatic.split_grooved_at hgrooved
+  exact ⟨hprefix, by grind [SwitchSimple]⟩
 
 /-! ## One deliberately broken groove -/
 
@@ -278,19 +163,10 @@ theorem flipped_passage_forward_trailing
     (hforward : arrive u p = (x, u))
     (hpbranch : p % 3 ≠ 0) :
     arrive (flipAt u (p / 3)) p = (x, u) := by
-  unfold arrive at hforward
-  rw [if_neg hpbranch] at hforward
-  injection hforward with hx hpin
-  have hu : u (p / 3) = bval p := by
-    simpa [pin] using (congrFun hpin (p / 3)).symm
-  have hrestore : pin (flipAt u (p / 3)) p = u := by
+  have hpin : pin (flipAt u (p / 3)) p = pin u p := by
     funext j
-    unfold pin flipAt
-    by_cases hj : j = p / 3
-    · subst j
-      simp [hu]
-    · simp [hj]
-  simp [arrive, hpbranch, hrestore, hx]
+    by_cases hj : j = p / 3 <;> simp [pin, flipAt, hj]
+  simpa only [arrive, if_neg hpbranch, hpin] using hforward
 
 /-- After the crossed passage at a first revisit, every groove away from the
 revisited switch survives.  In particular, the simple runway and the candy
@@ -374,65 +250,27 @@ variable {w : Wiring} {g e : Nat}
   (A : ManufacturedFlipReflector w g e)
 include w g e A
 
-/-- The mouth of every nondegenerate manufactured reflector is the stem of
-its switch. -/
-theorem ManufacturedFlipReflector.mouth_is_stem :
-    A.mouth % 3 = 0 := by
-  obtain ⟨oldAfter, hold⟩ := A.candyTrace.head_arrive.2
-  have holdStem := arrive_stem_endpoint A.mouthState A.mouth
-  rw [hold] at holdStem
-  have hnewStem := arrive_stem_endpoint A.returnState A.secondArm
-  rw [A.crossed] at hnewStem
-  have hsecondSwitch :=
-    arrive_exit_switch A.returnState A.secondArm
-  rw [A.crossed] at hsecondSwitch
-  by_cases hp : A.mouth % 3 = 0
-  · exact hp
-  · exfalso
-    have hpne : A.mouth ≠ 3 * (A.mouth / 3) := by omega
-    rcases holdStem with hpOld | hxStem
-    · exact hpne hpOld
-    · rcases hnewStem with hqStem | hpNew
-      · apply A.arms_ne
-        omega
-      · apply hpne
-        omega
+private theorem ManufacturedFlipReflector.port_geometry :
+    A.mouth % 3 = 0 ∧ A.firstArm % 3 ≠ 0 ∧ A.secondArm % 3 ≠ 0 ∧
+      A.mouth / 3 = A.firstArm / 3 ∧ A.mouth / 3 = A.secondArm / 3 := by
+  obtain ⟨_, hold⟩ := A.candyTrace.head_arrive.2
+  exact crossed_arrivals_geometry hold A.crossed A.arms_ne
 
-theorem ManufacturedFlipReflector.firstArm_switch :
-    A.firstArm / 3 = A.actionSwitch := by
-  obtain ⟨after, hhead⟩ := A.candyTrace.head_arrive.2
-  have hs := arrive_exit_switch A.mouthState A.mouth
-  rw [hhead] at hs
-  simpa [ManufacturedFlipReflector.actionSwitch] using hs
+/-- A manufactured lobe's mouth is the stem, with two distinct branch arms. -/
+theorem ManufacturedFlipReflector.mouth_is_stem : A.mouth % 3 = 0 :=
+  A.port_geometry.1
 
-theorem ManufacturedFlipReflector.secondArm_switch :
-    A.secondArm / 3 = A.actionSwitch := by
-  have hs := arrive_exit_switch A.returnState A.secondArm
-  rw [A.crossed] at hs
-  simpa [ManufacturedFlipReflector.actionSwitch] using hs.symm
+theorem ManufacturedFlipReflector.firstArm_switch : A.firstArm / 3 = A.actionSwitch :=
+  A.port_geometry.2.2.2.1.symm
 
-theorem ManufacturedFlipReflector.firstArm_branch :
-    A.firstArm % 3 ≠ 0 := by
-  intro hstem
-  have hne := arrive_exit_ne A.mouthState A.mouth
-  obtain ⟨after, hhead⟩ := A.candyTrace.head_arrive.2
-  rw [hhead] at hne
-  have hm := A.mouth_is_stem
-  have hs := A.firstArm_switch
-  unfold ManufacturedFlipReflector.actionSwitch at hs
-  apply hne
-  omega
+theorem ManufacturedFlipReflector.secondArm_switch : A.secondArm / 3 = A.actionSwitch :=
+  A.port_geometry.2.2.2.2.symm
 
-theorem ManufacturedFlipReflector.secondArm_branch :
-    A.secondArm % 3 ≠ 0 := by
-  intro hstem
-  have hne := arrive_exit_ne A.returnState A.secondArm
-  rw [A.crossed] at hne
-  have hm := A.mouth_is_stem
-  have hs := A.secondArm_switch
-  unfold ManufacturedFlipReflector.actionSwitch at hs
-  apply hne
-  omega
+theorem ManufacturedFlipReflector.firstArm_branch : A.firstArm % 3 ≠ 0 :=
+  A.port_geometry.2.1
+
+theorem ManufacturedFlipReflector.secondArm_branch : A.secondArm % 3 ≠ 0 :=
+  A.port_geometry.2.2.1
 
 theorem ManufacturedFlipReflector.selected_arm
     (state : Tongues) :
@@ -452,6 +290,13 @@ theorem ManufacturedFlipReflector.runway_trace
     PhysicalTrace w (g, state) A.runway (A.mouth, state) := by
   exact A.runwayTrace.replay_grooved state hgrooved
 
+/-- The first candy arm is grooved whenever the action tongue selects it. -/
+theorem ManufacturedFlipReflector.firstArm_groove_of_selected
+    (state : Tongues) (hselected : state A.actionSwitch = bval A.firstArm) :
+    arrive state A.firstArm = (A.mouth, state) :=
+  stem_branch_groove A.mouth_is_stem A.firstArm_branch A.firstArm_switch
+    (by simpa only [A.firstArm_switch] using hselected)
+
 /-- Candy traversal in its recorded direction, before the mouth switch is
 pinned on the return arm. -/
 theorem ManufacturedFlipReflector.candy_forward_trace
@@ -461,28 +306,12 @@ theorem ManufacturedFlipReflector.candy_forward_trace
     PhysicalTrace w (A.mouth, state)
       ((A.mouth, A.firstArm) :: A.candy)
       (A.secondArm, state) := by
-  have hfirstSwitch := A.firstArm_switch
-  have hfirstBranch := A.firstArm_branch
-  have hstem : 3 * (A.firstArm / 3) = A.mouth := by
-    have hm := A.mouth_is_stem
-    unfold ManufacturedFlipReflector.actionSwitch at hfirstSwitch
-    omega
-  have hagree : state (A.firstArm / 3) = bval A.firstArm := by
-    rw [hfirstSwitch]
-    exact hselected
-  have hpin : pin state A.firstArm = state := pin_of_agrees hagree
-  have hheadGroove :
-      arrive state A.firstArm = (A.mouth, state) := by
-    simp [arrive, hfirstBranch, hstem, hpin]
-  have hallGrooved :
-      PassagesGrooved state ((A.mouth, A.firstArm) :: A.candy) := by
-    intro passage hp
-    rcases List.mem_cons.mp hp with hhead | htail
-    · simpa [hhead] using hheadGroove
-    · exact hgrooved passage htail
-  exact physicalTrace_grooved_passages w state A.mouth A.firstArm
-    A.secondArm A.candy A.candyTrace.linked hallGrooved
-    A.candyTrace.last_link
+  apply physicalTrace_grooved_passages w state A.mouth A.firstArm A.secondArm A.candy
+    A.candyTrace.linked ?_ A.candyTrace.last_link
+  intro passage hp
+  rcases List.mem_cons.mp hp with rfl | hp
+  · exact A.firstArm_groove_of_selected state hselected
+  · exact hgrooved passage hp
 
 /-- Candy traversal in the opposite direction, with the reverse passage
 list retained explicitly. -/
@@ -493,24 +322,11 @@ theorem ManufacturedFlipReflector.candy_reverse_trace
     PhysicalTrace w (A.mouth, state)
       ((A.mouth, A.secondArm) :: reversePassages A.candy)
       (A.firstArm, state) := by
-  have hsecondSwitch := A.secondArm_switch
-  have hsecondBranch := A.secondArm_branch
-  have hstem : 3 * (A.secondArm / 3) = A.mouth := by
-    have hm := A.mouth_is_stem
-    unfold ManufacturedFlipReflector.actionSwitch at hsecondSwitch
-    omega
-  have hagree : state (A.secondArm / 3) = bval A.secondArm := by
-    rw [hsecondSwitch]
-    exact hselected
-  have hpin : pin state A.secondArm = state := pin_of_agrees hagree
-  have hsecondGroove :
-      arrive state A.secondArm = (A.mouth, state) := by
-    simp [arrive, hsecondBranch, hstem, hpin]
-  have hmouthForward := groove_forward hsecondGroove
+  have hg := stem_branch_groove A.mouth_is_stem A.secondArm_branch A.secondArm_switch
+    (by simpa only [A.secondArm_switch] using hselected)
   cases A.candyTrace with
   | cons _ hentry tail =>
-      exact physicalTrace_contact_retraces_prefix tail hgrooved hentry hmouthForward
-
+      exact physicalTrace_contact_retraces_prefix tail hgrooved hentry (groove_forward hg)
 
 theorem ManufacturedFlipReflector.reverse_support_simple :
     SwitchSimple
@@ -529,74 +345,16 @@ theorem ManufacturedFlipReflector.reverse_support_simple :
   rw [hmap]
   exact nodup_prefix_head_reverse_tail hs
 
-/-- No-change prefix reaching the same candy occurrence when the candy is
-traversed in the opposite direction. -/
-theorem ManufacturedFlipReflector.reverse_prefix_to_candy_occurrence
-    (state : Tongues)
-    (hpaths : PathGrooves [A.runway, A.candy] state)
-    (hselected : state A.actionSwitch = bval A.secondArm)
-    {before after : List Passage} {p x : Nat}
-    (hoccurs : A.candy = before ++ (p, x) :: after) :
-    PhysicalTrace w (g, state)
-      (A.runway ++
-        (A.mouth, A.secondArm) :: reversePassages after)
-      (x, state) ∧
-      (∀ passage ∈
-          A.runway ++
-            (A.mouth, A.secondArm) :: reversePassages after,
-        passageSwitch passage ≠ passageSwitch (x, p)) := by
-  have hp := pathGrooves_pair.mp hpaths
-  have hrun := A.runway_trace state hp.1
-  have hcandy := A.candy_reverse_trace state hselected hp.2
-  have hfull := hrun.append hcandy
-  have hsimple := A.reverse_support_simple
-  have hgrooved := hfull.grooved_of_switchSimple hsimple
-  have hreverse : reversePassages A.candy =
-      reversePassages after ++ (x, p) :: reversePassages before := by
-    rw [hoccurs, reversePassages_append]
-    simp [reversePassages, List.append_assoc]
-  have hsplit :
-      A.runway ++
-          (A.mouth, A.secondArm) :: reversePassages A.candy =
-        (A.runway ++
-          (A.mouth, A.secondArm) :: reversePassages after) ++
-            (x, p) :: reversePassages before := by
-    rw [hreverse]
-    simp [List.append_assoc]
-  exact simple_grooved_trace_prefix_to_occurrence
-    hfull hsplit hgrooved hsimple
-
 /-- The lobe mouth is absent from both support paths; its flip is therefore
 the unique possible support fault seen by another reflector. -/
 theorem ManufacturedFlipReflector.support_foreign :
     ∀ path ∈ [A.runway, A.candy], ∀ passage ∈ path,
       passageSwitch passage ≠ A.actionSwitch := by
-  intro path hp
+  have hs := A.simple
+  intro path hp passage hm
   simp only [List.mem_cons, List.not_mem_nil, or_false] at hp
-  rcases hp with rfl | rfl
-  · intro passage hpassage hEq
-    have hsimple := A.simple
-    unfold SwitchSimple at hsimple
-    simp only [List.map_append, List.map_cons] at hsimple
-    have hparts := List.nodup_append.mp hsimple
-    have hcross := hparts.2.2
-    have hne := hcross (passageSwitch passage)
-      (List.mem_map.mpr ⟨passage, hpassage, rfl⟩)
-      A.actionSwitch (by simp [ManufacturedFlipReflector.actionSwitch,
-        passageSwitch])
-    exact hne hEq
-  · intro passage hpassage hEq
-    have hsimpleCandy :
-        SwitchSimple ((A.mouth, A.firstArm) :: A.candy) := by
-      have hsimple := A.simple
-      unfold SwitchSimple at hsimple ⊢
-      simp only [List.map_append] at hsimple
-      exact (List.nodup_append.mp hsimple).2.1
-    unfold SwitchSimple at hsimpleCandy
-    simp only [List.map_cons, List.nodup_cons] at hsimpleCandy
-    apply hsimpleCandy.1
-    apply List.mem_map.mpr
-    exact ⟨passage, hpassage, hEq⟩
+  rcases hp with rfl | rfl <;>
+    grind [SwitchSimple, passageSwitch, ManufacturedFlipReflector.actionSwitch]
 
 /-- Core capture, packaged on the retained manufactured-reflector data. -/
 theorem ManufacturedFlipReflector.capture_from_mouth
@@ -651,57 +409,14 @@ def ManufacturedStayReflector.toSupported
   paths := [A.runway, [(A.mouth, A.arm)]]
   action := .stay
   run := by
-    have hcoreAt (outside : Nat)
-        (hmouth : w.link A.mouth = some outside) :=
-      self_edge_groove_isReflector w A.selfLink hmouth
-    cases hrunway : A.runway with
-    | nil =>
-        have htrace := A.runwayTrace
-        rw [hrunway] at htrace
-        have hs : (g, A.base) = (A.mouth, A.mouthState) := by
-          simpa [stepN] using htrace.sound
-        have hgm : g = A.mouth := congrArg Prod.fst hs
-        have hmouth : w.link A.mouth = some e := by
-          apply w.symm
-          simpa [hgm] using A.entryEdge
-        have hcore := hcoreAt e hmouth
-        intro state hpaths
-        have hp := pathGrooves_pair.mp hpaths
-        obtain ⟨hstep, hnext⟩ := hcore state
-          (passagesGrooved_singleton.mp hp.2)
-        constructor
-        · simpa [hrunway, hgm, LocalAction.apply] using hstep
-        · exact pathGrooves_pair.mpr
-            ⟨(by intro passage hmem; cases hmem),
-              passagesGrooved_singleton.mpr hnext⟩
-    | cons passage rest =>
-        rcases passage with ⟨p, x⟩
-        have htrace := A.runwayTrace
-        rw [hrunway] at htrace
-        have hstart : g = p := htrace.head_arrive.1
-        have hlast :
-            w.link (lastPassageExit x rest) = some A.mouth :=
-          htrace.last_link
-        have hmouth :
-            w.link A.mouth = some (lastPassageExit x rest) :=
-          w.symm _ _ hlast
-        have hcore := hcoreAt (lastPassageExit x rest) hmouth
-        have hsandwich := sandwich_nonempty_reflector w htrace.linked
-          hlast (by simpa [hstart] using A.entryEdge) hcore
-          (fun _ hg => hg)
-        have hlen :
-            (((p, x) :: rest).length + 2 +
-                ((p, x) :: rest).length) =
-              2 * ((p, x) :: rest).length + 2 := by omega
-        rw [hlen] at hsandwich
-        intro state hpaths
-        have hp := pathGrooves_pair.mp hpaths
-        obtain ⟨hstep, hnext⟩ := hsandwich state
-          ⟨hp.1, passagesGrooved_singleton.mp hp.2⟩
-        constructor
-        · simpa [hrunway, hstart, LocalAction.apply] using hstep
-        · exact pathGrooves_pair.mpr
-            ⟨hnext.1, passagesGrooved_singleton.mpr hnext.2⟩
+    have href := A.runwayTrace.sandwich_reflector A.entryEdge
+      (fun _ hmouth => self_edge_groove_isReflector w A.selfLink hmouth)
+      (fun _ hg => hg)
+    intro state hpaths
+    have hp := pathGrooves_pair.mp hpaths
+    obtain ⟨hr, hg, hs⟩ := href state ⟨hp.1, passagesGrooved_singleton.mp hp.2⟩
+    exact ⟨hr, pathGrooves_pair.mpr ⟨hg, passagesGrooved_singleton.mpr hs⟩⟩
+
 
 theorem ManufacturedStayReflector.runway_trace
     {w : Wiring} {g e : Nat}
@@ -866,46 +581,22 @@ theorem ManufacturedFlipReflector.oriented_finish_arrive
     arrive state
       ((ManufacturedReflector.flip R).orientedFinish state) =
         (R.mouth, flipAt state R.actionSwitch) := by
-  by_cases hselected :
-      state R.actionSwitch = bval R.firstArm
-  · have hopp : bval R.secondArm = !(state R.actionSwitch) := by
-      rw [hselected]
-      exact branch_values_opposite R.firstArm_branch
-        R.secondArm_branch
-        (R.firstArm_switch.trans R.secondArm_switch.symm)
-        R.arms_ne
-    have hpin : pin state R.secondArm =
-        flipAt state R.actionSwitch :=
-      pin_eq_flipAt R.secondArm_switch hopp
-    have hstem : 3 * (R.secondArm / 3) = R.mouth := by
-      have hm := R.mouth_is_stem
-      have hs := R.secondArm_switch
-      unfold ManufacturedFlipReflector.actionSwitch at hs
-      omega
-    simp [ManufacturedReflector.orientedFinish, hselected,
-      arrive, R.secondArm_branch, hstem, hpin]
-  · have hsecond :
-        state R.actionSwitch = bval R.secondArm := by
-      rcases R.selected_arm state with hfirst | hsecond
-      · exact absurd hfirst hselected
-      · exact hsecond
-    have hopp : bval R.firstArm = !(state R.actionSwitch) := by
-      rw [hsecond]
-      exact branch_values_opposite R.secondArm_branch
-        R.firstArm_branch
-        (R.secondArm_switch.trans R.firstArm_switch.symm)
-        (Ne.symm R.arms_ne)
-    have hpin : pin state R.firstArm =
-        flipAt state R.actionSwitch :=
-      pin_eq_flipAt R.firstArm_switch hopp
-    have hstem : 3 * (R.firstArm / 3) = R.mouth := by
-      have hm := R.mouth_is_stem
-      have hs := R.firstArm_switch
-      unfold ManufacturedFlipReflector.actionSwitch at hs
-      omega
-    simp [ManufacturedReflector.orientedFinish, hselected,
-      arrive, R.firstArm_branch, hstem, hpin]
-
+  have hm := R.mouth_is_stem
+  have hf := R.firstArm_switch
+  have hs := R.secondArm_switch
+  have hopp := branch_values_opposite R.firstArm_branch R.secondArm_branch
+    (hf.trans hs.symm) R.arms_ne
+  have hstem₁ : 3 * (R.firstArm / 3) = R.mouth := by
+    unfold ManufacturedFlipReflector.actionSwitch at hf; omega
+  have hstem₂ : 3 * (R.secondArm / 3) = R.mouth := by
+    unfold ManufacturedFlipReflector.actionSwitch at hs; omega
+  by_cases hselected : state R.actionSwitch = bval R.firstArm
+  · have hpin := pin_eq_flipAt (u := state) hs (by grind)
+    simp [ManufacturedReflector.orientedFinish, hselected, arrive, R.secondArm_branch,
+      hstem₂, hpin]
+  · have hpin := pin_eq_flipAt (u := state) hf (by grind)
+    simp [ManufacturedReflector.orientedFinish, hselected, arrive, R.firstArm_branch,
+      hstem₁, hpin]
 
 theorem ManufacturedReflector.orientedRoute_trace
     {w : Wiring} {g e : Nat}
@@ -1009,8 +700,8 @@ theorem ManufacturedReflector.support_passage_on_orientedRoute
 /-- Orientation-normalized contact dichotomy.  At the instant a fresh
 passage changes an old support switch, compare it with the passage on the
 outward route the old reflector would actually take in that state.  The
-fresh exit either points back into the already traversed prefix, or points
-forward and is repaired by the old route's next trailing traversal. -/
+fresh exit points either back into the already traversed prefix or forward
+along the selected route. -/
 theorem ManufacturedReflector.changed_contact_on_orientedRoute
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e) (state next : Tongues)
@@ -1023,12 +714,7 @@ theorem ManufacturedReflector.changed_contact_on_orientedRoute
     ∃ oriented ∈ A.orientedRoute state,
       arrive state oriented.2 = (oriented.1, state) ∧
       passageSwitch oriented = p / 3 ∧
-      (x = oriented.1 ∨
-        (x = oriented.2 ∧
-          ∃ repaired,
-            arrive next oriented.1 = (oriented.2, repaired) ∧
-            arrive repaired oriented.2 =
-              (oriented.1, repaired))) := by
+      (x = oriented.1 ∨ x = oriented.2) := by
   obtain ⟨oriented, horiented, horient⟩ :=
     A.support_passage_on_orientedRoute state hpath hold
   have holdGroove := hpaths path hpath old hold
@@ -1047,16 +733,9 @@ theorem ManufacturedReflector.changed_contact_on_orientedRoute
     · simp only [hreverse, passageSwitch]
       rw [hOldSwitch]
       exact hswitch
-  have hswitch' : oriented.1 / 3 = p / 3 := by
-    simpa [passageSwitch] using horientedSwitch
-  refine ⟨oriented, horiented, horientedGroove, horientedSwitch, ?_⟩
-  rcases (by grind [groove_forward, same_switch_passages_share_port] :
-      x = oriented.1 ∨ x = oriented.2) with hback | hforward
-  · exact Or.inl hback
-  · subst hforward
-    exact Or.inr ⟨rfl, by grind [arrive_back, arrive_exit_ne, arrive_exit_switch,
-      trailing_arrive_exit_independent]⟩
-
+  change oriented.1 / 3 = p / 3 at horientedSwitch
+  exact ⟨oriented, horiented, horientedGroove, horientedSwitch,
+    by grind [groove_forward, same_switch_passages_share_port]⟩
 
 theorem pathGrooves_after_arrive_without_support_change
     {u v : Tongues} {p x : Nat} {paths : List (List Passage)}
@@ -1083,34 +762,7 @@ theorem same_groove_same_tongue
     (hu : arrive u old.2 = (old.1, u))
     (hv : arrive v old.2 = (old.1, v)) :
     u (passageSwitch old) = v (passageSwitch old) := by
-  rcases old with ⟨p, x⟩
-  unfold passageSwitch
-  change u (p / 3) = v (p / 3)
-  have hswitchU := arrive_exit_switch u x
-  rw [hu] at hswitchU
-  simp only at hswitchU
-  by_cases hx : x % 3 = 0
-  · unfold arrive at hu hv
-    rw [if_pos hx] at hu hv
-    injection hu with hpu _
-    injection hv with hpv _
-    simp only at hpu hpv
-    have hbp : branchPort (x / 3) (u (x / 3)) =
-        branchPort (x / 3) (v (x / 3)) := hpu.trans hpv.symm
-    have hval : u (x / 3) = v (x / 3) := by
-      cases huval : u (x / 3) <;> cases hvval : v (x / 3) <;>
-        simp [branchPort, huval, hvval] at hbp ⊢ <;> omega
-    rw [hswitchU]
-    exact hval
-  · unfold arrive at hu hv
-    rw [if_neg hx] at hu hv
-    injection hu with _ hpinU
-    injection hv with _ hpinV
-    have hU := congrFun hpinU (x / 3)
-    have hV := congrFun hpinV (x / 3)
-    simp [pin] at hU hV
-    rw [hswitchU]
-    exact hU.symm.trans hV
+  exact grooved_states_agree_on_passage (groove_forward hu) (groove_forward hv)
 
 theorem PhysicalTrace.changed_switch_has_changed_passage
     {w : Wiring} {start finish : Nat × Tongues}
@@ -1141,28 +793,10 @@ theorem PhysicalTrace.changed_switch_has_changed_passage
   obtain ⟨middle, hbefore, hrest⟩ := htrace'.split_append
   cases hrest with
   | @cons _ _ q u v _ _ harrive hlink hafter =>
-      have hprefixForeign :
-          ∀ prior ∈ before, passageSwitch prior ≠ j := by
-        unfold SwitchSimple at hsimple'
-        simp only [List.map_append, List.map_cons] at hsimple'
-        have hparts := List.nodup_append.mp hsimple'
-        intro prior hprior hEq
-        have hne := hparts.2.2 (passageSwitch prior)
-          (List.mem_map.mpr ⟨prior, hprior, rfl⟩)
-          (passageSwitch (p, x)) (by simp)
-        apply hne
-        rw [hEq, hswitch]
-      have hsuffixForeign :
-          ∀ later ∈ after, passageSwitch later ≠ j := by
-        unfold SwitchSimple at hsimple'
-        simp only [List.map_append, List.map_cons] at hsimple'
-        have hparts := List.nodup_append.mp hsimple'
-        have hheadTail := hparts.2.1
-        rw [List.nodup_cons] at hheadTail
-        intro later hlater hEq
-        apply hheadTail.1
-        apply List.mem_map.mpr
-        exact ⟨later, hlater, by rw [hEq, hswitch]⟩
+      have hprefixForeign : ∀ prior ∈ before, passageSwitch prior ≠ j := by
+        grind [SwitchSimple]
+      have hsuffixForeign : ∀ later ∈ after, passageSwitch later ≠ j := by
+        grind [SwitchSimple]
       have hu : u j = start.2 j :=
         hbefore.preserves j hprefixForeign
       have hv : finish.2 j = v j :=
@@ -1235,14 +869,7 @@ theorem contact_of_not_avoids_flip
     (hnot : ¬ (LocalAction.flip k).Avoids paths) :
     ∃ path ∈ paths, ∃ passage ∈ path,
       passageSwitch passage = k := by
-  by_cases hcontact : ∃ path ∈ paths, ∃ passage ∈ path,
-      passageSwitch passage = k
-  · exact hcontact
-  · exfalso
-    apply hnot
-    intro path hp passage hpass hEq
-    apply hcontact
-    exact ⟨path, hp, passage, hpass, hEq⟩
+  simpa [LocalAction.Avoids] using hnot
 
 theorem ManufacturedReflector.travel_pos
     {w : Wiring} {g e : Nat}

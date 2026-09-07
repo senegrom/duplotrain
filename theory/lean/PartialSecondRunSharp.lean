@@ -93,12 +93,7 @@ structure ChangedContact
   oriented_groove :
     arrive contactState oriented.2 = (oriented.1, contactState)
   oriented_switch : passageSwitch oriented = p / 3
-  direction :
-    x = oriented.1 ∨
-      (x = oriented.2 ∧
-        ∃ repaired,
-          arrive nextState oriented.1 = (oriented.2, repaired) ∧
-          arrive repaired oriented.2 = (oriented.1, repaired))
+  direction : x = oriented.1 ∨ x = oriented.2
 
 /-- Extract the first damaging support passage from a partial continuation;
 no completed second reflector is assumed. -/
@@ -119,15 +114,7 @@ theorem ManufacturedReflector.changedContact_of_broken_simple
       horientedSwitch, hdirection⟩ :=
     A.changed_contact_on_orientedRoute u v hgrooves hpath hold
       hswitch harrive
-  have hfull := htrace
-  rw [hsplit] at hfull
-  obtain ⟨middle, hbefore, hafter⟩ := hfull.split_append
-  have hmiddle : middle = (p, u) := by
-    have hactual := hbefore.sound
-    have hgiven := happroach.sound
-    rw [hgiven] at hactual
-    exact (Option.some.inj hactual).symm
-  subst middle
+  have hafter := (hsplit ▸ htrace).after_prefix happroach
   exact ⟨{
     full := passages
     finish := finish
@@ -195,12 +182,7 @@ theorem ChangedContact.forward_stay_two_phase_tail
     {w : Wiring} {g e : Nat}
     {R : ManufacturedStayReflector w g e}
     (C : ChangedContact w (ManufacturedReflector.stay R))
-    {repaired : Tongues}
-    (hforward : C.x = C.oriented.2)
-    (hrepair :
-      arrive C.nextState C.oriented.1 = (C.oriented.2, repaired))
-    (hrestored :
-      arrive repaired C.oriented.2 = (C.oriented.1, repaired)) :
+    (hforward : C.x = C.oriented.2) :
     ∃ outside mouth,
       stepN w (C.approach.length + 1)
         (e, (ManufacturedReflector.stay R).activatedState) =
@@ -221,7 +203,7 @@ theorem ChangedContact.forward_stay_two_phase_tail
       (A := ManufacturedReflector.stay R)
       C.split C.full_simple C.approach_trace C.old_grooves
       C.arrive_eq C.changed C.oriented_mem C.oriented_groove
-      C.oriented_switch hforward hrepair hrestored
+      hforward
   have hOldRoute := (ManufacturedReflector.stay R).orientedRoute_trace C.contactState hRpaths
   have hOldGrooved := hOldRoute.grooved_of_switchSimple
     ((ManufacturedReflector.stay R).orientedRoute_simple C.contactState)

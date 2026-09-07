@@ -73,6 +73,13 @@ theorem tongues_eq_or_eq_flipAt_of_changes_only
     · simp only [flipAt, if_neg hj]
       grind
 
+/-- A selected branch meets its stem without changing the tongue vector. -/
+theorem stem_branch_groove {stem arm : Nat} {state : Tongues}
+    (hstem : stem % 3 = 0) (hbranch : arm % 3 ≠ 0)
+    (hswitch : arm / 3 = stem / 3) (hselected : state (arm / 3) = bval arm) :
+    arrive state arm = (stem, state) := by
+  simp [arrive, hbranch, pin_of_agrees hselected, show 3 * (arm / 3) = stem by omega]
+
 /-- In either mouth orientation, a lobe follows one grooved route and then
 flips its mouth on the final arrival. This single spatial certificate supplies
 both endpoint reflection and every intermediate state. -/
@@ -189,6 +196,12 @@ theorem stem_lobe_isReflector
     hpstem hxbranch hqbranch hpx hpq hxq hpathForeign
     hlinked hfinal hmouth
 
+/-- Two distinct arms meeting across an arrival force a stem mouth. -/
+theorem crossed_arrivals_geometry {p x q : Nat} {a b c d : Tongues}
+    (hold : arrive a p = (x, b)) (hnew : arrive c q = (p, d)) (hne : x ≠ q) :
+    p % 3 = 0 ∧ x % 3 ≠ 0 ∧ q % 3 ≠ 0 ∧ p / 3 = x / 3 ∧ p / 3 = q / 3 := by
+  grind [arrive, branchPort]
+
 /-- Extract the universal nondegenerate lobe reflector directly from a
 crossed first-revisit excursion.  The stem/branch orientation is not assumed:
 it follows from the two recorded passages and `x ≠ q`. -/
@@ -204,49 +217,11 @@ theorem crossed_excursion_core_reflector
     IsReflector w p outside (path.length + 2)
       (fun state => PassagesGrooved state path)
       (fun state => flipAt state (p / 3)) := by
-  obtain ⟨oldAfter, hold⟩ := hexcursion.head_arrive.2
-  have hpx : p / 3 = x / 3 := by
-    have hs := arrive_exit_switch u₀ p
-    rw [hold] at hs
-    exact hs.symm
-  have hpq : p / 3 = q / 3 := by
-    have hs := arrive_exit_switch u q
-    rw [hrepeat] at hs
-    exact hs
-  have holdStem := arrive_stem_endpoint u₀ p
-  rw [hold] at holdStem
-  have hnewStem := arrive_stem_endpoint u q
-  rw [hrepeat] at hnewStem
-  have hpstem : p % 3 = 0 := by
-    by_cases hp : p % 3 = 0
-    · exact hp
-    · exfalso
-      have hpne : p ≠ 3 * (p / 3) := by omega
-      rcases holdStem with hpOld | hxStem
-      · exact hpne hpOld
-      · rcases hnewStem with hqStem | hpNew
-        · apply hxq
-          omega
-        · apply hpne
-          omega
-  have holdNe : x ≠ p := by
-    have hn := arrive_exit_ne u₀ p
-    rw [hold] at hn
-    exact hn
-  have hnewNe : p ≠ q := by
-    have hn := arrive_exit_ne u q
-    rw [hrepeat] at hn
-    exact hn
-  have hxbranch : x % 3 ≠ 0 := by
-    intro hx
-    apply holdNe
-    omega
-  have hqbranch : q % 3 ≠ 0 := by
-    intro hq
-    apply hnewNe
-    omega
-  exact stem_lobe_isReflector w path hpstem hxbranch hqbranch
-    hpx hpq hxq hsimple hexcursion.linked hexcursion.last_link hmouth
+  obtain ⟨_, hold⟩ := hexcursion.head_arrive.2
+  obtain ⟨hp, hx, hq, hpx, hpq⟩ := crossed_arrivals_geometry hold hrepeat hxq
+  exact stem_lobe_isReflector w path hp hx hq hpx hpq hxq hsimple
+    hexcursion.linked hexcursion.last_link hmouth
+
 
 /-- If a switch-simple excursion returns at exactly its old exit port, its
 interior path is empty; the only possibility allowed by the raw `Wiring`
@@ -292,51 +267,43 @@ theorem self_edge_groove_isReflector
     IsReflector w p outside 2
       (fun state => arrive state x = (p, state))
       (fun state => state) := by
-  intro state hgroove
-  have hforward := groove_forward hgroove
-  have hone : stepN w 1 (p, state) = some (x, state) := by
-    simp [stepN, step, hforward, hself]
-  have htwo : stepN w 1 (x, state) = some (outside, state) := by
-    simp [stepN, step, hgroove, hmouth]
-  constructor
-  · rw [show 2 = 1 + 1 by omega, stepN_add, hone]
-    simp only [Option.bind_some]
-    exact htwo
-  · exact hgroove
+  intro state hg
+  exact ⟨by simpa using (PhysicalTrace.cons (groove_forward hg) hself
+    (PhysicalTrace.cons hg hmouth (PhysicalTrace.nil _))).sound, hg⟩
 
-/-- Sandwich a reflector behind a nonempty grooved runway.  The train walks
-the runway forward, uses the core reflector, then retraces the runway and
-emerges across the edge preceding `g`. -/
-theorem sandwich_nonempty_reflector
-    (w : Wiring) {g a p e k : Nat} {rest : List Passage}
-    {S : Tongues → Prop} {τ : Tongues → Tongues}
-    (hlinked : LinkedPassages w ((g, a) :: rest))
-    (hfinal : w.link (lastPassageExit a rest) = some p)
-    (hentry : w.link e = some g)
-    (hcore : IsReflector w p (lastPassageExit a rest) k S τ)
-    (hpreserve : ∀ u, PassagesGrooved u ((g, a) :: rest) →
-      PassagesGrooved (τ u) ((g, a) :: rest)) :
-    IsReflector w g e
-      (((g, a) :: rest).length + k + ((g, a) :: rest).length)
-      (fun u => PassagesGrooved u ((g, a) :: rest) ∧ S u) τ := by
-  intro u hu
-  have hforward := run_grooved_passages w u g a p rest
-    hlinked hu.1 hfinal
-  obtain ⟨hreflect, hSnext⟩ := hcore u hu.2
-  have hgroovedNext := hpreserve u hu.1
-  have hback := retrace_linked_passages w (τ u) g a e rest
-    hlinked hgroovedNext hentry
-  have hrun : (((g, a) :: rest).length + k +
-      ((g, a) :: rest).length) =
-      ((g, a) :: rest).length +
-        (k + ((g, a) :: rest).length) := by omega
-  constructor
-  · rw [hrun, stepN_add, hforward]
-    simp only [Option.bind_some]
-    rw [stepN_add, hreflect]
-    simp only [Option.bind_some]
-    exact hback
-  · exact ⟨hgroovedNext, hSnext⟩
+/-- A grooved runway transports any core reflector. Empty and nonempty
+runways share this interface, so each reflector construction needs only its
+core law and preservation of the runway grooves. -/
+theorem PhysicalTrace.sandwich_reflector
+    {w : Wiring} {start : Nat × Tongues} {p e k : Nat} {mouthState : Tongues}
+    {runway : List Passage} {S : Tongues → Prop} {τ : Tongues → Tongues}
+    (hrunway : PhysicalTrace w start runway (p, mouthState))
+    (hentry : w.link e = some start.1)
+    (hcore : ∀ outside, w.link p = some outside → IsReflector w p outside k S τ)
+    (hpreserve : ∀ u, PassagesGrooved u runway → PassagesGrooved (τ u) runway) :
+    IsReflector w start.1 e (2 * runway.length + k)
+      (fun u => PassagesGrooved u runway ∧ S u) τ := by
+  cases runway with
+  | nil =>
+      cases hrunway
+      intro u hu
+      obtain ⟨hr, hs⟩ := hcore e (w.symm _ _ hentry) u hu.2
+      exact ⟨by simpa using hr, hpreserve u hu.1, hs⟩
+  | cons passage rest =>
+      rcases passage with ⟨g, a⟩
+      intro u hu
+      have hg := hpreserve u hu.1
+      obtain ⟨hr, hs⟩ := hcore _ (w.symm _ _ hrunway.last_link) u hu.2
+      have hforward := (hrunway.replay_grooved u hu.1).sound
+      have hback := retrace_linked_passages w (τ u) g a e rest hrunway.linked hg
+        (by simpa only [hrunway.head_arrive.1] using hentry)
+      refine ⟨?_, hg, hs⟩
+      rw [show 2 * ((g, a) :: rest).length + k =
+        ((g, a) :: rest).length + (k + ((g, a) :: rest).length) by omega,
+        stepN_add, hforward]
+      simp only [Option.bind_some]
+      rw [stepN_add, hr]
+      exact hback
 
 /-- A nondegenerate crossed first revisit, together with the simple runway
 before it, is a complete `flipAt` reflector from one side of the runway's
@@ -358,60 +325,14 @@ theorem crossed_revisit_full_reflector
       (fun state =>
         PassagesGrooved state runway ∧ PassagesGrooved state path)
       (fun state => flipAt state (p / 3)) := by
-  have hsimpleExcursion : SwitchSimple ((p, x) :: path) := by
-    unfold SwitchSimple at hsimple ⊢
-    simp only [List.map_append] at hsimple
-    exact (List.nodup_append.mp hsimple).2.1
-  unfold SwitchSimple at hsimple
-  simp only [List.map_append, List.map_cons] at hsimple
-  have hparts := List.nodup_append.mp hsimple
-  have hrunwayForeign : ∀ passage ∈ runway,
-      passageSwitch passage ≠ p / 3 := by
-    intro passage hp hEq
-    have hne := hparts.2.2 (passageSwitch passage)
-      (List.mem_map.mpr ⟨passage, hp, rfl⟩)
-      (p / 3)
-      (by simp [passageSwitch])
-    exact hne hEq
-  cases runway with
-  | nil =>
-      cases hrunway
-      have hmouth : w.link p = some e := w.symm _ _ hentry
-      have hcore := crossed_excursion_core_reflector w hexcursion
-        hsimpleExcursion hrepeat hxq hmouth
-      intro state hs
-      obtain ⟨hstep, hnext⟩ := hcore state hs.2
-      constructor
-      · simpa using hstep
-      · exact ⟨(by
-          intro passage hp
-          cases hp), hnext⟩
-  | cons passage rest =>
-      rcases passage with ⟨g, a⟩
-      have hstart : start.1 = g := hrunway.head_arrive.1
-      have hlast : w.link (lastPassageExit a rest) = some p :=
-        hrunway.last_link
-      have hmouth : w.link p = some (lastPassageExit a rest) :=
-        w.symm _ _ hlast
-      have hcore := crossed_excursion_core_reflector w hexcursion
-        hsimpleExcursion hrepeat hxq hmouth
-      have hpreserve : ∀ state,
-          PassagesGrooved state ((g, a) :: rest) →
-          PassagesGrooved (flipAt state (p / 3)) ((g, a) :: rest) := by
-        intro state hg
-        apply grooved_after_flip_other hg
-        intro pathPassage hp
-        exact hrunwayForeign pathPassage hp
-      have hsandwich := sandwich_nonempty_reflector w
-        hrunway.linked hlast
-        (by simpa [hstart] using hentry)
-        hcore hpreserve
-      have hlen :
-          (((g, a) :: rest).length + (path.length + 2) +
-              ((g, a) :: rest).length) =
-          2 * ((g, a) :: rest).length + path.length + 2 := by omega
-      rw [hlen] at hsandwich
-      simpa only [hstart] using hsandwich
+  have hexcursionSimple : SwitchSimple ((p, x) :: path) := by
+    grind [SwitchSimple]
+  have hforeign : ∀ passage ∈ runway, passageSwitch passage ≠ p / 3 := by
+    grind [SwitchSimple, passageSwitch]
+  simpa only [Nat.add_assoc] using hrunway.sandwich_reflector hentry
+    (fun _ hmouth => crossed_excursion_core_reflector w hexcursion
+      hexcursionSimple hrepeat hxq hmouth)
+    (fun _ hg => grooved_after_flip_other hg hforeign)
 
 
 end GeneralN

@@ -41,7 +41,7 @@ theorem PhysicalTrace.simple_same_exit_cycle_all_time
     · exact hrest passage hp
   have hl : LinkedPassages w ((q, x) :: rest) := by
     have h := htrace.linked
-    cases rest <;> simpa [LinkedPassages] using h
+    cases rest <;> simp_all [LinkedPassages]
   have hstable := physicalTrace_grooved_passages w v q x q rest hl hg htrace.last_link
   intro d hd
   obtain ⟨port, hr⟩ := hstable.grooved_loop_all_time (by simp) hg d

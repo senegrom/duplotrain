@@ -128,7 +128,7 @@ theorem ManufacturedReflector.mem_reusableSwitches
   cases A <;>
     simp only [ManufacturedReflector.reusableSwitches, ManufacturedReflector.toSupported,
       ManufacturedStayReflector.toSupported, ManufacturedFlipReflector.toSupported,
-      List.mem_map, List.mem_append, List.mem_cons, List.mem_singleton] at hk ⊢ <;> grind
+      List.mem_map, List.mem_append, List.mem_cons] at hk ⊢ <;> grind
 
 theorem ManufacturedReflector.second_exploration_productive_writer_not_reusable
     {w : Wiring} {N g e : Nat}

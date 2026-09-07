@@ -38,176 +38,76 @@ theorem ManufacturedFlipReflector.reverse_candy_suffix_absorbs_twoPhases
       (∀ d, d ≤ travel → ∃ port phase,
         stepN w d (p, alternate) = some (port, phase) ∧
           (phase = contact ∨ phase = alternate)) := by
-  have hopp : bval R.secondArm = !(bval R.firstArm) :=
-    branch_values_opposite R.firstArm_branch R.secondArm_branch
-      (R.firstArm_switch.trans R.secondArm_switch.symm) R.arms_ne
-  have hnotFirst : contact R.actionSwitch ≠ bval R.firstArm := by
-    intro hfirst
-    have heq : bval R.firstArm = bval R.secondArm :=
-      hfirst.symm.trans hsecond
-    rw [hopp] at heq
-    cases hvalue : bval R.firstArm <;> simp [hvalue] at heq
   let alternate := flipAt contact R.actionSwitch
-  have hfirstAlternate :
-      alternate R.actionSwitch = bval R.firstArm := by
+  have hopp := branch_values_opposite R.firstArm_branch R.secondArm_branch
+    (R.firstArm_switch.trans R.secondArm_switch.symm) R.arms_ne
+  have hfirst : alternate R.actionSwitch = bval R.firstArm := by
     simp [alternate, flipAt, hsecond, hopp]
-  have hpathsAlternate :
-      PathGrooves [R.runway, R.candy] alternate := by
-    dsimp [alternate]
-    change PathGrooves [R.runway, R.candy]
-      ((LocalAction.flip R.actionSwitch).apply contact)
+  have hpathsAlternate : PathGrooves [R.runway, R.candy] alternate := by
+    change PathGrooves [R.runway, R.candy] ((LocalAction.flip R.actionSwitch).apply contact)
     exact hpaths.after_avoiding_action R.support_foreign
-
-  let lead := R.runway ++
-    (R.mouth, R.secondArm) :: reversePassages after
-  let candyTail := reversePassages (before ++ [(fresh, p)])
-  have hrouteSplit :
-      (ManufacturedReflector.flip R).orientedRoute contact =
-        lead ++ candyTail := by
-    dsimp [lead, candyTail]
-    simp [ManufacturedReflector.orientedRoute, hnotFirst,
-      hoccurs, reversePassages_append, reversePassages,
-      List.append_assoc]
-  have hroute :=
-    (ManufacturedReflector.flip R).orientedRoute_trace contact hpaths
-  rw [hrouteSplit] at hroute
-  obtain ⟨middle, _hlead, htail⟩ := hroute.split_append
-  have hprefixData := R.reverse_prefix_to_candy_occurrence
-    contact hpaths hsecond hoccurs
-  have hleadExpected :
-      PhysicalTrace w (e, contact) lead (p, contact) := by
-    simpa [lead] using hprefixData.1
-  have hmiddle : middle = (p, contact) := by
-    have h₁ := _hlead.sound
-    have h₂ := hleadExpected.sound
-    rw [h₂] at h₁
-    exact (Option.some.inj h₁).symm
-  subst middle
-  have htailContact :
-      PhysicalTrace w (p, contact) candyTail (R.firstArm, contact) := by
-    simpa [ManufacturedReflector.orientedFinish, hnotFirst] using htail
-  have htailForeign : ∀ passage ∈ candyTail,
-      passageSwitch passage ≠ R.actionSwitch := by
-    intro passage hpassage
-    dsimp [candyTail] at hpassage
-    obtain ⟨old, holdSegment, hpassageEq⟩ :=
-      source_of_mem_reversePassages hpassage
-    subst passage
-    have holdCandy : old ∈ R.candy := by
+  have hfirstAlternate := R.firstArm_groove_of_selected alternate hfirst
+  have hfirstContact : arrive contact R.firstArm = (R.mouth, alternate) := by
+    simpa [alternate, R.firstArm_switch, flipAt_flipAt] using
+      flipped_passage_forward_trailing hfirstAlternate R.firstArm_branch
+  let candyTail := (p, fresh) :: reversePassages before
+  have hsplit : (R.mouth, R.secondArm) :: reversePassages R.candy =
+      ((R.mouth, R.secondArm) :: reversePassages after) ++ candyTail := by
+    simp [candyTail, hoccurs, reversePassages, List.append_assoc]
+  have hreverse := R.candy_reverse_trace contact hsecond (pathGrooves_pair.mp hpaths).2
+  rw [hsplit] at hreverse
+  obtain ⟨middle, _, htail⟩ := hreverse.split_append
+  have hstart : middle.1 = p := htail.head_arrive.1
+  have hgrooved : ∀ current, (current = contact ∨ current = alternate) →
+      PassagesGrooved current candyTail := by
+    intro current hc
+    have hg : PassagesGrooved current R.candy := by
+      rcases hc with rfl | rfl
+      · exact (pathGrooves_pair.mp hpaths).2
+      · exact (pathGrooves_pair.mp hpathsAlternate).2
+    have hprefix : PassagesGrooved current (before ++ [(fresh, p)]) := by
+      intro passage hp
+      apply hg passage
       rw [hoccurs]
-      rcases List.mem_append.mp holdSegment with holdBefore | holdLast
-      · exact List.mem_append_left ((fresh, p) :: after) holdBefore
-      · simp only [List.mem_singleton] at holdLast
-        subst old
-        exact List.mem_append_right before List.mem_cons_self
-    have havoid := R.support_foreign R.candy (by simp) old holdCandy
-    have hexit := R.candyTrace.passage_exit_switch old
-      (List.mem_cons_of_mem _ holdCandy)
-    have hswitch :
-        passageSwitch (old.2, old.1) = passageSwitch old := by
-      simp only [passageSwitch]
-      exact hexit
-    rw [hswitch]
-    exact havoid
-  have htailAlternate :
-      PhysicalTrace w (p, alternate) candyTail
-        (R.firstArm, alternate) :=
-    htailContact.flip_unvisited htailForeign
-
-  have hcandySourceGrooved :
-      PassagesGrooved contact (before ++ [(fresh, p)]) := by
-    intro passage hp
-    apply (pathGrooves_pair.mp hpaths).2 passage
-    rw [hoccurs]
-    rcases List.mem_append.mp hp with hp | hp
-    · exact List.mem_append_left ((fresh, p) :: after) hp
-    · simp only [List.mem_singleton] at hp
-      subst passage
-      exact List.mem_append_right before List.mem_cons_self
-  have htailContactGrooved : PassagesGrooved contact candyTail := by
-    dsimp [candyTail]
-    exact reversePassages_grooved hcandySourceGrooved
-  have htailAlternateGrooved : PassagesGrooved alternate candyTail := by
-    exact grooved_after_flip_other htailContactGrooved htailForeign
-
-  have hfirstGrooveAlternate :
-      arrive alternate R.firstArm = (R.mouth, alternate) :=
-    R.firstArm_groove_of_selected alternate hfirstAlternate
-  have hrunwayAlternate : PassagesGrooved alternate R.runway :=
-    (pathGrooves_pair.mp hpathsAlternate).1
-  have hflipBack : flipAt alternate R.actionSwitch = contact := by
-    dsimp [alternate]
-    exact flipAt_flipAt contact R.actionSwitch
-  have hfirstContact :
-      arrive contact R.firstArm = (R.mouth, alternate) := by
-    have hrepair := flipped_passage_forward_trailing
-      hfirstGrooveAlternate R.firstArm_branch
-    rw [R.firstArm_switch, hflipBack] at hrepair
-    exact hrepair
-  have hreturnContact := physicalTrace_contact_retraces_prefix
-    R.runwayTrace hrunwayAlternate R.entryEdge hfirstContact
-  have hreturnAlternate := physicalTrace_contact_retraces_prefix
-    R.runwayTrace hrunwayAlternate R.entryEdge hfirstGrooveAlternate
-  have hreturnCover : ∀ current,
-      (current = contact ∨ current = alternate) →
-      arrive current R.firstArm = (R.mouth, alternate) →
-      ∀ d, d ≤ R.runway.length + 1 → ∃ port phase,
-        stepN w d (R.firstArm, current) = some (port, phase) ∧
+      grind
+    simpa [candyTail, reversePassages] using reversePassages_grooved hprefix
+  let travel := candyTail.length + (R.runway.length + 1)
+  have hjourney : ∀ current, (current = contact ∨ current = alternate) →
+      stepN w travel (p, current) = some (g, alternate) ∧
+      ∀ d, d ≤ travel → ∃ port phase,
+        stepN w d (p, current) = some (port, phase) ∧
           (phase = contact ∨ phase = alternate) := by
-    intro current hs ha d hd
-    obtain ⟨port, hr⟩ := (physicalTrace_contact_retraces_prefix_pointwise
-      R.runwayTrace hrunwayAlternate R.entryEdge ha).2 d hd
-    refine ⟨port, _, hr, ?_⟩
-    split
-    · exact hs
-    · exact Or.inr rfl
+    intro current hc
+    have hg := hgrooved current hc
+    have ht : PhysicalTrace w (p, current) candyTail (R.firstArm, current) := by
+      simpa only [hstart] using htail.replay_grooved current hg
+    have ha : arrive current R.firstArm = (R.mouth, alternate) := by
+      rcases hc with rfl | rfl
+      · exact hfirstContact
+      · exact hfirstAlternate
+    have hrunway := (pathGrooves_pair.mp hpathsAlternate).1
+    have hb := physicalTrace_contact_retraces_prefix R.runwayTrace hrunway R.entryEdge ha
+    constructor
+    · simpa [travel, reversePassages_length] using (ht.append hb).sound
+    · apply stepN_cover_append ht.sound
+      · intro d hd
+        obtain ⟨port, hr⟩ := ht.grooved_prefix_tongues current hg hd
+        exact ⟨port, current, hr, hc⟩
+      · intro d hd
+        obtain ⟨port, hr⟩ := (physicalTrace_contact_retraces_prefix_pointwise
+          R.runwayTrace hrunway R.entryEdge ha).2 d hd
+        refine ⟨port, _, hr, ?_⟩
+        split
+        · exact hc
+        · exact Or.inr rfl
+  have hc := hjourney contact (Or.inl rfl)
+  have ha := hjourney alternate (Or.inr rfl)
+  refine ⟨travel, by simp [travel]; omega, ?_, hc.1, ha.1, hc.2, ha.2⟩
+  change travel ≤ 2 * R.runway.length + R.candy.length + 2
+  have hlen := congrArg List.length hoccurs
+  simp only [List.length_append, List.length_cons] at hlen
+  simp only [travel, candyTail, List.length_cons, reversePassages_length]
+  omega
 
-  let journey := candyTail ++
-    (R.firstArm, R.mouth) :: reversePassages R.runway
-  have hjourneyContact :
-      PhysicalTrace w (p, contact) journey (g, alternate) := by
-    simpa [journey] using htailContact.append hreturnContact
-  have hjourneyAlternate :
-      PhysicalTrace w (p, alternate) journey (g, alternate) := by
-    simpa [journey] using htailAlternate.append hreturnAlternate
-  refine ⟨journey.length, ?_, ?_, hjourneyContact.sound,
-    hjourneyAlternate.sound, ?_, ?_⟩
-  · dsimp [journey]
-    simp only [List.length_append, List.length_cons]
-    omega
-  · change journey.length ≤ 2 * R.runway.length + R.candy.length + 2
-    have hcandyLen : R.candy.length =
-        before.length + 1 + after.length := by
-      rw [hoccurs]
-      simp
-      omega
-    have hjourneyLen : journey.length =
-        before.length + 2 + R.runway.length := by
-      dsimp [journey, candyTail]
-      simp only [List.length_append, List.length_cons,
-        List.length_nil, reversePassages_length]
-      omega
-    rw [hjourneyLen]
-    omega
-  · intro d hd
-    have hlead : ∀ t, t ≤ candyTail.length → ∃ port phase,
-        stepN w t (p, contact) = some (port, phase) ∧
-          (phase = contact ∨ phase = alternate) := by
-      intro t ht
-      obtain ⟨port, hr⟩ := htailContact.grooved_prefix_tongues contact htailContactGrooved ht
-      exact ⟨port, contact, hr, Or.inl rfl⟩
-    exact stepN_cover_append htailContact.sound hlead
-      (hreturnCover contact (Or.inl rfl) hfirstContact) d
-      (by simpa [journey, reversePassages_length, Nat.add_assoc] using hd)
-  · intro d hd
-    have hlead : ∀ t, t ≤ candyTail.length → ∃ port phase,
-        stepN w t (p, alternate) = some (port, phase) ∧
-          (phase = contact ∨ phase = alternate) := by
-      intro t ht
-      obtain ⟨port, hr⟩ := htailAlternate.grooved_prefix_tongues alternate htailAlternateGrooved ht
-      exact ⟨port, alternate, hr, Or.inr rfl⟩
-    exact stepN_cover_append htailAlternate.sound hlead
-      (hreturnCover alternate (Or.inr rfl) hfirstGrooveAlternate) d
-      (by simpa [journey, reversePassages_length, Nat.add_assoc] using hd)
 
 end GeneralN

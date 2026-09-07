@@ -27,8 +27,7 @@ theorem PartialSecondRunSharp.ChangedContact.all_run_distinct_le_N_add_four
     (hnd : (times.map
       (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
     times.length <= N + 4 := by
-  rcases C.direction with hbackward |
-      ⟨hforward, repaired, hrepair, hrestored⟩
+  rcases C.direction with hbackward | hforward
   · have hsmall := C.backward_all_run_distinct_le_N_add_three
       hN hA hbackward times hlive hnd
     omega
@@ -38,7 +37,7 @@ theorem PartialSecondRunSharp.ChangedContact.all_run_distinct_le_N_add_four
           ((ManufacturedReflector.stay R).exploration.length +
             (ManufacturedReflector.stay R).runway.length + 1))
         have hlocal := C.forward_stay_zero_novelty
-          (N := N) hforward hrepair hrestored localTimes
+          (N := N) hforward localTimes
         have hcount := C.changed_all_run_distinct_le_compressedLead_add_budget
           hA times hlive hnd (by simpa [localTimes] using hlocal)
         have hlength := C.compressedLead_length_le hN hA

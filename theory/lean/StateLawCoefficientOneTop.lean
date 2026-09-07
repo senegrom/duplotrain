@@ -232,12 +232,7 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_corner_cover
     {R : ManufacturedFlipReflector w g e}
     (C : SimpleContinuationChangedContact w
       (ManufacturedReflector.flip R))
-    {repaired : Tongues}
     (hforward : C.x = C.oriented.2)
-    (hrepair : arrive C.nextState C.oriented.1 =
-      (C.oriented.2, repaired))
-    (hrestored : arrive repaired C.oriented.2 =
-      (C.oriented.1, repaired))
     (times : List Nat) :
     ∀ k ∈ times, restrictedTonguesAt w N
       (e, (ManufacturedReflector.flip R).activatedState) k ∈
@@ -253,8 +248,7 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_corner_cover
     partial_first_forward_contact_active_lead
       (A := ManufacturedReflector.flip R) C.split C.full_simple
       C.approach_trace C.old_grooves C.arrive_eq C.changed
-      C.oriented_mem C.oriented_groove C.oriented_switch
-      hforward hrepair hrestored
+      C.oriented_mem C.oriented_groove hforward
   have hnextAlternate : C.nextState = flipAt C.contactState (mouth / 3) :=
     C.nextState_eq_of_post hreach
   have hentryHistorical :
@@ -324,18 +318,13 @@ theorem PartialSecondRunSharp.ChangedContact.forward_stay_zero_novelty
     {R : ManufacturedStayReflector w g e}
     (C : SimpleContinuationChangedContact w
       (ManufacturedReflector.stay R))
-    {repaired : Tongues}
     (hforward : C.x = C.oriented.2)
-    (hrepair : arrive C.nextState C.oriented.1 =
-      (C.oriented.2, repaired))
-    (hrestored : arrive repaired C.oriented.2 =
-      (C.oriented.1, repaired))
     (times : List Nat) :
     NoveltyCoverOn w N
       (e, (ManufacturedReflector.stay R).activatedState)
       times (C.compressedLead N) 0 := by
   obtain ⟨outside, mouth, hreach, hall⟩ :=
-    C.forward_stay_two_phase_tail hforward hrepair hrestored
+    C.forward_stay_two_phase_tail hforward
   have hnextHistorical := C.next_mem_compressedLead (N := N)
   rw [C.nextState_eq_of_post hreach] at hnextHistorical
   have hstateHistorical := C.contact_mem_compressedLead (N := N)
@@ -357,8 +346,7 @@ theorem PartialSecondRunSharp.ChangedContact.changed_two_novelty
     (times : List Nat) :
     NoveltyCoverOn w N (e, A.activatedState)
       times (C.compressedLead N) 2 := by
-  rcases C.direction with hbackward |
-      ⟨hforward, repaired, hrepair, hrestored⟩
+  rcases C.direction with hbackward | hforward
   · obtain ⟨fresh, hfresh, hmem⟩ :=
       C.backward_all_time_zero_novelty
         (N := N) hbackward times
@@ -367,9 +355,9 @@ theorem PartialSecondRunSharp.ChangedContact.changed_two_novelty
     | stay R =>
         obtain ⟨fresh, hfresh, hmem⟩ :=
           C.forward_stay_zero_novelty
-            hforward hrepair hrestored times
+            hforward times
         exact ⟨fresh, by omega, hmem⟩
     | flip R =>
-        exact ⟨_, by simp, C.forward_flip_corner_cover hforward hrepair hrestored times⟩
+        exact ⟨_, by simp, C.forward_flip_corner_cover hforward times⟩
 
 end GeneralN

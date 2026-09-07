@@ -36,7 +36,6 @@ theorem boundary_history_then_direct_tail_cover
       (tailTimes.map
         (restrictedTonguesAt w N endpoint)).Nodup ->
       tailTimes.length <= cap)
-    (hcapPos : 0 < cap)
     (times : List Nat)
     (hlive : forall k, List.Mem k times ->
       (stepN w k start).isSome)

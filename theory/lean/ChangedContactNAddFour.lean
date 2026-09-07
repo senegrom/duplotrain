@@ -294,12 +294,7 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
     {R : ManufacturedFlipReflector w g e}
     (C : SimpleContinuationChangedContact w
       (ManufacturedReflector.flip R))
-    {repaired : Tongues}
     (hforward : C.x = C.oriented.2)
-    (hrepair : arrive C.nextState C.oriented.1 =
-      (C.oriented.2, repaired))
-    (hrestored : arrive repaired C.oriented.2 =
-      (C.oriented.1, repaired))
     (haction : R.actionSwitch ∈ C.approachFirstWriterSwitches N)
     (times : List Nat) :
     NoveltyCoverOn w N
@@ -311,8 +306,8 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
   · left
     refine ⟨[VectorCount.restrict N (flipAt C.nextState R.actionSwitch)], by simp,
       fun k hk => ?_⟩
-    have h := C.forward_flip_corner_cover (N := N) hforward hrepair hrestored times k hk
-    simp only [List.mem_append, List.mem_cons, List.mem_singleton, List.not_mem_nil,
+    have h := C.forward_flip_corner_cover (N := N) hforward times k hk
+    simp only [List.mem_append, List.mem_cons, List.not_mem_nil,
       or_false] at h ⊢
     rcases h with h | h | h
     · exact Or.inl h
@@ -343,8 +338,7 @@ theorem PartialSecondRunSharp.ChangedContact.changed_N_add_four_or_runway_residu
         (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
     times.length <= N + 4 ∨
       Nonempty (C.RunwayNAddFourResidual (N := N) R) := by
-  rcases C.direction with hbackward |
-      ⟨hforward, repaired, hrepair, hrestored⟩
+  rcases C.direction with hbackward | hforward
   · left
     have hsmall := C.backward_all_run_distinct_le_N_add_three
       hN hA hbackward times hlive hnd
@@ -355,7 +349,7 @@ theorem PartialSecondRunSharp.ChangedContact.changed_N_add_four_or_runway_residu
           ((ManufacturedReflector.flip R).exploration.length +
             (ManufacturedReflector.flip R).runway.length + 1))
       rcases C.forward_flip_one_novelty_or_runway_residual
-          hforward hrepair hrestored haction localTimes with
+          hforward haction localTimes with
         hone | hresidual
       · left
         have hcount := C.changed_all_run_distinct_le_compressedLead_add_budget

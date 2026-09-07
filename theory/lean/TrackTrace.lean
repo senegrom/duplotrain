@@ -254,6 +254,15 @@ theorem PhysicalTrace.split_append {w : Wiring}
           obtain ⟨middle, hleft, hright⟩ := ih tail
           exact ⟨middle, PhysicalTrace.cons harrive hlink hleft, hright⟩
 
+/-- A deterministic prefix fixes the starting configuration of its suffix. -/
+theorem PhysicalTrace.after_prefix {w : Wiring}
+    {start middle finish : Nat × Tongues} {before after : List Passage}
+    (hfull : PhysicalTrace w start (before ++ after) finish)
+    (hprefix : PhysicalTrace w start before middle) :
+    PhysicalTrace w middle after finish := by
+  obtain ⟨mid, hl, hr⟩ := hfull.split_append
+  exact Option.some.inj (hl.sound.symm.trans hprefix.sound) ▸ hr
+
 /-- A suffix after a named passage retains its original recorded tongue state.
 No re-grooving or switch-simplicity assumption is needed to trim a witness. -/
 theorem PhysicalTrace.suffix_after_passage {w : Wiring}
@@ -620,6 +629,17 @@ theorem first_revisit_of_long_run {w : Wiring} {N : Nat}
   exact ⟨before, old, repeated, after, middle,
     hprefix, hsuffix, hbefore, hold, hkey⟩
 
+/-- Two states which groove the same passage agree on its tongue. -/
+theorem grooved_states_agree_on_passage {u v : Tongues} {p x : Nat}
+    (hu : arrive u x = (p, u)) (hv : arrive v x = (p, v)) :
+    u (x / 3) = v (x / 3) := by
+  by_cases hx : x % 3 = 0
+  · grind [arrive, branchPort]
+  · have hu' := congrArg (fun r : Nat × Tongues => r.2 (x / 3)) hu
+    have hv' := congrArg (fun r : Nat × Tongues => r.2 (x / 3)) hv
+    simp [arrive, hx, pin] at hu' hv'
+    exact hu'.symm.trans hv'
+
 /-- A local groove remains a groove if only tongues at other switches have
 changed. -/
 theorem groove_transfer {u v : Tongues} {p x : Nat}
@@ -687,16 +707,29 @@ theorem PhysicalTrace.replay_grooved
     (by intro passage hp u hu; subst u; exact ⟨state, groove_forward (hgrooved passage hp), rfl⟩) rfl
   exact hr
 
+/-- Split and rebase a trace at a named passage in one step. This works for
+empty prefixes and suffixes and requires no switch simplicity. -/
+theorem PhysicalTrace.split_grooved_at
+    {w : Wiring} {start finish : Nat × Tongues} {before after : List Passage}
+    {p x : Nat} {state : Tongues}
+    (htrace : PhysicalTrace w start (before ++ (p, x) :: after) finish)
+    (hgrooved : PassagesGrooved state (before ++ (p, x) :: after)) :
+    ∃ outside, w.link x = some outside ∧
+      PhysicalTrace w (start.1, state) before (p, state) ∧
+      PhysicalTrace w (outside, state) after (finish.1, state) := by
+  obtain ⟨middle, hleft, hright⟩ := htrace.split_append
+  cases hright with
+  | @cons _ _ outside _ _ _ _ _ hlink tail =>
+      exact ⟨outside, hlink,
+        hleft.replay_grooved state (fun passage hp => hgrooved passage (by simp [hp])),
+        tail.replay_grooved state (fun passage hp => hgrooved passage (by simp [hp]))⟩
+
 /-- Passage list for traversing a stored path in the opposite direction. -/
 def reversePassages (passages : List Passage) : List Passage :=
   passages.reverse.map Prod.swap
 
 theorem reversePassages_length (passages : List Passage) :
     (reversePassages passages).length = passages.length := by simp [reversePassages]
-
-theorem reversePassages_append (left right : List Passage) :
-    reversePassages (left ++ right) =
-      reversePassages right ++ reversePassages left := by simp [reversePassages]
 
 theorem reversePassage_mem {passage : Passage}
     {passages : List Passage} (hmem : passage ∈ passages) :
@@ -810,17 +843,6 @@ theorem PhysicalTrace.grooved_of_switchSimple {w : Wiring}
       rcases List.mem_cons.mp hp with hheadEq | htailMem
       · simpa [hheadEq] using hhead
       · exact htailGrooved passage htailMem
-
-/-- Follow a linked list of already-grooved passages in its recorded forward
-direction.  The last plain-track edge may lead to any requested port `q`.
-No tongue changes during the walk. -/
-theorem run_grooved_passages
-    (w : Wiring) (u : Tongues) (p x q : Nat) (rest : List Passage)
-    (hlinked : LinkedPassages w ((p, x) :: rest))
-    (hgrooved : PassagesGrooved u ((p, x) :: rest))
-    (hfinal : w.link (lastPassageExit x rest) = some q) :
-    stepN w ((p, x) :: rest).length (p, u) = some (q, u) := by
-  exact (physicalTrace_grooved_passages w u p x q rest hlinked hgrooved hfinal).sound
 
 /-- Total version of the retrace engine.  The train walks a grooved path
 backwards and then follows the plain-track edge at the path's original entry;

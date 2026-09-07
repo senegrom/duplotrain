@@ -387,6 +387,25 @@ and their phase cover together from `SupportedReflector.pair_all_time_four_phase
 the explicit period construction and its two iteration helpers are removed.
 The final action-corner proof handles compatibility once before its contact cases.
 
+## Shared trace cuts and reflector transport
+
+`PhysicalTrace.split_grooved_at` cuts a recorded path at a named passage
+and replays both sides in the chosen grooved state. It handles empty and
+nonempty prefixes uniformly, replacing the separate linked-prefix and
+boundary-link derivations. `PhysicalTrace.after_prefix` fixes a suffix's
+starting configuration by determinism. Prefix comparability now returns
+its endpoint trace directly.
+
+`PhysicalTrace.sandwich_reflector` transports either core reflector through
+an arbitrary grooved runway. The shared arrival-geometry and groove-agreement
+lemmas remove repeated local stem/branch algebra. The candy suffix uses one
+return proof for either starting phase, and the theta half composes its
+pointwise covers with `stepN_cover_append`.
+
+Forward contacts carry only the selected exit direction: the later splice
+construction derives its own return law, so the extra intermediate repair
+state and its two unused certificates are removed from the contact interfaces.
+
 ## Dependency and source reductions
 
 The transitive local-source closure of `StateLaw` includes the theorem's
@@ -408,6 +427,7 @@ comments and blanks, not just proof tactics.
 | Reviewed `main` (`97cc084`) | 46 | 14,525 |
 | Concurrent proof consolidation (`2580b9f`) | 46 | 14,304 |
 | After shared lobe routes, settled-cycle contracts, and fresh-sample counting | 46 | 13,277 |
+| After shared trace cuts, reflector transport, and minimal contact interfaces | 46 | 12,279 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -487,3 +507,11 @@ comment, and blank line. `StateLaw.lean`, `GeneralN.lean`, `VectorCount.lean`,
 `StateLawSmallN.lean`, `StateLawLowerBound.lean`, `WiringCompletion.lean`, and
 `StateLawAxiomAudit.lean` are byte-for-byte unchanged from the reviewed commit.
 A clean `lake build` checks all 95 jobs, including the exact axiom audit.
+
+The next trace-cut and reflector-transport pass removes **998 Lean source
+lines**, from **13,296 to 12,298** in 47 files, a **7.5%** reduction.
+The count includes all helper proofs, comments and blank lines. The same seven
+protected theorem/model/ceiling/attainment/audit files remain byte-for-byte
+unchanged. A clean build checks all 95 jobs and the exact axiom audit; all
+359 explicitly declared public source theorems remain in the headline
+proof's kernel dependency closure.

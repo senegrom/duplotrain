@@ -138,15 +138,11 @@ theorem ManufacturedFlipReflector.grooved_route_fault
   obtain ⟨before, ⟨p, x⟩, after, hsplit, hforeign, hswitch⟩ :=
     exists_first_satisfying_split
       (fun passage => passageSwitch passage = A.actionSwitch) route hcontact
-  have hraw := htrace
-  rw [hsplit] at hraw
-  obtain ⟨middle, hleft, hright⟩ := hraw.split_append
-  have hmiddle : middle.1 = p := hright.head_arrive.1
+  obtain ⟨_, _, hprefix, _⟩ :=
+    (hsplit ▸ htrace).split_grooved_at (hsplit ▸ hgrooved)
   have hbefore : PassagesGrooved state before := by
     intro passage hp
     exact hgrooved passage (by rw [hsplit]; exact List.mem_append_left _ hp)
-  have hprefix : PhysicalTrace w (e, state) before (p, state) := by
-    simpa only [hmiddle] using hleft.replay_grooved state hbefore
   have hprefixFlip := hprefix.flip_unvisited hforeign
   have hbeforeFlip := grooved_after_flip_other hbefore hforeign
   change p / 3 = A.actionSwitch at hswitch

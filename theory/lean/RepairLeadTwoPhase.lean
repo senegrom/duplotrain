@@ -16,29 +16,6 @@ most two tongue phases.
 
 namespace GeneralN
 
-/-- Two states which groove the same passage agree on that switch's tongue. -/
-theorem grooved_states_agree_on_passage
-    {u v : Tongues} {p x : Nat}
-    (hu : arrive u x = (p, u))
-    (hv : arrive v x = (p, v)) :
-    u (x / 3) = v (x / 3) := by
-  by_cases hx : x % 3 = 0
-  · have hpu : branchPort (x / 3) (u (x / 3)) = p := by
-      simpa [arrive, hx] using congrArg Prod.fst hu
-    have hpv : branchPort (x / 3) (v (x / 3)) = p := by
-      simpa [arrive, hx] using congrArg Prod.fst hv
-    cases huval : u (x / 3) <;>
-      cases hvval : v (x / 3) <;>
-      simp_all [branchPort] <;> omega
-  · have hpinu : pin u x = u := by
-      simpa [arrive, hx] using congrArg Prod.snd hu
-    have hpinv : pin v x = v := by
-      simpa [arrive, hx] using congrArg Prod.snd hv
-    have huval := congrFun hpinu (x / 3)
-    have hvval := congrFun hpinv (x / 3)
-    simp only [pin, if_pos] at huval hvval
-    exact huval.symm.trans hvval
-
 /-- States grooving the same support family agree at every switch represented
 by a support passage. -/
 theorem pathGrooves_agree_at_support_passage
@@ -47,12 +24,8 @@ theorem pathGrooves_agree_at_support_passage
     {path : List Passage} (hpath : path ∈ paths)
     {passage : Passage} (hpassage : passage ∈ path) :
     u (passageSwitch passage) = v (passageSwitch passage) := by
-  have hgu := hu path hpath passage hpassage
-  have hgv := hv path hpath passage hpassage
-  have hagree := grooved_states_agree_on_passage hgu hgv
-  have hexit := arrive_exit_switch u passage.2
-  rw [hgu] at hexit
-  simpa [passageSwitch, hexit] using hagree
+  exact same_groove_same_tongue (hu path hpath passage hpassage) (hv path hpath passage hpassage)
+
 
 section
 variable {w : Wiring} {g e : Nat}
