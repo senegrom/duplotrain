@@ -902,7 +902,7 @@ def solve(
     # translation, so the trig happens once here and the hot loop just adds offsets.
     sample_cache: dict[tuple[str, int, int], list[tuple[float, float, float]]] = {}
 
-    def placement_samples(
+    def placement_groups(
         pid: str,
         entry: int,
         hkey: int,
@@ -911,7 +911,7 @@ def solve(
         fx: float,
         fy: float,
         fz: float,
-    ) -> list[tuple[float, float, float]]:
+    ):
         key = (pid, entry, hkey)
         base_pts = sample_cache.get(key)
         if base_pts is None:
@@ -923,7 +923,7 @@ def solve(
                         (cos_t * lx - sin_t * ly, sin_t * lx + cos_t * ly, lz)
                     )
             sample_cache[key] = base_pts
-        return [(fx + x, fy + y, fz + z) for x, y, z in base_pts]
+        return field._prepare(base_pts, offset=(fx, fy, fz))
 
     stats = SolveStats()
     field = CollisionField(clearance=cfg.clearance)
@@ -1220,7 +1220,9 @@ def solve(
             piece = pieces[pid]
             frame = eng.frame(pid, entry, cursor)
             hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
-            pts = placement_samples(pid, entry, hkey, cos_t, sin_t, fx, fy, fz)
+            grouped_pts = placement_groups(
+                pid, entry, hkey, cos_t, sin_t, fx, fy, fz
+            )
             index = len(placements)
             ignore = {prev_index} if prev_index is not None else set()
             # A move that closes the loop legitimately butts against the anchor
@@ -1239,7 +1241,9 @@ def solve(
                     is not None
                 ):
                     ignore.add(stub_index)
-            if field.clashes(pts, piece.width / 2.0, ignore, underpass=piece.underpass):
+            if field._clashes_prepared(
+                grouped_pts, piece.width / 2.0, ignore, underpass=piece.underpass
+            ):
                 stats.pruned_collision += 1
                 continue
 
@@ -1247,7 +1251,9 @@ def solve(
             remaining_span -= span_of[pid]
             remaining_turn -= turn_of[pid]
             placements.append((pid, frame))
-            field.add(index, pts, piece.width / 2.0, underpass=piece.underpass)
+            field._add_prepared(
+                index, grouped_pts, piece.width / 2.0, underpass=piece.underpass
+            )
             new_stubs = 0
             if piece.is_junction:
                 for port_index in range(len(piece.ports)):

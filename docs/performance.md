@@ -69,3 +69,18 @@ cached by immutable path geometry, width, overhang and one of the 24 headings; e
 placement then contributes only a translated envelope. Editor state serialization also
 computes each exact connector pose once and shares it between layout JSON, joint audits
 and matable-pair detection. Returned JSON remains freshly owned by the caller.
+
+## Fourth-pass single-pass collision preparation
+
+Solver candidates now translate their cached local centreline samples and assign them
+to collision grid cells in the same pass. That prepared grouping is used first for the
+collision predicate and, when the candidate is accepted, inserted directly into the
+field without scanning the samples again. Public ``CollisionField.add`` and ``clashes``
+retain their original point-list interface.
+
+Prepared queries are evaluated cell-first: each neighbouring grid bucket and each stored
+placement's width/underpass metadata are resolved once for all candidate samples in that
+cell. The collision predicate, sample coordinates, grid size, clearance/underpass rules
+and neighbour exemptions are unchanged. Differential tests against the previous engine
+cover randomized add/query/pop sequences plus lattice, field, crossing, elevation and
+completion searches; ordinary regression tests keep the public behaviour covered.

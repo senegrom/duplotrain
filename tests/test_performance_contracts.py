@@ -25,6 +25,7 @@ from duplotrain.layout import (
 from duplotrain.pieces import _sample_paths
 from duplotrain.solver import (
     Solution,
+    SolverConfig,
     _cached_canonical_traversals,
     _cached_mirror_ports,
     _cached_mirror_traversals,
@@ -32,6 +33,7 @@ from duplotrain.solver import (
     _max_span,
     _moves_for,
     _turn_capacity,
+    solve,
 )
 
 
@@ -255,17 +257,51 @@ def test_collision_groups_points_per_cell_and_reuses_query_neighbourhood():
     field = CollisionField()
     field._grid = CountingGrid()
     stored = [(float(x), 0.0, 0.0) for x in range(0, 65, 4)]
-    field.add(0, stored, 32.0)
+    prepared = field._prepare(stored)
+    field._add_prepared(0, prepared, 32.0)
     # All points fit one 96 mm cell, represented by one placement group rather
-    # than repeating width/index/underpass metadata on every sample.
+    # than repeating width/index/underpass metadata on every sample. The prepared
+    # list itself is retained, so a successful clash check need not regroup it.
     assert len(field._grid[(0, 0)]) == 1
-    assert field._grid[(0, 0)][0].points == stored
+    assert field._grid[(0, 0)][0].points is prepared[0][1]
 
     # A same-cell query consults the 3x3 neighbourhood once, not once per point.
     # Keep it far enough in z that every scanned point is non-colliding.
     query = [(float(x), 0.0, 200.0) for x in range(0, 65, 4)]
-    assert not field.clashes(query, 32.0, ignore=set())
+    query_groups = field._prepare(query)
+    assert not field._clashes_prepared(query_groups, 32.0, ignore=set())
     assert field._grid.gets == 9
+
+
+def test_solver_reuses_the_same_prepared_collision_groups(monkeypatch):
+    prepared_for_add = None
+    checked = added = 0
+    original_clashes = CollisionField._clashes_prepared
+    original_add = CollisionField._add_prepared
+
+    def measured_clashes(field, grouped, half_width, ignore, underpass=False):
+        nonlocal prepared_for_add, checked
+        checked += 1
+        hit = original_clashes(field, grouped, half_width, ignore, underpass)
+        prepared_for_add = None if hit else grouped
+        return hit
+
+    def measured_add(field, placement, grouped, half_width, underpass=False):
+        nonlocal prepared_for_add, added
+        assert grouped is prepared_for_add
+        added += 1
+        return original_add(field, placement, grouped, half_width, underpass)
+
+    monkeypatch.setattr(CollisionField, "_clashes_prepared", measured_clashes)
+    monkeypatch.setattr(CollisionField, "_add_prepared", measured_add)
+    catalog = default_catalog()
+    solve(
+        {"curve": 4, "straight": 2},
+        catalog,
+        SolverConfig(max_nodes=80, max_results=2),
+    )
+    assert checked > 0
+    assert added > 0
 
 
 def test_state_reuses_each_exact_port_transform_once(monkeypatch):
@@ -306,6 +342,7 @@ def test_cached_local_footprint_matches_direct_layout_bounds():
                 (x0 + bx0, y0 + by0, x0 + bx1, y0 + by1), abs=1e-12
             )
     assert _local_footprint_bounds.cache_info().hits > 0
+
 
 def test_alg_hash_memo_is_not_a_constructor_field():
     x = Alg(1, 2, 3, 4)

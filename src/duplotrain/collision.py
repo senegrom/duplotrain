@@ -50,6 +50,10 @@ DEFAULT_CLEARANCE = 120.0
 #: ramp stays solid.  Refine when the real bridge is measured.
 UNDERPASS_MIN = 42.0
 
+_Point = tuple[float, float, float]
+_Cell = tuple[int, int]
+_GroupedPoints = tuple[tuple[_Cell, list[_Point]], ...]
+
 
 @dataclass(slots=True)
 class _CellCloud:
@@ -57,7 +61,7 @@ class _CellCloud:
 
     placement: int
     half_width: float
-    points: list[tuple[float, float, float]]
+    points: list[_Point]
     underpass: bool
 
 
@@ -67,7 +71,7 @@ class _Cloud:
 
     placement: int
     half_width: float
-    cells: tuple[tuple[int, int], ...]
+    cells: tuple[_Cell, ...]
     underpass: bool = False
     previous_max_half_width: float = 0.0
 
@@ -85,23 +89,59 @@ class CollisionField:
     clearance: float = DEFAULT_CLEARANCE
     cell: float = 96.0
     _clouds: list[_Cloud] = field(default_factory=list)
-    _grid: dict[tuple[int, int], list[_CellCloud]] = field(default_factory=dict)
+    _grid: dict[_Cell, list[_CellCloud]] = field(default_factory=dict)
     _max_half_width: float = 0.0
 
-    def clashes(
+    def _prepare(
         self,
-        points: list[tuple[float, float, float]],
+        points: list[_Point],
+        *,
+        offset: _Point | None = None,
+    ) -> _GroupedPoints:
+        """Group candidate samples by grid cell, optionally translating them once."""
+        cell = self.cell
+        grouped: dict[_Cell, list[_Point]] = {}
+        last_key: _Cell | None = None
+        last_points: list[_Point] = []
+        if offset is None:
+            for point in points:
+                x, y, _z = point
+                key = (int(x // cell), int(y // cell))
+                if key == last_key:
+                    last_points.append(point)
+                    continue
+                cell_points = grouped.get(key)
+                if cell_points is None:
+                    cell_points = []
+                    grouped[key] = cell_points
+                cell_points.append(point)
+                last_key = key
+                last_points = cell_points
+        else:
+            ox, oy, oz = offset
+            for x, y, z in points:
+                point = (ox + x, oy + y, oz + z)
+                key = (int(point[0] // cell), int(point[1] // cell))
+                if key == last_key:
+                    last_points.append(point)
+                    continue
+                cell_points = grouped.get(key)
+                if cell_points is None:
+                    cell_points = []
+                    grouped[key] = cell_points
+                cell_points.append(point)
+                last_key = key
+                last_points = cell_points
+        return tuple(grouped.items())
+
+    def _clashes_prepared(
+        self,
+        grouped: _GroupedPoints,
         half_width: float,
         ignore: set[int],
         underpass: bool = False,
     ) -> bool:
-        """Would a piece with these sample points overlap anything already placed?
-
-        *ignore* lists placement indices exempt from the check (the piece's direct
-        neighbours in the layout graph); *underpass* marks the querying piece as an
-        open arch that admits track beneath its deck.  This is the solver's hottest
-        non-arithmetic loop, hence the inlined cell scan.
-        """
+        """Check samples already grouped by query cell against stored placements."""
         if not self._grid:
             return False
         cell = self.cell
@@ -109,64 +149,78 @@ class CollisionField:
         grid = self._grid
         reach = half_width + self._max_half_width - TOUCH_MARGIN
         r = max(1, math.ceil(reach / cell))
-        neighbourhoods: dict[tuple[int, int], tuple[list[_CellCloud], ...]] = {}
-        for x, y, z in points:
-            cx = int(x // cell)
-            cy = int(y // cell)
-            key = (cx, cy)
-            buckets = neighbourhoods.get(key)
-            if buckets is None:
-                buckets = tuple(
-                    bucket
-                    for gx in range(cx - r, cx + r + 1)
-                    for gy in range(cy - r, cy + r + 1)
-                    if (bucket := grid.get((gx, gy)))
-                )
-                neighbourhoods[key] = buckets
-            for bucket in buckets:
-                for cloud in bucket:
-                    if cloud.placement in ignore:
+        for (cx, cy), cell_points in grouped:
+            for gx in range(cx - r, cx + r + 1):
+                for gy in range(cy - r, cy + r + 1):
+                    bucket = grid.get((gx, gy))
+                    if not bucket:
                         continue
-                    limit = half_width + cloud.half_width - TOUCH_MARGIN
-                    limit2 = limit * limit
-                    stored_underpass = cloud.underpass
-                    for px, py, pz in cloud.points:
-                        dz = z - pz
-                        if dz >= clearance or dz <= -clearance:
+                    for cloud in bucket:
+                        if cloud.placement in ignore:
                             continue
-                        if stored_underpass and dz <= -UNDERPASS_MIN:
-                            continue  # running under the stored piece's open arch
-                        if underpass and dz >= UNDERPASS_MIN:
-                            continue  # the stored track runs under this open arch
-                        dx = x - px
-                        dy = y - py
-                        if dx * dx + dy * dy < limit2:
-                            return True
+                        limit = half_width + cloud.half_width - TOUCH_MARGIN
+                        limit2 = limit * limit
+                        stored_underpass = cloud.underpass
+                        for x, y, z in cell_points:
+                            for px, py, pz in cloud.points:
+                                dz = z - pz
+                                if dz >= clearance or dz <= -clearance:
+                                    continue
+                                if stored_underpass and dz <= -UNDERPASS_MIN:
+                                    continue
+                                if underpass and dz >= UNDERPASS_MIN:
+                                    continue
+                                dx = x - px
+                                dy = y - py
+                                if dx * dx + dy * dy < limit2:
+                                    return True
         return False
 
-    def add(
+    def clashes(
+        self,
+        points: list[_Point],
+        half_width: float,
+        ignore: set[int],
+        underpass: bool = False,
+    ) -> bool:
+        """Would a piece with these sample points overlap anything already placed?"""
+        return self._clashes_prepared(
+            self._prepare(points), half_width, ignore, underpass=underpass
+        )
+
+    def _add_prepared(
         self,
         placement: int,
-        points: list[tuple[float, float, float]],
+        grouped: _GroupedPoints,
         half_width: float,
         underpass: bool = False,
     ) -> None:
-        cell = self.cell
-        grouped: dict[tuple[int, int], list[tuple[float, float, float]]] = {}
-        for point in points:
-            x, y, _z = point
-            key = (int(x // cell), int(y // cell))
-            grouped.setdefault(key, []).append(point)
+        """Insert samples already grouped by grid cell."""
         cloud = _Cloud(
-            placement, half_width, tuple(grouped), underpass, self._max_half_width
+            placement,
+            half_width,
+            tuple(key for key, _points in grouped),
+            underpass,
+            self._max_half_width,
         )
         self._clouds.append(cloud)
         self._max_half_width = max(self._max_half_width, half_width)
         grid = self._grid
-        for key, cell_points in grouped.items():
+        for key, cell_points in grouped:
             grid.setdefault(key, []).append(
                 _CellCloud(placement, half_width, cell_points, underpass)
             )
+
+    def add(
+        self,
+        placement: int,
+        points: list[_Point],
+        half_width: float,
+        underpass: bool = False,
+    ) -> None:
+        self._add_prepared(
+            placement, self._prepare(points), half_width, underpass=underpass
+        )
 
     def pop(self) -> None:
         """Remove the most recently added placement (backtracking)."""
