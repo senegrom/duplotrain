@@ -1,0 +1,92 @@
+name: Verify and publish editor optimization
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-editor-opt.yml]
+permissions:
+  contents: read
+concurrency:
+  group: publish-editor-opt
+  cancel-in-progress: false
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        python: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Apply reviewed app patch
+        run: python .github/editor-opt/apply.py
+      - run: python -m pip install -e '.[dev]'
+      - run: ruff check src webapp tests
+      - run: python -m pytest -m 'not slow and not browser'
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      matrix:
+        browser: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - name: Apply reviewed app patch
+        run: python .github/editor-opt/apply.py
+      - run: python -m pip install -e '.[dev]' playwright
+      - run: python -m playwright install --with-deps ${{ matrix.browser }}
+      - run: node --test tests/web/*.test.cjs
+      - run: python webapp/build.py
+      - run: python -m pytest tests/browser -m browser -v
+
+  publish:
+    needs: [python, browser]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Apply exact reviewed edits
+        run: python .github/editor-opt/apply.py
+      - name: Publish only app optimization
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git diff --check
+          git rm -r .github/editor-opt .github/workflows/publish-editor-opt.yml
+          git add docs/performance.md \
+            src/duplotrain/catalog.py src/duplotrain/collision.py \
+            src/duplotrain/exact.py src/duplotrain/layout.py src/duplotrain/solver.py \
+            tests/test_performance_contracts.py tests/test_worker_bundle.py \
+            webapp/build.py
+          test -z "$(git diff --cached --name-only -- theory)"
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Speed up cold geometry, solver metadata and collision rollback'
+          git fetch origin main
+          git rebase origin/main
+          auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin HEAD:main
