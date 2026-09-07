@@ -91,7 +91,7 @@ theorem manufactured_flip_then_stay_all_time_two_phase :
     rcases hs with rfl | rfl | rfl
     · exact ⟨A.toSupported.travel, (e, flipAt state A.actionSwitch),
         (ManufacturedReflector.flip A).travel_pos, (A.toSupported.run state hA).1,
-        Or.inr (Or.inl rfl), fun _ ht => A.travel_two_phase_stepN state hA ht⟩
+        Or.inr (Or.inl rfl), fun _ ht => (ManufacturedReflector.flip A).travel_two_phase_stepN state hA ht⟩
     · rcases manufactured_stay_support_fault_dichotomy_pointwise A B state hA hB hcontact with
         ⟨travel, hr, hp⟩ | ⟨hr, hp⟩
       · refine ⟨travel, (e, state), stepN_flip_restore_pos hr, hr, Or.inr (Or.inr rfl), ?_⟩

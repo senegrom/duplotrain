@@ -429,6 +429,7 @@ comments and blanks, not just proof tactics.
 | After shared lobe routes, settled-cycle contracts, and fresh-sample counting | 46 | 13,277 |
 | After shared trace cuts, reflector transport, and minimal contact interfaces | 46 | 12,279 |
 | After shared protected prefixes, historical covers, and theta composition | 45 | 11,655 |
+| After shared contact retraces, last-write recovery, and canonical action corners | 45 | 11,242 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -532,3 +533,17 @@ All seven protected theorem/model/ceiling/attainment/completion/audit files rema
 byte-for-byte unchanged. A clean `lake build` checks all **93 jobs** without
 warnings; the exact axiom audit passes, and all **357** public source theorems
 remain in the headline theorem's kernel dependency closure.
+
+The contact-retrace and action-corner pass removes another **413 Lean source
+lines**, from **11,674 to 11,261**, a **3.5%** reduction in the same 46 files.
+These totals include every helper proof, comment, blank line, and the audit.
+
+One backward-contact lemma replaces three repeated retrace constructions.
+Undoing the last productive write now supplies both historical-vector recovery
+arguments. Canonical four-corner lists simplify the pair invariant and let one
+lobe theorem handle both intersecting and avoiding actions. Trace composition
+and smaller helper conclusions remove the remaining duplicated work.
+
+All seven protected files remain byte-for-byte unchanged. A clean build checks
+all **93 jobs** without warnings, the exact axiom audit passes, and all **356**
+public source theorems remain in the headline proof's kernel dependency closure.

@@ -95,7 +95,7 @@ theorem ManufacturedFlipReflector.reverse_candy_suffix_absorbs_twoPhases
         exact ⟨port, current, hr, hc⟩
       · intro d hd
         obtain ⟨port, hr⟩ := (physicalTrace_contact_retraces_prefix_pointwise
-          R.runwayTrace hrunway R.entryEdge ha).2 d hd
+          R.runwayTrace hrunway R.entryEdge ha) d hd
         refine ⟨port, _, hr, ?_⟩
         split
         · exact hc

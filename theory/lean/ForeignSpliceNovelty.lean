@@ -138,12 +138,8 @@ theorem manufactured_flip_candy_splice_all_two_phases
       · exact (hreverseForeign passage hr heq).elim
   have hcompletionLocal : ∀ passage ∈ completion, ∀ phase, allowed phase →
       ∃ next, arrive phase passage.1 = (passage.2, next) ∧ allowed next := by
-    intro passage hp phase hphase
-    have hin : phase = bothState ∨ phase = flipAt bothState R.actionSwitch := by
-      simpa [bothState, flipAt_flipAt] using hphase.symm
-    obtain ⟨next, hr, hn⟩ := passages_preserve_flip_pair
-      hcompletionGrooved hcompletionNoFacing passage hp phase hin
-    exact ⟨next, hr, by simpa [allowed, bothState, flipAt_flipAt] using hn.symm⟩
+    simpa only [allowed, bothState, flipAt_flipAt, or_comm] using
+      passages_preserve_flip_pair hcompletionGrooved hcompletionNoFacing
   have hcompletionTrace : PhysicalTrace w (outside, bothState) completion (g, bothState) :=
     hcompletionData.1.replay_grooved bothState hcompletionGrooved
 

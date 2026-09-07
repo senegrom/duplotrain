@@ -159,46 +159,24 @@ theorem ManufacturedReflector.travel_two_phase_tongues
     {d : Nat} (hd : d ≤ A.toSupported.travel) :
     tonguesAt w (g, state) d = state ∨
       tonguesAt w (g, state) d = A.toSupported.action.apply state := by
-  by_cases hroute : d ≤ (A.orientedRoute state).length
-  · have htrace := A.orientedRoute_trace state hpaths
-    have hgrooved :
-        PassagesGrooved state (A.orientedRoute state) :=
-      htrace.grooved_of_switchSimple (A.orientedRoute_simple state)
-    obtain ⟨port, hrun⟩ :=
-      htrace.grooved_prefix_tongues state hgrooved hroute
-    left
-    simp [tonguesAt, hrun]
-  · let tailDepth := d - (A.orientedRoute state).length
-    have htailPos : 1 ≤ tailDepth := by
-      dsimp [tailDepth]
-      omega
-    have hsplit :
-        d = (A.orientedRoute state).length + tailDepth := by
-      dsimp [tailDepth]
-      omega
-    have htailBound : tailDepth ≤ A.runway.length + 1 := by
-      have htravel := A.travel_eq_oriented_add state
-      dsimp [tailDepth]
-      omega
-    have hpathsAfter :
-        PathGrooves A.toSupported.paths
-          (A.toSupported.action.apply state) :=
-      hpaths.after_avoiding_action A.action_avoids_own_support
-    have hrunwayAfter :
-        PassagesGrooved (A.toSupported.action.apply state) A.runway :=
-      hpathsAfter A.runway A.runway_mem_support
-    have hrecorded := A.runway_trace_at state hpaths
-    have hcontact := A.orientedFinish_arrive state hpaths
-    obtain ⟨port, htail⟩ := (physicalTrace_contact_retraces_prefix_pointwise
-      hrecorded hrunwayAfter A.entryEdge hcontact).2 tailDepth htailBound
-    rw [if_neg (show tailDepth ≠ 0 by omega)] at htail
-    have hlead := (A.orientedRoute_trace state hpaths).sound
-    have hrun : stepN w d (g, state) =
-        some (port, A.toSupported.action.apply state) := by
-      rw [hsplit, stepN_add, hlead]
-      exact htail
-    right
-    simp [tonguesAt, hrun]
+  have htrace := A.orientedRoute_trace state hpaths
+  have hg := htrace.grooved_of_switchSimple (A.orientedRoute_simple state)
+  have hpathsAfter := hpaths.after_avoiding_action A.action_avoids_own_support
+  have hreturn := (physicalTrace_contact_retraces_prefix_pointwise
+    (A.runway_trace_at state hpaths) (hpathsAfter A.runway A.runway_mem_support)
+    A.entryEdge (A.orientedFinish_arrive state hpaths))
+  have hcover : ∀ t, t ≤ (A.orientedRoute state).length + (A.runway.length + 1) →
+      ∃ port phase, stepN w t (g, state) = some (port, phase) ∧
+        (phase = state ∨ phase = A.toSupported.action.apply state) := by
+    apply stepN_cover_append htrace.sound
+    · intro t ht
+      obtain ⟨port, hr⟩ := htrace.grooved_prefix_tongues state hg ht
+      exact ⟨port, state, hr, Or.inl rfl⟩
+    · intro t ht
+      obtain ⟨port, hr⟩ := hreturn t ht
+      exact ⟨port, _, hr, by split <;> simp⟩
+  obtain ⟨port, phase, hr, hp⟩ := hcover d (by rwa [← A.travel_eq_oriented_add state])
+  simpa [tonguesAt, hr] using hp
 
 /-- A manufactured traversal has only its incoming and outgoing vectors. -/
 theorem ManufacturedReflector.travel_two_phase_stepN
@@ -275,23 +253,20 @@ theorem SupportedReflector.pair_all_time_four_phase
     phase ∈
       [state,
        A.action.apply state,
-       B.action.apply (A.action.apply state),
-       A.action.apply
-         (B.action.apply (A.action.apply state))] := by
+       B.action.apply state,
+       A.action.apply (B.action.apply state)] := by
   let a := A.action
   let b := B.action
-  let safe := fun u => u ∈ [state, a.apply state, b.apply (a.apply state), b.apply state]
-  have hfour : a.apply (b.apply (a.apply state)) = b.apply state := by
-    rw [a.commute b, a.involutive]
+  let safe := fun u => u ∈ [state, a.apply state, b.apply state, a.apply (b.apply state)]
   have hsafeA : ∀ u, safe u → safe (a.apply u) := by
     intro u hu
     simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
     rcases hu with rfl | rfl | rfl | rfl <;>
-      simp [safe, a.involutive, hfour, a.commute b]
+      simp [safe, a.involutive]
   have hsafeB : ∀ u, safe u → safe (b.apply u) := by
     intro u hu
     simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
-    rcases hu with rfl | rfl | rfl | rfl <;> simp [safe, b.involutive]
+    rcases hu with rfl | rfl | rfl | rfl <;> simp [safe, b.involutive, b.commute a]
   let boundary := fun c : Nat × Tongues =>
     (c.1 = g ∨ c.1 = e) ∧ safe c.2 ∧
       PathGrooves A.paths c.2 ∧ PathGrooves B.paths c.2
@@ -319,15 +294,11 @@ theorem SupportedReflector.pair_all_time_four_phase
       intro t ht
       obtain ⟨port, phase, hr, hv⟩ := hBtwo u huB t ht
       exact ⟨port, phase, hr, hv.elim (fun h => h.symm ▸ hu) (fun h => h.symm ▸ hsafeB u hu)⟩
-  obtain ⟨port, phase, hr, hs⟩ := stepN_covered_of_progress boundary safe hprogress
+  exact stepN_covered_of_progress boundary safe hprogress
     (start := (g, state)) ⟨Or.inl rfl, by simp [safe], hA, hB⟩ d
-  refine ⟨port, phase, hr, ?_⟩
-  change phase ∈ [state, a.apply state, b.apply (a.apply state),
-    a.apply (b.apply (a.apply state))]
-  simpa only [hfour] using hs
 
 /-- Manufactured reflectors supply the abstract pair law with their two-phase traversals. -/
-theorem manufactured_pair_all_time_four_phase_tongues
+theorem ManufacturedReflector.pair_all_time_four_phase
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -337,17 +308,14 @@ theorem manufactured_pair_all_time_four_phase_tongues
     (hAB : A.toSupported.action.Avoids B.toSupported.paths)
     (hBA : B.toSupported.action.Avoids A.toSupported.paths)
     (d : Nat) :
-    tonguesAt w (g, state) d ∈
-      [state,
-       A.toSupported.action.apply state,
-       B.toSupported.action.apply (A.toSupported.action.apply state),
-       A.toSupported.action.apply
-         (B.toSupported.action.apply (A.toSupported.action.apply state))] := by
-  obtain ⟨port, phase, hr, hs⟩ := A.toSupported.pair_all_time_four_phase B.toSupported
+    ∃ port phase, stepN w d (g, state) = some (port, phase) ∧
+      phase ∈ [state, A.toSupported.action.apply state,
+        B.toSupported.action.apply state,
+        A.toSupported.action.apply (B.toSupported.action.apply state)] := by
+  exact A.toSupported.pair_all_time_four_phase B.toSupported
     A.travel_pos B.travel_pos
     (fun u hu _ ht => A.travel_two_phase_stepN u hu ht)
     (fun u hu _ ht => B.travel_two_phase_stepN u hu ht)
     state hA hB hAB hBA d
-  simpa [tonguesAt, hr] using hs
 
 end GeneralN

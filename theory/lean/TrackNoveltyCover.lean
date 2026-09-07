@@ -14,10 +14,8 @@ The semantic premise `PassagesGrooved v recorded` is essential.  Mere switch
 simplicity of the old trace does not imply that an arbitrary contact vector
 still grooves it, so no theorem below hides that premise.
 
-The global coefficient-one state law remains open.  What is closed here is
-the local step needed by a global four-novelty argument: a completed retrace
-whose initial vector is already historical contributes at most one genuinely
-new restricted tongue vector, regardless of the length of the retraced path.
+A completed retrace whose initial vector is already historical contributes
+at most one new restricted tongue vector, regardless of its length.
 -/
 
 namespace GeneralN
@@ -80,7 +78,7 @@ theorem completed_retrace_at_vector_mem_history_or_contact
     omega
   obtain ⟨port, hlocal⟩ :=
     (physicalTrace_contact_retraces_prefix_pointwise
-      hrecorded hgrooved hentry hcontact).2 d hd
+      hrecorded hgrooved hentry hcontact) d hd
   have hj : j = K + d := by
     dsimp [d]
     omega

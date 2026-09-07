@@ -219,57 +219,9 @@ private theorem ManufacturedReflector.protected_changed_contact_one_or_forward
     B.changed_contact_on_orientedRoute u v hpaths
       hpath hold hswitch harrive
   rcases hdirection with hbackward | hforward
-  · obtain ⟨recorded, tail, hBsplit⟩ := List.append_of_mem horiented
-    have hBroute := B.orientedRoute_trace u hpaths
-    have hBsimple := B.orientedRoute_simple u
-    have hBgrooved := hBroute.grooved_of_switchSimple hBsimple
-    have hprefixData := simple_grooved_trace_prefix_to_occurrence
-      hBroute hBsplit hBgrooved hBsimple
-    have hrecorded := hprefixData.1
-    have hrecordedForeign : ∀ passage ∈ recorded,
-        passageSwitch passage ≠ p / 3 := by
-      intro passage hp hEq
-      apply hprefixData.2 passage hp
-      exact hEq.trans horientedSwitch.symm
-    have hrecordedSimple : SwitchSimple recorded := by
-      unfold SwitchSimple at hBsimple ⊢
-      rw [hBsplit] at hBsimple
-      simp only [List.map_append, List.map_cons] at hBsimple
-      exact (List.nodup_append.mp hBsimple).1
-    have hflip : v = flipAt u (p / 3) :=
-      changed_arrival_eq_flipAt harrive hchanged
-    have hrecordedV : PhysicalTrace w
-        (e, v) recorded (oriented.1, v) := by
-      rw [hflip]
-      exact hrecorded.flip_unvisited hrecordedForeign
-    have hrecordedGroovedV : PassagesGrooved v recorded :=
-      hrecordedV.grooved_of_switchSimple hrecordedSimple
-    have hrouteSimple := A.orientedRoute_simple B.activatedState
+  · have hrouteSimple := A.orientedRoute_simple B.activatedState
     rw [hrouteSplit] at hrouteSimple
-    have happroachSimple : SwitchSimple approach := by
-      unfold SwitchSimple at hrouteSimple ⊢
-      simp only [List.map_append, List.map_cons] at hrouteSimple
-      exact (List.nodup_append.mp hrouteSimple).1
-    have happroachForeign : ∀ passage ∈ approach,
-        passageSwitch passage ≠ p / 3 := by
-      unfold SwitchSimple at hrouteSimple
-      simp only [List.map_append, List.map_cons] at hrouteSimple
-      have hparts := List.nodup_append.mp hrouteSimple
-      intro passage hp hEq
-      have hne := hparts.2.2 (passageSwitch passage)
-        (List.mem_map.mpr ⟨passage, hp, rfl⟩)
-        (p / 3) (by simp [passageSwitch])
-      exact hne hEq
-    have happroachV : PhysicalTrace w
-        (g, flipAt B.activatedState (p / 3)) approach (p, v) := by
-      rw [hflip]
-      exact happroach.flip_unvisited happroachForeign
-    have happroachGroovedV : PassagesGrooved v approach :=
-      happroachV.grooved_of_switchSimple happroachSimple
-    have happroachGroovedU : PassagesGrooved u approach :=
-      happroach.grooved_of_switchSimple happroachSimple
-    have happroachReplayU : PhysicalTrace w (g, u) approach (p, u) :=
-      happroach.replay_grooved u happroachGroovedU
+    have happroachSimple : SwitchSimple approach := by grind [SwitchSimple]
     have happroachRoute : ∀ passage ∈ approach,
         passage ∈ A.orientedRoute B.activatedState := by
       intro passage hp
@@ -283,9 +235,8 @@ private theorem ManufacturedReflector.protected_changed_contact_one_or_forward
       rcases hrelation with rfl | rfl
       · exact hinitialHistorical
       · exact hpreHistorical
-    have hall := backward_contact_all_time_two_phase
-      hrecorded hrecordedGroovedV B.entryEdge
-      (by simpa [hbackward] using harrive) happroachReplayU happroachGroovedV
+    have hall := B.backward_contact_two_phase hpaths horiented happroach
+      (by grind [SwitchSimple, passageSwitch]) (by simpa [hbackward] using harrive)
     left
     intro times _ _
     exact two_phase_prefix_then_two_phase_tail_one_novelty
@@ -325,31 +276,9 @@ private theorem ManufacturedReflector.protected_facing_contact_one_or_forward
   rcases horientation with hsame | hreverse
   · have horientedEq : oriented = (fresh, p) := hsame
     subst oriented
-    obtain ⟨recorded, tail, hBsplit⟩ := List.append_of_mem horiented
-    have hBroute := B.orientedRoute_trace contact hpaths
-    have hBsimple := B.orientedRoute_simple contact
-    have hBgrooved := hBroute.grooved_of_switchSimple hBsimple
-    have hprefixData := simple_grooved_trace_prefix_to_occurrence
-      hBroute hBsplit hBgrooved hBsimple
-    have hrecorded := hprefixData.1
-    have hrecordedSimple : SwitchSimple recorded := by
-      unfold SwitchSimple at hBsimple ⊢
-      rw [hBsplit] at hBsimple
-      simp only [List.map_append, List.map_cons] at hBsimple
-      exact (List.nodup_append.mp hBsimple).1
-    have hrecordedGrooved : PassagesGrooved contact recorded :=
-      hrecorded.grooved_of_switchSimple hrecordedSimple
     have hrouteSimple := A.orientedRoute_simple B.activatedState
     rw [hrouteSplit] at hrouteSimple
-    have happroachSimple : SwitchSimple approach := by
-      unfold SwitchSimple at hrouteSimple ⊢
-      simp only [List.map_append, List.map_cons] at hrouteSimple
-      exact (List.nodup_append.mp hrouteSimple).1
-    have happroachGrooved : PassagesGrooved contact approach :=
-      happroach.grooved_of_switchSimple happroachSimple
-    have happroachReplay :
-        PhysicalTrace w (g, contact) approach (p, contact) :=
-      happroach.replay_grooved contact happroachGrooved
+    have happroachSimple : SwitchSimple approach := by grind [SwitchSimple]
     have happroachRoute : ∀ passage ∈ approach,
         passage ∈ A.orientedRoute B.activatedState := by
       intro passage hp
@@ -363,9 +292,8 @@ private theorem ManufacturedReflector.protected_facing_contact_one_or_forward
       rcases hrelation with rfl | rfl
       · exact hinitialHistorical
       · exact hpreHistorical
-    have hall := backward_contact_all_time_two_phase
-      hrecorded hrecordedGrooved B.entryEdge harrive
-      happroachReplay happroachGrooved
+    have hall := B.backward_contact_two_phase hpaths horiented happroach
+      (by grind [SwitchSimple, passageSwitch]) harrive
     left
     intro times _ _
     exact two_phase_prefix_then_two_phase_tail_one_novelty
@@ -632,50 +560,12 @@ theorem ManufacturedFlipReflector.flipped_preReturn_mem_second_sharp_of_last
     VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch) ∈
       B.sharpConstructionHistory N := by
   have htData := mem_rawFirstWriterTimes_iff.mp ht
-  have hprod : RawProductiveAt w N (e, B.baseState) t := htData.2.1
-  let span := B.exploration.length - (t + 1)
-  have hsum : t + 1 + span = B.exploration.length := by
-    dsimp [span]
-    omega
-  have hendQuiet :
-      restrictedTonguesAt w N (e, B.baseState) B.exploration.length =
-        restrictedTonguesAt w N (e, B.baseState) (t + 1) := by
-    have h := restrictedTonguesAt_eq_of_quiet_interval
-      (first := t + 1) (span := span)
-      (by simpa [hsum] using B.exploration_trace.sound)
-      (fun j hj hbound => hlast j (by omega) (by
-        rw [hsum] at hbound
-        exact hbound))
-    simpa [hsum] using h
-  have hend :
-      restrictedTonguesAt w N (e, B.baseState) B.exploration.length =
-        VectorCount.restrict N B.preReturn.2 := by
-    simp [restrictedTonguesAt, tonguesAt, B.exploration_trace.sound]
-  have hpost := rawProductiveAt_restricted_flip hprod
-  rw [hwriter] at hpost
-  have hflipEnd := restrict_flipAt_congr (C := R.actionSwitch)
-    (hend.symm.trans hendQuiet)
-  have hflipPost := restrict_flipAt_congr (C := R.actionSwitch) hpost
-  have hrecover :
-      VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch) =
-        restrictedTonguesAt w N (e, B.baseState) t := by
-    calc
-      VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch) =
-          VectorCount.restrict N
-            (flipAt (tonguesAt w (e, B.baseState) (t + 1))
-              R.actionSwitch) := hflipEnd
-      _ = VectorCount.restrict N
-          (flipAt
-            (flipAt (tonguesAt w (e, B.baseState) t)
-              R.actionSwitch)
-            R.actionSwitch) := hflipPost
-      _ = restrictedTonguesAt w N (e, B.baseState) t := by
-        simp [restrictedTonguesAt, flipAt_flipAt]
+  have hrecover := last_productive_recovers B.exploration_trace.sound
+    htData.1 htData.2.1 hlast
+  rw [hwriter] at hrecover
   rw [hrecover]
-  unfold ManufacturedReflector.sharpConstructionHistory
-  apply List.mem_append_left
-  apply List.mem_map.mpr
-  exact ⟨t, List.mem_range.mpr (by omega), rfl⟩
+  exact List.mem_append_left _ (List.mem_map.mpr
+    ⟨t, List.mem_range.mpr (by omega), rfl⟩)
 
 /-- A completed protected repair needs only one fresh vector whenever the
 `A`-action applied to `B`'s pre-return vector is historical.  Depending on

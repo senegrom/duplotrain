@@ -196,7 +196,7 @@ theorem ChangedContact.forward_stay_two_phase_tail
   obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
       candy, hentryOld, hrouteSplit, hOldTail,
       _hApproachReplay, hApproachGrooved,
-      hApproachForeign, hentryBranch, _hmouthStem,
+      hApproachForeign, hentryBranch, hentryMouthSwitch,
       hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
       hRpaths, hCandy, hCandyForeign, hLobe, hreach⟩ :=
     partial_first_forward_contact_active_lead
@@ -204,14 +204,6 @@ theorem ChangedContact.forward_stay_two_phase_tail
       C.split C.full_simple C.approach_trace C.old_grooves
       C.arrive_eq C.changed C.oriented_mem C.oriented_groove
       hforward
-  have hOldRoute := (ManufacturedReflector.stay R).orientedRoute_trace C.contactState hRpaths
-  have hOldGrooved := hOldRoute.grooved_of_switchSimple
-    ((ManufacturedReflector.stay R).orientedRoute_simple C.contactState)
-  have hOldForward := groove_forward (hOldGrooved (entry, mouth) hentryOld)
-  have hentryMouthSwitch : entry / 3 = mouth / 3 := by
-    have hs := arrive_exit_switch C.contactState entry
-    rw [hOldForward] at hs
-    exact hs.symm
   let L : SupportedReflector w mouth outside := {
     travel := candy.length + 2
     paths := [candy]
@@ -261,11 +253,7 @@ theorem ChangedContact.forward_stay_two_phase_tail
     refine ⟨port, phase, hr, ?_⟩
     simp only [L, LocalAction.apply, alternate, flipAt_flipAt,
       List.mem_cons, List.not_mem_nil, or_false] at hs
-    rcases hs with h | h | h | h
-    · exact Or.inl h
-    · exact Or.inr h
-    · exact Or.inl h
-    · exact Or.inr h
+    grind
 
 
 end PartialSecondRunSharp

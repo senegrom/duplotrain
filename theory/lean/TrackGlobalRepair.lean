@@ -645,7 +645,7 @@ theorem partial_first_forward_contact_active_lead
       PhysicalTrace w (e, u) approach (returnPort, u) ∧
       PassagesGrooved u approach ∧
       (∀ passage ∈ approach, passageSwitch passage ≠ mouth / 3) ∧
-      entry % 3 ≠ 0 ∧ mouth % 3 = 0 ∧
+      entry % 3 ≠ 0 ∧ entry / 3 = mouth / 3 ∧
       w.link mouth = some outside ∧
       entry ≠ returnPort ∧
       PassagesGrooved u ((mouth, entry) :: candy) ∧
@@ -712,7 +712,7 @@ theorem partial_first_forward_contact_active_lead
     simpa only [hsp] using changed_arrival_eq_flipAt harrive hchanged
   have hcrossed : arrive u p = (s, flipAt u (s / 3)) := by rw [harrive, hflip]
   refine ⟨a, s, p, outside, oldPrefix, oldTail, candy, horiented, hrouteSplit,
-    hOldRest, hforward, hApproachGrooved, hApproachForeign, haBranch, hsStem,
+    hOldRest, hforward, hApproachGrooved, hApproachForeign, haBranch, hsa.symm,
     hmouth, hap, hSpliceGrooved, hsplice, hcrossed, hpaths, hCandyGrooved,
     hCandyForeign, ?_, ?_⟩
   · exact stem_lobe_isReflector_foreign w candy hsStem haBranch hpBranch hsa hsp hap
@@ -1037,10 +1037,11 @@ theorem ManufacturedFlipReflector.facing_approach_to_candy_splice_impossible
       exact (List.nodup_append.mp (by simpa [SwitchSimple] using hs)).2.1
     obtain ⟨before, hsplit⟩ :=
       split_after_prefix_of_not_mem (hcore.symm.trans hrouteSplit) hnotRunway
-    have hprefixData := simple_grooved_trace_prefix_to_occurrence
-      htail hsplit (htail.grooved_of_switchSimple hsimple) hsimple
-    exact ⟨before, hprefixData.1, fun passage hp heq =>
-      hprefixData.2 passage hp (heq.trans hentryNew.symm)⟩
+    obtain ⟨_, _, hprefix, _⟩ := (hsplit ▸ htail).split_grooved_at
+      (hsplit ▸ htail.grooved_of_switchSimple hsimple)
+    refine ⟨before, hprefix, ?_⟩
+    rw [hsplit] at hsimple
+    grind [SwitchSimple, passageSwitch]
   obtain ⟨oldSegment, holdSegment, holdForeign⟩ := hOldSegment
   have hendpoints :=
     physicalTrace_endpoints_eq_before_avoided_switch

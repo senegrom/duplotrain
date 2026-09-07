@@ -102,7 +102,7 @@ support-changing contact. -/
 def PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches
     {w : Wiring} {g e : Nat}
     {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A) (N : Nat) : List Nat :=
+    (C : PartialSecondRunSharp.ChangedContact w A) (N : Nat) : List Nat :=
   (rawFirstWriterTimes w N (e, A.activatedState)
       C.approach.length).map
     (rawWriterAt w (e, A.activatedState))
@@ -113,7 +113,7 @@ variable {w : Wiring} {N g e : Nat}
   (hN : forall p q, w.link p = some q ->
     p < 3 * N /\ q < 3 * N)
   {R : ManufacturedFlipReflector w g e}
-  (C : SimpleContinuationChangedContact w
+  (C : PartialSecondRunSharp.ChangedContact w
     (ManufacturedReflector.flip R))
   (hA : PathGrooves
     (ManufacturedReflector.flip R).toSupported.paths
@@ -170,7 +170,7 @@ variable {w : Wiring} {N g e : Nat}
   (hN : forall p q, w.link p = some q ->
     p < 3 * N /\ q < 3 * N)
   {R : ManufacturedFlipReflector w g e}
-  (C : SimpleContinuationChangedContact w
+  (C : PartialSecondRunSharp.ChangedContact w
     (ManufacturedReflector.flip R))
   (hA : PathGrooves
     (ManufacturedReflector.flip R).toSupported.paths
@@ -230,7 +230,7 @@ end
 structure PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual
     {w : Wiring} {N g e : Nat}
     (R : ManufacturedFlipReflector w g e)
-    (C : SimpleContinuationChangedContact w
+    (C : PartialSecondRunSharp.ChangedContact w
       (ManufacturedReflector.flip R)) : Type where
   action_first_written :
     R.actionSwitch ∈ C.approachFirstWriterSwitches N
@@ -243,7 +243,7 @@ unless it produces the exact runway Gray-square residual above. -/
 theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_residual
     {w : Wiring} {N g e : Nat}
     {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
+    (C : PartialSecondRunSharp.ChangedContact w
       (ManufacturedReflector.flip R))
     (hforward : C.x = C.oriented.2)
     (haction : R.actionSwitch ∈ C.approachFirstWriterSwitches N)
@@ -275,7 +275,7 @@ theorem PartialSecondRunSharp.ChangedContact.changed_N_add_four_or_runway_residu
     (hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
     {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
+    (C : PartialSecondRunSharp.ChangedContact w
       (ManufacturedReflector.flip R))
     (hA : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths
@@ -319,7 +319,7 @@ pre-action vector, contradicting `old_corner_missing`. -/
 theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.exists_later_productive
     {w : Wiring} {N g e : Nat}
     {R : ManufacturedFlipReflector w g e}
-    {C : SimpleContinuationChangedContact w
+    {C : PartialSecondRunSharp.ChangedContact w
       (ManufacturedReflector.flip R)}
     (F : C.RunwayNAddFourResidual (N := N) R) :
     exists actionTime laterTime,
@@ -334,84 +334,19 @@ theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.exists_later
       RawProductiveAt w N
         (e, (ManufacturedReflector.flip R).activatedState)
         laterTime := by
-  let start : Nat × Tongues :=
-    (e, (ManufacturedReflector.flip R).activatedState)
-  have haction := F.action_first_written
-  change R.actionSwitch ∈
-    (rawFirstWriterTimes w N start C.approach.length).map
-      (rawWriterAt w start) at haction
-  obtain ⟨actionTime, hactionTime, hwriter⟩ :=
-    List.mem_map.mp haction
-  have hactionData := mem_rawFirstWriterTimes_iff.mp hactionTime
-  by_cases hlater : exists laterTime,
-      actionTime < laterTime /\
-      laterTime < C.approach.length /\
-      RawProductiveAt w N start laterTime
-  · obtain ⟨laterTime, hleft, hright, hprod⟩ := hlater
-    exact ⟨actionTime, laterTime, hactionTime, hwriter,
-      hleft, hright, hprod⟩
+  obtain ⟨t, ht, hwriter⟩ := List.mem_map.mp F.action_first_written
+  have htData := mem_rawFirstWriterTimes_iff.mp ht
+  by_cases hlater : ∃ j, t < j ∧ j < C.approach.length ∧
+      RawProductiveAt w N (e, (ManufacturedReflector.flip R).activatedState) j
+  · obtain ⟨j, hj, hbound, hprod⟩ := hlater
+    exact ⟨t, j, ht, hwriter, hj, hbound, hprod⟩
   · exfalso
     apply F.old_corner_missing
-    let span := C.approach.length - (actionTime + 1)
-    have hsum : actionTime + 1 + span = C.approach.length := by
-      dsimp [span]
-      omega
-    have hfinish : stepN w (actionTime + 1 + span) start =
-        some (C.p, C.contactState) := by
-      rw [hsum]
-      simpa [start] using C.approach_trace.sound
-    have hquiet : forall j,
-        actionTime + 1 <= j ->
-        j < actionTime + 1 + span ->
-        Not (RawProductiveAt w N start j) := by
-      intro j hjLeft hjRight hprod
-      apply hlater
-      refine ⟨j, by omega, ?_, hprod⟩
-      rw [hsum] at hjRight
-      exact hjRight
-    have hstable := restrictedTonguesAt_eq_of_quiet_interval
-      hfinish hquiet
-    rw [hsum] at hstable
-    have hcontactRestriction :
-        VectorCount.restrict N C.contactState =
-          VectorCount.restrict N
-            (tonguesAt w start (actionTime + 1)) := by
-      simpa [restrictedTonguesAt, tonguesAt, C.approach_trace.sound,
-        start] using hstable
-    have hprod := hactionData.2.1
-    have hflipRaw := rawProductiveAt_restricted_flip hprod
-    have hflip :
-        VectorCount.restrict N
-            (tonguesAt w start (actionTime + 1)) =
-          VectorCount.restrict N
-            (flipAt (tonguesAt w start actionTime)
-              R.actionSwitch) := by
-      simpa [restrictedTonguesAt, hwriter] using hflipRaw
-    have hundoContact := restrict_flipAt_congr
-      (C := R.actionSwitch) hcontactRestriction
-    have hundoWrite := restrict_flipAt_congr
-      (C := R.actionSwitch) hflip
-    have holdCorner :
-        VectorCount.restrict N
-            (flipAt C.contactState R.actionSwitch) =
-          restrictedTonguesAt w N start actionTime := by
-      calc
-        VectorCount.restrict N
-            (flipAt C.contactState R.actionSwitch) =
-            VectorCount.restrict N
-              (flipAt (tonguesAt w start (actionTime + 1))
-                R.actionSwitch) := hundoContact
-        _ = VectorCount.restrict N
-              (flipAt
-                (flipAt (tonguesAt w start actionTime)
-                  R.actionSwitch)
-                R.actionSwitch) := hundoWrite
-        _ = restrictedTonguesAt w N start actionTime := by
-          rw [flipAt_flipAt]
-          rfl
-    rw [holdCorner]
-    exact C.mem_compressedLead_of_approach
-      (N := N) (Nat.le_of_lt hactionData.1)
+    have hrecover := last_productive_recovers C.approach_trace.sound htData.1 htData.2.1
+      (by grind)
+    rw [hwriter] at hrecover
+    rw [hrecover]
+    exact C.mem_compressedLead_of_approach (Nat.le_of_lt htData.1)
 
 /-- Writing a flip reflector's action switch on a switch-simple trace whose
 endpoints groove its support forces a constant-tongue retrace of the runway
@@ -431,12 +366,8 @@ theorem ManufacturedFlipReflector.no_productive_after_action_writer
   have htData := mem_rawFirstWriterTimes_iff.mp ht
   have hactionProd : RawProductiveAt w N start t := by
     simpa [start] using htData.2.1
-  obtain ⟨cur, next, writerSwitch, hwriterDef, hcur, hnext,
-      hstep, hexit, _hflip⟩ :=
+  obtain ⟨cur, next, hcur, hnext, hstep, hexit, _hflip⟩ :=
     rawProductiveAt_is_endpoint_pivot hactionProd
-  have hwriterSwitch : writerSwitch = R.actionSwitch := by
-    exact hwriterDef.trans (by simpa [start] using hwriter)
-  subst writerSwitch
   have hmouth : 3 * R.actionSwitch = R.mouth := by
     unfold ManufacturedFlipReflector.actionSwitch
     have hstem := R.mouth_is_stem
@@ -450,7 +381,7 @@ theorem ManufacturedFlipReflector.no_productive_after_action_writer
         · rfl
         · exact hparts.2.symm
       _ = (R.mouth, next.2) := by
-        rw [hexit, hwriterSwitch, hmouth]
+        rw [hexit, hwriter, hmouth]
   have hpostRunwayGrooved : PassagesGrooved next.2 R.runway := by
     have hpostPaths := htrace.pathGrooves_at_prefix_of_endpoints
       hsimple hstart hfinish
@@ -460,7 +391,7 @@ theorem ManufacturedFlipReflector.no_productive_after_action_writer
       exact List.mem_cons_self)
   have hpointwise :=
     (physicalTrace_contact_retraces_prefix_pointwise
-      R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive).2
+      R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive)
   have hbackTrace := physicalTrace_contact_retraces_prefix
     R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive
   let runwaySpan := R.runway.length + 1
@@ -507,7 +438,7 @@ theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.impossible
     (_hN : forall p q, w.link p = some q ->
       p < 3 * N /\ q < 3 * N)
     {R : ManufacturedFlipReflector w g e}
-    {C : SimpleContinuationChangedContact w
+    {C : PartialSecondRunSharp.ChangedContact w
       (ManufacturedReflector.flip R)}
     (F : C.RunwayNAddFourResidual (N := N) R)
     (hA : PathGrooves

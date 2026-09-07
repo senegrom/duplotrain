@@ -25,16 +25,6 @@ theorem stepN_flip_restore_pos
       simp [flipAt] at hbit
   | succ n => omega
 
-/-- Compatibility interface for flip traversals. -/
-theorem ManufacturedFlipReflector.travel_two_phase_stepN
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedFlipReflector w g e) (state : Tongues)
-    (hA : PathGrooves [A.runway, A.candy] state)
-    {d : Nat} (hd : d ≤ 2 * A.runway.length + A.candy.length + 2) :
-    ∃ port phase, stepN w d (g, state) = some (port, phase) ∧
-      (phase = state ∨ phase = flipAt state A.actionSwitch) :=
-  (ManufacturedReflector.flip A).travel_two_phase_stepN state hA hd
-
 /-- The pointwise support-fault dichotomy is a stem/branch split on the
 actual selected route, not a case split on where that route was stored. -/
 theorem ManufacturedReflector.support_fault_dichotomy_pointwise

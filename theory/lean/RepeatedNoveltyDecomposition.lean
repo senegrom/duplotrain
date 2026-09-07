@@ -2,37 +2,17 @@ import TrackEndpointMatching
 import ManufacturedPairNovelty
 
 /-!
-# Raw repeated-novelty decomposition
+# Recovering vectors around the last productive write
 
-This file works directly over `GeneralN.Wiring` and `stepN`.  It isolates the
-extra physical fact which is absent from an arbitrary word of bit flips:
-every productive write to switch `C` leaves over the one fixed plain-track
-edge `link (3*C)`.  Consequently all productive writes to the same switch
-have the same post-write entry port.
-
-The flip-label argument is formalised in two stages.
-
-* A last-previous occurrence of a repeated novel writer cannot close with a
-  productive-free interior.  Two flips of the same switch would restore the
-  complete restricted tongue vector to the vector immediately before the
-  first flip, contradicting novelty.
-* Choose the last productive event in that interior.  Its writer is a
-  different switch and its next entry is fixed by that switch's stem edge.
-  Looking backwards to that rerouter's last previous write gives exactly
-  three possibilities: a genuinely first writer, a crossing writer frame,
-  or a strictly nested writer frame.
-
-Thus the artificial word `1,...,N,1,...,N` cannot remain an unstructured
-source of `N` repeated novelties: after its first repeated event, each next
-rerouter exposes a crossing frame.  Mapping the raw crossing/nesting
-alternatives to the restoration and reflector novelty bounds is done
-downstream.  No finite-`N` exhaustion is used here.
+A quiet interval preserves the restricted vector. Each productive step flips
+its writer's bit, so undoing the last such flip recovers the vector immediately
+before that write. These facts work over raw `Wiring` and `stepN`.
 -/
 
 namespace GeneralN
 
 
-/-- Every prefix of a successful finite run is successful. -/
+/-- An interval without productive steps preserves the restricted vector. -/
 theorem restrictedTonguesAt_eq_of_quiet_interval
     {w : Wiring} {N : Nat} {start finish : Nat × Tongues}
     {first span : Nat}
@@ -89,10 +69,26 @@ theorem rawProductiveAt_restricted_flip
     restrictedTonguesAt w N start (k+1) =
       VectorCount.restrict N
         (flipAt (tonguesAt w start k) (rawWriterAt w start k)) := by
-  obtain ⟨cur, next, C, hC, hcur, hnext, _hstep,
-      _hexit, hflip⟩ :=
+  obtain ⟨cur, next, hcur, hnext, _hstep, _hexit, hflip⟩ :=
     rawProductiveAt_is_endpoint_pivot hprod
-  subst C
   simp [restrictedTonguesAt, tonguesAt, hcur, hnext, hflip]
+
+/-- Undoing the last productive write recovers the vector just before it. -/
+theorem last_productive_recovers
+    {w : Wiring} {N t limit : Nat} {start finish : Nat × Tongues}
+    (hfinish : stepN w limit start = some finish)
+    (ht : t < limit) (hprod : RawProductiveAt w N start t)
+    (hquiet : ∀ j, t < j → j < limit → ¬ RawProductiveAt w N start j) :
+    VectorCount.restrict N (flipAt finish.2 (rawWriterAt w start t)) =
+      restrictedTonguesAt w N start t := by
+  have hsum : t + 1 + (limit - (t + 1)) = limit := by omega
+  have hstable := restrictedTonguesAt_eq_of_quiet_interval
+    (first := t + 1) (span := limit - (t + 1))
+    (by simpa only [hsum] using hfinish)
+    (fun j hj hbound => hquiet j (by omega) (by omega))
+  have hend : VectorCount.restrict N finish.2 = restrictedTonguesAt w N start (t + 1) := by
+    simpa [hsum, restrictedTonguesAt, tonguesAt, hfinish] using hstable
+  simpa only [flipAt_flipAt, restrictedTonguesAt] using restrict_flipAt_congr
+    (C := rawWriterAt w start t) (hend.trans (rawProductiveAt_restricted_flip hprod))
 
 end GeneralN

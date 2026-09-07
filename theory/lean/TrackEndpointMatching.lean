@@ -38,21 +38,12 @@ theorem live_successor_configs
       stepN w k start = some cur ∧
       stepN w (k+1) start = some next ∧
       step w cur = some next := by
-  cases hnext : stepN w (k+1) start with
-  | none => simp [hnext] at hlive
-  | some next =>
-      have hsplit := stepN_add w k 1 start
-      rw [hnext] at hsplit
-      cases hcur : stepN w k start with
-      | none => simp [hcur] at hsplit
-      | some cur =>
-          rw [hcur] at hsplit
-          have hone : stepN w 1 cur = some next := by
-            simpa using hsplit.symm
-          have hstep : step w cur = some next := by
-            simpa [stepN] using hone
-          exact ⟨cur, next, rfl, rfl, hstep⟩
-
+  obtain ⟨next, hnext⟩ := Option.isSome_iff_exists.mp hlive
+  have h := hnext
+  rw [stepN_add] at h
+  cases hcur : stepN w k start with
+  | none => simp [hcur] at h
+  | some cur => exact ⟨cur, next, rfl, hnext, by simpa [hcur, stepN] using h⟩
 
 /-- Restricted-vector productivity is a genuine change of the entered
 switch's own tongue. -/
@@ -90,18 +81,14 @@ theorem rawProductiveAt_is_endpoint_pivot
     {w : Wiring} {N : Nat}
     {start : Nat × Tongues} {k : Nat}
     (hprod : RawProductiveAt w N start k) :
-    ∃ cur next C,
-      C = rawWriterAt w start k ∧
+    ∃ cur next,
       stepN w k start = some cur ∧
       stepN w (k+1) start = some next ∧
       step w cur = some next ∧
-      exitPort cur = 3*C ∧
-      next.2 = flipAt cur.2 C := by
+      exitPort cur = 3 * rawWriterAt w start k ∧
+      next.2 = flipAt cur.2 (rawWriterAt w start k) := by
   obtain ⟨cur, next, hcur, hnext, hstep, hchanged⟩ :=
     rawProductiveAt_changes_writer hprod
-  let C := cur.1/3
-  have hC : C = rawWriterAt w start k := by
-    simp [C, rawWriterAt, rawEntryAt, hcur]
   have hparts := step_some_parts hstep
   have harrive : arrive cur.2 cur.1 = (exitPort cur, next.2) := by
     apply Prod.ext
@@ -109,9 +96,8 @@ theorem rawProductiveAt_is_endpoint_pivot
     · exact hparts.2.symm
   obtain ⟨_hbranch, hexit, _hpin⟩ :=
     changed_arrival_is_trailing harrive hchanged
-  have hflip : next.2 = flipAt cur.2 C := by
-    exact changed_arrival_eq_flipAt harrive hchanged
-  refine ⟨cur, next, C, hC, hcur, hnext, hstep, ?_, hflip⟩
-  simpa [C] using hexit
+  refine ⟨cur, next, hcur, hnext, hstep, ?_, ?_⟩
+  · simpa [rawWriterAt, rawEntryAt, hcur] using hexit
+  · simpa [rawWriterAt, rawEntryAt, hcur] using changed_arrival_eq_flipAt harrive hchanged
 
 end GeneralN

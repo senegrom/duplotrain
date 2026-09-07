@@ -136,23 +136,6 @@ theorem map_passageSwitch_reversePassages
   exact List.map_congr_left fun passage hp =>
     htrace.passage_exit_switch passage (List.mem_reverse.mp hp)
 
-/-- A grooved prefix reaches the named passage without changing tongues;
-switch simplicity excludes that passage's switch from the prefix. -/
-theorem simple_grooved_trace_prefix_to_occurrence
-    {w : Wiring} {e : Nat} {base u : Tongues}
-    {path before after : List Passage} {p x : Nat}
-    {finish : Nat × Tongues}
-    (hstatic : PhysicalTrace w (e, base) path finish)
-    (hoccurs : path = before ++ (p, x) :: after)
-    (hgrooved : PassagesGrooved u path)
-    (hsimple : SwitchSimple path) :
-    PhysicalTrace w (e, u) before (p, u) ∧
-      (∀ passage ∈ before,
-        passageSwitch passage ≠ passageSwitch (p, x)) := by
-  subst path
-  obtain ⟨_, _, hprefix, _⟩ := hstatic.split_grooved_at hgrooved
-  exact ⟨hprefix, by grind [SwitchSimple]⟩
-
 /-! ## One deliberately broken groove -/
 
 /-- If a grooved passage is entered trailing-first after its switch has been

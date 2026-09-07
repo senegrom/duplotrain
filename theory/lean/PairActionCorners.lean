@@ -36,14 +36,10 @@ theorem manufactured_pair_all_time_action_corners_tongues
       manufacturedPairActionCorners A B state := by
   by_cases hcompatible : A.toSupported.action.Avoids B.toSupported.paths ∧
       B.toSupported.action.Avoids A.toSupported.paths
-  · have hm := manufactured_pair_all_time_four_phase_tongues
-      A B state hA hB hcompatible.1 hcompatible.2 d
-    have hc := A.toSupported.action.commute B.toSupported.action
-      (A.toSupported.action.apply state)
-    rw [A.toSupported.action.involutive] at hc
-    rw [hc] at hm
-    simp only [manufacturedPairActionCorners, List.mem_cons, List.not_mem_nil, or_false] at hm ⊢
-    grind
+  · obtain ⟨port, phase, hr, hs⟩ := A.pair_all_time_four_phase B state hA hB
+      hcompatible.1 hcompatible.2 d
+    simpa [tonguesAt, hr, manufacturedPairActionCorners,
+      A.toSupported.action.commute B.toSupported.action] using hs
   · cases A with
     | stay SA =>
         cases B with

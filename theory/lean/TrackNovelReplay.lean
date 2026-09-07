@@ -64,12 +64,47 @@ theorem backward_contact_all_time_two_phase
       obtain ⟨port, hr⟩ := hcycle.grooved_loop_all_time (by simp [cycle]) hgrooved (n + 1)
       exact ⟨port, v, (stepN_after_arrival hcontact (by omega)).trans hr, Or.inr rfl⟩
 
+/-- A backward contact with the selected route settles into the contact's
+ two tongue phases. Both approaches avoid the contacted switch, so the
+ arrival preserves every groove needed by the closed retrace. -/
+theorem ManufacturedReflector.backward_contact_two_phase
+    {w : Wiring} {g e p entry x : Nat} {base u v : Tongues}
+    (A : ManufacturedReflector w g e)
+    (hpaths : PathGrooves A.toSupported.paths u)
+    (hmem : (entry, x) ∈ A.orientedRoute u)
+    {approach : List Passage}
+    (happroach : PhysicalTrace w (e, base) approach (p, u))
+    (hsimple : SwitchSimple (approach ++ [(p, entry)]))
+    (hcontact : arrive u p = (entry, v)) :
+    ∀ d, ∃ port phase, stepN w d (p, u) = some (port, phase) ∧
+      (phase = u ∨ phase = v) := by
+  obtain ⟨recorded, tail, hsplit⟩ := List.append_of_mem hmem
+  have hroute := A.orientedRoute_trace u hpaths
+  have hs := A.orientedRoute_simple u
+  have hg := hroute.grooved_of_switchSimple hs
+  obtain ⟨_, _, hrecorded, _⟩ := (hsplit ▸ hroute).split_grooved_at (hsplit ▸ hg)
+  have hswitch : entry / 3 = p / 3 := by
+    simpa only [hcontact] using arrive_exit_switch u p
+  have hrecordedV : PassagesGrooved v recorded := by
+    apply (show PassagesGrooved u recorded from
+      fun passage hp => hg passage (by rw [hsplit]; simp [hp])).transfer
+    intro passage hp
+    apply arrive_preserves_other hcontact
+    rw [hsplit] at hs
+    grind [SwitchSimple, passageSwitch]
+  have ha := happroach.grooved_of_switchSimple (show SwitchSimple approach by grind [SwitchSimple])
+  apply backward_contact_all_time_two_phase hrecorded hrecordedV A.entryEdge hcontact
+    (happroach.replay_grooved u ha)
+  apply ha.transfer
+  intro passage hp
+  apply arrive_preserves_other hcontact
+  grind [SwitchSimple, passageSwitch]
+
 /-- Pointwise completed-retrace novelty theorem.
 
 At depth zero the original tongue vector is still present.  At every depth
 from the contact step through the final reverse passage (inclusive), the
-tongue vector is exactly `v`.  Moreover the contact either changed no tongue
-or flipped exactly the tongue of the contacted switch.
+tongue vector is exactly `v`.
 -/
 theorem physicalTrace_contact_retraces_prefix_pointwise
     {w : Wiring} {g e p oldEntry : Nat}
@@ -80,22 +115,9 @@ theorem physicalTrace_contact_retraces_prefix_pointwise
     (hgrooved : PassagesGrooved v recorded)
     (hentry : w.link e = some g)
     (hcontact : arrive u p = (oldEntry, v)) :
-    (v = u ∨ v = flipAt u (p / 3)) ∧
-      ∀ d, d ≤ recorded.length + 1 →
-        ∃ port, stepN w d (p, u) =
-          some (port, if d = 0 then u else v) := by
-  have hcontactShape : v = u ∨ v = flipAt u (p / 3) := by
-    by_cases hchanged : v (p / 3) ≠ u (p / 3)
-    · exact Or.inr (changed_arrival_eq_flipAt hcontact hchanged)
-    · left
-      have hsame : v (p / 3) = u (p / 3) := by
-        cases hv : v (p / 3) <;> cases hu : u (p / 3) <;>
-          simp_all
-      funext j
-      by_cases hj : j = p / 3
-      · simpa [hj] using hsame
-      · exact arrive_preserves_other hcontact hj
-  refine ⟨hcontactShape, ?_⟩
+    ∀ d, d ≤ recorded.length + 1 →
+      ∃ port, stepN w d (p, u) =
+        some (port, if d = 0 then u else v) := by
   intro d hd
   cases d with
   | zero =>

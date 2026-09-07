@@ -6,7 +6,7 @@ import TrackThetaPointwiseCore
 Closing a boundary invariant under positive-length excursions yields absolute
 phase covers: a one-sided theta intersection visits at most **four** tongue
 vectors at *every* time, a mutual intersection at most **three**.  Together
-with `manufactured_pair_all_time_four_phase_tongues` (the avoiding case)
+with `ManufacturedReflector.pair_all_time_four_phase` (the avoiding case)
 this removes the last time-counted lasso from the flip/flip reflector-pair
 analysis: `manufactured_flip_pair_all_time_four_phase` below covers every
 flip/flip pair, however its supports intersect, by the same four vectors
@@ -52,7 +52,8 @@ theorem manufactured_theta_half_pointwise
         (phase = state ∨ phase = flipAt state A.actionSwitch ∨
           phase = flipAt state B.actionSwitch) := by
     intro d hd
-    obtain ⟨port, phase, hr, hp⟩ := A.travel_two_phase_stepN state hA hd
+    obtain ⟨port, phase, hr, hp⟩ := (ManufacturedReflector.flip A).travel_two_phase_stepN state hA hd
+    change phase = state ∨ phase = flipAt state A.actionSwitch at hp
     exact ⟨port, phase, hr, by grind⟩
   rcases manufactured_support_fault_dichotomy_pointwise
       A B state hA hB hcontact with ⟨cap, hc, hp⟩ | ⟨hr, hp⟩
@@ -67,7 +68,8 @@ theorem manufactured_theta_half_pointwise
         obtain ⟨port, phase, hr, hv⟩ := hp d hd
         exact ⟨port, phase, hr, by grind⟩
       · intro d hd
-        obtain ⟨port, phase, hr, hv⟩ := B.travel_two_phase_stepN state hB hd
+        obtain ⟨port, phase, hr, hv⟩ := (ManufacturedReflector.flip B).travel_two_phase_stepN state hB hd
+        change phase = state ∨ phase = flipAt state B.actionSwitch at hv
         exact ⟨port, phase, hr, by grind⟩
   · refine ⟨A.toSupported.travel + B.toSupported.travel, by omega, ?_, ?_⟩
     · rw [stepN_add, hArun]; exact hr
@@ -147,7 +149,8 @@ theorem manufactured_two_sided_theta_all_time_three_phase
         (ManufacturedReflector.flip A).travel_pos, (A.toSupported.run state hA).1,
         Or.inr (Or.inl rfl), ?_⟩
       intro t ht
-      obtain ⟨port, phase, hr, hp⟩ := A.travel_two_phase_stepN state hA ht
+      obtain ⟨port, phase, hr, hp⟩ := (ManufacturedReflector.flip A).travel_two_phase_stepN state hA ht
+      change phase = state ∨ phase = flipAt state A.actionSwitch at hp
       exact ⟨port, phase, hr, by rcases hp with rfl | rfl <;> simp [safe]⟩
     · rcases manufactured_support_fault_dichotomy_pointwise A B state hA hB hAB with
         ⟨travel, hr, hp⟩ | ⟨hr, hp⟩
@@ -177,7 +180,8 @@ theorem manufactured_two_sided_theta_all_time_three_phase
         (ManufacturedReflector.flip B).travel_pos, (B.toSupported.run state hB).1,
         Or.inr (Or.inr (Or.inl rfl)), ?_⟩
       intro t ht
-      obtain ⟨port, phase, hr, hp⟩ := B.travel_two_phase_stepN state hB ht
+      obtain ⟨port, phase, hr, hp⟩ := (ManufacturedReflector.flip B).travel_two_phase_stepN state hB ht
+      change phase = state ∨ phase = flipAt state B.actionSwitch at hp
       exact ⟨port, phase, hr, by rcases hp with rfl | rfl <;> simp [safe]⟩
   exact stepN_covered_of_progress boundary safe hprogress (Or.inl rfl) d
 
@@ -203,26 +207,20 @@ theorem manufactured_flip_pair_all_time_four_phase
         flipAt (flipAt state FA.actionSwitch) FB.actionSwitch] := by
   by_cases hAB : (LocalAction.flip FA.actionSwitch).Avoids [FB.runway, FB.candy]
   · by_cases hBA : (LocalAction.flip FB.actionSwitch).Avoids [FA.runway, FA.candy]
-    · obtain ⟨port, phase, hr, hm⟩ := FA.toSupported.pair_all_time_four_phase FB.toSupported
-        (ManufacturedReflector.flip FA).travel_pos (ManufacturedReflector.flip FB).travel_pos
-        (fun u hu _ ht => FA.travel_two_phase_stepN u hu ht)
-        (fun u hu _ ht => FB.travel_two_phase_stepN u hu ht)
-        state hA hB hAB hBA d
-      have hcancel : flipAt (flipAt (flipAt state FA.actionSwitch) FB.actionSwitch)
-          FA.actionSwitch = flipAt state FB.actionSwitch := by
-        simpa only [LocalAction.apply, flipAt_flipAt] using
-          (LocalAction.flip FA.actionSwitch).commute (.flip FB.actionSwitch)
-            (flipAt state FA.actionSwitch)
-      change phase ∈ [state, flipAt state FA.actionSwitch,
-        flipAt (flipAt state FA.actionSwitch) FB.actionSwitch,
-        flipAt (flipAt (flipAt state FA.actionSwitch) FB.actionSwitch) FA.actionSwitch] at hm
-      exact ⟨port, phase, hr, by rw [hcancel] at hm; grind⟩
+    · obtain ⟨port, phase, hr, hm⟩ := (ManufacturedReflector.flip FA).pair_all_time_four_phase
+        (.flip FB) state hA hB hAB hBA d
+      have hcomm : flipAt (flipAt state FB.actionSwitch) FA.actionSwitch =
+          flipAt (flipAt state FA.actionSwitch) FB.actionSwitch :=
+        (LocalAction.flip FA.actionSwitch).commute (.flip FB.actionSwitch) state
+      exact ⟨port, phase, hr, by simpa only [ManufacturedReflector.toSupported, ManufacturedFlipReflector.toSupported,
+        LocalAction.apply, hcomm] using hm⟩
     · have htail := manufactured_one_sided_theta_all_time_four_phase FB FA
         (flipAt state FA.actionSwitch) (hB.after_avoiding_action hAB)
         (FA.toSupported.run state hA).2 (contact_of_not_avoids_flip hBA) hAB
       apply stepN_cover_append (right := d) (FA.toSupported.run state hA).1 ?_ ?_ d (by omega)
       · intro t ht
-        obtain ⟨port, phase, hr, hp⟩ := FA.travel_two_phase_stepN state hA ht
+        obtain ⟨port, phase, hr, hp⟩ := (ManufacturedReflector.flip FA).travel_two_phase_stepN state hA ht
+        change phase = state ∨ phase = flipAt state FA.actionSwitch at hp
         exact ⟨port, phase, hr, by grind⟩
       · intro t _
         obtain ⟨port, phase, hr, hp⟩ := htail t
