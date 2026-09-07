@@ -1,4 +1,4 @@
-# gate v3: Git-data trigger with hash-locked applier
+# gate v4: Git-data trigger with hash-locked applier and explicit browser matrix
 name: Verify and publish editor optimization
 on:
   push:
@@ -54,6 +54,10 @@ jobs:
       - run: node --test tests/web/*.test.cjs
       - run: python webapp/build.py
       - run: python -m pytest tests/browser -m browser -v
+        env:
+          DUPLOTRAIN_REQUIRE_BROWSER: '1'
+          DUPLOTRAIN_BROWSER: ${{ matrix.browser }}
+          DUPLOTRAIN_STATIC_DIST: ${{ github.workspace }}/webapp/dist
 
   publish:
     needs: [python, browser]
