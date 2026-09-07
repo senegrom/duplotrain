@@ -598,20 +598,8 @@ theorem ManufacturedReflector.FacingForwardMerge.one_novelty_of_preReturn
   subst B
   obtain ⟨candyBefore, candyAfter, hcandySplit⟩ :=
     List.append_of_mem hcandyMem
-  have hrouteSimple :=
-    A.orientedRoute_simple
-      (ManufacturedReflector.flip R).activatedState
-  rw [hrouteSplit] at hrouteSimple
-  have hbeforeSimple : SwitchSimple before := by
-    unfold SwitchSimple at hrouteSimple ⊢
-    simp only [List.map_append, List.map_cons] at hrouteSimple
-    exact (List.nodup_append.mp hrouteSimple).1
-  have hbeforeRoute : ∀ passage ∈ before,
-      passage ∈ A.orientedRoute
-        (ManufacturedReflector.flip R).activatedState := by
-    intro passage hpassage
-    rw [hrouteSplit]
-    exact List.mem_append_left _ hpassage
+  obtain ⟨hbeforeSimple, hbeforeRoute⟩ := A.orientedRoute_prefix_simple_and_mem
+    (ManufacturedReflector.flip R).activatedState hrouteSplit
   have hrelation := A.repair_prefix_contact_eq_activated_or_preReturn
     (.flip R) hA hBstart hprefix hbeforeSimple hbeforeRoute hpaths
   have hpreAction :

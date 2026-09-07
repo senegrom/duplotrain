@@ -306,3 +306,12 @@ def test_cached_local_footprint_matches_direct_layout_bounds():
                 (x0 + bx0, y0 + by0, x0 + bx1, y0 + by1), abs=1e-12
             )
     assert _local_footprint_bounds.cache_info().hits > 0
+
+def test_alg_hash_memo_is_not_a_constructor_field():
+    x = Alg(1, 2, 3, 4)
+    assert hash(x) == hash(x)
+    assert replace(x, a=5) == Alg(5, 2, 3, 4)
+    assert pickle.loads(pickle.dumps(x)) == x
+    assert hash(pickle.loads(pickle.dumps(x))) == hash(x)
+    assert hash(copy.deepcopy(x)) == hash(x)
+    assert repr(x) == repr(Alg(1, 2, 3, 4))

@@ -25,7 +25,7 @@ answer rather than a judgement call.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from typing import Union
 
@@ -67,7 +67,7 @@ class Alg:
     b: Fraction
     c: Fraction
     d: Fraction
-    _hash: int | None
+    _hash: int | None = field(init=False, repr=False, compare=False)
 
     def __init__(
         self,

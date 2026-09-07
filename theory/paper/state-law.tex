@@ -629,11 +629,13 @@ $N+3$ or less.
 \end{lemma}
 
 Packaging the closed tree gives the keystone, discharged inline in
-\lean{state\_law\_N\_add\_four}:
+\lean{state\_law\_N\_add\_four}: the probe
+\lean{known\_edge\_N\_add\_four\_or\_changed\_contact\_or\_protected\_pair}
+leaves the two residual branches, closed by
+\lean{ChangedContact.all\_run\_distinct\_le\_N\_add\_four} and
+\lean{knownEdgeProtectedPairNAddFourLaw}.
 
 \begin{theorem}[Known incoming edge;
-  \lean{known\_edge\_N\_add\_four\_or\_protected\_pair} with
-  \lean{knownEdgeProtectedPairNAddFourLaw},
   \file{StateLawNAddFourSharp.lean}]\label{thm:knownedge}
   On a wiring total below $3N$, if the start is entered over a wired edge,
   every duplicate-free list of

@@ -57,6 +57,19 @@ the retrace/replay cycle has only the incoming contact vector and its settled
 post-contact vector.  The whole branch therefore has at most three vectors.
 -/
 
+/-- A prefix of the oriented route is switch-simple and stays on the route. -/
+theorem ManufacturedReflector.orientedRoute_prefix_simple_and_mem
+    {w : Wiring} {g e : Nat} (A : ManufacturedReflector w g e) (state : Tongues)
+    {before rest : List Passage}
+    (hsplit : A.orientedRoute state = before ++ rest) :
+    SwitchSimple before ∧ ∀ passage ∈ before, passage ∈ A.orientedRoute state := by
+  have hrouteSimple := A.orientedRoute_simple state
+  rw [hsplit] at hrouteSimple
+  refine ⟨?_, fun passage hp => by rw [hsplit]; exact List.mem_append_left _ hp⟩
+  unfold SwitchSimple at hrouteSimple ⊢
+  simp only [List.map_append] at hrouteSimple
+  exact (List.nodup_append.mp hrouteSimple).1
+
 /-- **Protected facing-forward count:** at most three distinct restricted
 tongue vectors. -/
 theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
@@ -84,20 +97,8 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
       htailAlternate, htailContactPhase, htailAlternatePhase⟩ :=
     R.reverse_candy_suffix_absorbs_twoPhases contact hpaths hsecond
       hcandySplit
-  have hrouteSimple :=
-    A.orientedRoute_simple
-      (ManufacturedReflector.flip R).activatedState
-  rw [hrouteSplit] at hrouteSimple
-  have hbeforeSimple : SwitchSimple before := by
-    unfold SwitchSimple at hrouteSimple ⊢
-    simp only [List.map_append, List.map_cons] at hrouteSimple
-    exact (List.nodup_append.mp hrouteSimple).1
-  have hbeforeRoute : ∀ passage ∈ before,
-      passage ∈ A.orientedRoute
-        (ManufacturedReflector.flip R).activatedState := by
-    intro passage hpassage
-    rw [hrouteSplit]
-    exact List.mem_append_left _ hpassage
+  obtain ⟨hbeforeSimple, hbeforeRoute⟩ := A.orientedRoute_prefix_simple_and_mem
+    (ManufacturedReflector.flip R).activatedState hrouteSplit
   have hprefixPhase := A.repair_prefix_two_phase (.flip R) hA hBstart
     hprefix hbeforeSimple hbeforeRoute hpaths
   have hbeforeGrooved : PassagesGrooved contact before :=

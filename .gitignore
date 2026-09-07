@@ -31,3 +31,5 @@ out/
 # Web app build artifacts (deployed copy lives in the website repo)
 webapp/dist/
 webapp/vendor/
+# scratch output of the Lean axiom audit step
+theory/lean/audit.log

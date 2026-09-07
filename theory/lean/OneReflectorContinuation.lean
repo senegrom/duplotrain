@@ -65,9 +65,10 @@ theorem PhysicalTrace.productive_writer_not_old_reusable
     _ = start.2 (old.2 / 3) := hagree.symm
     _ = start.2 (rawWriterAt w start k) := by rw [hexit, hswitch]
 
-/-- The old reusable coordinates and the first productive writers of a
-support-preserving simple continuation share one ambient switch budget. -/
-theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
+/-- The old reusable coordinates, the first productive writers of a
+support-preserving simple continuation, and any duplicate-free list of extra
+switches avoiding both share one ambient switch budget. -/
+theorem ManufacturedReflector.reusable_add_continuation_first_writers_add_extras_le
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →
       p < 3 * N ∧ q < 3 * N)
@@ -77,9 +78,15 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
     (htrace : PhysicalTrace w start passages finish)
     (hsimple : SwitchSimple passages)
     (hbase : PathGrooves A.toSupported.paths start.2)
-    (hend : PathGrooves A.toSupported.paths finish.2) :
+    (hend : PathGrooves A.toSupported.paths finish.2)
+    (extras : List Nat)
+    (hextrasNodup : extras.Nodup)
+    (hextrasLt : ∀ s ∈ extras, s < N)
+    (hextrasReusable : ∀ s ∈ extras, s ∉ A.reusableSwitches)
+    (hextrasWriters : ∀ s ∈ extras,
+      s ∉ (rawFirstWriterTimes w N start passages.length).map (rawWriterAt w start)) :
     A.reusableSwitches.length +
-      (rawFirstWriterTimes w N start passages.length).length ≤ N := by
+      (rawFirstWriterTimes w N start passages.length).length + extras.length ≤ N := by
   let times := rawFirstWriterTimes w N start passages.length
   let writers := times.map (rawWriterAt w start)
   have htimesNodup : times.Nodup := by
@@ -107,13 +114,20 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
     apply houtside
     rw [← hEq]
     exact hOld
-  let switches := A.reusableSwitches ++ writers
+  let switches := extras ++ (A.reusableSwitches ++ writers)
   have hnd : switches.Nodup := by
     dsimp [switches]
-    exact List.nodup_append.mpr
-      ⟨A.reusableSwitches_nodup, hwritersNodup, hdisjoint⟩
+    refine List.nodup_append.mpr ⟨hextrasNodup,
+      List.nodup_append.mpr ⟨A.reusableSwitches_nodup, hwritersNodup, hdisjoint⟩, ?_⟩
+    intro s hs t ht hEq
+    subst hEq
+    rcases List.mem_append.mp ht with hold | hfresh
+    · exact hextrasReusable s hs hold
+    · exact hextrasWriters s hs hfresh
   have hlt : ∀ C ∈ switches, C < N := by
     intro C hC
+    rcases List.mem_append.mp hC with hextra | hC
+    · exact hextrasLt C hextra
     rcases List.mem_append.mp hC with hOld | hFresh
     · exact A.reusableSwitch_lt hN hOld
     · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
@@ -121,10 +135,26 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
         simpa [times] using hk)
       exact rawProductiveAt_writer_lt hN hkData.2.1
   have hbound := nodup_nat_lt_length hnd hlt
-  have hlength :
-      A.reusableSwitches.length + times.length ≤ N := by
-    simpa [switches, writers] using hbound
-  simpa [times] using hlength
+  simp only [switches, writers, times, List.length_append, List.length_map] at hbound
+  omega
+
+/-- The old reusable coordinates and the first productive writers of a
+support-preserving simple continuation share one ambient switch budget. -/
+theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    {start finish : Nat × Tongues}
+    {passages : List Passage}
+    (htrace : PhysicalTrace w start passages finish)
+    (hsimple : SwitchSimple passages)
+    (hbase : PathGrooves A.toSupported.paths start.2)
+    (hend : PathGrooves A.toSupported.paths finish.2) :
+    A.reusableSwitches.length +
+      (rawFirstWriterTimes w N start passages.length).length ≤ N := by
+  simpa using A.reusable_add_continuation_first_writers_add_extras_le hN htrace hsimple
+    hbase hend [] List.nodup_nil (by simp) (by simp) (by simp)
 
 /-- Compressed history for one completed reflector and a subsequent
 support-preserving switch-simple continuation. -/

@@ -183,79 +183,10 @@ theorem PartialSecondRunSharp.ChangedContact.reusable_add_approach_writers_add_e
     (ManufacturedReflector.flip R).reusableSwitches.length +
         (rawFirstWriterTimes w N
           (e, (ManufacturedReflector.flip R).activatedState)
-          C.approach.length).length + extras.length <= N := by
-  let times := rawFirstWriterTimes w N
-    (e, (ManufacturedReflector.flip R).activatedState)
-    C.approach.length
-  let writers := times.map
-    (rawWriterAt w
-      (e, (ManufacturedReflector.flip R).activatedState))
-  have htimesNodup : times.Nodup := by
-    dsimp [times, rawFirstWriterTimes]
-    exact nodup_filter_nat _ List.nodup_range
-  have hwritersNodup : writers.Nodup := by
-    dsimp [writers]
-    apply nodup_map_of_injective_on_mem
-    · intro i hi j hj hEq
-      have hiData := mem_rawFirstWriterTimes_iff.mp (by
-        simpa [times] using hi)
-      have hjData := mem_rawFirstWriterTimes_iff.mp (by
-        simpa [times] using hj)
-      exact rawFirstWriterAt_injective hiData.2 hjData.2 hEq
-    · exact htimesNodup
-  have hdisjoint :
-      forall oldSwitch,
-        oldSwitch ∈ (ManufacturedReflector.flip R).reusableSwitches ->
-      forall freshSwitch, freshSwitch ∈ writers ->
-        oldSwitch ≠ freshSwitch := by
-    intro oldSwitch hOld freshSwitch hFresh hEq
-    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
-    have hkData := mem_rawFirstWriterTimes_iff.mp (by
-      simpa [times] using hk)
-    have houtside :=
-      C.approach_trace.productive_writer_not_old_reusable (ManufacturedReflector.flip R) C.approach_simple
-        hA C.old_grooves hkData.1 hkData.2.1
-    apply houtside
-    rw [← hEq]
-    exact hOld
-  let occupied :=
-    (ManufacturedReflector.flip R).reusableSwitches ++ writers
-  have hoccupiedNodup : occupied.Nodup := by
-    dsimp [occupied]
-    exact List.nodup_append.mpr
-      ⟨(ManufacturedReflector.flip R).reusableSwitches_nodup,
-        hwritersNodup, hdisjoint⟩
-  have hextrasNotOccupied : forall s, s ∈ extras -> Not (s ∈ occupied) := by
-    intro s hs hm
-    rcases List.mem_append.mp hm with hold | hfresh
-    · exact hextrasReusable s hs hold
-    · apply hextrasApproach s hs
-      simpa [PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches,
-        writers, times] using hfresh
-  have hallNodup : (extras ++ occupied).Nodup :=
-    List.nodup_append.mpr
-      ⟨hextrasNodup, hoccupiedNodup,
-        fun s hs t ht hEq => hextrasNotOccupied s hs (hEq ▸ ht)⟩
-  have hallLt : forall switch,
-      switch ∈ extras ++ occupied -> switch < N := by
-    intro switch hswitch
-    rcases List.mem_append.mp hswitch with hextra | hoccupied
-    · exact hextrasLt switch hextra
-    rcases List.mem_append.mp hoccupied with hold | hfresh
-    · exact (ManufacturedReflector.flip R).reusableSwitch_lt hN hold
-    · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hfresh
-      have hkData := mem_rawFirstWriterTimes_iff.mp (by
-        simpa [times] using hk)
-      exact rawProductiveAt_writer_lt hN hkData.2.1
-  have hbound := nodup_nat_lt_length hallNodup hallLt
-  have hlength :
-      (extras ++ occupied).length =
-        (ManufacturedReflector.flip R).reusableSwitches.length +
-          times.length + extras.length := by
-    simp [occupied, writers]
-    omega
-  rw [hlength] at hbound
-  simpa [times] using hbound
+          C.approach.length).length + extras.length <= N := 
+  (ManufacturedReflector.flip R).reusable_add_continuation_first_writers_add_extras_le hN
+    C.approach_trace C.approach_simple hA C.old_grooves extras hextrasNodup hextrasLt
+    hextrasReusable hextrasApproach
 
 /-- Every reserve in `extras` removes one unit from the generic `N+3`
 compressed-lead budget. -/
@@ -375,121 +306,20 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
       (e, (ManufacturedReflector.flip R).activatedState)
       times (C.compressedLead N) 1 ∨
     Nonempty (C.RunwayNAddFourResidual (N := N) R) := by
-  obtain ⟨entry, mouth, returnPort, outside, oldPrefix, oldTail,
-      candy, hentryOld, hrouteSplit, hOldTail,
-      hApproachReplay, hApproachGrooved,
-      hApproachForeign, hentryBranch, _hmouthStem,
-      hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
-      hRpaths, _hCandy, hCandyForeignNew, hLobe, hreach⟩ :=
-    partial_first_forward_contact_active_lead
-      (A := ManufacturedReflector.flip R) C.split C.full_simple
-      C.approach_trace C.old_grooves C.arrive_eq C.changed
-      C.oriented_mem C.oriented_groove C.oriented_switch
-      hforward hrepair hrestored
-  let K := C.approach.length + 1
-  let state := C.contactState
-  have hreach' : stepN w K
-      (e, (ManufacturedReflector.flip R).activatedState) =
-        some (outside, flipAt state (mouth / 3)) := by
-    simpa [K, state] using hreach
-  have hnextAlternate : C.nextState = flipAt state (mouth / 3) :=
-    C.nextState_eq_of_post hreach'
-  have hentryHistorical :
-      VectorCount.restrict N (flipAt state (mouth / 3)) ∈ C.compressedLead N := by
-    simpa [hnextAlternate] using C.next_mem_compressedLead (N := N)
-  have hstateHistorical :
-      VectorCount.restrict N state ∈ C.compressedLead N := by
-    simpa [state] using C.contact_mem_compressedLead (N := N)
-  have hleadHistorical : forall j, j ∈ times -> j < K ->
-      restrictedTonguesAt w N
-        (e, (ManufacturedReflector.flip R).activatedState) j ∈
-          C.compressedLead N := by
-    intro j _hj hjK
-    exact C.mem_compressedLead_of_approach (N := N) (by
-      dsimp [K] at hjK
-      omega)
-  by_cases hrunway : (entry, mouth) ∈ R.runway
-  · obtain ⟨before, after, hrunwaySplit⟩ :=
-      List.append_of_mem hrunway
-    obtain ⟨D, hDAction, hEntryOldNe, hDpaths,
-        hNewAvoidsDRaw⟩ :=
-      R.suffix_after_runway_passage state hRpaths
-        hrunwaySplit hmouthLink
-    have hentrySwitch : entry / 3 = mouth / 3 := by
-      have hheadGroove : arrive state entry = (mouth, state) :=
-        hfullGrooved (mouth, entry) List.mem_cons_self
-      have hswitch := arrive_exit_switch state entry
-      rw [hheadGroove] at hswitch
-      exact hswitch.symm
-    have hActionsNe : mouth / 3 ≠ D.actionSwitch := by
-      rw [← hentrySwitch]
-      exact hEntryOldNe
-    have hNewAvoidsD :
-        (LocalAction.flip (mouth / 3)).Avoids D.toSupported.paths := by
-      simpa [hentrySwitch] using hNewAvoidsDRaw
-    by_cases holdHistorical :
-        VectorCount.restrict N
-          (flipAt state R.actionSwitch) ∈ C.compressedLead N
-    · have holdHistoricalD :
-          VectorCount.restrict N
-            (flipAt state D.actionSwitch) ∈ C.compressedLead N := by
-        simpa [hDAction] using holdHistorical
-      by_cases hcontact : exists passage, passage ∈ candy /\
-          passageSwitch passage = D.actionSwitch
-      · left
-        exact ⟨[VectorCount.restrict N (flipAt (flipAt state (mouth / 3)) D.actionSwitch)],
-          by simp,
-          cover_of_live_phase_orbit
-            (phases := [flipAt state (mouth / 3),
-              flipAt (flipAt state (mouth / 3)) D.actionSwitch,
-              state, flipAt state D.actionSwitch]) hreach'
-            (manufactured_flip_arbitrary_lobe_all_time_four_phase D state hDpaths
-              hNewAvoidsD hentryBranch hentrySwitch hfullGrooved hfullTrace hcrossed
-              hCandyForeignNew hLobe hmouthLink hcontact)
-            (by simp [hentryHistorical, hstateHistorical, holdHistoricalD])
-            hleadHistorical⟩
-      · have hCandyForeignOld : forall passage, passage ∈ candy ->
-            passageSwitch passage ≠ D.actionSwitch := by
-          intro passage hp hEq
-          exact hcontact ⟨passage, hp, hEq⟩
-        left
-        exact ⟨[VectorCount.restrict N (flipAt (flipAt state (mouth / 3)) D.actionSwitch)],
-          by simp,
-          cover_of_live_phase_orbit
-            (phases := [flipAt state (mouth / 3),
-              flipAt (flipAt state (mouth / 3)) D.actionSwitch,
-              flipAt state D.actionSwitch, state]) hreach'
-            (manufactured_suffix_explicit_lobe_all_time_four_phase D state hDpaths
-              hNewAvoidsD hActionsNe hentryBranch hentrySwitch hfullGrooved hfullTrace
-              hcrossed hCandyForeignNew hCandyForeignOld hLobe hmouthLink)
-            (by simp [hentryHistorical, hstateHistorical, holdHistoricalD])
-            hleadHistorical⟩
-    · right
-      have hmissingR : Not (VectorCount.restrict N
-          (flipAt C.contactState R.actionSwitch) ∈
-            C.compressedLead N) := by
-        simpa [state] using holdHistorical
-      exact ⟨{
-        action_first_written := haction
-        old_corner_missing := hmissingR
-      }⟩
-  · obtain ⟨old, hold, horientation⟩ :=
-      R.nonrunway_oriented_branch_entry_is_candy state
-        hentryOld hrunway hentryBranch
-    have hentryGrooved : arrive state entry = (mouth, state) :=
-      hfullGrooved (mouth, entry) List.mem_cons_self
-    exact Or.inl ⟨[VectorCount.restrict N
-        (flipAt (flipAt state (mouth / 3)) R.actionSwitch)], by simp,
-      cover_of_live_phase_orbit
-        (phases := [flipAt state (mouth / 3),
-          flipAt (flipAt state (mouth / 3)) R.actionSwitch]) hreach'
-        (fun d => by
-          simpa only [List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] using
-            manufactured_flip_candy_splice_all_two_phases
-              R state hRpaths hrouteSplit hOldTail hrunway hentryBranch
-              hold horientation hentryGrooved hApproachReplay
-              hApproachGrooved hApproachForeign hcrossed hmouthLink harms d)
-        (by simp [hentryHistorical]) hleadHistorical⟩
+  by_cases hold : VectorCount.restrict N (flipAt C.contactState R.actionSwitch) ∈
+      C.compressedLead N
+  · left
+    refine ⟨[VectorCount.restrict N (flipAt C.nextState R.actionSwitch)], by simp,
+      fun k hk => ?_⟩
+    have h := C.forward_flip_corner_cover (N := N) hforward hrepair hrestored times k hk
+    simp only [List.mem_append, List.mem_cons, List.mem_singleton, List.not_mem_nil,
+      or_false] at h ⊢
+    rcases h with h | h | h
+    · exact Or.inl h
+    · exact Or.inr h
+    · rw [h]
+      exact Or.inl hold
+  · exact Or.inr ⟨{ action_first_written := haction, old_corner_missing := hold }⟩
 
 /-- **Sharp changed-contact frontier.**  For arbitrary `N`, every changed
 support contact is bounded by `N+4` unless it yields the explicit runway
