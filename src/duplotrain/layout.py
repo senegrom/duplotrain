@@ -20,7 +20,8 @@ from typing import Any
 
 from .exact import Alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose, cos_sin
-from .pieces import PieceType
+from .pieces import Path as TrackPath
+from .pieces import PieceType, _sample_paths
 from .validation import check_layout_json, rational_coefficient
 
 __all__ = ["Placement", "End", "Layout", "layout_to_dict", "layout_from_dict"]
@@ -77,6 +78,58 @@ def _heading_trig(heading: int) -> tuple[float, float]:
     """
     theta = math.radians((heading % HEADING_STEPS) * DEGREES_PER_STEP)
     return math.cos(theta), math.sin(theta)
+
+
+
+
+@lru_cache(maxsize=2048)
+def _local_footprint_bounds(
+    paths: tuple[TrackPath, ...], width: float, end_overhang: float, heading: int
+) -> tuple[float, float, float, float]:
+    """Sampled piece footprint at one heading, relative to the frame origin.
+
+    Piece geometry and the 24 possible headings repeat across every placement. The
+    expensive tangent/normal expansion therefore belongs to the piece+heading, not
+    to its translation in a particular Layout.
+    """
+    min_x = min_y = float("inf")
+    max_x = max_y = float("-inf")
+
+    def grow(x: float, y: float) -> None:
+        nonlocal min_x, min_y, max_x, max_y
+        min_x, max_x = min(min_x, x), max(max_x, x)
+        min_y, max_y = min(min_y, y), max(max_y, y)
+
+    hw = width / 2.0
+    cos_t, sin_t = _heading_trig(heading)
+    for local_line in _sample_paths(paths, 8.0):
+        line = [
+            (cos_t * x - sin_t * y, sin_t * x + cos_t * y)
+            for x, y, _z in local_line
+        ]
+        if len(line) < 2:
+            for x, y in line:
+                grow(x - hw, y - hw)
+                grow(x + hw, y + hw)
+            continue
+        n = len(line)
+        for i, (x, y) in enumerate(line):
+            ax, ay = line[max(0, i - 1)]
+            bx, by = line[min(n - 1, i + 1)]
+            dx, dy = bx - ax, by - ay
+            norm = math.hypot(dx, dy) or 1.0
+            nx, ny = -dy / norm, dx / norm
+            grow(x + nx * hw, y + ny * hw)
+            grow(x - nx * hw, y - ny * hw)
+            if end_overhang and i in (0, n - 1):
+                direction = -1.0 if i == 0 else 1.0
+                ox = x + direction * dx / norm * end_overhang
+                oy = y + direction * dy / norm * end_overhang
+                grow(ox + nx * hw, oy + ny * hw)
+                grow(ox - nx * hw, oy - ny * hw)
+    if min_x > max_x:
+        return (0.0, 0.0, 0.0, 0.0)
+    return (min_x, min_y, max_x, max_y)
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,14 +228,20 @@ class Layout:
             if (i, p) not in links and p not in placement.piece.sealed
         ]
 
-    def matable_pairs(self) -> list[tuple[End, End]]:
+    def matable_pairs(
+        self, port_poses: Mapping[End, Pose] | None = None
+    ) -> list[tuple[End, End]]:
         """Exactly coincident, oppositely facing open ends, in endpoint order.
 
         Index each exact pose once instead of reconstructing it for every pair.
-        Work is linear in the number of ends plus the number of matching pairs
-        (apart from hash-table costs). No floating-point tolerance is introduced.
+        ``port_poses`` lets serializers that already need every connector reuse those
+        transforms instead of hashing/rebuilding them a second time.
         """
-        poses = [(end, self.pose_of(end)) for end in self.connectable_ends()]
+        ends = self.connectable_ends()
+        poses = [
+            (end, self.pose_of(end) if port_poses is None else port_poses[end])
+            for end in ends
+        ]
         by_pose: dict[Pose, list[End]] = {}
         for end, pose in poses:
             by_pose.setdefault(pose, []).append(end)
@@ -207,7 +266,9 @@ class Layout:
         """
         return bool(self.placements) and not self.connectable_ends()
 
-    def joint_issues(self) -> list[dict[str, Any]]:
+    def joint_issues(
+        self, port_poses: Mapping[End, Pose] | None = None
+    ) -> list[dict[str, Any]]:
         """Audit each recorded joint once, independently of topological closure.
 
         Nonzero planar gaps may be deliberate forced fits; importing them is
@@ -219,7 +280,10 @@ class Layout:
         for a, b in sorted(self.links.items()):
             if a >= b:
                 continue
-            pa, pb = self.pose_of(a), self.pose_of(b)
+            if port_poses is None:
+                pa, pb = self.pose_of(a), self.pose_of(b)
+            else:
+                pa, pb = port_poses[a], port_poses[b]
             half_turn = HEADING_STEPS // 2
             heading_error = (pa.heading - pb.heading - half_turn) % HEADING_STEPS
             heading_error = min(heading_error, HEADING_STEPS - heading_error)
@@ -257,43 +321,23 @@ class Layout:
 
         Centreline samples are grown by each piece's half-width *perpendicular to the
         direction of travel* (plus any declared end overhang along it at the line
-        ends), so a straight run reports its true footprint rather than being inflated
-        lengthwise by its width.
+        ends). The sampled local footprint is cached by immutable geometry+heading;
+        placements then differ only by translation.
         """
+        if not self.placements:
+            return (0.0, 0.0, 0.0, 0.0)
         min_x = min_y = float("inf")
         max_x = max_y = float("-inf")
-
-        def grow(x: float, y: float) -> None:
-            nonlocal min_x, min_y, max_x, max_y
-            min_x, max_x = min(min_x, x), max(max_x, x)
-            min_y, max_y = min(min_y, y), max(max_y, y)
-
         for placement in self.placements:
-            hw = placement.piece.width / 2.0
-            overhang = placement.piece.end_overhang
-            for line in placement.centrelines():
-                if len(line) < 2:
-                    for x, y, _ in line:
-                        grow(x - hw, y - hw)
-                        grow(x + hw, y + hw)
-                    continue
-                n = len(line)
-                for i, (x, y, _z) in enumerate(line):
-                    ax, ay, _ = line[max(0, i - 1)]
-                    bx, by, _ = line[min(n - 1, i + 1)]
-                    dx, dy = bx - ax, by - ay
-                    norm = math.hypot(dx, dy) or 1.0
-                    nx, ny = -dy / norm, dx / norm
-                    grow(x + nx * hw, y + ny * hw)
-                    grow(x - nx * hw, y - ny * hw)
-                    if overhang and i in (0, n - 1):
-                        direction = -1.0 if i == 0 else 1.0
-                        ox = x + direction * dx / norm * overhang
-                        oy = y + direction * dy / norm * overhang
-                        grow(ox + nx * hw, oy + ny * hw)
-                        grow(ox - nx * hw, oy - ny * hw)
-        if min_x > max_x:
-            return (0.0, 0.0, 0.0, 0.0)
+            piece = placement.piece
+            x0, y0 = placement.frame.xy()
+            bx0, by0, bx1, by1 = _local_footprint_bounds(
+                piece.paths, piece.width, piece.end_overhang, placement.frame.heading
+            )
+            min_x = min(min_x, x0 + bx0)
+            min_y = min(min_y, y0 + by0)
+            max_x = max(max_x, x0 + bx1)
+            max_y = max(max_y, y0 + by1)
         return (min_x, min_y, max_x, max_y)
 
     def size(self) -> tuple[float, float]:

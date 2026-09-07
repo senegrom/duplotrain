@@ -51,13 +51,23 @@ DEFAULT_CLEARANCE = 120.0
 UNDERPASS_MIN = 42.0
 
 
-@dataclass
-class _Cloud:
-    """The sample points of one placement, flattened for fast scanning."""
+@dataclass(slots=True)
+class _CellCloud:
+    """One placement's sample points that fall in a single grid cell."""
 
     placement: int
     half_width: float
     points: list[tuple[float, float, float]]
+    underpass: bool
+
+
+@dataclass(slots=True)
+class _Cloud:
+    """Bookkeeping for one placement, including the cells it occupies."""
+
+    placement: int
+    half_width: float
+    cells: tuple[tuple[int, int], ...]
     underpass: bool = False
     previous_max_half_width: float = 0.0
 
@@ -75,9 +85,7 @@ class CollisionField:
     clearance: float = DEFAULT_CLEARANCE
     cell: float = 96.0
     _clouds: list[_Cloud] = field(default_factory=list)
-    _grid: dict[
-        tuple[int, int], list[tuple[float, float, float, float, int, bool]]
-    ] = field(default_factory=dict)
+    _grid: dict[tuple[int, int], list[_CellCloud]] = field(default_factory=dict)
     _max_half_width: float = 0.0
 
     def clashes(
@@ -101,28 +109,38 @@ class CollisionField:
         grid = self._grid
         reach = half_width + self._max_half_width - TOUCH_MARGIN
         r = max(1, math.ceil(reach / cell))
+        neighbourhoods: dict[tuple[int, int], tuple[list[_CellCloud], ...]] = {}
         for x, y, z in points:
             cx = int(x // cell)
             cy = int(y // cell)
-            for gx in range(cx - r, cx + r + 1):
-                for gy in range(cy - r, cy + r + 1):
-                    bucket = grid.get((gx, gy))
-                    if not bucket:
+            key = (cx, cy)
+            buckets = neighbourhoods.get(key)
+            if buckets is None:
+                buckets = tuple(
+                    bucket
+                    for gx in range(cx - r, cx + r + 1)
+                    for gy in range(cy - r, cy + r + 1)
+                    if (bucket := grid.get((gx, gy)))
+                )
+                neighbourhoods[key] = buckets
+            for bucket in buckets:
+                for cloud in bucket:
+                    if cloud.placement in ignore:
                         continue
-                    for px, py, pz, phw, pidx, pu in bucket:
-                        if pidx in ignore:
-                            continue
+                    limit = half_width + cloud.half_width - TOUCH_MARGIN
+                    limit2 = limit * limit
+                    stored_underpass = cloud.underpass
+                    for px, py, pz in cloud.points:
                         dz = z - pz
                         if dz >= clearance or dz <= -clearance:
                             continue
-                        if pu and dz <= -UNDERPASS_MIN:
+                        if stored_underpass and dz <= -UNDERPASS_MIN:
                             continue  # running under the stored piece's open arch
                         if underpass and dz >= UNDERPASS_MIN:
                             continue  # the stored track runs under this open arch
-                        limit = half_width + phw - TOUCH_MARGIN
                         dx = x - px
                         dy = y - py
-                        if dx * dx + dy * dy < limit * limit:
+                        if dx * dx + dy * dy < limit2:
                             return True
         return False
 
@@ -133,37 +151,38 @@ class CollisionField:
         half_width: float,
         underpass: bool = False,
     ) -> None:
+        cell = self.cell
+        grouped: dict[tuple[int, int], list[tuple[float, float, float]]] = {}
+        for point in points:
+            x, y, _z = point
+            key = (int(x // cell), int(y // cell))
+            grouped.setdefault(key, []).append(point)
         cloud = _Cloud(
-            placement, half_width, points, underpass, self._max_half_width
+            placement, half_width, tuple(grouped), underpass, self._max_half_width
         )
         self._clouds.append(cloud)
         self._max_half_width = max(self._max_half_width, half_width)
-        cell = self.cell
-        for x, y, z in points:
-            key = (int(x // cell), int(y // cell))
-            self._grid.setdefault(key, []).append(
-                (x, y, z, half_width, placement, underpass)
+        grid = self._grid
+        for key, cell_points in grouped.items():
+            grid.setdefault(key, []).append(
+                _CellCloud(placement, half_width, cell_points, underpass)
             )
 
     def pop(self) -> None:
         """Remove the most recently added placement (backtracking)."""
         cloud = self._clouds.pop()
-        # LIFO means the previous maximum is exactly the value that was current
-        # just before this cloud was added; no O(depth) rescan is necessary.
+        # Each placement contributes one grouped suffix per occupied cell. LIFO
+        # backtracking therefore removes one cell-cloud at a time, independent of
+        # how many centreline samples happened to land in that cell.
         self._max_half_width = cloud.previous_max_half_width
-        cell = self.cell
-        for x, y, _z in cloud.points:
-            key = (int(x // cell), int(y // cell))
-            bucket = self._grid.get(key)
-            if not bucket or bucket[-1][4] != cloud.placement:
-                continue
-            # Every point for one cloud was appended contiguously at the end of
-            # each cell bucket. Later clouds have already been popped, so remove
-            # that whole suffix once rather than reverse-scanning per sample.
-            while bucket and bucket[-1][4] == cloud.placement:
-                bucket.pop()
+        grid = self._grid
+        for key in cloud.cells:
+            bucket = grid[key]
+            if bucket[-1].placement != cloud.placement:
+                raise RuntimeError("collision field must be popped in LIFO order")
+            bucket.pop()
             if not bucket:
-                del self._grid[key]
+                del grid[key]
 
     def __len__(self) -> int:
         return len(self._clouds)

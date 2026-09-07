@@ -18,6 +18,7 @@ from duplotrain.layout import (
     Layout,
     Placement,
     _heading_trig,
+    _local_footprint_bounds,
     _port_pose,
     _rotated_local_pose,
 )
@@ -127,6 +128,7 @@ def test_all_shared_caches_are_bounded():
     assert _port_pose.cache_parameters()["maxsize"] == 4096
     assert _rotated_local_pose.cache_parameters()["maxsize"] == 2048
     assert _heading_trig.cache_parameters()["maxsize"] == 24
+    assert _local_footprint_bounds.cache_parameters()["maxsize"] == 2048
     assert _cached_canonical_traversals.cache_parameters()["maxsize"] == 128
     assert _cached_mirror_ports.cache_parameters()["maxsize"] == 128
     assert _cached_mirror_traversals.cache_parameters()["maxsize"] == 128
@@ -240,3 +242,67 @@ def test_shared_exact_values_are_immutable_and_still_copyable():
     pose = Placement(default_catalog()["straight"], ORIGIN).port_pose(1)
     with pytest.raises(FrozenInstanceError):
         pose.x.a = Fraction(999)
+
+
+def test_collision_groups_points_per_cell_and_reuses_query_neighbourhood():
+    class CountingGrid(dict):
+        gets = 0
+
+        def get(self, key, default=None):
+            self.gets += 1
+            return super().get(key, default)
+
+    field = CollisionField()
+    field._grid = CountingGrid()
+    stored = [(float(x), 0.0, 0.0) for x in range(0, 65, 4)]
+    field.add(0, stored, 32.0)
+    # All points fit one 96 mm cell, represented by one placement group rather
+    # than repeating width/index/underpass metadata on every sample.
+    assert len(field._grid[(0, 0)]) == 1
+    assert field._grid[(0, 0)][0].points == stored
+
+    # A same-cell query consults the 3x3 neighbourhood once, not once per point.
+    # Keep it far enough in z that every scanned point is non-colliding.
+    query = [(float(x), 0.0, 200.0) for x in range(0, 65, 4)]
+    assert not field.clashes(query, 32.0, ignore=set())
+    assert field._grid.gets == 9
+
+
+def test_state_reuses_each_exact_port_transform_once(monkeypatch):
+    piece = default_catalog()["straight"]
+    layout = Layout()
+    for x in (0, 300, 600):
+        layout, _ = layout.with_piece(piece, Pose.make(x=x))
+    session = Session()
+    session.history = [layout]
+
+    calls = []
+    original = Placement.port_pose
+
+    def measured_port_pose(placement, port):
+        calls.append((placement, port))
+        return original(placement, port)
+
+    monkeypatch.setattr(Placement, "port_pose", measured_port_pose)
+    state = session.state()
+    assert len(calls) == 6  # two ports x three pieces; matable/layout JSON reuse them
+    assert len(state["layout"]["placements"]) == 3
+
+
+def test_cached_local_footprint_matches_direct_layout_bounds():
+    _local_footprint_bounds.cache_clear()
+    for piece in default_catalog().values():
+        for heading in range(24):
+            frame = Pose.make(x=123.25, y=-89.75, heading=heading)
+            layout = Layout((Placement(piece, frame),))
+            cached = layout.bounds()
+            # Translation of the cached local envelope must preserve the public
+            # footprint to far below any displayed or physical precision.
+            bx0, by0, bx1, by1 = _local_footprint_bounds(
+                piece.paths, piece.width, piece.end_overhang, heading
+            )
+            x0, y0 = frame.xy()
+            assert cached == pytest.approx(
+                (x0 + bx0, y0 + by0, x0 + bx1, y0 + by1), abs=1e-12
+            )
+    assert _local_footprint_bounds.cache_info().hits > 0

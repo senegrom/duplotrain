@@ -29,7 +29,7 @@ from time import monotonic
 from typing import Any
 
 from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
-from .geometry import ORIGIN, steps_to_degrees
+from .geometry import ORIGIN, Pose, steps_to_degrees
 from .layout import End, Layout, layout_from_dict, layout_to_dict
 from .pieces import PieceType
 from .sets import SETS, inventory_for_sets
@@ -151,7 +151,9 @@ class Session:
 
     # -- serialisation for the front end ----------------------------------------
 
-    def _layout_json(self, layout: Layout) -> dict[str, Any]:
+    def _layout_json(
+        self, layout: Layout, port_poses: Mapping[End, Pose] | None = None
+    ) -> dict[str, Any]:
         placements = []
         for index, placement in enumerate(layout):
             lines = [
@@ -160,7 +162,11 @@ class Session:
             ]
             ports = []
             for port in range(len(placement.piece.ports)):
-                pose = placement.port_pose(port)
+                pose = (
+                    placement.port_pose(port)
+                    if port_poses is None
+                    else port_poses[(index, port)]
+                )
                 x, y = pose.xy()
                 ports.append(
                     {
@@ -193,7 +199,7 @@ class Session:
                 }
             )
         width, height = layout.size()
-        joint_issues = layout.joint_issues()
+        joint_issues = layout.joint_issues(port_poses)
         return {
             "placements": placements,
             "closed": layout.is_closed,  # topological, retained for API compatibility
@@ -243,6 +249,12 @@ class Session:
         return out
 
     def state(self) -> dict[str, Any]:
+        layout = self.layout
+        port_poses = {
+            (index, port): placement.port_pose(port)
+            for index, placement in enumerate(layout)
+            for port in range(len(placement.piece.ports))
+        }
         palette = []
         for pid, piece in self.catalog.items():
             variants = []
@@ -286,10 +298,10 @@ class Session:
                     "variants": variants,
                 }
             )
-        mates = [[list(a), list(b)] for a, b in self.layout.matable_pairs()]
+        mates = [[list(a), list(b)] for a, b in layout.matable_pairs(port_poses)]
         return {
-            "layout": self._layout_json(self.layout),
-            "open_ends": [list(end) for end in self.layout.connectable_ends()],
+            "layout": self._layout_json(layout, port_poses),
+            "open_ends": [list(end) for end in layout.connectable_ends()],
             "matable": mates,
             "inventory": {
                 "owned": {pid: self.inventory.get(pid, 0) for pid in self.catalog},

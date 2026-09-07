@@ -54,3 +54,18 @@ explore, network-enumeration and scoring helpers in addition to the CLI, rendere
 separately served editor HTML. Those modules remain in normal Python installs. The worker
 still contains every transitive dependency of gui.Session/solve and its isolated API
 round-trip test exercises state, edit, solve, apply, import, export and restore.
+
+
+## Third-pass collision and editor-state reuse
+
+Collision grid buckets group one placement's samples per occupied cell instead of
+repeating placement metadata for every point. LIFO rollback removes one grouped cell
+entry at a time, and each candidate query resolves a grid-cell neighbourhood once even
+when many 8 mm samples share that same 96 mm cell. Collision thresholds, height and
+underpass rules, neighbour exemptions, and sample coordinates are unchanged.
+
+Layout footprint expansion is translation-invariant, so the sampled local footprint is
+cached by immutable path geometry, width, overhang and one of the 24 headings; each
+placement then contributes only a translated envelope. Editor state serialization also
+computes each exact connector pose once and shares it between layout JSON, joint audits
+and matable-pair detection. Returned JSON remains freshly owned by the caller.
