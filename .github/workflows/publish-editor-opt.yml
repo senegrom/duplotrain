@@ -1,4 +1,4 @@
-# gate v2: hash-locked applier is present
+# gate v3: Git-data trigger with hash-locked applier
 name: Verify and publish editor optimization
 on:
   push:
