@@ -1,4 +1,4 @@
-import RunwayHistoricalOne
+import StateLawTwoCandidate
 import CompleteRepairFour
 
 /-!
@@ -409,14 +409,8 @@ theorem ManufacturedFlipReflector.runway_boundary_repeated
   have hAtNext :
       tonguesAt w (g, R.base) (R.runway.length + 1) =
         R.mouthState := by
-    have hlive :
-        ∃ finish, stepN w 1 (R.mouth, R.mouthState) = some finish := by
-      obtain ⟨q, hq⟩ := hstepOne
-      exact ⟨(q, R.mouthState), hq⟩
-    have hshift := tonguesAt_add_of_reaches
-      (K := R.runway.length) (d := 1) R.runwayTrace.sound hlive
     obtain ⟨q, hq⟩ := hstepOne
-    rw [hshift]
+    rw [tonguesAt_add_of_reaches R.runwayTrace.sound ⟨_, hq⟩]
     simp [tonguesAt, hq]
   simp only [restrictedTonguesAt]
   rw [hAtRunway, hAtNext]
@@ -523,13 +517,26 @@ theorem ManufacturedReflector.sharpHistoryCore_length
   rw [List.length_erase_of_mem hmem]
   simp [ManufacturedReflector.sharpConstructionHistory]
 
+/-- The activated vector lies in the sharp history. -/
+theorem ManufacturedReflector.activated_mem_sharpHistory
+    {w : Wiring} {g e N : Nat} (A : ManufacturedReflector w g e) :
+    VectorCount.restrict N A.activatedState ∈ A.sharpConstructionHistory N := by
+  simp [ManufacturedReflector.sharpConstructionHistory]
+
+/-- The pre-return vector lies in the sharp history. -/
+theorem ManufacturedReflector.preReturn_mem_sharpHistory
+    {w : Wiring} {g e N : Nat} (A : ManufacturedReflector w g e) :
+    VectorCount.restrict N A.preReturn.2 ∈ A.sharpConstructionHistory N :=
+  List.mem_append_left _ (List.mem_map.mpr ⟨A.exploration.length,
+    List.mem_range.mpr (by omega),
+    by simp [restrictedTonguesAt, tonguesAt, A.exploration_trace.sound]⟩)
+
 /-- The activated endpoint is retained by the compressed first history. -/
 theorem ManufacturedReflector.activated_mem_sharpHistoryCore
     {w : Wiring} {g e N : Nat}
     (A : ManufacturedReflector w g e) :
-    VectorCount.restrict N A.activatedState ∈ A.sharpHistoryCore N := by
-  apply A.mem_sharpHistoryCore_of_mem
-  simp [ManufacturedReflector.sharpConstructionHistory]
+    VectorCount.restrict N A.activatedState ∈ A.sharpHistoryCore N :=
+  A.mem_sharpHistoryCore_of_mem A.activated_mem_sharpHistory
 
 def ManufacturedReflector.preservedTwoHistoryCore
     {w : Wiring} {g e : Nat}
@@ -570,22 +577,6 @@ theorem ManufacturedReflector.preservedTwoHistoryCore_length_le_N_add_three
     A.sharpHistoryCore_length,
     B.writerConstructionHistory_length]
   omega
-
-/-- No represented construction vector is lost by coefficient-one
-compression or by erasing the common boundary. -/
-theorem ManufacturedReflector.mem_preservedTwoHistoryCore
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    {x : List Bool}
-    (hx : x ∈ A.sharpConstructionHistory N ∨
-      x ∈ B.sharpConstructionHistory N) :
-    x ∈ A.preservedTwoHistoryCore B N := by grind [
-      ManufacturedReflector.mem_sharpHistoryCore_of_mem,
-      ManufacturedReflector.mem_writerConstructionHistory_of_mem_sharp,
-      ManufacturedReflector.preservedTwoHistoryCore,
-      ManufacturedReflector.sharpConstructionHistory]
-
 
 /-- The facing action mouth of a flip reflector is not part of its reusable
 support. -/

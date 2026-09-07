@@ -25,6 +25,60 @@ theorem tonguesAt_add_of_reaches
   obtain ⟨finish, hfinish⟩ := hlive
   simp [tonguesAt, stepN_add, hreach, hfinish]
 
+/-- The restricted-vector form of `tonguesAt_add_of_reaches`. -/
+theorem restrictedTonguesAt_add_of_reaches
+    {w : Wiring} {N : Nat} {start middle : Nat × Tongues} {K d : Nat}
+    (hreach : stepN w K start = some middle)
+    (hlive : ∃ finish, stepN w d middle = some finish) :
+    restrictedTonguesAt w N start (K + d) = restrictedTonguesAt w N middle d :=
+  congrArg (VectorCount.restrict N) (tonguesAt_add_of_reaches hreach hlive)
+
+/-- A live sample past a reached configuration is a live sample of the
+suffix run. -/
+theorem stepN_suffix_some_of_reaches
+    {w : Wiring} {start middle : Nat × Tongues} {K d : Nat}
+    (hreach : stepN w K start = some middle)
+    (hlive : (stepN w (K + d) start).isSome) :
+    ∃ finish, stepN w d middle = some finish := by
+  simpa [stepN_add, hreach, Option.isSome_iff_exists] using hlive
+
+/-- Shift a phase orbit into an ambient run: past the reach time every live
+sample is the restriction of an orbit phase, so the run is covered by
+`history ++ fresh` as soon as every phase is. -/
+theorem cover_of_phase_orbit
+    {w : Wiring} {N K : Nat} {start middle : Nat × Tongues}
+    {phases : List Tongues} {times : List Nat} {history fresh : List (List Bool)}
+    (hreach : stepN w K start = some middle)
+    (horbit : ∀ d, (stepN w d middle).isSome → tonguesAt w middle d ∈ phases)
+    (hcover : ∀ phase ∈ phases, VectorCount.restrict N phase ∈ history ++ fresh)
+    (hlive : ∀ j ∈ times, (stepN w j start).isSome)
+    (hlead : ∀ j ∈ times, j < K → restrictedTonguesAt w N start j ∈ history) :
+    ∀ j ∈ times, restrictedTonguesAt w N start j ∈ history ++ fresh := by
+  intro j hj
+  by_cases hjK : j < K
+  · exact List.mem_append_left _ (hlead j hj hjK)
+  · obtain ⟨d, rfl⟩ : ∃ d, j = K + d := ⟨j - K, by omega⟩
+    have hd := stepN_suffix_some_of_reaches hreach (hlive _ hj)
+    rw [restrictedTonguesAt_add_of_reaches hreach hd]
+    exact hcover _ (horbit d (Option.isSome_iff_exists.mpr hd))
+
+/-- The all-time form: an orbit live at every time needs no liveness
+hypothesis on the sampled times. -/
+theorem cover_of_live_phase_orbit
+    {w : Wiring} {N K : Nat} {start middle : Nat × Tongues}
+    {phases : List Tongues} {times : List Nat} {history fresh : List (List Bool)}
+    (hreach : stepN w K start = some middle)
+    (horbit : ∀ d, ∃ port phase, stepN w d middle = some (port, phase) ∧ phase ∈ phases)
+    (hcover : ∀ phase ∈ phases, VectorCount.restrict N phase ∈ history ++ fresh)
+    (hlead : ∀ j ∈ times, j < K → restrictedTonguesAt w N start j ∈ history) :
+    ∀ j ∈ times, restrictedTonguesAt w N start j ∈ history ++ fresh := by
+  intro j hj
+  by_cases hjK : j < K
+  · exact List.mem_append_left _ (hlead j hj hjK)
+  · obtain ⟨d, rfl⟩ : ∃ d, j = K + d := ⟨j - K, by omega⟩
+    obtain ⟨port, phase, hr, hs⟩ := horbit d
+    simpa [restrictedTonguesAt, tonguesAt, stepN_add, hreach, hr] using hcover _ hs
+
 /-- A manufactured reflector's local action avoids every switch in its own
 retained groove support. -/
 theorem ManufacturedReflector.action_avoids_own_support
@@ -135,10 +189,9 @@ theorem ManufacturedReflector.travel_two_phase_tongues
       hpathsAfter A.runway A.runway_mem_support
     have hrecorded := A.runway_trace_at state hpaths
     have hcontact := A.orientedFinish_arrive state hpaths
-    obtain ⟨port, htail⟩ :=
-      physicalTrace_contact_retraces_prefix_positive
-        hrecorded hrunwayAfter A.entryEdge hcontact
-        htailPos htailBound
+    obtain ⟨port, htail⟩ := (physicalTrace_contact_retraces_prefix_pointwise
+      hrecorded hrunwayAfter A.entryEdge hcontact).2 tailDepth htailBound
+    rw [if_neg (show tailDepth ≠ 0 by omega)] at htail
     have hlead := (A.orientedRoute_trace state hpaths).sound
     have hrun : stepN w d (g, state) =
         some (port, A.toSupported.action.apply state) := by

@@ -100,8 +100,10 @@ theorem PartialSecondRunSharp.ChangedContact.all_run_distinct_le_N_add_four
           hN C hA times hlive hnd hlocal
         omega
     | flip R =>
-        exact C.changed_all_run_distinct_le_N_add_four
-          hN hA times hlive hnd
+        rcases C.changed_N_add_four_or_runway_residual
+            hN hA times hlive hnd with hbound | hresidual
+        · exact hbound
+        · exact hresidual.elim fun F => (F.impossible hN hA).elim
 
 /-- A literal changed-contact residual from the known-edge decomposition is
 therefore closed at `N+4`. -/
@@ -169,25 +171,5 @@ def KnownEdgeProtectedPairNAddFourLaw : Prop :=
         (times.map
           (restrictedTonguesAt w N start)).Nodup ->
         times.length <= N + 4
-
-/-- Closing the protected-pair law closes the entire known-edge `N+4`
-theorem; the changed-contact branch has no remaining hypothesis. -/
-theorem known_edge_all_run_distinct_le_N_add_four_of_protected_pair
-    (hpairLaw : KnownEdgeProtectedPairNAddFourLaw)
-    {w : Wiring} {N e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    (htotal : ∀ p, p < 3 * N → ∃ q, w.link p = some q)
-    {start : Nat × Tongues}
-    (hentry : w.link e = some start.1)
-    (times : List Nat)
-    (hlive : forall k, k ∈ times -> (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length <= N + 4 := by
-  rcases known_edge_N_add_four_or_protected_pair
-      hN htotal hentry times hlive hnd with hsmall | hpair
-  · exact hsmall
-  · exact hpairLaw hN (Classical.choice hpair) times hlive hnd
 
 end GeneralN

@@ -83,10 +83,7 @@ theorem PartialSecondRunSharp.ChangedContact.contact_mem_compressedLead :
     C.approach_trace.sound] using hm
 
 theorem PartialSecondRunSharp.ChangedContact.next_mem_compressedLead :
-    VectorCount.restrict N C.nextState ∈ C.compressedLead N := by
-  apply List.mem_append_right
-  apply List.mem_append_right
-  simp
+    VectorCount.restrict N C.nextState ∈ C.compressedLead N := by grind [PartialSecondRunSharp.ChangedContact.compressedLead, VectorCount.restrict]
 
 /-- A backward first damaging contact closes immediately into the old
 route-prefix lasso.  Every local vector, including the two contact phases,
@@ -284,13 +281,9 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_two_novelty
         (e, (ManufacturedReflector.flip R).activatedState) =
         some (outside, alternate) := by
     simpa [K, state, alternate] using hreach
-  obtain ⟨postPort, hpost⟩ := C.post_reaches
-  have hnextAlternate : C.nextState = alternate := by
-    rw [hreach'] at hpost
-    have hpairs := Option.some.inj hpost
-    exact (congrArg Prod.snd hpairs).symm
+  have hnextAlternate : C.nextState = alternate := C.nextState_eq_of_post hreach'
   have hentryHistorical :
-      VectorCount.restrict N alternate ∈ C.compressedLead N := by
+      VectorCount.restrict N (flipAt state (mouth / 3)) ∈ C.compressedLead N := by
     simpa [hnextAlternate] using C.next_mem_compressedLead (N := N)
   have hstateHistorical :
       VectorCount.restrict N state ∈ C.compressedLead N := by
@@ -323,23 +316,24 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_two_novelty
       simpa [hentrySwitch] using hNewAvoidsDRaw
     by_cases hcontact : ∃ passage ∈ candy,
         passageSwitch passage = D.actionSwitch
-    · apply manufactured_flip_arbitrary_lobe_absolute_two_novelty
-        D state hDpaths hNewAvoidsD hentryBranch hentrySwitch
-        hfullGrooved hfullTrace hcrossed hCandyForeignNew hLobe
-        hmouthLink hcontact hreach' times (C.compressedLead N)
-        hentryHistorical hstateHistorical
-      exact hleadHistorical
+    · exact ⟨[VectorCount.restrict N (flipAt (flipAt state (mouth / 3)) D.actionSwitch),
+        VectorCount.restrict N (flipAt state D.actionSwitch)], by simp,
+        cover_of_live_phase_orbit hreach'
+          (manufactured_flip_arbitrary_lobe_all_time_four_phase D state hDpaths
+            hNewAvoidsD hentryBranch hentrySwitch hfullGrooved hfullTrace hcrossed
+            hCandyForeignNew hLobe hmouthLink hcontact)
+          (by simp [hentryHistorical, hstateHistorical]) hleadHistorical⟩
     · have hCandyForeignOld : ∀ passage ∈ candy,
           passageSwitch passage ≠ D.actionSwitch := by
         intro passage hp hEq
         exact hcontact ⟨passage, hp, hEq⟩
-      apply manufactured_suffix_explicit_lobe_absolute_two_novelty
-        D state hDpaths hNewAvoidsD hActionsNe hentryBranch
-        hentrySwitch hfullGrooved hfullTrace hcrossed
-        hCandyForeignNew hCandyForeignOld hLobe hmouthLink
-        hreach' times (C.compressedLead N) hentryHistorical
-        hstateHistorical
-      exact hleadHistorical
+      exact ⟨[VectorCount.restrict N (flipAt (flipAt state (mouth / 3)) D.actionSwitch),
+        VectorCount.restrict N (flipAt state D.actionSwitch)], by simp,
+        cover_of_live_phase_orbit hreach'
+          (manufactured_suffix_explicit_lobe_all_time_four_phase D state hDpaths
+            hNewAvoidsD hActionsNe hentryBranch hentrySwitch hfullGrooved hfullTrace
+            hcrossed hCandyForeignNew hCandyForeignOld hLobe hmouthLink)
+          (by simp [hentryHistorical, hstateHistorical]) hleadHistorical⟩
   · obtain ⟨old, hold, horientation⟩ :=
       R.nonrunway_oriented_branch_entry_is_candy state
         hentryOld hrunway hentryBranch
@@ -379,11 +373,7 @@ theorem PartialSecondRunSharp.ChangedContact.forward_stay_zero_novelty
       (e, (ManufacturedReflector.stay R).activatedState) =
         some (outside, alternate) := by
     simpa [K, alternate] using hreach
-  obtain ⟨postPort, hpost⟩ := C.post_reaches
-  have hnextAlternate : C.nextState = alternate := by
-    rw [hreach'] at hpost
-    have hpairs := Option.some.inj hpost
-    exact (congrArg Prod.snd hpairs).symm
+  have hnextAlternate : C.nextState = alternate := C.nextState_eq_of_post hreach'
   have hentryHistorical :
       VectorCount.restrict N alternate ∈ C.compressedLead N := by
     simpa [hnextAlternate] using C.next_mem_compressedLead (N := N)

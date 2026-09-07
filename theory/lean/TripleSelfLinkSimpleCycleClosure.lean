@@ -106,51 +106,50 @@ theorem PhysicalTrace.simple_same_exit_cycle_traces_with_phase
         exact ⟨port, v, (stepN_after_arrival hnext (by omega)).trans hr, Or.inr rfl⟩
   exact ⟨htransient, hstable, hsimpleCycle, hphase⟩
 
-/-- The same-exit first-revisit orbit has exactly the settled tongue vector at
-every positive local time, not merely after one complete transient lap. -/
-theorem PhysicalTrace.simple_same_exit_cycle_all_positive
-    {w : Wiring} {p x q : Nat} {u₀ u v : Tongues}
-    {rest : List Passage}
-    (htrace : PhysicalTrace w (p, u₀) ((p, x) :: rest) (q, u))
-    (hsimple : SwitchSimple ((p, x) :: rest))
-    (hnext : arrive u q = (x, v)) :
-    ∀ d, 0 < d → ∃ port, stepN w d (q, u) = some (port, v) := by
-  obtain ⟨_htransient, hstable, hsimpleCycle, _⟩ :=
-    htrace.simple_same_exit_cycle_traces_with_phase hsimple hnext
-  intro d hpositive
-  obtain ⟨port, hr⟩ := hstable.grooved_loop_all_time (by simp)
-    (hstable.grooved_of_switchSimple hsimpleCycle) d
-  exact ⟨port, (stepN_after_arrival hnext hpositive).trans hr⟩
-
-/-- Trace-retaining form of the activated first-revisit normal form. -/
-theorem first_revisit_cycle_traces_or_activated_reflector
-    (w : Wiring) {start : Prod Nat Tongues}
-    {runway path : List Passage}
-    {p x q y e : Nat} {u₀ u v : Tongues}
-    (hrunway : PhysicalTrace w start runway (p, u₀))
-    (hexcursion :
-      PhysicalTrace w (p, u₀) ((p, x) :: path) (q, u))
-    (hsimple : SwitchSimple (runway ++ (p, x) :: path))
-    (hsw : p / 3 = q / 3)
-    (hrepeat : arrive u q = (y, v))
+/-- Split a long run at its first revisit and apply the activated normal
+form: after a switch-simple lead, either a two-phase simple cycle follows or
+a manufactured reflector is activated. -/
+theorem first_revisit_fork
+    {w : Wiring} {N e : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    {start finish : Nat × Tongues}
+    (hlive : stepN w (N + 1) start = some finish)
     (hentry : w.link e = some start.1) :
-    (exists cycle settled,
-      cycle ≠ [] /\
-      PhysicalTrace w (q, u) cycle (q, settled) /\
-      PhysicalTrace w (q, settled) cycle (q, settled) /\
-      SwitchSimple cycle /\
-      (forall d, d ≤ cycle.length -> exists port phase,
-        stepN w d (q, u) = some (port, phase) /\
-          (phase = u \/ phase = settled)) /\
-      (forall d, 0 < d -> exists port,
-        stepN w d (q, u) = some (port, settled))) \/
-    (exists (A : ManufacturedReflector w start.1 e) (state : Tongues),
-      PathGrooves A.toSupported.paths state /\
-      A.baseState = start.2 /\
-      state = A.activatedState /\
-      stepN w (runway.length + 1) (q, u) = some (e, state) /\
-      (forall j, j ∉ A.exploration.map passageSwitch ->
-        state j = start.2 j)) := by
+    ∃ (lead : List Passage) (q : Nat) (u : Tongues),
+      PhysicalTrace w start lead (q, u) ∧ SwitchSimple lead ∧
+      ((∃ cycle settled, cycle ≠ [] ∧
+          PhysicalTrace w (q, u) cycle (q, settled) ∧
+          PhysicalTrace w (q, settled) cycle (q, settled) ∧
+          SwitchSimple cycle ∧
+          (∀ d, d ≤ cycle.length → ∃ port phase,
+            stepN w d (q, u) = some (port, phase) ∧
+              (phase = u ∨ phase = settled)) ∧
+          (∀ d, 0 < d → ∃ port, stepN w d (q, u) = some (port, settled))) ∨
+        (∃ (A : ManufacturedReflector w start.1 e) (state : Tongues),
+          PathGrooves A.toSupported.paths state ∧
+          A.baseState = start.2 ∧
+          state = A.activatedState ∧
+          (∀ j, j ∉ A.exploration.map passageSwitch → state j = start.2 j))) := by
+  obtain ⟨before, old, repeated, after, middle,
+      hbeforeTrace, hafterTrace, hsimple, hold, hsameSwitch⟩ :=
+    first_revisit_of_long_run hN hlive
+  obtain ⟨runway, path, hsplit⟩ := List.append_of_mem hold
+  rcases old with ⟨p, x⟩
+  rcases repeated with ⟨q, y⟩
+  subst before
+  obtain ⟨atOld, hrunway, hexcursion⟩ := hbeforeTrace.split_append
+  have hatOldPort : atOld.1 = p := hexcursion.head_arrive.1
+  rcases atOld with ⟨oldPort, u₀⟩
+  simp only at hatOldPort
+  subst oldPort
+  obtain ⟨v, hrepeat⟩ := hafterTrace.head_arrive.2
+  have hmiddlePort : middle.1 = q := hafterTrace.head_arrive.1
+  rcases middle with ⟨middlePort, u⟩
+  simp only at hmiddlePort
+  subst middlePort
+  have hsw : p / 3 = q / 3 := by
+    simpa [passageSwitch] using hsameSwitch
+  refine ⟨_, _, _, hbeforeTrace, hsimple, ?_⟩
   have hsimpleExcursion : SwitchSimple ((p, x) :: path) := by
     unfold SwitchSimple at hsimple ⊢
     simp only [List.map_append] at hsimple
@@ -169,7 +168,6 @@ theorem first_revisit_cycle_traces_or_activated_reflector
     simpa [passageSwitch] using hsw
   have hshare : p = q \/ p = y \/ x = q \/ x = y :=
     recorded_passages_share_port holdStem hrepeatStem hsw'
-  have hfar : w.link start.1 = some e := w.symm _ _ hentry
   have hsupport := crossed_revisit_support_grooved
     hrunway hexcursion hsimple hsw hrepeat
   have hpreserves :
@@ -188,7 +186,45 @@ theorem first_revisit_cycle_traces_or_activated_reflector
       simp only [passageSwitch]
       omega
     exact (arrive_preserves_other hrepeat hjq).trans hu
-  rcases hshare with hpq | hpy | hxq | hxy
+  by_cases hxq : x = q
+  · subst q
+    have hfull := hrunway.append hexcursion
+    have hgrooved := hfull.grooved_of_switchSimple hsimple
+    have hold : arrive u x = (p, u) :=
+      hgrooved (p, x)
+        (List.mem_append_right runway List.mem_cons_self)
+    have holdGroove := hold
+    rw [hrepeat] at hold
+    injection hold with hyp huv
+    subst y
+    subst v
+    have hpathNil := same_exit_excursion_path_nil
+      hexcursion hsimpleExcursion
+    subst path
+    have hself : w.link x = some x := by
+      simpa [lastPassageExit] using hexcursion.last_link
+    let A : ManufacturedStayReflector w start.1 e := {
+      base := start.2
+      mouthState := u₀
+      returnState := u
+      runway := runway
+      mouth := p
+      arm := x
+      runwayTrace := by simpa using hrunway
+      coreTrace := by simpa using hexcursion
+      simple := hsimple
+      stemEndpoint := hexcursion.passage_stem_endpoint
+        (p, x) List.mem_cons_self
+      selfLink := hself
+      entryEdge := hentry
+    }
+    refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, ?_⟩
+    · change PathGrooves [runway, [(p, x)]] u
+      apply pathGrooves_pair.mpr
+      exact ⟨(pathGrooves_pair.mp hsupport).1,
+        passagesGrooved_singleton.mpr holdGroove⟩
+    · simpa [ManufacturedReflector.exploration] using hpreserves
+  rcases hshare with hpq | hpy | hxq' | hxy
   · subst q
     left
     have hgrooved :=
@@ -210,115 +246,37 @@ theorem first_revisit_cycle_traces_or_activated_reflector
     exact ⟨(p, x) :: path, u, by simp, hstable, hstable,
       hsimpleExcursion, hphase, fun d _ => hall d⟩
   · subst y
-    have hback := hrunway.simple_cross_exit_retraces_prefix
-      hexcursion hsimple hrepeat
-    rw [hfar] at hback
-    by_cases hxq : x = q
-    · subst q
-      have hpathNil := same_exit_excursion_path_nil
-        hexcursion hsimpleExcursion
-      subst path
-      have hfullGrooved :=
-        (hrunway.append hexcursion).grooved_of_switchSimple hsimple
-      have hold : arrive u x = (p, u) :=
-        hfullGrooved (p, x)
-          (List.mem_append_right runway List.mem_cons_self)
-      have holdGroove := hold
-      rw [hrepeat] at hold
-      injection hold with _ huv
-      subst v
-      have hself : w.link x = some x := by
-        simpa [lastPassageExit] using hexcursion.last_link
-      let A : ManufacturedStayReflector w start.1 e := {
-        base := start.2
-        mouthState := u₀
-        returnState := u
-        runway := runway
-        mouth := p
-        arm := x
-        runwayTrace := by simpa using hrunway
-        coreTrace := by simpa using hexcursion
-        simple := hsimple
-        stemEndpoint := hexcursion.passage_stem_endpoint
-          (p, x) List.mem_cons_self
-        selfLink := hself
-        entryEdge := hentry
-      }
-      refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, hback, ?_⟩
-      · change PathGrooves [runway, [(p, x)]] u
-        apply pathGrooves_pair.mpr
-        exact ⟨(pathGrooves_pair.mp hsupport).1,
-          passagesGrooved_singleton.mpr holdGroove⟩
-      · simpa [ManufacturedReflector.exploration] using hpreserves
-    · let A : ManufacturedFlipReflector w start.1 e := {
-        base := start.2
-        mouthState := u₀
-        returnState := u
-        afterReturn := v
-        runway := runway
-        candy := path
-        mouth := p
-        firstArm := x
-        secondArm := q
-        runwayTrace := by simpa using hrunway
-        candyTrace := hexcursion
-        simple := hsimple
-        crossed := hrepeat
-        arms_ne := hxq
-        entryEdge := hentry
-      }
-      refine Or.inr ⟨.flip A, v, ?_, rfl, rfl, hback, ?_⟩
-      · change PathGrooves [runway, path] v
-        exact hsupport
-      · simpa [ManufacturedReflector.exploration] using hpreserves
-  · subst q
-    have hfull := hrunway.append hexcursion
-    have hgrooved := hfull.grooved_of_switchSimple hsimple
-    have hold : arrive u x = (p, u) :=
-      hgrooved (p, x)
-        (List.mem_append_right runway List.mem_cons_self)
-    have holdGroove := hold
-    rw [hrepeat] at hold
-    injection hold with hyp huv
-    subst y
-    subst v
-    have hback := hrunway.simple_cross_exit_retraces_prefix
-      hexcursion hsimple (by simpa using hrepeat)
-    rw [hfar] at hback
-    have hpathNil := same_exit_excursion_path_nil
-      hexcursion hsimpleExcursion
-    subst path
-    have hself : w.link x = some x := by
-      simpa [lastPassageExit] using hexcursion.last_link
-    let A : ManufacturedStayReflector w start.1 e := {
+    let A : ManufacturedFlipReflector w start.1 e := {
       base := start.2
       mouthState := u₀
       returnState := u
+      afterReturn := v
       runway := runway
+      candy := path
       mouth := p
-      arm := x
+      firstArm := x
+      secondArm := q
       runwayTrace := by simpa using hrunway
-      coreTrace := by simpa using hexcursion
+      candyTrace := hexcursion
       simple := hsimple
-      stemEndpoint := hexcursion.passage_stem_endpoint
-        (p, x) List.mem_cons_self
-      selfLink := hself
+      crossed := hrepeat
+      arms_ne := hxq
       entryEdge := hentry
     }
-    refine Or.inr ⟨.stay A, u, ?_, rfl, rfl, hback, ?_⟩
-    · change PathGrooves [runway, [(p, x)]] u
-      apply pathGrooves_pair.mpr
-      exact ⟨(pathGrooves_pair.mp hsupport).1,
-        passagesGrooved_singleton.mpr holdGroove⟩
+    refine Or.inr ⟨.flip A, v, ?_, rfl, rfl, ?_⟩
+    · change PathGrooves [runway, path] v
+      exact hsupport
     · simpa [ManufacturedReflector.exploration] using hpreserves
+  · exact absurd hxq' hxq
   · subst y
     left
     obtain ⟨htransient, hstable, hsimpleCycle, hphase⟩ :=
       hexcursion.simple_same_exit_cycle_traces_with_phase
         hsimpleExcursion hrepeat
     exact ⟨(q, x) :: path, v, by simp, htransient, hstable,
-      hsimpleCycle, hphase,
-      hexcursion.simple_same_exit_cycle_all_positive
-        hsimpleExcursion hrepeat⟩
+      hsimpleCycle, hphase, fun d hpositive => by
+        obtain ⟨port, hr⟩ := hstable.grooved_loop_all_time (by simp)
+          (hstable.grooved_of_switchSimple hsimpleCycle) d
+        exact ⟨port, (stepN_after_arrival hrepeat hpositive).trans hr⟩⟩
 
 end GeneralN

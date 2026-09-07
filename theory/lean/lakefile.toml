@@ -21,13 +21,10 @@ defaultTargets = [
   "ProtectedPairNAddFour",
   "RepairLeadTwoPhase",
   "RepeatedNoveltyDecomposition",
-  "RunwayHistoricalOne",
   "RunwaySpliceNovelty",
   "SharpCertificateClosure",
   "SharpStateLawAssembly",
-  "ShortSuffixCount",
   "SimpleTraceOneNetChange",
-  "SingleCoordinateFlip",
   "StateLaw",
   "StateLawAxiomAudit",
   "StateLawCoefficientOneTop",
@@ -35,8 +32,6 @@ defaultTargets = [
   "StateLawNAddFourSharp",
   "StateLawSmallN",
   "StateLawTwoCandidate",
-  "StateLawTwoSharp",
-  "TrackEarlyRepairConstant",
   "TrackEndpointMatching",
   "TrackFiniteAlternation",
   "TrackGlobalRepair",
@@ -51,7 +46,6 @@ defaultTargets = [
   "TrackTrace",
   "TripleSelfLinkSimpleCycleClosure",
   "TwoHistoryUnionCharge",
-  "TwoPhasePrefixTailCount",
   "VectorCount"
 ]
 
@@ -110,9 +104,6 @@ name = "RepairLeadTwoPhase"
 name = "RepeatedNoveltyDecomposition"
 
 [[lean_lib]]
-name = "RunwayHistoricalOne"
-
-[[lean_lib]]
 name = "RunwaySpliceNovelty"
 
 [[lean_lib]]
@@ -122,13 +113,7 @@ name = "SharpCertificateClosure"
 name = "SharpStateLawAssembly"
 
 [[lean_lib]]
-name = "ShortSuffixCount"
-
-[[lean_lib]]
 name = "SimpleTraceOneNetChange"
-
-[[lean_lib]]
-name = "SingleCoordinateFlip"
 
 [[lean_lib]]
 name = "StateLaw"
@@ -151,12 +136,6 @@ name = "StateLawSmallN"
 [[lean_lib]]
 name = "StateLawTwoCandidate"
 
-[[lean_lib]]
-name = "StateLawTwoSharp"
-
-
-[[lean_lib]]
-name = "TrackEarlyRepairConstant"
 
 [[lean_lib]]
 name = "TrackEndpointMatching"
@@ -199,9 +178,6 @@ name = "TripleSelfLinkSimpleCycleClosure"
 
 [[lean_lib]]
 name = "TwoHistoryUnionCharge"
-
-[[lean_lib]]
-name = "TwoPhasePrefixTailCount"
 
 [[lean_lib]]
 name = "VectorCount"

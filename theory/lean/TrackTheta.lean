@@ -116,28 +116,6 @@ theorem physicalTrace_passages_prefix_comparable
           · obtain ⟨suffix, hsuffix⟩ := hprefix
             exact Or.inr ⟨suffix, by simp [hsuffix]⟩
 
-theorem forward_contact_repairs_old_passage
-    {u v : Tongues} {oldEntry oldExit freshEntry : Nat}
-    (hold : arrive u oldExit = (oldEntry, u))
-    (hfresh : arrive u freshEntry = (oldExit, v))
-    (hswitch : oldEntry / 3 = freshEntry / 3) :
-    ∃ repaired,
-      arrive v oldEntry = (oldExit, repaired) ∧
-      arrive repaired oldExit = (oldEntry, repaired) := by
-  grind [arrive_back, arrive_exit_ne, arrive_exit_switch, trailing_arrive_exit_independent]
-
-/-- Degree-three local contact law, stated early for the orientation package:
-a fresh passage through a switch carrying an old groove must exit through one
-of the two old passage ports. -/
-theorem grooved_contact_exit_dichotomy
-    {state next : Tongues}
-    {oldEntry oldExit freshEntry freshExit : Nat}
-    (hold : arrive state oldExit = (oldEntry, state))
-    (hfresh : arrive state freshEntry = (freshExit, next))
-    (hswitch : oldEntry / 3 = freshEntry / 3) :
-    freshExit = oldEntry ∨ freshExit = oldExit := by
-  grind [groove_forward, same_switch_passages_share_port]
-
 /-- A complete physical trace can be replayed after flipping a switch absent
 from the trace.  Every intermediate state is simply conjugated by that flip.
 -/
@@ -1236,18 +1214,15 @@ theorem ManufacturedReflector.changed_contact_on_orientedRoute
     · simp only [hreverse, passageSwitch]
       rw [hOldSwitch]
       exact hswitch
-  have hexit := grooved_contact_exit_dichotomy
-    horientedGroove hfresh (by
-      simpa [passageSwitch] using horientedSwitch)
-  refine ⟨oriented, horiented, horientedGroove,
-    horientedSwitch, ?_⟩
-  rcases hexit with hback | hforward
+  have hswitch' : oriented.1 / 3 = p / 3 := by
+    simpa [passageSwitch] using horientedSwitch
+  refine ⟨oriented, horiented, horientedGroove, horientedSwitch, ?_⟩
+  rcases (by grind [groove_forward, same_switch_passages_share_port] :
+      x = oriented.1 ∨ x = oriented.2) with hback | hforward
   · exact Or.inl hback
-  · right
-    refine ⟨hforward, ?_⟩
-    exact forward_contact_repairs_old_passage
-      horientedGroove (by simpa [hforward] using hfresh)
-      (by simpa [passageSwitch] using horientedSwitch)
+  · subst hforward
+    exact Or.inr ⟨rfl, by grind [arrive_back, arrive_exit_ne, arrive_exit_switch,
+      trailing_arrive_exit_independent]⟩
 
 
 theorem pathGrooves_after_arrive_without_support_change

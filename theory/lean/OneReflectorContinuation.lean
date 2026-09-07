@@ -221,15 +221,8 @@ theorem ManufacturedReflector.journey_then_continuation_mem
     have hd : d ≤ passages.length := by
       dsimp [d, firstTravel] at hk ⊢
       omega
-    have hlocalLive := stepN_prefix_some hd htrace.sound
-    have hshift := tonguesAt_add_of_reaches hreachA hlocalLive
-    have hvector : restrictedTonguesAt w N
-        (g, A.baseState) k =
-        restrictedTonguesAt w N localStart d := by
-      unfold restrictedTonguesAt
-      rw [hkEq]
-      exact congrArg (VectorCount.restrict N) hshift
-    rw [hvector]
+    rw [hkEq, restrictedTonguesAt_add_of_reaches hreachA
+      (stepN_prefix_some hd htrace.sound)]
     exact A.mem_continuationHistory
       (N := N) (finish := finish) (passages := passages)
       htrace hsimple hd

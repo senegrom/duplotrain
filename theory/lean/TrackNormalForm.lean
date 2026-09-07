@@ -93,21 +93,4 @@ structure SupportedReflector (w : Wiring) (g e : Nat) where
   action : LocalAction
   run : IsReflector w g e travel (PathGrooves paths) action.apply
 
-/-- Two opposite supported reflectors have a genuine period whenever their
-actions avoid one another's groove supports. -/
-theorem SupportedReflector.paired_period
-    {w : Wiring} {gA gB : Nat}
-    (A : SupportedReflector w gA gB)
-    (B : SupportedReflector w gB gA)
-    (hAB : A.action.Avoids B.paths)
-    (hBA : B.action.Avoids A.paths)
-    (u : Tongues) (hA : PathGrooves A.paths u)
-    (hB : PathGrooves B.paths u) :
-    stepN w (2 * (A.travel + B.travel)) (gA, u) = some (gA, u) := by
-  exact paired_reflectors_period w A.run B.run
-    (fun state hs => hs.after_avoiding_action hAB)
-    (fun state hs => hs.after_avoiding_action hBA)
-    (A.action.commute B.action)
-    A.action.involutive B.action.involutive u hA hB
-
 end GeneralN

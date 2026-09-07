@@ -706,20 +706,6 @@ theorem first_repeat_by {α : Type} (key : α → Nat) :
             exact ⟨hx, hbefore⟩
           · exact List.mem_cons_of_mem _ hmem
 
-/-- Every nonsimple passage list has a unique-in-the-prefix first revisit
-decomposition.  The theorem records exactly the data needed by the
-first-repeated-edge case split. -/
-theorem first_revisit_split {passages : List Passage}
-    (hnsimple : ¬ SwitchSimple passages) :
-    ∃ before repeated after,
-      passages = before ++ repeated :: after ∧
-      SwitchSimple before ∧
-      passageSwitch repeated ∈ before.map passageSwitch := by
-  unfold SwitchSimple at hnsimple
-  rcases first_repeat_by passageSwitch passages with hsimple | hrepeat
-  · exact absurd hsimple hnsimple
-  · exact hrepeat
-
 /-- A switch-simple live trace in an `N`-switch wiring has at most `N`
 passages. -/
 theorem PhysicalTrace.simple_length_le {w : Wiring} {N : Nat}
@@ -756,7 +742,7 @@ theorem first_revisit_of_long_run {w : Wiring} {N : Nat}
     have hle := htrace.simple_length_le hN hsimple
     omega
   obtain ⟨before, repeated, after, hEq, hbefore, hrepeat⟩ :=
-    first_revisit_split hnsimple
+    (first_repeat_by passageSwitch passages).resolve_left hnsimple
   subst passages
   obtain ⟨middle, hprefix, hsuffix⟩ := htrace.split_append
   obtain ⟨old, hold, hkey⟩ := List.mem_map.mp hrepeat
@@ -927,78 +913,6 @@ theorem retrace_linked_passages_option
       rw [hlen, stepN_add, htail']
       simp [stepN, step, hheadGroove]
 
-/-- **Crossed closure reverses the runway.**  A switch-simple prefix reaches
-`p`, a simple excursion leaves by `x` and returns to the same switch at `q`,
-and the next local passage exits through the old entry `p`.  The train then
-walks the entire prefix backwards without another tongue change.  The final
-plain-track edge is represented by the `Option.map`; it may be absent, in
-which case the train falls off exactly there. -/
-theorem PhysicalTrace.simple_cross_exit_retraces_prefix {w : Wiring}
-    {start : Nat × Tongues} {runway loop : List Passage}
-    {p x q : Nat} {u₀ u v : Tongues}
-    (hprefix : PhysicalTrace w start runway (p, u₀))
-    (hexcursion :
-      PhysicalTrace w (p, u₀) ((p, x) :: loop) (q, u))
-    (hsimple : SwitchSimple (runway ++ (p, x) :: loop))
-    (hnext : arrive u q = (p, v)) :
-    stepN w (runway.length + 1) (q, u) =
-      (w.link start.1).map (fun ell => (ell, v)) := by
-  have hfull := hprefix.append hexcursion
-  have hfullGrooved := hfull.grooved_of_switchSimple hsimple
-  have hqp : p / 3 = q / 3 := by
-    have hs := arrive_exit_switch u q
-    rw [hnext] at hs
-    exact hs
-  unfold SwitchSimple at hsimple
-  simp only [List.map_append, List.map_cons] at hsimple
-  have hparts := List.nodup_append.mp hsimple
-  have hpNotPrefix : p / 3 ∉ runway.map passageSwitch := by
-    intro hp
-    have hne := hparts.2.2 (p / 3) hp
-      (p / 3)
-      (by simp [passageSwitch])
-    apply hne
-    rfl
-  have hprefixGrooved : PassagesGrooved v runway := by
-    intro passage hp
-    have hold := hfullGrooved passage
-      (List.mem_append_left _ hp)
-    have hpassageNe : passageSwitch passage ≠ q / 3 := by
-      intro hEq
-      apply hpNotPrefix
-      apply List.mem_map.mpr
-      exact ⟨passage, hp, hEq.trans hqp.symm⟩
-    have hexitSwitch : passage.2 / 3 = passageSwitch passage := by
-      have hs := arrive_exit_switch u passage.2
-      rw [hold] at hs
-      exact hs.symm
-    have hforeign : passage.2 / 3 ≠ q / 3 := by
-      rw [hexitSwitch]
-      exact hpassageNe
-    exact groove_transfer hold (arrive_preserves_other hnext hforeign)
-  cases runway with
-  | nil =>
-      cases hprefix
-      simp [stepN, step, hnext]
-  | cons passage rest =>
-      rcases passage with ⟨a, b⟩
-      have hlast : w.link (lastPassageExit b rest) = some p :=
-        hprefix.last_link
-      have hpback : w.link p = some (lastPassageExit b rest) :=
-        w.symm _ _ hlast
-      have hone : stepN w 1 (q, u) =
-          some (lastPassageExit b rest, v) := by
-        simp [stepN, step, hnext, hpback]
-      have hback := retrace_linked_passages_option w v a b rest
-        hprefix.linked hprefixGrooved
-      have hstart : start.1 = a := by
-        cases hprefix
-        rfl
-      have hlen : ((a, b) :: rest).length + 1 =
-          1 + ((a, b) :: rest).length := by omega
-      rw [hlen, stepN_add, hone]
-      simp only [Option.bind_some]
-      rw [hback, hstart]
 
 theorem retrace_linked_passages
     (w : Wiring) (u : Tongues) (p x ell : Nat) (rest : List Passage)

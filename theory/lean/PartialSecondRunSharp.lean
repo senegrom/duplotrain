@@ -50,42 +50,19 @@ theorem first_activated_trace_outcome_sharp_partial
         PathGrooves A.toSupported.paths state ∧
         A.baseState = start.2 ∧
         state = A.activatedState := by
-  obtain ⟨before, old, repeated, after, middle,
-      hbeforeTrace, hafterTrace, hbeforeSimple, hold, hsameSwitch⟩ :=
-    first_revisit_of_long_run hN hlive
-  obtain ⟨runway, path, hsplit⟩ := List.append_of_mem hold
-  rcases old with ⟨p, x⟩
-  rcases repeated with ⟨q, y⟩
-  subst before
-  obtain ⟨atOld, hrunway, hexcursion⟩ := hbeforeTrace.split_append
-  have hatOldPort : atOld.1 = p := hexcursion.head_arrive.1
-  rcases atOld with ⟨oldPort, u₀⟩
-  simp only at hatOldPort
-  subst oldPort
-  obtain ⟨v, hrepeat⟩ := hafterTrace.head_arrive.2
-  have hmiddlePort : middle.1 = q := hafterTrace.head_arrive.1
-  rcases middle with ⟨middlePort, u⟩
-  simp only at hmiddlePort
-  subst middlePort
-  have hsw : p / 3 = q / 3 := by
-    simpa [passageSwitch] using hsameSwitch
-  have hfork := first_revisit_cycle_traces_or_activated_reflector w
-    hrunway hexcursion hbeforeSimple hsw hrepeat hentry
-  have hleadTrace : PhysicalTrace w start
-      (runway ++ (p, x) :: path) (q, u) := hbeforeTrace
+  obtain ⟨lead, q, u, hleadTrace, hleadSimple, hfork⟩ :=
+    first_revisit_fork hN hlive hentry
   rcases hfork with hcycle | hreflector
-  · obtain ⟨_cycle, settled, _hne, _ht, _hs,
-      _hsimple, _hphase, hpositive⟩ := hcycle
+  · obtain ⟨_cycle, settled, _hne, _ht, _hs, _hsimple, _hphase, hpositive⟩ := hcycle
     exact Or.inl ⟨{
-      lead := runway ++ (p, x) :: path
+      lead := lead
       atRepeat := (q, u)
       settled := settled
       lead_trace := hleadTrace
-      lead_simple := hbeforeSimple
+      lead_simple := hleadSimple
       positive_settled := hpositive
     }⟩
-  · obtain ⟨A, state, hgrooves, hbase, hactivated,
-      _hback, _hpreserves⟩ := hreflector
+  · obtain ⟨A, state, hgrooves, hbase, hactivated, _hpreserves⟩ := hreflector
     exact Or.inr ⟨A, state, hgrooves, hbase, hactivated⟩
 
 namespace PartialSecondRunSharp
@@ -200,6 +177,17 @@ theorem ChangedContact.post_reaches
       refine ⟨q, ?_⟩
       rw [stepN_add, C.approach_trace.sound]
       simp [stepN, step, C.arrive_eq, hlink]
+
+/-- Any reach equation at the post-contact time names the post-contact
+state. -/
+theorem ChangedContact.nextState_eq_of_post
+    {w : Wiring} {g e : Nat} {A : ManufacturedReflector w g e}
+    (C : ChangedContact w A) {port : Nat} {phase : Tongues}
+    (h : stepN w (C.approach.length + 1) (e, A.activatedState) =
+      some (port, phase)) : C.nextState = phase := by
+  obtain ⟨q, hq⟩ := C.post_reaches
+  rw [h] at hq
+  exact (congrArg Prod.snd (Option.some.inj hq)).symm
 
 /-- Coefficient-one history through the contact, including the one changed
 post-contact vector. -/
@@ -371,11 +359,7 @@ theorem ChangedContact.forward_stay_all_time_zero_novelty
       stepN w K (e, (ManufacturedReflector.stay R).activatedState) =
         some (outside, alternate) := by
     simpa [K, alternate] using hreach
-  obtain ⟨postPort, hpost⟩ := C.post_reaches
-  have hnextAlternate : C.nextState = alternate := by
-    rw [hreach'] at hpost
-    have hpairs := Option.some.inj hpost
-    exact (congrArg Prod.snd hpairs).symm
+  have hnextAlternate : C.nextState = alternate := C.nextState_eq_of_post hreach'
   have hentryHistorical :
       VectorCount.restrict N alternate ∈ C.history N := by
     simpa [hnextAlternate] using C.next_mem_history (N := N)

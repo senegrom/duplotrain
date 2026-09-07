@@ -13,30 +13,6 @@ time-indexed facts the global history extraction of the sharp bound uses.
 
 namespace GeneralN
 
-/-- A raw trajectory shifted to a reached configuration has exactly the same
-restricted tongue vectors. -/
-theorem restrictedTonguesAt_add_of_reach
-    {w : Wiring} {N shift d : Nat}
-    {start middle finish : Nat × Tongues}
-    (hreach : stepN w shift start = some middle)
-    (hfinish : stepN w d middle = some finish) :
-    restrictedTonguesAt w N start (shift + d) =
-      restrictedTonguesAt w N middle d := by
-  simp [restrictedTonguesAt, tonguesAt, stepN_add, hreach, hfinish]
-
-/-- A successful absolute suffix of a reached raw configuration is a
-successful local suffix.  This tiny transport fact lets the global-history
-argument use the local changed-forward novelty theorem without assuming an
-all-time liveness oracle. -/
-theorem stepN_suffix_some_of_reach
-    {w : Wiring} {shift d : Nat}
-    {start middle : Nat × Tongues}
-    (hreach : stepN w shift start = some middle)
-    (hglobal : (stepN w (shift + d) start).isSome) :
-    ∃ finish, stepN w d middle = some finish := by
-  rw [stepN_add, hreach] at hglobal
-  simpa using (Option.isSome_iff_exists.mp hglobal)
-
 /-- Transport one live post-time from an ambient raw run to a reached local
 run. -/
 theorem restrictedTonguesAt_sub_of_reach
@@ -48,14 +24,10 @@ theorem restrictedTonguesAt_sub_of_reach
     restrictedTonguesAt w N start t =
       restrictedTonguesAt w N middle (t - shift) := by
   have ht : t = shift + (t - shift) := by omega
-  have hglobal' :
-      (stepN w (shift + (t - shift)) start).isSome := by
-    rw [← ht]
-    exact hlive
-  obtain ⟨finish, hfinish⟩ := stepN_suffix_some_of_reach
-    hreach hglobal'
-  have htransport := restrictedTonguesAt_add_of_reach
-    (N := N) hreach hfinish
+  have htransport : restrictedTonguesAt w N start (shift + (t - shift)) =
+      restrictedTonguesAt w N middle (t - shift) :=
+    restrictedTonguesAt_add_of_reaches hreach
+      (stepN_suffix_some_of_reaches hreach (by rw [← ht]; exact hlive))
   rw [← ht] at htransport
   exact htransport
 

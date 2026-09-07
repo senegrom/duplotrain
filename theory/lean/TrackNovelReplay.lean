@@ -135,25 +135,4 @@ theorem physicalTrace_contact_retraces_prefix_pointwise
         (by simpa only [List.length_cons, reversePassages_length] using hd)
       exact ⟨port, by simpa using (stepN_after_arrival hcontact (by omega)).trans hr⟩
 
-/-- Positive-time projection of
-`physicalTrace_contact_retraces_prefix_pointwise`: every configuration from
-the contact through the end of the reverse traversal has tongue vector `v`.
--/
-theorem physicalTrace_contact_retraces_prefix_positive
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    {d : Nat} (hpos : 1 ≤ d) (hd : d ≤ recorded.length + 1) :
-    ∃ port, stepN w d (p, u) = some (port, v) := by
-  obtain ⟨port, hrun⟩ :=
-    (physicalTrace_contact_retraces_prefix_pointwise
-      hrecorded hgrooved hentry hcontact).2 d hd
-  have hd0 : d ≠ 0 := by omega
-  exact ⟨port, by simpa [hd0] using hrun⟩
-
 end GeneralN

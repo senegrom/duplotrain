@@ -61,11 +61,11 @@ theorem ManufacturedReflector.preReturn_eq_action_activated
       rw [hcross, flipAt_flipAt]
 
 
-/-- In the completed-repair branch, the activated and pre-return vectors are
-two opposite corners of the restored pair's Gray square.  The other two
-corners therefore form a two-vector novelty cover over the construction
-history. -/
-theorem ManufacturedReflector.completed_protected_route_two_novelty_of_preReturn
+/-- **Shared core of the completed protected repair.**  After the repair the
+run stays on the four action corners of the restored pair.  Two corners
+(the final vector and its `B`-action) are always historical; whenever the
+other two lie in `history ++ fresh`, so does every sampled vector. -/
+theorem ManufacturedReflector.completed_protected_route_cover
     {w : Wiring} {N g e : Nat}
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
@@ -77,13 +77,19 @@ theorem ManufacturedReflector.completed_protected_route_two_novelty_of_preReturn
       (A.orientedFinish B.activatedState, finalState))
     (hAfinal : PathGrooves A.toSupported.paths finalState)
     (hBfinal : PathGrooves B.toSupported.paths finalState)
-    (history : List (List Bool))
+    (history fresh : List (List Bool))
     (hinitialHistorical : VectorCount.restrict N B.activatedState ∈ history)
     (hpreHistorical : VectorCount.restrict N B.preReturn.2 ∈ history)
+    (hAcovered : VectorCount.restrict N
+      (A.toSupported.action.apply finalState) ∈ history ++ fresh)
+    (hBAcovered : VectorCount.restrict N
+      (B.toSupported.action.apply
+        (A.toSupported.action.apply finalState)) ∈ history ++ fresh)
     (times : List Nat)
     (hlive : ∀ k ∈ times,
       (stepN w k (g, B.activatedState)).isSome) :
-    NoveltyCoverOn w N (g, B.activatedState) times history 2 := by
+    ∀ k ∈ times,
+      restrictedTonguesAt w N (g, B.activatedState) k ∈ history ++ fresh := by
   obtain ⟨reference, _hreferencePaths, hrouteEq, hfinishEq,
       hreferenceGrooved, _hguard⟩ :=
     A.current_route_reference B.baseState B.activatedState hA
@@ -142,13 +148,6 @@ theorem ManufacturedReflector.completed_protected_route_two_novelty_of_preReturn
         rw [hpreAction, heq]
       simpa [hpreB] using hpreHistorical
     · simpa [haction] using hinitialHistorical
-  let freshStates : List Tongues :=
-    [A.toSupported.action.apply finalState,
-      B.toSupported.action.apply
-        (A.toSupported.action.apply finalState)]
-  let fresh := freshStates.map (VectorCount.restrict N)
-  have hfreshLength : fresh.length ≤ 2 := by
-    simp [fresh, freshStates]
   have hcornerCover : ∀ phase ∈ manufacturedPairActionCorners A B finalState,
       VectorCount.restrict N phase ∈ history ++ fresh := by
     intro phase hp
@@ -156,45 +155,19 @@ theorem ManufacturedReflector.completed_protected_route_two_novelty_of_preReturn
       List.not_mem_nil, or_false] at hp
     rcases hp with rfl | rfl | rfl | rfl
     · exact List.mem_append_left _ hfinalHistorical
-    · apply List.mem_append_right
-      simp [fresh, freshStates]
+    · exact hAcovered
     · exact List.mem_append_left _ hBfinalHistorical
-    · apply List.mem_append_right
-      simp [fresh, freshStates]
-  refine ⟨fresh, hfreshLength, ?_⟩
-  intro k hk
-  by_cases hkpre : k ≤ L
-  · obtain ⟨port, phase, hrun, hphase⟩ := hprefixPhase k hkpre
-    have hvec : restrictedTonguesAt w N (g, B.activatedState) k =
-        VectorCount.restrict N phase := by
-      simp [restrictedTonguesAt, tonguesAt, hrun]
-    rw [hvec]
-    rcases hphase with h | h
-    · apply List.mem_append_left
-      simpa [h] using hinitialHistorical
-    · apply List.mem_append_left
-      simpa [h] using hfinalHistorical
-  · let d := k - L
-    have hkEq : k = L + d := by
-      dsimp [d]
-      omega
-    have hkLive := hlive k hk
-    have htailLive : ∃ finish, stepN w d endpoint = some finish := by
-      rw [hkEq, stepN_add, hrepairReach] at hkLive
-      simp only [Option.bind_some] at hkLive
-      cases htail : stepN w d endpoint with
-      | none => simp [htail] at hkLive
-      | some finish => exact ⟨finish, rfl⟩
-    have hmem := manufactured_pair_reached_action_corners_tongues
-      A B finalState hAfinal hBfinal hpairReach htailLive
-    have hshift := tonguesAt_add_of_reaches hrepairReach htailLive
-    have hcovered := hcornerCover (tonguesAt w endpoint d) hmem
-    have hvector : restrictedTonguesAt w N
-        (g, B.activatedState) k =
-          VectorCount.restrict N (tonguesAt w endpoint d) := by
-      unfold restrictedTonguesAt
-      rw [hkEq]
-      exact congrArg (VectorCount.restrict N) hshift
-    simpa [hvector] using hcovered
+    · exact hBAcovered
+  refine cover_of_phase_orbit hrepairReach (fun d hd => by
+    rw [← tonguesAt_add_of_reaches hpairReach (Option.isSome_iff_exists.mp hd)]
+    exact manufactured_pair_all_time_action_corners_tongues A B finalState hAfinal hBfinal _)
+    hcornerCover hlive ?_
+  intro k hk hkpre
+  obtain ⟨port, phase, hrun, hphase⟩ := hprefixPhase k (Nat.le_of_lt hkpre)
+  rw [show restrictedTonguesAt w N (g, B.activatedState) k =
+    VectorCount.restrict N phase by simp [restrictedTonguesAt, tonguesAt, hrun]]
+  rcases hphase with rfl | rfl
+  · exact hinitialHistorical
+  · exact hfinalHistorical
 
 end GeneralN

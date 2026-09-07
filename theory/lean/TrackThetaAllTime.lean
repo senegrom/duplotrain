@@ -302,10 +302,15 @@ theorem manufactured_flip_pair_all_time_four_phase
           (ManufacturedReflector.flip FB).toSupported.paths := hAB
       have hBA' : (ManufacturedReflector.flip FB).toSupported.action.Avoids
           (ManufacturedReflector.flip FA).toSupported.paths := hBA
-      have hperiod :=
-        (ManufacturedReflector.flip FA).toSupported.paired_period
-          (ManufacturedReflector.flip FB).toSupported
-          hAB' hBA' state hA' hB'
+      have hperiod := paired_reflectors_period w
+        (ManufacturedReflector.flip FA).toSupported.run
+        (ManufacturedReflector.flip FB).toSupported.run
+        (fun state hs => hs.after_avoiding_action hAB')
+        (fun state hs => hs.after_avoiding_action hBA')
+        ((ManufacturedReflector.flip FA).toSupported.action.commute
+          (ManufacturedReflector.flip FB).toSupported.action)
+        (ManufacturedReflector.flip FA).toSupported.action.involutive
+        (ManufacturedReflector.flip FB).toSupported.action.involutive state hA' hB'
       have hApos : 0 < (ManufacturedReflector.flip FA).toSupported.travel :=
         (ManufacturedReflector.flip FA).travel_pos
       have hpos : 0 <

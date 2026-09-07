@@ -18,44 +18,16 @@ def Wiring.completed (w : Wiring) (N : Nat) : Wiring where
     | none => if p < 3 * N then some p else none
   symm := by
     intro a b hab
-    change (match w.link a with
-      | some q => some q
-      | none => if a < 3 * N then some a else none) = some b at hab
-    change (match w.link b with
-      | some q => some q
-      | none => if b < 3 * N then some b else none) = some a
-    cases ha : w.link a with
-    | some q =>
-        have hq : q = b := by simpa [ha] using hab
-        subst q
-        simp [w.symm a b ha]
-    | none =>
-        by_cases hbound : a < 3 * N
-        · have heq : a = b := by simpa [ha, hbound] using hab
-          subst b
-          simp [ha, hbound]
-        · simp [ha, hbound] at hab
+    cases ha : w.link a <;> cases hb : w.link b <;> grind [w.symm]
 
 /-- No existing connection is changed. -/
 theorem Wiring.completed_preserves {w : Wiring} {a b N : Nat}
-    (hab : w.link a = some b) : (w.completed N).link a = some b := by
-  simp [Wiring.completed, hab]
+    (hab : w.link a = some b) : (w.completed N).link a = some b := by grind [Wiring.completed]
 
 /-- Completion never adds a switch. -/
 theorem Wiring.completed_bounded {w : Wiring} {N : Nat}
     (hN : ∀ a b, w.link a = some b → a < 3 * N ∧ b < 3 * N) :
-    ∀ a b, (w.completed N).link a = some b → a < 3 * N ∧ b < 3 * N := by
-  intro a b hab
-  cases ha : w.link a with
-  | some q =>
-      have hq : q = b := by simpa [Wiring.completed, ha] using hab
-      subst q
-      exact hN a b ha
-  | none =>
-      by_cases hbound : a < 3 * N
-      · have heq : a = b := by simpa [Wiring.completed, ha, hbound] using hab
-        exact ⟨hbound, heq ▸ hbound⟩
-      · simp [Wiring.completed, ha, hbound] at hab
+    ∀ a b, (w.completed N).link a = some b → a < 3 * N ∧ b < 3 * N := by grind [Wiring.completed]
 
 /-- Every in-range port has a partner in the completion. -/
 theorem Wiring.completed_total (w : Wiring) {N p : Nat} (hp : p < 3 * N) :

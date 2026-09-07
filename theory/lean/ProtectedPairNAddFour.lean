@@ -18,89 +18,6 @@ no doubly-erased history, and no unresolved writer-order residual.
 
 namespace GeneralN
 
-/-- Writing the first reflector's action switch forces a constant-tongue
-retrace to the second exploration's starting port. Switch simplicity therefore
-makes this its last productive writer, regardless of earlier writer order. -/
-theorem ManufacturedFlipReflector.action_writer_is_last_productive
-    {w : Wiring} {N g e : Nat}
-    (_hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (R : ManufacturedFlipReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbaseGrooves : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths B.baseState)
-    (hpreGrooves : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths B.preReturn.2)
-    {t : Nat}
-    (ht : t ∈ rawFirstWriterTimes w N (e, B.baseState)
-      B.exploration.length)
-    (hwriter : rawWriterAt w (e, B.baseState) t = R.actionSwitch) :
-    ∀ j, t < j → j < B.exploration.length →
-      ¬ RawProductiveAt w N (e, B.baseState) j := by
-  intro j htj hjBound hjProd
-  let start : Nat × Tongues := (e, B.baseState)
-  have htData := mem_rawFirstWriterTimes_iff.mp ht
-  have hactionProd : RawProductiveAt w N start t := by
-    simpa [start] using htData.2.1
-  obtain ⟨cur, next, writerSwitch, hwriterDef, hcur, hnext,
-      hstep, hexit, _hflip⟩ :=
-    rawProductiveAt_is_endpoint_pivot hactionProd
-  have hwriterSwitch : writerSwitch = R.actionSwitch := by
-    exact hwriterDef.trans (by simpa [start] using hwriter)
-  subst writerSwitch
-  have hmouth : 3 * R.actionSwitch = R.mouth := by
-    unfold ManufacturedFlipReflector.actionSwitch
-    have hstem := R.mouth_is_stem
-    omega
-  have hparts := step_some_parts hstep
-  have hactionArrive :
-      arrive cur.2 cur.1 = (R.mouth, next.2) := by
-    calc
-      arrive cur.2 cur.1 = (exitPort cur, next.2) := by
-        apply Prod.ext
-        · rfl
-        · exact hparts.2.symm
-      _ = (R.mouth, next.2) := by
-        rw [hexit, hwriterSwitch, hmouth]
-  have hpostRunwayGrooved : PassagesGrooved next.2 R.runway := by
-    have hpostPaths := B.exploration_trace.pathGrooves_at_prefix_of_endpoints
-      B.exploration_simple hbaseGrooves hpreGrooves
-      (k := t + 1) (by omega) (by simpa [start] using hnext)
-    exact hpostPaths R.runway (by
-      change R.runway ∈ [R.runway, R.candy]
-      exact List.mem_cons_self)
-  have hpointwise :=
-    (physicalTrace_contact_retraces_prefix_pointwise
-      R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive).2
-  have hbackTrace := physicalTrace_contact_retraces_prefix
-    R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive
-  let runwaySpan := R.runway.length + 1
-  have hbackSound :
-      stepN w runwaySpan (cur.1, cur.2) = some (e, next.2) := by
-    simpa [runwaySpan, reversePassages_length, Nat.add_comm] using
-      hbackTrace.sound
-  let returnTime := t + runwaySpan
-  have hreturn :
-      stepN w returnTime start = some (e, next.2) := by
-    dsimp [returnTime]
-    rw [stepN_add, hcur]
-    exact hbackSound
-  have hexplorationByReturn : B.exploration.length ≤ returnTime := by
-    apply Nat.le_of_not_gt
-    intro hinside
-    exact B.exploration_trace.no_strict_return_to_start_port
-      B.exploration_simple
-        (k := returnTime) (returned := next.2)
-        (by dsimp [returnTime, runwaySpan]; omega)
-        hinside (by simpa [start] using hreturn)
-  have hjOutside := productive_not_inside_pointwise_retrace
-    (N := N) (repeatTime := t) (span := runwaySpan)
-    (openTime := j) (start := start)
-    (old := cur.2) (settled := next.2) (q := cur.1)
-    hcur (by simpa [runwaySpan] using hpointwise)
-    (by simpa [start] using hjProd) htj
-  dsimp [returnTime] at hexplorationByReturn
-  omega
-
 /-- Every support-preserving protected repair prefix ends in either the
 protected reflector's activated state or its pre-return state.  For a flip
 reflector these are the two values of its action tongue; for a stay
@@ -986,64 +903,11 @@ theorem ManufacturedReflector.completed_protected_route_one_novelty_of_action_pr
     (hlive : ∀ k ∈ times,
       (stepN w k (g, B.activatedState)).isSome) :
     NoveltyCoverOn w N (g, B.activatedState) times history 1 := by
-  obtain ⟨reference, _hreferencePaths, hrouteEq, hfinishEq,
-      hreferenceGrooved, _hguard⟩ :=
-    A.current_route_reference B.baseState B.activatedState hA
-  have hfinalGrooved :
-      PassagesGrooved finalState (A.orientedRoute B.activatedState) :=
-    hrepair.grooved_of_switchSimple
-      (A.orientedRoute_simple B.activatedState)
-  have hfinalReferenceGrooved :
-      PassagesGrooved finalState (A.orientedRoute reference) := by
-    rw [hrouteEq]
-    exact hfinalGrooved
-  have hreferenceGrooved' :
-      PassagesGrooved reference (A.orientedRoute reference) := by
-    rw [hrouteEq]
-    exact hreferenceGrooved
-  have horiented := A.oriented_data_eq_of_route_grooved
-    reference finalState hreferenceGrooved' hfinalReferenceGrooved
-  have hrouteFinal := A.orientedRoute_trace finalState hAfinal
-  have hrouteFinal' : PhysicalTrace w (g, finalState)
-      (A.orientedRoute B.activatedState)
-      (A.orientedFinish B.activatedState, finalState) := by
-    rw [horiented.1, horiented.2, hrouteEq, hfinishEq] at hrouteFinal
-    exact hrouteFinal
-  let L := (A.orientedRoute B.activatedState).length
-  let endpoint : Nat × Tongues :=
-    (A.orientedFinish B.activatedState, finalState)
-  have hrepairReach : stepN w L (g, B.activatedState) =
-      some endpoint := by
-    simpa [L, endpoint] using hrepair.sound
-  have hpairReach : stepN w L (g, finalState) = some endpoint := by
-    simpa [L, endpoint] using hrouteFinal'.sound
-  have hprefixPhase := A.repair_prefix_two_phase B hA hB
-    hrepair (A.orientedRoute_simple B.activatedState)
-    (by intro passage hp; exact hp) hBfinal
   have hrelation := A.completed_repair_initial_action_relation
     B hA hB hrepair hBfinal
   have hpreAction :
       B.preReturn.2 = B.toSupported.action.apply B.activatedState :=
     B.preReturn_eq_action_activated
-  have hfinalHistorical :
-      VectorCount.restrict N finalState ∈ history := by
-    rcases hrelation with heq | haction
-    · simpa [heq] using hinitialHistorical
-    · have hpreFinal : B.preReturn.2 = finalState := by
-        calc
-          B.preReturn.2 =
-              B.toSupported.action.apply B.activatedState := hpreAction
-          _ = finalState := by
-            rw [haction, B.toSupported.action.involutive]
-      simpa [hpreFinal] using hpreHistorical
-  have hBfinalHistorical : VectorCount.restrict N
-      (B.toSupported.action.apply finalState) ∈ history := by
-    rcases hrelation with heq | haction
-    · have hpreB : B.preReturn.2 =
-          B.toSupported.action.apply finalState := by
-        rw [hpreAction, heq]
-      simpa [hpreB] using hpreHistorical
-    · simpa [haction] using hinitialHistorical
   have hAorBAHistorical :
       VectorCount.restrict N
           (A.toSupported.action.apply finalState) ∈ history ∨
@@ -1076,72 +940,17 @@ theorem ManufacturedReflector.completed_protected_route_one_novelty_of_action_pr
           _ = finalState := by
             rw [haction, B.toSupported.action.involutive]
       simpa [hpreFinal] using haPreHistorical
-  have closeWithOne
-      (freshState : Tongues)
-      (hAcovered : VectorCount.restrict N
-        (A.toSupported.action.apply finalState) ∈
-          history ++ [VectorCount.restrict N freshState])
-      (hBAcovered : VectorCount.restrict N
-        (B.toSupported.action.apply
-          (A.toSupported.action.apply finalState)) ∈
-          history ++ [VectorCount.restrict N freshState]) :
-      NoveltyCoverOn w N (g, B.activatedState) times history 1 := by
-    have hcornerCover : ∀ phase ∈
-        manufacturedPairActionCorners A B finalState,
-        VectorCount.restrict N phase ∈
-          history ++ [VectorCount.restrict N freshState] := by
-      intro phase hp
-      simp only [manufacturedPairActionCorners, List.mem_cons,
-        List.not_mem_nil, or_false] at hp
-      rcases hp with rfl | rfl | rfl | rfl
-      · exact List.mem_append_left _ hfinalHistorical
-      · exact hAcovered
-      · exact List.mem_append_left _ hBfinalHistorical
-      · exact hBAcovered
-    refine ⟨[VectorCount.restrict N freshState], by simp, ?_⟩
-    intro k hk
-    by_cases hkpre : k ≤ L
-    · obtain ⟨port, phase, hrun, hphase⟩ := hprefixPhase k hkpre
-      have hvec : restrictedTonguesAt w N (g, B.activatedState) k =
-          VectorCount.restrict N phase := by
-        simp [restrictedTonguesAt, tonguesAt, hrun]
-      rw [hvec]
-      rcases hphase with h | h
-      · apply List.mem_append_left
-        simpa [h] using hinitialHistorical
-      · apply List.mem_append_left
-        simpa [h] using hfinalHistorical
-    · let d := k - L
-      have hkEq : k = L + d := by
-        dsimp [d]
-        omega
-      have hkLive := hlive k hk
-      have htailLive : ∃ finish, stepN w d endpoint = some finish := by
-        rw [hkEq, stepN_add, hrepairReach] at hkLive
-        simp only [Option.bind_some] at hkLive
-        cases htail : stepN w d endpoint with
-        | none => simp [htail] at hkLive
-        | some finish => exact ⟨finish, rfl⟩
-      have hmem := manufactured_pair_reached_action_corners_tongues
-        A B finalState hAfinal hBfinal hpairReach htailLive
-      have hshift := tonguesAt_add_of_reaches hrepairReach htailLive
-      have hvector : restrictedTonguesAt w N
-          (g, B.activatedState) k =
-            VectorCount.restrict N (tonguesAt w endpoint d) := by
-        unfold restrictedTonguesAt
-        rw [hkEq]
-        exact congrArg (VectorCount.restrict N) hshift
-      have hcovered := hcornerCover (tonguesAt w endpoint d) hmem
-      simpa [hvector] using hcovered
   rcases hAorBAHistorical with hAHistorical | hBAHistorical
-  · apply closeWithOne
-      (B.toSupported.action.apply
-        (A.toSupported.action.apply finalState))
-    · exact List.mem_append_left _ hAHistorical
-    · simp
-  · apply closeWithOne (A.toSupported.action.apply finalState)
-    · simp
-    · exact List.mem_append_left _ hBAHistorical
+  · exact ⟨[VectorCount.restrict N (B.toSupported.action.apply
+      (A.toSupported.action.apply finalState))], by simp,
+      A.completed_protected_route_cover B hA hB hrepair hAfinal hBfinal history _
+        hinitialHistorical hpreHistorical (List.mem_append_left _ hAHistorical)
+        (by simp) times hlive⟩
+  · exact ⟨[VectorCount.restrict N (A.toSupported.action.apply finalState)],
+      by simp,
+      A.completed_protected_route_cover B hA hB hrepair hAfinal hBfinal history _
+        hinitialHistorical hpreHistorical (by simp)
+        (List.mem_append_left _ hBAHistorical) times hlive⟩
 
 section
 variable (A : ManufacturedReflector w g e)
@@ -1208,21 +1017,12 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_cover :
         dsimp [totalTravel] at hd
         dsimp [q]
         omega
-      have hliveQ := stepN_prefix_some hqLe hreachB
-      have hshift := tonguesAt_add_of_reaches hreachA hliveQ
       have hm := B.manufacturing_journey_mem_sharpHistory
         (N := N) hBpaths (j := q)
           (by simpa [secondTravel] using hqLe)
-      have hm' : restrictedTonguesAt w N (e, A.activatedState) q ∈
-          B.sharpConstructionHistory N := by
-        simpa [hbase] using hm
-      have heq : restrictedTonguesAt w N (g, A.baseState) d =
-          restrictedTonguesAt w N (e, A.activatedState) q := by
-        unfold restrictedTonguesAt
-        rw [hdEq]
-        exact congrArg (VectorCount.restrict N) hshift
-      rw [heq]
-      exact hhistory _ (Or.inr hm')
+      rw [hdEq, restrictedTonguesAt_add_of_reaches hreachA
+        (stepN_prefix_some hqLe hreachB)]
+      exact hhistory _ (Or.inr (by simpa [hbase] using hm))
   have hlocalLive : ∀ d ∈ localTimes,
       (stepN w d (g, B.activatedState)).isSome := by
     intro d hd
@@ -1246,25 +1046,14 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_cover :
     have hkGt : totalTravel < k := by
       simpa using (List.mem_filter.mp hk).2
     have hkEq : k = totalTravel + (k - totalTravel) := by omega
-    have hkLive := hlive k hkTimes
-    cases htailRun : stepN w (k - totalTravel)
-        (g, B.activatedState) with
-    | none =>
-        have hglobalNone : stepN w k (g, A.baseState) = none := by
-          rw [hkEq, stepN_add, hreachTotal]
-          simp [htailRun]
-        rw [hglobalNone] at hkLive
-        simp at hkLive
-    | some finish =>
-        have hshift := tonguesAt_add_of_reaches
-          hreachTotal ⟨finish, htailRun⟩
-        have hstartEq : tonguesAt w (g, A.baseState)
-            (totalTravel + (k - totalTravel)) =
-            tonguesAt w (g, A.baseState) k := by
-          rw [← hkEq]
-        unfold restrictedTonguesAt
-        exact congrArg (VectorCount.restrict N)
-          (hshift.symm.trans hstartEq)
+    have hkLive :
+        (stepN w (totalTravel + (k - totalTravel)) (g, A.baseState)).isSome := by
+      rw [← hkEq]
+      exact hlive k hkTimes
+    have heq := restrictedTonguesAt_add_of_reaches (N := N) hreachTotal
+      (stepN_suffix_some_of_reaches hreachTotal hkLive)
+    rw [← hkEq] at heq
+    exact heq.symm
   have hfilteredNodup :
       ((times.filter (fun k => decide (totalTravel < k))).map
         (restrictedTonguesAt w N (g, A.baseState))).Nodup :=
@@ -1292,16 +1081,8 @@ theorem ManufacturedReflector.two_journeys_then_shared_history_novelty_cover :
     have hdMem : d ∈ localTimes := by
       dsimp [localTimes]
       exact List.mem_map.mpr ⟨k, hkFiltered, rfl⟩
-    obtain ⟨finish, hfinish⟩ :=
-      Option.isSome_iff_exists.mp (hlocalLive d hdMem)
-    have hshift := tonguesAt_add_of_reaches
-      hreachTotal ⟨finish, hfinish⟩
-    have hvector : restrictedTonguesAt w N (g, A.baseState) k =
-        restrictedTonguesAt w N (g, B.activatedState) d := by
-      unfold restrictedTonguesAt
-      rw [hkEq]
-      exact congrArg (VectorCount.restrict N) hshift
-    rw [hvector]
+    rw [hkEq, restrictedTonguesAt_add_of_reaches hreachTotal
+      (Option.isSome_iff_exists.mp (hlocalLive d hdMem))]
     exact hlocalMem d hdMem
 
 /-- Generic two-journey bookkeeping over an arbitrary shared history: the
@@ -1364,22 +1145,10 @@ theorem ManufacturedReflector.protected_repair_two_novelty_over_history
     (hnd : (times.map
       (restrictedTonguesAt w N (g, B.activatedState))).Nodup) :
     NoveltyCoverOn w N (g, B.activatedState) times history 2 := by
-  have hinitialHistorical :
-      VectorCount.restrict N B.activatedState ∈ history := by
-    apply hhistory
-    right
-    simp [ManufacturedReflector.sharpConstructionHistory]
-  have hpreHistorical :
-      VectorCount.restrict N B.preReturn.2 ∈ history := by
-    apply hhistory
-    right
-    unfold ManufacturedReflector.sharpConstructionHistory
-    apply List.mem_append_left
-    apply List.mem_map.mpr
-    refine ⟨B.exploration.length,
-      List.mem_range.mpr (by omega), ?_⟩
-    simp [restrictedTonguesAt, tonguesAt,
-      B.exploration_trace.sound]
+  have hinitialHistorical : VectorCount.restrict N B.activatedState ∈ history :=
+    hhistory _ (Or.inr B.activated_mem_sharpHistory)
+  have hpreHistorical : VectorCount.restrict N B.preReturn.2 ∈ history :=
+    hhistory _ (Or.inr B.preReturn_mem_sharpHistory)
   rcases manufactured_pair_protected_repair_novelty_outcomes
       A B hA hB history hinitialHistorical hpreHistorical with
     hone | hfacing | hchanged | hcomplete
@@ -1391,9 +1160,11 @@ theorem ManufacturedReflector.protected_repair_two_novelty_over_history
     exact ⟨fresh, by omega, hmem⟩
   · exact (hchanged.impossible_of_preReturn_grooved hB hpre).elim
   · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
-    exact A.completed_protected_route_two_novelty_of_preReturn
-      B hA hB hrepair hAfinal hBfinal history
-        hinitialHistorical hpreHistorical times hlive
+    exact ⟨[VectorCount.restrict N (A.toSupported.action.apply finalState),
+      VectorCount.restrict N (B.toSupported.action.apply
+        (A.toSupported.action.apply finalState))], by simp,
+      A.completed_protected_route_cover B hA hB hrepair hAfinal hBfinal history _
+        hinitialHistorical hpreHistorical (by simp) (by simp) times hlive⟩
 
 /-- If the first flip reflector's action switch is a productive first writer
 of the second construction, every protected repair continuation has only one
@@ -1421,22 +1192,10 @@ theorem ManufacturedFlipReflector.protected_repair_one_novelty_over_history_of_a
     (hnd : (times.map
       (restrictedTonguesAt w N (g, B.activatedState))).Nodup) :
     NoveltyCoverOn w N (g, B.activatedState) times history 1 := by
-  have hinitialHistorical :
-      VectorCount.restrict N B.activatedState ∈ history := by
-    apply hhistory
-    right
-    simp [ManufacturedReflector.sharpConstructionHistory]
-  have hpreHistorical :
-      VectorCount.restrict N B.preReturn.2 ∈ history := by
-    apply hhistory
-    right
-    unfold ManufacturedReflector.sharpConstructionHistory
-    apply List.mem_append_left
-    apply List.mem_map.mpr
-    refine ⟨B.exploration.length,
-      List.mem_range.mpr (by omega), ?_⟩
-    simp [restrictedTonguesAt, tonguesAt,
-      B.exploration_trace.sound]
+  have hinitialHistorical : VectorCount.restrict N B.activatedState ∈ history :=
+    hhistory _ (Or.inr B.activated_mem_sharpHistory)
+  have hpreHistorical : VectorCount.restrict N B.preReturn.2 ∈ history :=
+    hhistory _ (Or.inr B.preReturn_mem_sharpHistory)
   rcases manufactured_pair_protected_repair_novelty_outcomes
       (ManufacturedReflector.flip R) B hA hB history
         hinitialHistorical hpreHistorical with
@@ -1446,8 +1205,8 @@ theorem ManufacturedFlipReflector.protected_repair_one_novelty_over_history_of_a
       hN hA hB history hinitialHistorical hpreHistorical times hlive
   · exact (hchanged.impossible_of_preReturn_grooved hB hpre).elim
   · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
-    have hlast := R.action_writer_is_last_productive
-      hN B hA hpre ht hwriter
+    have hlast := R.no_productive_after_action_writer
+      B.exploration_trace B.exploration_simple hA hpre ht hwriter
     have haPreSharp := R.flipped_preReturn_mem_second_sharp_of_last B ht hwriter hlast
     have haPreHistorical : VectorCount.restrict N
         ((ManufacturedReflector.flip R).toSupported.action.apply
@@ -1486,7 +1245,11 @@ theorem ManufacturedReflector.preReturn_grooved_protected_pair_all_run_distinct_
   have hhistory : ∀ x, x ∈ A.sharpConstructionHistory N ∨
       x ∈ B.sharpConstructionHistory N → x ∈ history := by
     intro x hx
-    exact A.mem_preservedTwoHistoryCore B hx
+    show x ∈ A.preservedTwoHistoryCore B N
+    grind [ManufacturedReflector.mem_sharpHistoryCore_of_mem,
+      ManufacturedReflector.mem_writerConstructionHistory_of_mem_sharp,
+      ManufacturedReflector.preservedTwoHistoryCore,
+      ManufacturedReflector.sharpConstructionHistory]
   have htwo : history.length ≤ N + 2 → times.length ≤ N + 4 := by
     intro hlen
     have hcount := A.two_journeys_then_shared_history_novelty_count

@@ -345,31 +345,6 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_f
 
 end
 
-/-- A one-novelty local tail after the changed contact is exactly enough for
-the existing `N+3` compressed lead to give a global `N+4` bound. -/
-theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_four_of_one_novelty
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    (times : List Nat)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup)
-    (hlocal : NoveltyCoverOn w N (e, A.activatedState)
-      (times.map (fun k => k -
-        (A.exploration.length + A.runway.length + 1)))
-      (C.compressedLead N) 1) :
-    times.length <= N + 4 := by
-  have hcount :=
-    C.changed_all_run_distinct_le_compressedLead_add_budget
-      hA times hlive hnd hlocal
-  have hlength := C.compressedLead_length_le hN hA
-  omega
-
 structure PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual
     {w : Wiring} {N g e : Nat}
     (R : ManufacturedFlipReflector w g e)
@@ -418,13 +393,9 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
       (e, (ManufacturedReflector.flip R).activatedState) =
         some (outside, alternate) := by
     simpa [K, state, alternate] using hreach
-  obtain ⟨postPort, hpost⟩ := C.post_reaches
-  have hnextAlternate : C.nextState = alternate := by
-    rw [hreach'] at hpost
-    have hpairs := Option.some.inj hpost
-    exact (congrArg Prod.snd hpairs).symm
+  have hnextAlternate : C.nextState = alternate := C.nextState_eq_of_post hreach'
   have hentryHistorical :
-      VectorCount.restrict N alternate ∈ C.compressedLead N := by
+      VectorCount.restrict N (flipAt state (mouth / 3)) ∈ C.compressedLead N := by
     simpa [hnextAlternate] using C.next_mem_compressedLead (N := N)
   have hstateHistorical :
       VectorCount.restrict N state ∈ C.compressedLead N := by
@@ -466,23 +437,27 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
       by_cases hcontact : exists passage, passage ∈ candy /\
           passageSwitch passage = D.actionSwitch
       · left
-        exact manufactured_flip_arbitrary_lobe_absolute_one_novelty
-          D state hDpaths hNewAvoidsD hentryBranch hentrySwitch
-          hfullGrooved hfullTrace hcrossed hCandyForeignNew hLobe
-          hmouthLink hcontact hreach' times (C.compressedLead N)
-          hentryHistorical hstateHistorical holdHistoricalD
-          hleadHistorical
+        exact ⟨[VectorCount.restrict N (flipAt (flipAt state (mouth / 3)) D.actionSwitch)],
+          by simp,
+          cover_of_live_phase_orbit hreach'
+            (manufactured_flip_arbitrary_lobe_all_time_four_phase D state hDpaths
+              hNewAvoidsD hentryBranch hentrySwitch hfullGrooved hfullTrace hcrossed
+              hCandyForeignNew hLobe hmouthLink hcontact)
+            (by simp [hentryHistorical, hstateHistorical, holdHistoricalD])
+            hleadHistorical⟩
       · have hCandyForeignOld : forall passage, passage ∈ candy ->
             passageSwitch passage ≠ D.actionSwitch := by
           intro passage hp hEq
           exact hcontact ⟨passage, hp, hEq⟩
         left
-        exact manufactured_suffix_explicit_lobe_absolute_one_novelty
-          D state hDpaths hNewAvoidsD hActionsNe hentryBranch
-          hentrySwitch hfullGrooved hfullTrace hcrossed
-          hCandyForeignNew hCandyForeignOld hLobe hmouthLink hreach'
-          times (C.compressedLead N) hentryHistorical hstateHistorical
-          holdHistoricalD hleadHistorical
+        exact ⟨[VectorCount.restrict N (flipAt (flipAt state (mouth / 3)) D.actionSwitch)],
+          by simp,
+          cover_of_live_phase_orbit hreach'
+            (manufactured_suffix_explicit_lobe_all_time_four_phase D state hDpaths
+              hNewAvoidsD hActionsNe hentryBranch hentrySwitch hfullGrooved hfullTrace
+              hcrossed hCandyForeignNew hCandyForeignOld hLobe hmouthLink)
+            (by simp [hentryHistorical, hstateHistorical, holdHistoricalD])
+            hleadHistorical⟩
     · right
       have hmissingR : Not (VectorCount.restrict N
           (flipAt C.contactState R.actionSwitch) ∈
@@ -543,9 +518,10 @@ theorem PartialSecondRunSharp.ChangedContact.changed_N_add_four_or_runway_residu
           hforward hrepair hrestored haction localTimes with
         hone | hresidual
       · left
-        apply C.changed_all_run_distinct_le_N_add_four_of_one_novelty
-          hN hA times hlive hnd
-        simpa [localTimes] using hone
+        have hcount := C.changed_all_run_distinct_le_compressedLead_add_budget
+          hA times hlive hnd (by simpa [localTimes] using hone)
+        have hlength := C.compressedLead_length_le hN hA
+        omega
       · exact Or.inr hresidual
     · left
       exact C.changed_all_run_distinct_le_N_add_four_of_action_absent
@@ -652,6 +628,83 @@ theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.exists_later
     exact C.mem_compressedLead_of_approach
       (N := N) (Nat.le_of_lt hactionData.1)
 
+/-- Writing a flip reflector's action switch on a switch-simple trace whose
+endpoints groove its support forces a constant-tongue retrace of the runway
+back to the start port, so no later time before the trace ends is productive. -/
+theorem ManufacturedFlipReflector.no_productive_after_action_writer
+    {w : Wiring} {N g e : Nat} (R : ManufacturedFlipReflector w g e)
+    {state : Tongues} {approach : List Passage} {finish : Nat × Tongues}
+    (htrace : PhysicalTrace w (e, state) approach finish)
+    (hsimple : SwitchSimple approach)
+    (hstart : PathGrooves (ManufacturedReflector.flip R).toSupported.paths state)
+    (hfinish : PathGrooves (ManufacturedReflector.flip R).toSupported.paths finish.2)
+    {t : Nat} (ht : t ∈ rawFirstWriterTimes w N (e, state) approach.length)
+    (hwriter : rawWriterAt w (e, state) t = R.actionSwitch) :
+    ∀ j, t < j → j < approach.length → ¬ RawProductiveAt w N (e, state) j := by
+  intro j htj hjBound hjProd
+  let start : Nat × Tongues := (e, state)
+  have htData := mem_rawFirstWriterTimes_iff.mp ht
+  have hactionProd : RawProductiveAt w N start t := by
+    simpa [start] using htData.2.1
+  obtain ⟨cur, next, writerSwitch, hwriterDef, hcur, hnext,
+      hstep, hexit, _hflip⟩ :=
+    rawProductiveAt_is_endpoint_pivot hactionProd
+  have hwriterSwitch : writerSwitch = R.actionSwitch := by
+    exact hwriterDef.trans (by simpa [start] using hwriter)
+  subst writerSwitch
+  have hmouth : 3 * R.actionSwitch = R.mouth := by
+    unfold ManufacturedFlipReflector.actionSwitch
+    have hstem := R.mouth_is_stem
+    omega
+  have hparts := step_some_parts hstep
+  have hactionArrive :
+      arrive cur.2 cur.1 = (R.mouth, next.2) := by
+    calc
+      arrive cur.2 cur.1 = (exitPort cur, next.2) := by
+        apply Prod.ext
+        · rfl
+        · exact hparts.2.symm
+      _ = (R.mouth, next.2) := by
+        rw [hexit, hwriterSwitch, hmouth]
+  have hpostRunwayGrooved : PassagesGrooved next.2 R.runway := by
+    have hpostPaths := htrace.pathGrooves_at_prefix_of_endpoints
+      hsimple hstart hfinish
+      (k := t + 1) (by omega) (by simpa [start] using hnext)
+    exact hpostPaths R.runway (by
+      change R.runway ∈ [R.runway, R.candy]
+      exact List.mem_cons_self)
+  have hpointwise :=
+    (physicalTrace_contact_retraces_prefix_pointwise
+      R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive).2
+  have hbackTrace := physicalTrace_contact_retraces_prefix
+    R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive
+  let runwaySpan := R.runway.length + 1
+  have hbackSound :
+      stepN w runwaySpan (cur.1, cur.2) = some (e, next.2) := by
+    simpa [runwaySpan, reversePassages_length, Nat.add_comm] using
+      hbackTrace.sound
+  let returnTime := t + runwaySpan
+  have hreturn :
+      stepN w returnTime start = some (e, next.2) := by
+    dsimp [returnTime]
+    rw [stepN_add, hcur]
+    exact hbackSound
+  have hexitByReturn : approach.length ≤ returnTime := by
+    apply Nat.le_of_not_gt
+    intro hinside
+    exact htrace.no_strict_return_to_start_port
+      hsimple (k := returnTime) (returned := next.2)
+        (by dsimp [returnTime, runwaySpan]; omega)
+        hinside (by simpa [start] using hreturn)
+  have hjOutside := productive_not_inside_pointwise_retrace
+    (N := N) (repeatTime := t) (span := runwaySpan)
+    (openTime := j) (start := start)
+    (old := cur.2) (settled := next.2) (q := cur.1)
+    hcur (by simpa [runwaySpan] using hpointwise)
+    (by simpa [start] using hjProd) htj
+  dsimp [returnTime] at hexitByReturn
+  omega
+
 /-- The runway residual is physically impossible when the old reflector's
 support is grooved at the beginning of the continuation.
 
@@ -675,98 +728,11 @@ theorem PartialSecondRunSharp.ChangedContact.RunwayNAddFourResidual.impossible
     (hA : PathGrooves
       (ManufacturedReflector.flip R).toSupported.paths
       (ManufacturedReflector.flip R).activatedState) : False := by
-  let start : Nat × Tongues :=
-    (e, (ManufacturedReflector.flip R).activatedState)
   obtain ⟨actionTime, laterTime, hactionTime, hwriter,
       hactionLater, hlaterContact, hlaterProd⟩ :=
     F.exists_later_productive
-  have hactionData := mem_rawFirstWriterTimes_iff.mp hactionTime
-  have hactionProd : RawProductiveAt w N start actionTime := by
-    simpa [start] using hactionData.2.1
-  obtain ⟨cur, next, writerSwitch, hwriterDef, hcur, hnext,
-      hstep, hexit, _hflip⟩ :=
-    rawProductiveAt_is_endpoint_pivot hactionProd
-  have hwriterSwitch : writerSwitch = R.actionSwitch := by
-    exact hwriterDef.trans (by simpa [start] using hwriter)
-  subst writerSwitch
-  have hmouth : 3 * R.actionSwitch = R.mouth := by
-    unfold ManufacturedFlipReflector.actionSwitch
-    have hstem := R.mouth_is_stem
-    omega
-  have hparts := step_some_parts hstep
-  have hactionArrive :
-      arrive cur.2 cur.1 = (R.mouth, next.2) := by
-    calc
-      arrive cur.2 cur.1 = (exitPort cur, next.2) := by
-        apply Prod.ext
-        · rfl
-        · exact hparts.2.symm
-      _ = (R.mouth, next.2) := by
-        rw [hexit, hwriterSwitch, hmouth]
-  have hpostRunwayGrooved : PassagesGrooved next.2 R.runway := by
-    have hpostPaths := C.approach_trace.pathGrooves_at_prefix_of_endpoints
-      C.approach_simple hA C.old_grooves
-      (k := actionTime + 1) (by omega) (by simpa [start] using hnext)
-    exact hpostPaths R.runway (by
-      change R.runway ∈ [R.runway, R.candy]
-      exact List.mem_cons_self)
-  have hpointwise :=
-    (physicalTrace_contact_retraces_prefix_pointwise
-      R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive).2
-  have hbackTrace := physicalTrace_contact_retraces_prefix
-    R.runwayTrace hpostRunwayGrooved R.entryEdge hactionArrive
-  let runwaySpan := R.runway.length + 1
-  have hbackSound :
-      stepN w runwaySpan (cur.1, cur.2) = some (e, next.2) := by
-    simpa [runwaySpan, reversePassages_length, Nat.add_comm] using
-      hbackTrace.sound
-  let returnTime := actionTime + runwaySpan
-  have hreturn :
-      stepN w returnTime start = some (e, next.2) := by
-    dsimp [returnTime]
-    rw [stepN_add, hcur]
-    exact hbackSound
-  have hcontactByReturn : C.approach.length ≤ returnTime := by
-    apply Nat.le_of_not_gt
-    intro hinside
-    exact C.approach_trace.no_strict_return_to_start_port
-      C.approach_simple (k := returnTime) (returned := next.2)
-        (by dsimp [returnTime, runwaySpan]; omega)
-        hinside (by simpa [start] using hreturn)
-  have hlaterOutside := productive_not_inside_pointwise_retrace
-    (N := N) (repeatTime := actionTime) (span := runwaySpan)
-    (openTime := laterTime) (start := start)
-    (old := cur.2) (settled := next.2) (q := cur.1)
-    hcur (by simpa [runwaySpan] using hpointwise)
-    (by simpa [start] using hlaterProd) hactionLater
-  dsimp [returnTime] at hcontactByReturn
-  omega
-
-/-- **Unconditional changed-contact `N+4` theorem.**  The only residual of
-the coefficient-one accounting is excluded by the physical old-runway
-retrace above. -/
-theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_N_add_four
-    {w : Wiring} {N g e : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : SimpleContinuationChangedContact w
-      (ManufacturedReflector.flip R))
-    (hA : PathGrooves
-      (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (times : List Nat)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k
-        (g, (ManufacturedReflector.flip R).baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N
-        (g, (ManufacturedReflector.flip R).baseState))).Nodup) :
-    times.length <= N + 4 := by
-  rcases C.changed_N_add_four_or_runway_residual
-      hN hA times hlive hnd with hbound | hresidual
-  · exact hbound
-  · obtain ⟨F⟩ := hresidual
-    exact (F.impossible hN hA).elim
+  exact R.no_productive_after_action_writer C.approach_trace C.approach_simple
+    hA C.old_grooves hactionTime hwriter laterTime hactionLater hlaterContact
+    hlaterProd
 
 end GeneralN

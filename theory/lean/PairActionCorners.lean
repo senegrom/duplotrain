@@ -138,22 +138,4 @@ theorem manufactured_pair_all_time_action_corners_tongues
             ManufacturedFlipReflector.toSupported,
             LocalAction.apply] using hmem
 
-/-- Shift the action-corner law to any reached suffix configuration. -/
-theorem manufactured_pair_reached_action_corners_tongues
-    {w : Wiring} {g e shift d : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hB : PathGrooves B.toSupported.paths state)
-    {middle : Nat × Tongues}
-    (hreach : stepN w shift (g, state) = some middle)
-    (hlive : ∃ finish, stepN w d middle = some finish) :
-    tonguesAt w middle d ∈ manufacturedPairActionCorners A B state := by
-  have hmem := manufactured_pair_all_time_action_corners_tongues
-    A B state hA hB (shift + d)
-  have hshift := tonguesAt_add_of_reaches hreach hlive
-  rw [hshift] at hmem
-  exact hmem
-
 end GeneralN

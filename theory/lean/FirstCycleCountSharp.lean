@@ -109,32 +109,11 @@ theorem first_activated_count_outcome_sharp
           some (e, state) ∧
         (∀ j, j ∉ A.exploration.map passageSwitch →
           state j = start.2 j) := by
-  obtain ⟨before, old, repeated, after, middle,
-      hbeforeTrace, hafterTrace, hbeforeSimple, hold, hsameSwitch⟩ :=
-    first_revisit_of_long_run hN hlive
-  obtain ⟨runway, path, hsplit⟩ := List.append_of_mem hold
-  rcases old with ⟨p, x⟩
-  rcases repeated with ⟨q, y⟩
-  subst before
-  obtain ⟨atOld, hrunway, hexcursion⟩ := hbeforeTrace.split_append
-  have hatOldPort : atOld.1 = p := hexcursion.head_arrive.1
-  rcases atOld with ⟨oldPort, u₀⟩
-  simp only at hatOldPort
-  subst oldPort
-  obtain ⟨v, hrepeat⟩ := hafterTrace.head_arrive.2
-  have hmiddlePort : middle.1 = q := hafterTrace.head_arrive.1
-  rcases middle with ⟨middlePort, u⟩
-  simp only at hmiddlePort
-  subst middlePort
-  have hsw : p / 3 = q / 3 := by
-    simpa [passageSwitch] using hsameSwitch
-  have hfork := first_revisit_cycle_traces_or_activated_reflector w
-    hrunway hexcursion hbeforeSimple hsw hrepeat hentry
-  have hvisited :
-      stepN w (runway ++ (p, x) :: path).length start =
-        some (q, u) := hbeforeTrace.sound
-  have hvisitedLe : (runway ++ (p, x) :: path).length ≤ N :=
-    hbeforeTrace.simple_length_le hN hbeforeSimple
+  obtain ⟨lead, q, u, hleadTrace, hleadSimple, hfork⟩ :=
+    first_revisit_fork hN hlive hentry
+  have hvisited : stepN w lead.length start = some (q, u) := hleadTrace.sound
+  have hvisitedLe : lead.length ≤ N :=
+    hleadTrace.simple_length_le hN hleadSimple
   rcases hfork with hcycle | hreflector
   · left
     obtain ⟨cycle, settled, hnonempty, htransient,
@@ -144,8 +123,7 @@ theorem first_activated_count_outcome_sharp
       hvisited hvisitedLe hnonempty htransient hstable
       hsimpleCycle hphase times hnd
   · right
-    obtain ⟨A, state, hgrooves, hbase, hactivated,
-      _hback, hpreserves⟩ := hreflector
+    obtain ⟨A, state, hgrooves, hbase, hactivated, hpreserves⟩ := hreflector
     have hgroovesActivated :
         PathGrooves A.toSupported.paths A.activatedState := by
       rw [← hactivated]

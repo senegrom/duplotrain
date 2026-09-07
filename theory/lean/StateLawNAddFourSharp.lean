@@ -21,17 +21,6 @@ and contributes at most the time-zero vector.
 
 namespace GeneralN
 
-/-- The known-edge dynamical bound only needs total wirings. Arbitrary
-partial wirings are reduced to these by `Wiring.completed` below. -/
-theorem totalKnownIncomingEdgeNAddFour
-    {w : Wiring} {N : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    (htotal : ∀ p, p < 3 * N → ∃ q, w.link p = some q) :
-    KnownIncomingEdgeNAddFour w N := by
-  intro e start hentry times hlive hnd
-  exact known_edge_all_run_distinct_le_N_add_four_of_protected_pair
-    knownEdgeProtectedPairNAddFourLaw hN htotal hentry times hlive hnd
-
 /-- **Sharp state law.** Transfer original live samples to a total
 completion without changing the start, sample times, or switch budget. -/
 theorem state_law_N_add_four : StateLawNAddFour := by
@@ -59,8 +48,11 @@ theorem state_law_N_add_four : StateLawNAddFour := by
       apply List.map_congr_left
       intro k hk
       simp only [restrictedTonguesAt, tonguesAt, hreach k hk]
-    exact totalKnownIncomingEdgeNAddFour hvN hvtotal (v.symm _ _ he)
-      times hvlive (hvectors.symm ▸ hnd)
+    rcases known_edge_N_add_four_or_protected_pair hvN hvtotal (v.symm _ _ he)
+        times hvlive (hvectors.symm ▸ hnd) with hsmall | hpair
+    · exact hsmall
+    · exact knownEdgeProtectedPairNAddFourLaw hvN (Classical.choice hpair) times hvlive
+        (hvectors.symm ▸ hnd)
   · have hdead : stepN w 1 start = none := by
       have hedge : w.link (arrive start.2 start.1).1 = none := by
         cases hw : w.link (arrive start.2 start.1).1 with

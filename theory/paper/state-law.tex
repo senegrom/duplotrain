@@ -628,10 +628,12 @@ $N+3$ or less.
   first-writer-order subdivision and doubly-erased history are unnecessary.
 \end{lemma}
 
-Packaging the closed tree gives the keystone:
+Packaging the closed tree gives the keystone, discharged inline in
+\lean{state\_law\_N\_add\_four}:
 
 \begin{theorem}[Known incoming edge;
-  \lean{totalKnownIncomingEdgeNAddFour},
+  \lean{known\_edge\_N\_add\_four\_or\_protected\_pair} with
+  \lean{knownEdgeProtectedPairNAddFourLaw},
   \file{StateLawNAddFourSharp.lean}]\label{thm:knownedge}
   On a wiring total below $3N$, if the start is entered over a wired edge,
   every duplicate-free list of

@@ -63,26 +63,13 @@ theorem boundary_history_then_direct_tail_cover
       of_decide_eq_true (List.mem_filter.mp hk).2
     have hkEq : k = lead + (k - lead) := by
       omega
-    have hkLive := hlive k hkTimes
-    cases htailRun :
-        stepN w (k - lead) endpoint with
-    | none =>
-        have hglobalNone : stepN w k start = none := by
-          rw [hkEq, stepN_add, hreach]
-          simp [htailRun]
-        rw [hglobalNone] at hkLive
-        simp at hkLive
-    | some finish =>
-        have hshift := tonguesAt_add_of_reaches
-          hreach (Exists.intro finish htailRun)
-        have hstartEq :
-            tonguesAt w start (lead + (k - lead)) =
-              tonguesAt w start k :=
-          congrArg (tonguesAt w start) hkEq.symm
-        simp only [Function.comp_apply]
-        unfold restrictedTonguesAt
-        exact congrArg (VectorCount.restrict N)
-          (hshift.symm.trans hstartEq)
+    have hkLive : (stepN w (lead + (k - lead)) start).isSome := by
+      rw [← hkEq]
+      exact hlive k hkTimes
+    have heq := restrictedTonguesAt_add_of_reaches (N := N) hreach
+      (stepN_suffix_some_of_reaches hreach hkLive)
+    rw [← hkEq] at heq
+    exact heq.symm
   have hlateNodup :
       (late.map
         (restrictedTonguesAt w N start)).Nodup := by
@@ -173,26 +160,15 @@ theorem boundary_history_then_direct_tail_cover
       have hkEq : k = lead + d := by
         dsimp [d]
         omega
-      have hkLive := hlive k hk
-      have htailLive : Exists fun finish =>
-          stepN w d endpoint = some finish := by
-        cases hd : stepN w d endpoint with
-        | none =>
-            have hnone : stepN w k start = none := by
-              rw [hkEq, stepN_add, hreach]
-              simp [hd]
-            rw [hnone] at hkLive
-            simp at hkLive
-        | some finish =>
-            exact Exists.intro finish rfl
-      have hshift :=
-        tonguesAt_add_of_reaches hreach htailLive
+      have htailLive : ∃ finish, stepN w d endpoint = some finish := by
+        apply stepN_suffix_some_of_reaches hreach
+        rw [← hkEq]
+        exact hlive k hk
       have heq :
           restrictedTonguesAt w N start k =
             restrictedTonguesAt w N endpoint d := by
-        unfold restrictedTonguesAt
         rw [hkEq]
-        exact congrArg (VectorCount.restrict N) hshift
+        exact restrictedTonguesAt_add_of_reaches hreach htailLive
       by_cases hbd :
           restrictedTonguesAt w N endpoint d = boundary
       case pos =>
@@ -232,33 +208,5 @@ theorem boundary_history_then_direct_tail_cover
   case right =>
     intro k hk
     exact hmem k hk
-
-/-- Generic boundary-overlap theorem.  `prefixHistory` covers every time up to
-and including `lead`; the suffix begins at `endpoint`, whose vector is already
-in that history.  A direct suffix cap `cap` then contributes only `cap-1`
-additional vectors. -/
-theorem boundary_history_then_direct_tail_distinct_le
-    {w : Wiring} {N lead cap : Nat}
-    {start endpoint : Nat × Tongues}
-    (hreach : stepN w lead start = some endpoint)
-    (prefixHistory : List (List Bool))
-    (hprefixCover : ∀ d, d ≤ lead →
-      restrictedTonguesAt w N start d ∈ prefixHistory)
-    (hboundary : VectorCount.restrict N endpoint.2 ∈ prefixHistory)
-    (htail : ∀ (tailTimes : List Nat),
-      (∀ k ∈ tailTimes, (stepN w k endpoint).isSome) →
-      (tailTimes.map (restrictedTonguesAt w N endpoint)).Nodup →
-      tailTimes.length ≤ cap)
-    (hcapPos : 0 < cap)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ prefixHistory.length + cap - 1 := by
-  have hcover := boundary_history_then_direct_tail_cover
-    hreach prefixHistory hprefixCover hboundary htail hcapPos
-      times hlive hnd
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  omega
 
 end GeneralN

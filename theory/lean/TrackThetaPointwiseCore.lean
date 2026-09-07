@@ -35,13 +35,6 @@ theorem ManufacturedFlipReflector.travel_two_phase_stepN
       (phase = state ∨ phase = flipAt state A.actionSwitch) :=
   (ManufacturedReflector.flip A).travel_two_phase_stepN state hA hd
 
-/-- The selected outward route is a prefix of a complete traversal. -/
-theorem ManufacturedReflector.orientedRoute_length_le_travel
-    {w : Wiring} {g e : Nat} (B : ManufacturedReflector w g e)
-    (state : Tongues) : (B.orientedRoute state).length ≤ B.toSupported.travel := by
-  rw [B.travel_eq_oriented_add state]
-  omega
-
 /-- The pointwise support-fault dichotomy is a stem/branch split on the
 actual selected route, not a case split on where that route was stored. -/
 theorem ManufacturedReflector.support_fault_dichotomy_pointwise
@@ -85,8 +78,8 @@ theorem ManufacturedReflector.support_fault_dichotomy_pointwise
       ⟨passage, hmem, hswitch⟩ with hcapture | hrepair
   · exact Or.inl hcapture
   · obtain ⟨cutoff, hcutoff, hpre, hmerge⟩ := hrepair
-    have hle : cutoff ≤ B.toSupported.travel :=
-      Nat.le_trans hcutoff (B.orientedRoute_length_le_travel state)
+    have hle : cutoff ≤ B.toSupported.travel := by
+      rw [B.travel_eq_oriented_add state]; omega
     refine Or.inr ⟨(hmerge _ hle).trans (B.toSupported.run state hB).1, ?_⟩
     intro d hd
     by_cases hearly : d < cutoff

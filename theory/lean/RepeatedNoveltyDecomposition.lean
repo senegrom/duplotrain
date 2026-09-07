@@ -32,18 +32,6 @@ downstream.  No finite-`N` exhaustion is used here.
 namespace GeneralN
 
 
-/-- If a live raw step is not productive, its represented tongue vector is
-unchanged. -/
-theorem restrictedTonguesAt_succ_eq_of_not_productive
-    {w : Wiring} {N : Nat} {start : Nat × Tongues} {k : Nat}
-    (hlive : (stepN w (k+1) start).isSome)
-    (hquiet : ¬ RawProductiveAt w N start k) :
-    restrictedTonguesAt w N start (k+1) =
-      restrictedTonguesAt w N start k := by
-  apply Classical.byContradiction
-  intro hne
-  exact hquiet ⟨hlive, hne⟩
-
 /-- Every prefix of a successful finite run is successful. -/
 theorem restrictedTonguesAt_eq_of_quiet_interval
     {w : Wiring} {N : Nat} {start finish : Nat × Tongues}
@@ -66,8 +54,10 @@ theorem restrictedTonguesAt_eq_of_quiet_interval
         have harith : first + (n+1) = first + n + 1 := by omega
         rw [← harith, hfinish]
         simp
-      have hstep := restrictedTonguesAt_succ_eq_of_not_productive
-        hlive (hquiet (first+n) (by omega) (by omega))
+      have hstep : restrictedTonguesAt w N start (first + n + 1) =
+          restrictedTonguesAt w N start (first + n) :=
+        Classical.byContradiction fun hne =>
+          hquiet (first+n) (by omega) (by omega) ⟨hlive, hne⟩
       have harith : first + (n+1) = first+n+1 := by omega
       rw [harith]
       exact hstep.trans hprev
