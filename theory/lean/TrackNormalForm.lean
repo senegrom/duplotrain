@@ -48,23 +48,11 @@ def PathGrooves (paths : List (List Passage)) (u : Tongues) : Prop :=
 theorem pathGrooves_pair {a b : List Passage} {u : Tongues} :
     PathGrooves [a, b] u ↔
       PassagesGrooved u a ∧ PassagesGrooved u b := by
-  constructor
-  · intro h
-    exact ⟨h a (by simp), h b (by simp)⟩
-  · intro h path hp
-    simp at hp
-    rcases hp with rfl | rfl
-    · exact h.1
-    · exact h.2
+  simp [PathGrooves]
 
 theorem passagesGrooved_singleton {p x : Nat} {u : Tongues} :
     PassagesGrooved u [(p, x)] ↔ arrive u x = (p, u) := by
-  constructor
-  · intro h
-    exact h (p, x) List.mem_cons_self
-  · intro h passage hp
-    simp only [List.mem_singleton] at hp
-    simpa [hp] using h
+  simp [PassagesGrooved]
 
 /-- The local action does not touch any switch used by any support path. -/
 def LocalAction.Avoids (action : LocalAction)

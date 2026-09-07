@@ -53,7 +53,7 @@ theorem first_activated_trace_outcome_sharp_partial
   obtain ⟨lead, q, u, hleadTrace, hleadSimple, hfork⟩ :=
     first_revisit_fork hN hlive hentry
   rcases hfork with hcycle | hreflector
-  · obtain ⟨_cycle, settled, _hne, _ht, _hs, _hsimple, _hphase, hpositive⟩ := hcycle
+  · obtain ⟨settled, hpositive⟩ := hcycle
     exact Or.inl ⟨{
       lead := lead
       atRepeat := (q, u)

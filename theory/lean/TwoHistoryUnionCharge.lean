@@ -29,31 +29,6 @@ canonical manufacturing journey.
 
 namespace GeneralN
 
-/-- The complete canonical manufacturing journey really ends at the
-reflector's activated state.  This packages only raw `stepN` facts and is
-useful for identifying the first-turnaround contact vector with the initial
-corner of the following reflector pair. -/
-theorem ManufacturedReflector.manufacturing_journey_reaches_activated
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (hpaths : PathGrooves A.toSupported.paths A.activatedState) :
-    stepN w (A.exploration.length + A.runway.length + 1)
-      (g, A.baseState) = some (e, A.activatedState) := by
-  have hback :
-      stepN w (A.runway.length + 1) A.preReturn =
-        some (e, A.activatedState) := by
-    have htrace := physicalTrace_contact_retraces_prefix
-      A.runway_trace (A.runway_grooved hpaths)
-      A.entryEdge A.return_arrive_mouth
-    simpa [reversePassages_length] using htrace.sound
-  have hlen :
-      A.exploration.length + A.runway.length + 1 =
-        A.exploration.length + (A.runway.length + 1) := by
-    omega
-  rw [hlen, stepN_add, A.exploration_trace.sound]
-  exact hback
-
-
 private theorem count_map_range_two_of_eq
     {α : Type} [BEq α] [LawfulBEq α]
     (f : Nat → α) :
@@ -138,17 +113,9 @@ theorem ManufacturedReflector.reusableSwitches_nodup
         ManufacturedReflector.exploration, SwitchSimple] using R.simple
   | flip R =>
       have hs := R.simple
-      unfold SwitchSimple at hs
-      simp only [List.map_append, List.map_cons] at hs
-      have hparts := List.nodup_append.mp hs
-      have hout : (R.runway.map passageSwitch ++
-          R.candy.map passageSwitch).Nodup := by
-        apply List.nodup_append.mpr
-        refine ⟨hparts.1, (List.nodup_cons.mp hparts.2.1).2, ?_⟩
-        intro a ha b hb hab
-        exact hparts.2.2 a ha b (List.mem_cons_of_mem _ hb) hab
-      simpa only [ManufacturedReflector.reusableSwitches,
-        List.map_append] using hout
+      simp only [SwitchSimple, List.map_append, List.map_cons] at hs
+      simp only [ManufacturedReflector.reusableSwitches, List.map_append]
+      grind
 
 /-- Membership in `reusableSwitches` is exactly membership in one of the
 two reusable support paths. -/
@@ -158,26 +125,10 @@ theorem ManufacturedReflector.mem_reusableSwitches
     (hk : k ∈ A.reusableSwitches) :
     ∃ path ∈ A.toSupported.paths, ∃ passage ∈ path,
       passageSwitch passage = k := by
-  cases A with
-  | stay R =>
-      change ∃ path ∈ [R.runway, [(R.mouth, R.arm)]],
-        ∃ passage ∈ path, passageSwitch passage = k
-      change k ∈ (R.runway ++ [(R.mouth, R.arm)]).map passageSwitch at hk
-      obtain ⟨passage, hpassage, hswitch⟩ := List.mem_map.mp hk
-      rcases List.mem_append.mp hpassage with hrunway | hcore
-      · exact ⟨R.runway, by simp, passage, hrunway, hswitch⟩
-      · have hp : passage = (R.mouth, R.arm) := by simpa using hcore
-        subst passage
-        exact ⟨[(R.mouth, R.arm)], by simp,
-          (R.mouth, R.arm), by simp, hswitch⟩
-  | flip R =>
-      change ∃ path ∈ [R.runway, R.candy],
-        ∃ passage ∈ path, passageSwitch passage = k
-      change k ∈ (R.runway ++ R.candy).map passageSwitch at hk
-      obtain ⟨passage, hpassage, hswitch⟩ := List.mem_map.mp hk
-      rcases List.mem_append.mp hpassage with hrunway | hcandy
-      · exact ⟨R.runway, by simp, passage, hrunway, hswitch⟩
-      · exact ⟨R.candy, by simp, passage, hcandy, hswitch⟩
+  cases A <;>
+    simp only [ManufacturedReflector.reusableSwitches, ManufacturedReflector.toSupported,
+      ManufacturedStayReflector.toSupported, ManufacturedFlipReflector.toSupported,
+      List.mem_map, List.mem_append, List.mem_cons, List.mem_singleton] at hk ⊢ <;> grind
 
 theorem ManufacturedReflector.second_exploration_productive_writer_not_reusable
     {w : Wiring} {N g e : Nat}
@@ -193,29 +144,16 @@ theorem ManufacturedReflector.second_exploration_productive_writer_not_reusable
     rawWriterAt w (e, B.baseState) k ∉
       A.reusableSwitches := by
   intro hreusable
-  have hsurvives :=
-    B.exploration_trace.simple_raw_productive_writer_survives
-      B.exploration_simple hk hprod
-  obtain ⟨path, hpath, old, hold, hswitch⟩ :=
-    A.mem_reusableSwitches hreusable
-  have hbaseOld := hbaseGrooves path hpath old hold
-  have hpreOld := hpreGrooves path hpath old hold
-  have hagree :=
-    grooved_states_agree_on_passage hbaseOld hpreOld
-  have hexit :
-      old.2 / 3 = passageSwitch old := by
-    have hs := arrive_exit_switch B.baseState old.2
-    rw [hbaseOld] at hs
-    exact hs.symm
-  apply hsurvives
-  calc
-    B.preReturn.2 (rawWriterAt w (e, B.baseState) k) =
-        B.preReturn.2 (old.2 / 3) := by
-          rw [hexit, hswitch]
-    _ = B.baseState (old.2 / 3) := hagree.symm
-    _ = B.baseState (rawWriterAt w (e, B.baseState) k) := by
-          rw [hexit, hswitch]
-
+  have hsurvives := B.exploration_trace.simple_raw_productive_writer_survives
+    B.exploration_simple hk hprod
+  obtain ⟨path, hpath, old, hold, hswitch⟩ := A.mem_reusableSwitches hreusable
+  have hbase := hbaseGrooves path hpath old hold
+  have hpre := hpreGrooves path hpath old hold
+  have hs := arrive_exit_switch B.baseState old.2
+  rw [hbase] at hs
+  have hexit : old.2 / 3 = rawWriterAt w (e, B.baseState) k := hs.symm.trans hswitch
+  exact hsurvives (by
+    simpa only [hexit] using (grooved_states_agree_on_passage hbase hpre).symm)
 
 /-- Removing the facing action mouth loses at most one exploration switch. -/
 theorem ManufacturedReflector.exploration_length_le_reusable_add_one

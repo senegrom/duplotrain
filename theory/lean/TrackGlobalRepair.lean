@@ -78,29 +78,11 @@ theorem SwitchSimple.passage_eq_of_mem
     (hleft : left ∈ route) (hright : right ∈ route)
     (hswitch : passageSwitch left = passageSwitch right) :
     left = right := by
-  unfold SwitchSimple at hsimple
   induction route generalizing left right with
   | nil => cases hleft
   | cons head tail ih =>
-      simp only [List.map_cons] at hsimple
-      rw [List.nodup_cons] at hsimple
-      rcases List.mem_cons.mp hleft with hleftHead | hleftTail
-      · rcases List.mem_cons.mp hright with hrightHead | hrightTail
-        · exact hleftHead.trans hrightHead.symm
-        · exfalso
-          apply hsimple.1
-          have hmem : passageSwitch right ∈ tail.map passageSwitch :=
-            List.mem_map.mpr ⟨right, hrightTail, rfl⟩
-          rw [← hleftHead, hswitch]
-          exact hmem
-      · rcases List.mem_cons.mp hright with hrightHead | hrightTail
-        · exfalso
-          apply hsimple.1
-          have hmem : passageSwitch left ∈ tail.map passageSwitch :=
-            List.mem_map.mpr ⟨left, hleftTail, rfl⟩
-          rw [← hrightHead, ← hswitch]
-          exact hmem
-        · exact ih hsimple.2 hleftTail hrightTail hswitch
+      simp only [SwitchSimple, List.map_cons, List.nodup_cons] at hsimple
+      grind [SwitchSimple]
 
 /-- A switch-simple route cannot contain both orientations of one genuine
 passage. -/
@@ -157,19 +139,11 @@ theorem PhysicalTrace.repair_preserving_paths_until_conflict
         intro passage hp hEq
         apply hsimple.1
         exact List.mem_map.mpr ⟨passage, hp, hEq⟩
+      have hbaseSame : nextBase = base := congrArg Prod.snd
+        (harriveBase.symm.trans (groove_forward (hbase (p, x) List.mem_cons_self)))
       have htailBase : PassagesGrooved nextBase rest := by
-        intro passage hp
-        have hgrooveBase := hbase passage
-          (List.mem_cons_of_mem _ hp)
-        have hexitSwitch : passage.2 / 3 =
-            passageSwitch passage := by
-          have hs := arrive_exit_switch base passage.2
-          rw [hgrooveBase] at hs
-          exact hs.symm
-        apply groove_transfer hgrooveBase
-        rw [hexitSwitch]
-        exact arrive_preserves_other harriveBase
-          (htailForeign passage hp)
+        rw [hbaseSame]
+        exact fun passage hp => hbase passage (List.mem_cons_of_mem _ hp)
       let other := (arrive state p).1
       let next := (arrive state p).2
       have harrive : arrive state p = (other, next) := by
@@ -216,31 +190,11 @@ theorem PhysicalTrace.repair_preserving_paths_until_conflict
                   hprotectedU, hlocal, hpath, hold,
                   hswitch, hchange⟩)
             · obtain ⟨finalState, htailTrace,
-                  htailGrooved, hprotectedFinal⟩ := hcomplete
-              have hsameSwitch : x / 3 = p / 3 := by
-                have hs := arrive_exit_switch state p
-                rw [harriveX] at hs
-                exact hs
-              have hback : arrive next x = (p, next) := by
-                have hb := arrive_back state p
-                rw [harriveX] at hb
-                exact hb
-              have hpreserved : finalState (x / 3) =
-                  next (x / 3) := by
-                rw [hsameSwitch]
-                exact htailTrace.preserves (p / 3) htailForeign
-              have hheadGrooved : arrive finalState x =
-                  (p, finalState) :=
-                groove_transfer hback hpreserved
-              have hallGrooved : PassagesGrooved finalState
-                  ((p, x) :: rest) := by
-                intro passage hp
-                rcases List.mem_cons.mp hp with hhead | htailMem
-                · simpa [hhead] using hheadGrooved
-                · exact htailGrooved passage htailMem
-              exact Or.inr (Or.inr ⟨finalState,
-                PhysicalTrace.cons harriveX hlink htailTrace,
-                hallGrooved, hprotectedFinal⟩)
+                  _htailGrooved, hprotectedFinal⟩ := hcomplete
+              have hfull := PhysicalTrace.cons harriveX hlink htailTrace
+              exact Or.inr (Or.inr ⟨finalState, hfull,
+                hfull.grooved_of_switchSimple (by simpa [SwitchSimple] using hsimple),
+                hprotectedFinal⟩)
       · have hp : p % 3 = 0 := by
           apply Classical.byContradiction
           intro hbranch
@@ -347,15 +301,8 @@ theorem source_of_mem_reversePassages
     {passage : Passage} {passages : List Passage}
     (hmem : passage ∈ reversePassages passages) :
     ∃ old ∈ passages, passage = (old.2, old.1) := by
-  induction passages with
-  | nil => cases hmem
-  | cons head rest ih =>
-      simp only [reversePassages] at hmem
-      rcases List.mem_append.mp hmem with hrest | hhead
-      · obtain ⟨old, hold, hEq⟩ := ih hrest
-        exact ⟨old, List.mem_cons_of_mem _ hold, hEq⟩
-      · simp only [List.mem_singleton] at hhead
-        exact ⟨head, List.mem_cons_self, hhead⟩
+  obtain ⟨old, hold, heq⟩ := List.mem_map.mp hmem
+  exact ⟨old, List.mem_reverse.mp hold, heq.symm⟩
 
 /-- The first candy arm is grooved whenever the action tongue selects it. -/
 theorem ManufacturedFlipReflector.firstArm_groove_of_selected

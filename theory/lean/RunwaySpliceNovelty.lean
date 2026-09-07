@@ -51,44 +51,6 @@ theorem explicit_lobe_travel_two_phase
       exact hone
     exact ⟨outside, flipAt state (mouth / 3), hrun, Or.inr rfl⟩
 
-/-- The opposite orientation of the same explicit lobe is pointwise
-two-phase as well.  The second phase restores the original mouth tongue. -/
-theorem explicit_lobe_reverse_travel_two_phase
-    {w : Wiring} {mouth entry returnPort outside : Nat}
-    {state : Tongues} {candy : List Passage}
-    (hentryBranch : entry % 3 ≠ 0)
-    (hentrySwitch : entry / 3 = mouth / 3)
-    (hgrooved : PassagesGrooved state ((mouth, entry) :: candy))
-    (htrace : PhysicalTrace w (mouth, state)
-      ((mouth, entry) :: candy) (returnPort, state))
-    (hcrossed : arrive state returnPort =
-      (mouth, flipAt state (mouth / 3)))
-    (hCandyForeign : ∀ passage ∈ candy,
-      passageSwitch passage ≠ mouth / 3)
-    (hmouthLink : w.link mouth = some outside)
-    {d : Nat} (hd : d <= candy.length + 2) :
-    exists port phase,
-      stepN w d (mouth, flipAt state (mouth / 3)) =
-          some (port, phase) /\
-        (phase = flipAt state (mouth / 3) \/ phase = state) := by
-  obtain ⟨hreverseTrace, hreverseGrooved, hrestore⟩ :=
-    arbitrary_lobe_reverse_trace hentryBranch hentrySwitch
-      hgrooved htrace hcrossed hCandyForeign
-  have hrestore' : arrive (flipAt state (mouth / 3)) entry =
-      (mouth,
-        flipAt (flipAt state (mouth / 3)) (mouth / 3)) := by
-    simpa [flipAt_flipAt] using hrestore
-  have hd' : d <= (reversePassages candy).length + 2 := by
-    simpa [reversePassages_length] using hd
-  obtain ⟨port, phase, hrun, hphase⟩ :=
-    explicit_lobe_travel_two_phase hreverseGrooved hreverseTrace
-      hrestore' hmouthLink hd'
-  refine ⟨port, phase, hrun, ?_⟩
-  rcases hphase with hphase | hphase
-  · exact Or.inl hphase
-  · right
-    simpa [flipAt_flipAt] using hphase
-
 /-- A recorded lobe with a mouth-free interior is two-phase in every grooved
 state, not only in the tongue assignment used to record it. Pin the mouth to
 its recorded entry arm; the given state is that assignment or its one-bit flip.
@@ -109,47 +71,27 @@ theorem explicit_lobe_two_phase_at
     {d : Nat} (hd : d ≤ candy.length + 2) :
     ∃ port phase, stepN w d (mouth, current) = some (port, phase) ∧
       (phase = current ∨ phase = flipAt current (mouth / 3)) := by
-  have hhead := hgrooved (mouth, entry) List.mem_cons_self
-  have hselected : state (entry / 3) = bval entry := by
-    have hpin : pin state entry = state := by
-      simpa only [arrive, if_neg hentryBranch] using congrArg Prod.snd hhead
-    have heq := congrFun hpin (entry / 3)
-    simpa [pin] using heq.symm
   have hreturnSwitch : returnPort / 3 = mouth / 3 := by
-    have h := arrive_exit_switch state returnPort
-    rw [hcrossed] at h
-    exact h.symm
-  obtain ⟨hreturnBranch, hmouth, hpin⟩ := changed_arrival_is_trailing hcrossed
+    have hs := arrive_exit_switch state returnPort
+    rw [hcrossed] at hs
+    exact hs.symm
+  obtain ⟨hbranch, hmouth, _⟩ := changed_arrival_is_trailing hcrossed
     (by simp [hreturnSwitch, flipAt])
-  have hreturnValue : bval returnPort = !(state (mouth / 3)) := by
-    have heq := congrFun hpin (mouth / 3)
-    simpa [pin, flipAt, hreturnSwitch] using heq.symm
-  let base := pin current entry
-  have hbaseSelected : base (mouth / 3) = state (mouth / 3) := by
-    rw [← hentrySwitch, hselected]
-    simp [base, pin]
-  have hbaseGrooved : PassagesGrooved base ((mouth, entry) :: candy) := by
-    intro passage hp
-    rcases List.mem_cons.mp hp with rfl | hp
-    · exact groove_transfer hhead (by simpa [hentrySwitch] using hbaseSelected)
-    · exact grooved_after_pin_other hcurrent
-        (fun passage hp => by simpa [hentrySwitch] using hforeign passage hp) passage hp
-  have hbaseTrace := htrace.replay_grooved base hbaseGrooved
-  have hbaseCrossed : arrive base returnPort =
-      (mouth, flipAt base (mouth / 3)) := by
-    have hp := pin_eq_flipAt (u := base) hreturnSwitch
-      (by rw [hbaseSelected]; exact hreturnValue)
-    simpa [arrive, hreturnBranch, ← hmouth] using congrArg (Prod.mk mouth) hp
-  by_cases haligned : current (entry / 3) = bval entry
-  · have heq : base = current := pin_of_agrees haligned
-    simpa only [heq] using explicit_lobe_travel_two_phase
-      hbaseGrooved hbaseTrace hbaseCrossed hlink hd
-  · have heq : base = flipAt current (mouth / 3) := by
-      apply pin_eq_flipAt hentrySwitch
-      have hne : current (mouth / 3) ≠ bval entry := by simpa [hentrySwitch] using haligned
-      cases hc : current (mouth / 3) <;> cases he : bval entry <;> simp [hc, he] at hne ⊢
-    simpa only [heq, flipAt_flipAt] using explicit_lobe_reverse_travel_two_phase
-      hentryBranch hentrySwitch hbaseGrooved hbaseTrace hbaseCrossed hforeign hlink hd
+  have hne : entry ≠ returnPort := by
+    intro heq
+    have hhead := hgrooved (mouth, entry) List.mem_cons_self
+    rw [heq, hcrossed] at hhead
+    have h := congrFun (Prod.mk.inj hhead).2 (mouth / 3)
+    simp [flipAt] at h
+  obtain ⟨route, last, hlen, hr, hg, hc⟩ := stem_lobe_route w candy
+    (by omega) hentryBranch hbranch hentrySwitch.symm hreturnSwitch.symm hne
+    hforeign htrace.linked htrace.last_link current hcurrent
+  by_cases hroute : d ≤ route.length
+  · obtain ⟨port, hp⟩ := hr.grooved_prefix_tongues current hg hroute
+    exact ⟨port, current, hp, Or.inl rfl⟩
+  · have hd' : d = route.length + 1 := by omega
+    refine ⟨outside, flipAt current (mouth / 3), ?_, Or.inr rfl⟩
+    simp [hd', stepN_add, hr.sound, stepN, step, hc, hlink]
 
 /-- Prepending a constant-tongue trace preserves a two-phase cover. -/
 theorem PhysicalTrace.prepend_two_phase

@@ -250,27 +250,6 @@ theorem manufactured_two_sided_theta_all_time_three_phase
 
 end
 
-/-- Liveness at all times from a closed period. -/
-private theorem period_all_time_live
-    {w : Wiring} {s : Nat × Tongues} {period : Nat}
-    (hpos : 0 < period)
-    (hperiod : stepN w period s = some s) (d : Nat) :
-    ∃ mid, stepN w d s = some mid := by
-  let q := d / period
-  let r := d % period
-  have hr : r < period := by
-    dsimp [r]
-    exact Nat.mod_lt _ hpos
-  have hdEq : d = q * period + r := by
-    dsimp [q, r]
-    have hdiv := Nat.div_add_mod d period
-    rw [Nat.mul_comm period (d / period)] at hdiv
-    omega
-  obtain ⟨mid, hmid⟩ := stepN_prefix_some (Nat.le_of_lt hr) hperiod
-  refine ⟨mid, ?_⟩
-  rw [hdEq, stepN_add, stepN_mul_period_pair_novelty hperiod q]
-  simpa using hmid
-
 /-- **Every flip/flip pair has an absolute four-phase law.**  Whatever the
 intersection pattern of the two supports — disjoint, one-sided, or mutual —
 the walk from `(g, state)` is live forever and visits only the four
@@ -293,55 +272,25 @@ theorem manufactured_flip_pair_all_time_four_phase
       [FB.runway, FB.candy]
   · by_cases hBA : (LocalAction.flip FB.actionSwitch).Avoids
         [FA.runway, FA.candy]
-    · -- disjoint supports: the compatible-pair four-corner orbit
-      have hA' : PathGrooves
-          (ManufacturedReflector.flip FA).toSupported.paths state := hA
-      have hB' : PathGrooves
-          (ManufacturedReflector.flip FB).toSupported.paths state := hB
-      have hAB' : (ManufacturedReflector.flip FA).toSupported.action.Avoids
-          (ManufacturedReflector.flip FB).toSupported.paths := hAB
-      have hBA' : (ManufacturedReflector.flip FB).toSupported.action.Avoids
-          (ManufacturedReflector.flip FA).toSupported.paths := hBA
-      have hperiod := paired_reflectors_period w
-        (ManufacturedReflector.flip FA).toSupported.run
-        (ManufacturedReflector.flip FB).toSupported.run
-        (fun state hs => hs.after_avoiding_action hAB')
-        (fun state hs => hs.after_avoiding_action hBA')
-        ((ManufacturedReflector.flip FA).toSupported.action.commute
-          (ManufacturedReflector.flip FB).toSupported.action)
-        (ManufacturedReflector.flip FA).toSupported.action.involutive
-        (ManufacturedReflector.flip FB).toSupported.action.involutive state hA' hB'
-      have hApos : 0 < (ManufacturedReflector.flip FA).toSupported.travel :=
-        (ManufacturedReflector.flip FA).travel_pos
-      have hpos : 0 <
-          2 * ((ManufacturedReflector.flip FA).toSupported.travel +
-            (ManufacturedReflector.flip FB).toSupported.travel) := by
-        omega
-      obtain ⟨mid, hmid⟩ := period_all_time_live hpos hperiod d
-      rcases mid with ⟨port, phase⟩
-      have hmem := manufactured_pair_all_time_four_phase_tongues
-        (ManufacturedReflector.flip FA) (ManufacturedReflector.flip FB)
-        state hA' hB' hAB' hBA' d
-      have hph : tonguesAt w (g, state) d = phase := by
-        simp [tonguesAt, hmid]
-      rw [hph] at hmem
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmem
-      refine ⟨port, phase, hmid, ?_⟩
-      rcases hmem with h | h | h | h
-      · simp [h]
-      · have h' : phase = flipAt state FA.actionSwitch := h
-        simp [h']
-      · have h' : phase =
-            flipAt (flipAt state FA.actionSwitch) FB.actionSwitch := h
-        simp [h']
-      · have h' : phase =
-            flipAt (flipAt (flipAt state FA.actionSwitch)
-              FB.actionSwitch) FA.actionSwitch := h
-        by_cases hsw : FA.actionSwitch = FB.actionSwitch
-        · rw [← hsw, flipAt_flipAt] at h'
-          simp [h']
-        · rw [flipAt_comm hsw, flipAt_flipAt] at h'
-          simp [h']
+    · obtain ⟨port, phase, hr, hm⟩ := FA.toSupported.pair_all_time_four_phase FB.toSupported
+        (ManufacturedReflector.flip FA).travel_pos (ManufacturedReflector.flip FB).travel_pos
+        (fun u hu _ ht => FA.travel_two_phase_stepN u hu ht)
+        (fun u hu _ ht => FB.travel_two_phase_stepN u hu ht)
+        state hA hB hAB hBA d
+      have hcancel : flipAt (flipAt (flipAt state FA.actionSwitch) FB.actionSwitch)
+          FA.actionSwitch = flipAt state FB.actionSwitch := by
+        have hc := (LocalAction.flip FA.actionSwitch).commute (.flip FB.actionSwitch)
+          (flipAt state FA.actionSwitch)
+        change flipAt (flipAt (flipAt state FA.actionSwitch) FB.actionSwitch)
+          FA.actionSwitch = flipAt (flipAt (flipAt state FA.actionSwitch)
+            FA.actionSwitch) FB.actionSwitch at hc
+        simpa only [flipAt_flipAt] using hc
+      change phase ∈ [state, flipAt state FA.actionSwitch,
+        flipAt (flipAt state FA.actionSwitch) FB.actionSwitch,
+        flipAt (flipAt (flipAt state FA.actionSwitch) FB.actionSwitch) FA.actionSwitch] at hm
+      refine ⟨port, phase, hr, ?_⟩
+      rw [hcancel] at hm
+      grind
     · -- FA's action avoids FB's support, FB's support meets FA's switch:
       -- one FA-traversal, then the one-sided theta seen from `e`
       have hcontactBA := contact_of_not_avoids_flip hBA

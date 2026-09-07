@@ -251,20 +251,6 @@ theorem ManufacturedFlipReflector.capture_from_mouth_two_phase
   exact ⟨port, phase, hr, hphase⟩
 
 
-/-- Repeat a closed raw-track period any number of times. -/
-theorem stepN_mul_period_pair_novelty
-    {w : Wiring} {start : Nat × Tongues} {period : Nat}
-    (hperiod : stepN w period start = some start) :
-    ∀ q, stepN w (q * period) start = some start := by
-  intro q
-  induction q with
-  | zero => simp [stepN]
-  | succ q ih =>
-      have hlen : (q + 1) * period = q * period + period := by
-        simp [Nat.add_mul]
-      rw [hlen, stepN_add, ih]
-      exact hperiod
-
 /-- The two local actions preserve their four-corner orbit and both groove
 supports. Alternate positive-length traversals inside that invariant; there
 is no need to calculate a four-leg time window or reduce time modulo a period. -/

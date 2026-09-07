@@ -43,170 +43,55 @@ theorem boundary_history_then_direct_tail_cover
     (hnd : (times.map
       (restrictedTonguesAt w N start)).Nodup) :
     NoveltyCoverOn w N start times prefixHistory (cap - 1) := by
-  let late := times.filter (fun k => decide (lead < k))
-  let shifted := late.map (fun k => k - lead)
-  let boundary := VectorCount.restrict N endpoint.2
-  let other := shifted.filter (fun d =>
-    decide (Ne (restrictedTonguesAt w N endpoint d) boundary))
-  let otherVectors :=
-    other.map (restrictedTonguesAt w N endpoint)
-  have hlateVector : shifted.map
-      (restrictedTonguesAt w N endpoint) =
-      late.map (restrictedTonguesAt w N start) := by
-    dsimp [shifted]
+  let freshTimes := times.filter fun k =>
+    decide (restrictedTonguesAt w N start k ∉ prefixHistory)
+  let shifted := freshTimes.map (fun k => k - lead)
+  let fresh := freshTimes.map (restrictedTonguesAt w N start)
+  have hinfo : ∀ k ∈ freshTimes,
+      (stepN w (k - lead) endpoint).isSome ∧
+      restrictedTonguesAt w N endpoint (k - lead) =
+        restrictedTonguesAt w N start k := by
+    intro k hk
+    obtain ⟨hkt, hfresh⟩ := List.mem_filter.mp hk
+    have hlate : lead < k := by
+      have hn := of_decide_eq_true hfresh
+      by_cases h : k ≤ lead
+      · exact (hn (hprefixCover k h)).elim
+      · omega
+    have heq : k = lead + (k - lead) := by omega
+    have hl := hlive k hkt
+    rw [heq, stepN_add, hreach] at hl
+    have hl' : (stepN w (k - lead) endpoint).isSome := hl
+    refine ⟨hl', ?_⟩
+    simpa only [← heq] using (restrictedTonguesAt_add_of_reaches hreach
+      (Option.isSome_iff_exists.mp hl')).symm
+  have hmap : shifted.map (restrictedTonguesAt w N endpoint) = fresh := by
     rw [List.map_map]
-    apply List.map_congr_left
-    intro k hk
-    have hkTimes : List.Mem k times :=
-      (List.mem_filter.mp hk).1
-    have hkGt : lead < k :=
-      of_decide_eq_true (List.mem_filter.mp hk).2
-    have hkEq : k = lead + (k - lead) := by
-      omega
-    have hkLive : (stepN w (lead + (k - lead)) start).isSome := by
-      rw [← hkEq]
-      exact hlive k hkTimes
-    have heq := restrictedTonguesAt_add_of_reaches (N := N) hreach
-      (stepN_suffix_some_of_reaches hreach hkLive)
-    rw [← hkEq] at heq
-    exact heq.symm
-  have hlateNodup :
-      (late.map
-        (restrictedTonguesAt w N start)).Nodup := by
-    dsimp [late]
-    exact tailsharp_nodup_map_filter _ hnd
-  have hshiftedNodup :
-      (shifted.map
-        (restrictedTonguesAt w N endpoint)).Nodup := by
-    rw [hlateVector]
-    exact hlateNodup
-  have hotherNodup : otherVectors.Nodup := by
-    dsimp [otherVectors, other]
-    exact tailsharp_nodup_map_filter _ hshiftedNodup
-  have hzeroVector :
-      restrictedTonguesAt w N endpoint 0 = boundary := by
-    dsimp [boundary]
+    exact List.map_congr_left fun k hk => (hinfo k hk).2
+  have hzero : restrictedTonguesAt w N endpoint 0 =
+      VectorCount.restrict N endpoint.2 := by
     simp [restrictedTonguesAt, tonguesAt, stepN]
-  have hboundaryNotOther :
-      Not (List.Mem boundary otherVectors) := by
-    intro hm
-    obtain data := List.mem_map.mp hm
-    let d := Exists.choose data
-    have hd := Exists.choose_spec data
-    have hne :
-        Ne (restrictedTonguesAt w N endpoint d) boundary :=
-      of_decide_eq_true (List.mem_filter.mp hd.1).2
-    exact hne hd.2
-  have hzeroOtherNodup :
-      ((0 :: other).map
-        (restrictedTonguesAt w N endpoint)).Nodup := by
-    simp only [List.map_cons, List.nodup_cons]
+  have hnd' : ((0 :: shifted).map (restrictedTonguesAt w N endpoint)).Nodup := by
+    rw [List.map_cons, hmap, List.nodup_cons, hzero]
     constructor
-    case left =>
-      intro hm
-      rw [hzeroVector] at hm
-      exact hboundaryNotOther hm
-    case right =>
-      exact hotherNodup
-  have hotherLive : forall d, List.Mem d other ->
-      (stepN w d endpoint).isSome := by
+    · intro hm
+      obtain ⟨k, hk, heq⟩ := List.mem_map.mp hm
+      exact (of_decide_eq_true (List.mem_filter.mp hk).2) (heq.symm ▸ hboundary)
+    · exact tailsharp_nodup_map_filter _ hnd
+  have hbound := htail (0 :: shifted) (by
     intro d hd
-    have hdShifted := (List.mem_filter.mp hd).1
-    obtain data := List.mem_map.mp hdShifted
-    let k := Exists.choose data
-    have hk := Exists.choose_spec data
-    have hkd : k - lead = d := hk.2
-    have hkTimes : List.Mem k times :=
-      (List.mem_filter.mp hk.1).1
-    have hkGt : lead < k :=
-      of_decide_eq_true (List.mem_filter.mp hk.1).2
-    have hkEq : k = lead + (k - lead) := by
-      omega
-    have hkLiveRaw := hlive k hkTimes
-    rw [hkEq, stepN_add, hreach] at hkLiveRaw
-    have hkLive :
-        (stepN w (k - lead) endpoint).isSome := by
-      simpa using hkLiveRaw
-    exact Eq.mp
-      (congrArg
-        (fun z => (stepN w z endpoint).isSome = true) hkd)
-      hkLive
-  have hzeroOtherLive : forall d, List.Mem d (0 :: other) ->
-      (stepN w d endpoint).isSome := by
-    intro d hd
-    rcases List.mem_cons.mp hd with hd | hd
-    case inl =>
-      subst d
-      simp [stepN]
-    case inr =>
-      exact hotherLive d hd
-  have htailBound : (0 :: other).length <= cap :=
-    htail (0 :: other) hzeroOtherLive hzeroOtherNodup
-  have hotherBound : other.length <= cap - 1 := by
-    simp only [List.length_cons] at htailBound
+    rcases List.mem_cons.mp hd with rfl | hd
+    · simp [stepN]
+    · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hd
+      exact (hinfo k hk).1) hnd'
+  refine ⟨fresh, ?_, ?_⟩
+  · have : freshTimes.length + 1 ≤ cap := by simpa [shifted] using hbound
+    simp only [fresh, List.length_map]
     omega
-  have hmem : forall k, List.Mem k times ->
-      List.Mem (restrictedTonguesAt w N start k)
-        (prefixHistory ++ otherVectors) := by
-    intro k hk
-    by_cases hpre : k <= lead
-    case pos =>
-      exact List.mem_append_left otherVectors
-        (hprefixCover k hpre)
-    case neg =>
-      have hkGt : lead < k := by
-        omega
-      let d := k - lead
-      have hkEq : k = lead + d := by
-        dsimp [d]
-        omega
-      have htailLive : ∃ finish, stepN w d endpoint = some finish := by
-        apply stepN_suffix_some_of_reaches hreach
-        rw [← hkEq]
-        exact hlive k hk
-      have heq :
-          restrictedTonguesAt w N start k =
-            restrictedTonguesAt w N endpoint d := by
-        rw [hkEq]
-        exact restrictedTonguesAt_add_of_reaches hreach htailLive
-      by_cases hbd :
-          restrictedTonguesAt w N endpoint d = boundary
-      case pos =>
-        rw [heq, hbd]
-        have hb : List.Mem boundary prefixHistory := by
-          dsimp [boundary]
-          exact hboundary
-        exact List.mem_append_left otherVectors hb
-      case neg =>
-        rw [heq]
-        apply List.mem_append_right prefixHistory
-        dsimp [otherVectors]
-        apply List.mem_map.mpr
-        refine Exists.intro d ?_
-        constructor
-        case left =>
-          apply List.mem_filter.mpr
-          constructor
-          case left =>
-            dsimp [shifted, late, d]
-            apply List.mem_map.mpr
-            refine Exists.intro k ?_
-            constructor
-            case left =>
-              apply List.mem_filter.mpr
-              exact And.intro hk (decide_eq_true hkGt)
-            case right =>
-              rfl
-          case right =>
-            exact decide_eq_true hbd
-        case right =>
-          rfl
-  refine Exists.intro otherVectors ?_
-  constructor
-  case left =>
-    simpa [otherVectors] using hotherBound
-  case right =>
-    intro k hk
-    exact hmem k hk
+  · intro k hk
+    by_cases hh : restrictedTonguesAt w N start k ∈ prefixHistory
+    · exact List.mem_append_left _ hh
+    · exact List.mem_append_right _ (List.mem_map.mpr
+        ⟨k, List.mem_filter.mpr ⟨hk, decide_eq_true hh⟩, rfl⟩)
 
 end GeneralN

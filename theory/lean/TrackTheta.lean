@@ -19,14 +19,7 @@ theorem pin_flip_other {u : Tongues} {p k : Nat}
     (hpk : p / 3 ≠ k) :
     pin (flipAt u k) p = flipAt (pin u p) k := by
   funext j
-  unfold pin flipAt
-  by_cases hjp : j = p / 3
-  · subst j
-    simp [hpk]
-  · by_cases hjk : j = k
-    · subst j
-      simp [Ne.symm hpk]
-    · simp [hjp, hjk]
+  by_cases hj : j = p / 3 <;> simp [pin, flipAt, hj, hpk]
 
 /-- Flipping an unvisited switch commutes with one local lazy-point
 traversal. -/
@@ -55,16 +48,8 @@ theorem changed_arrival_is_trailing
     (harrive : arrive u p = (x, v))
     (hchanged : v (p / 3) ≠ u (p / 3)) :
     p % 3 ≠ 0 ∧ x = 3 * (p / 3) ∧ v = pin u p := by
-  by_cases hp : p % 3 = 0
-  · have hpair := harrive
-    simp only [arrive, hp, if_pos] at hpair
-    have hv : v = u := (congrArg Prod.snd hpair).symm
-    exact (hchanged (by rw [hv])).elim
-  · have hpair := harrive
-    simp only [arrive, hp] at hpair
-    have hx : x = 3 * (p / 3) := (congrArg Prod.fst hpair).symm
-    have hv : v = pin u p := (congrArg Prod.snd hpair).symm
-    exact ⟨hp, hx, hv⟩
+  unfold arrive at harrive
+  split at harrive <;> cases harrive <;> simp_all
 
 theorem changed_arrival_eq_flipAt
     {u v : Tongues} {p x : Nat}
@@ -139,102 +124,6 @@ theorem PhysicalTrace.flip_unvisited
       intro passage hp
       exact hforeign passage (List.mem_cons_of_mem _ hp)
 
-theorem physicalTrace_grooved_passages
-    (w : Wiring) (u : Tongues) (p x q : Nat)
-    (rest : List Passage)
-    (hlinked : LinkedPassages w ((p, x) :: rest))
-    (hgrooved : PassagesGrooved u ((p, x) :: rest))
-    (hfinal : w.link (lastPassageExit x rest) = some q) :
-    PhysicalTrace w (p, u) ((p, x) :: rest) (q, u) := by
-  induction rest generalizing p x with
-  | nil =>
-      have hforward := groove_forward
-        (hgrooved (p, x) List.mem_cons_self)
-      exact PhysicalTrace.cons hforward hfinal (PhysicalTrace.nil _)
-  | cons passage rest ih =>
-      rcases passage with ⟨r, y⟩
-      have hxy : w.link x = some r := hlinked.1
-      have htailLinked : LinkedPassages w ((r, y) :: rest) := hlinked.2
-      have htailGrooved : PassagesGrooved u ((r, y) :: rest) := by
-        intro passage hp
-        exact hgrooved passage (List.mem_cons_of_mem _ hp)
-      have htailFinal : w.link (lastPassageExit y rest) = some q := by
-        simpa [lastPassageExit] using hfinal
-      have htail := ih r y htailLinked htailGrooved htailFinal
-      have hforward := groove_forward
-        (hgrooved (p, x) List.mem_cons_self)
-      exact PhysicalTrace.cons hforward hxy htail
-
-/-- Replay any recorded physical trace in a state that grooves all of its
-passages.  The replay changes no tongue. -/
-theorem PhysicalTrace.replay_grooved
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (state : Tongues)
-    (hgrooved : PassagesGrooved state passages) :
-    PhysicalTrace w (start.1, state) passages (finish.1, state) := by
-  induction htrace with
-  | nil c => exact PhysicalTrace.nil _
-  | @cons p x q u v passages finish harrive hlink tail ih =>
-      have hhead := groove_forward
-        (hgrooved (p, x) List.mem_cons_self)
-      have htail : PassagesGrooved state passages := by
-        intro passage hp
-        exact hgrooved passage (List.mem_cons_of_mem _ hp)
-      exact PhysicalTrace.cons hhead hlink (ih htail)
-
-/-- Passage list for traversing a stored path in the opposite direction. -/
-def reversePassages : List Passage → List Passage
-  | [] => []
-  | passage :: rest =>
-      reversePassages rest ++ [(passage.2, passage.1)]
-
-theorem reversePassages_length (passages : List Passage) :
-    (reversePassages passages).length = passages.length := by
-  induction passages with
-  | nil => rfl
-  | cons passage rest ih =>
-      simp [reversePassages, ih]
-
-theorem reversePassages_append (left right : List Passage) :
-    reversePassages (left ++ right) =
-      reversePassages right ++ reversePassages left := by
-  induction left with
-  | nil => simp [reversePassages]
-  | cons passage left ih =>
-      simp [reversePassages, ih, List.append_assoc]
-
-theorem reversePassage_mem {passage : Passage}
-    {passages : List Passage} (hmem : passage ∈ passages) :
-    (passage.2, passage.1) ∈ reversePassages passages := by
-  induction passages with
-  | nil => cases hmem
-  | cons head rest ih =>
-      rcases List.mem_cons.mp hmem with rfl | htail
-      · simp [reversePassages]
-      · exact List.mem_append_left _ (ih htail)
-
-theorem reversePassages_grooved {state : Tongues}
-    {passages : List Passage}
-    (hgrooved : PassagesGrooved state passages) :
-    PassagesGrooved state (reversePassages passages) := by
-  induction passages with
-  | nil =>
-      intro passage hp
-      cases hp
-  | cons head rest ih =>
-      intro passage hp
-      simp only [reversePassages] at hp
-      rcases List.mem_append.mp hp with htail | hhead
-      · apply ih
-        · intro old hold
-          exact hgrooved old (List.mem_cons_of_mem _ hold)
-        · exact htail
-      · simp only [List.mem_singleton] at hhead
-        subst passage
-        exact groove_forward (hgrooved head List.mem_cons_self)
-
 private theorem nodup_prefix_head_reverse_tail
     {pre tail : List Nat} {head : Nat}
     (hnd : (pre ++ head :: tail).Nodup) :
@@ -265,42 +154,10 @@ theorem map_passageSwitch_reversePassages
     (htrace : PhysicalTrace w start passages finish) :
     (reversePassages passages).map passageSwitch =
       (passages.map passageSwitch).reverse := by
-  induction htrace with
-  | nil => rfl
-  | @cons p x q u v passages finish harrive hlink tail ih =>
-      have hs := arrive_exit_switch u p
-      rw [harrive] at hs
-      simp [reversePassages, List.map_append, ih,
-        passageSwitch, hs]
-
-/-- A fresh local passage that exits through the entry of a recorded prefix
-immediately traverses that prefix backwards and leaves over its incoming
-boundary edge. -/
-theorem physicalTrace_contact_retraces_prefix
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v)) :
-    PhysicalTrace w (p, u)
-      ((p, oldEntry) :: reversePassages recorded) (e, v) := by
-  induction recorded generalizing g base e with
-  | nil =>
-      cases hrecorded
-      exact PhysicalTrace.cons hcontact (w.symm _ _ hentry) (PhysicalTrace.nil _)
-  | cons passage rest ih =>
-      cases hrecorded with
-      | @cons _ x next _ middle _ _ _ hlink tail =>
-          have hrest := ih tail
-            (fun passage hp => hgrooved passage (List.mem_cons_of_mem _ hp)) hlink
-          have hhead : PhysicalTrace w (x, v) [(x, g)] (e, v) :=
-            PhysicalTrace.cons (hgrooved (g, x) List.mem_cons_self)
-              (w.symm _ _ hentry) (PhysicalTrace.nil _)
-          simpa [reversePassages] using hrest.append hhead
-
+  change (passages.reverse.map Prod.swap).map passageSwitch = _
+  rw [List.map_map, ← List.map_reverse]
+  exact List.map_congr_left fun passage hp =>
+    htrace.passage_exit_switch passage (List.mem_reverse.mp hp)
 
 theorem linked_prefix_of_append {w : Wiring}
     {left right : List Passage}
@@ -452,44 +309,20 @@ theorem crossed_revisit_support_grooved
     (hrepeat : arrive u q = (y, v)) :
     PathGrooves [runway, path] v := by
   have hfull := hrunway.append hexcursion
-  have hgrooved := hfull.grooved_of_switchSimple hsimple
-  have hexit := hfull.passage_exit_switch
-  have hparts :
-      (runway.map passageSwitch).Nodup ∧
-      (((p, x) :: path).map passageSwitch).Nodup ∧
-      ∀ a ∈ runway.map passageSwitch,
-        ∀ b ∈ ((p, x) :: path).map passageSwitch, a ≠ b := by
-    unfold SwitchSimple at hsimple
-    simp only [List.map_append] at hsimple
-    exact List.nodup_append.mp hsimple
-  apply pathGrooves_pair.mpr
-  constructor
-  · intro passage hp
-    have hold := hgrooved passage (List.mem_append_left _ hp)
-    have hforeign : passage.2 / 3 ≠ q / 3 := by
-      rw [hexit passage (List.mem_append_left _ hp), ← hsw]
-      have hne := hparts.2.2 (passageSwitch passage)
-        (List.mem_map.mpr ⟨passage, hp, rfl⟩)
-        (passageSwitch (p, x)) (by simp)
-      simpa [passageSwitch] using hne
-    exact groove_transfer hold
-      (arrive_preserves_other hrepeat hforeign)
-  · intro passage hp
-    have hmem : passage ∈ runway ++ (p, x) :: path :=
-      List.mem_append_right runway (List.mem_cons_of_mem _ hp)
-    have hold := hgrooved passage hmem
-    have htailNodup := hparts.2.1
-    simp only [List.map_cons, List.nodup_cons] at htailNodup
-    have hforeign : passage.2 / 3 ≠ q / 3 := by
-      rw [hexit passage hmem, ← hsw]
-      have hne : passageSwitch (p, x) ≠ passageSwitch passage := by
-        intro hEq
-        apply htailNodup.1
-        rw [hEq]
-        exact List.mem_map.mpr ⟨passage, hp, rfl⟩
-      simpa [passageSwitch] using Ne.symm hne
-    exact groove_transfer hold
-      (arrive_preserves_other hrepeat hforeign)
+  have hold := hfull.grooved_of_switchSimple hsimple
+  have hs : (runway.map passageSwitch ++ p / 3 :: path.map passageSwitch).Nodup := by
+    simpa only [SwitchSimple, List.map_append, List.map_cons, passageSwitch] using hsimple
+  have hgrooved : PassagesGrooved v (runway ++ path) := by
+    apply PassagesGrooved.transfer
+      (fun passage hp => hold passage (by grind))
+    intro passage hp
+    apply arrive_preserves_other hrepeat
+    have hm : passageSwitch passage ∈ runway.map passageSwitch ++ path.map passageSwitch := by
+      simpa only [List.map_append] using List.mem_map.mpr ⟨passage, hp, rfl⟩
+    grind
+  exact pathGrooves_pair.mpr
+    ⟨fun passage hp => hgrooved passage (List.mem_append_left _ hp),
+     fun passage hp => hgrooved passage (List.mem_append_right _ hp)⟩
 
 /-! ## Retaining the construction data -/
 

@@ -14,79 +14,35 @@ vector.  A switch-simple prefix of length at most `N` therefore gives at most
 
 namespace GeneralN
 
-/-- Prefix plus an at-most-two-phase transient/stable cycle tail. -/
-theorem prefix_then_two_phase_cycle_distinct_le_succ_succ
-    {w : Wiring} {N L : Nat}
-    {start atRepeat : Nat × Tongues}
-    {cycle : List Passage} {settled : Tongues}
-    (hreach : stepN w L start = some atRepeat)
-    (hL : L ≤ N)
-    (hnonempty : cycle ≠ [])
-    (htransient : PhysicalTrace w atRepeat cycle
-      (atRepeat.1, settled))
-    (hstable : PhysicalTrace w (atRepeat.1, settled) cycle
-      (atRepeat.1, settled))
-    (hsimple : SwitchSimple cycle)
-    (htransientPhase : ∀ d, d ≤ cycle.length → ∃ port phase,
-      stepN w d atRepeat = some (port, phase) ∧
-        (phase = atRepeat.2 ∨ phase = settled))
+/-- A prefix of length at most `N` followed by one settled vector has at
+most `N+2` distinct vectors, including the initial and boundary samples. -/
+theorem prefix_then_settled_distinct_le
+    {w : Wiring} {N L : Nat} {start atRepeat : Nat × Tongues} {settled : Tongues}
+    (hreach : stepN w L start = some atRepeat) (hL : L ≤ N)
+    (htail : ∀ d, 0 < d → ∃ port, stepN w d atRepeat = some (port, settled))
     (times : List Nat)
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ N + 2 := by
-  have hpositive : 0 < cycle.length := List.length_pos_iff.mpr hnonempty
-  have hsettledAll := hstable.grooved_loop_all_time hpositive
-    (hstable.grooved_of_switchSimple hsimple)
-  let history := ((List.range (L + 1)).map
-    (restrictedTonguesAt w N start)) ++
-      [VectorCount.restrict N settled]
-  have hrepeatMem : VectorCount.restrict N atRepeat.2 ∈ history := by
-    apply List.mem_append_left
-    have hvec : restrictedTonguesAt w N start L =
-        VectorCount.restrict N atRepeat.2 := by
-      simp [restrictedTonguesAt, tonguesAt, hreach]
-    rw [← hvec]
-    exact List.mem_map.mpr ⟨L, List.mem_range.mpr (by omega), rfl⟩
-  have hcover : NoveltyCoverOn w N start times history 0 := by
-    refine ⟨[], by simp, ?_⟩
-    intro k hk
-    simp only [List.append_nil]
-    by_cases hkpre : k ≤ L
-    · apply List.mem_append_left
-      exact List.mem_map.mpr ⟨k, List.mem_range.mpr (by omega), rfl⟩
-    · let d := k - L
-      have hkEq : k = L + d := by dsimp [d]; omega
-      by_cases hd : d ≤ cycle.length
-      · obtain ⟨port, phase, hrun, hphase⟩ := htransientPhase d hd
-        have hglobal : stepN w k start = some (port, phase) := by
-          rw [hkEq, stepN_add, hreach]
-          simpa using hrun
-        have hvec : restrictedTonguesAt w N start k =
-            VectorCount.restrict N phase := by
-          simp [restrictedTonguesAt, tonguesAt, hglobal]
-        rw [hvec]
-        rcases hphase with h | h
-        · rw [h]
-          exact hrepeatMem
-        · apply List.mem_append_right
-          simp [h]
-      · let r := d - cycle.length
-        have hdEq : d = cycle.length + r := by dsimp [r]; omega
-        obtain ⟨port, hrun⟩ := hsettledAll r
-        have hglobal : stepN w k start = some (port, settled) := by
-          rw [hkEq, hdEq, stepN_add, hreach]
-          simp only [Option.bind_some]
-          rw [stepN_add, htransient.sound]
-          simpa using hrun
-        have hvec : restrictedTonguesAt w N start k =
-            VectorCount.restrict N settled := by
-          simp [restrictedTonguesAt, tonguesAt, hglobal]
-        rw [hvec]
-        apply List.mem_append_right
-        simp
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  have hhistory : history.length ≤ N + 2 := by
-    simp [history]
-    omega
+  let history := (List.range (L + 1)).map (restrictedTonguesAt w N start) ++
+    [VectorCount.restrict N settled]
+  have hcover : ∀ k ∈ times, restrictedTonguesAt w N start k ∈ history := by
+    intro k _
+    by_cases hk : k ≤ L
+    · exact List.mem_append_left _ (List.mem_map.mpr
+        ⟨k, List.mem_range.mpr (by omega), rfl⟩)
+    · obtain ⟨port, hr⟩ := htail (k - L) (by omega)
+      have heq : k = L + (k - L) := by omega
+      have hglobal : stepN w k start = some (port, settled) := by
+        rw [heq, stepN_add, hreach]
+        exact hr
+      apply List.mem_append_right
+      simp [restrictedTonguesAt, tonguesAt, hglobal]
+  have hc := nodup_subset_length_nat hnd (by
+    intro vector hv
+    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hv
+    exact hcover k hk)
+  simp only [history, List.length_append, List.length_map, List.length_range,
+    List.length_cons, List.length_nil] at hc
   omega
 
 /-- First activation with the sharp `N+2` simple-cycle count. -/
@@ -116,32 +72,16 @@ theorem first_activated_count_outcome_sharp
     hleadTrace.simple_length_le hN hleadSimple
   rcases hfork with hcycle | hreflector
   · left
-    obtain ⟨cycle, settled, hnonempty, htransient,
-      hstable, hsimpleCycle, hphase, _hpositive⟩ := hcycle
-    intro times hnd
-    exact prefix_then_two_phase_cycle_distinct_le_succ_succ
-      hvisited hvisitedLe hnonempty htransient hstable
-      hsimpleCycle hphase times hnd
+    obtain ⟨settled, hsettled⟩ := hcycle
+    exact fun times hnd => prefix_then_settled_distinct_le
+      hvisited hvisitedLe hsettled times hnd
   · right
     obtain ⟨A, state, hgrooves, hbase, hactivated, hpreserves⟩ := hreflector
     have hgroovesActivated :
         PathGrooves A.toSupported.paths A.activatedState := by
       rw [← hactivated]
       exact hgrooves
-    have hbackExact :
-        stepN w (A.runway.length + 1) A.preReturn =
-          some (e, A.activatedState) := by
-      have htrace := physicalTrace_contact_retraces_prefix
-        A.runway_trace (A.runway_grooved hgroovesActivated)
-        A.entryEdge A.return_arrive_mouth
-      simpa [reversePassages_length] using htrace.sound
-    have hreachBase :
-        stepN w (A.exploration.length + A.runway.length + 1)
-          (start.1, A.baseState) = some (e, A.activatedState) := by
-      have hlen : A.exploration.length + A.runway.length + 1 =
-          A.exploration.length + (A.runway.length + 1) := by omega
-      rw [hlen, stepN_add, A.exploration_trace.sound]
-      exact hbackExact
+    have hreachBase := A.manufacturing_journey_reaches_activated hgroovesActivated
     refine ⟨A, state, hgrooves, hbase, hactivated, ?_, hpreserves⟩
     simpa [hbase, hactivated] using hreachBase
 

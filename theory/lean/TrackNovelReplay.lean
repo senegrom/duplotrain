@@ -15,30 +15,6 @@ an arbitrary number of switches.
 
 namespace GeneralN
 
-/-- Every prefix of a grooved physical trace runs with the specified tongue
-vector.  The endpoint port is intentionally existential: novelty accounting
-cares about the complete tongue vector, not the particular plain-track edge.
--/
-theorem PhysicalTrace.grooved_prefix_tongues
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (state : Tongues)
-    (hgrooved : PassagesGrooved state passages)
-    {d : Nat} (hd : d ≤ passages.length) :
-    ∃ port, stepN w d (start.1, state) = some (port, state) := by
-  have htrace' : PhysicalTrace w start
-      (passages.take d ++ passages.drop d) finish := by
-    simpa only [List.take_append_drop] using htrace
-  obtain ⟨middle, hprefix, _hsuffix⟩ := htrace'.split_append
-  have hprefixGrooved : PassagesGrooved state (passages.take d) := by
-    intro passage hp
-    exact hgrooved passage (List.mem_of_mem_take hp)
-  have hreplay := hprefix.replay_grooved state hprefixGrooved
-  have hsound := hreplay.sound
-  rw [List.length_take_of_le hd] at hsound
-  exact ⟨middle.1, hsound⟩
-
 /-- Any nonempty closed spatial route grooved at `state` runs forever with
 that vector. The recorded witness need not be simple or have equal endpoints. -/
 theorem PhysicalTrace.grooved_loop_all_time

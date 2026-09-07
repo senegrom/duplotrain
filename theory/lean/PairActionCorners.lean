@@ -34,108 +34,49 @@ theorem manufactured_pair_all_time_action_corners_tongues
     (d : Nat) :
     tonguesAt w (g, state) d ∈
       manufacturedPairActionCorners A B state := by
-  cases A with
-  | stay SA =>
-      cases B with
-      | stay SB =>
-          have hmem := manufactured_pair_all_time_four_phase_tongues
-            (.stay SA) (.stay SB) state hA hB
-              (by trivial) (by trivial) d
-          simpa [manufacturedPairActionCorners,
-            ManufacturedReflector.toSupported,
-            ManufacturedStayReflector.toSupported,
-            LocalAction.apply] using hmem
-      | flip FB =>
-          change PathGrooves
-            [SA.runway, [(SA.mouth, SA.arm)]] state at hA
-          change PathGrooves [FB.runway, FB.candy] state at hB
-          by_cases hBA : (LocalAction.flip FB.actionSwitch).Avoids
-              [SA.runway, [(SA.mouth, SA.arm)]]
-          · have hmem := manufactured_pair_all_time_four_phase_tongues
-              (.stay SA) (.flip FB) state hA hB
-                (by trivial) hBA d
-            simpa [manufacturedPairActionCorners,
-              ManufacturedReflector.toSupported,
-              ManufacturedStayReflector.toSupported,
-              ManufacturedFlipReflector.toSupported,
-              LocalAction.apply] using hmem
-          · have hcontact := contact_of_not_avoids_flip hBA
-            obtain ⟨port, phase, hrun, hphase⟩ :=
-              manufactured_stay_then_flip_contact_all_time_two_phase
-                SA FB state hA hB hcontact d
-            have ht : tonguesAt w (g, state) d = phase := by
-              simp [tonguesAt, hrun]
+  by_cases hcompatible : A.toSupported.action.Avoids B.toSupported.paths ∧
+      B.toSupported.action.Avoids A.toSupported.paths
+  · have hm := manufactured_pair_all_time_four_phase_tongues
+      A B state hA hB hcompatible.1 hcompatible.2 d
+    have hc := A.toSupported.action.commute B.toSupported.action
+      (A.toSupported.action.apply state)
+    rw [A.toSupported.action.involutive] at hc
+    rw [hc] at hm
+    simp only [manufacturedPairActionCorners, List.mem_cons, List.not_mem_nil, or_false] at hm ⊢
+    grind
+  · cases A with
+    | stay SA =>
+        cases B with
+        | stay SB => exact (hcompatible ⟨by trivial, by trivial⟩).elim
+        | flip FB =>
+            have hcontact := contact_of_not_avoids_flip
+              (fun h => hcompatible ⟨by trivial, h⟩)
+            obtain ⟨port, phase, hr, hp⟩ :=
+              manufactured_stay_then_flip_contact_all_time_two_phase SA FB state hA hB hcontact d
+            have ht : tonguesAt w (g, state) d = phase := by simp [tonguesAt, hr]
             rw [ht]
-            rcases hphase with rfl | rfl <;>
-              simp [manufacturedPairActionCorners,
-                ManufacturedReflector.toSupported,
-                ManufacturedStayReflector.toSupported,
-                ManufacturedFlipReflector.toSupported,
+            rcases hp with rfl | rfl <;>
+              simp [manufacturedPairActionCorners, ManufacturedReflector.toSupported,
+                ManufacturedStayReflector.toSupported, ManufacturedFlipReflector.toSupported,
                 LocalAction.apply]
-  | flip FA =>
-      cases B with
-      | stay SB =>
-          change PathGrooves [FA.runway, FA.candy] state at hA
-          change PathGrooves
-            [SB.runway, [(SB.mouth, SB.arm)]] state at hB
-          by_cases hAB : (LocalAction.flip FA.actionSwitch).Avoids
-              [SB.runway, [(SB.mouth, SB.arm)]]
-          · have hmem := manufactured_pair_all_time_four_phase_tongues
-              (.flip FA) (.stay SB) state hA hB
-                hAB (by trivial) d
-            have hmem' :
-                tonguesAt w (g, state) d = state ∨
-                  tonguesAt w (g, state) d =
-                    flipAt state FA.actionSwitch ∨
-                  tonguesAt w (g, state) d = state := by
-              simpa [ManufacturedReflector.toSupported,
-                ManufacturedStayReflector.toSupported,
-                ManufacturedFlipReflector.toSupported,
-                LocalAction.apply, flipAt_flipAt] using hmem
-            have htwo :
-                tonguesAt w (g, state) d = state ∨
-                  tonguesAt w (g, state) d =
-                    flipAt state FA.actionSwitch := by
-              rcases hmem' with h | h | h
-              · exact Or.inl h
-              · exact Or.inr h
-              · exact Or.inl h
-            rcases htwo with h | h
-            · simp [manufacturedPairActionCorners,
-                ManufacturedReflector.toSupported,
-                ManufacturedStayReflector.toSupported,
-                ManufacturedFlipReflector.toSupported,
-                LocalAction.apply, h]
-            · simp [manufacturedPairActionCorners,
-                ManufacturedReflector.toSupported,
-                ManufacturedStayReflector.toSupported,
-                ManufacturedFlipReflector.toSupported,
-                LocalAction.apply, h]
-          · have hcontact := contact_of_not_avoids_flip hAB
-            obtain ⟨port, phase, hrun, hphase⟩ :=
-              manufactured_flip_then_stay_all_time_two_phase
-                FA SB state hA hB hcontact d
-            have ht : tonguesAt w (g, state) d = phase := by
-              simp [tonguesAt, hrun]
+    | flip FA =>
+        cases B with
+        | stay SB =>
+            have hcontact := contact_of_not_avoids_flip
+              (fun h => hcompatible ⟨h, by trivial⟩)
+            obtain ⟨port, phase, hr, hp⟩ :=
+              manufactured_flip_then_stay_all_time_two_phase FA SB state hA hB hcontact d
+            have ht : tonguesAt w (g, state) d = phase := by simp [tonguesAt, hr]
             rw [ht]
-            rcases hphase with rfl | rfl <;>
-              simp [manufacturedPairActionCorners,
-                ManufacturedReflector.toSupported,
-                ManufacturedStayReflector.toSupported,
-                ManufacturedFlipReflector.toSupported,
+            rcases hp with rfl | rfl <;>
+              simp [manufacturedPairActionCorners, ManufacturedReflector.toSupported,
+                ManufacturedStayReflector.toSupported, ManufacturedFlipReflector.toSupported,
                 LocalAction.apply]
-      | flip FB =>
-          change PathGrooves [FA.runway, FA.candy] state at hA
-          change PathGrooves [FB.runway, FB.candy] state at hB
-          obtain ⟨port, phase, hrun, hmem⟩ :=
-            manufactured_flip_pair_all_time_four_phase
-              FA FB state hA hB d
-          have ht : tonguesAt w (g, state) d = phase := by
-            simp [tonguesAt, hrun]
-          rw [ht]
-          simpa [manufacturedPairActionCorners,
-            ManufacturedReflector.toSupported,
-            ManufacturedFlipReflector.toSupported,
-            LocalAction.apply] using hmem
+        | flip FB =>
+            obtain ⟨port, phase, hr, hm⟩ :=
+              manufactured_flip_pair_all_time_four_phase FA FB state hA hB d
+            simpa [tonguesAt, hr, manufacturedPairActionCorners,
+              ManufacturedReflector.toSupported, ManufacturedFlipReflector.toSupported,
+              LocalAction.apply] using hm
 
 end GeneralN

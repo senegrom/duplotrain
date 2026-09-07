@@ -20,14 +20,7 @@ theorem pin_other_then_restore {u : Tongues} {x q : Nat}
     (hsw : x / 3 = q / 3) (haligned : u (x / 3) = bval x) :
     pin (pin u q) x = u := by
   funext j
-  unfold pin
-  by_cases hj : j = x / 3
-  · rw [if_pos hj, hj, haligned]
-  · rw [if_neg hj]
-    have hjq : j ≠ q / 3 := by
-      rw [← hsw]
-      exact hj
-    rw [if_neg hjq]
+  by_cases hj : j = x / 3 <;> simp [pin, hj, ← hsw, haligned]
 
 /-- Changing the mouth switch preserves every groove on a switch-disjoint
 interior path. -/
@@ -37,17 +30,9 @@ theorem grooved_after_pin_other
     (hforeign : ∀ passage ∈ path,
       passageSwitch passage ≠ q / 3) :
     PassagesGrooved (pin u q) path := by
+  apply hgrooved.transfer
   intro passage hp
-  have hold := hgrooved passage hp
-  have hexitSwitch : passage.2 / 3 = passageSwitch passage := by
-    have hs := arrive_exit_switch u passage.2
-    rw [hold] at hs
-    exact hs.symm
-  apply groove_transfer hold
-  unfold pin
-  rw [if_neg (by
-    rw [hexitSwitch]
-    exact hforeign passage hp)]
+  simp [pin, hforeign passage hp]
 
 /-- Flipping a switch preserves every groove on a switch-disjoint path. -/
 theorem grooved_after_flip_other
@@ -55,17 +40,9 @@ theorem grooved_after_flip_other
     (hgrooved : PassagesGrooved u path)
     (hforeign : ∀ passage ∈ path, passageSwitch passage ≠ k) :
     PassagesGrooved (flipAt u k) path := by
+  apply hgrooved.transfer
   intro passage hp
-  have hold := hgrooved passage hp
-  have hexitSwitch : passage.2 / 3 = passageSwitch passage := by
-    have hs := arrive_exit_switch u passage.2
-    rw [hold] at hs
-    exact hs.symm
-  apply groove_transfer hold
-  unfold flipAt
-  rw [if_neg (by
-    rw [hexitSwitch]
-    exact hforeign passage hp)]
+  simp [flipAt, hforeign passage hp]
 
 /-- The two distinct branch ports of one switch encode opposite Booleans. -/
 theorem branch_values_opposite {x q : Nat}
@@ -79,120 +56,88 @@ theorem pin_eq_flipAt {u : Tongues} {q k : Nat}
     (hq : q / 3 = k) (hopposite : bval q = !(u k)) :
     pin u q = flipAt u k := by
   funext j
-  unfold pin flipAt
-  by_cases hj : j = k
-  · rw [if_pos (by simpa [hq] using hj), if_pos hj, hj, hopposite]
-  · rw [if_neg (by
-      intro h
-      apply hj
-      simpa [hq] using h), if_neg hj]
+  by_cases hj : j = k <;> simp [pin, flipAt, hq, hj, hopposite]
 
-/-- **Arbitrary mouth-avoiding lobe = two-state reflector.**
+/-- A one-coordinate difference between Boolean vectors is identity or a flip. -/
+theorem tongues_eq_or_eq_flipAt_of_changes_only
+    {u v : Tongues} {k : Nat}
+    (hchanges : ∀ j, v j ≠ u j → j = k) :
+    u = v ∨ u = flipAt v k := by
+  by_cases hkey : u k = v k
+  · left; funext j; by_cases hj : j = k <;> grind
+  · right
+    funext j
+    by_cases hj : j = k
+    · subst j
+      cases hu : u k <;> cases hv : v k <;> simp_all [flipAt]
+    · simp only [flipAt, if_neg hj]
+      grind
 
-`p` is the stem/mouth, `x` and `q` are its two candy-side branches, and
-`path` is a grooved path from the edge at `x` to the edge at `q` whose
-interior passages avoid the mouth switch.
-The stem edge leads to `outside`.  One reflection changes `u` to `pin u q`;
-the next restores `u`, with the same exact travel time. -/
-theorem stem_lobe_two_state_reflector_foreign
-    (w : Wiring) {p x q outside : Nat} {u : Tongues}
-    (path : List Passage)
+/-- In either mouth orientation, a lobe follows one grooved route and then
+flips its mouth on the final arrival. This single spatial certificate supplies
+both endpoint reflection and every intermediate state. -/
+theorem stem_lobe_route
+    (w : Wiring) {p x q : Nat} (path : List Passage)
     (hpstem : p % 3 = 0)
     (hxbranch : x % 3 ≠ 0) (hqbranch : q % 3 ≠ 0)
-    (hpx : p / 3 = x / 3) (hpq : p / 3 = q / 3)
-    (hpathForeign : ∀ passage ∈ path,
-      passageSwitch passage ≠ q / 3)
+    (hpx : p / 3 = x / 3) (hpq : p / 3 = q / 3) (hxq : x ≠ q)
+    (hforeign : ∀ passage ∈ path, passageSwitch passage ≠ p / 3)
     (hlinked : LinkedPassages w ((p, x) :: path))
-    (hgrooved : PassagesGrooved u ((p, x) :: path))
     (hfinal : w.link (lastPassageExit x path) = some q)
-    (hmouth : w.link p = some outside) :
-    let u' := pin u q
-    stepN w (path.length + 2) (p, u) = some (outside, u') ∧
-      stepN w (path.length + 2) (p, u') = some (outside, u) := by
-  let u' := pin u q
-  have hpqStem : 3 * (q / 3) = p := by omega
-  have hpxStem : 3 * (x / 3) = p := by omega
-  have holdHead : arrive u x = (p, u) :=
-    hgrooved (p, x) (by simp)
-  have hualigned : u (x / 3) = bval x := by
-    unfold arrive at holdHead
-    rw [if_neg hxbranch] at holdHead
-    injection holdHead with _ hpin
-    have hpoint := congrFun hpin (x / 3)
-    simpa [pin] using hpoint.symm
-  have hrestore : pin u' x = u := by
-    unfold u'
-    exact pin_other_then_restore (hpx.symm.trans hpq) hualigned
-  have hforward := run_grooved_passages w u p x q path
-    hlinked hgrooved hfinal
-  have hqArrive : arrive u q = (p, u') := by
-    simp [arrive, hqbranch, hpqStem, u']
-  have hqStep : stepN w 1 (q, u) = some (outside, u') := by
-    simp [stepN, step, hqArrive, hmouth]
-  have hfirstLen : path.length + 2 =
-      ((p, x) :: path).length + 1 := by simp
-  have hfirst : stepN w (path.length + 2) (p, u) =
-      some (outside, u') := by
-    rw [hfirstLen, stepN_add, hforward]
-    simp only [Option.bind_some]
-    exact hqStep
-
-  have hqSelected : u' (p / 3) = bval q := by
-    unfold u' pin
-    rw [if_pos (by omega)]
-  have hqBranch : branchPort (p / 3) (u' (p / 3)) = q := by
-    rw [hqSelected]
-    have hrecover := branchPort_bval hqbranch
-    rw [hpq]
-    exact hrecover
-  have hpArrive : arrive u' p = (q, u') := by
-    simp [arrive, hpstem, hqBranch]
-  have hqBack : w.link q = some (lastPassageExit x path) :=
-    w.symm _ _ hfinal
-  have henterBack : stepN w 1 (p, u') =
-      some (lastPassageExit x path, u') := by
-    simp [stepN, step, hpArrive, hqBack]
-
-  have hpathGroovedU' : PassagesGrooved u' path := by
-    unfold u'
-    exact grooved_after_pin_other
-      (fun passage hp => hgrooved passage (List.mem_cons_of_mem _ hp))
-      hpathForeign
-
-  have hfinishBack :
-      stepN w (path.length + 1)
-        (lastPassageExit x path, u') = some (outside, u) := by
-    cases path with
-    | nil =>
-        have hxArrive : arrive u' x = (p, u) := by
-          simp [arrive, hxbranch, hpxStem, hrestore]
-        simp [stepN, step, lastPassageExit, hxArrive, hmouth]
-    | cons passage rest =>
-        rcases passage with ⟨r, y⟩
-        have hxr : w.link x = some r := hlinked.1
-        have hrx : w.link r = some x := w.symm _ _ hxr
-        have hpathLinked : LinkedPassages w ((r, y) :: rest) := hlinked.2
-        have hbackPath := retrace_linked_passages_option w u' r y rest
-          hpathLinked hpathGroovedU'
-        rw [hrx] at hbackPath
-        have hxArrive : arrive u' x = (p, u) := by
-          simp [arrive, hxbranch, hpxStem, hrestore]
-        have hxStep : stepN w 1 (x, u') = some (outside, u) := by
-          simp [stepN, step, hxArrive, hmouth]
-        have hbackPath' :
-            stepN w ((r, y) :: rest).length
-              (lastPassageExit x ((r, y) :: rest), u') = some (x, u') := by
-          simpa [lastPassageExit] using hbackPath
-        rw [stepN_add, hbackPath']
-        simp only [Option.bind_some]
-        exact hxStep
-  have hsecond : stepN w (path.length + 2) (p, u') =
-      some (outside, u) := by
-    have hlen : path.length + 2 = 1 + (path.length + 1) := by omega
-    rw [hlen, stepN_add, henterBack]
-    simp only [Option.bind_some]
-    exact hfinishBack
-  exact ⟨hfirst, hsecond⟩
+    (state : Tongues) (hgrooved : PassagesGrooved state path) :
+    ∃ route last, route.length = path.length + 1 ∧
+      PhysicalTrace w (p, state) route (last, state) ∧
+      PassagesGrooved state route ∧
+      arrive state last = (p, flipAt state (p / 3)) := by
+  let base := pin state x
+  have hselected : base (x / 3) = bval x := by simp [base, pin]
+  have hbaseHead : arrive base x = (p, base) := by
+    simp [arrive, hxbranch, pin_of_agrees hselected, show 3 * (x / 3) = p by omega]
+  have hbasePath := grooved_after_pin_other (q := x) hgrooved
+    (fun passage hp => by simpa [← hpx] using hforeign passage hp)
+  have hbaseGrooved : PassagesGrooved base ((p, x) :: path) := by
+    intro passage hp
+    rcases List.mem_cons.mp hp with rfl | hp
+    · exact hbaseHead
+    · exact hbasePath passage hp
+  have hforward := physicalTrace_grooved_passages w base p x q path
+    hlinked hbaseGrooved hfinal
+  have hflip : pin base q = flipAt base (p / 3) :=
+    pin_eq_flipAt hpq.symm (by
+      rw [hpx, hselected]
+      exact branch_values_opposite hxbranch hqbranch (hpx.symm.trans hpq) hxq)
+  have hcrossed : arrive base q = (p, flipAt base (p / 3)) := by
+    simp [arrive, hqbranch, hflip, show 3 * (q / 3) = p by omega]
+  have hrestore : arrive (flipAt base (p / 3)) x = (p, base) := by
+    rw [← hflip]
+    simp [arrive, hxbranch, pin_other_then_restore (hpx.symm.trans hpq) hselected,
+      show 3 * (x / 3) = p by omega]
+  have hback : arrive (flipAt base (p / 3)) p = (q, flipAt base (p / 3)) := by
+    simpa only [hcrossed] using arrive_back base q
+  have hpathFlip := grooved_after_flip_other hbasePath hforeign
+  have hreverse : PhysicalTrace w (p, flipAt base (p / 3))
+      ((p, q) :: reversePassages path) (x, flipAt base (p / 3)) := by
+    cases hforward with
+    | cons _ hlink tail =>
+        exact physicalTrace_contact_retraces_prefix tail hpathFlip hlink hback
+  have hreverseGrooved : PassagesGrooved (flipAt base (p / 3))
+      ((p, q) :: reversePassages path) := by
+    intro passage hp
+    rcases List.mem_cons.mp hp with rfl | hp
+    · exact groove_forward hback
+    · exact reversePassages_grooved hpathFlip passage hp
+  have hphases : state = base ∨ state = flipAt base (p / 3) :=
+    tongues_eq_or_eq_flipAt_of_changes_only (by
+      intro j hj
+      by_cases heq : j = x / 3
+      · omega
+      · exact (hj (by simp [base, pin, heq])).elim)
+  rcases hphases with heq | heq
+  · exact ⟨(p, x) :: path, q, by simp, by simpa only [heq] using hforward,
+      by simpa only [heq] using hbaseGrooved, by simpa only [heq] using hcrossed⟩
+  · exact ⟨(p, q) :: reversePassages path, x, by simp [reversePassages_length],
+      by simpa only [heq] using hreverse, by simpa only [heq] using hreverseGrooved,
+      by simpa only [heq, flipAt_flipAt] using hrestore⟩
 
 theorem stem_lobe_isReflector_foreign
     (w : Wiring) {p x q outside : Nat}
@@ -209,91 +154,13 @@ theorem stem_lobe_isReflector_foreign
     IsReflector w p outside (path.length + 2)
       (fun u => PassagesGrooved u path)
       (fun u => flipAt u (p / 3)) := by
-  have hxqsw : x / 3 = q / 3 := hpx.symm.trans hpq
-  have hopp : bval q = !(bval x) :=
-    branch_values_opposite hxbranch hqbranch hxqsw hxq
-  intro state hpathGrooved
-  let base := pin state x
-  have hbaseAligned : base (x / 3) = bval x := by
-    unfold base pin
-    rw [if_pos rfl]
-  have hbasePinX : pin base x = base :=
-    pin_of_agrees hbaseAligned
-  have hbaseHead : arrive base x = (p, base) := by
-    have hstem : 3 * (x / 3) = p := by omega
-    simp [arrive, hxbranch, hstem, hbasePinX]
-  have hbasePathGrooved : PassagesGrooved base path := by
-    unfold base
-    apply grooved_after_pin_other hpathGrooved
-    intro passage hp
-    have hne := hpathForeign passage hp
-    rw [← hpx]
-    exact hne
-  have hbaseGrooved : PassagesGrooved base ((p, x) :: path) := by
-    intro passage hp
-    rcases List.mem_cons.mp hp with hhead | htail
-    · simpa [hhead] using hbaseHead
-    · exact hbasePathGrooved passage htail
-  have hpairs := stem_lobe_two_state_reflector_foreign w path
-    hpstem hxbranch hqbranch hpx hpq
-    (by
-      intro passage hp hEq
-      exact hpathForeign passage hp (hEq.trans hpq.symm))
-    hlinked hbaseGrooved hfinal hmouth
-  dsimp only at hpairs
-  by_cases hsx : state (x / 3) = bval x
-  · have hbaseEq : base = state := by
-      unfold base
-      exact pin_of_agrees hsx
-    have hflipEq : pin base q = flipAt state (p / 3) := by
-      rw [hbaseEq]
-      apply pin_eq_flipAt
-      · exact hpq.symm
-      · have hsxp : state (p / 3) = bval x := by
-          rw [hpx]
-          exact hsx
-        rw [hsxp]
-        exact hopp
-    have hflipState : pin state q = flipAt state (p / 3) := by
-      exact (congrArg (fun z => pin z q) hbaseEq.symm).trans hflipEq
-    constructor
-    · have hstep := hpairs.1
-      rw [hbaseEq, hflipState] at hstep
-      exact hstep
-    · change PassagesGrooved (flipAt state (p / 3)) path
-      rw [← hflipState]
-      apply grooved_after_pin_other hpathGrooved
-      intro passage hp
-      have hne := hpathForeign passage hp
-      rw [← hpq]
-      exact hne
-  · have hsq : state (q / 3) = bval q := by
-      have hstateOpp : state (x / 3) = !(bval x) := by
-        cases hs : state (x / 3) <;> cases hb : bval x <;>
-          simp_all
-      rw [← hxqsw, hstateOpp]
-      exact hopp.symm
-    have hstateRestore : pin base q = state := by
-      unfold base
-      exact pin_other_then_restore hxqsw.symm hsq
-    have hbaseFlip : base = flipAt state (p / 3) := by
-      unfold base
-      apply pin_eq_flipAt
-      · exact hpx.symm
-      · have : bval x = !(state (p / 3)) := by
-          have hstateP : state (p / 3) = bval q := by
-            rw [hpq]
-            exact hsq
-          rw [hstateP]
-          cases hb : bval x <;> simp_all
-        exact this
-    constructor
-    · have hstep := hpairs.2
-      rw [hstateRestore, hbaseFlip] at hstep
-      exact hstep
-    · change PassagesGrooved (flipAt state (p / 3)) path
-      rw [← hbaseFlip]
-      exact hbasePathGrooved
+  intro state hg
+  obtain ⟨route, last, hlen, htrace, _, hcontact⟩ := stem_lobe_route w path
+    hpstem hxbranch hqbranch hpx hpq hxq hpathForeign hlinked hfinal state hg
+  refine ⟨?_, grooved_after_flip_other hg hpathForeign⟩
+  have hr := (htrace.append
+    (PhysicalTrace.cons hcontact hmouth (PhysicalTrace.nil _))).sound
+  simpa [List.length_append, hlen] using hr
 
 /-- The switch-simple form of `stem_lobe_isReflector_foreign`. -/
 theorem stem_lobe_isReflector
@@ -546,39 +413,5 @@ theorem crossed_revisit_full_reflector
       rw [hlen] at hsandwich
       simpa only [hstart] using hsandwich
 
-
-/-- Two opposite-facing exact reflectors with commuting involutive state maps
-have a genuine four-corner (at most) Gray orbit. -/
-theorem paired_reflectors_period
-    (w : Wiring) {gA gB kA kB : Nat}
-    {SA SB : Tongues → Prop} {τA τB : Tongues → Tongues}
-    (hA : IsReflector w gA gB kA SA τA)
-    (hB : IsReflector w gB gA kB SB τB)
-    (hA_pres_B : ∀ u, SB u → SB (τA u))
-    (hB_pres_A : ∀ u, SA u → SA (τB u))
-    (hcomm : ∀ u, τA (τB u) = τB (τA u))
-    (hinvA : ∀ u, τA (τA u) = u)
-    (hinvB : ∀ u, τB (τB u) = u)
-    (u : Tongues) (hSA : SA u) (hSB : SB u) :
-    stepN w (2 * (kA + kB)) (gA, u) = some (gA, u) := by
-  obtain ⟨hAu, hSA1⟩ := hA u hSA
-  have hSB1 : SB (τA u) := hA_pres_B u hSB
-  obtain ⟨hBu, hSB2⟩ := hB (τA u) hSB1
-  have hSA2 : SA (τB (τA u)) :=
-    hB_pres_A (τA u) hSA1
-  obtain ⟨hAu2, hSA3⟩ := hA (τB (τA u)) hSA2
-  have hSB3 : SB (τA (τB (τA u))) :=
-    hA_pres_B (τB (τA u)) hSB2
-  obtain ⟨hBu2, _⟩ := hB (τA (τB (τA u))) hSB3
-  have hrestore : τB (τA (τB (τA u))) = u := by
-    rw [hcomm (τA u), hinvA, hinvB]
-  have hhalf : kA + kB + (kA + kB) = 2 * (kA + kB) := by omega
-  rw [← hhalf, stepN_add, stepN_add, hAu]
-  simp only [Option.bind_some]
-  rw [hBu]
-  simp only [Option.bind_some]
-  rw [stepN_add, hAu2]
-  simp only [Option.bind_some]
-  rw [hBu2, hrestore]
 
 end GeneralN

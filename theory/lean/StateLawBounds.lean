@@ -3,8 +3,8 @@ import TrackNoveltyCover
 /-!
 # State-count targets independent of the upper-bound proof
 
-Keep these statements below both the current proof and the retained
-shifted-start proof, so stating the theorem does not import that old proof.
+The reusable upper-bound statement depends only on the raw model and vector
+counting interface.
 -/
 
 namespace GeneralN
@@ -22,16 +22,5 @@ def StateLawNAddFour : Prop :=
         (tonguesAt w start k))).Nodup ->
       times.length <= N + 4
 
-
-/-- The exact `N+4` hypothesis for a run whose incoming edge is known. -/
-def KnownIncomingEdgeNAddFour (w : Wiring) (N : Nat) : Prop :=
-  forall {e : Nat} {localStart : Nat × Tongues},
-    w.link e = some localStart.1 ->
-    forall localTimes : List Nat,
-      (forall k, k ∈ localTimes ->
-        (stepN w k localStart).isSome) ->
-      (localTimes.map
-        (restrictedTonguesAt w N localStart)).Nodup ->
-      localTimes.length <= N + 4
 
 end GeneralN

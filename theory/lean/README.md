@@ -350,6 +350,43 @@ is an endpoint vector. If a productive writer instead agreed at the endpoints,
 its two adjacent values would both equal that common value, a contradiction.
 Neither consequence needs a new analysis of the physical trace.
 
+## One lobe route supplies endpoint and pointwise laws
+
+`stem_lobe_route` records a grooved outward route and its final mouth arrival.
+Pinning the mouth to the recorded entry arm gives a reference state; any
+current grooved state is that state or its mouth flip. The recorded route and
+its reverse cover these two possibilities. Both `stem_lobe_isReflector_foreign`
+and `explicit_lobe_two_phase_at` now consume this same spatial certificate,
+removing the separate two-state endpoint and reverse-travel derivations.
+
+The common replay, reverse-trace, and prefix lemmas now live in `TrackTrace`,
+where both consumers can use them. Grooved replay and prefix coverage are
+instances of `PhysicalTrace.replay_preserving`. `reversePassages` uses list
+reversal followed by endpoint swapping, so its algebra and source-membership
+facts follow directly from the standard list operations.
+
+## Settled cycles and fresh samples need less bookkeeping
+
+The cycle alternative of `first_revisit_fork` now returns exactly the fact
+needed downstream: every positive-time configuration has the settled tongue
+vector. Its proof still constructs the grooved loop, then uses first-arrival
+synchronization. Consumers no longer carry transient/stable cycle traces,
+cycle simplicity, or a separate finite-window phase law. A prefix of length
+at most `N` followed by that one vector gives the `N+2` count directly.
+
+For a direct tail, filter the sampled times once to keep only vectors outside
+the complete prefix history. All those samples lie strictly after the boundary.
+Shift them to tail time and adjoin time zero: its historical vector is distinct
+from every fresh sample, so the tail cap bounds their number by `cap - 1`.
+There is no separate late-time list and second boundary-only filter.
+
+First-repeat detection grows a duplicate-free prefix until the next key is
+already present. This removes the two repeated extraction arguments in the
+former tail-first induction. Compatible reflector pairs now obtain liveness
+and their phase cover together from `SupportedReflector.pair_all_time_four_phase`;
+the explicit period construction and its two iteration helpers are removed.
+The final action-corner proof handles compatibility once before its contact cases.
+
 ## Dependency and source reductions
 
 The transitive local-source closure of `StateLaw` includes the theorem's
@@ -368,6 +405,9 @@ comments and blanks, not just proof tactics.
 | After spatial-loop and action-orbit invariants | 52 | 17,733 |
 | After shared lobe contracts and first-contact excursions | 52 | 16,973 |
 | After grooved-return and first-arrival synchronization | 52 | 16,058 |
+| Reviewed `main` (`97cc084`) | 46 | 14,525 |
+| Concurrent proof consolidation (`2580b9f`) | 46 | 14,304 |
+| After shared lobe routes, settled-cycle contracts, and fresh-sample counting | 46 | 13,277 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -439,3 +479,11 @@ removes **915 retained Lean source lines**, from 16,992 to **16,077** in
 The protected theorem, model, ceiling, attainment and axiom-audit files are
 byte-for-byte unchanged. All 418 explicitly declared public source theorems
 remain in the headline theorem's kernel dependency closure.
+
+The shared-route and counting pass on 7 September 2026 removes **1,027 Lean
+source lines**, from **14,323 to 13,296** in 47 files (including the unchanged
+19-line audit), a **7.2%** reduction. These counts include every new helper,
+comment, and blank line. `StateLaw.lean`, `GeneralN.lean`, `VectorCount.lean`,
+`StateLawSmallN.lean`, `StateLawLowerBound.lean`, `WiringCompletion.lean`, and
+`StateLawAxiomAudit.lean` are byte-for-byte unchanged from the reviewed commit.
+A clean `lake build` checks all 95 jobs, including the exact axiom audit.
