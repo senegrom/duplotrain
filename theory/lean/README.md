@@ -428,6 +428,7 @@ comments and blanks, not just proof tactics.
 | Concurrent proof consolidation (`2580b9f`) | 46 | 14,304 |
 | After shared lobe routes, settled-cycle contracts, and fresh-sample counting | 46 | 13,277 |
 | After shared trace cuts, reflector transport, and minimal contact interfaces | 46 | 12,279 |
+| After shared protected prefixes, historical covers, and theta composition | 45 | 11,655 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -515,3 +516,19 @@ protected theorem/model/ceiling/attainment/audit files remain byte-for-byte
 unchanged. A clean build checks all 95 jobs and the exact axiom audit; all
 359 explicitly declared public source theorems remain in the headline
 proof's kernel dependency closure.
+
+The protected-prefix and historical-cover pass removes **624 Lean source
+lines**, from **12,298 to 11,674**, a **5.1%** reduction. There are now
+**46 files**, including the unchanged 19-line audit. The count includes every
+helper proof, comment, and blank line.
+
+A repaired trace can be replayed directly, eliminating the separate route
+orientation proof. The same protected-prefix relation now handles intermediate
+and completed repairs, making `CompleteRepairFour.lean` unnecessary. A shared
+historical-prefix lemma replaces repeated sample shifting and counting, while
+trace composition handles the remaining one-sided theta case.
+
+All seven protected theorem/model/ceiling/attainment/completion/audit files remain
+byte-for-byte unchanged. A clean `lake build` checks all **93 jobs** without
+warnings; the exact axiom audit passes, and all **357** public source theorems
+remain in the headline theorem's kernel dependency closure.

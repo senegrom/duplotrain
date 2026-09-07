@@ -28,26 +28,13 @@ theorem passages_preserve_flip_pair
         (next = base ∨ next = flipAt base j) := by
   intro passage hp phase hphase
   have hforward := groove_forward (hgrooved passage hp)
-  by_cases hj : passageSwitch passage = j
-  · have hbranch := hnoFacing passage hp hj
-    have hexit : passage.2 = 3 * (passage.1 / 3) := by
-      simpa only [arrive, if_neg hbranch] using (congrArg Prod.fst hforward).symm
-    refine ⟨pin phase passage.1, by simp [arrive, hbranch, hexit], ?_⟩
-    apply tongues_eq_or_eq_flipAt_of_changes_only
-    intro k hchanged
-    by_cases hkj : k = j
-    · exact hkj
-    apply False.elim
-    have hsame : phase k = base k := by
-      rcases hphase with rfl | rfl
-      · rfl
-      · simp [flipAt, hkj]
-    exact hchanged (by simpa [pin, show passage.1 / 3 = j from hj, hkj] using hsame.symm)
-  · rcases hphase with heq | heq
-    · subst phase
-      exact ⟨base, hforward, Or.inl rfl⟩
-    · subst phase
-      exact ⟨flipAt base j, arrive_flip_other hforward hj, Or.inr rfl⟩
+  rcases hphase with heq | heq <;> subst phase
+  · exact ⟨base, hforward, Or.inl rfl⟩
+  · by_cases hj : passageSwitch passage = j
+    · rw [← hj]
+      exact ⟨base, flipped_passage_forward_trailing hforward (hnoFacing passage hp hj),
+        Or.inl rfl⟩
+    · exact ⟨flipAt base j, arrive_flip_other hforward hj, Or.inr rfl⟩
 
 /-- A strict candy splice repeats a spatial route with only the old action
 coordinate free. That coordinate is never entered facing, so its value cannot

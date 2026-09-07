@@ -598,6 +598,27 @@ theorem ManufacturedFlipReflector.oriented_finish_arrive
     simp [ManufacturedReflector.orientedFinish, hselected, arrive, R.firstArm_branch,
       hstem₁, hpin]
 
+/-- The state before the final return is the action-applied activated state. -/
+theorem ManufacturedReflector.preReturn_eq_action_activated
+    {w : Wiring} {g e : Nat} (B : ManufacturedReflector w g e) :
+    B.preReturn.2 = B.toSupported.action.apply B.activatedState := by
+  cases B with
+  | stay R => rfl
+  | flip R =>
+      change R.returnState = flipAt R.afterReturn R.actionSwitch
+      have hs : SwitchSimple ((R.mouth, R.firstArm) :: R.candy) := by
+        have := R.simple
+        grind [SwitchSimple]
+      have hfirst := R.candyTrace.grooved_of_switchSimple hs
+        (R.mouth, R.firstArm) List.mem_cons_self
+      have hselected : R.returnState R.actionSwitch = bval R.firstArm := by
+        have hbit := congrArg (fun r => r.2 R.actionSwitch) hfirst
+        simpa [arrive, R.firstArm_branch, pin, R.firstArm_switch] using hbit.symm
+      have hafter := R.oriented_finish_arrive R.returnState
+      simp only [ManufacturedReflector.orientedFinish, hselected, if_pos] at hafter
+      have hcross := (Prod.mk.inj (R.crossed.symm.trans hafter)).2
+      rw [hcross, flipAt_flipAt]
+
 theorem ManufacturedReflector.orientedRoute_trace
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e) (state : Tongues)
@@ -606,18 +627,8 @@ theorem ManufacturedReflector.orientedRoute_trace
       (A.orientedFinish state, state) := by
   cases A with
   | stay R =>
-      change PathGrooves
-        [R.runway, [(R.mouth, R.arm)]] state at hpaths
       have hp := pathGrooves_pair.mp hpaths
-      have hrun := R.runway_trace state hp.1
-      have hcoreBack := passagesGrooved_singleton.mp hp.2
-      have hcoreForward := groove_forward hcoreBack
-      have hcore : PhysicalTrace w (R.mouth, state)
-          [(R.mouth, R.arm)] (R.arm, state) :=
-        PhysicalTrace.cons hcoreForward R.selfLink
-          (PhysicalTrace.nil _)
-      simpa [ManufacturedReflector.orientedRoute,
-        ManufacturedReflector.orientedFinish] using hrun.append hcore
+      exact (R.runway_trace state hp.1).append (R.coreTrace.replay_grooved state hp.2)
   | flip R =>
       change PathGrooves [R.runway, R.candy] state at hpaths
       have hp := pathGrooves_pair.mp hpaths
@@ -666,36 +677,20 @@ theorem ManufacturedReflector.support_passage_on_orientedRoute
   cases A with
   | stay R =>
       change path ∈ [R.runway, [(R.mouth, R.arm)]] at hpath
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hpath
-      rcases hpath with rfl | rfl
-      · exact ⟨old,
-          (by
-            simp only [ManufacturedReflector.orientedRoute]
-            exact List.mem_append_left _ hold), Or.inl rfl⟩
-      · simp only [List.mem_singleton] at hold
-        subst old
-        exact ⟨(R.mouth, R.arm), by
-          simp [ManufacturedReflector.orientedRoute], Or.inl rfl⟩
+      refine ⟨old, ?_, Or.inl rfl⟩
+      change old ∈ R.runway ++ [(R.mouth, R.arm)]
+      grind
   | flip R =>
       change path ∈ [R.runway, R.candy] at hpath
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hpath
-      rcases hpath with rfl | rfl
-      · exact ⟨old,
-          (by
-            simp only [ManufacturedReflector.orientedRoute]
-            split <;> exact List.mem_append_left _ hold), Or.inl rfl⟩
-      · by_cases hselected :
-            state R.actionSwitch = bval R.firstArm
-        · exact ⟨old, by
-            simp only [ManufacturedReflector.orientedRoute, hselected,
-              if_pos]
-            exact List.mem_append_right _
-              (List.mem_cons_of_mem _ hold), Or.inl rfl⟩
-        · exact ⟨(old.2, old.1), by
-            simp only [ManufacturedReflector.orientedRoute, hselected]
-            exact List.mem_append_right _
-              (List.mem_cons_of_mem _ (reversePassage_mem hold)),
-            Or.inr rfl⟩
+      by_cases hselected : state R.actionSwitch = bval R.firstArm
+      · refine ⟨old, ?_, Or.inl rfl⟩
+        simp only [ManufacturedReflector.orientedRoute, hselected, if_pos]
+        grind
+      · by_cases hr : old ∈ R.runway
+        · exact ⟨old, by simp [ManufacturedReflector.orientedRoute, hselected, hr], Or.inl rfl⟩
+        · have hc : old ∈ R.candy := by grind
+          exact ⟨(old.2, old.1), by
+            simp [ManufacturedReflector.orientedRoute, hselected, reversePassage_mem hc], Or.inr rfl⟩
 
 /-- Orientation-normalized contact dichotomy.  At the instant a fresh
 passage changes an old support switch, compare it with the passage on the

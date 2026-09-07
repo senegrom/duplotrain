@@ -31,6 +31,24 @@ theorem restrictedTonguesAt_sub_of_reach
   rw [← ht] at htransport
   exact htransport
 
+/-- A historical prefix adds no cost to a novelty cover of its shifted tail. -/
+theorem NoveltyCoverOn.prepend
+    {w : Wiring} {N K budget : Nat} {start middle : Nat × Tongues}
+    {times localTimes : List Nat} {history : List (List Bool)}
+    (hlocal : NoveltyCoverOn w N middle localTimes history budget)
+    (hreach : stepN w K start = some middle)
+    (hprefix : ∀ k, k ≤ K → restrictedTonguesAt w N start k ∈ history)
+    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
+    (hmem : ∀ k ∈ times, K < k → k - K ∈ localTimes) :
+    NoveltyCoverOn w N start times history budget := by
+  obtain ⟨fresh, hfresh, hcover⟩ := hlocal
+  refine ⟨fresh, hfresh, ?_⟩
+  intro k hk
+  by_cases hle : k ≤ K
+  · exact List.mem_append_left _ (hprefix k hle)
+  · rw [restrictedTonguesAt_sub_of_reach hreach (by omega) (hlive k hk)]
+    exact hcover _ (hmem k hk (by omega))
+
 /-- Raw writer names are invariant under shifting to a reached local run. -/
 theorem rawWriterAt_add_of_reach
     {w : Wiring} {shift d : Nat}

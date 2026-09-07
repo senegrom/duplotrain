@@ -5,7 +5,6 @@ defaultTargets = [
   "StateLawBounds",
   "BoundaryOverlapTailCount",
   "ChangedContactNAddFour",
-  "CompleteRepairFour",
   "EarlyFacingConstant",
   "FacingForwardNovelty",
   "FirstCycleCountSharp",
@@ -54,9 +53,6 @@ name = "BoundaryOverlapTailCount"
 
 [[lean_lib]]
 name = "ChangedContactNAddFour"
-
-[[lean_lib]]
-name = "CompleteRepairFour"
 
 [[lean_lib]]
 name = "EarlyFacingConstant"

@@ -89,20 +89,11 @@ theorem first_revisit_fork
     unfold SwitchSimple at hsimple ⊢
     simp only [List.map_append] at hsimple
     exact (List.nodup_append.mp hsimple).2.1
-  have holdStem :
-      p = 3 * passageSwitch (p, x) \/
-        x = 3 * passageSwitch (p, x) :=
-    hexcursion.passage_stem_endpoint (p, x) List.mem_cons_self
-  have hrepeatStem :
-      q = 3 * passageSwitch (q, y) \/
-        y = 3 * passageSwitch (q, y) := by
-    have hs := arrive_stem_endpoint u q
-    rw [hrepeat] at hs
-    exact hs
-  have hsw' : passageSwitch (p, x) = passageSwitch (q, y) := by
-    simpa [passageSwitch] using hsw
-  have hshare : p = q \/ p = y \/ x = q \/ x = y :=
-    recorded_passages_share_port holdStem hrepeatStem hsw'
+  have hgrooved := hexcursion.grooved_of_switchSimple hsimpleExcursion
+  have hhead := groove_forward (hgrooved (p, x) List.mem_cons_self)
+  have hshare : p = q ∨ p = y ∨ x = q ∨ x = y := by
+    have hs := same_switch_passages_share_port u u p q hsw
+    simpa [hhead, hrepeat] using hs
   have hsupport := crossed_revisit_support_grooved
     hrunway hexcursion hsimple hsw hrepeat
   have hpreserves :
@@ -114,12 +105,9 @@ theorem first_revisit_fork
       apply hforeign
       exact List.mem_map.mpr ⟨passage, hp, hEq⟩)
     have hjq : j ≠ q / 3 := by
-      intro hEq
+      intro heq
       apply hforeign
-      apply List.mem_map.mpr
-      refine ⟨(p, x), List.mem_append_right runway List.mem_cons_self, ?_⟩
-      simp only [passageSwitch]
-      omega
+      exact List.mem_map.mpr ⟨(p, x), by simp, by simp [passageSwitch, hsw, heq]⟩
     exact (arrive_preserves_other hrepeat hjq).trans hu
   by_cases hxq : x = q
   · subst q
@@ -161,13 +149,9 @@ theorem first_revisit_fork
     · simpa [ManufacturedReflector.exploration] using hpreserves
   rcases hshare with hpq | hpy | hxq' | hxy
   · subst q
-    left
-    have hgrooved :=
-      hexcursion.grooved_of_switchSimple hsimpleExcursion
-    have hstable : PhysicalTrace w (p, u) ((p, x) :: path) (p, u) :=
-      physicalTrace_grooved_passages w u p x p path
-        hexcursion.linked hgrooved hexcursion.last_link
-    exact ⟨u, fun d _ => hstable.grooved_loop_all_time (by simp) hgrooved d⟩
+    have hyx : y = x := congrArg Prod.fst (hrepeat.symm.trans hhead)
+    subst y
+    exact Or.inl ⟨v, hexcursion.simple_same_exit_cycle_all_time hsimpleExcursion hrepeat⟩
   · subst y
     let A : ManufacturedFlipReflector w start.1 e := {
       base := start.2

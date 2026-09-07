@@ -520,15 +520,6 @@ theorem PhysicalTrace.passage_stem_endpoint {w : Wiring}
         exact hs
       · exact ih passage htail
 
-/-- Two valid recorded passages through the same switch share one endpoint. -/
-theorem recorded_passages_share_port {a b : Passage}
-    (ha : a.1 = 3 * passageSwitch a ∨
-      a.2 = 3 * passageSwitch a)
-    (hb : b.1 = 3 * passageSwitch b ∨
-      b.2 = 3 * passageSwitch b)
-    (hsw : passageSwitch a = passageSwitch b) :
-    a.1 = b.1 ∨ a.1 = b.2 ∨ a.2 = b.1 ∨ a.2 = b.2 := by grind
-
 theorem nodup_subset_length_nat {α : Type} [BEq α] [LawfulBEq α]
     {xs pool : List α}
     (hnd : xs.Nodup) (hsub : ∀ x ∈ xs, x ∈ pool) :

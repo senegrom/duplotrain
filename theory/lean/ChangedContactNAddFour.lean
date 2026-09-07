@@ -107,55 +107,6 @@ def PartialSecondRunSharp.ChangedContact.approachFirstWriterSwitches
       C.approach.length).map
     (rawWriterAt w (e, A.activatedState))
 
-/-- Lift a local novelty cover after the manufacturing journey to a count for
-the complete run.  The only global cost is the compressed lead plus the local
-novelty budget. -/
-theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_compressedLead_add_budget
-    {w : Wiring} {N g e budget : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : SimpleContinuationChangedContact w A)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    (times : List Nat)
-    (hlive : forall k, k ∈ times ->
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup)
-    (hlocal : NoveltyCoverOn w N (e, A.activatedState)
-      (times.map (fun k => k -
-        (A.exploration.length + A.runway.length + 1)))
-      (C.compressedLead N) budget) :
-    times.length <= (C.compressedLead N).length + budget := by
-  let firstTravel := A.exploration.length + A.runway.length + 1
-  let localTimes := times.map (fun k => k - firstTravel)
-  have hreach : stepN w firstTravel (g, A.baseState) =
-      some (e, A.activatedState) := by
-    simpa [firstTravel] using
-      A.manufacturing_journey_reaches_activated hA
-  have hlocal' : NoveltyCoverOn w N (e, A.activatedState)
-      localTimes (C.compressedLead N) budget := by
-    simpa [localTimes, firstTravel] using hlocal
-  obtain ⟨fresh, hfresh, hmem⟩ := hlocal'
-  have hcover : NoveltyCoverOn w N (g, A.baseState)
-      times (C.compressedLead N) budget := by
-    refine ⟨fresh, hfresh, ?_⟩
-    intro k hk
-    by_cases hfirst : k <= firstTravel
-    · unfold PartialSecondRunSharp.ChangedContact.compressedLead
-      apply List.mem_append_left
-      apply List.mem_append_left
-      apply A.mem_sharpHistoryCore_of_mem
-      exact A.manufacturing_journey_mem_sharpHistory hA (by
-        simpa [firstTravel] using hfirst)
-    · let d := k - firstTravel
-      have hdMem : d ∈ localTimes := by
-        dsimp [d, localTimes]
-        exact List.mem_map.mpr ⟨k, hk, rfl⟩
-      have hm := hmem d hdMem
-      have hshift := restrictedTonguesAt_sub_of_reach
-        (N := N) hreach (by omega) (hlive k hk)
-      rw [hshift]
-      exact hm
-  exact noveltyCoverOn_distinct_count hcover hnd
 
 section
 variable {w : Wiring} {N g e : Nat}

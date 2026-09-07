@@ -31,26 +31,12 @@ theorem exists_first_satisfying_split
         (∀ y ∈ before, ¬ P y) ∧ P x := by
   intro xs hexists
   induction xs with
-  | nil =>
-      obtain ⟨x, hx, _⟩ := hexists
-      cases hx
+  | nil => simp at hexists
   | cons head tail ih =>
-      by_cases hhead : P head
-      · exact ⟨[], head, tail, rfl,
-          (by intro y hy; cases hy), hhead⟩
-      · have htail : ∃ x ∈ tail, P x := by
-          obtain ⟨x, hx, hPx⟩ := hexists
-          rcases List.mem_cons.mp hx with rfl | hx
-          · exact absurd hPx hhead
-          · exact ⟨x, hx, hPx⟩
-        obtain ⟨before, x, after, hsplit, hbefore, hx⟩ := ih htail
-        refine ⟨head :: before, x, after, ?_, ?_, hx⟩
-        · rw [hsplit]
-          simp
-        · intro y hy
-          rcases List.mem_cons.mp hy with rfl | hy
-          · exact hhead
-          · exact hbefore y hy
+      by_cases hp : P head
+      · exact ⟨[], head, tail, rfl, by simp, hp⟩
+      · obtain ⟨before, x, after, hs, hb, hx⟩ := ih (by simpa [hp] using hexists)
+        exact ⟨head :: before, x, after, by simp [hs], by simpa [hp] using hb, hx⟩
 
 /-- A split at an element absent from the prefix must occur in the suffix.
 This list fact needs no uniqueness or switch-count argument. -/
@@ -134,11 +120,6 @@ theorem PhysicalTrace.repair_preserving_paths_until_conflict
       simp only [List.map_cons] at hsimple
       rw [List.nodup_cons] at hsimple
       have htailSimple : SwitchSimple rest := hsimple.2
-      have htailForeign : ∀ passage ∈ rest,
-          passageSwitch passage ≠ p / 3 := by
-        intro passage hp hEq
-        apply hsimple.1
-        exact List.mem_map.mpr ⟨passage, hp, hEq⟩
       have hbaseSame : nextBase = base := congrArg Prod.snd
         (harriveBase.symm.trans (groove_forward (hbase (p, x) List.mem_cons_self)))
       have htailBase : PassagesGrooved nextBase rest := by
@@ -163,10 +144,7 @@ theorem PhysicalTrace.repair_preserving_paths_until_conflict
               passageSwitch old = p / 3 →
                 next (p / 3) = state (p / 3) := by
             intro path hpath old hold hswitch
-            apply Classical.byContradiction
-            intro hchanged
-            exact hcontact ⟨path, hpath, old, hold,
-              hswitch, hchanged⟩
+            grind
           have hprotectedNext : PathGrooves guardPaths next :=
             pathGrooves_after_arrive_without_support_change
               harriveX hprotected hquiet
@@ -231,35 +209,14 @@ theorem physicalTrace_endpoints_eq_before_avoided_switch
       passageSwitch passage ≠ k) :
     finishA = finishB := by
   rcases physicalTrace_prefix_comparable_with_endpoints hleft hright with
-      ⟨suffix, hrightEq, htail⟩ | ⟨suffix, hleftEq, htail⟩
-  · cases suffix with
-    | nil =>
-        cases htail
-        rfl
+      ⟨suffix, heq, htail⟩ | ⟨suffix, heq, htail⟩
+  all_goals
+    cases suffix with
+    | nil => cases htail; rfl
     | cons passage rest =>
-        have hstart := htail.head_arrive.1
-        have hpassageMem : passage ∈ right := by
-          rw [hrightEq]
-          exact List.mem_append_right left List.mem_cons_self
-        exfalso
-        apply (hrightForeign passage hpassageMem).elim
-        rcases passage with ⟨p, x⟩
-        simp only at hstart
-        simp [passageSwitch, ← hstart, hfinishA]
-  · cases suffix with
-    | nil =>
-        cases htail
-        rfl
-    | cons passage rest =>
-        have hstart := htail.head_arrive.1
-        have hpassageMem : passage ∈ left := by
-          rw [hleftEq]
-          exact List.mem_append_right right List.mem_cons_self
-        exfalso
-        apply (hleftForeign passage hpassageMem).elim
-        rcases passage with ⟨p, x⟩
-        simp only at hstart
-        simp [passageSwitch, ← hstart, hfinishB]
+        have := htail.head_arrive.1
+        have hm : passage ∈ left ∨ passage ∈ right := by simp [heq]
+        grind [passageSwitch]
 
 theorem source_of_mem_reversePassages
     {passage : Passage} {passages : List Passage}
@@ -274,42 +231,11 @@ theorem ManufacturedReflector.support_grooves_of_orientedRoute
     (selector state : Tongues)
     (hroute : PassagesGrooved state (A.orientedRoute selector)) :
     PathGrooves A.toSupported.paths state := by
-  cases A with
-  | stay R =>
-      change PassagesGrooved state
-        (R.runway ++ [(R.mouth, R.arm)]) at hroute
-      change PathGrooves [R.runway, [(R.mouth, R.arm)]] state
-      apply pathGrooves_pair.mpr
-      constructor
-      · intro passage hp
-        exact hroute passage (List.mem_append_left _ hp)
-      · intro passage hp
-        exact hroute passage (List.mem_append_right _ hp)
-  | flip R =>
-      change PathGrooves [R.runway, R.candy] state
-      apply pathGrooves_pair.mpr
-      by_cases hselected :
-          selector R.actionSwitch = bval R.firstArm
-      · simp only [ManufacturedReflector.orientedRoute, hselected,
-          if_pos] at hroute
-        constructor
-        · intro passage hp
-          exact hroute passage (List.mem_append_left _ hp)
-        · intro passage hp
-          exact hroute passage
-            (List.mem_append_right _ (List.mem_cons_of_mem _ hp))
-      · simp only [ManufacturedReflector.orientedRoute, hselected,
-          if_false] at hroute
-        constructor
-        · intro passage hp
-          exact hroute passage (List.mem_append_left _ hp)
-        · intro passage hp
-          have hreverse :
-              arrive state passage.1 = (passage.2, state) := by
-            exact hroute (passage.2, passage.1)
-              (List.mem_append_right _
-                (List.mem_cons_of_mem _ (reversePassage_mem hp)))
-          exact groove_forward hreverse
+  intro path hp old ho
+  obtain ⟨oriented, hm, horient⟩ := A.support_passage_on_orientedRoute selector hp ho
+  rcases horient with rfl | rfl
+  · exact hroute _ hm
+  · exact groove_forward (hroute (old.2, old.1) hm)
 
 /-- Align only the reflector's private action tongue with an arbitrary current
 state.  Its reusable support avoids that tongue, so the aligned reference
@@ -326,78 +252,29 @@ theorem ManufacturedReflector.current_route_reference
       A.orientedFinish reference = A.orientedFinish state ∧
       PassagesGrooved reference (A.orientedRoute state) ∧
       (∀ j, reference j ≠ base j → reference j = state j) := by
+  suffices ∃ reference, PathGrooves A.toSupported.paths reference ∧
+      A.orientedRoute reference = A.orientedRoute state ∧
+      A.orientedFinish reference = A.orientedFinish state ∧
+      (∀ j, reference j ≠ base j → reference j = state j) by
+    obtain ⟨reference, hp, hr, hf, hg⟩ := this
+    refine ⟨reference, hp, hr, hf, ?_, hg⟩
+    rw [← hr]
+    exact (A.orientedRoute_trace reference hp).grooved_of_switchSimple
+      (A.orientedRoute_simple reference)
   cases A with
-  | stay R =>
-      have htrace :=
-        (ManufacturedReflector.stay R).orientedRoute_trace base hpaths
-      have hgrooved := htrace.grooved_of_switchSimple
-        ((ManufacturedReflector.stay R).orientedRoute_simple base)
-      exact ⟨base, hpaths, rfl, rfl, hgrooved,
-        (by intro j hj; exact (hj rfl).elim)⟩
+  | stay R => exact ⟨base, hpaths, rfl, rfl, fun _ hj => (hj rfl).elim⟩
   | flip R =>
-      by_cases hsame :
-          state R.actionSwitch = base R.actionSwitch
-      · have hroute :
-            (ManufacturedReflector.flip R).orientedRoute base =
-              (ManufacturedReflector.flip R).orientedRoute state := by
-          simp only [ManufacturedReflector.orientedRoute]
-          rw [hsame]
-        have hfinish :
-            (ManufacturedReflector.flip R).orientedFinish base =
-              (ManufacturedReflector.flip R).orientedFinish state := by
-          simp only [ManufacturedReflector.orientedFinish]
-          rw [hsame]
-        have htrace :=
-          (ManufacturedReflector.flip R).orientedRoute_trace base hpaths
-        have hgrooved := htrace.grooved_of_switchSimple
-          ((ManufacturedReflector.flip R).orientedRoute_simple base)
-        rw [hroute] at hgrooved
-        exact ⟨base, hpaths, hroute, hfinish, hgrooved,
-          (by intro j hj; exact (hj rfl).elim)⟩
-      · let reference := flipAt base R.actionSwitch
-        have hrefAction :
-            reference R.actionSwitch = state R.actionSwitch := by
-          dsimp [reference]
-          simp only [flipAt, if_pos]
-          cases hb : base R.actionSwitch <;>
-            cases hs : state R.actionSwitch <;> simp_all
-        have hreferencePaths :
-            PathGrooves
-              (ManufacturedReflector.flip R).toSupported.paths
-              reference := by
-          change PathGrooves [R.runway, R.candy]
-            (flipAt base R.actionSwitch)
-          change PathGrooves [R.runway, R.candy] base at hpaths
-          have havoid : (LocalAction.flip R.actionSwitch).Avoids
-              [R.runway, R.candy] := R.support_foreign
-          exact hpaths.after_avoiding_action havoid
-        have hroute :
-            (ManufacturedReflector.flip R).orientedRoute reference =
-              (ManufacturedReflector.flip R).orientedRoute state := by
-          simp only [ManufacturedReflector.orientedRoute]
-          rw [hrefAction]
-        have hfinish :
-            (ManufacturedReflector.flip R).orientedFinish reference =
-              (ManufacturedReflector.flip R).orientedFinish state := by
-          simp only [ManufacturedReflector.orientedFinish]
-          rw [hrefAction]
-        have htrace :=
-          (ManufacturedReflector.flip R).orientedRoute_trace
-            reference hreferencePaths
-        have hgrooved := htrace.grooved_of_switchSimple
-          ((ManufacturedReflector.flip R).orientedRoute_simple reference)
-        rw [hroute] at hgrooved
-        have hguard : ∀ j, reference j ≠ base j →
-            reference j = state j := by
-          intro j hj
-          by_cases hja : j = R.actionSwitch
-          · subst j
-            exact hrefAction
-          · have heq : reference j = base j := by
-              simp [reference, flipAt, hja]
-            exact (hj heq).elim
-        exact ⟨reference, hreferencePaths,
-          hroute, hfinish, hgrooved, hguard⟩
+      let reference : Tongues := fun j => if j = R.actionSwitch then state j else base j
+      refine ⟨reference, ?_, ?_, ?_, ?_⟩
+      · intro path hp
+        apply (hpaths path hp).transfer
+        intro passage hm
+        have hne := R.support_foreign path hp passage hm
+        simp [reference, hne]
+      · simp [ManufacturedReflector.orientedRoute, reference]
+      · simp [ManufacturedReflector.orientedFinish, reference]
+      · intro j hj
+        by_cases heq : j = R.actionSwitch <;> simp_all [reference]
 
 /-- Replay the route currently selected by a damaged reflector while keeping
 an arbitrary second groove family intact.  This is the reflector-level form
@@ -450,18 +327,10 @@ theorem ManufacturedReflector.repair_current_route_preserving_until_conflict
   · obtain ⟨before, p, x, after, contact, other,
         hsplit, hprefix, hguardContact, hstem,
         harrive, hother⟩ := hfacing
-    have hsimple' := hsimple
-    rw [hsplit] at hsimple'
     have hprefixForeign : ∀ passage ∈ before,
         passageSwitch passage ≠ passageSwitch (p, x) := by
-      unfold SwitchSimple at hsimple'
-      simp only [List.map_append, List.map_cons] at hsimple'
-      have hparts := List.nodup_append.mp hsimple'
-      intro passage hp hEq
-      have hne := hparts.2.2 (passageSwitch passage)
-        (List.mem_map.mpr ⟨passage, hp, rfl⟩)
-        (passageSwitch (p, x)) (by simp)
-      exact hne hEq
+      rw [hsplit] at hsimple
+      grind [SwitchSimple]
     have hcontactState : contact (passageSwitch (p, x)) =
         state (passageSwitch (p, x)) :=
       hprefix.preserves _ hprefixForeign
@@ -484,18 +353,9 @@ theorem ManufacturedReflector.repair_current_route_preserving_until_conflict
       have hforward := groove_forward hcurrentGroove
       rw [harrive] at hforward
       exact hother (congrArg Prod.fst hforward)
-    have hreferenceBase : reference (passageSwitch (p, x)) =
-        base (passageSwitch (p, x)) := by
-      by_cases heq : reference (passageSwitch (p, x)) =
-          base (passageSwitch (p, x))
-      · exact heq
-      · exfalso
-        exact hstateReference (hreferenceGuard _ heq).symm
-    have hstateBase : state (passageSwitch (p, x)) ≠
-        base (passageSwitch (p, x)) := by
-      intro heq
-      apply hstateReference
-      exact heq.trans hreferenceBase.symm
+    have hstateBase : state (passageSwitch (p, x)) ≠ base (passageSwitch (p, x)) := by
+      have := hreferenceGuard (passageSwitch (p, x))
+      grind
     exact Or.inl ⟨before, p, x, after, contact, other,
       hsplit, hprefix, hguardContact, hstem, hstateBase,
       hcontactState, harrive, hother⟩
@@ -507,60 +367,6 @@ theorem ManufacturedReflector.repair_current_route_preserving_until_conflict
         A.support_grooves_of_orientedRoute state finalState
           hrouteGrooved,
         hguardFinal⟩)
-
-/-- If the route selected by `selector` is grooved both in `selector` and in
-`state`, then the action-switch tongue agrees.  Consequently both vectors
-select exactly the same outward route and the same far endpoint. -/
-theorem ManufacturedReflector.oriented_data_eq_of_route_grooved
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (selector state : Tongues)
-    (hselector : PassagesGrooved selector (A.orientedRoute selector))
-    (hstate : PassagesGrooved state (A.orientedRoute selector)) :
-    A.orientedRoute state = A.orientedRoute selector ∧
-      A.orientedFinish state = A.orientedFinish selector := by
-  cases A with
-  | stay R =>
-      exact ⟨rfl, rfl⟩
-  | flip R =>
-      by_cases hselected :
-          selector R.actionSwitch = bval R.firstArm
-      · have hmem : (R.mouth, R.firstArm) ∈
-            (ManufacturedReflector.flip R).orientedRoute selector := by
-          simp [ManufacturedReflector.orientedRoute, hselected]
-        have htongue := same_groove_same_tongue
-          (hselector (R.mouth, R.firstArm) hmem)
-          (hstate (R.mouth, R.firstArm) hmem)
-        have hstateSelected :
-            state R.actionSwitch = bval R.firstArm := by
-          calc
-            state R.actionSwitch = selector R.actionSwitch := by
-              simpa [passageSwitch,
-                ManufacturedFlipReflector.actionSwitch] using htongue.symm
-            _ = bval R.firstArm := hselected
-        constructor <;>
-          simp [ManufacturedReflector.orientedRoute,
-            ManufacturedReflector.orientedFinish,
-            hselected, hstateSelected]
-      · have hmem : (R.mouth, R.secondArm) ∈
-            (ManufacturedReflector.flip R).orientedRoute selector := by
-          simp [ManufacturedReflector.orientedRoute, hselected]
-        have htongue := same_groove_same_tongue
-          (hselector (R.mouth, R.secondArm) hmem)
-          (hstate (R.mouth, R.secondArm) hmem)
-        have hstateNotSelected :
-            state R.actionSwitch ≠ bval R.firstArm := by
-          intro heq
-          apply hselected
-          calc
-            selector R.actionSwitch = state R.actionSwitch := by
-              simpa [passageSwitch,
-                ManufacturedFlipReflector.actionSwitch] using htongue
-            _ = bval R.firstArm := heq
-        constructor <;>
-          simp [ManufacturedReflector.orientedRoute,
-            ManufacturedReflector.orientedFinish,
-            hselected, hstateNotSelected]
 
 theorem ManufacturedReflector.changed_exploration_passage_mem_support
     {w : Wiring} {g e : Nat}

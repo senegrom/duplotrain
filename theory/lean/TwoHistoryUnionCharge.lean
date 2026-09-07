@@ -1,5 +1,5 @@
 import StateLawTwoCandidate
-import CompleteRepairFour
+import PairActionCorners
 
 /-!
 # Charging two opposite construction histories once

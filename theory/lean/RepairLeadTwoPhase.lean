@@ -65,48 +65,13 @@ theorem ManufacturedReflector.repair_prefix_changes_only_protected_return :
     hroute (p, x) hmemApproach
   have hrefBack : arrive reference x = (p, reference) :=
     hreferenceGrooved (p, x) hmemRoute
-  have hrefForward : arrive reference p = (x, reference) :=
-    groove_forward hrefBack
-  have hswitch' : p / 3 = j := by
-    simpa [passageSwitch] using hswitch
-  have hchangedLocal : v (p / 3) ≠ u (p / 3) := by
-    simpa [hswitch'] using hvu
-  obtain ⟨hpBranch, _hxStem, hvPin⟩ :=
-    changed_arrival_is_trailing harrive hchangedLocal
-  have hvValue : v (p / 3) = bval p := by
-    rw [hvPin]
-    simp [pin]
-  have hrefPin : pin reference p = reference := by
-    unfold arrive at hrefForward
-    rw [if_neg hpBranch] at hrefForward
-    exact (Prod.mk.inj hrefForward).2
-  have hrefValue : reference (p / 3) = bval p := by
-    have h := congrFun hrefPin (p / 3)
-    simp only [pin, if_pos] at h
-    exact h.symm
   have hvReference : v j = reference j := by
-    rw [← hswitch']
-    exact hvValue.trans hrefValue.symm
-  have hrefNeState : reference j ≠ B.activatedState j := by
-    intro heq
-    apply hvu
-    calc
-      v j = reference j := hvReference
-      _ = B.activatedState j := heq
-      _ = u j := huStart'.symm
-  have hrefBase : reference j = B.baseState j := by
-    by_cases hbase : reference j = B.baseState j
-    · exact hbase
-    · exact (hrefNeState (hguard j hbase)).elim
-  have hactivatedChange :
-      B.activatedState j ≠ B.baseState j := by
-    intro heq
-    apply hvu
-    calc
-      v j = reference j := hvReference
-      _ = B.baseState j := hrefBase
-      _ = B.activatedState j := heq.symm
-      _ = u j := huStart'.symm
+    have hback := arrive_back u p
+    rw [harrive] at hback
+    simpa [hswitch] using same_groove_same_tongue (old := (p, x)) hback hrefBack
+  have hactivatedChange : B.activatedState j ≠ B.baseState j := by
+    have hguardAt := hguard j
+    grind
   rcases B.activated_change_return_or_exploration hactivatedChange with
     hreturn | hexploration
   · exact hreturn.1
@@ -126,6 +91,37 @@ theorem ManufacturedReflector.repair_prefix_changes_only_protected_return :
     exfalso
     apply hchange
     simpa [hj] using hagree.symm
+
+/-- Every support-preserving protected repair prefix ends in either the
+protected reflector's activated state or its pre-return state.  For a flip
+reflector these are the two values of its action tongue; for a stay
+reflector the core groove rules out even that one-coordinate difference. -/
+theorem ManufacturedReflector.repair_prefix_contact_eq_activated_or_preReturn :
+    contact = B.activatedState ∨ contact = B.preReturn.2 := by
+  have hchanges := A.repair_prefix_changes_only_protected_return
+    B hA hBstart hprefix hsimple hroute hBcontact
+  cases B with
+  | stay R =>
+      left
+      have hkey := grooved_states_agree_on_passage
+        (passagesGrooved_singleton.mp (pathGrooves_pair.mp hBstart).2)
+        (passagesGrooved_singleton.mp (pathGrooves_pair.mp hBcontact).2)
+      funext j
+      by_cases hj : contact j = R.returnState j
+      · exact hj
+      · have hs := hchanges j hj
+        change j = R.arm / 3 at hs
+        exact hs ▸ hkey.symm
+  | flip R =>
+      change contact = R.afterReturn ∨ contact = R.returnState
+      have hrelation := tongues_eq_or_eq_flipAt_of_changes_only
+        (u := R.afterReturn) (v := contact) (k := R.actionSwitch)
+        (fun j hj => (hchanges j hj).trans R.secondArm_switch)
+      have hpre := (ManufacturedReflector.flip R).preReturn_eq_action_activated
+      change R.returnState = flipAt R.afterReturn R.actionSwitch at hpre
+      rcases hrelation with heq | heq
+      · exact Or.inl heq.symm
+      · right; rw [hpre, heq, flipAt_flipAt]
 
 /-- **Two-phase protected repair lead.** -/
 theorem ManufacturedReflector.repair_prefix_two_phase :

@@ -201,10 +201,8 @@ theorem manufactured_flip_pair_all_time_four_phase
       phase ∈ [state, flipAt state FA.actionSwitch,
         flipAt state FB.actionSwitch,
         flipAt (flipAt state FA.actionSwitch) FB.actionSwitch] := by
-  by_cases hAB : (LocalAction.flip FA.actionSwitch).Avoids
-      [FB.runway, FB.candy]
-  · by_cases hBA : (LocalAction.flip FB.actionSwitch).Avoids
-        [FA.runway, FA.candy]
+  by_cases hAB : (LocalAction.flip FA.actionSwitch).Avoids [FB.runway, FB.candy]
+  · by_cases hBA : (LocalAction.flip FB.actionSwitch).Avoids [FA.runway, FA.candy]
     · obtain ⟨port, phase, hr, hm⟩ := FA.toSupported.pair_all_time_four_phase FB.toSupported
         (ManufacturedReflector.flip FA).travel_pos (ManufacturedReflector.flip FB).travel_pos
         (fun u hu _ ht => FA.travel_two_phase_stepN u hu ht)
@@ -212,85 +210,33 @@ theorem manufactured_flip_pair_all_time_four_phase
         state hA hB hAB hBA d
       have hcancel : flipAt (flipAt (flipAt state FA.actionSwitch) FB.actionSwitch)
           FA.actionSwitch = flipAt state FB.actionSwitch := by
-        have hc := (LocalAction.flip FA.actionSwitch).commute (.flip FB.actionSwitch)
-          (flipAt state FA.actionSwitch)
-        change flipAt (flipAt (flipAt state FA.actionSwitch) FB.actionSwitch)
-          FA.actionSwitch = flipAt (flipAt (flipAt state FA.actionSwitch)
-            FA.actionSwitch) FB.actionSwitch at hc
-        simpa only [flipAt_flipAt] using hc
+        simpa only [LocalAction.apply, flipAt_flipAt] using
+          (LocalAction.flip FA.actionSwitch).commute (.flip FB.actionSwitch)
+            (flipAt state FA.actionSwitch)
       change phase ∈ [state, flipAt state FA.actionSwitch,
         flipAt (flipAt state FA.actionSwitch) FB.actionSwitch,
         flipAt (flipAt (flipAt state FA.actionSwitch) FB.actionSwitch) FA.actionSwitch] at hm
-      refine ⟨port, phase, hr, ?_⟩
-      rw [hcancel] at hm
-      grind
-    · -- FA's action avoids FB's support, FB's support meets FA's switch:
-      -- one FA-traversal, then the one-sided theta seen from `e`
-      have hcontactBA := contact_of_not_avoids_flip hBA
-      have hArun := (FA.toSupported.run state hA).1
-      change stepN w (2 * FA.runway.length + FA.candy.length + 2)
-        (g, state) = some (e, flipAt state FA.actionSwitch) at hArun
-      have hA2 : PathGrooves [FA.runway, FA.candy]
-          (flipAt state FA.actionSwitch) :=
-        (FA.toSupported.run state hA).2
-      have hB2 : PathGrooves [FB.runway, FB.candy]
-          (flipAt state FA.actionSwitch) :=
-        hB.after_avoiding_action hAB
-      by_cases hd1 : d ≤ 2 * FA.runway.length + FA.candy.length + 2
-      · obtain ⟨port, phase, hrun, hphase⟩ :=
-          FA.travel_two_phase_stepN state hA hd1
-        refine ⟨port, phase, hrun, ?_⟩
-        rcases hphase with h | h
-        · simp [h]
-        · simp [h]
-      · let rr := d - (2 * FA.runway.length + FA.candy.length + 2)
-        have hdEq : d =
-            (2 * FA.runway.length + FA.candy.length + 2) + rr := by
-          dsimp [rr]
-          omega
-        obtain ⟨port, phase, hrunR, hmem⟩ :=
-          manufactured_one_sided_theta_all_time_four_phase FB FA
-            (flipAt state FA.actionSwitch) hB2 hA2 hcontactBA hAB rr
-        refine ⟨port, phase, ?_, ?_⟩
-        · rw [hdEq, stepN_add, hArun]
-          simpa using hrunR
-        · simp only [List.mem_cons, List.not_mem_nil, or_false] at hmem
-          rcases hmem with h | h | h | h
-          · simp [h]
-          · simp [h]
-          · rw [flipAt_flipAt] at h
-            simp [h]
-          · rw [flipAt_flipAt] at h
-            simp [h]
-  · have hcontactAB := contact_of_not_avoids_flip hAB
-    by_cases hBA : (LocalAction.flip FB.actionSwitch).Avoids
-        [FA.runway, FA.candy]
-    · -- FB's support avoided, FA's switch meets FB's support: direct
-      -- one-sided theta from `g`
-      obtain ⟨port, phase, hrun, hmem⟩ :=
-        manufactured_one_sided_theta_all_time_four_phase FA FB
-          state hA hB hcontactAB hBA d
-      refine ⟨port, phase, hrun, ?_⟩
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmem
-      rcases hmem with h | h | h | h
-      · simp [h]
-      · simp [h]
-      · simp [h]
-      · by_cases hsw : FA.actionSwitch = FB.actionSwitch
-        · rw [← hsw, flipAt_flipAt] at h
-          simp [h]
-        · rw [flipAt_comm (Ne.symm hsw)] at h
-          simp [h]
-    · -- mutual contact: the three-phase theta
-      have hcontactBA := contact_of_not_avoids_flip hBA
-      obtain ⟨port, phase, hrun, hmem⟩ :=
-        manufactured_two_sided_theta_all_time_three_phase FA FB
-          state hA hB hcontactAB hcontactBA d
-      refine ⟨port, phase, hrun, ?_⟩
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hmem
-      rcases hmem with h | h | h
-      · simp [h]
-      · simp [h]
-      · simp [h]
+      exact ⟨port, phase, hr, by rw [hcancel] at hm; grind⟩
+    · have htail := manufactured_one_sided_theta_all_time_four_phase FB FA
+        (flipAt state FA.actionSwitch) (hB.after_avoiding_action hAB)
+        (FA.toSupported.run state hA).2 (contact_of_not_avoids_flip hBA) hAB
+      apply stepN_cover_append (right := d) (FA.toSupported.run state hA).1 ?_ ?_ d (by omega)
+      · intro t ht
+        obtain ⟨port, phase, hr, hp⟩ := FA.travel_two_phase_stepN state hA ht
+        exact ⟨port, phase, hr, by grind⟩
+      · intro t _
+        obtain ⟨port, phase, hr, hp⟩ := htail t
+        exact ⟨port, phase, hr, by simp only [flipAt_flipAt] at hp; grind⟩
+  · have hcontact := contact_of_not_avoids_flip hAB
+    by_cases hBA : (LocalAction.flip FB.actionSwitch).Avoids [FA.runway, FA.candy]
+    · obtain ⟨port, phase, hr, hm⟩ := manufactured_one_sided_theta_all_time_four_phase
+        FA FB state hA hB hcontact hBA d
+      have hcomm : flipAt (flipAt state FB.actionSwitch) FA.actionSwitch =
+          flipAt (flipAt state FA.actionSwitch) FB.actionSwitch :=
+        (LocalAction.flip FA.actionSwitch).commute (.flip FB.actionSwitch) state
+      exact ⟨port, phase, hr, by rw [hcomm] at hm; grind⟩
+    · obtain ⟨port, phase, hr, hm⟩ := manufactured_two_sided_theta_all_time_three_phase
+        FA FB state hA hB hcontact (contact_of_not_avoids_flip hBA) d
+      exact ⟨port, phase, hr, by grind⟩
 
 end GeneralN
