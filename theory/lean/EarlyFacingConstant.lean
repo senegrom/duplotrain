@@ -74,7 +74,7 @@ theorem ManufacturedFlipReflector.facing_mouth_tail_two_phase
     (hpaths : PathGrooves [B.runway, B.candy] contact) :
     ∀ d, ∃ port phase,
       stepN w d (B.mouth, contact) = some (port, phase) ∧
-      (phase = flipAt contact B.actionSwitch ∨ phase = contact) := by
+      (phase = contact ∨ phase = flipAt contact B.actionSwitch) := by
   have hreturn : ∀ current, (current = contact ∨ current = flipAt contact B.actionSwitch) →
       ∃ travel final, 0 < travel ∧
         stepN w travel (B.mouth, current) = some (g, final) ∧
@@ -104,6 +104,6 @@ theorem ManufacturedFlipReflector.facing_mouth_tail_two_phase
   intro d
   obtain ⟨port, phase, hr, hp⟩ := B.grooved_return_two_phase contact hpaths
     happroachContact hgrooved hreturn (Or.inr rfl) (Or.inl rfl) d
-  exact ⟨port, phase, hr, hp.symm⟩
+  exact ⟨port, phase, hr, hp⟩
 
 end GeneralN

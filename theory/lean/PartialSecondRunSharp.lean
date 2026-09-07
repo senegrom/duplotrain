@@ -189,57 +189,6 @@ theorem ChangedContact.nextState_eq_of_post
   rw [h] at hq
   exact (congrArg Prod.snd (Option.some.inj hq)).symm
 
-/-- Coefficient-one history through the contact, including the one changed
-post-contact vector. -/
-def ChangedContact.history
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : ChangedContact w A) (N : Nat) : List (List Bool) :=
-  A.continuationHistory N (e, A.activatedState) C.approach.length ++
-    [VectorCount.restrict N C.nextState]
-
-theorem ChangedContact.history_length_le_N_add_three
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {A : ManufacturedReflector w g e}
-    (C : ChangedContact w A)
-    (hA : PathGrooves A.toSupported.paths A.activatedState) :
-    (C.history N).length ≤ N + 3 := by
-  have hlead := A.continuationHistory_length_le
-    hN (start := (e, A.activatedState))
-      (finish := (C.p, C.contactState))
-      (passages := C.approach) rfl C.approach_trace
-      C.approach_simple hA C.old_grooves
-  simp [ChangedContact.history]
-  omega
-
-theorem ChangedContact.approach_mem_history
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : ChangedContact w A)
-    {d : Nat} (hd : d ≤ C.approach.length) :
-    restrictedTonguesAt w N (e, A.activatedState) d ∈ C.history N := by
-  apply List.mem_append_left
-  exact A.mem_continuationHistory C.approach_trace
-    C.approach_simple hd
-
-theorem ChangedContact.contact_mem_history
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : ChangedContact w A) :
-    VectorCount.restrict N C.contactState ∈ C.history N := by
-  have hm := C.approach_mem_history
-    (N := N) (d := C.approach.length) (Nat.le_refl _)
-  simpa [restrictedTonguesAt, tonguesAt,
-    C.approach_trace.sound] using hm
-
-theorem ChangedContact.next_mem_history
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : ChangedContact w A) :
-    VectorCount.restrict N C.nextState ∈ C.history N := by grind [
-      PartialSecondRunSharp.ChangedContact.history, VectorCount.restrict]
-
 /-- Exact two-phase tail after a changed forward contact with a stay
 reflector, generalized to an arbitrary switch-simple partial route. -/
 theorem ChangedContact.forward_stay_two_phase_tail
@@ -336,61 +285,6 @@ theorem ChangedContact.forward_stay_two_phase_tail
     · exact Or.inl h
     · exact Or.inr h
 
-/-- Both all-time phases in the stay-forward case are already the contact
-pre-vector and the explicitly stored post-vector. -/
-theorem ChangedContact.forward_stay_all_time_zero_novelty
-    {w : Wiring} {N g e : Nat}
-    {R : ManufacturedStayReflector w g e}
-    (C : ChangedContact w (ManufacturedReflector.stay R))
-    {repaired : Tongues}
-    (hforward : C.x = C.oriented.2)
-    (hrepair :
-      arrive C.nextState C.oriented.1 = (C.oriented.2, repaired))
-    (hrestored :
-      arrive repaired C.oriented.2 = (C.oriented.1, repaired))
-    (times : List Nat) :
-    NoveltyCoverOn w N (e, (ManufacturedReflector.stay R).activatedState)
-      times (C.history N) 0 := by
-  obtain ⟨outside, mouth, hreach, hall⟩ :=
-    C.forward_stay_two_phase_tail hforward hrepair hrestored
-  let K := C.approach.length + 1
-  let alternate := flipAt C.contactState (mouth / 3)
-  have hreach' :
-      stepN w K (e, (ManufacturedReflector.stay R).activatedState) =
-        some (outside, alternate) := by
-    simpa [K, alternate] using hreach
-  have hnextAlternate : C.nextState = alternate := C.nextState_eq_of_post hreach'
-  have hentryHistorical :
-      VectorCount.restrict N alternate ∈ C.history N := by
-    simpa [hnextAlternate] using C.next_mem_history (N := N)
-  have hstateHistorical :
-      VectorCount.restrict N C.contactState ∈ C.history N :=
-    C.contact_mem_history
-  refine ⟨[], by simp, ?_⟩
-  intro j _hj
-  simp only [List.append_nil]
-  by_cases hjK : j < K
-  · exact C.approach_mem_history (N := N) (by
-      dsimp [K] at hjK
-      omega)
-  · let d := j - K
-    have hjEq : j = K + d := by
-      dsimp [d]
-      omega
-    obtain ⟨port, phase, hrun, hphase⟩ := hall d
-    have hglobal :
-        stepN w j (e, (ManufacturedReflector.stay R).activatedState) =
-          some (port, phase) := by
-      rw [hjEq, stepN_add, hreach']
-      exact hrun
-    have hvector : restrictedTonguesAt w N
-        (e, (ManufacturedReflector.stay R).activatedState) j =
-          VectorCount.restrict N phase := by
-      simp [restrictedTonguesAt, tonguesAt, hglobal]
-    rw [hvector]
-    rcases hphase with h | h
-    · simpa [alternate, h] using hentryHistorical
-    · simpa [h] using hstateHistorical
 
 end PartialSecondRunSharp
 end GeneralN

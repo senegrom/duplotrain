@@ -103,47 +103,39 @@ theorem ManufacturedReflector.repair_prefix_contact_eq_activated_or_preReturn
           _ = flipAt R.afterReturn R.actionSwitch := by rw [hflip]
           _ = R.returnState := hpre.symm
 
-/-- A two-phase historical prefix followed by a direct two-vector suffix
-has one-vector novelty over the shared history. -/
-theorem two_phase_prefix_then_direct_tail_one_novelty
+/-- A historical two-phase prefix followed by an all-time two-phase tail
+has at most one fresh vector.  The shared boundary phase is charged only once. -/
+theorem two_phase_prefix_then_two_phase_tail_one_novelty
     {w : Wiring} {N lead : Nat}
-    {start endpoint : Nat × Tongues} {u v : Tongues}
+    {start endpoint : Nat × Tongues} {u v z : Tongues}
     (hreach : stepN w lead start = some endpoint)
     (hphase : ∀ d, d ≤ lead → ∃ port phase,
-      stepN w d start = some (port, phase) ∧
-        (phase = u ∨ phase = v))
+      stepN w d start = some (port, phase) ∧ (phase = u ∨ phase = v))
     (hendpoint : endpoint.2 = v)
     (history : List (List Bool))
     (hu : VectorCount.restrict N u ∈ history)
     (hv : VectorCount.restrict N v ∈ history)
-    (htail : ∀ tailTimes : List Nat,
-      (∀ k ∈ tailTimes, (stepN w k endpoint).isSome) →
-      (tailTimes.map
-        (restrictedTonguesAt w N endpoint)).Nodup →
-      tailTimes.length ≤ 2)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
+    (htail : ∀ d, ∃ port phase,
+      stepN w d endpoint = some (port, phase) ∧ (phase = v ∨ phase = z))
+    (times : List Nat) :
     NoveltyCoverOn w N start times history 1 := by
-  have hprefix : ∀ d, d ≤ lead →
-      restrictedTonguesAt w N start d ∈ history := by
-    intro d hd
-    obtain ⟨port, phase, hrun, hp⟩ := hphase d hd
-    have hvec : restrictedTonguesAt w N start d =
-        VectorCount.restrict N phase := by
-      simp [restrictedTonguesAt, tonguesAt, hrun]
-    rw [hvec]
+  refine ⟨[VectorCount.restrict N z], by simp, ?_⟩
+  apply cover_of_live_phase_orbit hreach (phases := [v, z])
+  · intro d
+    obtain ⟨port, phase, hr, hp⟩ := htail d
+    exact ⟨port, phase, hr, by simpa using hp⟩
+  · intro phase hp
+    simp only [List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] at hp
+    rcases hp with rfl | rfl
+    · exact List.mem_append_left _ hv
+    · exact List.mem_append_right _ (by simp)
+  · intro j _ hj
+    obtain ⟨port, phase, hr, hp⟩ := hphase j (by omega)
+    rw [show restrictedTonguesAt w N start j = VectorCount.restrict N phase by
+      simp [restrictedTonguesAt, tonguesAt, hr]]
     rcases hp with rfl | rfl
     · exact hu
     · exact hv
-  have hboundary : VectorCount.restrict N endpoint.2 ∈ history := by
-    simpa [hendpoint] using hv
-  have hcover := boundary_history_then_direct_tail_cover
-    hreach history hprefix hboundary htail (by omega)
-      times hlive hnd
-  simpa using hcover
-
 /-- A direct three-state tail with two distinct historical states actually
 costs at most one new vector.  The witnesses need not occur in the sampled
 list: if two different nonhistorical samples existed, adjoining the two
@@ -308,32 +300,10 @@ private theorem ManufacturedReflector.return_change_facing_one_novelty
         happroach.replay_grooved contact happroachGrooved
       have hall := R.facing_mouth_tail_two_phase
         happroachContact happroachGrooved hpaths
-      have htail : ∀ tailTimes : List Nat,
-          (∀ d ∈ tailTimes,
-            (stepN w d (R.mouth, contact)).isSome) →
-          (tailTimes.map
-            (restrictedTonguesAt w N (R.mouth, contact))).Nodup →
-          tailTimes.length ≤ 2 := by
-        intro tailTimes _ htailNodup
-        let tailHistory := [VectorCount.restrict N contact,
-          VectorCount.restrict N (flipAt contact R.actionSwitch)]
-        have hcover : NoveltyCoverOn w N (R.mouth, contact)
-            tailTimes [] 2 := by
-          refine ⟨tailHistory, by simp [tailHistory], ?_⟩
-          intro d hd
-          simp only [List.nil_append]
-          obtain ⟨port, phase, hrun, hphaseTail⟩ := hall d
-          have hvec : restrictedTonguesAt w N (R.mouth, contact) d =
-              VectorCount.restrict N phase := by
-            simp [restrictedTonguesAt, tonguesAt, hrun]
-          rw [hvec]
-          rcases hphaseTail with h | h <;>
-            simp [tailHistory, h]
-        have hcount := noveltyCoverOn_distinct_count hcover htailNodup
-        simpa using hcount
-      exact two_phase_prefix_then_direct_tail_one_novelty
-        happroach.sound hphase rfl history hinitialHistorical
-          hcontactHistorical htail times hlive hnd
+      exact two_phase_prefix_then_two_phase_tail_one_novelty
+        happroach.sound hphase rfl history hinitialHistorical hcontactHistorical
+        hall times
+
 
 /-- A backward state-changing protected contact costs one fresh vector over
 the activated/pre-return history; otherwise the exact forward merge is
@@ -440,20 +410,13 @@ private theorem ManufacturedReflector.protected_changed_contact_one_or_forward
       rcases hrelation with rfl | rfl
       · exact hinitialHistorical
       · exact hpreHistorical
-    have htail : ∀ tailTimes : List Nat,
-        (∀ k ∈ tailTimes, (stepN w k (p, u)).isSome) →
-        (tailTimes.map (restrictedTonguesAt w N (p, u))).Nodup →
-        tailTimes.length ≤ 2 := by
-      intro tailTimes _ htailNodup
-      exact backward_contact_tail_distinct_le_two
-        hrecorded hrecordedGroovedV B.entryEdge
-        (by simpa [hbackward] using harrive)
-        happroachReplayU happroachGroovedV tailTimes htailNodup
+    have hall := backward_contact_all_time_two_phase
+      hrecorded hrecordedGroovedV B.entryEdge
+      (by simpa [hbackward] using harrive) happroachReplayU happroachGroovedV
     left
-    intro times hlive hnd
-    exact two_phase_prefix_then_direct_tail_one_novelty
-      happroach.sound hphase rfl history hinitialHistorical
-        huHistorical htail times hlive hnd
+    intro times _ _
+    exact two_phase_prefix_then_two_phase_tail_one_novelty
+      happroach.sound hphase rfl history hinitialHistorical huHistorical hall times
   · right
     obtain ⟨hforwardExit, repaired, hrepair, hgroove⟩ := hforward
     exact ⟨oriented, repaired, horiented, horientedGroove,
@@ -530,20 +493,13 @@ private theorem ManufacturedReflector.protected_facing_contact_one_or_forward
       rcases hrelation with rfl | rfl
       · exact hinitialHistorical
       · exact hpreHistorical
-    have htail : ∀ tailTimes : List Nat,
-        (∀ k ∈ tailTimes, (stepN w k (p, contact)).isSome) →
-        (tailTimes.map
-          (restrictedTonguesAt w N (p, contact))).Nodup →
-        tailTimes.length ≤ 2 := by
-      intro tailTimes _ htailNodup
-      exact backward_contact_tail_distinct_le_two
-        hrecorded hrecordedGrooved B.entryEdge harrive
-        happroachReplay happroachGrooved tailTimes htailNodup
+    have hall := backward_contact_all_time_two_phase
+      hrecorded hrecordedGrooved B.entryEdge harrive
+      happroachReplay happroachGrooved
     left
-    intro times hlive hnd
-    exact two_phase_prefix_then_direct_tail_one_novelty
-      happroach.sound hphase rfl history hinitialHistorical
-        hcontactHistorical htail times hlive hnd
+    intro times _ _
+    exact two_phase_prefix_then_two_phase_tail_one_novelty
+      happroach.sound hphase rfl history hinitialHistorical hcontactHistorical hall times
   · right
     simpa [hreverse] using horiented
 
@@ -1279,29 +1235,6 @@ theorem ManufacturedReflector.preReturn_grooved_protected_pair_all_run_distinct_
 
 end
 
-/-- The literal fully-protected residual exposed by the known-edge probe is
-bounded by the direct protected-pair theorem above. -/
-theorem KnownEdgeFullyProtectedPair.all_run_distinct_le_N_add_four
-    {w : Wiring} {N e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start : Nat × Tongues}
-    (D : KnownEdgeFullyProtectedPair w e start)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 4 := by
-  have hliveA : ∀ k ∈ times,
-      (stepN w k (start.1, D.pair.A.baseState)).isSome := by
-    simpa [D.pair.A_base] using hlive
-  have hndA : (times.map
-      (restrictedTonguesAt w N
-        (start.1, D.pair.A.baseState))).Nodup := by
-    simpa [D.pair.A_base] using hnd
-  exact D.pair.A.preReturn_grooved_protected_pair_all_run_distinct_le_N_add_four
-    hN D.pair.B D.pair.B_base D.pair.A_grooves
-      D.pair.B_grooves D.preGrooves times hliveA hndA
-
 /-- **Unconditional known-edge protected-pair law, exact raw `N+4`.**
 Broken pre-return support is the already-closed changed-contact branch;
 fully protected support is the theorem above. -/
@@ -1309,11 +1242,14 @@ theorem knownEdgeProtectedPairNAddFourLaw :
     KnownEdgeProtectedPairNAddFourLaw := by
   intro w N e hN start D times hlive hnd
   by_cases hpre : PathGrooves D.A.toSupported.paths D.B.preReturn.2
-  · let F : KnownEdgeFullyProtectedPair w e start := {
-      pair := D
-      preGrooves := hpre
-    }
-    exact F.all_run_distinct_le_N_add_four hN times hlive hnd
+  · have hliveA : ∀ k ∈ times,
+        (stepN w k (start.1, D.A.baseState)).isSome := by
+      simpa [D.A_base] using hlive
+    have hndA : (times.map
+        (restrictedTonguesAt w N (start.1, D.A.baseState))).Nodup := by
+      simpa [D.A_base] using hnd
+    exact D.A.preReturn_grooved_protected_pair_all_run_distinct_le_N_add_four
+      hN D.B D.B_base D.A_grooves D.B_grooves hpre times hliveA hndA
   · have htrace : PhysicalTrace w (e, D.A.activatedState)
         D.B.exploration D.B.preReturn := by
       simpa [D.B_base] using D.B.exploration_trace

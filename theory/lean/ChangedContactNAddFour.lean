@@ -388,12 +388,12 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
       hforward hrepair hrestored
   let K := C.approach.length + 1
   let state := C.contactState
-  let alternate := flipAt state (mouth / 3)
   have hreach' : stepN w K
       (e, (ManufacturedReflector.flip R).activatedState) =
-        some (outside, alternate) := by
-    simpa [K, state, alternate] using hreach
-  have hnextAlternate : C.nextState = alternate := C.nextState_eq_of_post hreach'
+        some (outside, flipAt state (mouth / 3)) := by
+    simpa [K, state] using hreach
+  have hnextAlternate : C.nextState = flipAt state (mouth / 3) :=
+    C.nextState_eq_of_post hreach'
   have hentryHistorical :
       VectorCount.restrict N (flipAt state (mouth / 3)) ∈ C.compressedLead N := by
     simpa [hnextAlternate] using C.next_mem_compressedLead (N := N)
@@ -439,7 +439,10 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
       · left
         exact ⟨[VectorCount.restrict N (flipAt (flipAt state (mouth / 3)) D.actionSwitch)],
           by simp,
-          cover_of_live_phase_orbit hreach'
+          cover_of_live_phase_orbit
+            (phases := [flipAt state (mouth / 3),
+              flipAt (flipAt state (mouth / 3)) D.actionSwitch,
+              state, flipAt state D.actionSwitch]) hreach'
             (manufactured_flip_arbitrary_lobe_all_time_four_phase D state hDpaths
               hNewAvoidsD hentryBranch hentrySwitch hfullGrooved hfullTrace hcrossed
               hCandyForeignNew hLobe hmouthLink hcontact)
@@ -452,7 +455,10 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
         left
         exact ⟨[VectorCount.restrict N (flipAt (flipAt state (mouth / 3)) D.actionSwitch)],
           by simp,
-          cover_of_live_phase_orbit hreach'
+          cover_of_live_phase_orbit
+            (phases := [flipAt state (mouth / 3),
+              flipAt (flipAt state (mouth / 3)) D.actionSwitch,
+              flipAt state D.actionSwitch, state]) hreach'
             (manufactured_suffix_explicit_lobe_all_time_four_phase D state hDpaths
               hNewAvoidsD hActionsNe hentryBranch hentrySwitch hfullGrooved hfullTrace
               hcrossed hCandyForeignNew hCandyForeignOld hLobe hmouthLink)
@@ -472,14 +478,18 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_one_novelty_or_runway_
         hentryOld hrunway hentryBranch
     have hentryGrooved : arrive state entry = (mouth, state) :=
       hfullGrooved (mouth, entry) List.mem_cons_self
-    have hone := manufactured_flip_candy_splice_absolute_one_novelty
-      R state hRpaths hrouteSplit hOldTail hrunway hentryBranch
-      hold horientation hentryGrooved hApproachReplay
-      hApproachGrooved hApproachForeign hcrossed hmouthLink harms
-      hreach' N (C.compressedLead N) hentryHistorical times
-      hleadHistorical
-    obtain ⟨fresh, hfresh, hmem⟩ := hone
-    exact Or.inl ⟨fresh, hfresh, hmem⟩
+    exact Or.inl ⟨[VectorCount.restrict N
+        (flipAt (flipAt state (mouth / 3)) R.actionSwitch)], by simp,
+      cover_of_live_phase_orbit
+        (phases := [flipAt state (mouth / 3),
+          flipAt (flipAt state (mouth / 3)) R.actionSwitch]) hreach'
+        (fun d => by
+          simpa only [List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] using
+            manufactured_flip_candy_splice_all_two_phases
+              R state hRpaths hrouteSplit hOldTail hrunway hentryBranch
+              hold horientation hentryGrooved hApproachReplay
+              hApproachGrooved hApproachForeign hcrossed hmouthLink harms d)
+        (by simp [hentryHistorical]) hleadHistorical⟩
 
 /-- **Sharp changed-contact frontier.**  For arbitrary `N`, every changed
 support contact is bounded by `N+4` unless it yields the explicit runway

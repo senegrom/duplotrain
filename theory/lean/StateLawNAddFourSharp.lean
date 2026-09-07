@@ -48,11 +48,21 @@ theorem state_law_N_add_four : StateLawNAddFour := by
       apply List.map_congr_left
       intro k hk
       simp only [restrictedTonguesAt, tonguesAt, hreach k hk]
-    rcases known_edge_N_add_four_or_protected_pair hvN hvtotal (v.symm _ _ he)
-        times hvlive (hvectors.symm ▸ hnd) with hsmall | hpair
+    rcases known_edge_N_add_four_or_changed_contact_or_protected_pair
+        hvN hvtotal (v.symm _ _ he) times hvlive (hvectors.symm ▸ hnd) with
+        hsmall | hchanged | hpair
     · exact hsmall
-    · exact knownEdgeProtectedPairNAddFourLaw hvN (Classical.choice hpair) times hvlive
-        (hvectors.symm ▸ hnd)
+    · obtain ⟨D⟩ := hchanged
+      have hliveA : ∀ k ∈ times,
+          (stepN v k (start.1, D.A.baseState)).isSome := by
+        simpa [D.base] using hvlive
+      have hndA : (times.map
+          (restrictedTonguesAt v N (start.1, D.A.baseState))).Nodup := by
+        simpa [D.base] using (hvectors.symm ▸ hnd)
+      exact D.contact.all_run_distinct_le_N_add_four
+        hvN D.grooves times hliveA hndA
+    · exact knownEdgeProtectedPairNAddFourLaw hvN (Classical.choice hpair)
+        times hvlive (hvectors.symm ▸ hnd)
   · have hdead : stepN w 1 start = none := by
       have hedge : w.link (arrive start.2 start.1).1 = none := by
         cases hw : w.link (arrive start.2 start.1).1 with
