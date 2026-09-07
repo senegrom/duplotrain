@@ -19,7 +19,7 @@ from functools import lru_cache
 from typing import Any
 
 from .exact import Alg
-from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose
+from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose, cos_sin
 from .pieces import PieceType
 from .validation import check_layout_json, rational_coefficient
 
@@ -41,7 +41,42 @@ def _alg_from_json(data: list[str]) -> Alg:
 @lru_cache(maxsize=4096)
 def _port_pose(frame: Pose, local: Pose) -> Pose:
     """Bounded exact transform cache; retains no Layout, Session or PieceType."""
-    return frame.then(local.x, local.y, local.z, local.heading)
+    dx, dy, dz, dheading = _rotated_local_pose(local, frame.heading)
+    return Pose(
+        frame.x + dx,
+        frame.y + dy,
+        frame.z + dz,
+        frame.heading + dheading,
+    )
+
+
+@lru_cache(maxsize=2048)
+def _rotated_local_pose(local: Pose, heading: int) -> tuple[Alg, Alg, Alg, int]:
+    """Rotate a repeated piece-local pose once for each lattice heading.
+
+    Frames vary for every placement, but piece-local connector poses and the 24
+    possible headings repeat constantly.  Splitting rotation from translation
+    removes most exact field multiplication from cold port transforms.
+    """
+    c, s = cos_sin(heading)
+    return (
+        c * local.x - s * local.y,
+        s * local.x + c * local.y,
+        local.z,
+        local.heading,
+    )
+
+
+@lru_cache(maxsize=HEADING_STEPS)
+def _heading_trig(heading: int) -> tuple[float, float]:
+    """Floating render/collision rotation for one lattice heading.
+
+    Cache only the trig, not the transformed points: keeping the original
+    multiply/add evaluation order makes every sampled float bit-for-bit identical
+    to the uncached implementation, including borderline collision comparisons.
+    """
+    theta = math.radians((heading % HEADING_STEPS) * DEGREES_PER_STEP)
+    return math.cos(theta), math.sin(theta)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,18 +98,15 @@ class Placement:
 
     def centrelines(self, spacing: float = 8.0) -> list[list[tuple[float, float, float]]]:
         """Every route through the piece, sampled in world coordinates."""
-        theta = math.radians(self.frame.degrees)
-        cos_t, sin_t = math.cos(theta), math.sin(theta)
+        cos_t, sin_t = _heading_trig(self.frame.heading)
         ox, oy, oz = self.frame.xyz()
-        out = []
-        for path_pts in self.piece.all_centrelines(spacing):
-            out.append(
-                [
-                    (ox + cos_t * x - sin_t * y, oy + sin_t * x + cos_t * y, oz + z)
-                    for x, y, z in path_pts
-                ]
-            )
-        return out
+        return [
+            [
+                (ox + cos_t * x - sin_t * y, oy + sin_t * x + cos_t * y, oz + z)
+                for x, y, z in line
+            ]
+            for line in self.piece.all_centrelines(spacing)
+        ]
 
     def __repr__(self) -> str:
         return f"Placement({self.piece.id}, {self.frame!r})"
@@ -135,7 +167,13 @@ class Layout:
 
     def connectable_ends(self) -> list[End]:
         """Open ends something could actually plug into."""
-        return [end for end in self.open_ends() if not self.is_sealed(end)]
+        links = self.links
+        return [
+            (i, p)
+            for i, placement in enumerate(self.placements)
+            for p in range(len(placement.piece.ports))
+            if (i, p) not in links and p not in placement.piece.sealed
+        ]
 
     def matable_pairs(self) -> list[tuple[End, End]]:
         """Exactly coincident, oppositely facing open ends, in endpoint order.

@@ -29,3 +29,28 @@ Regression coverage lives in tests/test_performance_contracts.py,
 tests/test_worker_bundle.py, tests/web/render-reuse.test.cjs and the browser suite.
 Tests compare exact arithmetic, cache isolation/bounds, worker API round-trips and
 DOM identity rather than making machine-dependent wall-clock assertions.
+
+## Second-pass cold-start and search overhead
+
+Port transforms split repeated local rotation from per-placement translation. Connector
+geometry has only 24 possible headings, so exact radical multiplication is reused across
+placements while every returned Pose remains exact. Floating centreline evaluation keeps
+its original operation order; only the 24 sin/cos pairs are cached, so sampled float
+values and borderline collision comparisons are bit-for-bit unchanged.
+
+Alg hashes are memoized lazily. This avoids paying tuple/Fraction hashing for the many
+short-lived exact values that are never dictionary keys, while repeated exact-position
+lookups reuse a stable hash. Built-in catalogue parsing and solver symmetry/span metadata
+are likewise bounded and cached; public catalogue mappings remain fresh caller-owned
+objects and all cached piece objects are immutable.
+
+Collision rollback now exploits its strict LIFO contract: the previous maximum piece
+width is restored in O(1), and each grid cell removes the just-added contiguous suffix
+instead of reverse-scanning once per sample point. The collision predicate, cell layout,
+clearance rules, and sample coordinates are unchanged.
+
+The Pyodide worker now uses a minimal package marker and excludes the desktop-only drive,
+explore, network-enumeration and scoring helpers in addition to the CLI, renderer and
+separately served editor HTML. Those modules remain in normal Python installs. The worker
+still contains every transitive dependency of gui.Session/solve and its isolated API
+round-trip test exercises state, edit, solve, apply, import, export and restore.

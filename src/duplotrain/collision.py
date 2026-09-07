@@ -59,6 +59,7 @@ class _Cloud:
     half_width: float
     points: list[tuple[float, float, float]]
     underpass: bool = False
+    previous_max_half_width: float = 0.0
 
 
 @dataclass
@@ -132,7 +133,9 @@ class CollisionField:
         half_width: float,
         underpass: bool = False,
     ) -> None:
-        cloud = _Cloud(placement, half_width, points, underpass)
+        cloud = _Cloud(
+            placement, half_width, points, underpass, self._max_half_width
+        )
         self._clouds.append(cloud)
         self._max_half_width = max(self._max_half_width, half_width)
         cell = self.cell
@@ -145,18 +148,20 @@ class CollisionField:
     def pop(self) -> None:
         """Remove the most recently added placement (backtracking)."""
         cloud = self._clouds.pop()
-        if cloud.half_width >= self._max_half_width:
-            self._max_half_width = max(
-                (c.half_width for c in self._clouds), default=0.0
-            )
+        # LIFO means the previous maximum is exactly the value that was current
+        # just before this cloud was added; no O(depth) rescan is necessary.
+        self._max_half_width = cloud.previous_max_half_width
         cell = self.cell
         for x, y, _z in cloud.points:
             key = (int(x // cell), int(y // cell))
-            bucket = self._grid[key]
-            for i in range(len(bucket) - 1, -1, -1):
-                if bucket[i][4] == cloud.placement:
-                    bucket.pop(i)
-                    break
+            bucket = self._grid.get(key)
+            if not bucket or bucket[-1][4] != cloud.placement:
+                continue
+            # Every point for one cloud was appended contiguously at the end of
+            # each cell bucket. Later clouds have already been popped, so remove
+            # that whole suffix once rather than reverse-scanning per sample.
+            while bucket and bucket[-1][4] == cloud.placement:
+                bucket.pop()
             if not bucket:
                 del self._grid[key]
 

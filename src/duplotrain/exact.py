@@ -67,6 +67,7 @@ class Alg:
     b: Fraction
     c: Fraction
     d: Fraction
+    _hash: int | None
 
     def __init__(
         self,
@@ -83,6 +84,7 @@ class Alg:
         object.__setattr__(self, "b", _exact_fraction(b))
         object.__setattr__(self, "c", _exact_fraction(c))
         object.__setattr__(self, "d", _exact_fraction(d))
+        object.__setattr__(self, "_hash", None)
 
     # -- construction ----------------------------------------------------------
 
@@ -178,9 +180,15 @@ class Alg:
     def __hash__(self) -> int:
         # Rational values hash like their Fraction (hence like equal ints), keeping the
         # hash/eq contract with the numbers __eq__ deliberately accepts.
-        if not (self.b or self.c or self.d):
-            return hash(self.a)
-        return hash((self.a, self.b, self.c, self.d))
+        value = self._hash
+        if value is None:
+            value = (
+                hash(self.a)
+                if not (self.b or self.c or self.d)
+                else hash((self.a, self.b, self.c, self.d))
+            )
+            object.__setattr__(self, "_hash", value)
+        return value
 
     def __bool__(self) -> bool:
         return bool(self.a or self.b or self.c or self.d)

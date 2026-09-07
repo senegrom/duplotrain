@@ -36,6 +36,20 @@ WEBAPP = ROOT / "webapp"
 DIST = WEBAPP / "dist"
 VENDOR = WEBAPP / "vendor"
 
+WORKER_EXCLUDES = {
+    "static/editor.html",
+    "cli.py",
+    "render.py",
+    # Public desktop helpers imported only by the regular package __init__.  The
+    # browser worker talks to gui.Session directly and does not need these modules.
+    "drive.py",
+    "explore.py",
+    "networks.py",
+    "scoring.py",
+}
+
+WORKER_INIT = b'''"""Minimal package marker for the Pyodide editor worker."""\n'''
+
 #: Everything Pyodide needs for `loadPyodide` + pure-Python imports.
 PYODIDE_FILES = [
     "pyodide.mjs",
@@ -138,12 +152,13 @@ def build_source_zip() -> bytes:
         for path in sorted(src.rglob("*")):
             relative = path.relative_to(src)
             if ("__pycache__" in relative.parts or not path.is_file()
-                    or relative.as_posix() in {"static/editor.html", "cli.py", "render.py"}):
+                    or relative.as_posix() in WORKER_EXCLUDES):
                 continue
             arcname = (Path("duplotrain") / relative).as_posix()
             info = zipfile.ZipInfo(arcname, date_time=(2020, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
-            zf.writestr(info, path.read_bytes())
+            payload = WORKER_INIT if relative.as_posix() == "__init__.py" else path.read_bytes()
+            zf.writestr(info, payload)
     return buffer.getvalue()
 
 

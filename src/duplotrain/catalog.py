@@ -33,6 +33,7 @@ replace the built-ins.
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -289,9 +290,20 @@ ACCESSORIES: dict[str, dict[str, str]] = {
 STONE_MOUNTS = frozenset({"straight"})
 
 
+@lru_cache(maxsize=1)
+def _default_catalog_items() -> tuple[tuple[str, PieceType], ...]:
+    """Parse the immutable built-in catalogue once per process."""
+    return tuple(parse_pieces(DEFAULT_CATALOG_SPECS).items())
+
+
 def default_catalog() -> dict[str, PieceType]:
-    """The built-in modern-generation piece set, keyed by id."""
-    return parse_pieces(DEFAULT_CATALOG_SPECS)
+    """The built-in modern-generation piece set, keyed by id.
+
+    The returned mapping is always caller-owned; only the immutable piece objects
+    behind it are shared.  Re-parsing the same built-in JSON on every Session/solve
+    start was measurable startup work, especially in the Pyodide worker.
+    """
+    return dict(_default_catalog_items())
 
 
 def load_catalog(*paths: str | Path, include_default: bool = True) -> dict[str, PieceType]:

@@ -16,7 +16,7 @@ spec.loader.exec_module(build)
 def test_worker_zip_is_deterministic_and_excludes_only_desktop_files():
     data = build.build_source_zip()
     assert data == build.build_source_zip()
-    excluded = {"static/editor.html", "cli.py", "render.py"}
+    excluded = build.WORKER_EXCLUDES
     src = ROOT / "src/duplotrain"
     expected = {
         "duplotrain/" + p.relative_to(src).as_posix()
@@ -26,6 +26,7 @@ def test_worker_zip_is_deterministic_and_excludes_only_desktop_files():
     }
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         assert set(archive.namelist()) == expected
+        assert archive.read("duplotrain/__init__.py") == build.WORKER_INIT
         assert all(info.date_time == (2020, 1, 1, 0, 0, 0) for info in archive.infolist())
         assert all("\\" not in name for name in archive.namelist())
     assert all((src / name).is_file() for name in excluded)

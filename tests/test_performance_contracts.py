@@ -1,6 +1,7 @@
 """Exact results, cache isolation and bounded retention, not fragile wall-clock limits."""
 
 import copy
+import math
 import pickle
 import random
 from dataclasses import FrozenInstanceError, replace
@@ -8,13 +9,29 @@ from fractions import Fraction
 
 import pytest
 
-from duplotrain.catalog import default_catalog
+from duplotrain.catalog import _default_catalog_items, default_catalog
+from duplotrain.collision import CollisionField
 from duplotrain.exact import Alg, _exact_fraction
 from duplotrain.geometry import ORIGIN, Pose
 from duplotrain.gui import Session
-from duplotrain.layout import Layout, Placement, _port_pose
+from duplotrain.layout import (
+    Layout,
+    Placement,
+    _heading_trig,
+    _port_pose,
+    _rotated_local_pose,
+)
 from duplotrain.pieces import _sample_paths
-from duplotrain.solver import Solution, _cached_moves, _moves_for
+from duplotrain.solver import (
+    Solution,
+    _cached_canonical_traversals,
+    _cached_mirror_ports,
+    _cached_mirror_traversals,
+    _cached_moves,
+    _max_span,
+    _moves_for,
+    _turn_capacity,
+)
 
 
 def full_product(x, y):
@@ -108,6 +125,14 @@ def test_all_shared_caches_are_bounded():
     assert _cached_moves.cache_parameters()["maxsize"] == 128
     assert _sample_paths.cache_parameters()["maxsize"] == 128
     assert _port_pose.cache_parameters()["maxsize"] == 4096
+    assert _rotated_local_pose.cache_parameters()["maxsize"] == 2048
+    assert _heading_trig.cache_parameters()["maxsize"] == 24
+    assert _cached_canonical_traversals.cache_parameters()["maxsize"] == 128
+    assert _cached_mirror_ports.cache_parameters()["maxsize"] == 128
+    assert _cached_mirror_traversals.cache_parameters()["maxsize"] == 128
+    assert _turn_capacity.cache_parameters()["maxsize"] == 128
+    assert _max_span.cache_parameters()["maxsize"] == 128
+    assert _default_catalog_items.cache_parameters()["maxsize"] == 1
     _port_pose.cache_clear()
     for i in range(4100):
         _port_pose(Pose.make(x=i), ORIGIN)
@@ -120,6 +145,55 @@ def test_all_shared_caches_are_bounded():
         piece.all_centrelines(8.0 + i)
     assert _cached_moves.cache_info().currsize == 128
     assert _sample_paths.cache_info().currsize == 128
+
+
+def test_default_catalog_reuses_immutable_pieces_but_not_the_mapping():
+    _default_catalog_items.cache_clear()
+    first = default_catalog()
+    second = default_catalog()
+    assert first == second
+    assert first is not second
+    assert first["straight"] is second["straight"]
+    first.pop("straight")
+    assert "straight" in default_catalog()
+    assert _default_catalog_items.cache_info().hits >= 2
+
+
+def test_rotated_transform_caches_match_direct_geometry():
+    piece = default_catalog()["switch"]
+    _rotated_local_pose.cache_clear()
+    _heading_trig.cache_clear()
+    for heading in range(24):
+        frame = Pose.make(x=Alg(5, 1), y=Alg(-7, 0, 1), z=3, heading=heading)
+        placement = Placement(piece, frame)
+        for port, local in enumerate(piece.ports):
+            expected = frame.then(local.pose.x, local.pose.y, local.pose.z, local.pose.heading)
+            assert placement.port_pose(port) == expected
+        for spacing in (8.0, 10.0, 17.0):
+            theta = math.radians(frame.degrees)
+            c, s = math.cos(theta), math.sin(theta)
+            ox, oy, oz = frame.xyz()
+            expected_lines = [
+                [(ox + c * x - s * y, oy + s * x + c * y, oz + z) for x, y, z in line]
+                for line in piece.all_centrelines(spacing)
+            ]
+            assert placement.centrelines(spacing) == expected_lines
+
+
+def test_collision_pop_restores_exact_previous_grid_and_width():
+    field = CollisionField()
+    first = [(0.0, 0.0, 0.0), (5.0, 5.0, 0.0), (10.0, 10.0, 0.0)]
+    second = [(1.0, 1.0, 0.0), (6.0, 6.0, 0.0), (11.0, 11.0, 0.0)]
+    field.add(0, first, 80.0)
+    grid_before = {key: list(bucket) for key, bucket in field._grid.items()}
+    field.add(1, second, 32.0)
+    assert field._max_half_width == 80.0
+    field.pop()
+    assert field._max_half_width == 80.0
+    assert field._grid == grid_before
+    field.pop()
+    assert field._max_half_width == 0.0
+    assert field._grid == {}
 
 
 def test_state_and_candidate_return_values_cannot_poison_later_responses(monkeypatch):

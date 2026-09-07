@@ -82,6 +82,13 @@ def _canonical_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, 
     (they are the left and the right turn).  Used both to enumerate search moves and
     to normalise loop signatures, so both sides agree on what "the same move" means.
     """
+    return dict(_cached_canonical_traversals(piece))
+
+
+@lru_cache(maxsize=128)
+def _cached_canonical_traversals(
+    piece: PieceType,
+) -> tuple[tuple[tuple[int, int], tuple[int, int]], ...]:
     canon: dict[tuple[int, int], tuple[int, int]] = {}
     by_key: dict[tuple, tuple[int, int]] = {}
     for entry in range(len(piece.ports)):
@@ -89,7 +96,7 @@ def _canonical_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, 
             key = _traversal_key(piece, entry, exit_port)
             representative = by_key.setdefault(key, (entry, exit_port))
             canon[(entry, exit_port)] = representative
-    return canon
+    return tuple(canon.items())
 
 
 def _moves_for(piece: PieceType) -> list[Move]:
@@ -123,16 +130,21 @@ def _mirror_ports(piece: PieceType) -> dict[int, int | None]:
     for that port (the crossing's diagonal ports), in which case callers skip the
     mirror candidate rather than mis-pair.
     """
+    return dict(_cached_mirror_ports(piece))
+
+
+@lru_cache(maxsize=128)
+def _cached_mirror_ports(piece: PieceType) -> tuple[tuple[int, int | None], ...]:
     by_pose = {
         (p.pose.x, p.pose.y, p.pose.z, p.pose.heading): i
         for i, p in enumerate(piece.ports)
     }
-    return {
+    return tuple({
         i: by_pose.get(
             (p.pose.x, -p.pose.y, p.pose.z, (-p.pose.heading) % HEADING_STEPS)
         )
         for i, p in enumerate(piece.ports)
-    }
+    }.items())
 
 
 def _mirror_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, int] | None]:
@@ -145,6 +157,13 @@ def _mirror_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, int
     readings, a switch's two branches, and even a crossing's two routes; a genuinely
     single-handed piece maps to ``None`` (its loops have no buildable mirror twin).
     """
+    return dict(_cached_mirror_traversals(piece))
+
+
+@lru_cache(maxsize=128)
+def _cached_mirror_traversals(
+    piece: PieceType,
+) -> tuple[tuple[tuple[int, int], tuple[int, int] | None], ...]:
     by_key: dict[tuple, tuple[int, int]] = {}
     traversals: list[tuple[int, int]] = []
     for entry in range(len(piece.ports)):
@@ -163,9 +182,10 @@ def _mirror_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, int
         )
         partner = by_key.get(mirrored_key)
         mirror[(entry, exit_port)] = canon[partner] if partner is not None else None
-    return mirror
+    return tuple(mirror.items())
 
 
+@lru_cache(maxsize=128)
 def _turn_capacity(piece: PieceType) -> int:
     """Largest |heading swing| any single traversal of this piece can contribute."""
     best = 0
@@ -179,6 +199,7 @@ def _turn_capacity(piece: PieceType) -> int:
     return best
 
 
+@lru_cache(maxsize=128)
 def _max_span(piece: PieceType) -> float:
     best = 0.0
     for i, a in enumerate(piece.ports):
