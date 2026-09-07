@@ -15,7 +15,7 @@ Everything below is over the raw `Wiring` / `stepN` dynamics, for arbitrary
 -/
 
 namespace GeneralN
-/-- Pointwise strengthening of `reverse_candy_suffix_absorbs`.  Both possible
+/-- The reverse candy suffix absorbs a fault pointwise.  Both possible
 starting phases follow the same physical suffix.  Starting in `contact` makes
 exactly the action-tongue repair at `firstArm`; starting in `alternate` makes
 no change.  Thus every intermediate tongue vector is `contact` or

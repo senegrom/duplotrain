@@ -1,4 +1,3 @@
-import RunwaySpliceNovelty
 import SharpStateLawAssembly
 
 /-!

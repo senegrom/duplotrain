@@ -4,9 +4,8 @@ import PartialSecondRunSharp
 # Coefficient-one continuation bounds
 
 Assemble cycle, changed-contact, and two-reflector continuation bounds.
-The sharp known-edge frontier works on total wirings, so the former
-`OneReflectorSecondDead` classification and its periodicity contradiction
-are no longer needed.
+The sharp known-edge frontier works on total wirings, on which every
+probe is live, so no dead-continuation case arises.
 -/
 
 namespace GeneralN

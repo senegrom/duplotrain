@@ -1,5 +1,4 @@
 import PairActionCorners
-import SingleCoordinateFlip
 
 /-!
 # Four-vector complete protected repair

@@ -1,5 +1,4 @@
 import OneReflectorContinuation
-import TripleSelfLinkSimpleCycleClosure
 
 /-!
 # Sharp partial second-run accounting
