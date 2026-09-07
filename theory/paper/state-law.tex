@@ -53,8 +53,8 @@
   layout.  The whole law is machine-checked as a single Lean~4 theorem,
   \lean{GeneralN.state\_law}, built without Mathlib, whose axiom audit is
   exactly the three standard Lean axioms.  This document is a
-  human-readable rendering of that proof: complete for the model, the
-  $2^N$ ceiling, and every attainment construction, and a structured
+  human-readable rendering of that proof: complete for the model and
+  every attainment construction, and a structured
   account of the sharp $N+4$ upper bound.
 \end{abstract}
 
@@ -826,44 +826,17 @@ its incoming edge: induction reverses the tail and then the head.
 This one fact covers reverse loops, reverse arbitrary lobes, and final
 runway returns, including empty paths.
 
-\section{The ceiling: $f(N) \le 2^N$}\label{sec:ceiling}
-
-\begin{proposition}[Finite-state ceiling; \lean{state\_law\_two\_pow},
-  \file{StateLawSmallN.lean}]\label{prop:ceiling}
-  For every wiring, every start, and every list of sample times whose
-  restricted tongue vectors are pairwise distinct, the list has length at
-  most $2^N$.  No liveness assumption is needed.
-\end{proposition}
-
-\begin{proof}
-  Send a boolean list $b_0 b_1 \cdots b_{m-1}$ to its little-endian binary
-  value $\sum_i b_i 2^i$.  On lists of one fixed length this map is
-  injective (the head is the value modulo~$2$, the tail its half) and takes
-  values below $2^m$.  Restricted vectors have length $N$, so pairwise
-  distinct vectors map to pairwise distinct naturals below $2^N$.
-\end{proof}
-
-\begin{lemma}[\lean{add\_four\_le\_two\_pow}, \file{StateLawSmallN.lean}]
-  \label{lem:minside}
-  $N + 4 \le 2^N$ for $N \ge 3$; so $\min(2^N, N+4) = N+4$ for $N \ge 3$
-  and $= 2^N$ for $N \le 2$.
-\end{lemma}
-
-\begin{proof}
-  $3 + 4 = 7 \le 8$, and doubling outgrows adding one.
-\end{proof}
-
 \section{Assembly}\label{sec:assembly}
 
-\begin{proof}[Proof of Theorem~\ref{thm:main}]
-  \emph{Upper bound:} a duplicate-free sample list is bounded by $2^N$
-  (Proposition~\ref{prop:ceiling}) and by $N+4$
-  (Theorem~\ref{thm:upper}), hence by their minimum.
+\begin{proof}[Proof of Theorem~\ref{thm:main}]\sloppy
+  \emph{Upper bound:} there are only $2^N$ Boolean tongue vectors
+  (\lean{state\_law\_two\_pow}), and a duplicate-free sample list is
+  also bounded by $N+4$ (Theorem~\ref{thm:upper}), hence by their minimum.
   \emph{Attainment:} for $N = 0$ the empty layout, for $N = 1$ the
   teardrop, for $N = 2$ the dogbone (Section~\ref{sec:small}), each
   attaining $2^N = \min(2^N, N+4)$; for $N \ge 3$ the extremal family
-  (Theorem~\ref{thm:lower}) attains $N+4$, which is the minimum by
-  Lemma~\ref{lem:minside}.
+  (Theorem~\ref{thm:lower}) attains $N+4$, which is the minimum since
+  $N+4 \le 2^N$ for $N \ge 3$ (\lean{add\_four\_le\_two\_pow}).
 \end{proof}
 
 \section{Beyond the count: a conjectured structure theorem}
