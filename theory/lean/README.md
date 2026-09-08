@@ -447,6 +447,7 @@ comments and blanks, not just proof tactics.
 | After unified coordinate counting and direct duplicate-sample omission | 44 | 10,849 |
 | After direct first-writer induction and unified first-revisit probes | 43 | 10,447 |
 | After unified repair traversal and early protected-contact exclusion | 43 | 10,155 |
+| After direct historical phases and manufacturing-return coverage | 39 | 9,673 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -605,4 +606,20 @@ candy-return theorem handles either starting phase in one statement.
 
 All seven protected files remain byte-for-byte unchanged. A clean build checks
 all **89 jobs** without warnings, the exact axiom audit passes, and all **343**
+public source theorems remain in the headline proof's kernel dependency closure.
+
+The direct-phase pass removes **482 Lean source lines**, from **10,174 to
+9,692**, a **4.7%** reduction. The proof now has **40 files**, including the
+unchanged audit; counts include every helper, comment, and blank line.
+
+Facing-forward repairs introduce zero new vectors: the contact and its action
+alternate are exactly the two already historical states. This replaces the
+three-state bound and historical-witness counting chain. Manufacturing history
+coverage follows directly from the return retrace's pointwise state formula.
+The remaining helpers move to their underlying modules, eliminating
+`StateLawTwoCandidate`, `BoundaryOverlapTailCount`, `EarlyFacingConstant`, and
+`SharpStateLawAssembly`.
+
+All seven protected files remain byte-for-byte unchanged. A clean build checks
+all **81 jobs** without warnings, the exact axiom audit passes, and all **337**
 public source theorems remain in the headline proof's kernel dependency closure.

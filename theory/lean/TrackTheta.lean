@@ -647,6 +647,19 @@ theorem ManufacturedReflector.orientedRoute_simple
       · simpa [ManufacturedReflector.orientedRoute, hselected] using
           R.reverse_support_simple
 
+/-- A prefix of the oriented route is switch-simple and stays on the route. -/
+theorem ManufacturedReflector.orientedRoute_prefix_simple_and_mem
+    {w : Wiring} {g e : Nat} (A : ManufacturedReflector w g e) (state : Tongues)
+    {before rest : List Passage}
+    (hsplit : A.orientedRoute state = before ++ rest) :
+    SwitchSimple before ∧ ∀ passage ∈ before, passage ∈ A.orientedRoute state := by
+  have hrouteSimple := A.orientedRoute_simple state
+  rw [hsplit] at hrouteSimple
+  refine ⟨?_, fun passage hp => by rw [hsplit]; exact List.mem_append_left _ hp⟩
+  unfold SwitchSimple at hrouteSimple ⊢
+  simp only [List.map_append] at hrouteSimple
+  exact (List.nodup_append.mp hrouteSimple).1
+
 /-- Every reusable support passage occurs on the selected outward route,
 possibly in the opposite orientation when the candy is traversed backwards.
 -/

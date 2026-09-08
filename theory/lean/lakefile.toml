@@ -2,9 +2,7 @@ name = "duplotrain"
 defaultTargets = [
   "WiringCompletion",
   "StateLawBounds",
-  "BoundaryOverlapTailCount",
   "ChangedContactNAddFour",
-  "EarlyFacingConstant",
   "FacingForwardNovelty",
   "ForeignSpliceNovelty",
   "GeneralN",
@@ -20,7 +18,6 @@ defaultTargets = [
   "RepeatedNoveltyDecomposition",
   "RunwaySpliceNovelty",
   "SharpCertificateClosure",
-  "SharpStateLawAssembly",
   "SimpleTraceOneNetChange",
   "StateLaw",
   "StateLawAxiomAudit",
@@ -28,7 +25,6 @@ defaultTargets = [
   "StateLawLowerBound",
   "StateLawNAddFourSharp",
   "StateLawSmallN",
-  "StateLawTwoCandidate",
   "TrackEndpointMatching",
   "TrackFiniteAlternation",
   "TrackGlobalRepair",
@@ -47,13 +43,7 @@ defaultTargets = [
 ]
 
 [[lean_lib]]
-name = "BoundaryOverlapTailCount"
-
-[[lean_lib]]
 name = "ChangedContactNAddFour"
-
-[[lean_lib]]
-name = "EarlyFacingConstant"
 
 [[lean_lib]]
 name = "FacingForwardNovelty"
@@ -101,9 +91,6 @@ name = "RunwaySpliceNovelty"
 name = "SharpCertificateClosure"
 
 [[lean_lib]]
-name = "SharpStateLawAssembly"
-
-[[lean_lib]]
 name = "SimpleTraceOneNetChange"
 
 [[lean_lib]]
@@ -123,9 +110,6 @@ name = "StateLawNAddFourSharp"
 
 [[lean_lib]]
 name = "StateLawSmallN"
-
-[[lean_lib]]
-name = "StateLawTwoCandidate"
 
 
 [[lean_lib]]

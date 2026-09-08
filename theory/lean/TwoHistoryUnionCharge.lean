@@ -1,4 +1,4 @@
-import StateLawTwoCandidate
+import TripleSelfLinkSimpleCycleClosure
 import PairActionCorners
 
 /-!

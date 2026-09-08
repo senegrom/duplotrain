@@ -2,20 +2,11 @@ import VectorCount
 import TrackNovelReplay
 
 /-!
-# Novelty covers for completed physical retraces
+# Restricted-vector covers and finite sample counts
 
-`TrackNovelReplay` proves the pointwise fact behind novelty accounting: once
-a train contacts the exit of an old grooved physical trace, every positive
-time on the completed reverse traversal carries the one contact tongue
-vector.
-
-This file packages that fact as an exact cover and as a counting theorem.
-The semantic premise `PassagesGrooved v recorded` is essential.  Mere switch
-simplicity of the old trace does not imply that an arbitrary contact vector
-still grooves it, so no theorem below hides that premise.
-
-A completed retrace whose initial vector is already historical contributes
-at most one new restricted tongue vector, regardless of its length.
+A cover separates already historical vectors from a bounded list of new
+vectors. Distinct samples cannot outnumber the cover. A dead horizon also
+bounds distinct live samples by the number of preceding times.
 -/
 
 namespace GeneralN
@@ -54,47 +45,28 @@ theorem noveltyCoverOn_distinct_count
   omega
 
 
-theorem completed_retrace_at_vector_mem_history_or_contact
-    {w : Wiring} {g e p oldEntry : Nat}
-    {base mouthState u v : Tongues}
-    {recorded : List Passage}
-    (hrecorded :
-      PhysicalTrace w (g, base) recorded (oldEntry, mouthState))
-    (hgrooved : PassagesGrooved v recorded)
-    (hentry : w.link e = some g)
-    (hcontact : arrive u p = (oldEntry, v))
-    {start : Nat × Tongues} {K : Nat}
-    (hreach : stepN w K start = some (p, u))
-    (N : Nat) (history : List (List Bool))
-    (hu : VectorCount.restrict N u ∈ history)
-    {j : Nat} (hlower : K ≤ j)
-    (hupper : j ≤ K + recorded.length + 1) :
-    restrictedTonguesAt w N start j ∈ history ∨
-      restrictedTonguesAt w N start j =
-        VectorCount.restrict N v := by
-  let d := j - K
-  have hd : d ≤ recorded.length + 1 := by
-    dsimp [d]
-    omega
-  obtain ⟨port, hlocal⟩ :=
-    (physicalTrace_contact_retraces_prefix_pointwise
-      hrecorded hgrooved hentry hcontact) d hd
-  have hj : j = K + d := by
-    dsimp [d]
-    omega
-  have hglobal :
-      stepN w j start =
-        some (port, if d = 0 then u else v) := by
-    rw [hj, stepN_add, hreach]
-    exact hlocal
-  have hvector :
-      restrictedTonguesAt w N start j =
-        VectorCount.restrict N (if d = 0 then u else v) := by
-    simp [restrictedTonguesAt, tonguesAt, hglobal]
-  by_cases hzero : d = 0
-  · left
-    rw [hvector, if_pos hzero]
-    exact hu
-  · right
-    rw [hvector, if_neg hzero]
+/-- If the train is off-track at time `L`, a list of live sample times whose
+restricted tongue vectors are pairwise distinct has length at most `L`.
+
+The conclusion is positional, not dynamical: every live sample lies in the
+finite interval `[0,L)`, and vector-nodup implies time-nodup. -/
+theorem dead_horizon_live_distinct_le
+    {w : Wiring} {N L : Nat} {start : Nat × Tongues}
+    (hdead : stepN w L start = none)
+    (times : List Nat)
+    (hlive : ∀ k ∈ times, (stepN w k start).isSome)
+    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
+    times.length ≤ L := by
+  have htimesNodup : times.Nodup :=
+    List.Pairwise.of_map (restrictedTonguesAt w N start)
+      (fun _ _ hne hEq => hne (congrArg _ hEq)) hnd
+  have hlt : ∀ k ∈ times, k < L := by
+    intro k hk
+    by_cases hsmall : k < L
+    · exact hsmall
+    · have hkLive := hlive k hk
+      rw [show k = L + (k - L) by omega, stepN_add, hdead] at hkLive
+      simp at hkLive
+  exact nodup_nat_lt_length htimesNodup hlt
+
 end GeneralN

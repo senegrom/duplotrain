@@ -1,4 +1,4 @@
-import SharpStateLawAssembly
+import RepeatedNoveltyDecomposition
 
 /-!
 # Time shifts and first-writer history coverage

@@ -79,6 +79,42 @@ theorem cover_of_live_phase_orbit
     obtain ⟨port, phase, hr, hs⟩ := horbit d
     simpa [restrictedTonguesAt, tonguesAt, stepN_add, hreach, hr] using hcover _ hs
 
+/-- The recorded exploration followed by its return retrace reaches activation. -/
+theorem ManufacturedReflector.manufacturing_journey_reaches_activated
+    {w : Wiring} {g e : Nat} (A : ManufacturedReflector w g e)
+    (hpaths : PathGrooves A.toSupported.paths A.activatedState) :
+    stepN w (A.exploration.length + A.runway.length + 1)
+      (g, A.baseState) = some (e, A.activatedState) := by
+  have hreturn := physicalTrace_contact_retraces_prefix A.runway_trace
+    (hpaths A.runway A.runway_mem_support) A.entryEdge A.return_arrive_mouth
+  simpa [reversePassages_length, Nat.add_assoc] using (A.exploration_trace.append hreturn).sound
+
+def ManufacturedReflector.sharpConstructionHistory
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e) (N : Nat) : List (List Bool) :=
+  ((List.range (A.exploration.length + 1)).map
+      (restrictedTonguesAt w N (g, A.baseState))) ++
+    [VectorCount.restrict N A.activatedState]
+
+/-- Every exploration sample is recorded; every later return sample is activated. -/
+theorem ManufacturedReflector.manufacturing_journey_mem_sharpHistory
+    {w : Wiring} {g e N : Nat} (A : ManufacturedReflector w g e)
+    (hpaths : PathGrooves A.toSupported.paths A.activatedState)
+    {j : Nat} (hj : j ≤ A.exploration.length + A.runway.length + 1) :
+    restrictedTonguesAt w N (g, A.baseState) j ∈ A.sharpConstructionHistory N := by
+  by_cases hearly : j ≤ A.exploration.length
+  · exact List.mem_append_left _ (List.mem_map.mpr ⟨j, List.mem_range.mpr (by omega), rfl⟩)
+  · obtain ⟨port, hr⟩ := physicalTrace_contact_retraces_prefix_pointwise A.runway_trace
+      (hpaths A.runway A.runway_mem_support) A.entryEdge A.return_arrive_mouth
+      (j - A.exploration.length) (by omega)
+    have hpos : j - A.exploration.length ≠ 0 := by omega
+    have hrun : stepN w j (g, A.baseState) = some (port, A.activatedState) := by
+      rw [show j = A.exploration.length + (j - A.exploration.length) by omega,
+        stepN_add, A.exploration_trace.sound]
+      simpa [hpos] using hr
+    apply List.mem_append_right
+    simp [restrictedTonguesAt, tonguesAt, hrun]
+
 /-- A manufactured reflector's local action avoids every switch in its own
 retained groove support. -/
 theorem ManufacturedReflector.action_avoids_own_support
