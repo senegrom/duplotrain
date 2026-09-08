@@ -260,13 +260,6 @@ theorem ManufacturedFlipReflector.runway_trace
     PhysicalTrace w (g, state) A.runway (A.mouth, state) := by
   exact A.runwayTrace.replay_grooved state hgrooved
 
-/-- The first candy arm is grooved whenever the action tongue selects it. -/
-theorem ManufacturedFlipReflector.firstArm_groove_of_selected
-    (state : Tongues) (hselected : state A.actionSwitch = bval A.firstArm) :
-    arrive state A.firstArm = (A.mouth, state) :=
-  stem_branch_groove A.mouth_is_stem A.firstArm_branch A.firstArm_switch
-    (by simpa only [A.firstArm_switch] using hselected)
-
 /-- Candy traversal in its recorded direction, before the mouth switch is
 pinned on the return arm. -/
 theorem ManufacturedFlipReflector.candy_forward_trace
@@ -280,7 +273,8 @@ theorem ManufacturedFlipReflector.candy_forward_trace
     A.candyTrace.linked ?_ A.candyTrace.last_link
   intro passage hp
   rcases List.mem_cons.mp hp with rfl | hp
-  · exact A.firstArm_groove_of_selected state hselected
+  · exact stem_branch_groove A.mouth_is_stem A.firstArm_branch A.firstArm_switch
+      (by simpa only [A.firstArm_switch] using hselected)
   · exact hgrooved passage hp
 
 /-- Candy traversal in the opposite direction, with the reverse passage
@@ -380,13 +374,13 @@ def ManufacturedStayReflector.toSupported
   action := .stay
   run := by
     have href := A.runwayTrace.sandwich_reflector A.entryEdge
-      (fun _ hmouth => self_edge_groove_isReflector w A.selfLink hmouth)
+      (fun _ hmouth state hg => ⟨by simpa using (PhysicalTrace.cons (groove_forward hg)
+        A.selfLink (PhysicalTrace.cons hg hmouth (PhysicalTrace.nil _))).sound, hg⟩)
       (fun _ hg => hg)
     intro state hpaths
     have hp := pathGrooves_pair.mp hpaths
     obtain ⟨hr, hg, hs⟩ := href state ⟨hp.1, passagesGrooved_singleton.mp hp.2⟩
     exact ⟨hr, pathGrooves_pair.mpr ⟨hg, passagesGrooved_singleton.mpr hs⟩⟩
-
 
 theorem ManufacturedStayReflector.runway_trace
     {w : Wiring} {g e : Nat}
@@ -715,13 +709,6 @@ theorem pathGrooves_after_arrive_without_support_change
   · apply arrive_preserves_other harrive
     rw [hexit]
     exact hsame
-theorem same_groove_same_tongue
-    {u v : Tongues} {old : Passage}
-    (hu : arrive u old.2 = (old.1, u))
-    (hv : arrive v old.2 = (old.1, v)) :
-    u (passageSwitch old) = v (passageSwitch old) := by
-  exact grooved_states_agree_on_passage (groove_forward hu) (groove_forward hv)
-
 theorem PhysicalTrace.first_changed_support_passage
     {w : Wiring} {start finish : Nat × Tongues}
     {passages : List Passage} {paths : List (List Passage)}
@@ -751,7 +738,6 @@ theorem PhysicalTrace.first_changed_support_passage
         exact ⟨(p, x) :: before, p', x', after, u', v', path, old, by simp [hs],
           PhysicalTrace.cons harrive hlink ht, hg, ha, hp, ho, hj, hc⟩
 
-
 theorem ManufacturedReflector.entryEdge
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e) :
@@ -759,15 +745,6 @@ theorem ManufacturedReflector.entryEdge
   cases A with
   | stay R => exact R.entryEdge
   | flip R => exact R.entryEdge
-
-
-
-theorem contact_of_not_avoids_flip
-    {paths : List (List Passage)} {k : Nat}
-    (hnot : ¬ (LocalAction.flip k).Avoids paths) :
-    ∃ path ∈ paths, ∃ passage ∈ path,
-      passageSwitch passage = k := by
-  simpa [LocalAction.Avoids] using hnot
 
 theorem ManufacturedReflector.travel_pos
     {w : Wiring} {g e : Nat}

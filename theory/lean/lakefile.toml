@@ -19,7 +19,6 @@ defaultTargets = [
   "StateLawLowerBound",
   "StateLawNAddFourSharp",
   "StateLawSmallN",
-  "TrackEndpointMatching",
   "TrackFiniteAlternation",
   "TrackGlobalRepair",
   "TrackLobe",
@@ -84,9 +83,6 @@ name = "StateLawNAddFourSharp"
 [[lean_lib]]
 name = "StateLawSmallN"
 
-
-[[lean_lib]]
-name = "TrackEndpointMatching"
 
 [[lean_lib]]
 name = "TrackFiniteAlternation"

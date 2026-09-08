@@ -64,13 +64,6 @@ theorem lb_link_chain_stem {N k : Nat} (hk2 : 2 ≤ k)
   unfold lbLink
   grind (splits := 12)
 
-/-- The family is symmetric for `N ≥ 3`. -/
-theorem lb_symm {N : Nat} (h3 : 3 ≤ N) :
-    ∀ p q, lbLink N p = some q → lbLink N q = some p := by
-  intro p q h
-  unfold lbLink at h ⊢
-  grind (splits := 40)
-
 /-- Every linked port lies below `3*N`. -/
 theorem lb_bound {N : Nat} (h3 : 3 ≤ N) :
     ∀ p q, lbLink N p = some q → p < 3 * N ∧ q < 3 * N := by
@@ -80,7 +73,7 @@ theorem lb_bound {N : Nat} (h3 : 3 ≤ N) :
 
 /-- The lower-bound wiring. -/
 def lbWiring (N : Nat) (h3 : 3 ≤ N) : Wiring :=
-  ⟨lbLink N, lb_symm h3⟩
+  ⟨lbLink N, fun p q h => by unfold lbLink at h ⊢; grind (splits := 40)⟩
 
 /-! ## The tongue states of the witness run -/
 
@@ -192,26 +185,6 @@ theorem lb_TA_succ {N m : Nat} :
     (fun j => if j = N - 2 - m then true else lbTA N m j) =
       lbTA N (m + 1) := by grind [lbTA]
 
-theorem lb_TA_to_TB {N : Nat} :
-    (fun j => if j = 0 then true else lbTA N (N - 2) j) = lbTB N := by grind [
-      lbTA, lbTB]
-
-theorem lb_TB_to_TC {N : Nat} :
-    (fun j => if j = N - 1 then true else lbTB N j) = lbTC N := by grind [lbTB,
-      lbTC]
-
-theorem lb_TC_to_TD {N : Nat} :
-    (fun j => if j = N - 2 then false else lbTC N j) = lbTD N := by grind [
-      lbTC, lbTD]
-
-theorem lb_TD_to_TE {N : Nat} :
-    (fun j => if j = 0 then false else lbTD N j) = lbTE N := by grind [lbTD,
-      lbTE]
-
-theorem lb_TE_to_TF {N : Nat} (h3 : 3 ≤ N) :
-    (fun j => if j = N - 2 then true else lbTE N j) = lbTF N := by grind [lbTE,
-      lbTF]
-
 /-! ## The trajectory -/
 
 section Trajectory
@@ -302,7 +275,7 @@ theorem lb_cfg_N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     have hlink : (lbWiring N h3).link (3 * 0) = some 3 := by
       show lbLink N 0 = some 3
       grind [lbLink]
-    rw [lb_stepN_br2 hlink, lb_TA_to_TB]
+    rw [lb_stepN_br2 hlink]; congr 2; funext j; grind [lbTA, lbTB]
   have hidx : (N - 1) + 1 = N := by omega
   rw [hidx] at hmain
   exact hmain
@@ -362,7 +335,7 @@ theorem lb_cfg_2N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
       some (3 * (N - 2) + 1) := by
     show lbLink N (3 * (N - 1)) = _
     grind [lbLink]
-  rw [lb_stepN_br2 hlink, lb_TB_to_TC]
+  rw [lb_stepN_br2 hlink]; congr 2; funext j; grind [lbTB, lbTC]
 
 /-- Reopening the near end switch: time `2N`. -/
 theorem lb_cfg_2N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
@@ -379,7 +352,7 @@ theorem lb_cfg_2N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     have hidx : N - 2 - 1 = N - 3 := by omega
     rw [hidx] at hthis
     exact hthis
-  rw [lb_stepN_br1 hlink, lb_TC_to_TD]
+  rw [lb_stepN_br1 hlink]; congr 2; funext j; grind [lbTC, lbTD]
 
 /-- Phase C: gliding back down with the near end switch open. -/
 theorem lb_phaseC (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
@@ -463,7 +436,7 @@ theorem lb_cfg_3N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
   have hlink : (lbWiring N h3).link (3 * 0) = some 3 := by
     show lbLink N 0 = some 3
     grind [lbLink]
-  rw [lb_stepN_br1 hlink, lb_TD_to_TE]
+  rw [lb_stepN_br1 hlink]; congr 2; funext j; grind [lbTD, lbTE]
 
 /-- Phase D: riding back up with teardrop and near end both open. -/
 theorem lb_phaseD (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
@@ -542,7 +515,7 @@ theorem lb_cfg_4N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     have hidx : N - 2 - 1 = N - 3 := by omega
     rw [hidx] at hthis
     exact hthis
-  rw [lb_stepN_br2 hlink, lb_TE_to_TF h3]
+  rw [lb_stepN_br2 hlink]; congr 2; funext j; grind [lbTE, lbTF]
 
 end Trajectory
 
@@ -566,26 +539,11 @@ macro "lb_ne" N:term : tactic => `(tactic| first
   | exact lb_restrict_ne (j := $N - 2) (by omega)
       (by simp only [lbTA, lbTB, lbTC, lbTD, lbTE, lbTF]; grind))
 
-section Distinct
-
-variable {N : Nat}
-
-theorem lb_ne_TA_TA (h4 : 4 ≤ N) {m m' : Nat} (hlt : m < m')
-    (hm' : m' ≤ N - 2) :
-    VectorCount.restrict N (lbTA N m) ≠
-      VectorCount.restrict N (lbTA N m') :=
-  lb_restrict_ne (j := N - 1 - m') (by omega) (by unfold lbTA; grind)
-
-end Distinct
-
 /-! ## Assembly -/
 
 /-- The sample times. -/
 def lbTimes (N : Nat) : List Nat :=
   (List.range (N - 1)) ++ [N, 2 * N - 1, 2 * N, 3 * N - 1, 4 * N - 1]
-
-theorem lb_times_length {N : Nat} (h4 : 4 ≤ N) :
-    (lbTimes N).length = N + 4 := by grind [lbTimes]
 
 /-- The vector visited at each chain time. -/
 theorem lb_vector_range {N : Nat} (h4 : 4 ≤ N) (h3 : 3 ≤ N)
@@ -610,7 +568,7 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
         ks.length = N + 4 := by
   have h3 : 3 ≤ N := by omega
   refine ⟨lbWiring N h3, lb_bound h3, lbStart N, lbTimes N,
-    ?_, ?_, lb_times_length h4⟩
+    ?_, ?_, by grind [lbTimes]⟩
   · intro k hk
     unfold lbTimes at hk
     rcases List.mem_append.mp hk with hkr | hks
@@ -667,9 +625,8 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
       by_cases hab : a = b
       · exact hab
       · rcases Nat.lt_or_ge a b with hlt | hge
-        · exact absurd hEq (lb_ne_TA_TA h4 hlt (by omega))
-        · have hlt : b < a := by omega
-          exact absurd hEq.symm (lb_ne_TA_TA h4 hlt (by omega))
+        · exact absurd hEq (lb_restrict_ne (j := N - 1 - b) (by omega) (by unfold lbTA; grind))
+        · exact absurd hEq.symm (lb_restrict_ne (j := N - 1 - a) (by omega) (by unfold lbTA; grind))
       exact List.nodup_range
     · simp only [List.nodup_cons, List.mem_cons, List.not_mem_nil, or_false, not_or,
         List.nodup_nil, not_false_eq_true, and_true]

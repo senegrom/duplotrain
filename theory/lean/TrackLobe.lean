@@ -14,26 +14,6 @@ It is the component needed to compose two lobes into the dumbbell Gray square.
 
 namespace GeneralN
 
-/-- Pinning the other branch and then pinning `x` restores a state which was
-already aligned with `x`. -/
-theorem pin_other_then_restore {u : Tongues} {x q : Nat}
-    (hsw : x / 3 = q / 3) (haligned : u (x / 3) = bval x) :
-    pin (pin u q) x = u := by
-  funext j
-  by_cases hj : j = x / 3 <;> simp [pin, hj, ← hsw, haligned]
-
-/-- Changing the mouth switch preserves every groove on a switch-disjoint
-interior path. -/
-theorem grooved_after_pin_other
-    {u : Tongues} {q : Nat} {path : List Passage}
-    (hgrooved : PassagesGrooved u path)
-    (hforeign : ∀ passage ∈ path,
-      passageSwitch passage ≠ q / 3) :
-    PassagesGrooved (pin u q) path := by
-  apply hgrooved.transfer
-  intro passage hp
-  simp [pin, hforeign passage hp]
-
 /-- Flipping a switch preserves every groove on a switch-disjoint path. -/
 theorem grooved_after_flip_other
     {u : Tongues} {k : Nat} {path : List Passage}
@@ -101,8 +81,11 @@ theorem stem_lobe_route
   have hselected : base (x / 3) = bval x := by simp [base, pin]
   have hbaseHead : arrive base x = (p, base) := by
     simp [arrive, hxbranch, pin_of_agrees hselected, show 3 * (x / 3) = p by omega]
-  have hbasePath := grooved_after_pin_other (q := x) hgrooved
-    (fun passage hp => by simpa [← hpx] using hforeign passage hp)
+  have hbasePath : PassagesGrooved base path := by
+    apply hgrooved.transfer
+    intro passage hp
+    have hne : passageSwitch passage ≠ x / 3 := by simpa [← hpx] using hforeign passage hp
+    simp [base, pin, hne]
   have hbaseGrooved : PassagesGrooved base ((p, x) :: path) := by
     intro passage hp
     rcases List.mem_cons.mp hp with rfl | hp
@@ -118,8 +101,11 @@ theorem stem_lobe_route
     simp [arrive, hqbranch, hflip, show 3 * (q / 3) = p by omega]
   have hrestore : arrive (flipAt base (p / 3)) x = (p, base) := by
     rw [← hflip]
-    simp [arrive, hxbranch, pin_other_then_restore (hpx.symm.trans hpq) hselected,
-      show 3 * (x / 3) = p by omega]
+    have hsw : x / 3 = q / 3 := hpx.symm.trans hpq
+    have hpinpin : pin (pin base q) x = base := by
+      funext j
+      by_cases hj : j = x / 3 <;> simp [pin, hj, ← hsw, hselected]
+    simp [arrive, hxbranch, hpinpin, show 3 * (x / 3) = p by omega]
   have hback : arrive (flipAt base (p / 3)) p = (q, flipAt base (p / 3)) := by
     simpa only [hcrossed] using arrive_back base q
   have hpathFlip := grooved_after_flip_other hbasePath hforeign
@@ -217,19 +203,6 @@ theorem same_exit_excursion_path_nil
           exact (hne ((Option.some.inj (hlink.symm.trans hlast)).symm.trans
             tail.head_arrive.1)).elim
 
-/-- A grooved passage whose exit edge is self-linked is an identity
-reflector: it traverses the switch out and immediately back, then leaves over
-the mouth edge. -/
-theorem self_edge_groove_isReflector
-    (w : Wiring) {p x outside : Nat}
-    (hself : w.link x = some x) (hmouth : w.link p = some outside) :
-    IsReflector w p outside 2
-      (fun state => arrive state x = (p, state))
-      (fun state => state) := by
-  intro state hg
-  exact ⟨by simpa using (PhysicalTrace.cons (groove_forward hg) hself
-    (PhysicalTrace.cons hg hmouth (PhysicalTrace.nil _))).sound, hg⟩
-
 /-- A grooved runway transports any core reflector. Empty and nonempty
 runways share this interface, so each reflector construction needs only its
 core law and preservation of the runway grooves. -/
@@ -294,6 +267,5 @@ theorem crossed_revisit_full_reflector
       exact stem_lobe_isReflector w _ hp hx hq hpx hpq hxq hexcursionSimple
         hexcursion.linked hexcursion.last_link hmouth)
     (fun _ hg => grooved_after_flip_other hg hforeign)
-
 
 end GeneralN

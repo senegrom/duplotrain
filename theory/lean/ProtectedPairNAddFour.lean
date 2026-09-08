@@ -53,7 +53,9 @@ theorem ManufacturedReflector.preReturn_grooved_protected_pair_all_run_distinct_
         exact List.mem_append_left _ (A.mem_continuationHistory B.exploration_trace (by have := List.mem_range.mp hj; omega))
       · exact List.mem_append_right _ hx
   have hpreHistorical : VectorCount.restrict N B.preReturn.2 ∈ history :=
-    hhistory _ (Or.inr B.preReturn_mem_sharpHistory)
+    hhistory (VectorCount.restrict N B.preReturn.2) (Or.inr (List.mem_append_left _
+      (List.mem_map.mpr ⟨B.exploration.length, List.mem_range.mpr (by omega),
+        by simp [restrictedTonguesAt, tonguesAt, B.exploration_trace.sound]⟩)))
   have hinitialHistorical : VectorCount.restrict N B.activatedState ∈ history :=
     hhistory _ (Or.inr B.activated_mem_sharpHistory)
   have hcount (fresh : List (List Bool))

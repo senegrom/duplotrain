@@ -14,26 +14,7 @@ corner and leaving only one fresh vector over the generic `N+3` lead.
 Everything here is symbolic in `N`; no finite enumeration is used.
 -/
 
-
 namespace GeneralN
-
-/-- A switch-simple physical trace cannot return to its literal starting
-port and then continue.  The raw writer at time zero and at the return time
-would both be the switch of that port, contradicting the indexed `Nodup`
-property of the passage word.  The tongue states need not agree. -/
-theorem PhysicalTrace.no_strict_return_to_start_port
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    {k : Nat} {returned : Tongues}
-    (hpositive : 0 < k)
-    (hinside : k < passages.length)
-    (hreturn : stepN w k start = some (start.1, returned)) : False := by
-  have heq := htrace.rawWriterAt_injective hsimple (i := 0) (by omega) hinside
-    (by simp [rawWriterAt, rawEntryAt, stepN, hreturn])
-  omega
-
 
 /-- Writing a flip reflector's action switch on a switch-simple trace whose
 endpoints groove its support forces a constant-tongue retrace of the runway
@@ -78,8 +59,10 @@ theorem ManufacturedFlipReflector.action_writer_recovers
   have hbound : approach.length ≤ returnTime := by
     apply Nat.le_of_not_gt
     intro hinside
-    exact htrace.no_strict_return_to_start_port hsimple
-      (by dsimp [returnTime]; omega) hinside hreturn
+    have heq := htrace.rawWriterAt_injective hsimple (i := 0) (by omega) hinside
+      (by simp [rawWriterAt, rawEntryAt, stepN, hreturn])
+    dsimp [returnTime] at heq
+    omega
   dsimp [returnTime] at hbound
   have hconstant {d : Nat} (hd : 0 < d) (hspan : d ≤ R.runway.length + 1) :
       restrictedTonguesAt w N (e, state) (t + d) = VectorCount.restrict N next.2 := by
@@ -100,7 +83,6 @@ def PartialSecondRunSharp.ChangedContact.approachWriterSwitches
   (rawProductiveTimes w N (e, A.activatedState)
       C.approach.length).map
     (rawWriterAt w (e, A.activatedState))
-
 
 /-- Reserving the flip action coordinate lowers the changed-contact history
 from `N+3` to `N+2`. -/

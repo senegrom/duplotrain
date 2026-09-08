@@ -90,8 +90,10 @@ theorem PhysicalTrace.productive_writer_not_old_reusable
   intro hreusable
   have hsurvives := htrace.simple_raw_productive_writer_survives hsimple hk hprod
   obtain ⟨path, hpath, old, hold, hswitch⟩ := A.mem_reusableSwitches hreusable
-  exact hsurvives (by simpa [← hswitch] using
-    (same_groove_same_tongue (hbase path hpath old hold) (hend path hpath old hold)).symm)
+  have hagree : start.2 (passageSwitch old) = finish.2 (passageSwitch old) :=
+    grooved_states_agree_on_passage (groove_forward (hbase path hpath old hold))
+      (groove_forward (hend path hpath old hold))
+  exact hsurvives (by simpa [← hswitch] using hagree.symm)
 
 /-- Removing the facing action mouth loses at most one exploration switch. -/
 theorem ManufacturedReflector.exploration_length_le_reusable_add_one
@@ -253,21 +255,6 @@ theorem ManufacturedReflector.activated_mem_sharpHistory
     {w : Wiring} {g e N : Nat} (A : ManufacturedReflector w g e) :
     VectorCount.restrict N A.activatedState ∈ A.sharpConstructionHistory N := by
   simp [ManufacturedReflector.sharpConstructionHistory]
-
-/-- The pre-return vector lies in the sharp history. -/
-theorem ManufacturedReflector.preReturn_mem_sharpHistory
-    {w : Wiring} {g e N : Nat} (A : ManufacturedReflector w g e) :
-    VectorCount.restrict N A.preReturn.2 ∈ A.sharpConstructionHistory N :=
-  List.mem_append_left _ (List.mem_map.mpr ⟨A.exploration.length,
-    List.mem_range.mpr (by omega),
-    by simp [restrictedTonguesAt, tonguesAt, A.exploration_trace.sound]⟩)
-
-/-- The activated endpoint is retained by the compressed first history. -/
-theorem ManufacturedReflector.activated_mem_sharpHistoryCore
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e) :
-    VectorCount.restrict N A.activatedState ∈ A.sharpHistoryCore N :=
-  A.mem_sharpHistoryCore_of_mem A.activated_mem_sharpHistory
 
 /-- The facing action mouth of a flip reflector is not part of its reusable
 support. -/

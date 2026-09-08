@@ -34,11 +34,6 @@ theorem arrive_stem_endpoint (t : Tongues) (p : Nat) :
     p = 3 * (p / 3) ∨ (arrive t p).1 = 3 * (p / 3) := by
   grind [arrive, branchPort]
 
-/-- The two local endpoints of a switch passage are distinct. -/
-theorem arrive_exit_ne (t : Tongues) (p : Nat) :
-    (arrive t p).1 ≠ p := by
-  grind [arrive, branchPort]
-
 /-- **Degree-three intersection.**  Any two passages through the same lazy
 point share a port.  Equivalently, revisiting a switch necessarily reuses one
 of the three incident physical track edges either on arrival or immediately
@@ -321,7 +316,6 @@ theorem PhysicalTrace.last_link {w : Wiring}
       cases h with
       | cons _ _ tail => exact ih tail
 
-
 /-- Expose the first local passage of a nonempty trace without destructively
 case-splitting the rest of the trace. -/
 theorem PhysicalTrace.head_arrive {w : Wiring}
@@ -351,7 +345,6 @@ theorem PhysicalTrace.last_exit_switch_mem {w : Wiring}
       cases h with
       | cons _ _ tail => exact List.mem_cons_of_mem _ (ih tail)
 
-
 /-- A switch-simple nonempty trace cannot have its final exit port equal its
 first entry port. -/
 theorem PhysicalTrace.simple_last_exit_ne_first_entry {w : Wiring}
@@ -364,7 +357,7 @@ theorem PhysicalTrace.simple_last_exit_ne_first_entry {w : Wiring}
   cases rest with
   | nil =>
       obtain ⟨v, harrive⟩ := h.head_arrive.2
-      have hne := arrive_exit_ne start.2 p
+      have hne : (arrive start.2 p).1 ≠ p := by grind [arrive, branchPort]
       exact hne (by simpa [harrive, lastPassageExit] using heq)
   | cons passage rest =>
       cases h with
@@ -374,7 +367,6 @@ theorem PhysicalTrace.simple_last_exit_ne_first_entry {w : Wiring}
             grind [SwitchSimple]
           apply hn
           simpa only [passageSwitch, lastPassageExit] using heq ▸ hm
-
 
 /-- Every successful finite raw run has a physical passage trace. -/
 theorem physicalTrace_of_stepN (w : Wiring) :
@@ -397,7 +389,6 @@ theorem physicalTrace_of_stepN (w : Wiring) :
       refine ⟨(start.1, exitPort start) :: passages, by simp [hlen], ?_⟩
       have ha : arrive start.2 start.1 = (exitPort start, middle.2) := Prod.ext rfl hp.2.symm
       exact PhysicalTrace.cons ha hp.1 htrace
-
 
 /-- A switch passage can modify only its own tongue. -/
 theorem arrive_preserves_other {u v : Tongues} {p x j : Nat}
@@ -473,17 +464,6 @@ theorem PhysicalTrace.switch_lt {w : Wiring} {N : Nat}
   rw [harrive] at hsame
   unfold passageSwitch
   omega
-
-/-- Every recorded passage really uses the stem of its switch. -/
-theorem PhysicalTrace.passage_stem_endpoint {w : Wiring}
-    {start finish : Nat × Tongues} {passages : List Passage}
-    (h : PhysicalTrace w start passages finish) :
-    ∀ passage ∈ passages,
-      passage.1 = 3 * passageSwitch passage ∨
-        passage.2 = 3 * passageSwitch passage := by
-  intro passage hp
-  obtain ⟨u, v, _, harrive, _⟩ := h.passage_step passage hp
-  simpa only [harrive, passageSwitch] using arrive_stem_endpoint u passage.1
 
 theorem nodup_subset_length_nat {α : Type} [BEq α] [LawfulBEq α]
     {xs pool : List α}
@@ -733,7 +713,6 @@ theorem physicalTrace_contact_retraces_prefix
   | cons passage rest =>
       have hlink := w.symm _ _ hrecorded.last_link
       exact PhysicalTrace.cons hcontact hlink (hrecorded.reverse_grooved hgrooved hentry hlink)
-
 
 /-- Every prefix of a grooved physical trace runs with the specified tongue
 vector.  The endpoint port is intentionally existential: novelty accounting

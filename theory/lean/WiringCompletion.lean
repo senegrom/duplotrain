@@ -24,18 +24,6 @@ def Wiring.completed (w : Wiring) (N : Nat) : Wiring where
 theorem Wiring.completed_preserves {w : Wiring} {a b N : Nat}
     (hab : w.link a = some b) : (w.completed N).link a = some b := by grind [Wiring.completed]
 
-/-- Completion never adds a switch. -/
-theorem Wiring.completed_bounded {w : Wiring} {N : Nat}
-    (hN : ∀ a b, w.link a = some b → a < 3 * N ∧ b < 3 * N) :
-    ∀ a b, (w.completed N).link a = some b → a < 3 * N ∧ b < 3 * N := by grind [Wiring.completed]
-
-/-- Every in-range port has a partner in the completion. -/
-theorem Wiring.completed_total (w : Wiring) {N p : Nat} (hp : p < 3 * N) :
-    ∃ q, (w.completed N).link p = some q := by
-  cases ha : w.link p with
-  | some q => exact ⟨q, w.completed_preserves ha⟩
-  | none => exact ⟨p, by simp [Wiring.completed, ha, hp]⟩
-
 /-- Every finite prefix in a bounded total wiring is live. -/
 theorem stepN_live_of_total {w : Wiring} {N : Nat}
     (hN : ∀ a b, w.link a = some b → a < 3 * N ∧ b < 3 * N)

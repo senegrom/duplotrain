@@ -106,8 +106,9 @@ theorem first_revisit_fork
       runwayTrace := by simpa using hrunway
       coreTrace := by simpa using hexcursion
       simple := hsimple
-      stemEndpoint := hexcursion.passage_stem_endpoint
-        (p, x) List.mem_cons_self
+      stemEndpoint := by
+        obtain ⟨u, v, _, harrive, _⟩ := hexcursion.passage_step (p, x) List.mem_cons_self
+        simpa only [harrive, passageSwitch] using arrive_stem_endpoint u (p, x).1
       selfLink := hself
       entryEdge := hentry
     }

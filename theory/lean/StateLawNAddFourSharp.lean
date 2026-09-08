@@ -74,9 +74,12 @@ theorem state_law_N_add_four : StateLawNAddFour := by
   change (times.map (restrictedTonguesAt w N start)).Nodup at hnd
   by_cases hstart : start.1 < 3 * N
   · let v := w.completed N
-    have hvN := w.completed_bounded hN
-    have hvtotal : ∀ p, p < 3 * N → ∃ q, v.link p = some q :=
-      fun _ hp => w.completed_total hp
+    have hvN : ∀ a b, (w.completed N).link a = some b → a < 3 * N ∧ b < 3 * N := by
+      grind [Wiring.completed]
+    have hvtotal : ∀ p, p < 3 * N → ∃ q, v.link p = some q := fun p hp => by
+      cases ha : w.link p with
+      | some q => exact ⟨q, Wiring.completed_preserves ha⟩
+      | none => exact ⟨p, by simp [v, Wiring.completed, ha, hp]⟩
     obtain ⟨e, he⟩ := hvtotal start.1 hstart
     have hreach : ∀ k ∈ times, stepN v k start = stepN w k start := by
       intro k hk

@@ -135,12 +135,8 @@ theorem teardropLink_cases (p q : Nat) (h : teardropLink p = some q) :
   | 2, h => cases h; decide
   | _ + 3, h => cases h
 
-theorem teardrop_symm :
-    ∀ p q, teardropLink p = some q → teardropLink q = some p := by
-  intro p q h
-  rcases teardropLink_cases p q h with h' | h' <;> cases h' <;> rfl
-
-def teardropWiring : Wiring := ⟨teardropLink, teardrop_symm⟩
+def teardropWiring : Wiring :=
+  ⟨teardropLink, fun p q h => by rcases teardropLink_cases p q h with h' | h' <;> cases h' <;> rfl⟩
 
 /-- `f(1) ≥ 2`: the teardrop flips its own switch on the first passage. -/
 theorem state_law_lower_bound_one :
@@ -182,13 +178,9 @@ theorem dogboneLink_cases (p q : Nat) (h : dogboneLink p = some q) :
   | 5, h => cases h; decide
   | _ + 6, h => cases h
 
-theorem dogbone_symm :
-    ∀ p q, dogboneLink p = some q → dogboneLink q = some p := by
-  intro p q h
-  rcases dogboneLink_cases p q h with h' | h' | h' | h' | h' | h' <;>
-    cases h' <;> rfl
-
-def dogboneWiring : Wiring := ⟨dogboneLink, dogbone_symm⟩
+def dogboneWiring : Wiring :=
+  ⟨dogboneLink, fun p q h => by
+    rcases dogboneLink_cases p q h with h' | h' | h' | h' | h' | h' <;> cases h' <;> rfl⟩
 
 /-- `f(2) ≥ 4`: the dogbone walks the full Gray square
 `FF → TF → TT → FT`, one tongue flip every second step. -/

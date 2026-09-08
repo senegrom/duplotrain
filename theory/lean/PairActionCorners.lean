@@ -47,11 +47,12 @@ theorem ManufacturedReflector.pair_progress
     · cases B with
       | stay R => exact (hAv hA).elim
       | flip R =>
-          have hcontact := contact_of_not_avoids_flip
-            (fun h => hAv (hA.after_avoiding_action h))
+          have hnot : ¬ (LocalAction.flip R.actionSwitch).Avoids A.toSupported.paths :=
+            fun h => hAv (hA.after_avoiding_action h)
+          obtain ⟨path, hp, old, ho, hsw⟩ : ∃ path ∈ A.toSupported.paths, ∃ passage ∈ path,
+              passageSwitch passage = R.actionSwitch := by simpa [LocalAction.Avoids] using hnot
           have htrace := A.orientedRoute_trace u hA
           have hgrooved := htrace.grooved_of_switchSimple (A.orientedRoute_simple u)
-          obtain ⟨path, hp, old, ho, hsw⟩ := hcontact
           obtain ⟨passage, hmem, horient⟩ := A.support_passage_on_orientedRoute u hp ho
           have hswitch : passageSwitch passage = R.actionSwitch := by
             rcases horient with rfl | rfl

@@ -93,7 +93,7 @@ theorem ManufacturedReflector.mem_continuationHistory
       VectorCount.restrict N A.activatedState
   · apply List.mem_append_left
     rw [hboundary]
-    exact A.activated_mem_sharpHistoryCore
+    exact A.mem_sharpHistoryCore_of_mem A.activated_mem_sharpHistory
   · apply List.mem_append_right
     exact (List.mem_erase_of_ne hboundary).mpr hm
 
