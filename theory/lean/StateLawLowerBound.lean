@@ -103,87 +103,30 @@ def lbTF (N : Nat) : Tongues :=
 def lbStart (N : Nat) : Nat × Tongues :=
   (3 * (N - 2) + 2, lbTA N 0)
 
-/-! ## Arrival helpers -/
-
-theorem lb_arrive_stem (t : Tongues) (k : Nat) :
-    arrive t (3 * k) = (branchPort k (t k), t) := by
-  simp [arrive]
-
-theorem lb_arrive_br2 (t : Tongues) (k : Nat) :
-    arrive t (3 * k + 2) =
-      (3 * k, fun j => if j = k then true else t j) := by
-  have hdiv : (3 * k + 2) / 3 = k := by omega
-  simp [arrive, hdiv]
-  funext j
-  unfold pin bval
-  rw [hdiv]
-  simp
-
-theorem lb_arrive_br1 (t : Tongues) (k : Nat) :
-    arrive t (3 * k + 1) =
-      (3 * k, fun j => if j = k then false else t j) := by
-  have hdiv : (3 * k + 1) / 3 = k := by omega
-  simp [arrive, hdiv]
-  funext j
-  unfold pin bval
-  rw [hdiv]
-  simp
-
-theorem lb_set_noop {t : Tongues} {k : Nat} (h : t k = true) :
-    (fun j => if j = k then true else t j) = t := by grind
-
-theorem lb_stepN_one (w : Wiring) (c : Nat × Tongues) :
-    stepN w 1 c = step w c := by
-  simp [stepN]
+/-! ## One-step transitions -/
 
 private theorem lb_stepN_br2 {w : Wiring} {t : Tongues} {k q : Nat}
     (hlink : w.link (3 * k) = some q) :
     stepN w 1 (3 * k + 2, t) =
       some (q, fun j => if j = k then true else t j) := by
-  rw [lb_stepN_one]
-  unfold step
-  rw [lb_arrive_br2, hlink]
-  rfl
+  have hdiv : (3 * k + 2) / 3 = k := by omega
+  simp [stepN, step, arrive, hdiv, hlink]; funext j; simp [pin, bval, hdiv]
 
 private theorem lb_stepN_br1 {w : Wiring} {t : Tongues} {k q : Nat}
     (hlink : w.link (3 * k) = some q) :
     stepN w 1 (3 * k + 1, t) =
       some (q, fun j => if j = k then false else t j) := by
-  rw [lb_stepN_one]
-  unfold step
-  rw [lb_arrive_br1, hlink]
-  rfl
+  have hdiv : (3 * k + 1) / 3 = k := by omega
+  simp [stepN, step, arrive, hdiv, hlink]; funext j; simp [pin, bval, hdiv]
 
-private theorem lb_stepN_stem_true {w : Wiring} {t : Tongues} {k q : Nat}
-    (ht : t k = true) (hlink : w.link (3 * k + 2) = some q) :
-    stepN w 1 (3 * k, t) = some (q, t) := by
-  rw [lb_stepN_one]
-  unfold step
-  rw [lb_arrive_stem]
-  simp only []
-  rw [ht]
-  simp only [branchPort, if_true]
-  rw [hlink]
-  rfl
+private theorem lb_stepN_stem {w : Wiring} {t : Tongues} {k q : Nat}
+    (hlink : w.link (branchPort k (t k)) = some q) :
+    stepN w 1 (3 * k, t) = some (q, t) := by simp [stepN, step, arrive, hlink]
 
-private theorem lb_stepN_stem_false {w : Wiring} {t : Tongues} {k q : Nat}
-    (ht : t k = false) (hlink : w.link (3 * k + 1) = some q) :
-    stepN w 1 (3 * k, t) = some (q, t) := by
-  rw [lb_stepN_one]
-  unfold step
-  rw [lb_arrive_stem]
-  simp only []
-  rw [ht]
-  unfold branchPort
-  simp only [if_neg (Bool.false_ne_true ∘ id)]
-  rw [hlink]
-  rfl
-
-/-! ## Tongue transitions -/
-
-theorem lb_TA_succ {N m : Nat} :
-    (fun j => if j = N - 2 - m then true else lbTA N m j) =
-      lbTA N (m + 1) := by grind [lbTA]
+private theorem lb_next {w : Wiring} {m n : Nat} {a b c : Nat × Tongues}
+    (h : stepN w m a = some b) (ht : n = m + 1)
+    (hs : stepN w 1 b = some c) : stepN w n a = some c := by
+  rw [ht, stepN_add, h]; exact hs
 
 /-! ## The trajectory -/
 
@@ -191,331 +134,178 @@ section Trajectory
 
 variable {N : Nat}
 
-/-- Phase A: flipping down the chain. -/
-theorem lb_phaseA (h3 : 3 ≤ N) {m : Nat}
-    (hm : m ≤ N - 3) :
-    stepN (lbWiring N h3) m (lbStart N) =
-      some (3 * (N - 2 - m) + 2, lbTA N m) := by
+/-- Both upward phases traverse the same selected chain without moving a tongue. -/
+private theorem lb_chain_up {N : Nat} (h3 : 3 ≤ N) (t : Tongues) {j : Nat}
+    (hj : j ≤ N - 3) (ht : ∀ k, 1 ≤ k → k ≤ j → t k = true) :
+    stepN (lbWiring N h3) j (3, t) = some (3 * (j + 1), t) := by
+  induction j with
+  | zero => simp [stepN]
+  | succ j ih =>
+      rw [stepN_add, ih (by omega) (fun k hk hk' => ht k hk (by omega))]
+      simp only [Option.bind_some]
+      apply lb_stepN_stem
+      simpa [lbWiring, branchPort, ht (j + 1) (by omega) (by omega)] using
+        lb_link_chain_br2 (N := N) (k := j + 1) (by omega) (by omega)
+
+/-- Descending writes the visited interval and exits at the teardrop stem. -/
+private theorem lb_chain_down {N k m : Nat} (h3 : 3 ≤ N) (t : Tongues)
+    (hk : 1 ≤ k) (hkN : k ≤ N - 2) (hm : m ≤ k) :
+    stepN (lbWiring N h3) m (3 * k + 2, t) =
+      some (if m = k then 0 else 3 * (k - m) + 2,
+        fun j => if k + 1 - m ≤ j ∧ j ≤ k then true else t j) := by
   induction m with
   | zero =>
-      simp [stepN, lbStart]
+      simp only [stepN, Nat.sub_zero, if_neg (by omega : 0 ≠ k)]
+      congr 2; funext j; grind
   | succ m ih =>
-      have hm' : m ≤ N - 3 := by omega
-      have hstep := ih hm'
-      have hone : stepN (lbWiring N h3) (m + 1) (lbStart N) =
-          (stepN (lbWiring N h3) m (lbStart N)).bind
-            (stepN (lbWiring N h3) 1) := by
-        exact stepN_add _ m 1 _
-      rw [hone, hstep]
-      simp only [Option.bind_some]
-      have hlink : (lbWiring N h3).link (3 * (N - 2 - m)) =
-          some (3 * (N - 2 - (m + 1)) + 2) := by
-        show lbLink N (3 * (N - 2 - m)) = _
-        have hthis := lb_link_chain_stem (N := N) (k := N - 2 - m)
-          (by omega) (by omega)
-        have hidx : N - 2 - m - 1 = N - 2 - (m + 1) := by omega
-        rw [hidx] at hthis
-        exact hthis
-      rw [lb_stepN_br2 hlink, lb_TA_succ]
+      rw [stepN_add, ih (by omega)]
+      simp only [Option.bind_some, if_neg (by omega : m ≠ k)]
+      have hlink : (lbWiring N h3).link (3 * (k - m)) =
+          some (if m + 1 = k then 0 else 3 * (k - (m + 1)) + 2) := by
+        by_cases h : m + 1 = k
+        · have hkm : k - m = 1 := by omega
+          simp [h, hkm, lbWiring, lbLink]
+        · simpa [lbWiring, h, Nat.sub_sub] using
+            lb_link_chain_stem (N := N) (k := k - m) (by omega) (by omega)
+      rw [lb_stepN_br2 hlink]
+      congr 2; funext j; grind
+
+/-- Phase A: flipping down the chain. -/
+theorem lb_phaseA (h3 : 3 ≤ N) {m : Nat} (hm : m ≤ N - 2) :
+    stepN (lbWiring N h3) m (lbStart N) =
+      some (if m = N - 2 then 0 else 3 * (N - 2 - m) + 2, lbTA N m) := by
+  unfold lbStart
+  rw [lb_chain_down h3 _ (by omega) (Nat.le_refl _) hm]
+  congr 2; funext j; grind [lbTA]
 
 /-- Reaching the teardrop stem at time `N-2`. -/
-theorem lb_cfg_N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
+theorem lb_cfg_N2 (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (N - 2) (lbStart N) =
       some (0, lbTA N (N - 2)) := by
-  have hmain : stepN (lbWiring N h3) ((N - 3) + 1) (lbStart N) =
-      some (0, lbTA N (N - 2)) := by
-    rw [stepN_add, lb_phaseA h3 (Nat.le_refl _)]
-    simp only [Option.bind_some]
-    have hport : 3 * (N - 2 - (N - 3)) + 2 = 3 * 1 + 2 := by omega
-    rw [hport]
-    have hlink : (lbWiring N h3).link (3 * 1) = some 0 := by
-      show lbLink N 3 = some 0
-      grind [lbLink]
-    have hT : (fun j => if j = 1 then true else lbTA N (N - 3) j) =
-        lbTA N (N - 2) := by
-      have h := lb_TA_succ (N := N) (m := N - 3)
-      have hidx : N - 2 - (N - 3) = 1 := by omega
-      rw [hidx] at h
-      have hsucc : N - 3 + 1 = N - 2 := by omega
-      rw [hsucc] at h
-      exact h
-    rw [lb_stepN_br2 hlink, hT]
-  have hidx : (N - 3) + 1 = N - 2 := by omega
-  rw [hidx] at hmain
-  exact hmain
+  simpa using lb_phaseA h3 (Nat.le_refl _)
 
 /-- Bouncing through the teardrop: time `N-1`. -/
 theorem lb_cfg_N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (N - 1) (lbStart N) =
       some (2, lbTA N (N - 2)) := by
-  have hsplit : N - 1 = (N - 2) + 1 := by omega
-  rw [hsplit, stepN_add, lb_cfg_N2 h4 h3]
-  simp only [Option.bind_some]
-  have hzero : (0 : Nat) = 3 * 0 := by omega
-  rw [hzero]
-  have hval : lbTA N (N - 2) 0 = false := by
-    unfold lbTA
-    simp only [decide_eq_false_iff_not]
-    omega
-  have hlink : (lbWiring N h3).link (3 * 0 + 1) = some 2 := by
-    show lbLink N 1 = some 2
-    grind [lbLink]
-  rw [lb_stepN_stem_false hval hlink]
+  apply lb_next (lb_cfg_N2 h3) (by omega)
+  apply lb_stepN_stem (k := 0)
+  have hidx : N - 1 - (N - 2) = 1 := by omega
+  simp [lbWiring, branchPort, lbTA, hidx, lbLink]
 
 /-- Closing the teardrop: time `N`. -/
 theorem lb_cfg_N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) N (lbStart N) =
       some (3, lbTB N) := by
-  have hmain : stepN (lbWiring N h3) ((N - 1) + 1) (lbStart N) =
-      some (3, lbTB N) := by
-    rw [stepN_add, lb_cfg_N1 h4 h3]
-    simp only [Option.bind_some]
-    have htwo : (2 : Nat) = 3 * 0 + 2 := by omega
-    rw [htwo]
-    have hlink : (lbWiring N h3).link (3 * 0) = some 3 := by
-      show lbLink N 0 = some 3
-      grind [lbLink]
-    rw [lb_stepN_br2 hlink]; congr 2; funext j; grind [lbTA, lbTB]
-  have hidx : (N - 1) + 1 = N := by omega
-  rw [hidx] at hmain
-  exact hmain
+  apply lb_next (lb_cfg_N1 h4 h3) (by omega)
+  change stepN _ 1 (3 * 0 + 2, _) = _
+  rw [lb_stepN_br2 (k := 0) (q := 3) (by simp [lbWiring, lbLink])]
+  congr 2; funext j; grind [lbTA, lbTB]
 
 /-- Phase B: riding the stems back up with the teardrop closed. -/
 theorem lb_phaseB (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
     (hj : j ≤ N - 3) :
     stepN (lbWiring N h3) (N + j) (lbStart N) =
       some (3 * (j + 1), lbTB N) := by
-  induction j with
-  | zero =>
-      have h := lb_cfg_N h4 h3
-      simpa using h
-  | succ j ih =>
-      have hj' : j ≤ N - 3 := by omega
-      have hstep := ih hj'
-      have hone : N + (j + 1) = (N + j) + 1 := by omega
-      rw [hone, stepN_add, hstep]
-      simp only [Option.bind_some]
-      have hval : lbTB N (j + 1) = true := by
-        unfold lbTB
-        rw [decide_eq_true_eq]
-        omega
-      have hlink : (lbWiring N h3).link (3 * (j + 1) + 2) =
-          some (3 * (j + 1 + 1)) := by
-        show lbLink N (3 * (j + 1) + 2) = _
-        exact lb_link_chain_br2 (by omega) (by omega)
-      rw [lb_stepN_stem_true hval hlink]
+  rw [stepN_add, lb_cfg_N h4 h3]
+  exact lb_chain_up h3 _ hj (by intros; simp only [lbTB, decide_eq_true_eq]; omega)
 
 /-- Crossing to the far switch: time `2N-2`. -/
 theorem lb_cfg_2N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (2 * N - 2) (lbStart N) =
       some (3 * (N - 1) + 2, lbTB N) := by
-  have hsplit : 2 * N - 2 = (N + (N - 3)) + 1 := by omega
-  rw [hsplit, stepN_add, lb_phaseB h4 h3 (Nat.le_refl _)]
-  simp only [Option.bind_some]
-  have hport : 3 * (N - 3 + 1) = 3 * (N - 2) := by omega
-  rw [hport]
-  have hval : lbTB N (N - 2) = true := by
-    unfold lbTB
-    rw [decide_eq_true_eq]
-    omega
-  have hlink : (lbWiring N h3).link (3 * (N - 2) + 2) =
-      some (3 * (N - 1) + 2) := by
-    show lbLink N (3 * (N - 2) + 2) = _
-    grind [lbLink]
-  rw [lb_stepN_stem_true hval hlink]
+  apply lb_next (lb_phaseB h4 h3 (Nat.le_refl _)) (by omega)
+  rw [show N - 3 + 1 = N - 2 by omega]
+  apply lb_stepN_stem
+  simp only [lbTB, branchPort, lbWiring]
+  grind [lbLink]
 
 /-- Closing the far switch: time `2N-1`. -/
 theorem lb_cfg_2N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (2 * N - 1) (lbStart N) =
       some (3 * (N - 2) + 1, lbTC N) := by
-  have hsplit : 2 * N - 1 = (2 * N - 2) + 1 := by omega
-  rw [hsplit, stepN_add, lb_cfg_2N2 h4 h3]
-  simp only [Option.bind_some]
-  have hlink : (lbWiring N h3).link (3 * (N - 1)) =
-      some (3 * (N - 2) + 1) := by
-    show lbLink N (3 * (N - 1)) = _
-    grind [lbLink]
-  rw [lb_stepN_br2 hlink]; congr 2; funext j; grind [lbTB, lbTC]
+  apply lb_next (lb_cfg_2N2 h4 h3) (by omega)
+  rw [lb_stepN_br2 (k := N - 1) (q := 3 * (N - 2) + 1)
+    (by simp only [lbWiring]; grind [lbLink])]
+  congr 2; funext j; grind [lbTB, lbTC]
 
 /-- Reopening the near end switch: time `2N`. -/
 theorem lb_cfg_2N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (2 * N) (lbStart N) =
       some (3 * (N - 3) + 2, lbTD N) := by
-  have hsplit : 2 * N = (2 * N - 1) + 1 := by omega
-  rw [hsplit, stepN_add, lb_cfg_2N1 h4 h3]
-  simp only [Option.bind_some]
-  have hlink : (lbWiring N h3).link (3 * (N - 2)) =
-      some (3 * (N - 3) + 2) := by
-    show lbLink N (3 * (N - 2)) = _
-    have hthis := lb_link_chain_stem (N := N) (k := N - 2)
-      (by omega) (Nat.le_refl _)
-    have hidx : N - 2 - 1 = N - 3 := by omega
-    rw [hidx] at hthis
-    exact hthis
-  rw [lb_stepN_br1 hlink]; congr 2; funext j; grind [lbTC, lbTD]
+  apply lb_next (lb_cfg_2N1 h4 h3) (by omega)
+  rw [lb_stepN_br1 (w := lbWiring N h3)
+    (lb_link_chain_stem (k := N - 2) (by omega) (Nat.le_refl _))]
+  congr 2; funext j; grind [lbTC, lbTD]
 
 /-- Phase C: gliding back down with the near end switch open. -/
-theorem lb_phaseC (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
-    (hj : j ≤ N - 4) :
+theorem lb_phaseC (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat} (hj : j ≤ N - 3) :
     stepN (lbWiring N h3) (2 * N + j) (lbStart N) =
-      some (3 * (N - 3 - j) + 2, lbTD N) := by
-  induction j with
-  | zero =>
-      have h := lb_cfg_2N h4 h3
-      simpa using h
-  | succ j ih =>
-      have hj' : j ≤ N - 4 := by omega
-      have hstep := ih hj'
-      have hone : 2 * N + (j + 1) = (2 * N + j) + 1 := by omega
-      rw [hone, stepN_add, hstep]
-      simp only [Option.bind_some]
-      have hnoop : (fun i => if i = N - 3 - j then true
-          else lbTD N i) = lbTD N := by
-        apply lb_set_noop
-        unfold lbTD
-        rw [decide_eq_true_eq]
-        omega
-      have hlink : (lbWiring N h3).link (3 * (N - 3 - j)) =
-          some (3 * (N - 3 - (j + 1)) + 2) := by
-        show lbLink N (3 * (N - 3 - j)) = _
-        have hthis := lb_link_chain_stem (N := N) (k := N - 3 - j)
-          (by omega) (by omega)
-        have hidx : N - 3 - j - 1 = N - 3 - (j + 1) := by omega
-        rw [hidx] at hthis
-        exact hthis
-      simpa only [hnoop] using
-        (lb_stepN_br2 (t := lbTD N) hlink)
+      some (if j = N - 3 then 0 else 3 * (N - 3 - j) + 2, lbTD N) := by
+  rw [stepN_add, lb_cfg_2N h4 h3]
+  simp only [Option.bind_some]
+  rw [lb_chain_down h3 _ (by omega) (by omega) hj]
+  congr 2; funext i; grind [lbTD]
 
 /-- Back at the teardrop stem: time `3N-3`. -/
 theorem lb_cfg_3N3 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (3 * N - 3) (lbStart N) =
       some (0, lbTD N) := by
-  have hsplit : 3 * N - 3 = (2 * N + (N - 4)) + 1 := by omega
-  rw [hsplit, stepN_add, lb_phaseC h4 h3 (Nat.le_refl _)]
-  simp only [Option.bind_some]
-  have hport : 3 * (N - 3 - (N - 4)) + 2 = 3 * 1 + 2 := by omega
-  rw [hport]
-  have hnoop : (fun i => if i = 1 then true else lbTD N i) =
-      lbTD N := by
-    apply lb_set_noop
-    unfold lbTD
-    rw [decide_eq_true_eq]
-    omega
-  have hlink : (lbWiring N h3).link (3 * 1) = some 0 := by
-    show lbLink N 3 = some 0
-    grind [lbLink]
-  simpa only [hnoop] using (lb_stepN_br2 (t := lbTD N) hlink)
+  have ht : 2 * N + (N - 3) = 3 * N - 3 := by omega
+  simpa [ht] using lb_phaseC h4 h3 (Nat.le_refl _)
 
 /-- Through the teardrop the other way: time `3N-2`. -/
 theorem lb_cfg_3N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (3 * N - 2) (lbStart N) =
       some (1, lbTD N) := by
-  have hsplit : 3 * N - 2 = (3 * N - 3) + 1 := by omega
-  rw [hsplit, stepN_add, lb_cfg_3N3 h4 h3]
-  simp only [Option.bind_some]
-  have hzero : (0 : Nat) = 3 * 0 := by omega
-  rw [hzero]
-  have hval : lbTD N 0 = true := by
-    unfold lbTD
-    rw [decide_eq_true_eq]
-    omega
-  have hlink : (lbWiring N h3).link (3 * 0 + 2) = some 1 := by
-    show lbLink N 2 = some 1
-    grind [lbLink]
-  rw [lb_stepN_stem_true hval hlink]
+  apply lb_next (lb_cfg_3N3 h4 h3) (by omega)
+  apply lb_stepN_stem (k := 0)
+  have hval : lbTD N 0 = true := by simp only [lbTD, decide_eq_true_eq]; omega
+  simp [branchPort, hval, lbWiring, lbLink]
 
 /-- Reopening the teardrop: time `3N-1`. -/
 theorem lb_cfg_3N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (3 * N - 1) (lbStart N) =
       some (3, lbTE N) := by
-  have hsplit : 3 * N - 1 = (3 * N - 2) + 1 := by omega
-  rw [hsplit, stepN_add, lb_cfg_3N2 h4 h3]
-  simp only [Option.bind_some]
-  have hone : (1 : Nat) = 3 * 0 + 1 := by omega
-  rw [hone]
-  have hlink : (lbWiring N h3).link (3 * 0) = some 3 := by
-    show lbLink N 0 = some 3
-    grind [lbLink]
-  rw [lb_stepN_br1 hlink]; congr 2; funext j; grind [lbTD, lbTE]
+  apply lb_next (lb_cfg_3N2 h4 h3) (by omega)
+  change stepN _ 1 (3 * 0 + 1, _) = _
+  rw [lb_stepN_br1 (k := 0) (q := 3) (by simp [lbWiring, lbLink])]
+  congr 2; funext j; grind [lbTD, lbTE]
 
 /-- Phase D: riding back up with teardrop and near end both open. -/
 theorem lb_phaseD (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
     (hj : j ≤ N - 3) :
     stepN (lbWiring N h3) (3 * N - 1 + j) (lbStart N) =
       some (3 * (j + 1), lbTE N) := by
-  induction j with
-  | zero =>
-      have h := lb_cfg_3N1 h4 h3
-      simpa using h
-  | succ j ih =>
-      have hj' : j ≤ N - 3 := by omega
-      have hstep := ih hj'
-      have hone : 3 * N - 1 + (j + 1) = (3 * N - 1 + j) + 1 := by
-        omega
-      rw [hone, stepN_add, hstep]
-      simp only [Option.bind_some]
-      have hval : lbTE N (j + 1) = true := by
-        unfold lbTE
-        rw [decide_eq_true_eq]
-        omega
-      have hlink : (lbWiring N h3).link (3 * (j + 1) + 2) =
-          some (3 * (j + 1 + 1)) := by
-        show lbLink N (3 * (j + 1) + 2) = _
-        exact lb_link_chain_br2 (by omega) (by omega)
-      rw [lb_stepN_stem_true hval hlink]
+  rw [stepN_add, lb_cfg_3N1 h4 h3]
+  exact lb_chain_up h3 _ hj (by intros; simp only [lbTE, decide_eq_true_eq]; omega)
 
 /-- Deflected at the open near end switch: time `4N-3`. -/
 theorem lb_cfg_4N3 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (4 * N - 3) (lbStart N) =
       some (3 * (N - 1), lbTE N) := by
-  have hsplit : 4 * N - 3 = (3 * N - 1 + (N - 3)) + 1 := by omega
-  rw [hsplit, stepN_add, lb_phaseD h4 h3 (Nat.le_refl _)]
-  simp only [Option.bind_some]
-  have hport : 3 * (N - 3 + 1) = 3 * (N - 2) := by omega
-  rw [hport]
-  have hval : lbTE N (N - 2) = false := by
-    unfold lbTE
-    simp only [decide_eq_false_iff_not]
-    omega
-  have hlink : (lbWiring N h3).link (3 * (N - 2) + 1) =
-      some (3 * (N - 1)) := by
-    show lbLink N (3 * (N - 2) + 1) = _
-    grind [lbLink]
-  rw [lb_stepN_stem_false hval hlink]
+  apply lb_next (lb_phaseD h4 h3 (Nat.le_refl _)) (by omega)
+  rw [show N - 3 + 1 = N - 2 by omega]
+  apply lb_stepN_stem
+  simp [branchPort, lbTE, lbWiring]; grind [lbLink]
 
 /-- Across the far switch: time `4N-2`. -/
 theorem lb_cfg_4N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (4 * N - 2) (lbStart N) =
       some (3 * (N - 2) + 2, lbTE N) := by
-  have hsplit : 4 * N - 2 = (4 * N - 3) + 1 := by omega
-  rw [hsplit, stepN_add, lb_cfg_4N3 h4 h3]
-  simp only [Option.bind_some]
-  have hval : lbTE N (N - 1) = true := by
-    unfold lbTE
-    rw [decide_eq_true_eq]
-    omega
-  have hlink : (lbWiring N h3).link (3 * (N - 1) + 2) =
-      some (3 * (N - 2) + 2) := by
-    show lbLink N (3 * (N - 1) + 2) = _
-    grind [lbLink]
-  rw [lb_stepN_stem_true hval hlink]
+  apply lb_next (lb_cfg_4N3 h4 h3) (by omega)
+  apply lb_stepN_stem
+  have hval : lbTE N (N - 1) = true := by simp only [lbTE, decide_eq_true_eq]; omega
+  simp [branchPort, hval, lbWiring]; grind [lbLink]
 
 /-- Reclosing the near end switch: time `4N-1`. -/
 theorem lb_cfg_4N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (4 * N - 1) (lbStart N) =
       some (3 * (N - 3) + 2, lbTF N) := by
-  have hsplit : 4 * N - 1 = (4 * N - 2) + 1 := by omega
-  rw [hsplit, stepN_add, lb_cfg_4N2 h4 h3]
-  simp only [Option.bind_some]
-  have hlink : (lbWiring N h3).link (3 * (N - 2)) =
-      some (3 * (N - 3) + 2) := by
-    show lbLink N (3 * (N - 2)) = _
-    have hthis := lb_link_chain_stem (N := N) (k := N - 2)
-      (by omega) (Nat.le_refl _)
-    have hidx : N - 2 - 1 = N - 3 := by omega
-    rw [hidx] at hthis
-    exact hthis
-  rw [lb_stepN_br2 hlink]; congr 2; funext j; grind [lbTE, lbTF]
+  apply lb_next (lb_cfg_4N2 h4 h3) (by omega)
+  rw [lb_stepN_br2 (w := lbWiring N h3)
+    (lb_link_chain_stem (k := N - 2) (by omega) (Nat.le_refl _))]
+  congr 2; funext j; grind [lbTE, lbTF]
 
 end Trajectory
 
@@ -561,11 +351,7 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
     unfold lbTimes at hk
     rcases List.mem_append.mp hk with hkr | hks
     · have hm : k < N - 1 := List.mem_range.mp hkr
-      by_cases hcase : k ≤ N - 3
-      · simp [lb_phaseA h3 hcase]
-      · have hk2 : k = N - 2 := by omega
-        subst hk2
-        simp [lb_cfg_N2 h4 h3]
+      simp [lb_phaseA h3 (by omega : k ≤ N - 2)]
     · simp only [List.mem_cons, List.not_mem_nil, or_false] at hks
       rcases hks with rfl | rfl | rfl | rfl | rfl
       all_goals simp [lb_cfg_N h4 h3, lb_cfg_2N1 h4 h3,
@@ -580,33 +366,14 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
          VectorCount.restrict N (lbTD N),
          VectorCount.restrict N (lbTE N),
          VectorCount.restrict N (lbTF N)] := by
-      unfold lbTimes
-      rw [List.map_append]
-      have hL : (List.range (N - 1)).map (fun k =>
-          VectorCount.restrict N
-            (tonguesAt (lbWiring N h3) (lbStart N) k)) =
-          (List.range (N - 1)).map (fun m =>
-            VectorCount.restrict N (lbTA N m)) := by
-        apply List.map_congr_left
+      simp only [lbTimes, List.map_append]
+      congr 1
+      · apply List.map_congr_left
         intro m hm
-        have hm' : m < N - 1 := List.mem_range.mp hm
-        by_cases hcase : m ≤ N - 3
-        · simp [tonguesAt, lb_phaseA h3 hcase]
-        · have hm2 : m = N - 2 := by omega
-          subst hm2
-          simp [tonguesAt, lb_cfg_N2 h4 h3]
-      have hR : [N, 2 * N - 1, 2 * N, 3 * N - 1, 4 * N - 1].map
-          (fun k => VectorCount.restrict N
-            (tonguesAt (lbWiring N h3) (lbStart N) k)) =
-          [VectorCount.restrict N (lbTB N),
-           VectorCount.restrict N (lbTC N),
-           VectorCount.restrict N (lbTD N),
-           VectorCount.restrict N (lbTE N),
-           VectorCount.restrict N (lbTF N)] := by
-        simp [tonguesAt, lb_cfg_N h4 h3, lb_cfg_2N1 h4 h3,
-          lb_cfg_2N h4 h3, lb_cfg_3N1 h4 h3,
-          lb_cfg_4N1 h4 h3]
-      rw [hL, hR]
+        have hm' := List.mem_range.mp hm
+        simp [tonguesAt, lb_phaseA h3 (by omega : m ≤ N - 2)]
+      · simp [tonguesAt, lb_cfg_N h4 h3, lb_cfg_2N1 h4 h3,
+          lb_cfg_2N h4 h3, lb_cfg_3N1 h4 h3, lb_cfg_4N1 h4 h3]
     rw [hmap]
     rw [List.nodup_append]
     refine ⟨?_, ?_, ?_⟩
