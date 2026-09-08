@@ -99,7 +99,7 @@ bounds
 \[ 26N{+}3 \to 24N{+}5 \to 18N{+}3 \to \cdots \to 2N{+}9 \to N{+}7 \to
    N{+}6 \to N{+}5 \to N{+}4 \]
 was tightened until the constructive lower bound was met.  The final
-development (7,425 lines of Lean~4 in 34 files, using no
+development (6,970 lines of Lean~4 in 31 files, using no
 external mathematics library) proves the single statement
 \begin{center}
   \lean{GeneralN.state\_law :\ }$\forall N$,
@@ -511,21 +511,20 @@ The state-side consequences are the first two entries of the budget:
 \end{lemma}
 
 \begin{lemma}[Two-phase and four-corner laws;
-  \file{ManufacturedPairNovelty.lean}, \file{TrackThetaAllTime.lean}]
+  \file{ManufacturedPairNovelty.lean}, \file{PairActionCorners.lean}]
   \label{lem:phases}
-  A complete traversal of a manufactured reflector has exactly two tongue
+  A complete traversal of a manufactured reflector has at most two tongue
   phases: the incoming vector, and that vector with the local action
   applied.  For \emph{two} opposite reflectors $A, B$ bouncing a train
   between them, every vector at every time lies in the four algebraic
   corners
   \[ u,\quad u + A,\quad u + B,\quad u + A + B, \]
-  whether or not their supports intersect: if the supports avoid each
-  other this is the composed two-phase law, and if one action lands on
-  the other's grooved support the \emph{theta} analysis
-  (\file{TrackTheta*.lean}) shows the disturbed groove is either repaired
-  in one trailing pass or captured into the old mouth, giving pointwise
-  covers by at most three or four vectors.  No path length ever enters:
-  the covers are blind to how long the runways are.
+  whether or not their supports intersect. At either boundary, both
+  supports are grooved at a reference corner and the current vector is
+  that corner or the previous action applied to it. A normal traversal,
+  stem capture, or branch repair preserves this invariant. Strong induction
+  over positive-length excursions gives the all-time cover; no runway
+  length enters the number of corners.
 \end{lemma}
 
 The dogbone of Section~\ref{sec:small} is the equality case of
@@ -717,22 +716,28 @@ value; after that passage both runs have the same full configuration,
 so determinism identifies every subsequent state. At a stem entry the
 mouth-capture law applies. There is no separate runway, forward-loop,
 or reverse-loop contact classification
-(\file{RunwaySpliceNovelty.lean}, \file{TrackThetaPointwiseCore.lean}).
+(\file{RunwaySpliceNovelty.lean}, \file{PairActionCorners.lean}).
 
 For all-time covers it is enough to close a boundary invariant under
 positive-length excursions whose intermediate tongue vectors belong to
 the claimed cover. Strong induction on the queried time proves the
 claim: a query inside the first excursion uses its local cover; a later
 query subtracts the strictly positive duration and continues at the next
-invariant boundary. For mutually contacting flip reflectors the four
-boundaries are
+invariant boundary. One invariant now handles every manufactured pair.
+Let $S=\{s,a(s),b(s),b(a(s))\}$ be the four-corner orbit of the two
+commuting involutions. A boundary configuration has a reference $u\in S$
+that grooves both supports, with its current vector in
 \[
- (g,u),\quad(e,u^A),\quad(g,u^B),\quad(e,u),
- \qquad u^A=\operatorname{flip}_A(u),\quad u^B=\operatorname{flip}_B(u).
+ \{u,b(u)\}\quad\text{at }g,\qquad
+ \{u,a(u)\}\quad\text{at }e.
 \]
-The normal and capture-or-repair excursions close this invariant and
-expose only $u,u^A,u^B$. Thus no case-specific period computation is
-needed (\file{TrackThetaAllTime.lean}).
+If the next reflector remains grooved, its ordinary traversal uses the
+current vector as the new reference. Otherwise the previous action must
+be a flip, and the first support contact either captures back to $u$ or
+repairs the fault and completes the next traversal from $u$. All intermediate
+vectors stay in $S$, and each resulting boundary has the same form. This
+replaces the separate stay/flip, one-sided, and mutual-contact arguments
+(\file{PairActionCorners.lean}).
 
 The same argument applies when the opposite component is an arbitrary
 lobe rather than a manufactured reflector. If its interior grooves are
@@ -874,9 +879,9 @@ dependence $N + 2^d$ is exact in the data: tails of dimension $0, 1, 2$
 reach $N+1$, $N+2$, $N+4$ vectors respectively and no more.
 
 Relation to the formal proof.  In the protected-pair regime the square is
-already a theorem: \lean{manufactured\_flip\_pair\_all\_time\_four\_phase}
-(\file{TrackThetaAllTime.lean}) proves that \emph{at every time} the
-phase of a flip/flip reflector pair is one of the four corners
+already a theorem: \lean{manufactured\_pair\_all\_time\_action\_corners\_tongues}
+(\file{PairActionCorners.lean}) proves that \emph{at every time} the
+phase of any manufactured reflector pair is one of the four corners
 $u, u{+}A, u{+}B, u{+}A{+}B$, whatever the supports do.  The two moving
 switches are the mouths of the two reflectors the run manufactures ---
 the dogbone of Section~\ref{sec:small} in its universal form --- and the
@@ -893,7 +898,7 @@ square.
 \section{About the formalisation}\label{sec:formal}
 
 The development in \file{theory/lean} builds with Lean~4.32.2 and no
-external library. Run \texttt{lake build} to compile all 34 Lean files;
+external library. Run \texttt{lake build} to compile all 31 Lean files;
 \file{StateLawAxiomAudit.lean} checks the exact transitive axiom list of
 \lean{GeneralN.state\_law}:
 \begin{center}

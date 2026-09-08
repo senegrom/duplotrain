@@ -312,25 +312,4 @@ theorem SupportedReflector.pair_all_time_four_phase
   exact stepN_covered_of_progress boundary safe hprogress
     (start := (g, state)) ⟨Or.inl rfl, by simp [safe], hA, hB⟩ d
 
-/-- Manufactured reflectors supply the abstract pair law with their two-phase traversals. -/
-theorem ManufacturedReflector.pair_all_time_four_phase
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (state : Tongues)
-    (hA : PathGrooves A.toSupported.paths state)
-    (hB : PathGrooves B.toSupported.paths state)
-    (hAB : A.toSupported.action.Avoids B.toSupported.paths)
-    (hBA : B.toSupported.action.Avoids A.toSupported.paths)
-    (d : Nat) :
-    ∃ port phase, stepN w d (g, state) = some (port, phase) ∧
-      phase ∈ [state, A.toSupported.action.apply state,
-        B.toSupported.action.apply state,
-        A.toSupported.action.apply (B.toSupported.action.apply state)] := by
-  exact A.toSupported.pair_all_time_four_phase B.toSupported
-    A.travel_pos B.travel_pos
-    (fun u hu _ ht => A.travel_two_phase_stepN u hu ht)
-    (fun u hu _ ht => B.travel_two_phase_stepN u hu ht)
-    state hA hB hAB hBA d
-
 end GeneralN

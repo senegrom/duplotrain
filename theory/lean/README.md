@@ -190,7 +190,7 @@ switch bound nor extraction of a later productive writer.
 
 ## Selected-route fault analysis: one stem/branch split
 
-`TrackThetaPointwiseCore.lean` now treats a disturbed traversal using the
+`PairActionCorners.lean` treats a disturbed traversal using the
 single selected outward route (`orientedRoute`). Every retained support
 passage appears on that route in the orientation the train actually takes.
 The shared first-contact theorem selects the first occurrence of the disturbed
@@ -210,11 +210,9 @@ Only two local cases remain, for either a flip or a stay reflector:
 
 The shared theorem `ManufacturedFlipReflector.grooved_route_fault` states
 that synchronization explicitly, even for reference routes with repeated switches. There are no separate runway, forward-candy,
-and reverse-candy repair/capture proofs. The generic
-`ManufacturedReflector.support_fault_dichotomy_pointwise` specializes the
-shared route theorem directly
-to flip/flip and flip/stay contacts, without adding a finite-switch or
-totality assumption to the local theorem.
+and reverse-candy repair/capture proofs. `ManufacturedReflector.pair_progress`
+uses that synchronization directly to close the next boundary excursion,
+without a separate support-fault wrapper or a finite-switch assumption.
 
 ## Boundary invariants instead of explicit contact periods
 
@@ -227,26 +225,20 @@ cover; a later query subtracts a strictly positive duration and continues
 from the next invariant boundary. Neither eventual periodicity nor a finite
 boundary set is required by this general lemma.
 
-For mutual flip/flip contact, write `uA = flipAt u A.actionSwitch` and
-`uB = flipAt u B.actionSwitch`. The boundary invariant consists of
+One invariant handles every opposite manufactured pair. Its reference vector
+`u` belongs to the four-corner orbit of the two commuting actions `a` and `b`,
+and grooves both supports. The current vector is `u` or `b(u)` at the first
+boundary, and `u` or `a(u)` at the second.
 
-```
-(g,u), (e,uA), (g,uB), (e,u).
-```
+If the next reflector remains grooved, its normal traversal takes the current
+vector as the new reference. Otherwise the previous action must be a flip.
+The first support contact either captures back to `u`, or repairs the fault
+and completes the next traversal from `u`. Each excursion has positive length,
+stays in the four corners, and restores the same boundary invariant.
 
-Normal traversals connect `(g,u)` to `(e,uA)` and `(e,u)` to `(g,uB)`.
-From `(e,uA)`, the fault theorem either captures to `(e,u)` or repairs to
-`(g,uB)`; the opposite disturbed traversal either captures to `(g,u)` or
-repairs to `(e,uA)`. Each excursion exposes only `u`, `uA`, or `uB`.
-Captures have positive length because time zero cannot restore a genuinely
-flipped tongue. This proves the three-vector cover directly, without the
-previous case-specific lead and period calculations.
-
-The one-sided contact proof uses two boundary configurations and a four-vector
-cover. The flip/stay proof uses three boundary configurations and a two-vector
-cover. Ordinary periodicity results still needed elsewhere are retained;
-this removes the contact-specific period construction, not every use of
-periodicity from the development.
+`ManufacturedReflector.pair_progress` supplies this argument in either direction;
+`manufactured_pair_all_time_action_corners_tongues` closes it by strong induction.
+The separate stay/flip, one-sided, and mutual-contact modules are removed.
 
 ## Capture is a suffix of ordinary traversal
 
@@ -455,6 +447,7 @@ comments and blanks, not just proof tactics.
 | After replacing protected repair by the pre-return pair orbit | 35 | 8,311 |
 | After direct contact recovery, shared continuation budgets, and closed probes | 33 | 7,593 |
 | After shared reverse replay and direct productive-step histories | 33 | 7,406 |
+| After one boundary invariant for every manufactured pair | 30 | 6,951 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -680,3 +673,18 @@ The clean **69-job** build and exact axiom audit pass without warnings. All
 **288** public source theorems are used, and the seven protected files remain
 byte-for-byte unchanged. Together these two passes remove **882 lines** from
 the reviewed 8,307-line baseline (**10.6%**).
+
+The unified-pair pass removes **455 Lean source lines**, from **7,425 to
+6,970** (**6.1%**), and reduces the retained development from **34 to 31
+files**. One reference-corner boundary invariant replaces all separate
+stay/flip, one-sided, and mutual-contact cases. Normal traversals, captures,
+and repaired traversals close the same invariant in either direction.
+
+The selected-route fault argument is used directly, removing its wrapper
+and the modules `TrackStayContactAllTime`, `TrackThetaAllTime`, and
+`TrackThetaPointwiseCore`. The abstract pair law remains for arbitrary lobes.
+
+A clean **63-job** build passes without warnings. The exact axiom audit
+passes, all **277** public source theorems are in the headline kernel
+dependency closure, and all seven protected files remain byte-for-byte
+unchanged. The paper and its rendered PDF follow the same invariant.

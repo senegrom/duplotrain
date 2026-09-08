@@ -26,10 +26,7 @@ defaultTargets = [
   "TrackNormalForm",
   "TrackNovelReplay",
   "TrackNoveltyCover",
-  "TrackStayContactAllTime",
   "TrackTheta",
-  "TrackThetaAllTime",
-  "TrackThetaPointwiseCore",
   "TrackTrace",
   "TripleSelfLinkSimpleCycleClosure",
   "TwoHistoryUnionCharge",
@@ -110,16 +107,7 @@ name = "TrackNovelReplay"
 name = "TrackNoveltyCover"
 
 [[lean_lib]]
-name = "TrackStayContactAllTime"
-
-[[lean_lib]]
 name = "TrackTheta"
-
-[[lean_lib]]
-name = "TrackThetaAllTime"
-
-[[lean_lib]]
-name = "TrackThetaPointwiseCore"
 
 [[lean_lib]]
 name = "TrackTrace"

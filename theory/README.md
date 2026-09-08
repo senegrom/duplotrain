@@ -25,14 +25,15 @@ historical corners directly, and stay reflectors add no fresh tail vector.
 Productive-step histories cover every live prefix; writer injectivity on
 simple traces supplies the count without a first-writer predicate. Disturbed traversals are analysed on
 the selected outward route, leaving only stem capture versus branch repair.
-All-time phase covers use boundary invariants under positive-length
-excursions instead of enumerated contact periods. Capture is a suffix of
+A single boundary invariant covers every manufactured pair: both supports
+are grooved at a reference corner, and the current state differs by at most
+the previous action. Positive-length excursions preserve the four-corner cover. Capture is a suffix of
 ordinary traversal. Shortened reflectors reuse their original construction
 witnesses rather than rebuilding them in the later tongue state.
 
-The retained development has 34 Lean files and 7,425 source lines,
-including its 19-line axiom audit; the headline import closure has 33
-modules and 7,406 lines. Source lines include comments and blank lines.
+The retained development has 31 Lean files and 6,970 source lines,
+including its 19-line axiom audit; the headline import closure has 30
+modules and 6,951 lines. Source lines include comments and blank lines.
 The theorem statement, model, finite-state ceiling, attainment constructions,
 and exact axiom audit are unchanged. Git history retains superseded proofs.
 
