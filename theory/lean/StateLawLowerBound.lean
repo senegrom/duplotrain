@@ -134,6 +134,13 @@ section Trajectory
 
 variable {N : Nat}
 
+/-- The teardrop returns to the chain in two steps, toggling its tongue. -/
+private theorem lb_teardrop (h3 : 3 ≤ N) (t : Tongues) :
+    stepN (lbWiring N h3) 2 (0, t) =
+      some (3, fun j => if j = 0 then !t 0 else t j) := by
+  cases ht : t 0 <;> simp [stepN, step, arrive, branchPort, lbWiring, lbLink, ht]
+  all_goals funext j; simp [pin, bval]
+
 /-- Both upward phases traverse the same selected chain without moving a tongue. -/
 private theorem lb_chain_up {N : Nat} (h3 : 3 ≤ N) (t : Tongues) {j : Nat}
     (hj : j ≤ N - 3) (ht : ∀ k, 1 ≤ k → k ≤ j → t k = true) :
@@ -178,53 +185,29 @@ theorem lb_phaseA (h3 : 3 ≤ N) {m : Nat} (hm : m ≤ N - 2) :
   rw [lb_chain_down h3 _ (by omega) (Nat.le_refl _) hm]
   congr 2; funext j; grind [lbTA]
 
-/-- Reaching the teardrop stem at time `N-2`. -/
-theorem lb_cfg_N2 (h3 : 3 ≤ N) :
-    stepN (lbWiring N h3) (N - 2) (lbStart N) =
-      some (0, lbTA N (N - 2)) := by
-  simpa using lb_phaseA h3 (Nat.le_refl _)
-
-/-- Bouncing through the teardrop: time `N-1`. -/
-theorem lb_cfg_N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    stepN (lbWiring N h3) (N - 1) (lbStart N) =
-      some (2, lbTA N (N - 2)) := by
-  apply lb_next (lb_cfg_N2 h3) (by omega)
-  apply lb_stepN_stem (k := 0)
-  have hidx : N - 1 - (N - 2) = 1 := by omega
-  simp [lbWiring, branchPort, lbTA, hidx, lbLink]
-
 /-- Closing the teardrop: time `N`. -/
 theorem lb_cfg_N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) N (lbStart N) =
       some (3, lbTB N) := by
-  apply lb_next (lb_cfg_N1 h4 h3) (by omega)
-  change stepN _ 1 (3 * 0 + 2, _) = _
-  rw [lb_stepN_br2 (k := 0) (q := 3) (by simp [lbWiring, lbLink])]
+  conv => lhs; arg 2; rw [show N = (N - 2) + 2 by omega]
+  rw [stepN_add, lb_phaseA h3 (Nat.le_refl _)]
+  simp only [ite_true, Option.bind_some]
+  rw [lb_teardrop]
   congr 2; funext j; grind [lbTA, lbTB]
-
-/-- Phase B: riding the stems back up with the teardrop closed. -/
-theorem lb_phaseB (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
-    (hj : j ≤ N - 3) :
-    stepN (lbWiring N h3) (N + j) (lbStart N) =
-      some (3 * (j + 1), lbTB N) := by
-  rw [stepN_add, lb_cfg_N h4 h3]
-  exact lb_chain_up h3 _ hj (by intros; simp only [lbTB, decide_eq_true_eq]; omega)
-
-/-- Crossing to the far switch: time `2N-2`. -/
-theorem lb_cfg_2N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    stepN (lbWiring N h3) (2 * N - 2) (lbStart N) =
-      some (3 * (N - 1) + 2, lbTB N) := by
-  apply lb_next (lb_phaseB h4 h3 (Nat.le_refl _)) (by omega)
-  rw [show N - 3 + 1 = N - 2 by omega]
-  apply lb_stepN_stem
-  simp only [lbTB, branchPort, lbWiring]
-  grind [lbLink]
 
 /-- Closing the far switch: time `2N-1`. -/
 theorem lb_cfg_2N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (2 * N - 1) (lbStart N) =
       some (3 * (N - 2) + 1, lbTC N) := by
-  apply lb_next (lb_cfg_2N2 h4 h3) (by omega)
+  apply lb_next (m := 2 * N - 2) (b := (3 * (N - 1) + 2, lbTB N)) (by
+    apply lb_next (m := N + (N - 3)) (b := (3 * (N - 3 + 1), lbTB N))
+      (by rw [stepN_add, lb_cfg_N h4 h3]
+          exact lb_chain_up h3 _ (Nat.le_refl _)
+            (by intros; simp only [lbTB, decide_eq_true_eq]; omega)) (by omega)
+    rw [show N - 3 + 1 = N - 2 by omega]
+    apply lb_stepN_stem
+    simp only [lbTB, branchPort, lbWiring]
+    grind [lbLink]) (by omega)
   rw [lb_stepN_br2 (k := N - 1) (q := 3 * (N - 2) + 1)
     (by simp only [lbWiring]; grind [lbLink])]
   congr 2; funext j; grind [lbTB, lbTC]
@@ -238,71 +221,34 @@ theorem lb_cfg_2N (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     (lb_link_chain_stem (k := N - 2) (by omega) (Nat.le_refl _))]
   congr 2; funext j; grind [lbTC, lbTD]
 
-/-- Phase C: gliding back down with the near end switch open. -/
-theorem lb_phaseC (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat} (hj : j ≤ N - 3) :
-    stepN (lbWiring N h3) (2 * N + j) (lbStart N) =
-      some (if j = N - 3 then 0 else 3 * (N - 3 - j) + 2, lbTD N) := by
-  rw [stepN_add, lb_cfg_2N h4 h3]
-  simp only [Option.bind_some]
-  rw [lb_chain_down h3 _ (by omega) (by omega) hj]
-  congr 2; funext i; grind [lbTD]
-
-/-- Back at the teardrop stem: time `3N-3`. -/
-theorem lb_cfg_3N3 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    stepN (lbWiring N h3) (3 * N - 3) (lbStart N) =
-      some (0, lbTD N) := by
-  have ht : 2 * N + (N - 3) = 3 * N - 3 := by omega
-  simpa [ht] using lb_phaseC h4 h3 (Nat.le_refl _)
-
-/-- Through the teardrop the other way: time `3N-2`. -/
-theorem lb_cfg_3N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    stepN (lbWiring N h3) (3 * N - 2) (lbStart N) =
-      some (1, lbTD N) := by
-  apply lb_next (lb_cfg_3N3 h4 h3) (by omega)
-  apply lb_stepN_stem (k := 0)
-  have hval : lbTD N 0 = true := by simp only [lbTD, decide_eq_true_eq]; omega
-  simp [branchPort, hval, lbWiring, lbLink]
-
 /-- Reopening the teardrop: time `3N-1`. -/
 theorem lb_cfg_3N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (3 * N - 1) (lbStart N) =
       some (3, lbTE N) := by
-  apply lb_next (lb_cfg_3N2 h4 h3) (by omega)
-  change stepN _ 1 (3 * 0 + 1, _) = _
-  rw [lb_stepN_br1 (k := 0) (q := 3) (by simp [lbWiring, lbLink])]
+  rw [show 3 * N - 1 = 2 * N + ((N - 3) + 2) by omega,
+    stepN_add, lb_cfg_2N h4 h3]
+  simp only [Option.bind_some]
+  rw [stepN_add, lb_chain_down h3 _ (by omega) (by omega) (Nat.le_refl _)]
+  simp only [ite_true, Option.bind_some]
+  rw [lb_teardrop]
   congr 2; funext j; grind [lbTD, lbTE]
-
-/-- Phase D: riding back up with teardrop and near end both open. -/
-theorem lb_phaseD (h4 : 4 ≤ N) (h3 : 3 ≤ N) {j : Nat}
-    (hj : j ≤ N - 3) :
-    stepN (lbWiring N h3) (3 * N - 1 + j) (lbStart N) =
-      some (3 * (j + 1), lbTE N) := by
-  rw [stepN_add, lb_cfg_3N1 h4 h3]
-  exact lb_chain_up h3 _ hj (by intros; simp only [lbTE, decide_eq_true_eq]; omega)
-
-/-- Deflected at the open near end switch: time `4N-3`. -/
-theorem lb_cfg_4N3 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    stepN (lbWiring N h3) (4 * N - 3) (lbStart N) =
-      some (3 * (N - 1), lbTE N) := by
-  apply lb_next (lb_phaseD h4 h3 (Nat.le_refl _)) (by omega)
-  rw [show N - 3 + 1 = N - 2 by omega]
-  apply lb_stepN_stem
-  simp [branchPort, lbTE, lbWiring]; grind [lbLink]
-
-/-- Across the far switch: time `4N-2`. -/
-theorem lb_cfg_4N2 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
-    stepN (lbWiring N h3) (4 * N - 2) (lbStart N) =
-      some (3 * (N - 2) + 2, lbTE N) := by
-  apply lb_next (lb_cfg_4N3 h4 h3) (by omega)
-  apply lb_stepN_stem
-  have hval : lbTE N (N - 1) = true := by simp only [lbTE, decide_eq_true_eq]; omega
-  simp [branchPort, hval, lbWiring]; grind [lbLink]
 
 /-- Reclosing the near end switch: time `4N-1`. -/
 theorem lb_cfg_4N1 (h4 : 4 ≤ N) (h3 : 3 ≤ N) :
     stepN (lbWiring N h3) (4 * N - 1) (lbStart N) =
       some (3 * (N - 3) + 2, lbTF N) := by
-  apply lb_next (lb_cfg_4N2 h4 h3) (by omega)
+  apply lb_next (m := 4 * N - 2) (b := (3 * (N - 2) + 2, lbTE N)) (by
+    apply lb_next (m := 4 * N - 3) (b := (3 * (N - 1), lbTE N)) (by
+      apply lb_next (m := 3 * N - 1 + (N - 3)) (b := (3 * (N - 3 + 1), lbTE N))
+        (by rw [stepN_add, lb_cfg_3N1 h4 h3]
+            exact lb_chain_up h3 _ (Nat.le_refl _)
+              (by intros; simp only [lbTE, decide_eq_true_eq]; omega)) (by omega)
+      rw [show N - 3 + 1 = N - 2 by omega]
+      apply lb_stepN_stem
+      simp [branchPort, lbTE, lbWiring]; grind [lbLink]) (by omega)
+    apply lb_stepN_stem
+    have hval : lbTE N (N - 1) = true := by simp only [lbTE, decide_eq_true_eq]; omega
+    simp [branchPort, hval, lbWiring]; grind [lbLink]) (by omega)
   rw [lb_stepN_br2 (w := lbWiring N h3)
     (lb_link_chain_stem (k := N - 2) (by omega) (Nat.le_refl _))]
   congr 2; funext j; grind [lbTE, lbTF]

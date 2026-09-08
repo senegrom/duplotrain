@@ -430,15 +430,17 @@ return trips, and one downward-chain lemma that writes the visited interval
 and includes the final exit to the teardrop stem. The cold descent and the
 later unchanged descent are instances of that same result. Including their
 endpoints removes the separate last-step case from the initial sample block.
-One-step phase composition shares the time arithmetic, while direct branch
-and stem laws replace the separate arrival wrappers. The wiring, named
+One two-step teardrop lemma handles both directions by toggling its tongue.
+The sampled-state proofs compose these traversals directly, without separate
+phase and intermediate-state theorems. Direct branch and stem laws handle
+the end pair. The wiring, named
 vectors, sample times, and coordinate witnesses for distinctness are unchanged.
 
 ## Size
 
 The tree is the headline theorem, its local import closure, and the
-separate axiom audit: 25 files and 5,977 source lines, including the
-19-line audit. The closure of `StateLaw` alone has 24 modules and 5,958
+separate axiom audit: 25 files and 5,923 source lines, including the
+19-line audit. The closure of `StateLaw` alone has 24 modules and 5,904
 lines. Source lines count comments and blanks, not just proof tactics.
 Every public theorem lies in the headline proof's kernel dependency
 closure. There is no `sorry`, no additional axiom, and no `native_decide`;
