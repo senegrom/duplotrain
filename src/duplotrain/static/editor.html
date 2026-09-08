@@ -858,9 +858,10 @@ el("clear").addEventListener("click", async () => {
     status("Floor cleared — Undo restores it.");
   } catch (e) { status(e.message, "err"); }
 });
-el("export").addEventListener("click", async () => {
+el("export").addEventListener("click", () => {
   try {
-    const data = await api("/api/export");
+    if (!S) throw new Error("The editor is still loading; try exporting again when it finishes.");
+    const data = S.snapshot.layout;
     const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -871,10 +872,13 @@ el("export").addEventListener("click", async () => {
   } catch (e) { status(e.message, "err"); }
 });
 el("import").addEventListener("click", () => el("importfile").click());
+let importSequence = 0;
 el("importfile").addEventListener("change", async (e) => {
   const file = e.target.files && e.target.files[0];
   e.target.value = "";
   if (!file) return;
+  // A slow read must not replace a newer selection or adopt an intervening edit.
+  const selection = ++importSequence, revision = S && S.revision;
   if (file.size > 2 * 1024 * 1024) {
     status("import refused: file larger than 2 MB", "err");
     return;
@@ -883,16 +887,18 @@ el("importfile").addEventListener("change", async (e) => {
   try {
     data = JSON.parse(await file.text());
   } catch (err) {
-    status("import refused: not valid JSON", "err");
+    if (selection === importSequence) status("import refused: not valid JSON", "err");
     return;
   }
+  if (selection !== importSequence) return;
   try {
-    S = await api("/api/import", { data });
+    S = await api("/api/import", { data, revision });
     fitted = false;
     redraw();
-    if (!S.layout.joint_issues.length) status(`imported ${S.layout.placements.length} pieces.`);
+    if (selection === importSequence && !S.layout.joint_issues.length)
+      status(`imported ${S.layout.placements.length} pieces.`);
   } catch (err) {
-    status(`import refused: ${err.message}`, "err");
+    if (selection === importSequence) status(`import refused: ${err.message}`, "err");
   }
 });
 el("solve").addEventListener("click", async () => {
@@ -1114,7 +1120,7 @@ window.addEventListener("keydown", (e) => {
 el("reversing").addEventListener("change", (e) => { e.target.dataset.touched = "1"; });
 el("unlimited").addEventListener("change", async (e) => {
   try { S = await api("/api/unlimited", { on: e.target.checked }); redraw(); }
-  catch (err) { status(err.message, "err"); e.target.checked = !e.target.checked; }
+  catch (err) { status(err.message, "err"); e.target.checked = !!(S && S.inventory.unlimited); }
 });
 
 resize();

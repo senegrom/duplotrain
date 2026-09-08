@@ -408,6 +408,86 @@ def test_stale_tab_refreshes_without_replaying_a_delete(editor):
         other.close()
 
 
+def test_stale_tab_export_saves_the_displayed_layout(editor):
+    import json
+    from pathlib import Path
+
+    page, session, url, errors = editor
+    session.attach("straight", 0, None)
+    load(page, url)
+    displayed = page.evaluate("S.snapshot.layout")
+    other = page.context.new_page()
+    try:
+        load(other, url)
+        other.locator("#clear").tap()
+        wait_count(other, 0)
+        page.wait_for_function("!autosaveReady")
+        assert page.evaluate("S.layout.placements.length") == 1
+        # Recovery export must still work if the server has gone offline.
+        page.route("**/api/**", lambda route: route.abort())
+        with page.expect_download() as downloaded:
+            page.locator("#export").tap()
+        assert json.loads(Path(downloaded.value.path()).read_text()) == displayed
+        assert not errors
+    finally:
+        other.close()
+
+
+@pytest.mark.parametrize("intervening", ["import", "edit"])
+def test_delayed_import_cannot_overwrite_newer_work(editor, intervening):
+    import json
+
+    from duplotrain.layout import layout_to_dict
+
+    page, session, url, errors = editor
+    load(page, url)
+    page.evaluate("""() => {
+      window.importReads = [];
+      const read = File.prototype.text;
+      File.prototype.text = function() {
+        return new Promise((resolve, reject) => {
+          window.importReads.push(() => read.call(this).then(resolve, reject));
+        });
+      };
+    }""")
+
+    def choose(piece):
+        layout = build_chain([(session.catalog[piece], 0, 1)])
+        page.locator("#importfile").set_input_files({
+            "name": f"{piece}.json", "mimeType": "application/json",
+            "buffer": json.dumps(layout_to_dict(layout)).encode(),
+        })
+
+    choose("curve")
+    if intervening == "import":
+        choose("straight")
+        page.evaluate("window.importReads[1]()")
+        wait_count(page, 1)
+    else:
+        place_straight(page)
+    page.evaluate("window.importReads[0]()")
+    page.wait_for_function("!apiBusy")
+    assert page.evaluate("S.layout.placements.map(p => p.piece)") == ["straight"]
+    assert [p.piece.id for p in session.layout] == ["straight"]
+    if intervening == "edit":
+        assert "not applied" in page.locator("#status").inner_text()
+    assert not errors
+
+
+def test_stale_sandbox_toggle_matches_the_refreshed_engine(editor):
+    page, session, url, errors = editor
+    load(page, url)
+    session.attach("straight", 0, None)
+    # Dispatch a real change without check() insisting the rejected toggle sticks.
+    page.locator("#unlimited").tap()
+    page.wait_for_function("S.revision === 1 && !apiBusy")
+    assert not page.locator("#unlimited").is_checked()
+    assert page.evaluate("S.inventory.unlimited") is False
+    assert session.unlimited is False
+    assert "not applied" in page.locator("#status").inner_text()
+    assert not errors
+
+
 def test_redraw_preserves_control_identity_focus_and_unsubmitted_inventory(editor):
     page, _session, url, errors = editor
     load(page, url)
