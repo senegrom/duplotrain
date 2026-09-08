@@ -23,8 +23,9 @@ the two budgets `(N+2)+2` and `(N+3)+1`. The continuation history and its
 optional reserved coordinates supply both bounds; action writers recover
 historical corners directly, and stay reflectors add no fresh tail vector.
 Productive-step histories cover every live prefix; writer injectivity on
-simple traces supplies the count without a first-writer predicate. Disturbed traversals are analysed on
-the selected outward route, leaving only stem capture versus branch repair.
+simple traces supplies the count without a first-writer predicate.
+Disturbed traversals are analysed on the selected outward route, leaving
+only stem capture versus branch repair.
 A single boundary invariant covers every manufactured pair: both supports
 are grooved at a reference corner, and the current state differs by at most
 the previous action. The arbitrary-lobe case selects its current orientation
@@ -53,10 +54,10 @@ the shared-history budgets, and the trace-reuse arguments. Build with
 
 Spatial loops use a one-bit invariant instead of contact/avoidance period
 cases. Arbitrary grooved lobes have the same incoming/outgoing-phase
-traversal law. Stay
-splices repeat a phase-preserving prefix followed by that lobe, while flip
-splices retain their four-corner invariant. Positive excursions provide both
-liveness and pointwise phase bounds without calculating periods. One shared
+traversal law. Stay splices repeat a phase-preserving prefix followed by
+that lobe, while flip splices retain their four-corner invariant. Positive
+excursions provide both liveness and pointwise phase bounds without
+calculating periods. One shared
 first-contact theorem handles both arbitrary routes with repeated switches
 and the switch-simple manufactured routes. The paper and Lean guide describe
 these reductions; the elementary `2^N` ceiling remains a one-line observation
