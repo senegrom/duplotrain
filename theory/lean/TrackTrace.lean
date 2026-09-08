@@ -313,21 +313,14 @@ theorem PhysicalTrace.last_link {w : Wiring}
     {rest : List Passage}
     (h : PhysicalTrace w start ((p, x) :: rest) finish) :
     w.link (lastPassageExit x rest) = some finish.1 := by
-  induction rest generalizing p x start finish with
+  induction rest generalizing p x start with
   | nil =>
       cases h with
-      | @cons _ _ q _ v _ _ harrive hlink tail =>
-          cases tail
-          simpa [lastPassageExit] using hlink
+      | cons _ hlink tail => cases tail; exact hlink
   | cons passage rest ih =>
-      rcases passage with ⟨q, y⟩
       cases h with
-      | @cons _ _ r _ v _ _ harrive hlink tail =>
-          cases tail with
-          | cons harrive' hlink' restTrace =>
-              have htail := ih
-                (PhysicalTrace.cons harrive' hlink' restTrace)
-              simpa [lastPassageExit] using htail
+      | cons _ _ tail => exact ih tail
+
 
 /-- Expose the first local passage of a nonempty trace without destructively
 case-splitting the rest of the trace. -/
@@ -348,23 +341,16 @@ theorem PhysicalTrace.last_exit_switch_mem {w : Wiring}
     (h : PhysicalTrace w start ((p, x) :: rest) finish) :
     lastPassageExit x rest / 3 ∈
       (((p, x) :: rest).map passageSwitch) := by
-  induction rest generalizing p x start finish with
+  induction rest generalizing p x start with
   | nil =>
-      have ha := h.head_arrive
-      obtain ⟨v, harrive⟩ := ha.2
+      obtain ⟨v, harrive⟩ := h.head_arrive.2
       have hs := arrive_exit_switch start.2 p
-      rw [harrive] at hs
-      simp [lastPassageExit, passageSwitch, hs]
+      simp [harrive, lastPassageExit, passageSwitch] at hs ⊢
+      exact hs
   | cons passage rest ih =>
-      rcases passage with ⟨q, y⟩
       cases h with
-      | @cons _ _ r _ v _ _ harrive hlink tail =>
-          cases tail with
-          | cons harrive' hlink' restTrace =>
-              have htail := ih
-                (PhysicalTrace.cons harrive' hlink' restTrace)
-              exact List.mem_cons_of_mem _ (by
-                simpa [lastPassageExit] using htail)
+      | cons _ _ tail => exact List.mem_cons_of_mem _ (ih tail)
+
 
 /-- A switch-simple nonempty trace cannot have its final exit port equal its
 first entry port. -/
@@ -374,30 +360,21 @@ theorem PhysicalTrace.simple_last_exit_ne_first_entry {w : Wiring}
     (h : PhysicalTrace w start ((p, x) :: rest) finish)
     (hsimple : SwitchSimple ((p, x) :: rest)) :
     lastPassageExit x rest ≠ p := by
+  intro heq
   cases rest with
   | nil =>
-      intro hEq
-      have hxne := arrive_exit_ne start.2 p
       obtain ⟨v, harrive⟩ := h.head_arrive.2
-      rw [harrive] at hxne
-      exact hxne (by simpa [lastPassageExit] using hEq)
+      have hne := arrive_exit_ne start.2 p
+      exact hne (by simpa [harrive, lastPassageExit] using heq)
   | cons passage rest =>
-      rcases passage with ⟨q, y⟩
-      intro hEq
-      unfold SwitchSimple at hsimple
-      simp only [List.map_cons, List.nodup_cons] at hsimple
-      apply hsimple.1
       cases h with
-      | @cons _ _ r _ v _ _ harrive hlink tail =>
-          cases tail with
-          | cons harrive' hlink' restTrace =>
-              have htailMem := (PhysicalTrace.cons harrive' hlink'
-                restTrace).last_exit_switch_mem
-              have hkey : passageSwitch (p, x) =
-                  lastPassageExit y rest / 3 := by
-                simp [passageSwitch, ← hEq, lastPassageExit]
-              rw [hkey]
-              exact htailMem
+      | cons _ _ tail =>
+          have hm := tail.last_exit_switch_mem
+          have hn : passageSwitch (p, x) ∉ (passage :: rest).map passageSwitch := by
+            grind [SwitchSimple]
+          apply hn
+          simpa only [passageSwitch, lastPassageExit] using heq ▸ hm
+
 
 /-- Every successful finite raw run has a physical passage trace. -/
 theorem physicalTrace_of_stepN (w : Wiring) :
@@ -414,25 +391,13 @@ theorem physicalTrace_of_stepN (w : Wiring) :
       exact ⟨[], rfl, PhysicalTrace.nil start⟩
   | succ n ih =>
       intro start finish h
-      cases hs : step w start with
-      | none =>
-          simp [stepN, hs] at h
-      | some middle =>
-          have htail : stepN w n middle = some finish := by
-            simpa [stepN, hs] using h
-          obtain ⟨passages, hlen, htrace⟩ := ih htail
-          cases ha : arrive start.2 start.1 with
-          | mk x v =>
-              cases hl : w.link x with
-              | none =>
-                  simp [step, ha, hl] at hs
-              | some q =>
-                  have hmiddle : middle = (q, v) := by
-                    simpa [step, ha, hl] using hs.symm
-                  subst middle
-                  refine ⟨(start.1, x) :: passages, ?_, ?_⟩
-                  · simp [hlen]
-                  · exact PhysicalTrace.cons ha hl htrace
+      obtain ⟨middle, hs, ht⟩ := Option.bind_eq_some_iff.mp h
+      obtain ⟨passages, hlen, htrace⟩ := ih ht
+      have hp := step_some_parts hs
+      refine ⟨(start.1, exitPort start) :: passages, by simp [hlen], ?_⟩
+      have ha : arrive start.2 start.1 = (exitPort start, middle.2) := Prod.ext rfl hp.2.symm
+      exact PhysicalTrace.cons ha hp.1 htrace
+
 
 /-- A switch passage can modify only its own tongue. -/
 theorem arrive_preserves_other {u v : Tongues} {p x j : Nat}
@@ -493,6 +458,20 @@ theorem PhysicalTrace.prefix_coordinate_eq_endpoint {w : Wiring}
     intro passage hp heq
     exact hprefix (List.mem_map.mpr ⟨passage, hp, heq⟩)
 
+/-- Every recorded passage exposes its local arrival and outgoing edge. -/
+theorem PhysicalTrace.passage_step
+    {w : Wiring} {start finish : Nat × Tongues} {passages : List Passage}
+    (htrace : PhysicalTrace w start passages finish) :
+    ∀ passage ∈ passages, ∃ u v q,
+      arrive u passage.1 = (passage.2, v) ∧ w.link passage.2 = some q := by
+  induction htrace with
+  | nil => simp
+  | @cons p x q u v passages finish harrive hlink tail ih =>
+      intro passage hp
+      rcases List.mem_cons.mp hp with rfl | hp
+      · exact ⟨u, v, q, harrive, hlink⟩
+      · exact ih passage hp
+
 /-- Every switch in a live trace is one of the `N` switches named by a
 finite-wiring bound. -/
 theorem PhysicalTrace.switch_lt {w : Wiring} {N : Nat}
@@ -500,20 +479,13 @@ theorem PhysicalTrace.switch_lt {w : Wiring} {N : Nat}
     {start finish : Nat × Tongues} {passages : List Passage}
     (h : PhysicalTrace w start passages finish) :
     ∀ passage ∈ passages, passageSwitch passage < N := by
-  induction h with
-  | nil =>
-      intro passage hp
-      cases hp
-  | @cons p x q u v passages finish harrive hlink tail ih =>
-      intro passage hp
-      rcases List.mem_cons.mp hp with hhead | htail
-      · subst passage
-        unfold passageSwitch
-        have hx : x < 3 * N := (hN x q hlink).1
-        have hsw := arrive_exit_switch u p
-        rw [harrive] at hsw
-        omega
-      · exact ih passage htail
+  intro passage hp
+  obtain ⟨u, v, q, harrive, hlink⟩ := h.passage_step passage hp
+  have hbound := (hN _ _ hlink).1
+  have hsame := arrive_exit_switch u passage.1
+  rw [harrive] at hsame
+  unfold passageSwitch
+  omega
 
 /-- Every recorded passage really uses the stem of its switch. -/
 theorem PhysicalTrace.passage_stem_endpoint {w : Wiring}
@@ -522,19 +494,9 @@ theorem PhysicalTrace.passage_stem_endpoint {w : Wiring}
     ∀ passage ∈ passages,
       passage.1 = 3 * passageSwitch passage ∨
         passage.2 = 3 * passageSwitch passage := by
-  induction h with
-  | nil =>
-      intro passage hp
-      cases hp
-  | @cons p x q u v passages finish harrive hlink tail ih =>
-      intro passage hp
-      rcases List.mem_cons.mp hp with hhead | htail
-      · subst passage
-        unfold passageSwitch
-        have hs := arrive_stem_endpoint u p
-        rw [harrive] at hs
-        exact hs
-      · exact ih passage htail
+  intro passage hp
+  obtain ⟨u, v, _, harrive, _⟩ := h.passage_step passage hp
+  simpa only [harrive, passageSwitch] using arrive_stem_endpoint u passage.1
 
 theorem nodup_subset_length_nat {α : Type} [BEq α] [LawfulBEq α]
     {xs pool : List α}
@@ -750,6 +712,26 @@ theorem reversePassages_grooved {state : Tongues} {passages : List Passage}
   obtain ⟨old, hold, rfl⟩ := List.mem_map.mp hp
   exact groove_forward (hgrooved old (List.mem_reverse.mp hold))
 
+/-- Reverse any grooved recorded route between its two boundary edges. -/
+theorem PhysicalTrace.reverse_grooved
+    {w : Wiring} {start finish : Nat × Tongues} {route : List Passage}
+    {entry outside : Nat} {state : Tongues}
+    (htrace : PhysicalTrace w start route finish)
+    (hgrooved : PassagesGrooved state route)
+    (hentry : w.link entry = some start.1)
+    (hexit : w.link finish.1 = some outside) :
+    PhysicalTrace w (outside, state) (reversePassages route) (entry, state) := by
+  induction htrace generalizing entry with
+  | nil c =>
+      have heq : outside = entry := Option.some.inj (hexit.symm.trans (w.symm _ _ hentry))
+      subst outside
+      exact PhysicalTrace.nil _
+  | @cons p x q u v route finish _ hlink tail ih =>
+      have hback := ih (fun passage hp => hgrooved passage (List.mem_cons_of_mem _ hp)) hlink hexit
+      have hhead := PhysicalTrace.cons (hgrooved (p, x) List.mem_cons_self)
+        (w.symm _ _ hentry) (PhysicalTrace.nil _)
+      simpa [reversePassages] using hback.append hhead
+
 /-- A fresh local passage that exits through the entry of a recorded prefix
 immediately traverses that prefix backwards and leaves over its incoming
 boundary edge. -/
@@ -764,19 +746,13 @@ theorem physicalTrace_contact_retraces_prefix
     (hcontact : arrive u p = (oldEntry, v)) :
     PhysicalTrace w (p, u)
       ((p, oldEntry) :: reversePassages recorded) (e, v) := by
-  induction recorded generalizing g base e with
+  cases recorded with
   | nil =>
       cases hrecorded
       exact PhysicalTrace.cons hcontact (w.symm _ _ hentry) (PhysicalTrace.nil _)
-  | cons passage rest ih =>
-      cases hrecorded with
-      | @cons _ x next _ middle _ _ _ hlink tail =>
-          have hrest := ih tail
-            (fun passage hp => hgrooved passage (List.mem_cons_of_mem _ hp)) hlink
-          have hhead : PhysicalTrace w (x, v) [(x, g)] (e, v) :=
-            PhysicalTrace.cons (hgrooved (g, x) List.mem_cons_self)
-              (w.symm _ _ hentry) (PhysicalTrace.nil _)
-          simpa [reversePassages] using hrest.append hhead
+  | cons passage rest =>
+      have hlink := w.symm _ _ hrecorded.last_link
+      exact PhysicalTrace.cons hcontact hlink (hrecorded.reverse_grooved hgrooved hentry hlink)
 
 
 /-- Every prefix of a grooved physical trace runs with the specified tongue
@@ -830,52 +806,5 @@ theorem PhysicalTrace.grooved_of_switchSimple {w : Wiring}
       rcases List.mem_cons.mp hp with rfl | hp
       · exact hhead
       · exact ih htail passage hp
-
-/-- Total version of the retrace engine.  The train walks a grooved path
-backwards and then follows the plain-track edge at the path's original entry;
-if that edge is absent, the result is exactly `none`. -/
-theorem retrace_linked_passages_option
-    (w : Wiring) (u : Tongues) (p x : Nat) (rest : List Passage)
-    (hlinked : LinkedPassages w ((p, x) :: rest))
-    (hgrooved : PassagesGrooved u ((p, x) :: rest)) :
-    stepN w ((p, x) :: rest).length
-      (lastPassageExit x rest, u) =
-        (w.link p).map (fun ell => (ell, u)) := by
-  induction rest generalizing p x with
-  | nil =>
-      have hg : arrive u x = (p, u) :=
-        hgrooved (p, x) (by simp)
-      simp [stepN, step, lastPassageExit, hg]
-  | cons passage rest ih =>
-      rcases passage with ⟨q, y⟩
-      have hxy : w.link x = some q := hlinked.1
-      have hqx : w.link q = some x := w.symm _ _ hxy
-      have htailLinked : LinkedPassages w ((q, y) :: rest) := hlinked.2
-      have htailGrooved : PassagesGrooved u ((q, y) :: rest) := by
-        intro passage hp
-        exact hgrooved passage (List.mem_cons_of_mem _ hp)
-      have htail := ih q y htailLinked htailGrooved
-      rw [hqx] at htail
-      have htail' :
-          stepN w ((q, y) :: rest).length
-            (lastPassageExit x ((q, y) :: rest), u) = some (x, u) := by
-        simpa [lastPassageExit] using htail
-      have hheadGroove : arrive u x = (p, u) :=
-        hgrooved (p, x) (by simp)
-      have hlen : ((p, x) :: (q, y) :: rest).length =
-          ((q, y) :: rest).length + 1 := by simp
-      rw [hlen, stepN_add, htail']
-      simp [stepN, step, hheadGroove]
-
-
-theorem retrace_linked_passages
-    (w : Wiring) (u : Tongues) (p x ell : Nat) (rest : List Passage)
-    (hlinked : LinkedPassages w ((p, x) :: rest))
-    (hgrooved : PassagesGrooved u ((p, x) :: rest))
-    (hentry : w.link ell = some p) :
-    stepN w ((p, x) :: rest).length
-      (lastPassageExit x rest, u) = some (ell, u) := by
-  rw [retrace_linked_passages_option w u p x rest hlinked hgrooved, w.symm _ _ hentry]
-  rfl
 
 end GeneralN

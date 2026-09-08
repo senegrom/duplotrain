@@ -108,18 +108,9 @@ theorem PhysicalTrace.passage_exit_switch
     (htrace : PhysicalTrace w start passages finish) :
     ∀ passage ∈ passages,
       passage.2 / 3 = passageSwitch passage := by
-  induction htrace with
-  | nil =>
-      intro passage hp
-      cases hp
-  | @cons p x q u v passages finish harrive hlink tail ih =>
-      intro passage hp
-      rcases List.mem_cons.mp hp with hhead | htail
-      · subst passage
-        have hs := arrive_exit_switch u p
-        rw [harrive] at hs
-        exact hs
-      · exact ih passage htail
+  intro passage hp
+  obtain ⟨u, v, _, harrive, _⟩ := htrace.passage_step passage hp
+  simpa only [harrive, passageSwitch] using arrive_exit_switch u passage.1
 
 theorem map_passageSwitch_reversePassages
     {w : Wiring} {start finish : Nat × Tongues}

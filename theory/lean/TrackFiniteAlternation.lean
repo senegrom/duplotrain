@@ -1,12 +1,12 @@
 import TrackNoveltyCover
 
 /-!
-# Productive steps and first-writer histories
+# Productive steps and histories
 
 A productive step changes the restricted tongue vector. Its writer is the
-switch entered at that step, and first productive writers have distinct
-switch labels. On a switch-simple trace every productive step is a first
-write, so these histories cover the whole trace.
+switch entered at that step. Recording every productive post-vector covers
+any live finite run. Switch-simple traces have distinct writer labels,
+so their histories use at most one entry per visited switch.
 -/
 
 namespace GeneralN
@@ -27,31 +27,20 @@ def RawProductiveAt (w : Wiring) (N : Nat)
   restrictedTonguesAt w N start (k+1) ≠
     restrictedTonguesAt w N start k
 
-/-- This is the first productive occurrence of its writer. -/
-def RawFirstWriterAt (w : Wiring) (N : Nat)
-    (start : Nat × Tongues) (k : Nat) : Prop :=
-  RawProductiveAt w N start k ∧
-  ∀ j, j < k → RawProductiveAt w N start j →
-    rawWriterAt w start j ≠ rawWriterAt w start k
-
 instance (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) :
     Decidable (RawProductiveAt w N start k) := by
   unfold RawProductiveAt; infer_instance
 
-instance (w : Wiring) (N : Nat) (start : Nat × Tongues) (k : Nat) :
-    Decidable (RawFirstWriterAt w N start k) := by
-  unfold RawFirstWriterAt; infer_instance
-
-def rawFirstWriterTimes
+def rawProductiveTimes
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) : List Nat :=
   (List.range K).filter
-    (fun k => decide (RawFirstWriterAt w N start k))
+    (fun k => decide (RawProductiveAt w N start k))
 
-theorem mem_rawFirstWriterTimes_iff
+theorem mem_rawProductiveTimes_iff
     {w : Wiring} {N K k : Nat} {start : Nat × Tongues} :
-    k ∈ rawFirstWriterTimes w N start K ↔
-      k < K ∧ RawFirstWriterAt w N start k := by
-  simp [rawFirstWriterTimes]
+    k ∈ rawProductiveTimes w N start K ↔
+      k < K ∧ RawProductiveAt w N start k := by
+  simp [rawProductiveTimes]
 
 theorem rawProductiveAt_writer_lt
     {w : Wiring} {N : Nat}
@@ -67,20 +56,11 @@ theorem rawProductiveAt_writer_lt
     omega
   simpa [rawWriterAt, rawEntryAt, hcur] using hlt
 
-/-- First productive writers are injective by their switch label. -/
-theorem rawFirstWriterAt_injective
-    {w : Wiring} {N : Nat} {start : Nat × Tongues} {i j : Nat}
-    (hi : RawFirstWriterAt w N start i)
-    (hj : RawFirstWriterAt w N start j)
-    (hwriter : rawWriterAt w start i = rawWriterAt w start j) :
-    i = j := by
-  grind [RawFirstWriterAt]
-
-def rawFirstWriterHistory
+def rawProductiveHistory
     (w : Wiring) (N : Nat) (start : Nat × Tongues) (K : Nat) :
     List (List Bool) :=
   restrictedTonguesAt w N start 0 ::
-    (rawFirstWriterTimes w N start K).map
+    (rawProductiveTimes w N start K).map
       (fun k => restrictedTonguesAt w N start (k+1))
 
 end GeneralN

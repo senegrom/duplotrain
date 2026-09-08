@@ -99,7 +99,7 @@ bounds
 \[ 26N{+}3 \to 24N{+}5 \to 18N{+}3 \to \cdots \to 2N{+}9 \to N{+}7 \to
    N{+}6 \to N{+}5 \to N{+}4 \]
 was tightened until the constructive lower bound was met.  The final
-development (7,612 lines of Lean~4 in 34 files, using no
+development (7,425 lines of Lean~4 in 34 files, using no
 external mathematics library) proves the single statement
 \begin{center}
   \lean{GeneralN.state\_law :\ }$\forall N$,
@@ -534,27 +534,29 @@ the sticky/alternating dichotomy visible in the toy.
 
 \subsection{The coordinate budget}\label{ssec:budget}
 
-All counting is funnelled through one frame
-(\file{TrackFiniteAlternation.lean}).  Call a live step
-\emph{productive} if it changes the restricted vector; its \emph{writer}
-is the switch it enters.  Then a run's distinct vectors are at most
-\[ 1 \;+\; \#\{\text{first productive writes}\} \;+\;
-   \#\{\text{repeated-writer novelties}\}, \]
-where the first term is the initial vector, the second is at most $N$
---- one per switch --- and a \emph{repeated-writer novelty} is a
-productive event of an already-productive switch whose resulting vector
-is globally new.  The whole difficulty of the theorem is that repeated
-writers may in principle keep minting new vectors; the reflector
-machinery exists to cap them by a constant.  The refined bookkeeping
-never charges the crude $N$: it charges the switch-simple
-\emph{exploration} (at most $N$ coordinates, Lemma~\ref{lem:history}),
-and every later count is charged \emph{into the same $N$ ambient switch
-coordinates} --- reusable support here, productive first writers of a
-continuation there --- plus explicitly named constant corners.  Two
-overlapping histories are never paid twice: when a second manufactured
-exploration follows a first, the union of the two construction histories,
-with their shared boundary vector erased, still fits the frame
-(\file{TwoHistoryUnionCharge.lean}).
+Call a live step \emph{productive} when it changes the restricted vector;
+its \emph{writer} is the switch it enters
+(\file{TrackFiniteAlternation.lean}). Record the initial vector and the
+post-vector of every productive step. This history covers every live prefix
+by induction: a quiet step repeats its preceding vector, and a productive
+step adds its own post-vector (\file{SharpCertificateClosure.lean}).
+
+On a switch-simple trace the writer labels are injective, so the productive
+steps already have distinct writers. No separate first-writer predicate is
+needed. If the continuation's endpoints groove the old reusable support,
+its productive writers avoid that support. Thus one joint coordinate budget
+pays for the old support, the continuation writers, and any disjoint reserved
+coordinates:
+\[
+  \#\{\text{old reusable switches}\}+
+  \#\{\text{productive writers}\}+
+  \#\{\text{reserved switches}\}\le N.
+\]
+The first history omits a known duplicate, and the continuation erases their
+shared boundary vector. The same history-size proof handles either an empty
+reserve or the old action switch, leaving only the explicitly named constant
+tail corners (\file{TwoHistoryUnionCharge.lean},
+\file{OneReflectorContinuation.lean}).
 
 The endpoint-coordinate law also shortens this bookkeeping. On a
 switch-simple trace, each intermediate coordinate equals its initial or final
@@ -891,7 +893,7 @@ square.
 \section{About the formalisation}\label{sec:formal}
 
 The development in \file{theory/lean} builds with Lean~4.32.2 and no
-external library. Run \texttt{lake build} to compile all 36 Lean files;
+external library. Run \texttt{lake build} to compile all 34 Lean files;
 \file{StateLawAxiomAudit.lean} checks the exact transitive axiom list of
 \lean{GeneralN.state\_law}:
 \begin{center}

@@ -24,23 +24,14 @@ theorem restrictedTonguesAt_eq_of_quiet_interval
   induction span generalizing finish with
   | zero => simp
   | succ n ih =>
-      have hprefix : ∃ middle,
-          stepN w (first + n) start = some middle :=
-        stepN_prefix_some (by omega) hfinish
-      obtain ⟨middle, hmiddle⟩ := hprefix
-      have hprev := ih hmiddle
-        (fun j hfirst hj => hquiet j hfirst (by omega))
-      have hlive : (stepN w (first + n + 1) start).isSome := by
-        have harith : first + (n+1) = first + n + 1 := by omega
-        rw [← harith, hfinish]
-        simp
+      rw [← Nat.add_assoc] at hfinish
+      obtain ⟨middle, hmiddle⟩ := stepN_prefix_some (d := first + n) (by omega) hfinish
       have hstep : restrictedTonguesAt w N start (first + n + 1) =
-          restrictedTonguesAt w N start (first + n) :=
-        Classical.byContradiction fun hne =>
-          hquiet (first+n) (by omega) (by omega) ⟨hlive, hne⟩
-      have harith : first + (n+1) = first+n+1 := by omega
-      rw [harith]
-      exact hstep.trans hprev
+          restrictedTonguesAt w N start (first + n) := by
+        apply Classical.byContradiction
+        intro hne
+        exact hquiet (first + n) (by omega) (by omega) ⟨by rw [hfinish]; rfl, hne⟩
+      exact hstep.trans (ih hmiddle (fun j hj hbound => hquiet j hj (by omega)))
 
 /-- Restriction commutes with flipping a represented coordinate, even when
 the two full tongue functions may differ outside the first `N` switches. -/
@@ -52,13 +43,9 @@ theorem restrict_flipAt_congr
   unfold VectorCount.restrict
   apply List.map_congr_left
   intro j hj
-  have hjN : j < N := List.mem_range.mp hj
-  have huv : u j = v j := restrict_eq_apply h hjN
-  unfold flipAt
-  by_cases hjC : j = C
-  · subst j
-    simp [huv]
-  · simp [hjC, huv]
+  have huv := restrict_eq_apply h (List.mem_range.mp hj)
+  simp only [flipAt]
+  split <;> rw [huv]
 
 /-- A productive raw step flips exactly the represented bit named by its
 writer. -/

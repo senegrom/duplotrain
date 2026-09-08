@@ -1,11 +1,11 @@
 import RepeatedNoveltyDecomposition
 
 /-!
-# Time shifts and first-writer history coverage
+# Time shifts and productive-history coverage
 
-Live time shifts preserve restricted vectors. A switch-simple trace has
-no repeated productive writer, so induction covers every vector by the
-initial state and the post-state of each first productive write.
+Live time shifts preserve restricted vectors. Productive-step histories
+cover every live prefix by induction. In a switch-simple trace the writer
+labels are injective, supplying the finite coordinate count separately.
 -/
 
 namespace GeneralN
@@ -61,51 +61,31 @@ theorem PhysicalTrace.rawWriterAt_eq_passageSwitch_getElem
           obtain ⟨cfg, hcfg⟩ := stepN_prefix_some (Nat.le_of_lt hkTail) tail.sound
           simpa [rawWriterAt, rawEntryAt, stepN, step, harrive, hlink, hcfg] using ih hkTail
 
-/-- Every productive event inside a switch-simple physical construction is
-globally the first productive event of its writer.  This is the raw-history
-extraction missing from the older five-frame formulation: passage simplicity
-controls the complete absolute run prefix, not merely a local certificate. -/
-theorem PhysicalTrace.rawProductiveAt_first_of_switchSimple
-    {w : Wiring} {N : Nat} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages) :
-    ∀ {k : Nat}, k < passages.length →
-      RawProductiveAt w N start k →
-      RawFirstWriterAt w N start k := by
-  intro k hk hprod
-  refine ⟨hprod, ?_⟩
-  intro j hj hprodj hwriter
-  have hjBound : j < passages.length := Nat.lt_trans hj hk
-  have hwriterJ := htrace.rawWriterAt_eq_passageSwitch_getElem hjBound
-  have hwriterK := htrace.rawWriterAt_eq_passageSwitch_getElem hk
-  have hpair := List.pairwise_iff_getElem.mp hsimple
-  have hne := hpair j k (by simpa using hjBound) (by simpa using hk) hj
-  apply hne
-  simpa [hwriterJ, hwriterK] using hwriter
+/-- A switch-simple trace visits each writer at most once. -/
+theorem PhysicalTrace.rawWriterAt_injective
+    {w : Wiring} {start finish : Nat × Tongues} {passages : List Passage}
+    (htrace : PhysicalTrace w start passages finish) (hsimple : SwitchSimple passages)
+    {i j : Nat} (hi : i < passages.length) (hj : j < passages.length)
+    (heq : rawWriterAt w start i = rawWriterAt w start j) : i = j := by
+  apply (List.getElem_inj (h₀ := by simpa using hi) (h₁ := by simpa using hj) hsimple).mp
+  simpa [htrace.rawWriterAt_eq_passageSwitch_getElem hi,
+    htrace.rawWriterAt_eq_passageSwitch_getElem hj] using heq
 
-/-- Every state of a switch-simple physical construction prefix belongs to
-the canonical initial-plus-first-writer history.  This is an unconditional
-global raw-history extraction, including the endpoint of the trace. -/
-theorem PhysicalTrace.restrictedTonguesAt_mem_rawFirstWriterHistory
-    {w : Wiring} {N : Nat} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages) :
-    ∀ k, k ≤ passages.length →
-      restrictedTonguesAt w N start k ∈
-        rawFirstWriterHistory w N start passages.length := by
+/-- The initial vector and post-vectors of productive steps cover every
+live prefix, including repeated visits to a writer. -/
+theorem restrictedTonguesAt_mem_rawProductiveHistory
+    {w : Wiring} {N K : Nat} {start finish : Nat × Tongues}
+    (hfinish : stepN w K start = some finish) :
+    ∀ k, k ≤ K → restrictedTonguesAt w N start k ∈ rawProductiveHistory w N start K := by
   intro k
   induction k with
-  | zero => intro _; simp [rawFirstWriterHistory]
+  | zero => intro _; simp [rawProductiveHistory]
   | succ k ih =>
       intro hk
       by_cases heq : restrictedTonguesAt w N start (k + 1) = restrictedTonguesAt w N start k
       · rw [heq]; exact ih (by omega)
-      · have hprod : RawProductiveAt w N start k :=
-          ⟨Option.isSome_iff_exists.mpr (stepN_prefix_some hk htrace.sound), heq⟩
-        have hfirst := htrace.rawProductiveAt_first_of_switchSimple hsimple (by omega) hprod
-        exact List.mem_cons_of_mem _ (List.mem_map.mpr
-          ⟨k, mem_rawFirstWriterTimes_iff.mpr ⟨by omega, hfirst⟩, rfl⟩)
+      · exact List.mem_cons_of_mem _ (List.mem_map.mpr
+          ⟨k, mem_rawProductiveTimes_iff.mpr ⟨by omega,
+            Option.isSome_iff_exists.mpr (stepN_prefix_some hk hfinish), heq⟩, rfl⟩)
 
 end GeneralN

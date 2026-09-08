@@ -72,9 +72,11 @@ The former count-only and trace-retaining wrappers are unnecessary. A shared
 settled-tail lemma charges the constant future vector once after any
 historical prefix.
 
-First-writer histories cover simple traces by induction: an unchanged step
-keeps the previous vector, while a changed step writes a switch for the first
-time. This direct proof replaces the general repeated-writer novelty layer.
+Productive histories cover every live prefix by induction: an unchanged step
+keeps the previous vector, while a changed step contributes its post-vector.
+A switch-simple trace has injective writer labels, so its productive steps
+already have distinct writers. No first-writer predicate or search through
+earlier times is needed.
 
 `StateLawNAddFourSharp.lean` reduces arbitrary starts and partial wirings
 to this setting using `WiringCompletion.lean`:
@@ -375,7 +377,10 @@ and `explicit_lobe_two_phase_at` now consume this same spatial certificate,
 removing the separate two-state endpoint and reverse-travel derivations.
 
 The common replay, reverse-trace, and prefix lemmas now live in `TrackTrace`,
-where both consumers can use them. Grooved replay and prefix coverage are
+where both consumers can use them. `PhysicalTrace.reverse_grooved` supplies
+both reflector return and contact retrace; the separate linked-path retrace
+engine is removed. A single `passage_step` extraction supplies the local
+geometry and finite-switch bounds. Grooved replay and prefix coverage are
 instances of `PhysicalTrace.replay_preserving`. `reversePassages` uses list
 reversal followed by endpoint swapping, so its algebra and source-membership
 facts follow directly from the standard list operations.
@@ -449,6 +454,7 @@ comments and blanks, not just proof tactics.
 | After direct historical phases and manufacturing-return coverage | 39 | 9,673 |
 | After replacing protected repair by the pre-return pair orbit | 35 | 8,311 |
 | After direct contact recovery, shared continuation budgets, and closed probes | 33 | 7,593 |
+| After shared reverse replay and direct productive-step histories | 33 | 7,406 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -659,3 +665,18 @@ removing `KnownEdgeNAddFourFrontier` and `KnownEdgeNAddFourChangedClosed`.
 All seven protected files remain byte-for-byte unchanged. A clean build checks
 all **69 jobs** without warnings, the exact axiom audit passes, and all **290**
 public source theorems belong to the headline proof's kernel dependency closure.
+
+The direct-productive-history pass removes another **187 Lean source lines**,
+from **7,612 to 7,425** (**2.5%**), across the same 34 files. Productive
+histories now cover arbitrary live prefixes; switch simplicity supplies
+writer injectivity only where the coordinate count needs it. This deletes
+the first-writer predicate, its decision procedure, and its extraction proof.
+
+One grooved reverse replay replaces the separate linked-path retrace engine.
+A single recorded-passage extraction replaces repeated geometry inductions,
+and action-writer recovery now directly returns its historical vector.
+
+The clean **69-job** build and exact axiom audit pass without warnings. All
+**288** public source theorems are used, and the seven protected files remain
+byte-for-byte unchanged. Together these two passes remove **882 lines** from
+the reviewed 8,307-line baseline (**10.6%**).

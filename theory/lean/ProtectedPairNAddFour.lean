@@ -50,8 +50,7 @@ theorem ManufacturedReflector.preReturn_grooved_protected_pair_all_run_distinct_
     · exact List.mem_append_left _ (List.mem_append_left _ (A.mem_sharpHistoryCore_of_mem hx))
     · rcases List.mem_append.mp hx with hx | hx
       · obtain ⟨j, hj, rfl⟩ := List.mem_map.mp hx
-        exact List.mem_append_left _ (A.mem_continuationHistory B.exploration_trace
-          B.exploration_simple (by have := List.mem_range.mp hj; omega))
+        exact List.mem_append_left _ (A.mem_continuationHistory B.exploration_trace (by have := List.mem_range.mp hj; omega))
       · exact List.mem_append_right _ hx
   have hpreHistorical : VectorCount.restrict N B.preReturn.2 ∈ history :=
     hhistory _ (Or.inr B.preReturn_mem_sharpHistory)
@@ -93,18 +92,12 @@ theorem ManufacturedReflector.preReturn_grooved_protected_pair_all_run_distinct_
       change ∀ fresh, VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch) ∈ history ++ fresh →
         VectorCount.restrict N (flipAt B.activatedState R.actionSwitch) ∈ history ++ fresh →
         times.length ≤ history.length + fresh.length at hcount
-      by_cases haction : R.actionSwitch ∈ B.constructionFirstWriterSwitches N
+      by_cases haction : R.actionSwitch ∈ B.constructionWriterSwitches N
       · obtain ⟨t, ht, hwriter⟩ := List.mem_map.mp haction
-        have htData := mem_rawFirstWriterTimes_iff.mp ht
-        have hlast := R.no_productive_after_action_writer B.exploration_trace
-          B.exploration_simple hAatBase hpre ht hwriter
-        have hrecover := last_productive_recovers B.exploration_trace.sound
-          htData.1 htData.2.1 hlast
-        rw [hwriter] at hrecover
         have hcorner : VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch) ∈ history := by
-          rw [hrecover]
+          rw [R.action_writer_recovers B.exploration_trace B.exploration_simple hAatBase hpre ht hwriter]
           exact hhistory _ (Or.inr (List.mem_append_left _ (List.mem_map.mpr
-            ⟨t, List.mem_range.mpr (by omega), rfl⟩)))
+            ⟨t, List.mem_range.mpr (Nat.lt_succ_of_lt (mem_rawProductiveTimes_iff.mp ht).1), rfl⟩)))
         have h := hcount [VectorCount.restrict N (flipAt B.activatedState R.actionSwitch)]
           (by simp [hcorner]) (by simp)
         simp only [List.length_singleton] at h
@@ -113,7 +106,7 @@ theorem ManufacturedReflector.preReturn_grooved_protected_pair_all_run_distinct_
           have h := (ManufacturedReflector.flip R).continuationHistory_length_le hN hbase
             B.exploration_trace B.exploration_simple hAatBase hpre [R.actionSwitch]
             (by simp) (by simpa using R.action_lt hN)
-            (by simpa using R.action_not_mem_reusable) (by simpa only [List.mem_singleton, forall_eq, ManufacturedReflector.constructionFirstWriterSwitches] using haction)
+            (by simpa using R.action_not_mem_reusable) (by simpa only [List.mem_singleton, forall_eq, ManufacturedReflector.constructionWriterSwitches] using haction)
           simpa [history] using h
         have h := hcount [VectorCount.restrict N (flipAt B.preReturn.2 R.actionSwitch),
           VectorCount.restrict N (flipAt B.activatedState R.actionSwitch)] (by simp) (by simp)

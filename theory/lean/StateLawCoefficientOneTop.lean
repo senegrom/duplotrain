@@ -42,7 +42,7 @@ theorem PartialSecondRunSharp.ChangedContact.mem_compressedLead_of_approach
     {j : Nat} (hj : j ≤ C.approach.length) :
     restrictedTonguesAt w N (e, A.activatedState) j ∈
       C.compressedLead N := by
-  exact List.mem_append_left _ (A.mem_continuationHistory C.approach_trace C.approach_simple hj)
+  exact List.mem_append_left _ (A.mem_continuationHistory C.approach_trace hj)
 
 theorem PartialSecondRunSharp.ChangedContact.contact_mem_compressedLead :
     VectorCount.restrict N C.contactState ∈ C.compressedLead N := by

@@ -274,15 +274,14 @@ theorem PhysicalTrace.sandwich_reflector
       have hg := hpreserve u hu.1
       obtain ⟨hr, hs⟩ := hcore _ (w.symm _ _ hrunway.last_link) u hu.2
       have hforward := (hrunway.replay_grooved u hu.1).sound
-      have hback := retrace_linked_passages w (τ u) g a e rest hrunway.linked hg
-        (by simpa only [hrunway.head_arrive.1] using hentry)
+      have hback := (hrunway.reverse_grooved hg hentry (w.symm _ _ hrunway.last_link)).sound
       refine ⟨?_, hg, hs⟩
       rw [show 2 * ((g, a) :: rest).length + k =
         ((g, a) :: rest).length + (k + ((g, a) :: rest).length) by omega,
         stepN_add, hforward]
       simp only [Option.bind_some]
       rw [stepN_add, hr]
-      exact hback
+      simpa [reversePassages_length] using hback
 
 /-- A nondegenerate crossed first revisit, together with the simple runway
 before it, is a complete `flipAt` reflector from one side of the runway's

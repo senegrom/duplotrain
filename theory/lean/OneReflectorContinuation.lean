@@ -39,7 +39,7 @@ def ManufacturedReflector.continuationHistory
     (N : Nat) (start : Nat × Tongues) (length : Nat) :
     List (List Bool) :=
   A.sharpHistoryCore N ++
-    (rawFirstWriterHistory w N start length).erase
+    (rawProductiveHistory w N start length).erase
       (VectorCount.restrict N A.activatedState)
 
 /-- The combined first-reflector/continuation history has size at most
@@ -61,20 +61,20 @@ theorem ManufacturedReflector.continuationHistory_length_le
     (hextrasLt : ∀ s ∈ extras, s < N := by simp)
     (hextrasReusable : ∀ s ∈ extras, s ∉ A.reusableSwitches := by simp)
     (hextrasWriters : ∀ s ∈ extras,
-      s ∉ (rawFirstWriterTimes w N start passages.length).map (rawWriterAt w start) := by simp) :
+      s ∉ (rawProductiveTimes w N start passages.length).map (rawWriterAt w start) := by simp) :
     (A.continuationHistory N start passages.length).length + extras.length ≤ N + 2 := by
   have hboundary : VectorCount.restrict N A.activatedState ∈
-      rawFirstWriterHistory w N start passages.length := by
-    simp [rawFirstWriterHistory, restrictedTonguesAt,
+      rawProductiveHistory w N start passages.length := by
+    simp [rawProductiveHistory, restrictedTonguesAt,
       tonguesAt, stepN, hstart]
   have hcharge :=
-    A.reusable_add_continuation_first_writers_add_extras_le
+    A.reusable_add_continuation_writers_add_extras_le
       hN htrace hsimple hbase hend extras hextrasNodup hextrasLt hextrasReusable hextrasWriters
   have houter := A.exploration_length_le_reusable_add_one
   unfold ManufacturedReflector.continuationHistory
   rw [List.length_append, List.length_erase_of_mem hboundary,
     A.sharpHistoryCore_length]
-  simp [rawFirstWriterHistory]
+  simp [rawProductiveHistory]
   omega
 
 /-- Every state of the simple continuation belongs to its compressed
@@ -85,12 +85,10 @@ theorem ManufacturedReflector.mem_continuationHistory
     {start finish : Nat × Tongues}
     {passages : List Passage}
     (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
     {d : Nat} (hd : d ≤ passages.length) :
     restrictedTonguesAt w N start d ∈
       A.continuationHistory N start passages.length := by
-  have hm := htrace.restrictedTonguesAt_mem_rawFirstWriterHistory
-    (N := N) hsimple d hd
+  have hm := restrictedTonguesAt_mem_rawProductiveHistory (N := N) htrace.sound d hd
   by_cases hboundary : restrictedTonguesAt w N start d =
       VectorCount.restrict N A.activatedState
   · apply List.mem_append_left
@@ -107,7 +105,6 @@ theorem ManufacturedReflector.journey_then_continuation_mem
     (hA : PathGrooves A.toSupported.paths A.activatedState)
     {finish : Nat × Tongues} {passages : List Passage}
     (htrace : PhysicalTrace w (e, A.activatedState) passages finish)
-    (hsimple : SwitchSimple passages)
     {k : Nat}
     (hk : k ≤ A.exploration.length + A.runway.length + 1 +
       passages.length) :
@@ -136,7 +133,7 @@ theorem ManufacturedReflector.journey_then_continuation_mem
       (stepN_prefix_some hd htrace.sound)]
     exact A.mem_continuationHistory
       (N := N) (finish := finish) (passages := passages)
-      htrace hsimple hd
+      htrace hd
 
 /-- A cover of the manufacturing history and every live continuation vector
 covers every live vector of the original run. -/
@@ -183,7 +180,7 @@ theorem simple_lead_one_vector_tail_distinct_le_N_add_three
     rw [stepN_add, A.manufacturing_journey_reaches_activated hA]
     exact hlead.sound
   have hcover := history_then_settled_one_novelty (N := N) hreach
-    (fun _ hk => A.journey_then_continuation_mem hA hlead hleadSimple hk) htail times
+    (fun _ hk => A.journey_then_continuation_mem hA hlead hk) htail times
   have hcount := noveltyCoverOn_distinct_count hcover hnd
   have hhistory := A.continuationHistory_length_le hN rfl hlead hleadSimple hA hend
   omega

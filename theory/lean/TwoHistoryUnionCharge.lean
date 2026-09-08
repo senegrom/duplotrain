@@ -116,10 +116,10 @@ theorem ManufacturedReflector.reusableSwitch_lt
 
 /-- Switch coordinates of the productive first writers in a manufactured
 reflector's switch-simple construction. -/
-def ManufacturedReflector.constructionFirstWriterSwitches
+def ManufacturedReflector.constructionWriterSwitches
     {w : Wiring} {g e : Nat}
     (B : ManufacturedReflector w g e) (N : Nat) : List Nat :=
-  (rawFirstWriterTimes w N (g, B.baseState)
+  (rawProductiveTimes w N (g, B.baseState)
       B.exploration.length).map
     (rawWriterAt w (g, B.baseState))
 
@@ -139,29 +139,29 @@ include w N g e hN A start finish passages htrace hsimple hbase hend
 /-- The old reusable coordinates, the first productive writers of a
 support-preserving simple continuation, and any duplicate-free list of extra
 switches avoiding both share one ambient switch budget. -/
-theorem ManufacturedReflector.reusable_add_continuation_first_writers_add_extras_le
+theorem ManufacturedReflector.reusable_add_continuation_writers_add_extras_le
     (extras : List Nat)
     (hextrasNodup : extras.Nodup)
     (hextrasLt : ∀ s ∈ extras, s < N)
     (hextrasReusable : ∀ s ∈ extras, s ∉ A.reusableSwitches)
     (hextrasWriters : ∀ s ∈ extras,
-      s ∉ (rawFirstWriterTimes w N start passages.length).map (rawWriterAt w start)) :
+      s ∉ (rawProductiveTimes w N start passages.length).map (rawWriterAt w start)) :
     A.reusableSwitches.length +
-      (rawFirstWriterTimes w N start passages.length).length + extras.length ≤ N := by
-  let times := rawFirstWriterTimes w N start passages.length
+      (rawProductiveTimes w N start passages.length).length + extras.length ≤ N := by
+  let times := rawProductiveTimes w N start passages.length
   let writers := times.map (rawWriterAt w start)
   have hwritersNodup : writers.Nodup := by
     apply nodup_map_of_injective_on_mem
     · intro i hi j hj heq
-      exact rawFirstWriterAt_injective (mem_rawFirstWriterTimes_iff.mp hi).2
-        (mem_rawFirstWriterTimes_iff.mp hj).2 heq
+      exact htrace.rawWriterAt_injective hsimple (mem_rawProductiveTimes_iff.mp hi).1
+        (mem_rawProductiveTimes_iff.mp hj).1 heq
     · exact List.Pairwise.filter _ List.nodup_range
   have hwriters : ∀ j ∈ writers, j < N ∧ j ∉ A.reusableSwitches := by
     intro j hj
     obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hj
-    have hk := mem_rawFirstWriterTimes_iff.mp hk
-    exact ⟨rawProductiveAt_writer_lt hN hk.2.1,
-      htrace.productive_writer_not_old_reusable A hsimple hbase hend hk.1 hk.2.1⟩
+    have hk := mem_rawProductiveTimes_iff.mp hk
+    exact ⟨rawProductiveAt_writer_lt hN hk.2,
+      htrace.productive_writer_not_old_reusable A hsimple hbase hend hk.1 hk.2⟩
   have hnd : (extras ++ (A.reusableSwitches ++ writers)).Nodup := by
     refine List.nodup_append.mpr ⟨hextrasNodup,
       List.nodup_append.mpr ⟨A.reusableSwitches_nodup, hwritersNodup, ?_⟩, ?_⟩ <;> grind
