@@ -108,15 +108,9 @@ theorem manufactured_pair_all_time_action_corners_tongues
       manufacturedPairActionCorners A B state := by
   let a := A.toSupported.action
   let b := B.toSupported.action
-  let safe := fun u => u ∈ [state, a.apply state, b.apply state, b.apply (a.apply state)]
-  have hsafeA : ∀ u, safe u → safe (a.apply u) := by
-    intro u hu
-    simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
-    rcases hu with rfl | rfl | rfl | rfl <;> simp [safe, a.involutive, a.commute b]
-  have hsafeB : ∀ u, safe u → safe (b.apply u) := by
-    intro u hu
-    simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
-    rcases hu with rfl | rfl | rfl | rfl <;> simp [safe, b.involutive]
+  let safe := fun u => u ∈ a.corners b state
+  have hsafeA u hu := (a.corners_closed b state u hu).1
+  have hsafeB u hu := (a.corners_closed b state u hu).2
   let boundary := fun c : Nat × Tongues => ∃ u, safe u ∧
     PathGrooves A.toSupported.paths u ∧ PathGrooves B.toSupported.paths u ∧
       ((c.1 = g ∧ (c.2 = u ∨ c.2 = b.apply u)) ∨
@@ -140,8 +134,9 @@ theorem manufactured_pair_all_time_action_corners_tongues
     · exact A.pair_progress B safe boundary hsafeA hsafeB hforward hu hAu hBu hv
     · exact B.pair_progress A safe boundary hsafeB hsafeA hbackward hu hBu hAu hv
   obtain ⟨port, phase, hr, hs⟩ := stepN_covered_of_progress boundary safe hprogress
-    (start := (g, state)) (hforward state (by simp [safe]) hA hB).1 d
-  simpa [tonguesAt, hr, manufacturedPairActionCorners, safe, a, b] using hs
+    (start := (g, state)) (hforward state (by simp [safe, LocalAction.corners]) hA hB).1 d
+  simpa [tonguesAt, hr, manufacturedPairActionCorners, safe, LocalAction.corners, a, b,
+    A.toSupported.action.commute B.toSupported.action] using hs
 
 /-- Start the pair at the protected pre-return state. Traversing `B` reaches
 its activated boundary, so every live continuation inherits the same four

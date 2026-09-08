@@ -27,13 +27,15 @@ simple traces supplies the count without a first-writer predicate. Disturbed tra
 the selected outward route, leaving only stem capture versus branch repair.
 A single boundary invariant covers every manufactured pair: both supports
 are grooved at a reference corner, and the current state differs by at most
-the previous action. Positive-length excursions preserve the four-corner cover. Capture is a suffix of
+the previous action. The arbitrary-lobe case selects its current orientation
+and closes one outer-boundary invariant, with no separate reverse excursion.
+All three pair arguments share the algebraic corner-closure proof. Capture is a suffix of
 ordinary traversal. Shortened reflectors reuse their original construction
 witnesses rather than rebuilding them in the later tongue state.
 
-The retained development has 31 Lean files and 6,970 source lines,
+The retained development has 31 Lean files and 6,790 source lines,
 including its 19-line axiom audit; the headline import closure has 30
-modules and 6,951 lines. Source lines include comments and blank lines.
+modules and 6,771 lines. Source lines include comments and blank lines.
 The theorem statement, model, finite-state ceiling, attainment constructions,
 and exact axiom audit are unchanged. Git history retains superseded proofs.
 

@@ -272,16 +272,9 @@ theorem SupportedReflector.pair_all_time_four_phase
        A.action.apply (B.action.apply state)] := by
   let a := A.action
   let b := B.action
-  let safe := fun u => u ∈ [state, a.apply state, b.apply state, a.apply (b.apply state)]
-  have hsafeA : ∀ u, safe u → safe (a.apply u) := by
-    intro u hu
-    simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
-    rcases hu with rfl | rfl | rfl | rfl <;>
-      simp [safe, a.involutive]
-  have hsafeB : ∀ u, safe u → safe (b.apply u) := by
-    intro u hu
-    simp only [safe, List.mem_cons, List.not_mem_nil, or_false] at hu
-    rcases hu with rfl | rfl | rfl | rfl <;> simp [safe, b.involutive, b.commute a]
+  let safe := fun u => u ∈ a.corners b state
+  have hsafeA u hu := (a.corners_closed b state u hu).1
+  have hsafeB u hu := (a.corners_closed b state u hu).2
   let boundary := fun c : Nat × Tongues =>
     (c.1 = g ∨ c.1 = e) ∧ safe c.2 ∧
       PathGrooves A.paths c.2 ∧ PathGrooves B.paths c.2
@@ -310,6 +303,6 @@ theorem SupportedReflector.pair_all_time_four_phase
       obtain ⟨port, phase, hr, hv⟩ := hBtwo u huB t ht
       exact ⟨port, phase, hr, hv.elim (fun h => h.symm ▸ hu) (fun h => h.symm ▸ hsafeB u hu)⟩
   exact stepN_covered_of_progress boundary safe hprogress
-    (start := (g, state)) ⟨Or.inl rfl, by simp [safe], hA, hB⟩ d
+    (start := (g, state)) ⟨Or.inl rfl, by simp [safe, LocalAction.corners], hA, hB⟩ d
 
 end GeneralN

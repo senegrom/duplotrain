@@ -41,6 +41,17 @@ theorem LocalAction.commute (a b : LocalAction) :
           · rw [h]
           · exact flipAt_comm (Ne.symm h)
 
+/-- Two commuting local actions preserve their four algebraic corners. -/
+def LocalAction.corners (a b : LocalAction) (state : Tongues) : List Tongues :=
+  [state, a.apply state, b.apply state, a.apply (b.apply state)]
+
+theorem LocalAction.corners_closed (a b : LocalAction) (state u : Tongues)
+    (hu : u ∈ a.corners b state) :
+    a.apply u ∈ a.corners b state ∧ b.apply u ∈ a.corners b state := by
+  simp only [corners, List.mem_cons, List.not_mem_nil, or_false] at hu
+  rcases hu with rfl | rfl | rfl | rfl <;>
+    simp [corners, a.involutive, b.involutive, b.commute a]
+
 /-- Every path in `paths` is currently grooved. -/
 def PathGrooves (paths : List (List Passage)) (u : Tongues) : Prop :=
   ∀ path ∈ paths, PassagesGrooved u path

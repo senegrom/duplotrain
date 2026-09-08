@@ -95,7 +95,8 @@ theorem stem_lobe_route
     ∃ route last, route.length = path.length + 1 ∧
       PhysicalTrace w (p, state) route (last, state) ∧
       PassagesGrooved state route ∧
-      arrive state last = (p, flipAt state (p / 3)) := by
+      arrive state last = (p, flipAt state (p / 3)) ∧
+      (route = (p, x) :: path ∨ route = (p, q) :: reversePassages path) := by
   let base := pin state x
   have hselected : base (x / 3) = bval x := by simp [base, pin]
   have hbaseHead : arrive base x = (p, base) := by
@@ -141,10 +142,11 @@ theorem stem_lobe_route
       · exact (hj (by simp [base, pin, heq])).elim)
   rcases hphases with heq | heq
   · exact ⟨(p, x) :: path, q, by simp, by simpa only [heq] using hforward,
-      by simpa only [heq] using hbaseGrooved, by simpa only [heq] using hcrossed⟩
+      by simpa only [heq] using hbaseGrooved, by simpa only [heq] using hcrossed,
+      Or.inl rfl⟩
   · exact ⟨(p, q) :: reversePassages path, x, by simp [reversePassages_length],
       by simpa only [heq] using hreverse, by simpa only [heq] using hreverseGrooved,
-      by simpa only [heq, flipAt_flipAt] using hrestore⟩
+      by simpa only [heq, flipAt_flipAt] using hrestore, Or.inr rfl⟩
 
 theorem stem_lobe_isReflector_foreign
     (w : Wiring) {p x q outside : Nat}
@@ -162,7 +164,7 @@ theorem stem_lobe_isReflector_foreign
       (fun u => PassagesGrooved u path)
       (fun u => flipAt u (p / 3)) := by
   intro state hg
-  obtain ⟨route, last, hlen, htrace, _, hcontact⟩ := stem_lobe_route w path
+  obtain ⟨route, last, hlen, htrace, _, hcontact, _⟩ := stem_lobe_route w path
     hpstem hxbranch hqbranch hpx hpq hxq hpathForeign hlinked hfinal state hg
   refine ⟨?_, grooved_after_flip_other hg hpathForeign⟩
   have hr := (htrace.append
@@ -184,14 +186,8 @@ theorem stem_lobe_isReflector
     IsReflector w p outside (path.length + 2)
       (fun u => PassagesGrooved u path)
       (fun u => flipAt u (p / 3)) := by
-  have hpathForeign : ∀ passage ∈ path,
-      passageSwitch passage ≠ p / 3 := by
-    unfold SwitchSimple at hsimple
-    simp only [List.map_cons, List.nodup_cons] at hsimple
-    intro passage hp hEq
-    apply hsimple.1
-    apply List.mem_map.mpr
-    exact ⟨passage, hp, hEq⟩
+  have hpathForeign : ∀ passage ∈ path, passageSwitch passage ≠ p / 3 := by
+    grind [SwitchSimple, passageSwitch]
   exact stem_lobe_isReflector_foreign w path
     hpstem hxbranch hqbranch hpx hpq hxq hpathForeign
     hlinked hfinal hmouth
@@ -214,28 +210,12 @@ theorem same_exit_excursion_path_nil
   cases path with
   | nil => rfl
   | cons passage rest =>
-      rcases passage with ⟨r, y⟩
-      exfalso
-      have hlinked := hexcursion.linked
-      have hxr : w.link x = some r := hlinked.1
-      have hfinal : w.link (lastPassageExit y rest) = some x := by
-        simpa [lastPassageExit] using hexcursion.last_link
-      have hxlast : w.link x = some (lastPassageExit y rest) :=
-        w.symm _ _ hfinal
-      have hrequal : r = lastPassageExit y rest := by
-        rw [hxr] at hxlast
-        injection hxlast
-      have htailSimple : SwitchSimple ((r, y) :: rest) := by
-        unfold SwitchSimple at hsimple ⊢
-        simp only [List.map_cons, List.nodup_cons] at hsimple ⊢
-        exact hsimple.2
       cases hexcursion with
-      | @cons _ _ q _ v _ _ harrive hlink tail =>
-          cases tail with
-          | cons harrive' hlink' restTrace =>
-              have hne := (PhysicalTrace.cons harrive' hlink'
-                restTrace).simple_last_exit_ne_first_entry htailSimple
-              exact hne hrequal.symm
+      | @cons _ _ next _ _ _ _ _ hlink tail =>
+          have hlast := w.symm _ _ tail.last_link
+          have hne := tail.simple_last_exit_ne_first_entry (List.nodup_cons.mp hsimple).2
+          exact (hne ((Option.some.inj (hlink.symm.trans hlast)).symm.trans
+            tail.head_arrive.1)).elim
 
 /-- A grooved passage whose exit edge is self-linked is an identity
 reflector: it traverses the switch out and immediately back, then leaves over

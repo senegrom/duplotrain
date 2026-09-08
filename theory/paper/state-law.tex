@@ -99,7 +99,7 @@ bounds
 \[ 26N{+}3 \to 24N{+}5 \to 18N{+}3 \to \cdots \to 2N{+}9 \to N{+}7 \to
    N{+}6 \to N{+}5 \to N{+}4 \]
 was tightened until the constructive lower bound was met.  The final
-development (6,970 lines of Lean~4 in 31 files, using no
+development (6,790 lines of Lean~4 in 31 files, using no
 external mathematics library) proves the single statement
 \begin{center}
   \lean{GeneralN.state\_law :\ }$\forall N$,
@@ -739,34 +739,24 @@ vectors stay in $S$, and each resulting boundary has the same form. This
 replaces the separate stay/flip, one-sided, and mutual-contact arguments
 (\file{PairActionCorners.lean}).
 
-The same argument applies when the opposite component is an arbitrary
-lobe rather than a manufactured reflector. If its interior grooves are
-preserved by the old action, both components satisfy one common contract:
-each positive-length traversal exposes only its incoming and outgoing
-vectors and preserves the opposite support. Their commuting involutions
-preserve the four-corner orbit. The invariant theorem depends only on this
-contract, not on a particular construction or on simplicity of the lobe.
+An arbitrary mouth-free lobe has a grooved route in either orientation.
+Pin the current mouth tongue to its recorded entry branch: the current
+vector is that pinned vector or its mouth flip. All interior grooves remain
+unchanged. A stay reflector has identity action, so its pair orbit collapses
+to two vectors. At a self-linked boundary the same lobe supplies both sides.
 
-To verify that contract for an arbitrary mouth-free lobe, pin the current
-mouth tongue to its recorded entry branch. The current vector equals that
-pinned vector or its single mouth flip; the recorded forward and reverse
-routes give the two cases. All other currently grooved coordinates are
-unchanged. A stay reflector has identity action, so its corresponding orbit
-collapses to two vectors; the self-linked boundary uses the same lobe on
-both sides of the abstract pair.
-
-When the old action instead occurs inside the arbitrary lobe, the shared
-first-contact theorem yields capture or synchronization with the reference
-run. One old-reflector traversal followed by this capture-or-repair
-continuation gives a positive excursion from $(g,u)$ to $(g,u^B)$, exposing
-only $u,u^A,u^B$. Reverse the lobe in $u^B$ to obtain an excursion back,
-exposing only $u^B,u^{AB},u$. Closing these two boundary states proves the
-four-vector cover. No upper bound on excursion length, explicit period, or
-modulo-time calculation is needed. Both runway cases provide a live
-configuration at every time directly, so no separate periodicity argument
-is needed for liveness
-(\file{ManufacturedPairNovelty.lean}, \file{RunwaySpliceNovelty.lean},
-\file{PartialSecondRunSharp.lean}).
+For a flip reflector opposite an arbitrary lobe, one invariant now
+handles every excursion. At the old reflector's outer boundary, both
+supports are grooved and the vector lies in their four-corner orbit.
+Select the lobe's route in the current vector; this route represents every
+interior switch even when its orientation is reversed. If the old action
+avoids the route, both components traverse normally. At a contact, the
+shared first-contact theorem either captures and restores the reference
+vector or synchronizes with its remaining traversal. Both outcomes restore
+the same boundary invariant after a positive excursion. Strong induction
+therefore gives the all-time cover without constructing a separate reverse
+excursion. The corner-closure calculation is shared by all three pair
+arguments (\file{TrackNormalForm.lean}, \file{RunwaySpliceNovelty.lean}).
 
 The protected facing exits need no separate approach-and-return invariant.
 The continuation after the protected pre-return state is a suffix of the
@@ -833,6 +823,7 @@ its incoming edge: induction reverses the tail and then the head.
 This one fact covers reverse loops, reverse arbitrary lobes, and final
 runway returns, including empty paths.
 
+\clearpage
 \section{Assembly}\label{sec:assembly}
 
 \begin{proof}[Proof of Theorem~\ref{thm:main}]\sloppy

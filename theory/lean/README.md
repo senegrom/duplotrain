@@ -240,6 +240,22 @@ stays in the four corners, and restores the same boundary invariant.
 `manufactured_pair_all_time_action_corners_tongues` closes it by strong induction.
 The separate stay/flip, one-sided, and mutual-contact modules are removed.
 
+## One invariant for the arbitrary lobe
+
+A flip reflector opposite an arbitrary lobe now uses one invariant at the
+reflector's outer boundary: the current vector grooves both supports and
+belongs to their four-corner orbit. `explicit_lobe_route_at` selects the
+current grooved orientation and certifies that it represents every interior
+switch. This same certificate supplies normal traversal and first-contact
+fault analysis.
+
+If the old action avoids the selected route, both components traverse normally.
+Otherwise capture restores the reference vector before an ordinary lobe
+traversal, or repair synchronizes with that traversal. Both outcomes preserve
+the boundary invariant, so no separate reverse-lobe excursion is needed.
+`LocalAction.corners_closed` supplies the common corner-closure calculation
+for the abstract, manufactured, and arbitrary-lobe pair arguments.
+
 ## Capture is a suffix of ordinary traversal
 
 Start an ordinary flip-reflector traversal with its action tongue flipped.
@@ -409,8 +425,8 @@ its endpoint trace directly.
 `PhysicalTrace.sandwich_reflector` transports either core reflector through
 an arbitrary grooved runway. The shared arrival-geometry and groove-agreement
 lemmas remove repeated local stem/branch algebra. The candy suffix uses one
-return proof for either starting phase, and the theta half composes its
-pointwise covers with `stepN_cover_append`.
+return proof for either starting phase, and the lobe boundary invariant
+composes its pointwise covers with `stepN_cover_append`.
 
 Forward contacts carry only the selected exit direction: the later splice
 construction derives its own return law, so the extra intermediate repair
@@ -448,6 +464,7 @@ comments and blanks, not just proof tactics.
 | After direct contact recovery, shared continuation budgets, and closed probes | 33 | 7,593 |
 | After shared reverse replay and direct productive-step histories | 33 | 7,406 |
 | After one boundary invariant for every manufactured pair | 30 | 6,951 |
+| After one selected-route invariant for the arbitrary lobe | 30 | 6,771 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -688,3 +705,15 @@ A clean **63-job** build passes without warnings. The exact axiom audit
 passes, all **277** public source theorems are in the headline kernel
 dependency closure, and all seven protected files remain byte-for-byte
 unchanged. The paper and its rendered PDF follow the same invariant.
+
+The arbitrary-lobe pass removes another **180 Lean source lines**, from
+**6,970 to 6,790** (**2.6%**), across the same **31 files**. One selected-route
+boundary invariant replaces the forward/reverse theta excursions and the
+standalone reverse-lobe proof. A shared algebraic corner-closure lemma serves
+all three pair arguments. The self-link contradiction uses the existing
+final-exit theorem, and the reflector return directly reuses grooved replay.
+
+The clean **63-job** build and exact axiom audit pass without warnings. All
+**276** public source theorems remain in the headline kernel dependency
+closure, and the seven protected files are byte-for-byte unchanged. The
+paper and rendered PDF describe the selected-route invariant.

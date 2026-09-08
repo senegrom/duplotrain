@@ -299,71 +299,6 @@ theorem ManufacturedFlipReflector.suffix_after_runway_passage
       subst path
       exact List.mem_append_right _ (List.mem_cons_of_mem _ hpassage)
 
-/-- Reverse the arbitrary lobe in the tongue state obtained after its own
-flip.  No simplicity is needed: linked grooved passages retrace physically,
-and the original entry arm becomes the final trailing arm that restores the
-base state. -/
-theorem arbitrary_lobe_reverse_trace
-    {w : Wiring} {mouth entry returnPort : Nat}
-    {state : Tongues} {candy : List Passage}
-    (hentryBranch : entry % 3 ≠ 0)
-    (hentrySwitch : entry / 3 = mouth / 3)
-    (hgrooved : PassagesGrooved state ((mouth, entry) :: candy))
-    (htrace : PhysicalTrace w (mouth, state)
-      ((mouth, entry) :: candy) (returnPort, state))
-    (hcrossed : arrive state returnPort =
-      (mouth, flipAt state (mouth / 3)))
-    (hCandyForeign : ∀ passage ∈ candy,
-      passageSwitch passage ≠ mouth / 3) :
-    PhysicalTrace w (mouth, flipAt state (mouth / 3))
-        ((mouth, returnPort) :: reversePassages candy)
-        (entry, flipAt state (mouth / 3)) ∧
-      PassagesGrooved (flipAt state (mouth / 3))
-        ((mouth, returnPort) :: reversePassages candy) ∧
-      arrive (flipAt state (mouth / 3)) entry = (mouth, state) := by
-  have hheadGroove : arrive state entry = (mouth, state) :=
-    hgrooved (mouth, entry) List.mem_cons_self
-  have hrestore : arrive (flipAt state (mouth / 3)) entry =
-      (mouth, state) := by
-    have hrepair :=
-      flipped_passage_forward_trailing hheadGroove hentryBranch
-    simpa [hentrySwitch] using hrepair
-  have hmouthForward : arrive (flipAt state (mouth / 3)) mouth =
-      (returnPort, flipAt state (mouth / 3)) := by
-    have hback := arrive_back state returnPort
-    rw [hcrossed] at hback
-    exact hback
-  have hreturnGroove :
-      arrive (flipAt state (mouth / 3)) returnPort =
-        (mouth, flipAt state (mouth / 3)) :=
-    groove_forward hmouthForward
-  have hCandyGrooved : PassagesGrooved state candy := by
-    intro passage hpassage
-    exact hgrooved passage (List.mem_cons_of_mem _ hpassage)
-  have hCandyFlip :
-      PassagesGrooved (flipAt state (mouth / 3)) candy :=
-    grooved_after_flip_other hCandyGrooved hCandyForeign
-  have hReverseGrooved :
-      PassagesGrooved (flipAt state (mouth / 3))
-        (reversePassages candy) := by
-    intro passage hpassage
-    exact reversePassages_grooved hCandyFlip passage hpassage
-  have hfullReverseGrooved :
-      PassagesGrooved (flipAt state (mouth / 3))
-        ((mouth, returnPort) :: reversePassages candy) := by
-    intro passage hpassage
-    rcases List.mem_cons.mp hpassage with hhead | htail
-    · simpa [hhead] using hreturnGroove
-    · exact hReverseGrooved passage htail
-  have hreverseTrace :
-      PhysicalTrace w (mouth, flipAt state (mouth / 3))
-        ((mouth, returnPort) :: reversePassages candy)
-        (entry, flipAt state (mouth / 3)) := by
-    cases htrace with
-    | cons _ hentry tail =>
-        exact physicalTrace_contact_retraces_prefix tail hCandyFlip hentry hmouthForward
-  exact ⟨hreverseTrace, hfullReverseGrooved, hrestore⟩
-
 theorem ManufacturedFlipReflector.nonrunway_oriented_branch_entry_is_candy
     {w : Wiring} {g e : Nat}
     (R : ManufacturedFlipReflector w e g)
@@ -582,14 +517,9 @@ theorem ManufacturedFlipReflector.oriented_return_trace
       (((ManufacturedReflector.flip R).orientedFinish state,
           R.mouth) :: reversePassages R.runway)
       (g, flipAt state R.actionSwitch) := by
-  change PathGrooves [R.runway, R.candy] state at hpaths
-  have hrunwayGrooved := (pathGrooves_pair.mp hpaths).1
-  have hrunwayFlip :
-      PassagesGrooved (flipAt state R.actionSwitch) R.runway := by
-    apply grooved_after_flip_other hrunwayGrooved
-    intro passage hpassage
-    exact R.support_foreign R.runway (by simp) passage hpassage
-  exact physicalTrace_contact_retraces_prefix R.runwayTrace hrunwayFlip
+  exact physicalTrace_contact_retraces_prefix R.runwayTrace
+    (grooved_after_flip_other (pathGrooves_pair.mp hpaths).1
+      (R.support_foreign R.runway (by simp)))
     R.entryEdge (R.oriented_finish_arrive state)
 
 

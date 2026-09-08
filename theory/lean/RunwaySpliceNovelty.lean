@@ -16,45 +16,48 @@ same two-phase lobe contract also covers splices into stay reflectors.
 
 namespace GeneralN
 
-/-- One traversal of the explicit lobe created by a changed-forward splice
-has only its incoming vector and the vector obtained by pinning the lobe
-mouth.  This is the pointwise fact hidden by the older `IsReflector`
-endpoint interface. -/
-theorem explicit_lobe_travel_two_phase
-    {w : Wiring} {mouth entry returnPort outside : Nat}
+/-- Select the lobe's current orientation once. Every interior switch is
+represented on this grooved route, in either direction. -/
+theorem explicit_lobe_route_at
+    {w : Wiring} {mouth entry returnPort : Nat}
     {state : Tongues} {candy : List Passage}
+    (hentryBranch : entry % 3 ≠ 0)
+    (hentrySwitch : entry / 3 = mouth / 3)
     (hgrooved : PassagesGrooved state ((mouth, entry) :: candy))
     (htrace : PhysicalTrace w (mouth, state)
       ((mouth, entry) :: candy) (returnPort, state))
     (hcrossed : arrive state returnPort =
       (mouth, flipAt state (mouth / 3)))
-    (hmouthLink : w.link mouth = some outside)
-    {d : Nat} (hd : d <= candy.length + 2) :
-    exists port phase,
-      stepN w d (mouth, state) = some (port, phase) /\
-        (phase = state \/ phase = flipAt state (mouth / 3)) := by
-  by_cases hroute : d <= ((mouth, entry) :: candy).length
-  · obtain ⟨port, hrun⟩ :=
-      htrace.grooved_prefix_tongues state hgrooved hroute
-    exact ⟨port, state, hrun, Or.inl rfl⟩
-  · have hrouteLength : ((mouth, entry) :: candy).length =
-        candy.length + 1 := by simp
-    have hdEq : d = ((mouth, entry) :: candy).length + 1 := by
-      rw [hrouteLength] at hroute ⊢
-      omega
-    have hone : stepN w 1 (returnPort, state) =
-        some (outside, flipAt state (mouth / 3)) := by
-      simp [stepN, step, hcrossed, hmouthLink]
-    have hrun : stepN w d (mouth, state) =
-        some (outside, flipAt state (mouth / 3)) := by
-      rw [hdEq, stepN_add, htrace.sound]
-      exact hone
-    exact ⟨outside, flipAt state (mouth / 3), hrun, Or.inr rfl⟩
+    (hforeign : ∀ passage ∈ candy, passageSwitch passage ≠ mouth / 3)
+    (current : Tongues) (hcurrent : PassagesGrooved current candy)
+    : ∃ route last, route.length = candy.length + 1 ∧
+      PhysicalTrace w (mouth, current) route (last, current) ∧
+      PassagesGrooved current route ∧
+      arrive current last = (mouth, flipAt current (mouth / 3)) ∧
+      ∀ old ∈ candy, ∃ passage ∈ route, passageSwitch passage = passageSwitch old := by
+  have hreturnSwitch : returnPort / 3 = mouth / 3 := by
+    have hs := arrive_exit_switch state returnPort
+    rw [hcrossed] at hs
+    exact hs.symm
+  obtain ⟨hbranch, hmouth, _⟩ := changed_arrival_is_trailing hcrossed
+    (by simp [hreturnSwitch, flipAt])
+  have hne : entry ≠ returnPort := by
+    intro heq
+    have hhead := hgrooved (mouth, entry) List.mem_cons_self
+    rw [heq, hcrossed] at hhead
+    have h := congrFun (Prod.mk.inj hhead).2 (mouth / 3)
+    simp [flipAt] at h
+  obtain ⟨route, last, hlen, hr, hg, hc, horient⟩ := stem_lobe_route w candy
+    (by omega) hentryBranch hbranch hentrySwitch.symm hreturnSwitch.symm hne
+    hforeign htrace.linked htrace.last_link current hcurrent
+  refine ⟨route, last, hlen, hr, hg, hc, ?_⟩
+  intro old hold
+  rcases horient with rfl | rfl
+  · exact ⟨old, List.mem_cons_of_mem _ hold, rfl⟩
+  · exact ⟨(old.2, old.1), List.mem_cons_of_mem _ (reversePassage_mem hold),
+      htrace.passage_exit_switch old (List.mem_cons_of_mem _ hold)⟩
 
-/-- A recorded lobe with a mouth-free interior is two-phase in every grooved
-state, not only in the tongue assignment used to record it. Pin the mouth to
-its recorded entry arm; the given state is that assignment or its one-bit flip.
-The two orientations then supply the same abstract traversal contract. -/
+/-- A lobe traversal exposes only its incoming and outgoing vectors. -/
 theorem explicit_lobe_two_phase_at
     {w : Wiring} {mouth entry returnPort outside : Nat}
     {state : Tongues} {candy : List Passage}
@@ -71,21 +74,8 @@ theorem explicit_lobe_two_phase_at
     {d : Nat} (hd : d ≤ candy.length + 2) :
     ∃ port phase, stepN w d (mouth, current) = some (port, phase) ∧
       (phase = current ∨ phase = flipAt current (mouth / 3)) := by
-  have hreturnSwitch : returnPort / 3 = mouth / 3 := by
-    have hs := arrive_exit_switch state returnPort
-    rw [hcrossed] at hs
-    exact hs.symm
-  obtain ⟨hbranch, hmouth, _⟩ := changed_arrival_is_trailing hcrossed
-    (by simp [hreturnSwitch, flipAt])
-  have hne : entry ≠ returnPort := by
-    intro heq
-    have hhead := hgrooved (mouth, entry) List.mem_cons_self
-    rw [heq, hcrossed] at hhead
-    have h := congrFun (Prod.mk.inj hhead).2 (mouth / 3)
-    simp [flipAt] at h
-  obtain ⟨route, last, hlen, hr, hg, hc⟩ := stem_lobe_route w candy
-    (by omega) hentryBranch hbranch hentrySwitch.symm hreturnSwitch.symm hne
-    hforeign htrace.linked htrace.last_link current hcurrent
+  obtain ⟨route, last, hlen, hr, hg, hc, _⟩ := explicit_lobe_route_at
+    hentryBranch hentrySwitch hgrooved htrace hcrossed hforeign current hcurrent
   by_cases hroute : d ≤ route.length
   · obtain ⟨port, hp⟩ := hr.grooved_prefix_tongues current hg hroute
     exact ⟨port, current, hp, Or.inl rfl⟩
@@ -184,83 +174,6 @@ variable {w : Wiring} {outside mouth entry returnPort : Nat}
   (hCpaths : PathGrooves C.toSupported.paths state)
 include w outside mouth entry returnPort C state hCpaths
 
-/-- Pointwise strengthening of the arbitrary-lobe theta half.  The old
-manufactured reflector first exposes `state` and its own action state.  The
-first old-action contact on the new lobe then either captures through the old
-mouth or repairs trailing-first; in both cases every remaining intermediate
-vector is `state` or the new lobe state.  Thus the complete half has exactly
-the three advertised possible phases. -/
-theorem manufactured_flip_arbitrary_lobe_theta_half_three_phase
-    {candy : List Passage}
-    (hgrooved : PassagesGrooved state ((mouth, entry) :: candy))
-    (htrace : PhysicalTrace w (mouth, state)
-      ((mouth, entry) :: candy) (returnPort, state))
-    (hcrossed : arrive state returnPort =
-      (mouth, flipAt state (mouth / 3)))
-    (hmouthLink : w.link mouth = some outside)
-    (hcontact : ∃ passage ∈ candy,
-      passageSwitch passage = C.actionSwitch) :
-    ∃ travel, 0 < travel ∧
-      stepN w travel (outside, state) =
-        some (outside, flipAt state (mouth / 3)) ∧
-      ∀ d, d ≤ travel →
-        ∃ port phase,
-          stepN w d (outside, state) = some (port, phase) ∧
-          phase ∈
-            [state, flipAt state C.actionSwitch,
-              flipAt state (mouth / 3)] := by
-  have hnormal : stepN w (candy.length + 2) (mouth, state) =
-      some (outside, flipAt state (mouth / 3)) := by
-    simpa [Nat.add_assoc] using
-      (htrace.append (PhysicalTrace.cons hcrossed hmouthLink (PhysicalTrace.nil _))).sound
-  let safe := fun phase => phase ∈
-    [state, flipAt state C.actionSwitch, flipAt state (mouth / 3)]
-  have hexplicit : ∀ d, d ≤ candy.length + 2 → ∃ port phase,
-      stepN w d (mouth, state) = some (port, phase) ∧ safe phase := by
-    intro d hd
-    obtain ⟨port, phase, hr, hs⟩ := explicit_lobe_travel_two_phase
-      hgrooved htrace hcrossed hmouthLink hd
-    refine ⟨port, phase, hr, ?_⟩
-    rcases hs with rfl | rfl <;> simp [safe]
-  have hfault : ∃ travel, stepN w travel (mouth, flipAt state C.actionSwitch) =
-      some (outside, flipAt state (mouth / 3)) ∧
-      ∀ d, d ≤ travel → ∃ port phase,
-        stepN w d (mouth, flipAt state C.actionSwitch) = some (port, phase) ∧ safe phase := by
-    have hrouteContact : ∃ passage ∈ (mouth, entry) :: candy,
-        passageSwitch passage = C.actionSwitch := by
-      obtain ⟨passage, hp, hs⟩ := hcontact
-      exact ⟨passage, List.mem_cons_of_mem _ hp, hs⟩
-    rcases C.grooved_route_fault state hCpaths htrace hgrooved hrouteContact with
-      hcapture | hrepair
-    · obtain ⟨travel, hr, hs⟩ := hcapture
-      refine ⟨travel + (candy.length + 2), ?_, ?_⟩
-      · rw [stepN_add, hr]; exact hnormal
-      · apply stepN_cover_append hr ?_ hexplicit
-        intro d hd
-        obtain ⟨port, phase, hr, hp⟩ := hs d hd
-        refine ⟨port, phase, hr, ?_⟩
-        rcases hp with rfl | rfl <;> simp [safe]
-    · obtain ⟨cutoff, hbound, hpre, hmerge⟩ := hrepair
-      have hle : cutoff ≤ candy.length + 2 := by simpa using Nat.le_trans hbound (by simp)
-      refine ⟨candy.length + 2, (hmerge _ hle).trans hnormal, ?_⟩
-      intro d hd
-      by_cases hearly : d < cutoff
-      · obtain ⟨port, hr⟩ := hpre d hearly
-        exact ⟨port, _, hr, by simp [safe]⟩
-      · obtain ⟨port, phase, hr, hs⟩ := hexplicit d hd
-        exact ⟨port, phase, (hmerge d (by omega)).trans hr, hs⟩
-  obtain ⟨travel, hrun, hcover⟩ := hfault
-  have hCrun := (C.toSupported.run state hCpaths).1
-  refine ⟨C.toSupported.travel + travel,
-    Nat.add_pos_left (ManufacturedReflector.flip C).travel_pos _, ?_, ?_⟩
-  · rw [stepN_add, hCrun]; exact hrun
-  · apply stepN_cover_append hCrun ?_ hcover
-    intro d hd
-    obtain ⟨port, phase, hr, hs⟩ := (ManufacturedReflector.flip C).travel_two_phase_stepN
-      state hCpaths hd
-    refine ⟨port, phase, hr, ?_⟩
-    rcases hs with rfl | rfl <;> simp [safe, ManufacturedReflector.toSupported,
-      ManufacturedFlipReflector.toSupported, LocalAction.apply]
 
 section
 variable (hNewAvoidsC : (LocalAction.flip (mouth / 3)).Avoids
@@ -282,95 +195,93 @@ variable (hNewAvoidsC : (LocalAction.flip (mouth / 3)).Avoids
 include hNewAvoidsC candy hentryBranch hentrySwitch hgrooved htrace hcrossed hCandyForeign hLobe
   hmouthLink
 
-/-- Every suffix/lobe pair stays in its four action corners. Avoiding supports
-use the abstract pair law; a contact uses capture or repair excursions. -/
+/-- Every suffix/lobe pair preserves one four-corner boundary invariant.
+The selected route handles avoidance, capture, and repair in either orientation. -/
 theorem manufactured_flip_arbitrary_lobe_all_time_four_phase (d : Nat) :
     ∃ port phase, stepN w d (outside, flipAt state (mouth / 3)) = some (port, phase) ∧
       phase ∈ [flipAt state (mouth / 3),
         flipAt (flipAt state (mouth / 3)) C.actionSwitch,
         state, flipAt state C.actionSwitch] := by
-  by_cases hcontact : ∃ passage ∈ candy, passageSwitch passage = C.actionSwitch
-  ·
-    let newState := flipAt state (mouth / 3)
-    let oldState := flipAt state C.actionSwitch
-    let oldNewState := flipAt newState C.actionSwitch
-    obtain ⟨forwardTravel, hforwardPositive,
-        hforward, hforwardPointwise⟩ :=
-      manufactured_flip_arbitrary_lobe_theta_half_three_phase
-        C state hCpaths hgrooved htrace hcrossed hmouthLink hcontact
-    have hCNew : PathGrooves C.toSupported.paths newState := by
-      dsimp [newState]
-      exact hCpaths.after_avoiding_action hNewAvoidsC
-    obtain ⟨hreverseTrace, hreverseGrooved, hrestore⟩ :=
-      arbitrary_lobe_reverse_trace hentryBranch hentrySwitch
-        hgrooved htrace hcrossed hCandyForeign
-    have hreverseCrossed : arrive newState entry =
-        (mouth, flipAt newState (mouth / 3)) := by
-      dsimp [newState]
-      simpa [flipAt_flipAt] using hrestore
-    have hcontactReverse : ∃ passage ∈ reversePassages candy,
-        passageSwitch passage = C.actionSwitch := by
-      obtain ⟨old, hold, hs⟩ := hcontact
-      exact ⟨(old.2, old.1), reversePassage_mem hold,
-        (htrace.passage_exit_switch old (List.mem_cons_of_mem _ hold)).trans hs⟩
-    obtain ⟨reverseTravel, hreversePositive,
-        hreverse, hreversePointwise⟩ :=
-      manufactured_flip_arbitrary_lobe_theta_half_three_phase C
-        newState hCNew hreverseGrooved hreverseTrace hreverseCrossed
-        hmouthLink hcontactReverse
-    simp only [newState, flipAt_flipAt] at hreverse
-    let safe := fun phase => phase ∈ [newState, oldNewState, state, oldState]
-    have hprogress : ∀ start,
-        start = (outside, state) ∨ start = (outside, newState) →
-        ∃ travel finish, 0 < travel ∧ stepN w travel start = some finish ∧
-          (finish = (outside, state) ∨ finish = (outside, newState)) ∧
-          ∀ t, t ≤ travel → ∃ port phase,
-            stepN w t start = some (port, phase) ∧ safe phase := by
-      intro start hs
-      rcases hs with rfl | rfl
-      · refine ⟨forwardTravel, (outside, newState), hforwardPositive,
-          hforward, Or.inr rfl, ?_⟩
-        intro t ht
-        obtain ⟨port, phase, hr, hs⟩ := hforwardPointwise t ht
-        refine ⟨port, phase, hr, ?_⟩
-        simp only [List.mem_cons, List.not_mem_nil, or_false] at hs
-        rcases hs with rfl | rfl | rfl <;> simp [safe, oldState, newState]
-      · refine ⟨reverseTravel, (outside, state), hreversePositive,
-          hreverse, Or.inl rfl, ?_⟩
-        intro t ht
-        obtain ⟨port, phase, hr, hs⟩ := hreversePointwise t ht
-        refine ⟨port, phase, hr, ?_⟩
-        simp only [List.mem_cons, List.not_mem_nil, or_false] at hs
-        rcases hs with rfl | rfl | rfl <;> simp [safe, oldNewState, newState, flipAt_flipAt]
-    exact stepN_covered_of_progress _ safe hprogress (Or.inr rfl) d
-  ·
-    let L : SupportedReflector w mouth outside := {
-      travel := candy.length + 2
-      paths := [candy]
-      action := .flip (mouth / 3)
-      run := by simpa [IsReflector, PathGrooves, LocalAction.apply] using hLobe
-    }
-    have hOldAvoidsL : C.toSupported.action.Avoids L.paths := by
-      intro path hp passage hm
-      have heq : path = candy := by simpa [L] using hp
-      subst path
-      exact fun heq => hcontact ⟨passage, hm, heq⟩
-    have hCNew := hCpaths.after_avoiding_action hNewAvoidsC
-    have hCandy : PassagesGrooved state candy :=
-      fun passage hp => hgrooved passage (List.mem_cons_of_mem _ hp)
-    have hLNew : PathGrooves L.paths (flipAt state (mouth / 3)) := by
-      simpa [L, PathGrooves] using grooved_after_flip_other hCandy hCandyForeign
-    have htwo : ∀ u, PathGrooves L.paths u → ∀ t, t ≤ L.travel →
-        ∃ port phase, stepN w t (mouth, u) = some (port, phase) ∧
-          (phase = u ∨ phase = L.action.apply u) := by
-      intro u hu t ht
-      exact explicit_lobe_two_phase_at hentryBranch hentrySwitch hgrooved htrace
-        hcrossed hCandyForeign hmouthLink u (hu candy (by simp [L])) ht
-    have hcover := C.toSupported.pair_all_time_four_phase L
-      (ManufacturedReflector.flip C).travel_pos (by dsimp [L]; omega)
-      (fun u hu _ ht => (ManufacturedReflector.flip C).travel_two_phase_stepN u hu ht)
-      htwo (flipAt state (mouth / 3)) hCNew hLNew hOldAvoidsL hNewAvoidsC d
-    simpa [L, ManufacturedFlipReflector.toSupported, LocalAction.apply, flipAt_flipAt] using hcover
+  let a := C.toSupported.action
+  let b := LocalAction.flip (mouth / 3)
+  let safe := fun u => u ∈ a.corners b state
+  have hsafeA u hu := (a.corners_closed b state u hu).1
+  have hsafeB u hu := (a.corners_closed b state u hu).2
+  let boundary := fun c : Nat × Tongues => c.1 = outside ∧ safe c.2 ∧
+    PathGrooves C.toSupported.paths c.2 ∧ PassagesGrooved c.2 candy
+  have hLcover : ∀ u, PassagesGrooved u candy → safe u → ∀ d, d ≤ candy.length + 2 →
+      ∃ port phase, stepN w d (mouth, u) = some (port, phase) ∧ safe phase := by
+    intro u hLu hu d hd
+    obtain ⟨port, phase, hr, hp⟩ := explicit_lobe_two_phase_at
+      hentryBranch hentrySwitch hgrooved htrace hcrossed hCandyForeign hmouthLink u hLu hd
+    exact ⟨port, phase, hr,
+      hp.elim (fun h => h.symm ▸ hu) (fun h => h.symm ▸ hsafeB u hu)⟩
+  have hprogress : ∀ start, boundary start → ∃ travel finish,
+      0 < travel ∧ stepN w travel start = some finish ∧ boundary finish ∧
+      ∀ d, d ≤ travel → ∃ port phase,
+        stepN w d start = some (port, phase) ∧ safe phase := by
+    intro ⟨p, u⟩ ⟨hp, hu, hCu, hLu⟩
+    dsimp only at hp hu hCu hLu
+    subst p
+    have hv := hsafeA u hu
+    have hnew : boundary (outside, b.apply u) :=
+      ⟨rfl, hsafeB u hu, hCu.after_avoiding_action hNewAvoidsC,
+        grooved_after_flip_other hLu hCandyForeign⟩
+    have hnormal := (hLobe u hLu).1
+    have hafter : ∃ travel finish,
+        stepN w travel (mouth, a.apply u) = some finish ∧ boundary finish ∧
+        ∀ d, d ≤ travel → ∃ port phase,
+          stepN w d (mouth, a.apply u) = some (port, phase) ∧ safe phase := by
+      obtain ⟨route, last, hlen, hr, hg, _, hsupport⟩ := explicit_lobe_route_at
+        hentryBranch hentrySwitch hgrooved htrace hcrossed hCandyForeign u hLu
+      by_cases hcontact : ∃ passage ∈ route, passageSwitch passage = C.actionSwitch
+      · rcases C.grooved_route_fault u hCu hr hg hcontact
+            with ⟨travel, hreach, hcover⟩ | ⟨cutoff, hbound, hpre, hmerge⟩
+        · change stepN w travel (mouth, a.apply u) = some (mouth, u) at hreach
+          refine ⟨travel + (candy.length + 2), (outside, b.apply u), ?_, hnew, ?_⟩
+          · rw [stepN_add, hreach]; exact hnormal
+          · apply stepN_cover_append hreach ?_ (hLcover u hLu hu)
+            intro d hd
+            obtain ⟨port, phase, hr, hp⟩ := hcover d hd
+            exact ⟨port, phase, hr,
+              hp.elim (fun h => h.symm ▸ hv) (fun h => h.symm ▸ hu)⟩
+        · refine ⟨candy.length + 2, (outside, b.apply u),
+            (hmerge _ (by omega)).trans hnormal, hnew, ?_⟩
+          intro d hd
+          by_cases hearly : d < cutoff
+          · obtain ⟨port, hr⟩ := hpre d hearly
+            exact ⟨port, _, hr, hv⟩
+          · obtain ⟨port, phase, hr, hp⟩ := hLcover u hLu hu d hd
+            exact ⟨port, phase, (hmerge d (by omega)).trans hr, hp⟩
+      · have hLv : PassagesGrooved (a.apply u) candy := by
+          apply grooved_after_flip_other hLu
+          intro old hold heq
+          obtain ⟨passage, hp, hs⟩ := hsupport old hold
+          exact hcontact ⟨passage, hp, hs.trans heq⟩
+        have hrun := hLobe (a.apply u) hLv
+        exact ⟨candy.length + 2, (outside, b.apply (a.apply u)), hrun.1,
+          ⟨rfl, hsafeB _ hv, (C.toSupported.run u hCu).2.after_avoiding_action hNewAvoidsC,
+            hrun.2⟩, hLcover _ hLv hv⟩
+    obtain ⟨travel, finish, hr, hfinish, hcover⟩ := hafter
+    have hCrun := (C.toSupported.run u hCu).1
+    refine ⟨C.toSupported.travel + travel, finish,
+      Nat.add_pos_left (ManufacturedReflector.flip C).travel_pos _, ?_, hfinish, ?_⟩
+    · rw [stepN_add, hCrun]; exact hr
+    · apply stepN_cover_append hCrun ?_ hcover
+      intro d hd
+      obtain ⟨port, phase, hr, hp⟩ :=
+        (ManufacturedReflector.flip C).travel_two_phase_stepN u hCu hd
+      exact ⟨port, phase, hr,
+        hp.elim (fun h => h.symm ▸ hu) (fun h => h.symm ▸ hv)⟩
+  have hCandy : PassagesGrooved state candy :=
+    fun passage hp => hgrooved passage (List.mem_cons_of_mem _ hp)
+  obtain ⟨port, phase, hr, hp⟩ := stepN_covered_of_progress boundary safe hprogress
+    (start := (outside, b.apply state))
+    ⟨rfl, by simp [safe, LocalAction.corners], hCpaths.after_avoiding_action hNewAvoidsC,
+      grooved_after_flip_other hCandy hCandyForeign⟩ d
+  exact ⟨port, phase, hr, by
+    simpa [safe, LocalAction.corners, a, b, ManufacturedFlipReflector.toSupported, LocalAction.apply,
+      or_comm, or_left_comm, or_assoc] using hp⟩
 
 end
 
