@@ -6,7 +6,6 @@ defaultTargets = [
   "ChangedContactNAddFour",
   "EarlyFacingConstant",
   "FacingForwardNovelty",
-  "FirstCycleCountSharp",
   "ForeignSpliceNovelty",
   "GeneralN",
   "KnownEdgeNAddFourChangedClosed",
@@ -58,9 +57,6 @@ name = "EarlyFacingConstant"
 
 [[lean_lib]]
 name = "FacingForwardNovelty"
-
-[[lean_lib]]
-name = "FirstCycleCountSharp"
 
 [[lean_lib]]
 name = "ForeignSpliceNovelty"

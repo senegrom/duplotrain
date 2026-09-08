@@ -58,46 +58,40 @@ theorem known_edge_N_add_four_or_changed_contact_or_protected_pair
     {start : Nat × Tongues}
     (hentry : w.link e = some start.1)
     (times : List Nat)
-    (_hlive : ∀ k ∈ times, (stepN w k start).isSome)
     (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
     times.length ≤ N + 4 ∨
       Nonempty (KnownEdgeChangedContact w e start) ∨
       Nonempty (KnownEdgeProtectedPair w e start) := by
   obtain ⟨firstFinish, hfirst⟩ :=
     stepN_live_of_total hN htotal (N + 1) start (hN _ _ hentry).2
-  rcases first_activated_count_outcome_sharp hN hfirst hentry with hcycleA | hreflectorA
-  · left
-    have hshort := hcycleA times hnd
+  rcases first_revisit_fork hN hfirst hentry with hcycleA | ⟨A, hA, hbaseA⟩
+  · obtain ⟨lead, atRepeat, settled, htrace, hsimple, hsettled⟩ := hcycleA
+    left
+    have hshort := prefix_then_settled_distinct_le htrace.sound
+      (htrace.simple_length_le hN hsimple) hsettled times hnd
     omega
-  · obtain ⟨A, stateA, hA, hbaseA, hactivatedA, _hreachA, _hpreservesA⟩ := hreflectorA
-    subst stateA
-    have hentryB : w.link start.1 = some e := w.symm _ _ hentry
+  · have hentryB : w.link start.1 = some e := w.symm _ _ hentry
     have hndA : (times.map
         (restrictedTonguesAt w N (start.1, A.baseState))).Nodup := by
       simpa [hbaseA] using hnd
     obtain ⟨secondFinish, hsecond⟩ := stepN_live_of_total hN htotal
       (N + 1) (e, A.activatedState) (hN _ _ hentry).1
-    rcases first_activated_trace_outcome_sharp_partial
-        hN hsecond hentryB with hcycleB | hreflectorB
-    · obtain ⟨C⟩ := hcycleB
-      by_cases hend : PathGrooves A.toSupported.paths C.atRepeat.2
+    rcases first_revisit_fork hN hsecond hentryB with hcycleB | ⟨B, hB, hbaseB⟩
+    · obtain ⟨lead, atRepeat, settled, htrace, hsimple, hsettled⟩ := hcycleB
+      by_cases hend : PathGrooves A.toSupported.paths atRepeat.2
       · left
         have hsmall := simple_lead_one_vector_tail_distinct_le_N_add_three
-          hN A hA C.lead_trace C.lead_simple hend C.positive_settled times hndA
+          hN A hA htrace hsimple hend hsettled times hndA
         omega
       · right
         left
         obtain ⟨D⟩ :=
           PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple
-            A hA C.lead_trace C.lead_simple hend
+            A hA htrace hsimple hend
         exact ⟨{ A := A, grooves := hA, base := hbaseA, contact := D }⟩
-    · right
-      right
-      obtain ⟨B, stateB, hB, hbaseB, hactivatedB⟩ := hreflectorB
-      subst stateB
-      exact ⟨{
+    · exact Or.inr (Or.inr ⟨{
         A := A, B := B, A_grooves := hA, B_grooves := hB,
         A_base := hbaseA, B_base := hbaseB
-      }⟩
+      }⟩)
 
 end GeneralN

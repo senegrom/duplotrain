@@ -1,5 +1,5 @@
 import FacingForwardNovelty
-import FirstCycleCountSharp
+import TripleSelfLinkSimpleCycleClosure
 import EarlyFacingConstant
 
 /-!

@@ -1,14 +1,11 @@
 import SharpStateLawAssembly
 
 /-!
-# Raw time shifting and switch-simple traces
+# Time shifts and first-writer history coverage
 
-Shifting a run to a reached local start preserves its restricted tongue
-vectors, its liveness, and its raw writer names, and a physical trace names
-the writer of every productive step by its passage switch.  On a
-switch-simple trace no repeated-writer novelty occurs, and every vector of
-the trace already lies in the first-writer history.  These are the
-time-indexed facts the global history extraction of the sharp bound uses.
+Live time shifts preserve restricted vectors. A switch-simple trace has
+no repeated productive writer, so induction covers every vector by the
+initial state and the post-state of each first productive write.
 -/
 
 namespace GeneralN
@@ -24,12 +21,9 @@ theorem restrictedTonguesAt_sub_of_reach
     restrictedTonguesAt w N start t =
       restrictedTonguesAt w N middle (t - shift) := by
   have ht : t = shift + (t - shift) := by omega
-  have htransport : restrictedTonguesAt w N start (shift + (t - shift)) =
-      restrictedTonguesAt w N middle (t - shift) :=
-    restrictedTonguesAt_add_of_reaches hreach
-      (stepN_suffix_some_of_reaches hreach (by rw [← ht]; exact hlive))
-  rw [← ht] at htransport
-  exact htransport
+  have h := restrictedTonguesAt_add_of_reaches (N := N) hreach
+    (stepN_suffix_some_of_reaches hreach (by rwa [← ht]))
+  rwa [← ht] at h
 
 /-- A historical prefix adds no cost to a novelty cover of its shifted tail. -/
 theorem NoveltyCoverOn.prepend
@@ -49,18 +43,6 @@ theorem NoveltyCoverOn.prepend
   · rw [restrictedTonguesAt_sub_of_reach hreach (by omega) (hlive k hk)]
     exact hcover _ (hmem k hk (by omega))
 
-/-- Raw writer names are invariant under shifting to a reached local run. -/
-theorem rawWriterAt_add_of_reach
-    {w : Wiring} {shift d : Nat}
-    {start middle : Nat × Tongues}
-    (hreach : stepN w shift start = some middle)
-    (hlive : (stepN w d middle).isSome) :
-    rawWriterAt w start (shift + d) =
-      rawWriterAt w middle d := by
-  obtain ⟨finish, hfinish⟩ := Option.isSome_iff_exists.mp hlive
-  simp [rawWriterAt, rawEntryAt, stepN_add, hreach, hfinish]
-
-
 theorem PhysicalTrace.rawWriterAt_eq_passageSwitch_getElem
     {w : Wiring} {start finish : Nat × Tongues}
     {passages : List Passage}
@@ -75,22 +57,9 @@ theorem PhysicalTrace.rawWriterAt_eq_passageSwitch_getElem
       | zero =>
           simp [rawWriterAt, rawEntryAt, stepN, passageSwitch]
       | succ k =>
-          have hkTail : k < passages.length := by
-            simp only [List.length_cons] at hk
-            omega
-          have hstep : step w (p, u) = some (q, v) := by
-            simp [step, harrive, hlink]
-          have hreach : stepN w 1 (p, u) = some (q, v) := by
-            simpa [stepN] using hstep
-          obtain ⟨cfg, hcfg⟩ := stepN_prefix_some
-            (d := k) (K := passages.length)
-            (Nat.le_of_lt hkTail) tail.sound
-          have hcfgSome : (stepN w k (q, v)).isSome := by
-            rw [hcfg]
-            simp
-          have hwriter := rawWriterAt_add_of_reach hreach hcfgSome
-          have htail := ih hkTail
-          simpa [Nat.one_add] using hwriter.trans htail
+          have hkTail : k < passages.length := by simpa using hk
+          obtain ⟨cfg, hcfg⟩ := stepN_prefix_some (Nat.le_of_lt hkTail) tail.sound
+          simpa [rawWriterAt, rawEntryAt, stepN, step, harrive, hlink, hcfg] using ih hkTail
 
 /-- Every productive event inside a switch-simple physical construction is
 globally the first productive event of its writer.  This is the raw-history
@@ -115,28 +84,6 @@ theorem PhysicalTrace.rawProductiveAt_first_of_switchSimple
   apply hne
   simpa [hwriterJ, hwriterK] using hwriter
 
-/-- A switch-simple physical construction prefix contains no repeated-writer
-novelty event.  This is the event-level form of the global history
-extraction, and follows from the time-indexed passage theorem above. -/
-theorem PhysicalTrace.rawRepeatedWriterNovelTimes_eq_nil_of_switchSimple
-    {w : Wiring} {N : Nat} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages) :
-    rawRepeatedWriterNovelTimes w N start passages.length = [] := by
-  cases htimes : rawRepeatedWriterNovelTimes w N start passages.length with
-  | nil => rfl
-  | cons k rest =>
-      exfalso
-      have hkMem :
-          k ∈ rawRepeatedWriterNovelTimes w N start passages.length := by
-        rw [htimes]
-        exact List.mem_cons_self
-      have hkData := mem_rawRepeatedWriterNovelTimes_iff.mp hkMem
-      have hkFirst := htrace.rawProductiveAt_first_of_switchSimple
-        hsimple hkData.1 hkData.2.1
-      exact hkData.2.2.1 hkFirst
-
 /-- Every state of a switch-simple physical construction prefix belongs to
 the canonical initial-plus-first-writer history.  This is an unconditional
 global raw-history extraction, including the endpoint of the trace. -/
@@ -148,14 +95,17 @@ theorem PhysicalTrace.restrictedTonguesAt_mem_rawFirstWriterHistory
     ∀ k, k ≤ passages.length →
       restrictedTonguesAt w N start k ∈
         rawFirstWriterHistory w N start passages.length := by
-  intro k hk
-  have hcover := restrictedTonguesAt_mem_finite_writer_cover
-    w N start passages.length k hk
-  have hempty :=
-    htrace.rawRepeatedWriterNovelTimes_eq_nil_of_switchSimple
-      (N := N) hsimple
-  unfold rawRepeatedWriterFresh at hcover
-  rw [hempty] at hcover
-  simpa using hcover
+  intro k
+  induction k with
+  | zero => intro _; simp [rawFirstWriterHistory]
+  | succ k ih =>
+      intro hk
+      by_cases heq : restrictedTonguesAt w N start (k + 1) = restrictedTonguesAt w N start k
+      · rw [heq]; exact ih (by omega)
+      · have hprod : RawProductiveAt w N start k :=
+          ⟨Option.isSome_iff_exists.mpr (stepN_prefix_some hk htrace.sound), heq⟩
+        have hfirst := htrace.rawProductiveAt_first_of_switchSimple hsimple (by omega) hprod
+        exact List.mem_cons_of_mem _ (List.mem_map.mpr
+          ⟨k, mem_rawFirstWriterTimes_iff.mpr ⟨by omega, hfirst⟩, rfl⟩)
 
 end GeneralN

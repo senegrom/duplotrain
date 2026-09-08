@@ -66,6 +66,16 @@ Its construction-history and pointwise reflector arguments remain the
 core of the proof, but both `N+1`-step exploration probes are automatically
 live. The former dead-probe classification is unnecessary.
 
+Both probes consume the same `first_revisit_fork`: a simple prefix followed
+by a settled cycle, or a manufactured reflector with its activated grooves.
+The former count-only and trace-retaining wrappers are unnecessary. A shared
+settled-tail lemma charges the constant future vector once after any
+historical prefix.
+
+First-writer histories cover simple traces by induction: an unchanged step
+keeps the previous vector, while a changed step writes a switch for the first
+time. This direct proof replaces the general repeated-writer novelty layer.
+
 `StateLawNAddFourSharp.lean` reduces arbitrary starts and partial wirings
 to this setting using `WiringCompletion.lean`:
 
@@ -435,6 +445,7 @@ comments and blanks, not just proof tactics.
 | After shared protected prefixes, historical covers, and theta composition | 45 | 11,655 |
 | After shared contact retraces, last-write recovery, and canonical action corners | 45 | 11,242 |
 | After unified coordinate counting and direct duplicate-sample omission | 44 | 10,849 |
+| After direct first-writer induction and unified first-revisit probes | 43 | 10,447 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -565,4 +576,18 @@ history, and protected repairs reuse the existing route-prefix lemma.
 
 All seven protected files remain byte-for-byte unchanged. A clean build checks
 all **91 jobs** without warnings, the exact axiom audit passes, and all **350**
+public source theorems remain in the headline proof's kernel dependency closure.
+
+The direct-history and first-revisit pass removes another **402 Lean source
+lines**, from **10,868 to 10,466**, a **3.7%** reduction. There are **44 files**,
+including the unchanged 19-line audit. Counts include every helper proof,
+comment, and blank line.
+
+Direct induction removes the repeated-writer novelty definitions and their
+coverage machinery. Both probes now use one first-revisit result with only
+the required witnesses. Settled-tail counting and successor-step decomposition
+are shared, and `FirstCycleCountSharp.lean` is no longer needed.
+
+All seven protected files remain byte-for-byte unchanged. A clean build checks
+all **89 jobs** without warnings, the exact axiom audit passes, and all **343**
 public source theorems remain in the headline proof's kernel dependency closure.

@@ -150,56 +150,15 @@ theorem simple_lead_one_vector_tail_distinct_le_N_add_three
     (hnd : (times.map
       (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
     times.length ≤ N + 3 := by
-  let firstTravel := A.exploration.length + A.runway.length + 1
-  let shift := firstTravel + lead.length
-  let localStart : Nat × Tongues := (e, A.activatedState)
-  let history := A.continuationHistory N localStart lead.length
-  let settledVector := VectorCount.restrict N settled
-  have hreachA : stepN w firstTravel (g, A.baseState) =
-      some localStart := by
-    simpa [firstTravel, localStart] using
-      A.manufacturing_journey_reaches_activated hA
-  have hreach : stepN w shift (g, A.baseState) =
-      some atRepeat := by
-    dsimp [shift]
-    rw [stepN_add, hreachA]
+  have hreach : stepN w
+      (A.exploration.length + A.runway.length + 1 + lead.length)
+      (g, A.baseState) = some atRepeat := by
+    rw [stepN_add, A.manufacturing_journey_reaches_activated hA]
     exact hlead.sound
-  have hcover : NoveltyCoverOn w N (g, A.baseState)
-      times (history ++ [settledVector]) 0 := by
-    refine ⟨[], by simp, ?_⟩
-    intro k _hk
-    simp only [List.append_nil]
-    by_cases hbefore : k ≤ shift
-    · apply List.mem_append_left
-      dsimp [history]
-      apply A.journey_then_continuation_mem hA hlead hleadSimple
-      simpa [shift, firstTravel] using hbefore
-    · let d := k - shift
-      have hd : 0 < d := by
-        dsimp [d]
-        omega
-      have hkEq : k = shift + d := by
-        dsimp [d]
-        omega
-      obtain ⟨port, hlocal⟩ := htail d hd
-      have hglobal : stepN w k (g, A.baseState) =
-          some (port, settled) := by
-        rw [hkEq, stepN_add, hreach]
-        exact hlocal
-      have hvector : restrictedTonguesAt w N
-          (g, A.baseState) k = settledVector := by
-        simp [restrictedTonguesAt, tonguesAt, hglobal, settledVector]
-      rw [hvector]
-      apply List.mem_append_right
-      simp
+  have hcover := history_then_settled_one_novelty (N := N) hreach
+    (fun _ hk => A.journey_then_continuation_mem hA hlead hleadSimple hk) htail times
   have hcount := noveltyCoverOn_distinct_count hcover hnd
-  have hhistory :
-      history.length ≤ N + 2 := by
-    dsimp [history, localStart]
-    exact A.continuationHistory_length_le
-      hN rfl hlead hleadSimple hA hend
-  dsimp [settledVector] at hcount
-  simp only [List.length_append, List.length_singleton] at hcount
+  have hhistory := A.continuationHistory_length_le hN rfl hlead hleadSimple hA hend
   omega
 
 end GeneralN

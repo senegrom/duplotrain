@@ -1,69 +1,14 @@
 import OneReflectorContinuation
 
 /-!
-# Sharp partial second-run accounting
+# First damaging contact after a manufactured reflector
 
-After one completed manufactured reflector, the second `N+1`-step probe has
-three outcomes: death, a tongue-stable simple-cycle capture, or a second
-manufactured reflector.  The last case is the protected reflector pair,
-charged separately in `ProtectedPairNAddFour.lean`.
-
-This file treats the other two outcomes without adding the first reflector's
-`N+2` history to a fresh `N+2` history.  All continuation writers are charged
-against the same ambient switch list as the first reflector's reusable
-support; only the genuinely dynamical cycle/contact corners are paid as a
-constant.
--/
-
-
-/-!
-## Eventual periodicity supplies raw prefixes of every length
-
-The one liveness fact the downstream counting files use.
+A switch-simple continuation that breaks the old support has a first
+damaging passage. Its orientation determines a backward retrace or a
+forward splice; both retain the same compressed continuation history.
 -/
 
 namespace GeneralN
-
-/-- Trace-retaining form of the simple-cycle branch of
-`first_activated_count_outcome_sharp`. -/
-structure PartialSecondCycleOutcome
-    (w : Wiring) (start : Nat × Tongues) (N : Nat) : Type where
-  lead : List Passage
-  atRepeat : Nat × Tongues
-  settled : Tongues
-  lead_trace : PhysicalTrace w start lead atRepeat
-  lead_simple : SwitchSimple lead
-  positive_settled : ∀ d, 0 < d → ∃ port,
-    stepN w d atRepeat = some (port, settled)
-
-/-- The sharp first-activation fork with its physical cycle witness retained.
-The reflector alternative is definitionally the same payload as the existing
-count-only theorem. -/
-theorem first_activated_trace_outcome_sharp_partial
-    {w : Wiring} {N e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {start finish : Nat × Tongues}
-    (hlive : stepN w (N + 1) start = some finish)
-    (hentry : w.link e = some start.1) :
-    Nonempty (PartialSecondCycleOutcome w start N) ∨
-      ∃ (A : ManufacturedReflector w start.1 e) (state : Tongues),
-        PathGrooves A.toSupported.paths state ∧
-        A.baseState = start.2 ∧
-        state = A.activatedState := by
-  obtain ⟨lead, q, u, hleadTrace, hleadSimple, hfork⟩ :=
-    first_revisit_fork hN hlive hentry
-  rcases hfork with hcycle | hreflector
-  · obtain ⟨settled, hpositive⟩ := hcycle
-    exact Or.inl ⟨{
-      lead := lead
-      atRepeat := (q, u)
-      settled := settled
-      lead_trace := hleadTrace
-      lead_simple := hleadSimple
-      positive_settled := hpositive
-    }⟩
-  · obtain ⟨A, state, hgrooves, hbase, hactivated, _hpreserves⟩ := hreflector
-    exact Or.inr ⟨A, state, hgrooves, hbase, hactivated⟩
 
 namespace PartialSecondRunSharp
 

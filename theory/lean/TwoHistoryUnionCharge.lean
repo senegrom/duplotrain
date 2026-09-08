@@ -152,7 +152,7 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_add_extras
     · intro i hi j hj heq
       exact rawFirstWriterAt_injective (mem_rawFirstWriterTimes_iff.mp hi).2
         (mem_rawFirstWriterTimes_iff.mp hj).2 heq
-    · exact nodup_filter_nat _ List.nodup_range
+    · exact List.Pairwise.filter _ List.nodup_range
   have hwriters : ∀ j ∈ writers, j < N ∧ j ∉ A.reusableSwitches := by
     intro j hj
     obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hj

@@ -67,6 +67,22 @@ theorem step_some_parts {w : Wiring} {c d : Nat × Tongues}
   obtain ⟨q, hq, rfl⟩ := Option.map_eq_some_iff.mp h
   exact ⟨hq, rfl⟩
 
+/-- Any successful successor time exposes the corresponding one-step raw
+transition. -/
+theorem live_successor_configs
+    {w : Wiring} {start : Nat × Tongues} {k : Nat}
+    (hlive : (stepN w (k+1) start).isSome) :
+    ∃ cur next,
+      stepN w k start = some cur ∧
+      stepN w (k+1) start = some next ∧
+      step w cur = some next := by
+  obtain ⟨next, hnext⟩ := Option.isSome_iff_exists.mp hlive
+  have h := hnext
+  rw [stepN_add] at h
+  cases hcur : stepN w k start with
+  | none => simp [hcur] at h
+  | some cur => exact ⟨cur, next, rfl, hnext, by simpa [hcur, stepN] using h⟩
+
 /-- One local switch passage, stored as `(entryPort, exitPort)`. -/
 abbrev Passage := Nat × Nat
 

@@ -29,22 +29,6 @@ theorem restrict_eq_apply
     List.getElem?_range hC] using hget
 
 
-/-- Any successful successor time exposes the corresponding one-step raw
-transition. -/
-theorem live_successor_configs
-    {w : Wiring} {start : Nat × Tongues} {k : Nat}
-    (hlive : (stepN w (k+1) start).isSome) :
-    ∃ cur next,
-      stepN w k start = some cur ∧
-      stepN w (k+1) start = some next ∧
-      step w cur = some next := by
-  obtain ⟨next, hnext⟩ := Option.isSome_iff_exists.mp hlive
-  have h := hnext
-  rw [stepN_add] at h
-  cases hcur : stepN w k start with
-  | none => simp [hcur] at h
-  | some cur => exact ⟨cur, next, rfl, hnext, by simpa [hcur, stepN] using h⟩
-
 /-- Restricted-vector productivity is a genuine change of the entered
 switch's own tongue. -/
 theorem rawProductiveAt_changes_writer
@@ -56,25 +40,16 @@ theorem rawProductiveAt_changes_writer
       stepN w (k+1) start = some next ∧
       step w cur = some next ∧
       next.2 (cur.1/3) ≠ cur.2 (cur.1/3) := by
-  obtain ⟨cur, next, hcur, hnext, hstep⟩ :=
-    live_successor_configs hprod.1
-  have hparts := step_some_parts hstep
-  have harrived : next.2 = (arrive cur.2 cur.1).2 := by
-    simpa [arrivedTongues] using hparts.2
-  have hchanged : next.2 (cur.1/3) ≠ cur.2 (cur.1/3) := by
-    intro hsame
-    apply hprod.2
-    have hrestrict : VectorCount.restrict N next.2 =
-        VectorCount.restrict N cur.2 := by
-      unfold VectorCount.restrict
-      apply List.map_congr_left
-      intro j hj
-      by_cases hjWriter : j = cur.1/3
-      · simpa [hjWriter] using hsame
-      · rw [harrived]
-        exact arrive_preserves_other rfl hjWriter
-    simpa [restrictedTonguesAt, tonguesAt, hcur, hnext] using hrestrict
-  exact ⟨cur, next, hcur, hnext, hstep, hchanged⟩
+  obtain ⟨cur, next, hcur, hnext, hstep⟩ := live_successor_configs hprod.1
+  refine ⟨cur, next, hcur, hnext, hstep, ?_⟩
+  intro hsame
+  have heq : next.2 = cur.2 := by
+    funext j
+    by_cases hj : j = cur.1 / 3
+    · simpa [hj] using hsame
+    · rw [(step_some_parts hstep).2]
+      exact arrive_preserves_other rfl hj
+  exact hprod.2 (by simp [restrictedTonguesAt, tonguesAt, hcur, hnext, heq])
 
 
 theorem rawProductiveAt_is_endpoint_pivot

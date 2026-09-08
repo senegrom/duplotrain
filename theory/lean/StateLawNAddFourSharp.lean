@@ -49,7 +49,7 @@ theorem state_law_N_add_four : StateLawNAddFour := by
       intro k hk
       simp only [restrictedTonguesAt, tonguesAt, hreach k hk]
     rcases known_edge_N_add_four_or_changed_contact_or_protected_pair
-        hvN hvtotal (v.symm _ _ he) times hvlive (hvectors.symm ▸ hnd) with
+        hvN hvtotal (v.symm _ _ he) times (hvectors.symm ▸ hnd) with
         hsmall | hchanged | hpair
     · exact hsmall
     · obtain ⟨D⟩ := hchanged
