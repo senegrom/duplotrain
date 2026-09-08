@@ -75,4 +75,27 @@ theorem manufactured_pair_all_time_action_corners_tongues
               ManufacturedReflector.toSupported, ManufacturedFlipReflector.toSupported,
               LocalAction.apply] using hm
 
+/-- Start the pair at the protected pre-return state. Traversing `B` reaches
+its activated boundary, so every live continuation inherits the same four
+corners without classifying a repair of `A`. -/
+theorem ManufacturedReflector.preReturn_pair_corners
+    {w : Wiring} {g e : Nat}
+    (A : ManufacturedReflector w g e) (B : ManufacturedReflector w e g)
+    (hB : PathGrooves B.toSupported.paths B.activatedState)
+    (hpre : PathGrooves A.toSupported.paths B.preReturn.2)
+    {d : Nat} (hlive : (stepN w d (g, B.activatedState)).isSome) :
+    tonguesAt w (g, B.activatedState) d ∈
+      [B.preReturn.2, B.activatedState, A.toSupported.action.apply B.preReturn.2,
+       A.toSupported.action.apply B.activatedState] := by
+  have hBpre : PathGrooves B.toSupported.paths B.preReturn.2 := by
+    rw [B.preReturn_eq_action_activated]
+    exact hB.after_avoiding_action B.action_avoids_own_support
+  have hactivate : B.toSupported.action.apply B.preReturn.2 = B.activatedState := by
+    rw [B.preReturn_eq_action_activated, B.toSupported.action.involutive]
+  have hreach := (B.toSupported.run B.preReturn.2 hBpre).1
+  rw [hactivate] at hreach
+  rw [← tonguesAt_add_of_reaches hreach (Option.isSome_iff_exists.mp hlive)]
+  simpa [manufacturedPairActionCorners, hactivate] using
+    manufactured_pair_all_time_action_corners_tongues B A B.preReturn.2 hBpre hpre _
+
 end GeneralN

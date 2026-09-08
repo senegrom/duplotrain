@@ -52,10 +52,6 @@ theorem changed_arrival_eq_flipAt
   simp only [pin] at hchanged
   cases hu : u (p / 3) <;> cases hb : bval p <;> simp_all
 
-theorem trailing_arrive_exit_independent
-    {u v : Tongues} {p : Nat} (hp : p % 3 ≠ 0) :
-    (arrive u p).1 = (arrive v p).1 := by simp [arrive, hp]
-
 /-- Deterministic traces from one configuration coincide until one ends;
 the remainder is itself a trace from that endpoint. -/
 theorem physicalTrace_prefix_comparable_with_endpoints
@@ -495,13 +491,6 @@ theorem ManufacturedReflector.return_arrive_mouth :
       rw [hhead, hafter] at hback
       exact hback
 
-/-- The local passage immediately following a manufactured exploration is
-the repeated-switch passage that activates the reflector. -/
-theorem ManufacturedReflector.return_arrive :
-    ∃ exit, arrive A.preReturn.2 A.preReturn.1 =
-      (exit, A.activatedState) :=
-  ⟨A.mouthConfig.1, A.return_arrive_mouth⟩
-
 theorem ManufacturedReflector.exploration_simple :
     SwitchSimple A.exploration := by
   cases A with
@@ -647,19 +636,6 @@ theorem ManufacturedReflector.orientedRoute_simple
       · simpa [ManufacturedReflector.orientedRoute, hselected] using
           R.reverse_support_simple
 
-/-- A prefix of the oriented route is switch-simple and stays on the route. -/
-theorem ManufacturedReflector.orientedRoute_prefix_simple_and_mem
-    {w : Wiring} {g e : Nat} (A : ManufacturedReflector w g e) (state : Tongues)
-    {before rest : List Passage}
-    (hsplit : A.orientedRoute state = before ++ rest) :
-    SwitchSimple before ∧ ∀ passage ∈ before, passage ∈ A.orientedRoute state := by
-  have hrouteSimple := A.orientedRoute_simple state
-  rw [hsplit] at hrouteSimple
-  refine ⟨?_, fun passage hp => by rw [hsplit]; exact List.mem_append_left _ hp⟩
-  unfold SwitchSimple at hrouteSimple ⊢
-  simp only [List.map_append] at hrouteSimple
-  exact (List.nodup_append.mp hrouteSimple).1
-
 /-- Every reusable support passage occurs on the selected outward route,
 possibly in the opposite orientation when the candy is traversed backwards.
 -/
@@ -755,95 +731,6 @@ theorem same_groove_same_tongue
     u (passageSwitch old) = v (passageSwitch old) := by
   exact grooved_states_agree_on_passage (groove_forward hu) (groove_forward hv)
 
-theorem PhysicalTrace.changed_switch_has_changed_passage
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage} {j : Nat}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    (hchange : finish.2 j ≠ start.2 j) :
-    ∃ before p x after u v,
-      passages = before ++ (p, x) :: after ∧
-      passageSwitch (p, x) = j ∧
-      PhysicalTrace w start before (p, u) ∧
-      arrive u p = (x, v) ∧
-      u j = start.2 j ∧ finish.2 j = v j ∧ v j ≠ u j := by
-  have hjmem : j ∈ passages.map passageSwitch := by
-    apply Classical.byContradiction
-    intro hnot
-    apply hchange
-    apply htrace.preserves
-    intro passage hp hEq
-    apply hnot
-    exact List.mem_map.mpr ⟨passage, hp, hEq⟩
-  obtain ⟨passage, hpassage, hswitch⟩ := List.mem_map.mp hjmem
-  obtain ⟨before, after, hsplit⟩ := List.append_of_mem hpassage
-  rcases passage with ⟨p, x⟩
-  have htrace' := htrace
-  have hsimple' := hsimple
-  rw [hsplit] at htrace' hsimple'
-  obtain ⟨middle, hbefore, hrest⟩ := htrace'.split_append
-  cases hrest with
-  | @cons _ _ q u v _ _ harrive hlink hafter =>
-      have hprefixForeign : ∀ prior ∈ before, passageSwitch prior ≠ j := by
-        grind [SwitchSimple]
-      have hsuffixForeign : ∀ later ∈ after, passageSwitch later ≠ j := by
-        grind [SwitchSimple]
-      have hu : u j = start.2 j :=
-        hbefore.preserves j hprefixForeign
-      have hv : finish.2 j = v j :=
-        hafter.preserves j hsuffixForeign
-      have hvu : v j ≠ u j := by
-        intro hEq
-        apply hchange
-        rw [hv, hEq, hu]
-      exact ⟨before, p, x, after, u, v, hsplit,
-        hswitch, hbefore, harrive, hu, hv, hvu⟩
-
-/-- Replay a reference route until its exit changes or a guarded tongue is
-changed. The common prefix is retained once, independently of the conflict. -/
-theorem PhysicalTrace.repair_preserving_paths_until_conflict
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage} {guardPaths : List (List Passage)}
-    (htrace : PhysicalTrace w start passages finish)
-    (state : Tongues) (hprotected : PathGrooves guardPaths state) :
-    (∃ approach p x suffix contact,
-      passages = approach ++ (p, x) :: suffix ∧
-      PhysicalTrace w (start.1, state) approach (p, contact) ∧
-      PathGrooves guardPaths contact ∧
-      ((p % 3 = 0 ∧ ∃ other, arrive contact p = (other, contact) ∧ other ≠ x) ∨
-        ∃ next path old, arrive contact p = (x, next) ∧
-          path ∈ guardPaths ∧ old ∈ path ∧ passageSwitch old = p / 3 ∧
-          next (p / 3) ≠ contact (p / 3))) ∨
-    ∃ finalState, PhysicalTrace w (start.1, state) passages (finish.1, finalState) ∧
-      PathGrooves guardPaths finalState := by
-  induction htrace generalizing state with
-  | nil => exact Or.inr ⟨state, PhysicalTrace.nil _, hprotected⟩
-  | @cons p x q base nextBase rest finish harriveBase hlink tail ih =>
-      obtain ⟨other, next, harrive⟩ : ∃ other next, arrive state p = (other, next) :=
-        ⟨_, _, rfl⟩
-      by_cases hfollow : other = x
-      · subst other
-        by_cases hcontact : ∃ path ∈ guardPaths, ∃ old ∈ path,
-            passageSwitch old = p / 3 ∧ next (p / 3) ≠ state (p / 3)
-        · obtain ⟨path, hp, old, ho, hs, hc⟩ := hcontact
-          exact Or.inl ⟨[], p, x, rest, state, rfl, PhysicalTrace.nil _, hprotected,
-            Or.inr ⟨next, path, old, harrive, hp, ho, hs, hc⟩⟩
-        · have hnext := pathGrooves_after_arrive_without_support_change
-            harrive hprotected (by grind)
-          rcases ih next hnext with ⟨before, p', x', after, contact, hs, ht, hg, hc⟩ |
-              ⟨final, ht, hg⟩
-          · exact Or.inl ⟨(p, x) :: before, p', x', after, contact,
-              by simp [hs], PhysicalTrace.cons harrive hlink ht, hg, hc⟩
-          · exact Or.inr ⟨final, PhysicalTrace.cons harrive hlink ht, hg⟩
-      · have hp : p % 3 = 0 := by
-          apply Classical.byContradiction
-          intro hbranch
-          have := trailing_arrive_exit_independent (u := state) (v := base) hbranch
-          simp [harrive, harriveBase, hfollow] at this
-        have hnext : next = state := by simpa [arrive, hp] using congrArg Prod.snd harrive.symm
-        exact Or.inl ⟨[], p, x, rest, state, rfl, PhysicalTrace.nil _, hprotected,
-          Or.inl ⟨hp, other, by simpa [hnext] using harrive, hfollow⟩⟩
-
 theorem PhysicalTrace.first_changed_support_passage
     {w : Wiring} {start finish : Nat × Tongues}
     {passages : List Passage} {paths : List (List Passage)}
@@ -858,14 +745,20 @@ theorem PhysicalTrace.first_changed_support_passage
       path ∈ paths ∧ old ∈ path ∧
       passageSwitch old = p / 3 ∧
       v (p / 3) ≠ u (p / 3) := by
-  rcases htrace.repair_preserving_paths_until_conflict start.2 hbase with
-      ⟨before, p, x, after, contact, hs, ht, hg, hc⟩ | ⟨final, ht, hg⟩
-  · rcases hc with ⟨_, other, harrive, hne⟩ | ⟨next, path, old, ha, hp, ho, hj, hn⟩
-    · obtain ⟨v, hv⟩ := ((hs ▸ htrace).after_prefix ht).head_arrive.2
-      exact (hne (congrArg Prod.fst (harrive.symm.trans hv))).elim
-    · exact ⟨before, p, x, after, contact, next, path, old, hs, ht, hg, ha, hp, ho, hj, hn⟩
-  · exact (hbroken ((congrArg Prod.snd
-      (Option.some.inj (ht.sound.symm.trans htrace.sound))) ▸ hg)).elim
+  induction htrace with
+  | nil => exact (hbroken hbase).elim
+  | @cons p x q u v rest finish harrive hlink tail ih =>
+      by_cases hhead : ∃ path ∈ paths, ∃ old ∈ path,
+          passageSwitch old = p / 3 ∧ v (p / 3) ≠ u (p / 3)
+      · obtain ⟨path, hp, old, ho, hs, hc⟩ := hhead
+        exact ⟨[], p, x, rest, u, v, path, old, rfl, PhysicalTrace.nil _,
+          hbase, harrive, hp, ho, hs, hc⟩
+      · have hnext := pathGrooves_after_arrive_without_support_change
+          harrive hbase (by grind)
+        obtain ⟨before, p', x', after, u', v', path, old, hs, ht, hg, ha, hp, ho, hj, hc⟩ :=
+          ih hnext hbroken
+        exact ⟨(p, x) :: before, p', x', after, u', v', path, old, by simp [hs],
+          PhysicalTrace.cons harrive hlink ht, hg, ha, hp, ho, hj, hc⟩
 
 
 theorem ManufacturedReflector.entryEdge

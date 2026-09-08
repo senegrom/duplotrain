@@ -115,6 +115,21 @@ and `B` the opposite second reflector. Once the old paths are grooved at
 both endpoints of `B`'s construction, use just the canonical history
 `A.preservedTwoHistoryCore B N` in every branch.
 
+The continuation needs no repair classification. Write `u = B.preReturn.2`,
+`s = B.activatedState`, and let `a`, `b` be the local actions of `A`, `B`.
+Both supports are grooved at `u`, and `b(u) = s`. The comparison run beginning
+at `(e,u)` traverses `B` to reach the actual boundary `(g,s)`. Therefore every
+live continuation sample inherits the pair theorem's four states:
+
+```
+u, s, a(u), a(s).
+```
+
+The first two are historical. An action writer also makes `a(u)` historical,
+leaving just `a(s)` to charge. This is `ManufacturedReflector.preReturn_pair_corners`
+in `PairActionCorners.lean`; it replaces the protected repair classification
+and the separate facing, backward, and completed-route novelty arguments.
+
 For a stay reflector `A`, that history has at most `N+2` entries and the
 repair tail has at most two fresh vectors. For a flip reflector, inspect
 its action coordinate (the tongue it flips on reflection):
@@ -330,24 +345,9 @@ Gray corners. `stepN_covered_of_progress` supplies all-time liveness and the
 phase cover directly. The obsolete excursion-length upper bound, four-leg
 windows, periods, and the period-based liveness helper have been removed.
 
-## Grooved returns and first-arrival synchronization
+## First-arrival synchronization
 
-`ManufacturedFlipReflector.grooved_return_two_phase` closes a two-vector cover
-around a grooved reference approach and a positive return. The return need only
-come back to the reference boundary, preserve that cover at every intermediate
-time, and work for either allowed input vector. It may take different durations
-or return different phases. Starting at either boundary in either phase is safe.
-
-On the undisturbed vector the approach replays. A disturbed approach either
-avoids the action switch and replays with the fault, captures at its first stem
-contact, or repairs at its first branch contact and synchronizes with the
-reference continuation. Each outcome gives a positive covered excursion. The
-existing progress induction proves all-time liveness and the two-vector bound.
-The approach need not be switch-simple or avoid the action switch. This replaces
-the three period constructions in `StateLawTwoCandidate` and strengthens the
-final-mouth theorem in `EarlyFacingConstant` to require only a grooved approach.
-
-The cycle cases use a different synchronization: if `arrive u p = (x, v)`,
+The cycle cases use first-arrival synchronization: if `arrive u p = (x, v)`,
 then `arrive v p = (x, v)` as well. Hence `stepN_after_arrival` identifies the
 complete runs from `(p, u)` and `(p, v)` at every **positive** time. It makes no
 claim that either run is globally constant. `PhysicalTrace.grooved_loop_all_time`
@@ -357,12 +357,10 @@ time zero is the original vector; every positive time is the settled one. There
 is no separate transient lap, stable period, or modulo-time proof. The pointwise
 reverse-trace theorem uses the same first-arrival synchronization.
 
-Finally, the existing endpoint-coordinate law replaces two more inductions. On
-a switch-simple trace, an intermediate coordinate is one of its endpoint values.
-If the endpoints differ only at one coordinate, every intermediate **vector**
-is an endpoint vector. If a productive writer instead agreed at the endpoints,
-its two adjacent values would both equal that common value, a contradiction.
-Neither consequence needs a new analysis of the physical trace.
+The endpoint-coordinate law also proves that a productive writer cannot agree
+at the trace endpoints: its adjacent values would then both equal the common
+endpoint value. The separate theorem for traces with one net changed coordinate
+became unnecessary when the pre-return orbit replaced protected repair analysis.
 
 ## One lobe route supplies endpoint and pointwise laws
 
@@ -388,11 +386,9 @@ synchronization. Consumers no longer carry transient/stable cycle traces,
 cycle simplicity, or a separate finite-window phase law. A prefix of length
 at most `N` followed by that one vector gives the `N+2` count directly.
 
-For a direct tail, filter the sampled times once to keep only vectors outside
-the complete prefix history. All those samples lie strictly after the boundary.
-Shift them to tail time and adjoin time zero: its historical vector is distinct
-from every fresh sample, so the tail cap bounds their number by `cap - 1`.
-There is no separate late-time list and second boundary-only filter.
+The pair tail now has a pointwise cover, so transporting sampled times needs
+only liveness. Distinctness is used once, when converting the final cover to
+a count; no boundary-subtraction count or duplicate-free suffix proof remains.
 
 First-repeat detection grows a duplicate-free prefix until the next key is
 already present. This removes the two repeated extraction arguments in the
@@ -448,6 +444,7 @@ comments and blanks, not just proof tactics.
 | After direct first-writer induction and unified first-revisit probes | 43 | 10,447 |
 | After unified repair traversal and early protected-contact exclusion | 43 | 10,155 |
 | After direct historical phases and manufacturing-return coverage | 39 | 9,673 |
+| After replacing protected repair by the pre-return pair orbit | 35 | 8,311 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -623,3 +620,22 @@ The remaining helpers move to their underlying modules, eliminating
 All seven protected files remain byte-for-byte unchanged. A clean build checks
 all **81 jobs** without warnings, the exact axiom audit passes, and all **337**
 public source theorems remain in the headline proof's kernel dependency closure.
+
+The pre-return orbit pass removes **1,362 Lean source lines**, from **9,692 to
+8,330**, a **14.1%** reduction. There are **36 files**, including the unchanged
+19-line audit; the count includes every helper, comment, and blank line.
+
+A comparison pair run at the protected pre-return state reaches the actual
+activated boundary after one reflector traversal. Its four-corner theorem
+therefore covers the entire continuation directly. This replaces the complete
+protected repair classification, its reference-state construction, facing and
+backward contact analyses, and completed-route bookkeeping. Pointwise tail
+covers also remove the suffix distinctness transport. Four more modules are
+removed: `FacingForwardNovelty`, `PreReturnProtectedRoute`, `RepairLeadTwoPhase`,
+and `SimpleTraceOneNetChange`.
+
+All seven protected files remain byte-for-byte unchanged. A clean build checks
+all **73 jobs** without warnings, the exact axiom audit passes, and all **310**
+public source theorems remain in the headline proof's kernel dependency closure.
+Across the last three checkpoints, the proof shrank from **10,466 to 8,330
+lines**: **2,136 lines (20.4%)**, with eight modules removed.

@@ -817,39 +817,19 @@ theorem PhysicalTrace.grooved_of_switchSimple {w : Wiring}
     (hsimple : SwitchSimple passages) :
     PassagesGrooved finish.2 passages := by
   induction h with
-  | nil =>
-      intro passage hp
-      cases hp
+  | nil => simp [PassagesGrooved]
   | @cons p x q u v passages finish harrive hlink tail ih =>
-      unfold SwitchSimple at hsimple
-      simp only [List.map_cons] at hsimple
-      rw [List.nodup_cons] at hsimple
-      have htailSimple : SwitchSimple passages := hsimple.2
-      have htailGrooved := ih htailSimple
-      have hxsw : x / 3 = p / 3 := by
-        have hexit := arrive_exit_switch u p
-        rw [harrive] at hexit
-        exact hexit
-      have htailForeign :
-          ∀ passage ∈ passages, passageSwitch passage ≠ p / 3 := by
-        intro passage hp hEq
-        apply hsimple.1
-        apply List.mem_map.mpr
-        exact ⟨passage, hp, hEq⟩
-      have hpreserve : finish.2 (p / 3) = v (p / 3) :=
-        tail.preserves (p / 3) htailForeign
-      have hback : arrive v x = (p, v) := by
-        have hb := arrive_back u p
-        rw [harrive] at hb
-        exact hb
-      have hhead : arrive finish.2 x = (p, finish.2) := by
-        apply groove_transfer hback
-        rw [hxsw]
-        exact hpreserve
+      have htail : SwitchSimple passages := by grind [SwitchSimple]
+      have hforeign : ∀ passage ∈ passages, passageSwitch passage ≠ p / 3 := by
+        grind [SwitchSimple, passageSwitch]
+      have hx : x / 3 = p / 3 := by simpa [harrive] using arrive_exit_switch u p
+      have hback : arrive v x = (p, v) := by simpa [harrive] using arrive_back u p
+      have hhead : arrive finish.2 x = (p, finish.2) :=
+        groove_transfer hback (by rw [hx]; exact tail.preserves _ hforeign)
       intro passage hp
-      rcases List.mem_cons.mp hp with hheadEq | htailMem
-      · simpa [hheadEq] using hhead
-      · exact htailGrooved passage htailMem
+      rcases List.mem_cons.mp hp with rfl | hp
+      · exact hhead
+      · exact ih htail passage hp
 
 /-- Total version of the retrace engine.  The train walks a grooved path
 backwards and then follows the plain-track edge at the path's original entry;

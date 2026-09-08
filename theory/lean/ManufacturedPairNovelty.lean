@@ -42,28 +42,7 @@ theorem stepN_suffix_some_of_reaches
     ∃ finish, stepN w d middle = some finish := by
   simpa [stepN_add, hreach, Option.isSome_iff_exists] using hlive
 
-/-- Shift a phase orbit into an ambient run: past the reach time every live
-sample is the restriction of an orbit phase, so the run is covered by
-`history ++ fresh` as soon as every phase is. -/
-theorem cover_of_phase_orbit
-    {w : Wiring} {N K : Nat} {start middle : Nat × Tongues}
-    {phases : List Tongues} {times : List Nat} {history fresh : List (List Bool)}
-    (hreach : stepN w K start = some middle)
-    (horbit : ∀ d, (stepN w d middle).isSome → tonguesAt w middle d ∈ phases)
-    (hcover : ∀ phase ∈ phases, VectorCount.restrict N phase ∈ history ++ fresh)
-    (hlive : ∀ j ∈ times, (stepN w j start).isSome)
-    (hlead : ∀ j ∈ times, j < K → restrictedTonguesAt w N start j ∈ history) :
-    ∀ j ∈ times, restrictedTonguesAt w N start j ∈ history ++ fresh := by
-  intro j hj
-  by_cases hjK : j < K
-  · exact List.mem_append_left _ (hlead j hj hjK)
-  · obtain ⟨d, rfl⟩ : ∃ d, j = K + d := ⟨j - K, by omega⟩
-    have hd := stepN_suffix_some_of_reaches hreach (hlive _ hj)
-    rw [restrictedTonguesAt_add_of_reaches hreach hd]
-    exact hcover _ (horbit d (Option.isSome_iff_exists.mpr hd))
-
-/-- The all-time form: an orbit live at every time needs no liveness
-hypothesis on the sampled times. -/
+/-- Shift a live phase orbit into an ambient run after a historical prefix. -/
 theorem cover_of_live_phase_orbit
     {w : Wiring} {N K : Nat} {start middle : Nat × Tongues}
     {phases : List Tongues} {times : List Nat} {history fresh : List (List Bool)}

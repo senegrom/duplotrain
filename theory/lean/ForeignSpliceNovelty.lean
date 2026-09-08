@@ -1,5 +1,5 @@
 import ManufacturedPairNovelty
-import RepairLeadTwoPhase
+import TrackGlobalRepair
 
 /-!
 # A one-bit invariant for candy splices

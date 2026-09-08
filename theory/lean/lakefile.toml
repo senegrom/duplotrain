@@ -3,7 +3,6 @@ defaultTargets = [
   "WiringCompletion",
   "StateLawBounds",
   "ChangedContactNAddFour",
-  "FacingForwardNovelty",
   "ForeignSpliceNovelty",
   "GeneralN",
   "KnownEdgeNAddFourChangedClosed",
@@ -12,13 +11,10 @@ defaultTargets = [
   "OneReflectorContinuation",
   "PairActionCorners",
   "PartialSecondRunSharp",
-  "PreReturnProtectedRoute",
   "ProtectedPairNAddFour",
-  "RepairLeadTwoPhase",
   "RepeatedNoveltyDecomposition",
   "RunwaySpliceNovelty",
   "SharpCertificateClosure",
-  "SimpleTraceOneNetChange",
   "StateLaw",
   "StateLawAxiomAudit",
   "StateLawCoefficientOneTop",
@@ -46,9 +42,6 @@ defaultTargets = [
 name = "ChangedContactNAddFour"
 
 [[lean_lib]]
-name = "FacingForwardNovelty"
-
-[[lean_lib]]
 name = "ForeignSpliceNovelty"
 
 [[lean_lib]]
@@ -73,13 +66,7 @@ name = "PairActionCorners"
 name = "PartialSecondRunSharp"
 
 [[lean_lib]]
-name = "PreReturnProtectedRoute"
-
-[[lean_lib]]
 name = "ProtectedPairNAddFour"
-
-[[lean_lib]]
-name = "RepairLeadTwoPhase"
 
 [[lean_lib]]
 name = "RepeatedNoveltyDecomposition"
@@ -89,9 +76,6 @@ name = "RunwaySpliceNovelty"
 
 [[lean_lib]]
 name = "SharpCertificateClosure"
-
-[[lean_lib]]
-name = "SimpleTraceOneNetChange"
 
 [[lean_lib]]
 name = "StateLaw"
