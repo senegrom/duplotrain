@@ -26,9 +26,9 @@ excursions instead of enumerated contact periods. Capture is a suffix of
 ordinary traversal. Shortened reflectors reuse their original construction
 witnesses rather than rebuilding them in the later tongue state.
 
-The retained development has 53 Lean files and 16,077 source lines,
-including its 19-line axiom audit; the headline import closure has 52
-modules and 16,058 lines. Source lines include comments and blank lines.
+The retained development has 36 Lean files and 8,307 source lines,
+including its 19-line axiom audit; the headline import closure has 35
+modules and 8,288 lines. Source lines include comments and blank lines.
 The theorem statement, model, finite-state ceiling, attainment constructions,
 and exact axiom audit are unchanged. Git history retains superseded proofs.
 
@@ -51,9 +51,9 @@ and the switch-simple manufactured routes. The paper and Lean guide describe
 these reductions; the elementary `2^N` ceiling remains a one-line observation
 in the paper's assembly rather than a standalone section.
 
-A grooved approach followed by any positive return inside a two-vector cover
-now closes one common repair invariant, even when the approach meets the
-action switch. Backward contacts and same-exit cycles synchronize after their
-first arrival with an already-grooved spatial loop, avoiding transient-lap and
-period calculations. The endpoint-coordinate law also supplies one-change
-phase bounds and productive-writer survival directly.
+The protected continuation is a suffix of the grooved pair run started at
+the pre-return state, so the four-corner theorem covers it directly and no
+repair classification remains. Backward contacts and same-exit cycles
+synchronize after their first arrival with an already-grooved spatial loop,
+avoiding transient-lap and period calculations. The endpoint-coordinate law
+also shows that a productive writer cannot agree at the trace endpoints.
