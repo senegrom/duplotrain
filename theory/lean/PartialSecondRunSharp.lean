@@ -143,7 +143,7 @@ theorem ChangedContact.forward_stay_two_phase_tail
       _hApproachReplay, hApproachGrooved,
       hApproachForeign, hentryBranch, hentryMouthSwitch,
       hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
-      hRpaths, hCandy, hCandyForeign, hLobe, hreach⟩ :=
+      hCandy, hCandyForeign, hLobe, hreach⟩ :=
     partial_first_forward_contact_active_lead
       (A := ManufacturedReflector.stay R)
       C.split C.full_simple C.approach_trace C.old_grooves
@@ -169,7 +169,7 @@ theorem ChangedContact.forward_stay_two_phase_tail
   rcases List.mem_append.mp hentryOld with hrunway | hcore
   · obtain ⟨before, after, hsplit⟩ := List.append_of_mem hrunway
     obtain ⟨D, hDpaths, hAvoid⟩ :=
-      R.suffix_after_runway_passage C.contactState hRpaths hsplit hmouthLink
+      R.suffix_after_runway_passage C.contactState C.old_grooves hsplit hmouthLink
     have hAvoid' : L.action.Avoids D.toSupported.paths := by
       simpa only [hentryMouthSwitch] using hAvoid
     have hDalt := hDpaths.after_avoiding_action hAvoid'

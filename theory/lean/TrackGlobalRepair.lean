@@ -84,114 +84,6 @@ theorem SwitchSimple.not_both_orientations
     exact hswitch)
   exact hne (congrArg Prod.fst hEq)
 
-theorem PhysicalTrace.repair_preserving_paths_until_conflict
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage} {guardPaths : List (List Passage)}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    (hbase : PassagesGrooved start.2 passages)
-    (state : Tongues)
-    (hprotected : PathGrooves guardPaths state) :
-    (∃ approach p x suffix contact other,
-      passages = approach ++ (p, x) :: suffix ∧
-      PhysicalTrace w (start.1, state) approach (p, contact) ∧
-      PathGrooves guardPaths contact ∧
-      p % 3 = 0 ∧
-      arrive contact p = (other, contact) ∧ other ≠ x) ∨
-    (∃ approach p x suffix u v path old,
-      passages = approach ++ (p, x) :: suffix ∧
-      PhysicalTrace w (start.1, state) approach (p, u) ∧
-      PathGrooves guardPaths u ∧
-      arrive u p = (x, v) ∧
-      path ∈ guardPaths ∧ old ∈ path ∧
-      passageSwitch old = p / 3 ∧
-      v (p / 3) ≠ u (p / 3)) ∨
-    ∃ finalState,
-      PhysicalTrace w (start.1, state) passages
-        (finish.1, finalState) ∧
-      PassagesGrooved finalState passages ∧
-      PathGrooves guardPaths finalState := by
-  induction htrace generalizing state with
-  | nil c =>
-      exact Or.inr (Or.inr ⟨state, PhysicalTrace.nil _,
-        (by intro passage hp; cases hp), hprotected⟩)
-  | @cons p x q base nextBase rest finish harriveBase hlink tail ih =>
-      unfold SwitchSimple at hsimple
-      simp only [List.map_cons] at hsimple
-      rw [List.nodup_cons] at hsimple
-      have htailSimple : SwitchSimple rest := hsimple.2
-      have hbaseSame : nextBase = base := congrArg Prod.snd
-        (harriveBase.symm.trans (groove_forward (hbase (p, x) List.mem_cons_self)))
-      have htailBase : PassagesGrooved nextBase rest := by
-        rw [hbaseSame]
-        exact fun passage hp => hbase passage (List.mem_cons_of_mem _ hp)
-      let other := (arrive state p).1
-      let next := (arrive state p).2
-      have harrive : arrive state p = (other, next) := by
-        exact Prod.ext rfl rfl
-      by_cases hfollow : other = x
-      · have harriveX : arrive state p = (x, next) := by
-          simpa [hfollow] using harrive
-        by_cases hcontact : ∃ path ∈ guardPaths, ∃ old ∈ path,
-            passageSwitch old = p / 3 ∧
-              next (p / 3) ≠ state (p / 3)
-        · obtain ⟨path, hpath, old, hold, hswitch, hchanged⟩ :=
-            hcontact
-          exact Or.inr (Or.inl ⟨[], p, x, rest, state, next,
-            path, old, rfl, PhysicalTrace.nil _, hprotected,
-            harriveX, hpath, hold, hswitch, hchanged⟩)
-        · have hquiet : ∀ path ∈ guardPaths, ∀ old ∈ path,
-              passageSwitch old = p / 3 →
-                next (p / 3) = state (p / 3) := by
-            intro path hpath old hold hswitch
-            grind
-          have hprotectedNext : PathGrooves guardPaths next :=
-            pathGrooves_after_arrive_without_support_change
-              harriveX hprotected hquiet
-          rcases ih htailSimple htailBase next hprotectedNext with
-            hfacing | hrest
-          · obtain ⟨approach, p₂, x₂, suffix, contact, diverted,
-                hsplit, hprefix, hprotectedContact, hp₂, hlocal,
-                hne⟩ := hfacing
-            exact Or.inl ⟨(p, x) :: approach, p₂, x₂, suffix,
-              contact, diverted, by simp [hsplit],
-              PhysicalTrace.cons harriveX hlink hprefix,
-              hprotectedContact, hp₂, hlocal, hne⟩
-          · rcases hrest with hchanged | hcomplete
-            · obtain ⟨approach, p₂, x₂, suffix, u, v, path, old,
-                  hsplit, hprefix, hprotectedU, hlocal,
-                  hpath, hold, hswitch, hchange⟩ := hchanged
-              exact Or.inr (Or.inl
-                ⟨(p, x) :: approach, p₂, x₂, suffix, u, v,
-                  path, old, by simp [hsplit],
-                  PhysicalTrace.cons harriveX hlink hprefix,
-                  hprotectedU, hlocal, hpath, hold,
-                  hswitch, hchange⟩)
-            · obtain ⟨finalState, htailTrace,
-                  _htailGrooved, hprotectedFinal⟩ := hcomplete
-              have hfull := PhysicalTrace.cons harriveX hlink htailTrace
-              exact Or.inr (Or.inr ⟨finalState, hfull,
-                hfull.grooved_of_switchSimple (by simpa [SwitchSimple] using hsimple),
-                hprotectedFinal⟩)
-      · have hp : p % 3 = 0 := by
-          apply Classical.byContradiction
-          intro hbranch
-          apply hfollow
-          dsimp [other]
-          calc
-            (arrive state p).1 = (arrive base p).1 :=
-              trailing_arrive_exit_independent hbranch
-            _ = x := congrArg Prod.fst harriveBase
-        have hnext : next = state := by
-          unfold arrive at harrive
-          rw [if_pos hp] at harrive
-          exact (Prod.mk.inj harrive).2.symm
-        have harriveFacing : arrive state p = (other, state) := by
-          simpa [hnext] using harrive
-        exact Or.inl ⟨[], p, x, rest, state, other,
-          rfl, PhysicalTrace.nil _, hprotected, hp,
-          harriveFacing, hfollow⟩
-
 /-- Two deterministic traces which first arrive at the same avoided switch
 must arrive through the same port.  Prefix comparability leaves an unmatched
 suffix only if its first passage visits that switch, contradicting avoidance.
@@ -321,52 +213,32 @@ theorem ManufacturedReflector.repair_current_route_preserving_until_conflict
     A.orientedRoute_trace reference hreferencePaths
   rw [hroute, hfinish] at hreferenceTrace
   have hsimple := A.orientedRoute_simple state
-  rcases hreferenceTrace.repair_preserving_paths_until_conflict
-      hsimple hreferenceGrooved state hguardPaths with
-    hfacing | hrest
-  · obtain ⟨before, p, x, after, contact, other,
-        hsplit, hprefix, hguardContact, hstem,
-        harrive, hother⟩ := hfacing
-    have hprefixForeign : ∀ passage ∈ before,
-        passageSwitch passage ≠ passageSwitch (p, x) := by
-      rw [hsplit] at hsimple
-      grind [SwitchSimple]
-    have hcontactState : contact (passageSwitch (p, x)) =
-        state (passageSwitch (p, x)) :=
-      hprefix.preserves _ hprefixForeign
-    have hreferenceGroove :
-        arrive reference x = (p, reference) :=
-      hreferenceGrooved (p, x) (by
-        rw [hsplit]
-        exact List.mem_append_right before List.mem_cons_self)
-    have hswitch : x / 3 = passageSwitch (p, x) := by
-      have hs := arrive_exit_switch reference x
-      rw [hreferenceGroove] at hs
-      exact hs.symm
-    have hstateReference : state (passageSwitch (p, x)) ≠
-        reference (passageSwitch (p, x)) := by
-      intro heq
-      have hcurrentGroove : arrive contact x = (p, contact) := by
-        apply groove_transfer hreferenceGroove
-        rw [hswitch, hcontactState]
-        exact heq
-      have hforward := groove_forward hcurrentGroove
-      rw [harrive] at hforward
-      exact hother (congrArg Prod.fst hforward)
-    have hstateBase : state (passageSwitch (p, x)) ≠ base (passageSwitch (p, x)) := by
-      have := hreferenceGuard (passageSwitch (p, x))
-      grind
-    exact Or.inl ⟨before, p, x, after, contact, other,
-      hsplit, hprefix, hguardContact, hstem, hstateBase,
-      hcontactState, harrive, hother⟩
-  · rcases hrest with hchanged | hcomplete
-    · exact Or.inr (Or.inl hchanged)
-    · obtain ⟨finalState, htrace, hrouteGrooved,
-          hguardFinal⟩ := hcomplete
-      exact Or.inr (Or.inr ⟨finalState, htrace,
-        A.support_grooves_of_orientedRoute state finalState
-          hrouteGrooved,
-        hguardFinal⟩)
+  rcases hreferenceTrace.repair_preserving_paths_until_conflict state hguardPaths with
+      ⟨before, p, x, after, contact, hsplit, hprefix, hguard, hconflict⟩ |
+      ⟨finalState, htrace, hguard⟩
+  · rcases hconflict with ⟨hstem, other, harrive, hother⟩ |
+        ⟨next, path, old, harrive, hp, ho, hs, hc⟩
+    · have hprefixForeign : ∀ passage ∈ before,
+          passageSwitch passage ≠ passageSwitch (p, x) := by
+        rw [hsplit] at hsimple
+        grind [SwitchSimple]
+      have hcontactState := hprefix.preserves _ hprefixForeign
+      have hgroove := groove_forward (hreferenceGrooved (p, x) (by rw [hsplit]; simp))
+      have hstateReference : state (p / 3) ≠ reference (p / 3) := by
+        intro heq
+        have hcurrent := groove_transfer hgroove (hcontactState.trans heq)
+        rw [harrive] at hcurrent
+        exact hother (congrArg Prod.fst hcurrent)
+      have hstateBase : state (p / 3) ≠ base (p / 3) := by
+        have := hreferenceGuard (p / 3)
+        grind
+      exact Or.inl ⟨before, p, x, after, contact, other,
+        hsplit, hprefix, hguard, hstem, hstateBase, hcontactState, harrive, hother⟩
+    · exact Or.inr (Or.inl ⟨before, p, x, after, contact, next, path, old,
+        hsplit, hprefix, hguard, harrive, hp, ho, hs, hc⟩)
+  · exact Or.inr (Or.inr ⟨finalState, htrace,
+      A.support_grooves_of_orientedRoute state finalState
+        (htrace.grooved_of_switchSimple hsimple), hguard⟩)
 
 theorem ManufacturedReflector.changed_exploration_passage_mem_support
     {w : Wiring} {g e : Nat}
@@ -508,11 +380,8 @@ def ManufacturedReflector.FacingForwardMerge
       before ++ (p, x) :: after ∧
     PhysicalTrace w (g, B.activatedState) before (p, contact) ∧
     PathGrooves B.toSupported.paths contact ∧
-    p % 3 = 0 ∧
-    B.activatedState (p / 3) ≠ B.baseState (p / 3) ∧
-    contact (p / 3) = B.activatedState (p / 3) ∧
     path ∈ B.toSupported.paths ∧ (fresh, p) ∈ path ∧
-    arrive contact p = (fresh, contact) ∧ fresh ≠ x ∧
+    arrive contact p = (fresh, contact) ∧
     (p, fresh) ∈ B.orientedRoute contact
 
 /-- A no-change forward merge can occur only in the reversed candy of a
@@ -535,88 +404,29 @@ theorem ManufacturedReflector.FacingForwardMerge.flip_candy
       (fresh, p) ∈ R.candy ∧
       contact R.actionSwitch = bval R.secondArm := by
   obtain ⟨before, p, x, after, contact, fresh, path,
-      hsplit, hprefix, hpaths, hp, _hchange, _hcontact,
-      hpath, hold, harrive, hne, hforward⟩ := hmerge
-  have hsameSwitch : p / 3 = fresh / 3 := by
-    have hs := arrive_exit_switch contact p
-    rw [harrive] at hs
-    exact hs.symm
-  have hpfresh : p ≠ fresh := by
-    have hneLocal := arrive_exit_ne contact p
-    rw [harrive] at hneLocal
-    exact hneLocal.symm
+      hsplit, hprefix, hpaths, hpath, hold, harrive, hforward⟩ := hmerge
+  have hnot : (fresh, p) ∉ B.orientedRoute contact := fun hr =>
+    (B.orientedRoute_simple contact).not_both_orientations hforward hr
+      (by simpa [harrive] using (arrive_exit_switch contact p).symm)
+      (by simpa [harrive] using (arrive_exit_ne contact p).symm)
   cases B with
   | stay R =>
       change path ∈ [R.runway, [(R.mouth, R.arm)]] at hpath
-      change PathGrooves [R.runway, [(R.mouth, R.arm)]] contact at hpaths
-      change (p, fresh) ∈
-        (ManufacturedReflector.stay R).orientedRoute contact at hforward
-      have holdRoute : (fresh, p) ∈
-          (ManufacturedReflector.stay R).orientedRoute contact := by
-        simp only [List.mem_cons, List.not_mem_nil, or_false] at hpath
-        rcases hpath with rfl | rfl
-        · simp [ManufacturedReflector.orientedRoute, hold]
-        · simp only [List.mem_singleton] at hold
-          simp [ManufacturedReflector.orientedRoute, hold]
-      exact (SwitchSimple.not_both_orientations
-        ((ManufacturedReflector.stay R).orientedRoute_simple contact)
-        hforward holdRoute hsameSwitch hpfresh).elim
+      exact (hnot (by change (fresh, p) ∈ R.runway ++ [(R.mouth, R.arm)]; grind)).elim
   | flip R =>
       change path ∈ [R.runway, R.candy] at hpath
-      change PathGrooves [R.runway, R.candy] contact at hpaths
-      change (p, fresh) ∈
-        (ManufacturedReflector.flip R).orientedRoute contact at hforward
-      simp only [List.mem_cons, List.not_mem_nil, or_false] at hpath
-      rcases hpath with hrunway | hcandy
-      · subst path
-        have holdRoute : (fresh, p) ∈
-            (ManufacturedReflector.flip R).orientedRoute contact := by
-          by_cases hselected :
-              contact R.actionSwitch = bval R.firstArm
-          · simp [ManufacturedReflector.orientedRoute,
-              hselected, hold]
-          · simp [ManufacturedReflector.orientedRoute,
-              hselected, hold]
-        exact (SwitchSimple.not_both_orientations
-          ((ManufacturedReflector.flip R).orientedRoute_simple contact)
-          hforward holdRoute hsameSwitch hpfresh).elim
-      · subst path
-        have hnotFirst :
-            contact R.actionSwitch ≠ bval R.firstArm := by
-          intro hselected
-          have holdRoute : (fresh, p) ∈
-              (ManufacturedReflector.flip R).orientedRoute contact := by
-            simp [ManufacturedReflector.orientedRoute,
-              hselected, hold]
-          exact SwitchSimple.not_both_orientations
-            ((ManufacturedReflector.flip R).orientedRoute_simple contact)
-            hforward holdRoute hsameSwitch hpfresh
-        have hsecond :
-            contact R.actionSwitch = bval R.secondArm := by
-          rcases R.selected_arm contact with hfirst | hsecond
-          · exact (hnotFirst hfirst).elim
-          · exact hsecond
-        exact ⟨R, before, p, x, after, contact, fresh,
-          rfl, hsplit, hprefix, hpaths, hold, hsecond⟩
-
-/-- The state-changing forward merge left by protected pair repair. -/
-def ManufacturedReflector.ChangedForwardMerge
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g) : Prop :=
-  ∃ approach p x suffix u v path old oriented,
-    A.orientedRoute B.activatedState =
-      approach ++ (p, x) :: suffix ∧
-    PhysicalTrace w (g, B.activatedState) approach (p, u) ∧
-    PathGrooves B.toSupported.paths u ∧
-    arrive u p = (x, v) ∧
-    path ∈ B.toSupported.paths ∧ old ∈ path ∧
-    passageSwitch old = p / 3 ∧
-    v (p / 3) ≠ u (p / 3) ∧
-    oriented ∈ B.orientedRoute u ∧
-    arrive u oriented.2 = (oriented.1, u) ∧
-    passageSwitch oriented = p / 3 ∧
-    x = oriented.2
+      have hrunway : (fresh, p) ∉ R.runway := by
+        intro hr
+        apply hnot
+        simp only [ManufacturedReflector.orientedRoute]
+        split <;> exact List.mem_append_left _ hr
+      have hcandy : (fresh, p) ∈ R.candy := by grind
+      have hsecond : contact R.actionSwitch = bval R.secondArm := by
+        rcases R.selected_arm contact with hfirst | hsecond
+        · exact (hnot (by simp [ManufacturedReflector.orientedRoute, hfirst, hcandy])).elim
+        · exact hsecond
+      exact ⟨R, before, p, x, after, contact, fresh,
+        rfl, hsplit, hprefix, hpaths, hcandy, hsecond⟩
 
 /-- The completed-reflector forward-splice construction only used the
 second reflector to supply a switch-simple route.  This is the same lemma
@@ -652,7 +462,6 @@ theorem partial_first_forward_contact_active_lead
       PhysicalTrace w (mouth, u) ((mouth, entry) :: candy)
         (returnPort, u) ∧
       arrive u returnPort = (mouth, flipAt u (mouth / 3)) ∧
-      PathGrooves A.toSupported.paths u ∧
       PassagesGrooved u candy ∧
       (∀ passage ∈ candy, passageSwitch passage ≠ mouth / 3) ∧
       IsReflector w mouth outside (candy.length + 2)
@@ -713,7 +522,7 @@ theorem partial_first_forward_contact_active_lead
   have hcrossed : arrive u p = (s, flipAt u (s / 3)) := by rw [harrive, hflip]
   refine ⟨a, s, p, outside, oldPrefix, oldTail, candy, horiented, hrouteSplit,
     hOldRest, hforward, hApproachGrooved, hApproachForeign, haBranch, hsa.symm,
-    hmouth, hap, hSpliceGrooved, hsplice, hcrossed, hpaths, hCandyGrooved,
+    hmouth, hap, hSpliceGrooved, hsplice, hcrossed, hCandyGrooved,
     hCandyForeign, ?_, ?_⟩
   · exact stem_lobe_isReflector_foreign w candy hsStem haBranch hpBranch hsa hsp hap
       hCandyForeign hsplice.linked hsplice.last_link hmouth

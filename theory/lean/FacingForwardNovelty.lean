@@ -29,15 +29,12 @@ theorem ManufacturedFlipReflector.reverse_candy_suffix_absorbs_twoPhases
     {before after : List Passage} {fresh p : Nat}
     (hoccurs : R.candy = before ++ (fresh, p) :: after) :
     let alternate := flipAt contact R.actionSwitch
-    ∃ travel, 0 < travel ∧ travel ≤ R.toSupported.travel ∧
-      stepN w travel (p, contact) = some (g, alternate) ∧
-      stepN w travel (p, alternate) = some (g, alternate) ∧
-      (∀ d, d ≤ travel → ∃ port phase,
-        stepN w d (p, contact) = some (port, phase) ∧
-          (phase = contact ∨ phase = alternate)) ∧
-      (∀ d, d ≤ travel → ∃ port phase,
-        stepN w d (p, alternate) = some (port, phase) ∧
-          (phase = contact ∨ phase = alternate)) := by
+    ∃ travel, 0 < travel ∧
+      ∀ current, (current = contact ∨ current = alternate) →
+        stepN w travel (p, current) = some (g, alternate) ∧
+        ∀ d, d ≤ travel → ∃ port phase,
+          stepN w d (p, current) = some (port, phase) ∧
+            (phase = contact ∨ phase = alternate) := by
   let alternate := flipAt contact R.actionSwitch
   have hopp := branch_values_opposite R.firstArm_branch R.secondArm_branch
     (R.firstArm_switch.trans R.secondArm_switch.symm) R.arms_ne
@@ -72,42 +69,30 @@ theorem ManufacturedFlipReflector.reverse_candy_suffix_absorbs_twoPhases
       grind
     simpa [candyTail, reversePassages] using reversePassages_grooved hprefix
   let travel := candyTail.length + (R.runway.length + 1)
-  have hjourney : ∀ current, (current = contact ∨ current = alternate) →
-      stepN w travel (p, current) = some (g, alternate) ∧
-      ∀ d, d ≤ travel → ∃ port phase,
-        stepN w d (p, current) = some (port, phase) ∧
-          (phase = contact ∨ phase = alternate) := by
-    intro current hc
-    have hg := hgrooved current hc
-    have ht : PhysicalTrace w (p, current) candyTail (R.firstArm, current) := by
-      simpa only [hstart] using htail.replay_grooved current hg
-    have ha : arrive current R.firstArm = (R.mouth, alternate) := by
-      rcases hc with rfl | rfl
-      · exact hfirstContact
-      · exact hfirstAlternate
-    have hrunway := (pathGrooves_pair.mp hpathsAlternate).1
-    have hb := physicalTrace_contact_retraces_prefix R.runwayTrace hrunway R.entryEdge ha
-    constructor
-    · simpa [travel, reversePassages_length] using (ht.append hb).sound
-    · apply stepN_cover_append ht.sound
-      · intro d hd
-        obtain ⟨port, hr⟩ := ht.grooved_prefix_tongues current hg hd
-        exact ⟨port, current, hr, hc⟩
-      · intro d hd
-        obtain ⟨port, hr⟩ := (physicalTrace_contact_retraces_prefix_pointwise
-          R.runwayTrace hrunway R.entryEdge ha) d hd
-        refine ⟨port, _, hr, ?_⟩
-        split
-        · exact hc
-        · exact Or.inr rfl
-  have hc := hjourney contact (Or.inl rfl)
-  have ha := hjourney alternate (Or.inr rfl)
-  refine ⟨travel, by simp [travel]; omega, ?_, hc.1, ha.1, hc.2, ha.2⟩
-  change travel ≤ 2 * R.runway.length + R.candy.length + 2
-  have hlen := congrArg List.length hoccurs
-  simp only [List.length_append, List.length_cons] at hlen
-  simp only [travel, candyTail, List.length_cons, reversePassages_length]
-  omega
+  refine ⟨travel, by simp [travel]; omega, ?_⟩
+  intro current hc
+  have hg := hgrooved current hc
+  have ht : PhysicalTrace w (p, current) candyTail (R.firstArm, current) := by
+    simpa only [hstart] using htail.replay_grooved current hg
+  have ha : arrive current R.firstArm = (R.mouth, alternate) := by
+    rcases hc with rfl | rfl
+    · exact hfirstContact
+    · exact hfirstAlternate
+  have hrunway := (pathGrooves_pair.mp hpathsAlternate).1
+  have hb := physicalTrace_contact_retraces_prefix R.runwayTrace hrunway R.entryEdge ha
+  constructor
+  · simpa [travel, reversePassages_length] using (ht.append hb).sound
+  · apply stepN_cover_append ht.sound
+    · intro d hd
+      obtain ⟨port, hr⟩ := ht.grooved_prefix_tongues current hg hd
+      exact ⟨port, current, hr, hc⟩
+    · intro d hd
+      obtain ⟨port, hr⟩ := (physicalTrace_contact_retraces_prefix_pointwise
+        R.runwayTrace hrunway R.entryEdge ha) d hd
+      refine ⟨port, _, hr, ?_⟩
+      split
+      · exact hc
+      · exact Or.inr rfl
 
 
 end GeneralN

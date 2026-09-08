@@ -170,63 +170,6 @@ private theorem ManufacturedReflector.return_change_facing_one_novelty
         hall times
 
 
-/-- A backward state-changing protected contact costs one fresh vector over
-the activated/pre-return history; otherwise the exact forward merge is
-retained. -/
-private theorem ManufacturedReflector.protected_changed_contact_one_or_forward
-    {w : Wiring} {N g e p x : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hA : PathGrooves A.toSupported.paths B.baseState)
-    (hBstart : PathGrooves B.toSupported.paths B.activatedState)
-    {u v : Tongues} {approach suffix : List Passage}
-    {path : List Passage} {old : Passage}
-    (hrouteSplit : A.orientedRoute B.activatedState =
-      approach ++ (p, x) :: suffix)
-    (happroach : PhysicalTrace w (g, B.activatedState) approach (p, u))
-    (hpaths : PathGrooves B.toSupported.paths u)
-    (harrive : arrive u p = (x, v))
-    (hpath : path ∈ B.toSupported.paths)
-    (hold : old ∈ path)
-    (hswitch : passageSwitch old = p / 3)
-    (hchanged : v (p / 3) ≠ u (p / 3))
-    (history : List (List Bool))
-    (hinitialHistorical : VectorCount.restrict N B.activatedState ∈ history)
-    (hpreHistorical : VectorCount.restrict N B.preReturn.2 ∈ history) :
-    (∀ times : List Nat,
-      (∀ k ∈ times,
-        (stepN w k (g, B.activatedState)).isSome) →
-      (times.map (restrictedTonguesAt w N
-        (g, B.activatedState))).Nodup →
-      NoveltyCoverOn w N (g, B.activatedState) times history 1) ∨
-      ∃ oriented, oriented ∈ B.orientedRoute u ∧
-        arrive u oriented.2 = (oriented.1, u) ∧
-        passageSwitch oriented = p / 3 ∧ x = oriented.2 := by
-  obtain ⟨oriented, horiented, horientedGroove,
-      horientedSwitch, hdirection⟩ :=
-    B.changed_contact_on_orientedRoute u v hpaths
-      hpath hold hswitch harrive
-  rcases hdirection with hbackward | hforward
-  · have hrouteSimple := A.orientedRoute_simple B.activatedState
-    rw [hrouteSplit] at hrouteSimple
-    obtain ⟨happroachSimple, happroachRoute⟩ :=
-      A.orientedRoute_prefix_simple_and_mem _ hrouteSplit
-    have hphase := A.repair_prefix_two_phase B hA hBstart
-      happroach happroachSimple happroachRoute hpaths
-    have hrelation := A.repair_prefix_contact_eq_activated_or_preReturn
-      B hA hBstart happroach happroachSimple happroachRoute hpaths
-    have huHistorical : VectorCount.restrict N u ∈ history := by
-      rcases hrelation with rfl | rfl
-      · exact hinitialHistorical
-      · exact hpreHistorical
-    have hall := B.backward_contact_two_phase hpaths horiented happroach
-      (by grind [SwitchSimple, passageSwitch]) (by simpa [hbackward] using harrive)
-    left
-    intro times _ _
-    exact two_phase_prefix_then_two_phase_tail_one_novelty
-      happroach.sound hphase rfl history hinitialHistorical huHistorical hall times
-  · exact Or.inr ⟨oriented, horiented, horientedGroove, horientedSwitch, hforward⟩
-
 /-- A backward no-change protected contact costs one fresh vector over the
 activated/pre-return history; otherwise the exact facing-forward merge is
 retained. -/
@@ -281,15 +224,68 @@ private theorem ManufacturedReflector.protected_facing_contact_one_or_forward
   · right
     simpa [hreverse] using horiented
 
+/-- Trailing passages of any selected route are reusable grooves; the
+private mouth passage is facing and therefore cannot occur here. -/
+private theorem ManufacturedReflector.trailing_orientedRoute_grooved
+    {w : Wiring} {g e p x : Nat}
+    (A : ManufacturedReflector w g e) (selector state : Tongues)
+    (hpaths : PathGrooves A.toSupported.paths state)
+    (hmem : (p, x) ∈ A.orientedRoute selector) (hpBranch : p % 3 ≠ 0) :
+    arrive state p = (x, state) := by
+  cases A with
+  | stay R =>
+      apply groove_forward
+      change PathGrooves [R.runway, [(R.mouth, R.arm)]] state at hpaths
+      change (p, x) ∈ R.runway ++ [(R.mouth, R.arm)] at hmem
+      rcases List.mem_append.mp hmem with hm | hm
+      · exact hpaths R.runway (by simp) (p, x) hm
+      · exact hpaths [(R.mouth, R.arm)] (by simp) (p, x) hm
+  | flip R =>
+      by_cases hr : (p, x) ∈ R.runway
+      · exact groove_forward (hpaths R.runway (by simp [ManufacturedReflector.toSupported,
+          ManufacturedFlipReflector.toSupported]) (p, x) hr)
+      · obtain ⟨old, ho, heq⟩ :=
+          R.nonrunway_oriented_branch_entry_is_candy selector hmem hr hpBranch
+        have hg := hpaths R.candy (by simp [ManufacturedReflector.toSupported,
+          ManufacturedFlipReflector.toSupported]) old ho
+        rcases heq with heq | heq <;> cases heq
+        · exact groove_forward hg
+        · exact hg
+
+/-- A repair cannot change guarded support when both reflector supports are
+still grooved at the protected pre-return state. -/
+theorem ManufacturedReflector.changed_protected_contact_impossible
+    {w : Wiring} {g e p x : Nat} {u v : Tongues} {path : List Passage} {old : Passage}
+    (A : ManufacturedReflector w g e) (B : ManufacturedReflector w e g)
+    (hBstart : PathGrooves B.toSupported.paths B.activatedState)
+    (hpre : PathGrooves A.toSupported.paths B.preReturn.2)
+    (hmem : (p, x) ∈ A.orientedRoute B.activatedState)
+    (hBu : PathGrooves B.toSupported.paths u)
+    (harrive : arrive u p = (x, v))
+    (hpath : path ∈ B.toSupported.paths) (hold : old ∈ path)
+    (hswitch : passageSwitch old = p / 3) (hchanged : v (p / 3) ≠ u (p / 3)) : False := by
+  have hprePassage := A.trailing_orientedRoute_grooved B.activatedState B.preReturn.2
+    hpre hmem (changed_arrival_is_trailing harrive hchanged).1
+  have hBpre : PathGrooves B.toSupported.paths B.preReturn.2 := by
+    rw [B.preReturn_eq_action_activated]
+    exact hBstart.after_avoiding_action B.action_avoids_own_support
+  have hupre := pathGrooves_agree_at_support_passage hBu hBpre hpath hold
+  rw [hswitch] at hupre
+  have hback := arrive_back u p
+  rw [harrive] at hback
+  exact hchanged ((grooved_states_agree_on_passage
+    (groove_forward hback) hprePassage).trans hupre.symm)
+
 /-- Protected-repair classification with every early exit already charged
 by one vector over a history containing the activated and pre-return states.
-Public: the productive-boundary closure consumes it from a separate file. -/
+The pre-return grooves exclude state-changing support contacts outright. -/
 theorem manufactured_pair_protected_repair_novelty_outcomes
     {w : Wiring} {N g e : Nat}
     (A : ManufacturedReflector w g e)
     (B : ManufacturedReflector w e g)
     (hA : PathGrooves A.toSupported.paths B.baseState)
     (hB : PathGrooves B.toSupported.paths B.activatedState)
+    (hpre : PathGrooves A.toSupported.paths B.preReturn.2)
     (history : List (List Bool))
     (hinitialHistorical : VectorCount.restrict N B.activatedState ∈ history)
     (hpreHistorical : VectorCount.restrict N B.preReturn.2 ∈ history) :
@@ -300,7 +296,6 @@ theorem manufactured_pair_protected_repair_novelty_outcomes
         (g, B.activatedState))).Nodup →
       NoveltyCoverOn w N (g, B.activatedState) times history 1) ∨
       A.FacingForwardMerge B ∨
-      A.ChangedForwardMerge B ∨
       ∃ finalState,
         PhysicalTrace w (g, B.activatedState)
           (A.orientedRoute B.activatedState)
@@ -328,26 +323,15 @@ theorem manufactured_pair_protected_repair_novelty_outcomes
           hinitialHistorical hpreHistorical with hcount | hforward
       · exact Or.inl hcount
       · exact Or.inr (Or.inl ⟨before, p, x, after,
-          contact, fresh, path, hsplit, hprefix, hBcontact, hp,
-          hchange, by simpa [passageSwitch] using hcontact,
-          hpath, hold, harriveFresh,
-          by simpa [hotherFresh] using hother,
-          hforward⟩)
+          contact, fresh, path, hsplit, hprefix, hBcontact,
+          hpath, hold, harriveFresh, hforward⟩)
   · rcases hrest with hchanged | hcomplete
     · obtain ⟨approach, p, x, suffix, u, v, path, old,
           hsplit, hprefix, hBu, harrive,
           hpath, hold, hswitch, hchange⟩ := hchanged
-      rcases A.protected_changed_contact_one_or_forward B hA hB
-          hsplit hprefix hBu harrive hpath hold hswitch hchange
-          history hinitialHistorical hpreHistorical with hcount | hforward
-      · exact Or.inl hcount
-      · obtain ⟨oriented, horiented, horientedGroove, horientedSwitch, hforwardExit⟩ := hforward
-        exact Or.inr (Or.inr (Or.inl
-          ⟨approach, p, x, suffix, u, v, path, old,
-            oriented, hsplit, hprefix, hBu, harrive,
-            hpath, hold, hswitch, hchange, horiented,
-            horientedGroove, horientedSwitch, hforwardExit⟩))
-    · exact Or.inr (Or.inr (Or.inr hcomplete))
+      exact (A.changed_protected_contact_impossible B hB hpre
+        (by rw [hsplit]; simp) hBu harrive hpath hold hswitch hchange).elim
+    · exact Or.inr (Or.inr hcomplete)
 
 /-- A facing-forward merge has at most one fresh vector over the activated
 and pre-return history.  Its eventual two-phase tail consists exactly of
@@ -410,8 +394,7 @@ theorem ManufacturedReflector.FacingForwardMerge.one_novelty_of_preReturn
     intro samples hsLive hsNodup
     exact hmerge.distinct_le_three hA hBstart samples hsLive hsNodup
   rcases hrelation with hcontactInitial | hcontactPre
-  · obtain ⟨tailTravel, _htailPositive, _htailLe, htailContact,
-        _htailAlternate, _htailContactPhase, _htailAlternatePhase⟩ :=
+  · obtain ⟨tailTravel, _htailPositive, hjourney⟩ :=
       R.reverse_candy_suffix_absorbs_twoPhases contact hpaths hsecond
         hcandySplit
     let loopSteps := before.length + tailTravel
@@ -420,7 +403,7 @@ theorem ManufacturedReflector.FacingForwardMerge.one_novelty_of_preReturn
           some (g, flipAt contact R.actionSwitch) := by
       dsimp [loopSteps]
       rw [stepN_add, hprefix.sound]
-      exact htailContact
+      exact (hjourney contact (Or.inl rfl)).1
     have hAlternatePre : flipAt contact R.actionSwitch =
         (ManufacturedReflector.flip R).preReturn.2 := by
       rw [hcontactInitial]
@@ -436,89 +419,6 @@ theorem ManufacturedReflector.FacingForwardMerge.one_novelty_of_preReturn
         (by simpa [hcontactPre] using hinitPreNe)
         hthree times hlive
 
-private theorem ManufacturedReflector.trailing_orientedRoute_grooved
-    {w : Wiring} {g e p x : Nat}
-    (A : ManufacturedReflector w g e)
-    (selector state : Tongues)
-    (hpaths : PathGrooves A.toSupported.paths state)
-    (hmem : (p, x) ∈ A.orientedRoute selector)
-    (hpBranch : p % 3 ≠ 0) :
-    arrive state p = (x, state) := by
-  cases A with
-  | stay R =>
-      change PathGrooves [R.runway, [(R.mouth, R.arm)]] state at hpaths
-      change (p, x) ∈ R.runway ++ [(R.mouth, R.arm)] at hmem
-      rcases List.mem_append.mp hmem with hrunway | hcore
-      · exact groove_forward
-          (hpaths R.runway (by simp) (p, x) hrunway)
-      · simp only [List.mem_singleton] at hcore
-        rcases Prod.mk.inj hcore with ⟨rfl, rfl⟩
-        exact groove_forward
-          (hpaths [(R.mouth, R.arm)] (by simp)
-            (R.mouth, R.arm) (by simp))
-  | flip R =>
-      change PathGrooves [R.runway, R.candy] state at hpaths
-      by_cases hselected : selector R.actionSwitch = bval R.firstArm
-      · simp only [ManufacturedReflector.orientedRoute, hselected,
-          if_pos] at hmem
-        rcases List.mem_append.mp hmem with hrunway | hrest
-        · exact groove_forward
-            (hpaths R.runway (by simp) (p, x) hrunway)
-        · rcases List.mem_cons.mp hrest with hmouth | hcandy
-          · have hpMouth : p = R.mouth := congrArg Prod.fst hmouth
-            exact (hpBranch (by rw [hpMouth]; exact R.mouth_is_stem)).elim
-          · exact groove_forward
-              (hpaths R.candy (by simp) (p, x) hcandy)
-      · simp only [ManufacturedReflector.orientedRoute, hselected,
-          if_false] at hmem
-        rcases List.mem_append.mp hmem with hrunway | hrest
-        · exact groove_forward
-            (hpaths R.runway (by simp) (p, x) hrunway)
-        · rcases List.mem_cons.mp hrest with hmouth | hcandy
-          · have hpMouth : p = R.mouth := congrArg Prod.fst hmouth
-            exact (hpBranch (by rw [hpMouth]; exact R.mouth_is_stem)).elim
-          · have hreverse : PassagesGrooved state
-                (reversePassages R.candy) :=
-              reversePassages_grooved (hpaths R.candy (by simp))
-            exact groove_forward (hreverse (p, x) hcandy)
-
-/-- Under the fully protected pre-return hypothesis a changed forward merge
-is impossible.  The changed route passage is a reusable passage of `A`, so
-`hpre` grooves it in `B.preReturn`.  The same switch is also represented in
-`B`'s support.  That support is grooved both at the contact state and at
-`B.preReturn`, forcing the two tongue values to agree, while the changed
-trailing arrival forces them to be opposite. -/
-theorem ManufacturedReflector.ChangedForwardMerge.impossible_of_preReturn_grooved
-    {w : Wiring} {g e : Nat}
-    {A : ManufacturedReflector w g e}
-    {B : ManufacturedReflector w e g}
-    (hBstart : PathGrooves B.toSupported.paths B.activatedState)
-    (hpre : PathGrooves A.toSupported.paths B.preReturn.2)
-    (hmerge : A.ChangedForwardMerge B) : False := by
-  obtain ⟨approach, p, x, suffix, u, v, path, old,
-      oriented, hsplit, _hprefix, hBu, harrive, hpath, hold, hswitch, hchanged,
-      _horiented, _horientedGroove, _horientedSwitch, _hforward⟩ := hmerge
-  have hmem : (p, x) ∈ A.orientedRoute B.activatedState := by
-    rw [hsplit]
-    exact List.mem_append_right approach List.mem_cons_self
-  obtain ⟨hpBranch, _hxStem, hvPin⟩ :=
-    changed_arrival_is_trailing harrive hchanged
-  have hprePassage : arrive B.preReturn.2 p =
-      (x, B.preReturn.2) :=
-    A.trailing_orientedRoute_grooved B.activatedState
-      B.preReturn.2 hpre hmem hpBranch
-  have hBpre : PathGrooves B.toSupported.paths B.preReturn.2 := by
-    rw [B.preReturn_eq_action_activated]
-    exact hBstart.after_avoiding_action B.action_avoids_own_support
-  have hupre := pathGrooves_agree_at_support_passage
-    hBu hBpre hpath hold
-  have hupre' : u (p / 3) = B.preReturn.2 (p / 3) := by
-    rw [hswitch] at hupre
-    exact hupre
-  have hback := arrive_back u p
-  rw [harrive] at hback
-  exact hchanged ((grooved_states_agree_on_passage
-    (groove_forward hback) hprePassage).trans hupre'.symm)
 
 section
 variable {w : Wiring} {N g e : Nat}
@@ -754,15 +654,14 @@ theorem ManufacturedReflector.protected_repair_two_novelty_over_history
   have hpreHistorical : VectorCount.restrict N B.preReturn.2 ∈ history :=
     hhistory _ (Or.inr B.preReturn_mem_sharpHistory)
   rcases manufactured_pair_protected_repair_novelty_outcomes
-      A B hA hB history hinitialHistorical hpreHistorical with
-    hone | hfacing | hchanged | hcomplete
+      A B hA hB hpre history hinitialHistorical hpreHistorical with
+    hone | hfacing | hcomplete
   · obtain ⟨fresh, hfresh, hmem⟩ := hone times hlive hnd
     exact ⟨fresh, by omega, hmem⟩
   · obtain ⟨fresh, hfresh, hmem⟩ :=
       hfacing.one_novelty_of_preReturn hN hA hB history
         hinitialHistorical hpreHistorical times hlive
     exact ⟨fresh, by omega, hmem⟩
-  · exact (hchanged.impossible_of_preReturn_grooved hB hpre).elim
   · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
     exact ⟨[VectorCount.restrict N (A.toSupported.action.apply finalState),
       VectorCount.restrict N (B.toSupported.action.apply
@@ -801,13 +700,12 @@ theorem ManufacturedFlipReflector.protected_repair_one_novelty_over_history_of_a
   have hpreHistorical : VectorCount.restrict N B.preReturn.2 ∈ history :=
     hhistory _ (Or.inr B.preReturn_mem_sharpHistory)
   rcases manufactured_pair_protected_repair_novelty_outcomes
-      (ManufacturedReflector.flip R) B hA hB history
+      (ManufacturedReflector.flip R) B hA hB hpre history
         hinitialHistorical hpreHistorical with
-    hone | hfacing | hchanged | hcomplete
+    hone | hfacing | hcomplete
   · exact hone times hlive hnd
   · exact hfacing.one_novelty_of_preReturn
       hN hA hB history hinitialHistorical hpreHistorical times hlive
-  · exact (hchanged.impossible_of_preReturn_grooved hB hpre).elim
   · obtain ⟨finalState, hrepair, hAfinal, hBfinal⟩ := hcomplete
     have hlast := R.no_productive_after_action_writer
       B.exploration_trace B.exploration_simple hA hpre ht hwriter

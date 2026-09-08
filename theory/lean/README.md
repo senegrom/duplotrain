@@ -446,6 +446,7 @@ comments and blanks, not just proof tactics.
 | After shared contact retraces, last-write recovery, and canonical action corners | 45 | 11,242 |
 | After unified coordinate counting and direct duplicate-sample omission | 44 | 10,849 |
 | After direct first-writer induction and unified first-revisit probes | 43 | 10,447 |
+| After unified repair traversal and early protected-contact exclusion | 43 | 10,155 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -587,6 +588,20 @@ Direct induction removes the repeated-writer novelty definitions and their
 coverage machinery. Both probes now use one first-revisit result with only
 the required witnesses. Settled-tail counting and successor-step decomposition
 are shared, and `FirstCycleCountSharp.lean` is no longer needed.
+
+All seven protected files remain byte-for-byte unchanged. A clean build checks
+all **89 jobs** without warnings, the exact axiom audit passes, and all **343**
+public source theorems remain in the headline proof's kernel dependency closure.
+
+The unified-repair pass removes **292 Lean source lines**, from **10,466 to
+10,174**, a **2.8%** reduction across 44 files. Counts include all helper
+proofs, comments, blank lines, and the unchanged audit.
+
+One general traversal retains the common repair prefix and supplies the
+first-damage theorem. Pre-return grooves rule out state-changing protected
+contacts before orientation classification, deleting that entire branch and
+its witness type. Forward merges share one orientation contradiction, and the
+candy-return theorem handles either starting phase in one statement.
 
 All seven protected files remain byte-for-byte unchanged. A clean build checks
 all **89 jobs** without warnings, the exact axiom audit passes, and all **343**

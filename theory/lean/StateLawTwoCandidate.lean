@@ -93,8 +93,7 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
   obtain ⟨candyBefore, candyAfter, hcandySplit⟩ :=
     List.append_of_mem hcandyMem
   let alternate := flipAt contact R.actionSwitch
-  obtain ⟨tailTravel, htailPositive, _htailLe, htailContact,
-      htailAlternate, htailContactPhase, htailAlternatePhase⟩ :=
+  obtain ⟨tailTravel, htailPositive, hjourney⟩ :=
     R.reverse_candy_suffix_absorbs_twoPhases contact hpaths hsecond
       hcandySplit
   obtain ⟨hbeforeSimple, hbeforeRoute⟩ := A.orientedRoute_prefix_simple_and_mem
@@ -112,13 +111,8 @@ theorem ManufacturedReflector.FacingForwardMerge.distinct_le_three
     apply R.grooved_return_two_phase contact hpaths hprefixContact hbeforeGrooved
       ?_ (Or.inr rfl) (Or.inl rfl)
     intro current hs
-    refine ⟨tailTravel, alternate, htailPositive, ?_, Or.inr rfl, ?_⟩
-    · rcases hs with rfl | rfl
-      · exact htailContact
-      · exact htailAlternate
-    · rcases hs with rfl | rfl
-      · exact htailContactPhase
-      · exact htailAlternatePhase
+    exact ⟨tailTravel, alternate, htailPositive,
+      (hjourney current hs).1, Or.inr rfl, (hjourney current hs).2⟩
   have htail : ∀ tailTimes : List Nat,
       (∀ k ∈ tailTimes, (stepN w k (p, contact)).isSome) →
       (tailTimes.map
@@ -154,4 +148,3 @@ witnesses: the protected approach has two phases, while the retrace/replay
 tail has two phases and shares the contact boundary.  Hence each early branch
 has at most three vectors.
 -/
-

@@ -144,7 +144,7 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_corner_cover
       hApproachReplay, hApproachGrooved,
       hApproachForeign, hentryBranch, hentrySwitch,
       hmouthLink, harms, hfullGrooved, hfullTrace, hcrossed,
-      hRpaths, _hCandy, hCandyForeignNew, hLobe, hreach⟩ :=
+      _hCandy, hCandyForeignNew, hLobe, hreach⟩ :=
     partial_first_forward_contact_active_lead
       (A := ManufacturedReflector.flip R) C.split C.full_simple
       C.approach_trace C.old_grooves C.arrive_eq C.changed
@@ -166,7 +166,7 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_corner_cover
   by_cases hrunway : (entry, mouth) ∈ R.runway
   · obtain ⟨before, after, hrunwaySplit⟩ := List.append_of_mem hrunway
     obtain ⟨D, hDAction, hEntryOldNe, hDpaths, hNewAvoidsDRaw⟩ :=
-      R.suffix_after_runway_passage C.contactState hRpaths hrunwaySplit hmouthLink
+      R.suffix_after_runway_passage C.contactState C.old_grooves hrunwaySplit hmouthLink
     have hNewAvoidsD :
         (LocalAction.flip (mouth / 3)).Avoids D.toSupported.paths := by
       simpa [hentrySwitch] using hNewAvoidsDRaw
@@ -186,7 +186,7 @@ theorem PartialSecondRunSharp.ChangedContact.forward_flip_corner_cover
       (fun d => by
         simpa only [List.mem_cons, List.mem_singleton, List.not_mem_nil, or_false] using
           manufactured_flip_candy_splice_all_two_phases
-            R C.contactState hRpaths hrouteSplit hOldTail hrunway hentryBranch
+            R C.contactState C.old_grooves hrouteSplit hOldTail hrunway hentryBranch
             hold horientation (hfullGrooved (mouth, entry) List.mem_cons_self)
             hApproachReplay hApproachGrooved hApproachForeign hcrossed hmouthLink harms d)
       (by simp [hentryHistorical]) hleadHistorical
