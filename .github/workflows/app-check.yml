@@ -1,10 +1,17 @@
 name: Application checks
 on:
+  # Python proof helpers remain application inputs: tests import theory/*.py.
   push:
     branches: [main]
-    paths-ignore: ['theory/lean/**']
+    paths-ignore:
+      - 'theory/lean/**'
+      - 'theory/paper/**'
+      - 'theory/*.md'
   pull_request:
-    paths-ignore: ['theory/lean/**']
+    paths-ignore:
+      - 'theory/lean/**'
+      - 'theory/paper/**'
+      - 'theory/*.md'
   workflow_dispatch:
 permissions:
   contents: read
