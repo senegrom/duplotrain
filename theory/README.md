@@ -29,13 +29,16 @@ A single boundary invariant covers every manufactured pair: both supports
 are grooved at a reference corner, and the current state differs by at most
 the previous action. The arbitrary-lobe case selects its current orientation
 and closes one outer-boundary invariant, with no separate reverse excursion.
-All three pair arguments share the algebraic corner-closure proof. Capture is a suffix of
-ordinary traversal. Shortened reflectors reuse their original construction
-witnesses rather than rebuilding them in the later tongue state.
+The manufactured-pair and arbitrary-flip-lobe arguments share the algebraic
+corner-closure proof. A stay splice repeats a two-phase excursion directly;
+its self-linked case has a zero-length prefix. Capture uses the live
+configuration and phase returned by ordinary traversal. Shortened reflectors
+reuse their original construction witnesses rather than rebuilding them in
+the later tongue state.
 
-The retained development has 31 Lean files and 6,790 source lines,
+The retained development has 31 Lean files and 6,649 source lines,
 including its 19-line axiom audit; the headline import closure has 30
-modules and 6,771 lines. Source lines include comments and blank lines.
+modules and 6,630 lines. Source lines include comments and blank lines.
 The theorem statement, model, finite-state ceiling, attainment constructions,
 and exact axiom audit are unchanged. Git history retains superseded proofs.
 
@@ -49,9 +52,10 @@ the shared-history budgets, and the trace-reuse arguments. Build with
 `tests/test_switch_ceiling.py`.
 
 Spatial loops use a one-bit invariant instead of contact/avoidance period
-cases. The general two-phase reflector contract now also handles arbitrary
-grooved lobes and stay-reflector splices. Their four-corner (or collapsed
-two-corner) orbit is preserved by positive excursions, which provide both
+cases. Arbitrary grooved lobes have the same incoming/outgoing-phase
+traversal law. Stay
+splices repeat a phase-preserving prefix followed by that lobe, while flip
+splices retain their four-corner invariant. Positive excursions provide both
 liveness and pointwise phase bounds without calculating periods. One shared
 first-contact theorem handles both arbitrary routes with repeated switches
 and the switch-simple manufactured routes. The paper and Lean guide describe

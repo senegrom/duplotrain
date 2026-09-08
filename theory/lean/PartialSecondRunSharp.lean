@@ -149,56 +149,58 @@ theorem ChangedContact.forward_stay_two_phase_tail
       C.split C.full_simple C.approach_trace C.old_grooves
       C.arrive_eq C.changed C.oriented_mem C.oriented_groove
       hforward
-  let L : SupportedReflector w mouth outside := {
-    travel := candy.length + 2
-    paths := [candy]
-    action := .flip (mouth / 3)
-    run := by simpa [IsReflector, PathGrooves, LocalAction.apply] using hLobe
-  }
-  let alternate := flipAt C.contactState (mouth / 3)
-  have hLalt : PathGrooves L.paths alternate := by
-    simpa [L, PathGrooves, alternate] using grooved_after_flip_other hCandy hCandyForeign
-  have htwo : ∀ u, PathGrooves L.paths u → ∀ t, t ≤ L.travel →
-      ∃ port phase, stepN w t (mouth, u) = some (port, phase) ∧
-        (phase = u ∨ phase = L.action.apply u) := by
-    intro u hu t ht
-    exact explicit_lobe_two_phase_at hentryBranch hentryMouthSwitch hfullGrooved
-      hfullTrace hcrossed hCandyForeign hmouthLink u (hu candy (by simp [L])) ht
-  refine ⟨outside, mouth, hreach, ?_⟩
-  change (entry, mouth) ∈ R.runway ++ [(R.mouth, R.arm)] at hentryOld
-  rcases List.mem_append.mp hentryOld with hrunway | hcore
-  · obtain ⟨before, after, hsplit⟩ := List.append_of_mem hrunway
-    obtain ⟨D, hDpaths, hAvoid⟩ :=
-      R.suffix_after_runway_passage C.contactState C.old_grooves hsplit hmouthLink
-    have hAvoid' : L.action.Avoids D.toSupported.paths := by
-      simpa only [hentryMouthSwitch] using hAvoid
-    have hDalt := hDpaths.after_avoiding_action hAvoid'
-    intro d
-    have hcover := D.toSupported.pair_all_time_four_phase L
-      (ManufacturedReflector.stay D).travel_pos (by dsimp [L]; omega)
-      (fun u hu _ ht => (ManufacturedReflector.stay D).travel_two_phase_stepN u hu ht)
-      htwo alternate hDalt hLalt (by trivial) hAvoid' d
-    simpa [L, ManufacturedStayReflector.toSupported, LocalAction.apply,
-      alternate, flipAt_flipAt] using hcover
-  · have hmouthEq : mouth = R.arm := congrArg Prod.snd (List.mem_singleton.mp hcore)
-    have houtsideEq : outside = mouth := by
-      rw [hmouthEq, R.selfLink] at hmouthLink
-      exact (Option.some.inj hmouthLink).symm.trans hmouthEq.symm
-    subst outside
-    have hAvoid : L.action.Avoids L.paths := by
-      intro path hp passage hm
-      have heq : path = candy := by simpa [L] using hp
-      subst path
-      exact hCandyForeign passage hm
-    intro d
-    have hcover := L.pair_all_time_four_phase L
-      (by dsimp [L]; omega) (by dsimp [L]; omega)
-      htwo htwo alternate hLalt hLalt hAvoid hAvoid d
-    obtain ⟨port, phase, hr, hs⟩ := hcover
-    refine ⟨port, phase, hr, ?_⟩
-    simp only [L, LocalAction.apply, alternate, flipAt_flipAt,
-      List.mem_cons, List.not_mem_nil, or_false] at hs
-    grind
+  let safe := fun u => u = flipAt C.contactState (mouth / 3) ∨ u = C.contactState
+  have hflip u (hu : safe u) : safe (flipAt u (mouth / 3)) := by
+    rcases hu with rfl | rfl <;> simp [safe, flipAt_flipAt]
+  have hgrooved u (hu : safe u) : PassagesGrooved u candy := by
+    rcases hu with rfl | rfl
+    · exact grooved_after_flip_other hCandy hCandyForeign
+    · exact hCandy
+  have hprefix : ∃ travel, ∀ u, safe u →
+      stepN w travel (outside, u) = some (mouth, u) ∧
+      ∀ t, t ≤ travel → ∃ port, stepN w t (outside, u) = some (port, u) := by
+    change (entry, mouth) ∈ R.runway ++ [(R.mouth, R.arm)] at hentryOld
+    rcases List.mem_append.mp hentryOld with hrunway | hcore
+    · obtain ⟨before, after, hsplit⟩ := List.append_of_mem hrunway
+      obtain ⟨D, hDpaths, hAvoid⟩ :=
+        R.suffix_after_runway_passage C.contactState C.old_grooves hsplit hmouthLink
+      have hAvoid' : (LocalAction.flip (mouth / 3)).Avoids D.toSupported.paths := by
+        simpa only [hentryMouthSwitch] using hAvoid
+      refine ⟨D.toSupported.travel, fun u hu => ?_⟩
+      have hg : PathGrooves D.toSupported.paths u := by
+        rcases hu with rfl | rfl
+        · exact hDpaths.after_avoiding_action hAvoid'
+        · exact hDpaths
+      refine ⟨(D.toSupported.run u hg).1, fun t ht => ?_⟩
+      simpa [ManufacturedReflector.toSupported, ManufacturedStayReflector.toSupported,
+        LocalAction.apply] using (ManufacturedReflector.stay D).travel_two_phase_stepN u hg ht
+    · have hmouthEq : mouth = R.arm := congrArg Prod.snd (List.mem_singleton.mp hcore)
+      have houtsideEq : outside = mouth := by
+        rw [hmouthEq, R.selfLink] at hmouthLink
+        exact (Option.some.inj hmouthLink).symm.trans hmouthEq.symm
+      subst outside
+      exact ⟨0, fun u _ => ⟨rfl, fun t ht => ⟨mouth, by simp [show t = 0 by omega, stepN]⟩⟩⟩
+  obtain ⟨travel, hprefix⟩ := hprefix
+  refine ⟨outside, mouth, hreach, fun d => ?_⟩
+  apply stepN_covered_of_progress (fun c => c.1 = outside ∧ safe c.2) safe ?_
+    ⟨rfl, Or.inl rfl⟩ d
+  intro ⟨p, u⟩ ⟨hp, hu⟩
+  dsimp only at hp hu
+  subst p
+  obtain ⟨hr, hpre⟩ := hprefix u hu
+  refine ⟨travel + (candy.length + 2), (outside, flipAt u (mouth / 3)),
+    by omega, ?_, ⟨rfl, hflip u hu⟩, ?_⟩
+  · rw [stepN_add, hr]; exact (hLobe u (hgrooved u hu)).1
+  · apply stepN_cover_append hr
+    · intro t ht
+      obtain ⟨port, hp⟩ := hpre t ht
+      exact ⟨port, u, hp, hu⟩
+    · intro t ht
+      obtain ⟨port, phase, hp, hs⟩ := explicit_lobe_two_phase_at hentryBranch
+        hentryMouthSwitch hfullGrooved hfullTrace hcrossed hCandyForeign hmouthLink
+        u (hgrooved u hu) ht
+      exact ⟨port, phase, hp,
+        hs.elim (fun h => h.symm ▸ hu) (fun h => h.symm ▸ hflip u hu)⟩
 
 
 end PartialSecondRunSharp

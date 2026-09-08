@@ -213,18 +213,12 @@ theorem ManufacturedStayReflector.suffix_after_runway_passage
       (LocalAction.flip (p / 3)).Avoids C.toSupported.paths := by
   obtain ⟨base, htail⟩ :=
     (hsplit ▸ R.runwayTrace).suffix_after_passage houtside
-  have hs := R.simple
-  unfold SwitchSimple at hs
-  rw [hsplit] at hs
-  have hrest : ((p, x) :: (after ++ [(R.mouth, R.arm)])).map
-      passageSwitch |>.Nodup := by
-    exact (List.nodup_append.mp (by simpa [List.map_append,
-      List.map_cons, List.append_assoc] using hs)).2.1
-  have hparts := List.nodup_cons.mp hrest
+  have hs : SwitchSimple (before ++ (p, x) :: (after ++ [(R.mouth, R.arm)])) := by
+    simpa [hsplit, List.append_assoc] using R.simple
   let C : ManufacturedStayReflector w outside x := {
     base := base, mouthState := R.mouthState, returnState := R.returnState
     runway := after, mouth := R.mouth, arm := R.arm
-    runwayTrace := htail, coreTrace := R.coreTrace, simple := hparts.2
+    runwayTrace := htail, coreTrace := R.coreTrace, simple := by grind [SwitchSimple]
     stemEndpoint := R.stemEndpoint, selfLink := R.selfLink, entryEdge := houtside
   }
   have hgrooves := pathGrooves_pair.mp hpaths
@@ -233,18 +227,9 @@ theorem ManufacturedStayReflector.suffix_after_runway_passage
     apply hgrooves.1 passage
     rw [hsplit]
     exact List.mem_append_right _ (List.mem_cons_of_mem _ hp)
-  · intro path hp passage hpassage heq
-    apply hparts.1
+  · intro path hp passage hpassage
     change path ∈ [after, [(R.mouth, R.arm)]] at hp
-    have hmem : passage ∈ after ++ [(R.mouth, R.arm)] := by
-      simpa only [List.mem_append] using
-        (show passage ∈ after ∨ passage ∈ [(R.mouth, R.arm)] from by
-          rcases List.mem_cons.mp hp with rfl | hp
-          · exact Or.inl hpassage
-          · have := List.mem_singleton.mp hp
-            subst path
-            exact Or.inr hpassage)
-    exact List.mem_map.mpr ⟨passage, hmem, heq⟩
+    grind [SwitchSimple, passageSwitch]
 
 /-- A flip reflector's runway suffix uses the original candy orientation.
 Its stored construction state need not equal the later state in which its
@@ -265,19 +250,13 @@ theorem ManufacturedFlipReflector.suffix_after_runway_passage
       (LocalAction.flip (p / 3)).Avoids C.toSupported.paths := by
   obtain ⟨base, htail⟩ :=
     (hsplit ▸ R.runwayTrace).suffix_after_passage houtside
-  have hs := R.simple
-  unfold SwitchSimple at hs
-  rw [hsplit] at hs
-  have hrest : ((p, x) :: (after ++ (R.mouth, R.firstArm) :: R.candy)).map
-      passageSwitch |>.Nodup := by
-    exact (List.nodup_append.mp (by simpa [List.map_append,
-      List.map_cons, List.append_assoc] using hs)).2.1
-  have hparts := List.nodup_cons.mp hrest
+  have hs : SwitchSimple (before ++ (p, x) :: (after ++ (R.mouth, R.firstArm) :: R.candy)) := by
+    simpa [hsplit, List.append_assoc] using R.simple
   let C : ManufacturedFlipReflector w outside x := {
     base := base, mouthState := R.mouthState, returnState := R.returnState
     afterReturn := R.afterReturn, runway := after, candy := R.candy
     mouth := R.mouth, firstArm := R.firstArm, secondArm := R.secondArm
-    runwayTrace := htail, candyTrace := R.candyTrace, simple := hparts.2
+    runwayTrace := htail, candyTrace := R.candyTrace, simple := by grind [SwitchSimple]
     crossed := R.crossed, arms_ne := R.arms_ne, entryEdge := houtside
   }
   have hgrooves := pathGrooves_pair.mp hpaths
@@ -288,16 +267,9 @@ theorem ManufacturedFlipReflector.suffix_after_runway_passage
     apply hgrooves.1 passage
     rw [hsplit]
     exact List.mem_append_right _ (List.mem_cons_of_mem _ hp)
-  · intro path hp passage hpassage heq
-    apply hparts.1
+  · intro path hp passage hpassage
     change path ∈ [after, R.candy] at hp
-    apply List.mem_map.mpr
-    refine ⟨passage, ?_, heq⟩
-    rcases List.mem_cons.mp hp with rfl | hp
-    · exact List.mem_append_left _ hpassage
-    · have := List.mem_singleton.mp hp
-      subst path
-      exact List.mem_append_right _ (List.mem_cons_of_mem _ hpassage)
+    grind [SwitchSimple, passageSwitch]
 
 theorem ManufacturedFlipReflector.nonrunway_oriented_branch_entry_is_candy
     {w : Wiring} {g e : Nat}

@@ -177,9 +177,11 @@ duplicate-multiplicity and value-erasure proofs while retaining every vector.
 
 `PhysicalTrace.prefix_coordinate_eq_endpoint` in `TrackTrace.lean` is a
 small general observation: on a switch-simple trace, each intermediate
-tongue value is either its starting value or its finishing value. Split
-the trace at that intermediate point. Switch simplicity means a coordinate
-cannot occur in both halves. The half not containing it preserves its value.
+tongue value is either its starting value or its finishing value. Induct
+directly over the recorded trace. After the first step, its switch remains
+fixed for the rest of the simple trace; every other coordinate keeps its
+initial value at that step. No indexed split or intermediate-endpoint
+identification is needed.
 
 Consequently paths grooved at both endpoints stay grooved at every
 intermediate configuration. `OneReflectorContinuation.lean` packages that
@@ -313,35 +315,32 @@ period reductions. `EventuallyPeriodic` and its remaining construction-only
 helpers are no longer used and have been removed. This does not assert that
 the full development is free of period arguments: other bounds still use them.
 
-The avoiding-reflector pair now uses the same progress principle. Its two
-commuting involutions preserve the four-corner action orbit and both groove
-supports. At either boundary, traverse the corresponding reflector; every
-intermediate state is the incoming or outgoing corner. This proves the
-all-time four-vector cover directly, replacing the four-leg window and
-modulo-period calculation in `ManufacturedPairNovelty.lean`.
+Manufactured pairs use the same progress principle with a reference corner
+that grooves both supports. The current vector differs by at most the
+previous action. This covers ordinary traversals, captures, and repairs in
+one invariant, with shared algebraic closure of the four corners.
 
 The general capture-phase law and the selected far-arm arrival fact are also
-shared at their earliest required layer. The formerly duplicated facing-case
-capture theorem and newly unused support lemmas have been deleted.
+shared at their earliest required layer. Ordinary traversal now returns its
+live configuration and incoming/outgoing-phase proof together. Mouth capture
+uses this result on a suffix, removing the intermediate `tonguesAt` theorem
+and the separate recovery of liveness.
 
-## Arbitrary lobes share the reflector invariant
+## Arbitrary lobes use positive excursions
 
-The four-corner theorem is now `SupportedReflector.pair_all_time_four_phase`.
-Its hypotheses require positive traversal lengths, preservation of the other
-support, and a pointwise incoming/outgoing-vector contract for each reflector.
-It does not depend on how the reflectors were manufactured. The result returns
-a live configuration and its phase at every time, so consumers no longer need
-a separate period just to obtain liveness.
+`explicit_lobe_two_phase_at` supplies the incoming/outgoing-vector contract
+for an arbitrary mouth-free grooved lobe. Pin the current mouth tongue to the
+recorded entry arm. The current vector equals that pinned vector or its mouth
+flip; the forward and reverse recorded routes cover both cases. This works
+for every current state grooving the interior, even when switches repeat.
 
-`explicit_lobe_two_phase_at` supplies the same contract for an arbitrary
-mouth-free grooved lobe. Pin the current mouth tongue to the recorded entry
-arm. The current vector equals that pinned vector or its mouth flip; the
-forward and reverse recorded routes cover both cases. This is uniform over
-all current states grooving the interior, even when the interior repeats
-switches. The disjoint-action runway splice is consequently an instance of
-the abstract pair theorem, as is the stay-reflector splice, whose action orbit
-collapses to two vectors. The self-linked boundary case is the same lobe
-composed with itself, not an additional period construction.
+A flip reflector opposite that lobe closes one four-corner boundary invariant
+through ordinary traversal, capture, or repair. A stay splice needs only two
+phases. Its excursion starts with the unchanged traversal of the old stay
+suffix, followed by the lobe's one mouth flip. At a self-linked boundary the
+prefix has length zero. In both cases the lobe makes the complete excursion
+positive, and the same two-phase invariant repeats indefinitely. This removes
+`SupportedReflector.pair_all_time_four_phase` and the self-pair construction.
 
 For intersecting actions, `ManufacturedFlipReflector.grooved_route_fault`
 selects the first contact on any grooved reference route. The prefix avoids
@@ -350,13 +349,6 @@ boundary; branch entry repairs the bit and synchronizes the complete
 configuration for every subsequent time. No restriction on later repetitions
 is required. This replaces the separately coded arbitrary-lobe and
 switch-simple contact analyses.
-
-The intersecting runway splice alternates covered positive excursions between
-`(outside, state)` and `(outside, flipAt state (mouth / 3))`. Each excursion
-exposes its base, old-action, or lobe-action vector. Their union is the four
-Gray corners. `stepN_covered_of_progress` supplies all-time liveness and the
-phase cover directly. The obsolete excursion-length upper bound, four-leg
-windows, periods, and the period-based liveness helper have been removed.
 
 ## First-arrival synchronization
 
@@ -408,10 +400,9 @@ a count; no boundary-subtraction count or duplicate-free suffix proof remains.
 
 First-repeat detection grows a duplicate-free prefix until the next key is
 already present. This removes the two repeated extraction arguments in the
-former tail-first induction. Compatible reflector pairs now obtain liveness
-and their phase cover together from `SupportedReflector.pair_all_time_four_phase`;
-the explicit period construction and its two iteration helpers are removed.
-The final action-corner proof handles compatibility once before its contact cases.
+former tail-first induction. Reflector pairs obtain liveness and their phase
+cover together from the common boundary invariant; the explicit period
+construction and its two iteration helpers are removed.
 
 ## Shared trace cuts and reflector transport
 
@@ -465,6 +456,7 @@ comments and blanks, not just proof tactics.
 | After shared reverse replay and direct productive-step histories | 33 | 7,406 |
 | After one boundary invariant for every manufactured pair | 30 | 6,951 |
 | After one selected-route invariant for the arbitrary lobe | 30 | 6,771 |
+| After direct two-phase excursions and traversal results | 30 | 6,630 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -717,3 +709,16 @@ The clean **63-job** build and exact axiom audit pass without warnings. All
 **276** public source theorems remain in the headline kernel dependency
 closure, and the seven protected files are byte-for-byte unchanged. The
 paper and rendered PDF describe the selected-route invariant.
+
+The direct two-phase pass removes **141 Lean source lines**, from **6,790 to
+6,649** (**2.1%**), across **31 files**. The stay splice and its self-linked
+boundary share one unchanged-prefix/lobe excursion, removing the last
+abstract four-phase pair engine. Ordinary traversal returns a live
+configuration and phase together, and mouth capture uses that result directly.
+Runway suffixes discharge simplicity and avoidance from the original simple
+route, while coordinate preservation uses direct trace induction.
+
+The clean **63-job** build and exact axiom audit pass without warnings. All
+**274** public source theorems belong to the headline kernel dependency
+closure, and the seven protected files remain byte-for-byte unchanged. The
+paper and rendered PDF describe the direct two-phase excursion.

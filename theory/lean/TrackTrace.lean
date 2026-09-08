@@ -415,14 +415,8 @@ theorem PhysicalTrace.preserves {w : Wiring}
   induction h with
   | nil => rfl
   | @cons p x q u v passages finish harrive hlink tail ih =>
-      have hpj : p / 3 ≠ j :=
-        hforeign (p, x) List.mem_cons_self
-      have hv : v j = u j := arrive_preserves_other harrive hpj.symm
-      have htailForeign :
-          ∀ passage ∈ passages, passageSwitch passage ≠ j := by
-        intro passage hp
-        exact hforeign passage (List.mem_cons_of_mem _ hp)
-      exact (ih htailForeign).trans hv
+      exact (ih (fun passage hp => hforeign passage (List.mem_cons_of_mem _ hp))).trans
+        (arrive_preserves_other harrive (hforeign (p, x) List.mem_cons_self).symm)
 
 /-- Along a switch-simple trace, each intermediate tongue is either its
 initial or final value: a switch cannot be visited in both halves of a split.
@@ -433,30 +427,23 @@ theorem PhysicalTrace.prefix_coordinate_eq_endpoint {w : Wiring}
     (hsimple : SwitchSimple passages) {k : Nat}
     (hk : k ≤ passages.length) (hrun : stepN w k start = some middle)
     (j : Nat) : middle.2 j = start.2 j ∨ middle.2 j = finish.2 j := by
-  have hsplit : PhysicalTrace w start
-      (passages.take k ++ passages.drop k) finish := by
-    simpa only [List.take_append_drop] using htrace
-  obtain ⟨mid, hleft, hright⟩ := hsplit.split_append
-  have hmid : mid = middle := by
-    have hsound := hleft.sound
-    rw [List.length_take_of_le hk, hrun] at hsound
-    exact (Option.some.inj hsound).symm
-  subst mid
-  have hnd : ((passages.take k).map passageSwitch ++
-      (passages.drop k).map passageSwitch).Nodup := by
-    rw [← List.map_append, List.take_append_drop]
-    exact hsimple
-  by_cases hprefix : j ∈ (passages.take k).map passageSwitch
-  · right
-    symm
-    apply hright.preserves
-    intro passage hp heq
-    exact (List.nodup_append.mp hnd).2.2 j hprefix j
-      (List.mem_map.mpr ⟨passage, hp, heq⟩) rfl
-  · left
-    apply hleft.preserves
-    intro passage hp heq
-    exact hprefix (List.mem_map.mpr ⟨passage, hp, heq⟩)
+  induction htrace generalizing k with
+  | nil =>
+      have : k = 0 := by simpa using hk
+      subst k
+      cases hrun
+      exact Or.inl rfl
+  | @cons p x q u v passages finish harrive hlink tail ih =>
+      cases k with
+      | zero => cases hrun; exact Or.inl rfl
+      | succ k =>
+          have hr : stepN w k (q, v) = some middle := by
+            simpa [stepN, step, harrive, hlink] using hrun
+          rcases ih (List.nodup_cons.mp hsimple).2 (by simpa using hk) hr with hv | hf
+          · by_cases hj : j = p / 3
+            · exact Or.inr (hv.trans (tail.preserves j (by grind [SwitchSimple, passageSwitch])).symm)
+            · exact Or.inl (hv.trans (arrive_preserves_other harrive hj))
+          · exact Or.inr hf
 
 /-- Every recorded passage exposes its local arrival and outgoing edge. -/
 theorem PhysicalTrace.passage_step
@@ -615,20 +602,13 @@ theorem groove_transfer {u v : Tongues} {p x : Nat}
     (hgroove : arrive u x = (p, u))
     (hsame : v (x / 3) = u (x / 3)) :
     arrive v x = (p, v) := by
+  have hport := congrArg Prod.fst hgroove
+  have hbit := congrArg (fun r => r.2 (x / 3)) hgroove
   by_cases hx : x % 3 = 0
-  · unfold arrive at hgroove ⊢
-    rw [if_pos hx] at hgroove ⊢
-    injection hgroove with hp _
-    rw [hsame, hp]
-  · unfold arrive at hgroove ⊢
-    rw [if_neg hx] at hgroove ⊢
-    injection hgroove with hp hpin
-    have hu : u (x / 3) = bval x := by
-      have := congrFun hpin (x / 3)
-      simpa [pin] using this.symm
-    have hv : v (x / 3) = bval x := hsame.trans hu
-    have hvpin : pin v x = v := pin_of_agrees hv
-    rw [hp, hvpin]
+  · simpa [arrive, hx, hsame] using hport
+  · have hv : v (x / 3) = bval x := by
+      simpa [arrive, hx, pin, ← hsame] using hbit.symm
+    simpa [arrive, hx, pin_of_agrees hv] using hport
 
 /-- Preserve path grooves by preserving the tongue at each recorded switch. -/
 theorem PassagesGrooved.transfer {u v : Tongues} {path : List Passage}
