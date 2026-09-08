@@ -1,8 +1,10 @@
 name: Application checks
 on:
   push:
-    branches: [main, fix/duplotrain-review]
+    branches: [main]
+    paths-ignore: ['theory/lean/**']
   pull_request:
+    paths-ignore: ['theory/lean/**']
   workflow_dispatch:
 permissions:
   contents: read
