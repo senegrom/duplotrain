@@ -2,74 +2,17 @@ import StateLawTwoCandidate
 import PairActionCorners
 
 /-!
-# Charging two opposite construction histories once
+# One coordinate budget for construction and continuation
 
-The coefficient-two estimate appends the two canonical manufactured-reflector
-histories and pays for every switch occurrence twice.  This file isolates the
-real obstruction.  Away from an old reusable support, the second exploration
-uses globally fresh switch coordinates; the only switch of the first
-exploration omitted from that support is the facing action mouth.  Thus the
-two raw histories, with their common boundary erased, have size at most
-`N + 4`.  If this estimate cannot be applied, the raw second exploration
-contains a concrete first old-support contact.  If that contact actually
-breaks the old grooves, the existing causal theorem exposes the exact return
-or outward state-changing event responsible for the second charge.
-
-All statements are over `Wiring`, `PhysicalTrace`, and `stepN`, for arbitrary
-`N`.  No overlap of the two histories is assumed.
--/
-
-
-/-!
-## The manufacturing journey reaches the activated state
-
-The one raw `stepN` fact every downstream counting file needs about the
-canonical manufacturing journey.
+A productive writer in a switch-simple trace cannot belong to a support
+family grooved at both endpoints. Its first writers, the old reusable
+switches, and any reserved coordinates therefore fit in one `N`-switch list.
+Construction histories omit a known duplicate sample and share their common
+boundary; the resulting covers cost `N+3`, or `N+2` with one reserve.
 -/
 
 namespace GeneralN
 
-private theorem count_map_range_two_of_eq
-    {α : Type} [BEq α] [LawfulBEq α]
-    (f : Nat → α) :
-    ∀ {n i j : Nat},
-      i < j → j < n → f i = f j →
-      2 ≤ ((List.range n).map f).count (f i) := by
-  intro n
-  induction n with
-  | zero =>
-      intro i j hij hj _
-      omega
-  | succ n ih =>
-      intro i j hij hj hEq
-      rw [List.range_succ, List.map_append, List.count_append]
-      by_cases hjLast : j = n
-      · subst j
-        have hi : i < n := by omega
-        have hmem : f i ∈ (List.range n).map f := by
-          apply List.mem_map.mpr
-          exact ⟨i, List.mem_range.mpr hi, rfl⟩
-        have hone : 1 ≤ ((List.range n).map f).count (f i) :=
-          List.one_le_count_iff.mpr hmem
-        have hsingle : ([n].map f).count (f i) = 1 := by
-          simp [← hEq]
-        omega
-      · have hjn : j < n := by omega
-        have htwo := ih hij hjn hEq
-        omega
-
-private theorem mem_erase_of_count_two
-    {α : Type} [BEq α] [LawfulBEq α]
-    {x y : α} {xs : List α}
-    (htwo : 2 ≤ xs.count x)
-    (hy : y ∈ xs) :
-    y ∈ xs.erase x := by
-  by_cases hyx : y = x
-  · subst y
-    apply List.count_pos_iff.mp
-    rw [List.count_erase_self]
-    omega
-  · exact (List.mem_erase_of_ne hyx).mpr hy
 /-- A productive event in a switch-simple trace permanently changes its
 writer. Otherwise both adjacent prefix values would equal the common endpoint
 value, contradicting productivity. No passage reconstruction is needed. -/
@@ -130,30 +73,25 @@ theorem ManufacturedReflector.mem_reusableSwitches
       ManufacturedStayReflector.toSupported, ManufacturedFlipReflector.toSupported,
       List.mem_map, List.mem_append, List.mem_cons] at hk ⊢ <;> grind
 
-theorem ManufacturedReflector.second_exploration_productive_writer_not_reusable
+/-- A productive passage in a switch-simple continuation cannot write an old
+reusable coordinate when the old support is grooved at both endpoints. -/
+theorem PhysicalTrace.productive_writer_not_old_reusable
     {w : Wiring} {N g e : Nat}
     (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbaseGrooves :
-      PathGrooves A.toSupported.paths B.baseState)
-    (hpreGrooves :
-      PathGrooves A.toSupported.paths B.preReturn.2)
-    {k : Nat} (hk : k < B.exploration.length)
-    (hprod :
-      RawProductiveAt w N (e, B.baseState) k) :
-    rawWriterAt w (e, B.baseState) k ∉
-      A.reusableSwitches := by
+    {start finish : Nat × Tongues}
+    {passages : List Passage}
+    (htrace : PhysicalTrace w start passages finish)
+    (hsimple : SwitchSimple passages)
+    (hbase : PathGrooves A.toSupported.paths start.2)
+    (hend : PathGrooves A.toSupported.paths finish.2)
+    {k : Nat} (hk : k < passages.length)
+    (hprod : RawProductiveAt w N start k) :
+    rawWriterAt w start k ∉ A.reusableSwitches := by
   intro hreusable
-  have hsurvives := B.exploration_trace.simple_raw_productive_writer_survives
-    B.exploration_simple hk hprod
+  have hsurvives := htrace.simple_raw_productive_writer_survives hsimple hk hprod
   obtain ⟨path, hpath, old, hold, hswitch⟩ := A.mem_reusableSwitches hreusable
-  have hbase := hbaseGrooves path hpath old hold
-  have hpre := hpreGrooves path hpath old hold
-  have hs := arrive_exit_switch B.baseState old.2
-  rw [hbase] at hs
-  have hexit : old.2 / 3 = rawWriterAt w (e, B.baseState) k := hs.symm.trans hswitch
-  exact hsurvives (by
-    simpa only [hexit] using (grooved_states_agree_on_passage hbase hpre).symm)
+  exact hsurvives (by simpa [← hswitch] using
+    (same_groove_same_tongue (hbase path hpath old hold) (hend path hpath old hold)).symm)
 
 /-- Removing the facing action mouth loses at most one exploration switch. -/
 theorem ManufacturedReflector.exploration_length_le_reusable_add_one
@@ -170,22 +108,11 @@ theorem ManufacturedReflector.reusableSwitch_lt
       p < 3 * N ∧ q < 3 * N)
     (A : ManufacturedReflector w g e)
     (hk : k ∈ A.reusableSwitches) : k < N := by
-  cases A with
-  | stay R =>
-      change k ∈ (R.runway ++ [(R.mouth, R.arm)]).map passageSwitch at hk
-      obtain ⟨passage, hpassage, rfl⟩ := List.mem_map.mp hk
-      apply (ManufacturedReflector.stay R).exploration_trace.switch_lt
-        hN passage
-      simpa [ManufacturedReflector.exploration] using hpassage
-  | flip R =>
-      change k ∈ (R.runway ++ R.candy).map passageSwitch at hk
-      obtain ⟨passage, hpassage, rfl⟩ := List.mem_map.mp hk
-      apply (ManufacturedReflector.flip R).exploration_trace.switch_lt
-        hN passage
-      rcases List.mem_append.mp hpassage with hrunway | hcandy
-      · exact List.mem_append_left _ hrunway
-      · exact List.mem_append_right R.runway
-          (List.mem_cons_of_mem _ hcandy)
+  have hmem : ∃ passage ∈ A.exploration, passageSwitch passage = k := by
+    cases A <;> simp only [ManufacturedReflector.reusableSwitches,
+      ManufacturedReflector.exploration, List.mem_map, List.mem_append, List.mem_cons] at hk ⊢ <;> grind
+  obtain ⟨passage, hp, rfl⟩ := hmem
+  exact A.exploration_trace.switch_lt hN passage hp
 
 /-- Switch coordinates of the productive first writers in a manufactured
 reflector's switch-simple construction. -/
@@ -196,92 +123,67 @@ def ManufacturedReflector.constructionFirstWriterSwitches
       B.exploration.length).map
     (rawWriterAt w (g, B.baseState))
 
-/-- The old reusable support and the second construction's productive
-first writers form a single duplicate-free list of coordinates below `N`.
-All ordinary and reserved-coordinate counts use this same certificate. -/
-theorem ManufacturedReflector.sharedConstructionCoordinates
+/-- The old reusable coordinates, the first productive writers of a
+support-preserving simple continuation, and any duplicate-free list of extra
+switches avoiding both share one ambient switch budget. -/
+theorem ManufacturedReflector.reusable_add_continuation_first_writers_add_extras_le
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →
       p < 3 * N ∧ q < 3 * N)
     (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbaseGrooves :
-      PathGrooves A.toSupported.paths B.baseState)
-    (hpreGrooves :
-      PathGrooves A.toSupported.paths B.preReturn.2) :
-    (A.reusableSwitches ++ B.constructionFirstWriterSwitches N).Nodup ∧
-      (∀ j ∈ A.reusableSwitches ++ B.constructionFirstWriterSwitches N, j < N) := by
-  let times :=
-    rawFirstWriterTimes w N (e, B.baseState)
-      B.exploration.length
-  let writers := times.map (rawWriterAt w (e, B.baseState))
-  have htimesNodup : times.Nodup := by
-    dsimp [times, rawFirstWriterTimes]
-    exact nodup_filter_nat _ List.nodup_range
-  have hwritersNodup : writers.Nodup := by
-    dsimp [writers]
-    apply nodup_map_of_injective_on_mem
-    · intro i hi j hj hEq
-      have hiData :=
-        mem_rawFirstWriterTimes_iff.mp (by
-          simpa [times] using hi)
-      have hjData :=
-        mem_rawFirstWriterTimes_iff.mp (by
-          simpa [times] using hj)
-      exact rawFirstWriterAt_injective
-        hiData.2 hjData.2 hEq
-    · exact htimesNodup
-  have hdisjoint :
-      ∀ oldSwitch ∈ A.reusableSwitches,
-        ∀ freshSwitch ∈ writers,
-          oldSwitch ≠ freshSwitch := by
-    intro oldSwitch hOld freshSwitch hFresh hEq
-    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
-    have hkData :=
-      mem_rawFirstWriterTimes_iff.mp (by
-        simpa [times] using hk)
-    have houtside :=
-      A.second_exploration_productive_writer_not_reusable B hbaseGrooves hpreGrooves
-          hkData.1 hkData.2.1
-    apply houtside
-    rw [← hEq]
-    exact hOld
-  let switches := A.reusableSwitches ++ writers
-  have hnd : switches.Nodup := by
-    dsimp [switches]
-    exact List.nodup_append.mpr
-      ⟨A.reusableSwitches_nodup, hwritersNodup, hdisjoint⟩
-  have hlt : ∀ C ∈ switches, C < N := by
-    intro C hC
-    rcases List.mem_append.mp hC with hOld | hFresh
-    · exact A.reusableSwitch_lt hN hOld
-    · obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hFresh
-      have hkData :=
-        mem_rawFirstWriterTimes_iff.mp (by
-          simpa [times] using hk)
-      exact rawProductiveAt_writer_lt hN hkData.2.1
-  exact ⟨hnd, hlt⟩
-
-/-- Coefficient-one coordinate charge in the groove-preserved branch.
-The first reflector's reusable switches and all productive first writers of
-the second simple exploration are disjoint and together occupy at most the
-`N` available switch coordinates. -/
-theorem ManufacturedReflector.reusable_add_second_first_writers_le
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbaseGrooves :
-      PathGrooves A.toSupported.paths B.baseState)
-    (hpreGrooves :
-      PathGrooves A.toSupported.paths B.preReturn.2) :
+    {start finish : Nat × Tongues}
+    {passages : List Passage}
+    (htrace : PhysicalTrace w start passages finish)
+    (hsimple : SwitchSimple passages)
+    (hbase : PathGrooves A.toSupported.paths start.2)
+    (hend : PathGrooves A.toSupported.paths finish.2)
+    (extras : List Nat)
+    (hextrasNodup : extras.Nodup)
+    (hextrasLt : ∀ s ∈ extras, s < N)
+    (hextrasReusable : ∀ s ∈ extras, s ∉ A.reusableSwitches)
+    (hextrasWriters : ∀ s ∈ extras,
+      s ∉ (rawFirstWriterTimes w N start passages.length).map (rawWriterAt w start)) :
     A.reusableSwitches.length +
-      (rawFirstWriterTimes w N (e, B.baseState)
-        B.exploration.length).length ≤ N := by
-  obtain ⟨hnd, hlt⟩ := A.sharedConstructionCoordinates hN B hbaseGrooves hpreGrooves
-  simpa [ManufacturedReflector.constructionFirstWriterSwitches] using
-    nodup_nat_lt_length hnd hlt
+      (rawFirstWriterTimes w N start passages.length).length + extras.length ≤ N := by
+  let times := rawFirstWriterTimes w N start passages.length
+  let writers := times.map (rawWriterAt w start)
+  have hwritersNodup : writers.Nodup := by
+    apply nodup_map_of_injective_on_mem
+    · intro i hi j hj heq
+      exact rawFirstWriterAt_injective (mem_rawFirstWriterTimes_iff.mp hi).2
+        (mem_rawFirstWriterTimes_iff.mp hj).2 heq
+    · exact nodup_filter_nat _ List.nodup_range
+  have hwriters : ∀ j ∈ writers, j < N ∧ j ∉ A.reusableSwitches := by
+    intro j hj
+    obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hj
+    have hk := mem_rawFirstWriterTimes_iff.mp hk
+    exact ⟨rawProductiveAt_writer_lt hN hk.2.1,
+      htrace.productive_writer_not_old_reusable A hsimple hbase hend hk.1 hk.2.1⟩
+  have hnd : (extras ++ (A.reusableSwitches ++ writers)).Nodup := by
+    refine List.nodup_append.mpr ⟨hextrasNodup,
+      List.nodup_append.mpr ⟨A.reusableSwitches_nodup, hwritersNodup, ?_⟩, ?_⟩ <;> grind
+  have hbound := nodup_nat_lt_length (N := N) hnd (by
+    have hlt : ∀ j ∈ A.reusableSwitches, j < N := fun _ hj => A.reusableSwitch_lt hN hj
+    grind)
+  simpa [writers, times, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using hbound
+
+/-- The old reusable coordinates and the first productive writers of a
+support-preserving simple continuation share one ambient switch budget. -/
+theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
+    {w : Wiring} {N g e : Nat}
+    (hN : ∀ p q, w.link p = some q →
+      p < 3 * N ∧ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    {start finish : Nat × Tongues}
+    {passages : List Passage}
+    (htrace : PhysicalTrace w start passages finish)
+    (hsimple : SwitchSimple passages)
+    (hbase : PathGrooves A.toSupported.paths start.2)
+    (hend : PathGrooves A.toSupported.paths finish.2) :
+    A.reusableSwitches.length +
+      (rawFirstWriterTimes w N start passages.length).length ≤ N := by
+  simpa using A.reusable_add_continuation_first_writers_add_extras_le hN htrace hsimple
+    hbase hend [] List.nodup_nil (by simp) (by simp) (by simp)
 
 /-- The second construction compressed to its initial vector, the post-vector
 of each productive first writer in the switch-simple exploration, and its
@@ -329,116 +231,61 @@ theorem ManufacturedFlipReflector.runway_boundary_repeated
     (R : ManufacturedFlipReflector w g e) :
     restrictedTonguesAt w N (g, R.base) R.runway.length =
       restrictedTonguesAt w N (g, R.base) (R.runway.length + 1) := by
-  have hAtRunway :
-      tonguesAt w (g, R.base) R.runway.length = R.mouthState := by
-    simp [tonguesAt, R.runwayTrace.sound]
-  have hstepOne :
-      ∃ q, stepN w 1 (R.mouth, R.mouthState) =
-        some (q, R.mouthState) := by
-    have htrace := R.candyTrace
-    cases htrace with
-    | @cons p x q u v passages finish harrive hlink tail =>
-        have hv : v = R.mouthState := by
-          unfold arrive at harrive
-          rw [if_pos R.mouth_is_stem] at harrive
-          exact (Prod.mk.inj harrive).2.symm
-        refine ⟨q, ?_⟩
+  have htrace := R.candyTrace
+  cases htrace with
+  | @cons p x q u v passages finish harrive hlink tail =>
+      have hv : v = R.mouthState := by
+        unfold arrive at harrive
+        rw [if_pos R.mouth_is_stem] at harrive
+        exact (Prod.mk.inj harrive).2.symm
+      have hnext : stepN w (R.runway.length + 1) (g, R.base) =
+          some (q, R.mouthState) := by
+        rw [stepN_add, R.runwayTrace.sound]
         simp [stepN, step, harrive, hlink, hv]
-  have hAtNext :
-      tonguesAt w (g, R.base) (R.runway.length + 1) =
-        R.mouthState := by
-    obtain ⟨q, hq⟩ := hstepOne
-    rw [tonguesAt_add_of_reaches R.runwayTrace.sound ⟨_, hq⟩]
-    simp [tonguesAt, hq]
-  simp only [restrictedTonguesAt]
-  rw [hAtRunway, hAtNext]
+      simp [restrictedTonguesAt, tonguesAt, R.runwayTrace.sound, hnext]
 
-/-- A canonical value that occurs twice in every sharp construction history.
-For a stay reflector it is the pre-return/activated value.  For a flip
-reflector it is the unchanged value on the two sides of the facing mouth
-passage. -/
-def ManufacturedReflector.sharpHistoryDuplicate
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) (N : Nat) : List Bool :=
-  match A with
-  | .stay R => VectorCount.restrict N R.returnState
-  | .flip R =>
-      restrictedTonguesAt w N (g, R.base) R.runway.length
-
-/-- Every sharp construction history has an internal repetition, independent
-of any relation to a second history. -/
-theorem ManufacturedReflector.sharpHistoryDuplicate_count
-    {w : Wiring} {g e N : Nat}
-    (A : ManufacturedReflector w g e) :
-    2 ≤ (A.sharpConstructionHistory N).count
-      (A.sharpHistoryDuplicate N) := by
-  cases A with
-  | stay R =>
-      let f := restrictedTonguesAt w N (g, R.base)
-      let x := VectorCount.restrict N R.returnState
-      have hxPrefix :
-          x ∈ (List.range
-            ((R.runway ++ [(R.mouth, R.arm)]).length + 1)).map f := by
-        apply List.mem_map.mpr
-        refine ⟨(R.runway ++ [(R.mouth, R.arm)]).length,
-          List.mem_range.mpr (by omega), ?_⟩
-        dsimp [f, x]
-        have hs :
-            stepN w (R.runway.length + 1) (g, R.base) =
-              some (R.arm, R.returnState) := by
-          simpa [
-          ManufacturedReflector.exploration,
-            ManufacturedReflector.baseState,
-            ManufacturedReflector.preReturn] using
-              (ManufacturedReflector.stay R).exploration_trace.sound
-        simp [restrictedTonguesAt, tonguesAt, hs]
-      change 2 ≤
-        (((List.range
-          ((R.runway ++ [(R.mouth, R.arm)]).length + 1)).map f) ++
-            [x]).count x
-      rw [List.count_append]
-      have hone :
-          1 ≤ ((List.range
-            ((R.runway ++ [(R.mouth, R.arm)]).length + 1)).map f).count x :=
-        List.one_le_count_iff.mpr hxPrefix
-      have hsingle : [x].count x = 1 := by simp
-      omega
-  | flip R =>
-      let f := restrictedTonguesAt w N (g, R.base)
-      have hEq : f R.runway.length = f (R.runway.length + 1) := by
-        exact R.runway_boundary_repeated
-      have hnext :
-          R.runway.length + 1 <
-            (R.runway ++ (R.mouth, R.firstArm) :: R.candy).length + 1 := by
-        simp only [List.length_append, List.length_cons]
-        omega
-      have hprefix := count_map_range_two_of_eq f
-        (n :=
-          (R.runway ++ (R.mouth, R.firstArm) :: R.candy).length + 1)
-        (i := R.runway.length) (j := R.runway.length + 1)
-        (by omega) hnext hEq
-      change 2 ≤
-        (((List.range
-          ((R.runway ++ (R.mouth, R.firstArm) :: R.candy).length + 1)).map f) ++
-            [VectorCount.restrict N R.afterReturn]).count
-              (f R.runway.length)
-      rw [List.count_append]
-      omega
-
-/-- The sharp history with one guaranteed internal repetition removed. -/
+/-- Omit a known duplicate sample: the stay activation, or the flip
+reflector's pre-mouth sample, which equals the following sample. -/
 def ManufacturedReflector.sharpHistoryCore
     {w : Wiring} {g e : Nat}
     (A : ManufacturedReflector w g e) (N : Nat) : List (List Bool) :=
-  (A.sharpConstructionHistory N).erase (A.sharpHistoryDuplicate N)
+  match A with
+  | .stay _ => (List.range (A.exploration.length + 1)).map
+      (restrictedTonguesAt w N (g, A.baseState))
+  | .flip R => ((List.range (A.exploration.length + 1)).erase R.runway.length).map
+      (restrictedTonguesAt w N (g, A.baseState)) ++ [VectorCount.restrict N A.activatedState]
 
-/-- Erasing the canonical duplicate loses no represented tongue vector. -/
+/-- Omitting the known duplicate loses no represented tongue vector. -/
 theorem ManufacturedReflector.mem_sharpHistoryCore_of_mem
     {w : Wiring} {g e N : Nat}
     (A : ManufacturedReflector w g e)
-    {x : List Bool}
-    (hx : x ∈ A.sharpConstructionHistory N) :
+    {x : List Bool} (hx : x ∈ A.sharpConstructionHistory N) :
     x ∈ A.sharpHistoryCore N := by
-  exact mem_erase_of_count_two A.sharpHistoryDuplicate_count hx
+  cases A with
+  | stay R =>
+      rcases List.mem_append.mp hx with hprefix | hactivated
+      · exact hprefix
+      · have hx : x = VectorCount.restrict N R.returnState := List.mem_singleton.mp hactivated
+        rw [hx]
+        apply List.mem_map.mpr
+        exact ⟨(ManufacturedReflector.stay R).exploration.length,
+          List.mem_range.mpr (by omega), by
+            simp [restrictedTonguesAt, tonguesAt,
+              (ManufacturedReflector.stay R).exploration_trace.sound,
+              ManufacturedReflector.preReturn]⟩
+  | flip R =>
+      rcases List.mem_append.mp hx with hprefix | hactivated
+      · apply List.mem_append_left
+        obtain ⟨j, hj, rfl⟩ := List.mem_map.mp hprefix
+        by_cases heq : j = R.runway.length
+        · subst j
+          exact List.mem_map.mpr ⟨R.runway.length + 1,
+            (List.mem_erase_of_ne (by omega)).mpr (List.mem_range.mpr (by
+              simp only [ManufacturedReflector.exploration, List.length_append, List.length_cons]
+              omega)),
+            R.runway_boundary_repeated.symm⟩
+        · exact List.mem_map.mpr ⟨j, (List.mem_erase_of_ne heq).mpr hj, rfl⟩
+      · exact List.mem_append_right _ hactivated
 
 /-- The compressed sharp history costs exactly one more vector than the
 simple exploration has passages. -/
@@ -446,14 +293,14 @@ theorem ManufacturedReflector.sharpHistoryCore_length
     {w : Wiring} {g e N : Nat}
     (A : ManufacturedReflector w g e) :
     (A.sharpHistoryCore N).length = A.exploration.length + 1 := by
-  have hmem :
-      A.sharpHistoryDuplicate N ∈ A.sharpConstructionHistory N :=
-    List.count_pos_iff.mp (by
-      have htwo := A.sharpHistoryDuplicate_count (N := N)
-      omega)
-  unfold ManufacturedReflector.sharpHistoryCore
-  rw [List.length_erase_of_mem hmem]
-  simp [ManufacturedReflector.sharpConstructionHistory]
+  cases A with
+  | stay R => simp [ManufacturedReflector.sharpHistoryCore]
+  | flip R =>
+      have hm : R.runway.length ∈ List.range
+          ((ManufacturedReflector.flip R).exploration.length + 1) := by
+        simp only [List.mem_range, ManufacturedReflector.exploration, List.length_append, List.length_cons]
+        omega
+      simp [ManufacturedReflector.sharpHistoryCore, List.length_erase_of_mem hm]
 
 /-- The activated vector lies in the sharp history. -/
 theorem ManufacturedReflector.activated_mem_sharpHistory
@@ -507,14 +354,52 @@ theorem ManufacturedReflector.preservedTwoHistoryCore_length_le_N_add_three
     simp [rawFirstWriterHistory, restrictedTonguesAt,
       tonguesAt, stepN, hbase]
   have hcharge :=
-    A.reusable_add_second_first_writers_le
-      hN B hbaseGrooves hpreGrooves
+    A.reusable_add_continuation_first_writers_le
+      hN B.exploration_trace B.exploration_simple hbaseGrooves hpreGrooves
   have houter := A.exploration_length_le_reusable_add_one
   unfold ManufacturedReflector.preservedTwoHistoryCore
   rw [List.length_append, List.length_erase_of_mem hboundary,
     A.sharpHistoryCore_length,
     B.writerConstructionHistory_length]
   omega
+
+/-- One unused coordinate lowers the canonical two-construction history
+from `N+3` to `N+2`, leaving room for two fresh repair-tail vectors. -/
+theorem ManufacturedReflector.preservedTwoHistoryCore_length_le_N_add_two_of_reserved
+    {w : Wiring} {N g e k0 : Nat}
+    (hN : forall p q, w.link p = some q ->
+      p < 3 * N /\ q < 3 * N)
+    (A : ManufacturedReflector w g e)
+    (B : ManufacturedReflector w e g)
+    (hbase : B.baseState = A.activatedState)
+    (hbaseGrooves :
+      PathGrooves A.toSupported.paths B.baseState)
+    (hpreGrooves :
+      PathGrooves A.toSupported.paths B.preReturn.2)
+    (hk0 : k0 < N)
+    (habsentA : Not (List.Mem k0 A.reusableSwitches))
+    (habsentB : Not (List.Mem k0
+      (B.constructionFirstWriterSwitches N))) :
+    (A.preservedTwoHistoryCore B N).length <= N + 2 := by
+  have hboundary :
+      VectorCount.restrict N A.activatedState ∈
+        B.writerConstructionHistory N := by
+    apply List.mem_append_left
+    simp [rawFirstWriterHistory, restrictedTonguesAt,
+      tonguesAt, stepN, hbase]
+  have hcharge := A.reusable_add_continuation_first_writers_add_extras_le
+    hN B.exploration_trace B.exploration_simple hbaseGrooves hpreGrooves [k0]
+    (by simp) (by simpa using hk0)
+    (by intro j hj; obtain rfl := List.mem_singleton.mp hj; exact habsentA)
+    (by intro j hj; obtain rfl := List.mem_singleton.mp hj; exact habsentB)
+  simp only [List.length_cons, List.length_nil] at hcharge
+  have houter := A.exploration_length_le_reusable_add_one
+  unfold ManufacturedReflector.preservedTwoHistoryCore
+  rw [List.length_append, List.length_erase_of_mem hboundary,
+    A.sharpHistoryCore_length,
+    B.writerConstructionHistory_length]
+  omega
+
 
 /-- The facing action mouth of a flip reflector is not part of its reusable
 support. -/

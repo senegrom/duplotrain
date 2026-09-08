@@ -1,7 +1,6 @@
 name = "duplotrain"
 defaultTargets = [
   "WiringCompletion",
-  "ReservedHistoryCharge",
   "StateLawBounds",
   "BoundaryOverlapTailCount",
   "ChangedContactNAddFour",
@@ -181,9 +180,6 @@ name = "VectorCount"
 
 [[lean_lib]]
 name = "StateLawBounds"
-
-[[lean_lib]]
-name = "ReservedHistoryCharge"
 
 [[lean_lib]]
 name = "WiringCompletion"

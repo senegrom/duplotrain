@@ -154,7 +154,7 @@ theorem PartialSecondRunSharp.ChangedContact.compressedLead_add_extras_le_N_add_
   have hcharge := C.reusable_add_approach_writers_add_extras_le
     hN hA extras hextrasNodup hextrasLt
       hextrasReusable hextrasApproach
-  unfold PartialSecondRunSharp.ChangedContact.compressedLead
+  unfold PartialSecondRunSharp.ChangedContact.compressedLead ManufacturedReflector.continuationHistory
   rw [List.length_append, List.length_append,
     List.length_erase_of_mem hboundary,
     (ManufacturedReflector.flip R).sharpHistoryCore_length]

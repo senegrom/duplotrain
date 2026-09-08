@@ -1,5 +1,4 @@
 import PreReturnProtectedRoute
-import ReservedHistoryCharge
 import KnownEdgeNAddFourChangedClosed
 
 /-!
@@ -148,19 +147,8 @@ private theorem ManufacturedReflector.return_change_facing_one_novelty
         change p / 3 = R.secondArm / 3 at hswitch
         omega
       subst p
-      have hrouteSimple :=
-        A.orientedRoute_simple (ManufacturedReflector.flip R).activatedState
-      have happroachSimple : SwitchSimple approach := by
-        unfold SwitchSimple at hrouteSimple ⊢
-        rw [hrouteSplit] at hrouteSimple
-        simp only [List.map_append, List.map_cons] at hrouteSimple
-        exact (List.nodup_append.mp hrouteSimple).1
-      have hrouteMembership : ∀ passage ∈ approach,
-          passage ∈ A.orientedRoute
-            (ManufacturedReflector.flip R).activatedState := by
-        intro passage hpassage
-        rw [hrouteSplit]
-        exact List.mem_append_left _ hpassage
+      obtain ⟨happroachSimple, hrouteMembership⟩ :=
+        A.orientedRoute_prefix_simple_and_mem _ hrouteSplit
       have hphase := A.repair_prefix_two_phase (.flip R) hA hBstart
         happroach happroachSimple hrouteMembership hpaths
       have hrelation := A.repair_prefix_contact_eq_activated_or_preReturn
@@ -221,12 +209,8 @@ private theorem ManufacturedReflector.protected_changed_contact_one_or_forward
   rcases hdirection with hbackward | hforward
   · have hrouteSimple := A.orientedRoute_simple B.activatedState
     rw [hrouteSplit] at hrouteSimple
-    have happroachSimple : SwitchSimple approach := by grind [SwitchSimple]
-    have happroachRoute : ∀ passage ∈ approach,
-        passage ∈ A.orientedRoute B.activatedState := by
-      intro passage hp
-      rw [hrouteSplit]
-      exact List.mem_append_left _ hp
+    obtain ⟨happroachSimple, happroachRoute⟩ :=
+      A.orientedRoute_prefix_simple_and_mem _ hrouteSplit
     have hphase := A.repair_prefix_two_phase B hA hBstart
       happroach happroachSimple happroachRoute hpaths
     have hrelation := A.repair_prefix_contact_eq_activated_or_preReturn
@@ -278,12 +262,8 @@ private theorem ManufacturedReflector.protected_facing_contact_one_or_forward
     subst oriented
     have hrouteSimple := A.orientedRoute_simple B.activatedState
     rw [hrouteSplit] at hrouteSimple
-    have happroachSimple : SwitchSimple approach := by grind [SwitchSimple]
-    have happroachRoute : ∀ passage ∈ approach,
-        passage ∈ A.orientedRoute B.activatedState := by
-      intro passage hp
-      rw [hrouteSplit]
-      exact List.mem_append_left _ hp
+    obtain ⟨happroachSimple, happroachRoute⟩ :=
+      A.orientedRoute_prefix_simple_and_mem _ hrouteSplit
     have hphase := A.repair_prefix_two_phase B hA hBstart
       happroach happroachSimple happroachRoute hpaths
     have hrelation := A.repair_prefix_contact_eq_activated_or_preReturn
@@ -737,8 +717,8 @@ theorem ManufacturedStayReflector.protectedHistory_length_le_N_add_two
     apply List.mem_append_left
     simp [rawFirstWriterHistory, restrictedTonguesAt,
       tonguesAt, stepN, hbase]
-  have hcharge := A.reusable_add_second_first_writers_le
-    hN B hbaseGrooves hpreGrooves
+  have hcharge := A.reusable_add_continuation_first_writers_le
+    hN B.exploration_trace B.exploration_simple hbaseGrooves hpreGrooves
   have heq : A.exploration.length = A.reusableSwitches.length := by
     simp [A, ManufacturedReflector.exploration,
       ManufacturedReflector.reusableSwitches]

@@ -126,18 +126,22 @@ same history, including the boundary configurations.
 
 ### One reservation lemma instead of repeated coordinate counting
 
-`TwoHistoryUnionCharge.lean` now proves a common coordinate certificate:
-the old reusable switches and `B`'s productive first-writer switches form
-a duplicate-free list below `N`. `ReservedHistoryCharge.lean` appends any
-duplicate-free list of reserved switches disjoint from that list, obtaining
+`TwoHistoryUnionCharge.lean` counts the old reusable switches, the productive
+first writers of any support-preserving simple trace, and any disjoint
+duplicate-free list of reserved switches together:
 
 ```
 old reusable coordinates + new productive writers + reserved coordinates <= N.
 ```
 
-The zero-, one-, and two-reservation counts reuse that certificate rather
-than independently reproving injectivity, disjointness, and the ambient bound.
-The remaining reservation interfaces are used by the active proof.
+Both reflector construction and continuation use this same argument, with
+zero, one, or two reserved coordinates. The separate `ReservedHistoryCharge`
+module and its specialized counting wrappers have been removed.
+
+The first construction history also omits a known duplicate sample directly:
+the stay activation equals its pre-return sample, and a flip reflector's
+facing-mouth passage preserves the tongue vector. This replaces the former
+duplicate-multiplicity and value-erasure proofs while retaining every vector.
 
 ### Endpoint agreement controls every intermediate state
 
@@ -430,6 +434,7 @@ comments and blanks, not just proof tactics.
 | After shared trace cuts, reflector transport, and minimal contact interfaces | 46 | 12,279 |
 | After shared protected prefixes, historical covers, and theta composition | 45 | 11,655 |
 | After shared contact retraces, last-write recovery, and canonical action corners | 45 | 11,242 |
+| After unified coordinate counting and direct duplicate-sample omission | 44 | 10,849 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -452,9 +457,8 @@ axiom audit. The accumulated reduction from the reviewed `b10aadd` baseline
 of 23,725 lines is **5,973 lines**. Counts include all new helper proofs,
 comments and blank lines, not just deleted code.
 
-Two small modules (`StateLawBounds` and `ReservedHistoryCharge`) hold the
-shared statements and counting facts that the removed modules previously
-supplied transitively.
+`StateLawBounds` holds the shared bound statements. The shared counting facts
+now live in `TwoHistoryUnionCharge`.
 
 The fifteen modules the two reductions took off the import path have been
 deleted, along with the declarations inside retained modules whose only
@@ -546,4 +550,19 @@ and smaller helper conclusions remove the remaining duplicated work.
 
 All seven protected files remain byte-for-byte unchanged. A clean build checks
 all **93 jobs** without warnings, the exact axiom audit passes, and all **356**
+public source theorems remain in the headline proof's kernel dependency closure.
+
+The unified-counting pass on 8 September 2026 removes **393 Lean source lines**,
+from **11,261 to 10,868**, a **3.5%** reduction. There are **45 files**, including
+the unchanged 19-line audit. Counts include all helper proofs, comments, and
+blank lines.
+
+Construction, continuation, and reserved-coordinate bounds now share one
+coordinate-budget proof. Omitting a known duplicate sample replaces the
+duplicate-count machinery. Changed-contact histories reuse the continuation
+history, and protected repairs reuse the existing route-prefix lemma.
+`ReservedHistoryCharge.lean` is no longer needed.
+
+All seven protected files remain byte-for-byte unchanged. A clean build checks
+all **91 jobs** without warnings, the exact axiom audit passes, and all **350**
 public source theorems remain in the headline proof's kernel dependency closure.

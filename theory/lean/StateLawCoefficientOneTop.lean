@@ -18,11 +18,8 @@ def PartialSecondRunSharp.ChangedContact.compressedLead
     {A : ManufacturedReflector w g e}
     (C : PartialSecondRunSharp.ChangedContact w A) (N : Nat) :
     List (List Bool) :=
-  A.sharpHistoryCore N ++
-    ((rawFirstWriterHistory w N (e, A.activatedState)
-      C.approach.length).erase
-        (VectorCount.restrict N A.activatedState) ++
-      [VectorCount.restrict N C.nextState])
+  A.continuationHistory N (e, A.activatedState) C.approach.length ++
+    [VectorCount.restrict N C.nextState]
 
 theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le
     {w : Wiring} {N g e : Nat}
@@ -31,19 +28,9 @@ theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le
     (C : PartialSecondRunSharp.ChangedContact w A)
     (hA : PathGrooves A.toSupported.paths A.activatedState) :
     (C.compressedLead N).length ≤ N + 3 := by
-  have hboundary : VectorCount.restrict N A.activatedState ∈
-      rawFirstWriterHistory w N (e, A.activatedState)
-        C.approach.length := by
-    simp [rawFirstWriterHistory, restrictedTonguesAt,
-      tonguesAt, stepN]
-  have hcharge := A.reusable_add_continuation_first_writers_le
-    hN C.approach_trace C.approach_simple hA C.old_grooves
-  have houter := A.exploration_length_le_reusable_add_one
-  unfold PartialSecondRunSharp.ChangedContact.compressedLead
-  rw [List.length_append, List.length_append,
-    List.length_erase_of_mem hboundary, A.sharpHistoryCore_length]
-  simp [rawFirstWriterHistory]
-  omega
+  have hlength := A.continuationHistory_length_le hN rfl C.approach_trace
+    C.approach_simple hA C.old_grooves
+  simpa [PartialSecondRunSharp.ChangedContact.compressedLead] using Nat.add_le_add_right hlength 1
 
 section
 variable {w : Wiring} {N g e : Nat}
@@ -55,17 +42,7 @@ theorem PartialSecondRunSharp.ChangedContact.mem_compressedLead_of_approach
     {j : Nat} (hj : j ≤ C.approach.length) :
     restrictedTonguesAt w N (e, A.activatedState) j ∈
       C.compressedLead N := by
-  have hm := C.approach_trace.restrictedTonguesAt_mem_rawFirstWriterHistory
-    (N := N) C.approach_simple j hj
-  by_cases hboundary : restrictedTonguesAt w N
-      (e, A.activatedState) j =
-      VectorCount.restrict N A.activatedState
-  · apply List.mem_append_left
-    rw [hboundary]
-    exact A.activated_mem_sharpHistoryCore
-  · apply List.mem_append_right
-    apply List.mem_append_left
-    exact (List.mem_erase_of_ne hboundary).mpr hm
+  exact List.mem_append_left _ (A.mem_continuationHistory C.approach_trace C.approach_simple hj)
 
 theorem PartialSecondRunSharp.ChangedContact.contact_mem_compressedLead :
     VectorCount.restrict N C.contactState ∈ C.compressedLead N := by
@@ -123,8 +100,8 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_compres
   apply hlocal.prepend (A.manufacturing_journey_reaches_activated hA) ?_ hlive
     (fun k hk _ => List.mem_map.mpr ⟨k, hk, rfl⟩)
   intro k hk
-  exact List.mem_append_left _ (A.mem_sharpHistoryCore_of_mem
-    (A.manufacturing_journey_mem_sharpHistory hA hk))
+  exact List.mem_append_left _ (List.mem_append_left _ (A.mem_sharpHistoryCore_of_mem
+    (A.manufacturing_journey_mem_sharpHistory hA hk)))
 
 /-- Absolute coefficient-one bound for the entire original run once the
 first damaging continuation contact points backward. -/
