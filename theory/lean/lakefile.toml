@@ -5,8 +5,6 @@ defaultTargets = [
   "ChangedContactNAddFour",
   "ForeignSpliceNovelty",
   "GeneralN",
-  "KnownEdgeNAddFourChangedClosed",
-  "KnownEdgeNAddFourFrontier",
   "ManufacturedPairNovelty",
   "OneReflectorContinuation",
   "PairActionCorners",
@@ -46,12 +44,6 @@ name = "ForeignSpliceNovelty"
 
 [[lean_lib]]
 name = "GeneralN"
-
-[[lean_lib]]
-name = "KnownEdgeNAddFourChangedClosed"
-
-[[lean_lib]]
-name = "KnownEdgeNAddFourFrontier"
 
 [[lean_lib]]
 name = "ManufacturedPairNovelty"

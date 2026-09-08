@@ -170,56 +170,7 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_add_extras
     grind)
   simpa [writers, times, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using hbound
 
-/-- The old reusable coordinates and the first productive writers of a
-support-preserving simple continuation share one ambient switch budget. -/
-theorem ManufacturedReflector.reusable_add_continuation_first_writers_le :
-    A.reusableSwitches.length +
-      (rawFirstWriterTimes w N start passages.length).length ≤ N := by
-  simpa using A.reusable_add_continuation_first_writers_add_extras_le hN htrace hsimple
-    hbase hend [] List.nodup_nil (by simp) (by simp) (by simp)
-
 end
-
-/-- The second construction compressed to its initial vector, the post-vector
-of each productive first writer in the switch-simple exploration, and its
-single activated endpoint.  Quiet old-support passages create no entry. -/
-def ManufacturedReflector.writerConstructionHistory
-    {w : Wiring} {g e : Nat}
-    (B : ManufacturedReflector w g e) (N : Nat) :
-    List (List Bool) :=
-  rawFirstWriterHistory w N (g, B.baseState)
-      B.exploration.length ++
-    [VectorCount.restrict N B.activatedState]
-
-/-- The compressed writer history represents every vector of the ordinary
-sharp construction history. -/
-theorem ManufacturedReflector.mem_writerConstructionHistory_of_mem_sharp
-    {w : Wiring} {N g e : Nat}
-    (B : ManufacturedReflector w g e)
-    {x : List Bool}
-    (hx : x ∈ B.sharpConstructionHistory N) :
-    x ∈ B.writerConstructionHistory N := by
-  unfold ManufacturedReflector.sharpConstructionHistory at hx
-  rcases List.mem_append.mp hx with hprefix | hactivated
-  · obtain ⟨j, hj, rfl⟩ := List.mem_map.mp hprefix
-    apply List.mem_append_left
-    apply B.exploration_trace.restrictedTonguesAt_mem_rawFirstWriterHistory
-      B.exploration_simple j
-    have hjlt := List.mem_range.mp hj
-    omega
-  · apply List.mem_append_right
-    simpa using hactivated
-
-/-- Exact size of the compressed writer history. -/
-theorem ManufacturedReflector.writerConstructionHistory_length
-    {w : Wiring} {N g e : Nat}
-    (B : ManufacturedReflector w g e) :
-    (B.writerConstructionHistory N).length =
-      (rawFirstWriterTimes w N (g, B.baseState)
-        B.exploration.length).length + 2 := by
-  simp [ManufacturedReflector.writerConstructionHistory,
-    rawFirstWriterHistory]
-
 
 theorem ManufacturedFlipReflector.runway_boundary_repeated
     {w : Wiring} {g e N : Nat}
@@ -317,84 +268,6 @@ theorem ManufacturedReflector.activated_mem_sharpHistoryCore
     (A : ManufacturedReflector w g e) :
     VectorCount.restrict N A.activatedState ∈ A.sharpHistoryCore N :=
   A.mem_sharpHistoryCore_of_mem A.activated_mem_sharpHistory
-
-def ManufacturedReflector.preservedTwoHistoryCore
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (N : Nat) : List (List Bool) :=
-  A.sharpHistoryCore N ++
-    (B.writerConstructionHistory N).erase
-      (VectorCount.restrict N A.activatedState)
-
-/-- The coefficient-one two-construction cover has size at most `N+3`.
-The additional three are the first reflector's possible facing mouth, the
-initial shared vector, and the second reflector's activated endpoint. -/
-theorem ManufacturedReflector.preservedTwoHistoryCore_length_le_N_add_three
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbase : B.baseState = A.activatedState)
-    (hbaseGrooves :
-      PathGrooves A.toSupported.paths B.baseState)
-    (hpreGrooves :
-      PathGrooves A.toSupported.paths B.preReturn.2) :
-    (A.preservedTwoHistoryCore B N).length ≤ N + 3 := by
-  have hboundary :
-      VectorCount.restrict N A.activatedState ∈
-        B.writerConstructionHistory N := by
-    apply List.mem_append_left
-    simp [rawFirstWriterHistory, restrictedTonguesAt,
-      tonguesAt, stepN, hbase]
-  have hcharge :=
-    A.reusable_add_continuation_first_writers_le
-      hN B.exploration_trace B.exploration_simple hbaseGrooves hpreGrooves
-  have houter := A.exploration_length_le_reusable_add_one
-  unfold ManufacturedReflector.preservedTwoHistoryCore
-  rw [List.length_append, List.length_erase_of_mem hboundary,
-    A.sharpHistoryCore_length,
-    B.writerConstructionHistory_length]
-  omega
-
-/-- One unused coordinate lowers the canonical two-construction history
-from `N+3` to `N+2`, leaving room for two fresh repair-tail vectors. -/
-theorem ManufacturedReflector.preservedTwoHistoryCore_length_le_N_add_two_of_reserved
-    {w : Wiring} {N g e k0 : Nat}
-    (hN : forall p q, w.link p = some q ->
-      p < 3 * N /\ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    (B : ManufacturedReflector w e g)
-    (hbase : B.baseState = A.activatedState)
-    (hbaseGrooves :
-      PathGrooves A.toSupported.paths B.baseState)
-    (hpreGrooves :
-      PathGrooves A.toSupported.paths B.preReturn.2)
-    (hk0 : k0 < N)
-    (habsentA : Not (List.Mem k0 A.reusableSwitches))
-    (habsentB : Not (List.Mem k0
-      (B.constructionFirstWriterSwitches N))) :
-    (A.preservedTwoHistoryCore B N).length <= N + 2 := by
-  have hboundary :
-      VectorCount.restrict N A.activatedState ∈
-        B.writerConstructionHistory N := by
-    apply List.mem_append_left
-    simp [rawFirstWriterHistory, restrictedTonguesAt,
-      tonguesAt, stepN, hbase]
-  have hcharge := A.reusable_add_continuation_first_writers_add_extras_le
-    hN B.exploration_trace B.exploration_simple hbaseGrooves hpreGrooves [k0]
-    (by simp) (by simpa using hk0)
-    (by intro j hj; obtain rfl := List.mem_singleton.mp hj; exact habsentA)
-    (by intro j hj; obtain rfl := List.mem_singleton.mp hj; exact habsentB)
-  simp only [List.length_cons, List.length_nil] at hcharge
-  have houter := A.exploration_length_le_reusable_add_one
-  unfold ManufacturedReflector.preservedTwoHistoryCore
-  rw [List.length_append, List.length_erase_of_mem hboundary,
-    A.sharpHistoryCore_length,
-    B.writerConstructionHistory_length]
-  omega
-
 
 /-- The facing action mouth of a flip reflector is not part of its reusable
 support. -/

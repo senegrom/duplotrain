@@ -19,16 +19,18 @@ makes the finite exploration probes automatically live, without shifting
 time zero or imposing totality on the original wiring.
 
 Inside the dynamical argument, one shared construction history supports
-the two budgets `(N+2)+2` and `(N+3)+1`. Disturbed traversals are analysed on
+the two budgets `(N+2)+2` and `(N+3)+1`. The continuation history and its
+optional reserved coordinates supply both bounds; action writers recover
+historical corners directly, and stay reflectors add no fresh tail vector. Disturbed traversals are analysed on
 the selected outward route, leaving only stem capture versus branch repair.
 All-time phase covers use boundary invariants under positive-length
 excursions instead of enumerated contact periods. Capture is a suffix of
 ordinary traversal. Shortened reflectors reuse their original construction
 witnesses rather than rebuilding them in the later tongue state.
 
-The retained development has 36 Lean files and 8,307 source lines,
-including its 19-line axiom audit; the headline import closure has 35
-modules and 8,288 lines. Source lines include comments and blank lines.
+The retained development has 34 Lean files and 7,612 source lines,
+including its 19-line axiom audit; the headline import closure has 33
+modules and 7,593 lines. Source lines include comments and blank lines.
 The theorem statement, model, finite-state ceiling, attainment constructions,
 and exact axiom audit are unchanged. Git history retains superseded proofs.
 

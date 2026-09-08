@@ -216,28 +216,4 @@ theorem PartialSecondRunSharp.ChangedContact.forward_stay_zero_novelty
     (by simp [hnextHistorical, hstateHistorical])
     (fun j _ hjK => C.mem_compressedLead_of_approach (N := N) (by omega))⟩
 
-/-- Every first-changing contact of an arbitrary simple continuation has at
-most two post-contact novelty vectors.  Backward contacts are exact retrace
-lassos; forward contacts are the stay/flip splices above. -/
-theorem PartialSecondRunSharp.ChangedContact.changed_two_novelty
-    {w : Wiring} {N g e : Nat}
-    {A : ManufacturedReflector w g e}
-    (C : PartialSecondRunSharp.ChangedContact w A)
-    (times : List Nat) :
-    NoveltyCoverOn w N (e, A.activatedState)
-      times (C.compressedLead N) 2 := by
-  rcases C.direction with hbackward | hforward
-  · obtain ⟨fresh, hfresh, hmem⟩ :=
-      C.backward_all_time_zero_novelty
-        (N := N) hbackward times
-    exact ⟨fresh, by omega, hmem⟩
-  · cases A with
-    | stay R =>
-        obtain ⟨fresh, hfresh, hmem⟩ :=
-          C.forward_stay_zero_novelty
-            hforward times
-        exact ⟨fresh, by omega, hmem⟩
-    | flip R =>
-        exact ⟨_, by simp, C.forward_flip_corner_cover hforward times⟩
-
 end GeneralN

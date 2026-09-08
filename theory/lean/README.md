@@ -60,7 +60,7 @@ The `2^N` ceiling is `state_law_two_pow` in `StateLawSmallN.lean`: the
 restricted vectors are length-`N` Boolean lists.
 
 The substantial dynamical result is the known-incoming-edge `N+4` bound,
-derived from `ProtectedPairNAddFour.lean`. Its internal entry point now
+proved by `known_edge_N_add_four` in `StateLawNAddFourSharp.lean`. Its entry point
 assumes a bounded **total** wiring: every port below `3*N` has a partner.
 Its construction-history and pointwise reflector arguments remain the
 core of the proof, but both `N+1`-step exploration probes are automatically
@@ -112,8 +112,8 @@ The pointwise cycle and repair facts still used for state counting remain.
 The next reduction is inside the known-incoming-edge proof, in
 `ProtectedPairNAddFour.lean`. Let `A` be the first manufactured reflector
 and `B` the opposite second reflector. Once the old paths are grooved at
-both endpoints of `B`'s construction, use just the canonical history
-`A.preservedTwoHistoryCore B N` in every branch.
+both endpoints of `B`'s construction, use `A.continuationHistory` through
+that construction plus `B`'s activated vector in every branch.
 
 The continuation needs no repair classification. Write `u = B.preReturn.2`,
 `s = B.activatedState`, and let `a`, `b` be the local actions of `A`, `B`.
@@ -130,8 +130,8 @@ leaving just `a(s)` to charge. This is `ManufacturedReflector.preReturn_pair_cor
 in `PairActionCorners.lean`; it replaces the protected repair classification
 and the separate facing, backward, and completed-route novelty arguments.
 
-For a stay reflector `A`, that history has at most `N+2` entries and the
-repair tail has at most two fresh vectors. For a flip reflector, inspect
+For a stay reflector `A`, all four corners are already historical, so the
+generic `N+3` history bound suffices. For a flip reflector, inspect
 its action coordinate (the tongue it flips on reflection):
 
 * **Absent from `B`'s productive first writers:** the coordinate is outside
@@ -146,8 +146,9 @@ its action coordinate (the tongue it flips on reflection):
 Thus the arithmetic is `(N+2)+2 = (N+3)+1 = N+4`. The earlier split between
 "first productive writer" and "an earlier writer exists" is unnecessary.
 The doubly-erased history and its separate coverage and counting lemmas
-have been removed. The existing generic tail lemmas work directly with the
-same history, including the boundary configurations.
+have been removed. One pointwise cover passes through each manufacturing
+journey in turn; it needs no separate shifted sample list or two-journey
+counting theorem.
 
 ### One reservation lemma instead of repeated coordinate counting
 
@@ -159,9 +160,11 @@ duplicate-free list of reserved switches together:
 old reusable coordinates + new productive writers + reserved coordinates <= N.
 ```
 
-Both reflector construction and continuation use this same argument, with
-zero, one, or two reserved coordinates. The separate `ReservedHistoryCharge`
-module and its specialized counting wrappers have been removed.
+Both reflector construction and continuation use this same argument.
+`continuationHistory_length_le` accepts an optional list of reserved
+coordinates, sharing the erasure and size calculation across both uses.
+The separate `ReservedHistoryCharge` module and specialized counting
+wrappers have been removed.
 
 The first construction history also omits a known duplicate sample directly:
 the stay activation equals its pre-return sample, and a flip reflector's
@@ -445,6 +448,7 @@ comments and blanks, not just proof tactics.
 | After unified repair traversal and early protected-contact exclusion | 43 | 10,155 |
 | After direct historical phases and manufacturing-return coverage | 39 | 9,673 |
 | After replacing protected repair by the pre-return pair orbit | 35 | 8,311 |
+| After direct contact recovery, shared continuation budgets, and closed probes | 33 | 7,593 |
 
 The second pass removes a further **1,778 lines** from this dependency
 closure (3,742 cumulatively). `ProtectedPairNAddFour.lean` itself decreases
@@ -639,3 +643,19 @@ all **73 jobs** without warnings, the exact axiom audit passes, and all **310**
 public source theorems remain in the headline proof's kernel dependency closure.
 Across the last three checkpoints, the proof shrank from **10,466 to 8,330
 lines**: **2,136 lines (20.4%)**, with eight modules removed.
+
+The direct-closure pass removes **695 Lean source lines**, from the reviewed
+**8,307 to 7,612**, an **8.4%** reduction. There are **34 files**, including
+the unchanged audit. Counts include every helper, comment, and blank line.
+
+The action writer's constant runway retrace recovers the historical corner
+directly, eliminating the changed-contact residual and contradiction chain.
+Protected pairs use the continuation history and its optional reserved
+coordinates; a stay reflector contributes no new tail vector. One pointwise
+cover lifts through the two manufacturing journeys in succession. Both
+first-revisit probes now close their outcomes directly in `known_edge_N_add_four`,
+removing `KnownEdgeNAddFourFrontier` and `KnownEdgeNAddFourChangedClosed`.
+
+All seven protected files remain byte-for-byte unchanged. A clean build checks
+all **69 jobs** without warnings, the exact axiom audit passes, and all **290**
+public source theorems belong to the headline proof's kernel dependency closure.

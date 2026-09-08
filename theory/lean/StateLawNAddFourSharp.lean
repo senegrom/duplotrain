@@ -1,5 +1,6 @@
 import ProtectedPairNAddFour
 import StateLawBounds
+import WiringCompletion
 
 /-!
 # Sharp `N+4` state law by completing all free ports
@@ -21,6 +22,51 @@ and contributes at most the time-zero vector.
 
 namespace GeneralN
 
+/-- On total wirings both first-revisit probes are live. Close each cycle or
+reflector outcome directly with its counting theorem. -/
+theorem known_edge_N_add_four
+    {w : Wiring} {N e : Nat}
+    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
+    (htotal : ∀ p, p < 3 * N → ∃ q, w.link p = some q)
+    {start : Nat × Tongues} (hentry : w.link e = some start.1)
+    (times : List Nat)
+    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
+    times.length ≤ N + 4 := by
+  obtain ⟨firstFinish, hfirst⟩ :=
+    stepN_live_of_total hN htotal (N + 1) start (hN _ _ hentry).2
+  rcases first_revisit_fork hN hfirst hentry with hcycleA | ⟨A, hA, hbaseA⟩
+  · obtain ⟨lead, atRepeat, settled, htrace, hsimple, hsettled⟩ := hcycleA
+    have hshort := prefix_then_settled_distinct_le htrace.sound
+      (htrace.simple_length_le hN hsimple) hsettled times hnd
+    omega
+  · have hndA : (times.map
+        (restrictedTonguesAt w N (start.1, A.baseState))).Nodup := by
+      simpa [hbaseA] using hnd
+    have hliveA : ∀ k ∈ times, (stepN w k (start.1, A.baseState)).isSome := by
+      intro k _
+      exact Option.isSome_iff_exists.mpr
+        (stepN_live_of_total hN htotal k _ (hN _ _ hentry).2)
+    have hchanged {finish : Nat × Tongues} {lead : List Passage}
+        (htrace : PhysicalTrace w (e, A.activatedState) lead finish)
+        (hsimple : SwitchSimple lead)
+        (hbroken : ¬ PathGrooves A.toSupported.paths finish.2) : times.length ≤ N + 4 := by
+      obtain ⟨C⟩ := PartialSecondRunSharp.ManufacturedReflector.changedContact_of_broken_simple
+        A hA htrace hsimple hbroken
+      exact C.all_run_distinct_le_N_add_four hN hA times hliveA hndA
+    obtain ⟨secondFinish, hsecond⟩ := stepN_live_of_total hN htotal
+      (N + 1) (e, A.activatedState) (hN _ _ hentry).1
+    rcases first_revisit_fork hN hsecond (w.symm _ _ hentry) with hcycleB | ⟨B, hB, hbaseB⟩
+    · obtain ⟨lead, atRepeat, settled, htrace, hsimple, hsettled⟩ := hcycleB
+      by_cases hend : PathGrooves A.toSupported.paths atRepeat.2
+      · have hsmall := simple_lead_one_vector_tail_distinct_le_N_add_three
+          hN A hA htrace hsimple hend hsettled times hndA
+        omega
+      · exact hchanged htrace hsimple hend
+    · by_cases hpre : PathGrooves A.toSupported.paths B.preReturn.2
+      · exact A.preReturn_grooved_protected_pair_all_run_distinct_le_N_add_four
+          hN B hbaseB hA hB hpre times hliveA hndA
+      · exact hchanged (by simpa [hbaseB] using B.exploration_trace) B.exploration_simple hpre
+
 /-- **Sharp state law.** Transfer original live samples to a total
 completion without changing the start, sample times, or switch budget. -/
 theorem state_law_N_add_four : StateLawNAddFour := by
@@ -39,30 +85,12 @@ theorem state_law_N_add_four : StateLawNAddFour := by
       | some finish =>
           exact stepN_preserved_by_wiring_extension
             (fun _ _ hab => Wiring.completed_preserves hab) k start finish hr
-    have hvlive : ∀ k ∈ times, (stepN v k start).isSome := by
-      intro k hk
-      rw [hreach k hk]
-      exact hlive k hk
     have hvectors : times.map (restrictedTonguesAt v N start) =
         times.map (restrictedTonguesAt w N start) := by
       apply List.map_congr_left
       intro k hk
       simp only [restrictedTonguesAt, tonguesAt, hreach k hk]
-    rcases known_edge_N_add_four_or_changed_contact_or_protected_pair
-        hvN hvtotal (v.symm _ _ he) times (hvectors.symm ▸ hnd) with
-        hsmall | hchanged | hpair
-    · exact hsmall
-    · obtain ⟨D⟩ := hchanged
-      have hliveA : ∀ k ∈ times,
-          (stepN v k (start.1, D.A.baseState)).isSome := by
-        simpa [D.base] using hvlive
-      have hndA : (times.map
-          (restrictedTonguesAt v N (start.1, D.A.baseState))).Nodup := by
-        simpa [D.base] using (hvectors.symm ▸ hnd)
-      exact D.contact.all_run_distinct_le_N_add_four
-        hvN D.grooves times hliveA hndA
-    · exact knownEdgeProtectedPairNAddFourLaw hvN (Classical.choice hpair)
-        times hvlive (hvectors.symm ▸ hnd)
+    exact known_edge_N_add_four hvN hvtotal (v.symm _ _ he) times (hvectors.symm ▸ hnd)
   · have hdead : stepN w 1 start = none := by
       have hedge : w.link (arrive start.2 start.1).1 = none := by
         cases hw : w.link (arrive start.2 start.1).1 with

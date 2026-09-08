@@ -99,7 +99,7 @@ bounds
 \[ 26N{+}3 \to 24N{+}5 \to 18N{+}3 \to \cdots \to 2N{+}9 \to N{+}7 \to
    N{+}6 \to N{+}5 \to N{+}4 \]
 was tightened until the constructive lower bound was met.  The final
-development (8,307 lines of Lean~4 in 36 files, using no
+development (7,612 lines of Lean~4 in 34 files, using no
 external mathematics library) proves the single statement
 \begin{center}
   \lean{GeneralN.state\_law :\ }$\forall N$,
@@ -592,12 +592,11 @@ its own count (files \file{PartialSecondRunSharp.lean},
 \end{tabular}
 \end{center}
 
-The two $N+4$ leaves are the genuine frontier
-(\file{KnownEdgeNAddFourFrontier.lean}); everything else in the tree is
+The two $N+4$ leaves are closed directly in
+\file{StateLawNAddFourSharp.lean}; everything else in the tree is
 $N+3$ or less.
 
-\begin{lemma}[Changed contact; \file{ChangedContactNAddFour.lean},
-  \file{KnownEdgeNAddFourChangedClosed.lean}]\label{lem:contact}
+\begin{lemma}[Changed contact; \file{ChangedContactNAddFour.lean}]\label{lem:contact}
   Suppose after the first flip reflector the run makes a first
   support-changing contact.  The general changed-support count pays a
   compressed lead of $N+3$ plus two fresh Gray corners; but the
@@ -606,8 +605,9 @@ $N+3$ or less.
   productively first-writes that very switch, the action switch is a
   reserved ambient coordinate, the lead compresses to $N+2$, and the
   branch closes at $N+4$.  In the remaining action-written case the local
-  forward tail has only one fresh corner (a runway alternative is killed
-  by the retrace contradiction), which again yields $N+3+1 = N+4$.
+  forward tail has only one fresh corner: the constant runway retrace
+  makes that action write the last productive write and recovers its
+  historical pre-write vector. Again the count is $N+3+1 = N+4$.
 \end{lemma}
 
 \begin{lemma}[Protected pair; \file{ProtectedPairNAddFour.lean},
@@ -620,8 +620,8 @@ $N+3$ or less.
   pre-return state: the four-corner theorem confines every later sample to
   the pre-return and activated states and their two images under the old
   reflector's action, of which the first two are historical. If the old
-  reflector is a stay reflector, that history has at most $N+2$ entries
-  and the tail adds at most two fresh vectors. For a flip reflector,
+  reflector is a stay reflector, all four corners are historical, so the
+  generic $N+3$ history bound suffices. For a flip reflector,
   split only on whether its private action coordinate occurs among the
   second construction's productive first writers. If absent, reserve that
   coordinate: again the budget is $(N+2)+2$. If present, its write forces a
@@ -631,12 +631,11 @@ $N+3$ or less.
   first-writer-order subdivision and doubly-erased history are unnecessary.
 \end{lemma}
 
-Packaging the closed tree gives the keystone, discharged inline in
-\lean{state\_law\_N\_add\_four}: the probe
-\lean{known\_edge\_N\_add\_four\_or\_changed\_contact\_or\_protected\_pair}
-leaves the two residual branches, closed by
-\lean{ChangedContact.all\_run\_distinct\_le\_N\_add\_four} and
-\lean{knownEdgeProtectedPairNAddFourLaw}.
+The continuation history and its optional reserved-coordinate list supply
+both budgets. A pointwise cover passes through each manufacturing journey
+in turn. The keystone \lean{known\_edge\_N\_add\_four} closes both probe
+outcomes directly; \lean{state\_law\_N\_add\_four} then transfers this bound
+to arbitrary partial wirings.
 
 \begin{theorem}[Known incoming edge;
   \file{StateLawNAddFourSharp.lean}]\label{thm:knownedge}

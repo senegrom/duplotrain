@@ -43,7 +43,7 @@ def ManufacturedReflector.continuationHistory
       (VectorCount.restrict N A.activatedState)
 
 /-- The combined first-reflector/continuation history has size at most
-`N+2`. -/
+`N+2`. Each reserved coordinate removes one further unit. -/
 theorem ManufacturedReflector.continuationHistory_length_le
     {w : Wiring} {N g e : Nat}
     (hN : ∀ p q, w.link p = some q →
@@ -55,15 +55,21 @@ theorem ManufacturedReflector.continuationHistory_length_le
     (htrace : PhysicalTrace w start passages finish)
     (hsimple : SwitchSimple passages)
     (hbase : PathGrooves A.toSupported.paths start.2)
-    (hend : PathGrooves A.toSupported.paths finish.2) :
-    (A.continuationHistory N start passages.length).length ≤ N + 2 := by
+    (hend : PathGrooves A.toSupported.paths finish.2)
+    (extras : List Nat := [])
+    (hextrasNodup : extras.Nodup := by simp)
+    (hextrasLt : ∀ s ∈ extras, s < N := by simp)
+    (hextrasReusable : ∀ s ∈ extras, s ∉ A.reusableSwitches := by simp)
+    (hextrasWriters : ∀ s ∈ extras,
+      s ∉ (rawFirstWriterTimes w N start passages.length).map (rawWriterAt w start) := by simp) :
+    (A.continuationHistory N start passages.length).length + extras.length ≤ N + 2 := by
   have hboundary : VectorCount.restrict N A.activatedState ∈
       rawFirstWriterHistory w N start passages.length := by
     simp [rawFirstWriterHistory, restrictedTonguesAt,
       tonguesAt, stepN, hstart]
   have hcharge :=
-    A.reusable_add_continuation_first_writers_le
-      hN htrace hsimple hbase hend
+    A.reusable_add_continuation_first_writers_add_extras_le
+      hN htrace hsimple hbase hend extras hextrasNodup hextrasLt hextrasReusable hextrasWriters
   have houter := A.exploration_length_le_reusable_add_one
   unfold ManufacturedReflector.continuationHistory
   rw [List.length_append, List.length_erase_of_mem hboundary,
@@ -131,6 +137,27 @@ theorem ManufacturedReflector.journey_then_continuation_mem
     exact A.mem_continuationHistory
       (N := N) (finish := finish) (passages := passages)
       htrace hsimple hd
+
+/-- A cover of the manufacturing history and every live continuation vector
+covers every live vector of the original run. -/
+theorem ManufacturedReflector.journey_then_live_cover
+    {w : Wiring} {N g e : Nat} (A : ManufacturedReflector w g e)
+    (hA : PathGrooves A.toSupported.paths A.activatedState)
+    (cover : List (List Bool))
+    (hhistory : ∀ x ∈ A.sharpConstructionHistory N, x ∈ cover)
+    (htail : ∀ k, (stepN w k (e, A.activatedState)).isSome →
+      restrictedTonguesAt w N (e, A.activatedState) k ∈ cover)
+    {k : Nat} (hlive : (stepN w k (g, A.baseState)).isSome) :
+    restrictedTonguesAt w N (g, A.baseState) k ∈ cover := by
+  let K := A.exploration.length + A.runway.length + 1
+  have hreach : stepN w K (g, A.baseState) = some (e, A.activatedState) :=
+    A.manufacturing_journey_reaches_activated hA
+  by_cases hk : k ≤ K
+  · exact hhistory _ (A.manufacturing_journey_mem_sharpHistory hA hk)
+  · have heq : K + (k - K) = k := by omega
+    have hs := stepN_suffix_some_of_reaches hreach (by rwa [heq])
+    rw [← heq, restrictedTonguesAt_add_of_reaches hreach hs]
+    exact htail _ (Option.isSome_iff_exists.mpr hs)
 
 theorem simple_lead_one_vector_tail_distinct_le_N_add_three
     {w : Wiring} {N g e : Nat}
