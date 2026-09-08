@@ -1,10 +1,11 @@
-import TrackNormalForm
+import TrackLobe
 
 /-!
 # The theta-intersection engine
 
-This file studies the only obstruction left by the supported-reflector normal
-form: one reflector flips a switch lying on the other reflector's grooved
+This file first packages the supported-reflector normal form (local actions,
+path grooves, and the reflector interface), then studies the only obstruction
+that form leaves: one reflector flips a switch lying on the other reflector's grooved
 support.  The local core is that a flipped groove has only two behaviours.
 Approached trailing-first it repairs itself; approached facing-first it leaves
 through the third arm.  For a manufactured lobe that third arm is precisely
@@ -12,6 +13,85 @@ the entrance into the older reflector, which is the theta capture.
 -/
 
 namespace GeneralN
+
+inductive LocalAction where
+  | stay
+  | flip (switch : Nat)
+
+def LocalAction.apply : LocalAction → Tongues → Tongues
+  | .stay, u => u
+  | .flip k, u => flipAt u k
+
+theorem LocalAction.involutive (action : LocalAction) :
+    ∀ u, action.apply (action.apply u) = u := by
+  intro u
+  cases action with
+  | stay => rfl
+  | flip k => exact flipAt_flipAt u k
+
+theorem LocalAction.commute (a b : LocalAction) :
+    ∀ u, a.apply (b.apply u) = b.apply (a.apply u) := by
+  intro u
+  cases a with
+  | stay => rfl
+  | flip ka =>
+      cases b with
+      | stay => rfl
+      | flip kb =>
+          by_cases h : ka = kb
+          · rw [h]
+          · exact flipAt_comm (Ne.symm h)
+
+/-- Two commuting local actions preserve their four algebraic corners. -/
+def LocalAction.corners (a b : LocalAction) (state : Tongues) : List Tongues :=
+  [state, a.apply state, b.apply state, a.apply (b.apply state)]
+
+theorem LocalAction.corners_closed (a b : LocalAction) (state u : Tongues)
+    (hu : u ∈ a.corners b state) :
+    a.apply u ∈ a.corners b state ∧ b.apply u ∈ a.corners b state := by
+  simp only [corners, List.mem_cons, List.not_mem_nil, or_false] at hu
+  rcases hu with rfl | rfl | rfl | rfl <;>
+    simp [corners, a.involutive, b.involutive, b.commute a]
+
+/-- Every path in `paths` is currently grooved. -/
+def PathGrooves (paths : List (List Passage)) (u : Tongues) : Prop :=
+  ∀ path ∈ paths, PassagesGrooved u path
+
+theorem pathGrooves_pair {a b : List Passage} {u : Tongues} :
+    PathGrooves [a, b] u ↔
+      PassagesGrooved u a ∧ PassagesGrooved u b := by
+  simp [PathGrooves]
+
+theorem passagesGrooved_singleton {p x : Nat} {u : Tongues} :
+    PassagesGrooved u [(p, x)] ↔ arrive u x = (p, u) := by
+  simp [PassagesGrooved]
+
+/-- The local action does not touch any switch used by any support path. -/
+def LocalAction.Avoids (action : LocalAction)
+    (paths : List (List Passage)) : Prop :=
+  match action with
+  | .stay => True
+  | .flip k =>
+      ∀ path ∈ paths, ∀ passage ∈ path, passageSwitch passage ≠ k
+
+theorem PathGrooves.after_avoiding_action
+    {paths : List (List Passage)} {u : Tongues} {action : LocalAction}
+    (hg : PathGrooves paths u) (ha : action.Avoids paths) :
+    PathGrooves paths (action.apply u) := by
+  cases action with
+  | stay => exact hg
+  | flip k =>
+      intro path hp
+      apply grooved_after_flip_other (hg path hp)
+      exact ha path hp
+
+/-- A reflector together with the finite list of paths whose grooves certify
+its operation and its identity/one-switch action. -/
+structure SupportedReflector (w : Wiring) (g e : Nat) where
+  travel : Nat
+  paths : List (List Passage)
+  action : LocalAction
+  run : IsReflector w g e travel (PathGrooves paths) action.apply
 
 /-! ## Equivariance away from the flipped switch -/
 
@@ -111,17 +191,6 @@ theorem PhysicalTrace.passage_exit_switch
   intro passage hp
   obtain ⟨u, v, _, harrive, _⟩ := htrace.passage_step passage hp
   simpa only [harrive, passageSwitch] using arrive_exit_switch u passage.1
-
-theorem map_passageSwitch_reversePassages
-    {w : Wiring} {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish) :
-    (reversePassages passages).map passageSwitch =
-      (passages.map passageSwitch).reverse := by
-  change (passages.reverse.map Prod.swap).map passageSwitch = _
-  rw [List.map_map, ← List.map_reverse]
-  exact List.map_congr_left fun passage hp =>
-    htrace.passage_exit_switch passage (List.mem_reverse.mp hp)
 
 /-! ## One deliberately broken groove -/
 
@@ -260,38 +329,6 @@ theorem ManufacturedFlipReflector.runway_trace
     PhysicalTrace w (g, state) A.runway (A.mouth, state) := by
   exact A.runwayTrace.replay_grooved state hgrooved
 
-/-- Candy traversal in its recorded direction, before the mouth switch is
-pinned on the return arm. -/
-theorem ManufacturedFlipReflector.candy_forward_trace
-    (state : Tongues)
-    (hselected : state A.actionSwitch = bval A.firstArm)
-    (hgrooved : PassagesGrooved state A.candy) :
-    PhysicalTrace w (A.mouth, state)
-      ((A.mouth, A.firstArm) :: A.candy)
-      (A.secondArm, state) := by
-  apply physicalTrace_grooved_passages w state A.mouth A.firstArm A.secondArm A.candy
-    A.candyTrace.linked ?_ A.candyTrace.last_link
-  intro passage hp
-  rcases List.mem_cons.mp hp with rfl | hp
-  · exact stem_branch_groove A.mouth_is_stem A.firstArm_branch A.firstArm_switch
-      (by simpa only [A.firstArm_switch] using hselected)
-  · exact hgrooved passage hp
-
-/-- Candy traversal in the opposite direction, with the reverse passage
-list retained explicitly. -/
-theorem ManufacturedFlipReflector.candy_reverse_trace
-    (state : Tongues)
-    (hselected : state A.actionSwitch = bval A.secondArm)
-    (hgrooved : PassagesGrooved state A.candy) :
-    PhysicalTrace w (A.mouth, state)
-      ((A.mouth, A.secondArm) :: reversePassages A.candy)
-      (A.firstArm, state) := by
-  have hg := stem_branch_groove A.mouth_is_stem A.secondArm_branch A.secondArm_switch
-    (by simpa only [A.secondArm_switch] using hselected)
-  cases A.candyTrace with
-  | cons _ hentry tail =>
-      exact physicalTrace_contact_retraces_prefix tail hgrooved hentry (groove_forward hg)
-
 theorem ManufacturedFlipReflector.reverse_support_simple :
     SwitchSimple
       (A.runway ++
@@ -302,7 +339,10 @@ theorem ManufacturedFlipReflector.reverse_support_simple :
     have htrace := A.candyTrace
     cases htrace with
     | cons harrive hlink tail =>
-        exact map_passageSwitch_reversePassages tail
+        change (A.candy.reverse.map Prod.swap).map passageSwitch = _
+        rw [List.map_map, ← List.map_reverse]
+        exact List.map_congr_left fun passage hp =>
+          tail.passage_exit_switch passage (List.mem_reverse.mp hp)
   have hs := A.simple
   unfold SwitchSimple at hs ⊢
   simp only [List.map_append, List.map_cons] at hs ⊢
@@ -592,7 +632,15 @@ theorem ManufacturedReflector.orientedRoute_trace
       have hrun := R.runway_trace state hp.1
       by_cases hselected :
           state R.actionSwitch = bval R.firstArm
-      · have hcandy := R.candy_forward_trace state hselected hp.2
+      · have hcandy : PhysicalTrace w (R.mouth, state) ((R.mouth, R.firstArm) :: R.candy)
+            (R.secondArm, state) := by
+          apply physicalTrace_grooved_passages w state R.mouth R.firstArm R.secondArm R.candy
+            R.candyTrace.linked ?_ R.candyTrace.last_link
+          intro passage hmem
+          rcases List.mem_cons.mp hmem with rfl | hmem
+          · exact stem_branch_groove R.mouth_is_stem R.firstArm_branch R.firstArm_switch
+              (by simpa only [R.firstArm_switch] using hselected)
+          · exact hp.2 passage hmem
         simpa [ManufacturedReflector.orientedRoute,
           ManufacturedReflector.orientedFinish, hselected] using
           hrun.append hcandy
@@ -601,7 +649,13 @@ theorem ManufacturedReflector.orientedRoute_trace
           rcases R.selected_arm state with hfirst | hsecond
           · exact absurd hfirst hselected
           · exact hsecond
-        have hcandy := R.candy_reverse_trace state hsecond hp.2
+        have hg := stem_branch_groove R.mouth_is_stem R.secondArm_branch R.secondArm_switch
+          (by simpa only [R.secondArm_switch] using hsecond)
+        have hcandy : PhysicalTrace w (R.mouth, state)
+            ((R.mouth, R.secondArm) :: reversePassages R.candy) (R.firstArm, state) := by
+          cases R.candyTrace with
+          | cons _ hentry tail =>
+              exact physicalTrace_contact_retraces_prefix tail hp.2 hentry (groove_forward hg)
         simpa [ManufacturedReflector.orientedRoute,
           ManufacturedReflector.orientedFinish, hselected] using
           hrun.append hcandy

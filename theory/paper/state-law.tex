@@ -99,7 +99,7 @@ bounds
 \[ 26N{+}3 \to 24N{+}5 \to 18N{+}3 \to \cdots \to 2N{+}9 \to N{+}7 \to
    N{+}6 \to N{+}5 \to N{+}4 \]
 was tightened until the constructive lower bound was met.  The final
-development (6,649 lines of Lean~4 in 31 files, using no
+development (6,210 lines of Lean~4 in 25 files, using no
 external mathematics library) proves the single statement
 \begin{center}
   \lean{GeneralN.state\_law :\ }$\forall N$,
@@ -535,7 +535,7 @@ the sticky/alternating dichotomy visible in the toy.
 
 Call a live step \emph{productive} when it changes the restricted vector;
 its \emph{writer} is the switch it enters
-(\file{TrackFiniteAlternation.lean}). Record the initial vector and the
+(\file{SharpCertificateClosure.lean}). Record the initial vector and the
 post-vector of every productive step. This history covers every live prefix
 by induction: a quiet step repeats its preceding vector, and a productive
 step adds its own post-vector (\file{SharpCertificateClosure.lean}).
@@ -654,7 +654,7 @@ its run fall off. Both complications can be removed in one comparison.
 The abstract model admits self-links, so completing an unwired port costs
 no switch. No totality premise is added to the headline theorem.
 
-\begin{lemma}[Total completion; \file{WiringCompletion.lean}]
+\begin{lemma}[Total completion; \file{StateLawNAddFourSharp.lean}]
   \label{lem:cap}
   For any wiring $w$ using only switches $0,\dots,N-1$, define $v$ by
   preserving every existing edge and setting $v(p)=p$ at every unwired
@@ -674,7 +674,7 @@ no switch. No totality premise is added to the headline theorem.
 
 \begin{lemma}[Extension preserves live runs;
   \lean{stepN\_preserved\_by\_wiring\_extension},
-  \file{WiringCompletion.lean}]\label{lem:extend}
+  \file{StateLawNAddFourSharp.lean}]\label{lem:extend}
   If every edge of $w$ is an edge of $v$, every configuration reached
   after $n$ live steps in $w$ is reached at exactly time $n$ in $v$.
 \end{lemma}
@@ -760,7 +760,7 @@ vector or synchronizes with its remaining traversal. Both outcomes restore
 the same boundary invariant after a positive excursion. Strong induction
 therefore gives the all-time cover without constructing a separate reverse
 excursion. The corner-closure calculation is shared with the manufactured-pair
-argument (\file{TrackNormalForm.lean}, \file{RunwaySpliceNovelty.lean}).
+argument (\file{TrackTheta.lean}, \file{RunwaySpliceNovelty.lean}).
 
 The protected facing exits need no separate approach-and-return invariant.
 The continuation after the protected pre-return state is a suffix of the
@@ -778,7 +778,7 @@ $v$, even if its interior repeats switches. When the contact supplies such a
 route, the original run consequently has vector $u$ at time zero and $v$ at
 every positive time. There is no need to analyse a transient lap and then
 reduce time modulo a stable period
-(\file{TrackNovelReplay.lean}, \file{TripleSelfLinkSimpleCycleClosure.lean}).
+(\file{TrackNoveltyCover.lean}, \file{TripleSelfLinkSimpleCycleClosure.lean}).
 
 \subsection{Closed spatial routes and one variable tongue}
 
@@ -885,7 +885,7 @@ square.
 \section{About the formalisation}\label{sec:formal}
 
 The development in \file{theory/lean} builds with Lean~4.32.2 and no
-external library. Run \texttt{lake build} to compile all 31 Lean files;
+external library. Run \texttt{lake build} to compile all 25 Lean files;
 \file{StateLawAxiomAudit.lean} checks the exact transitive axiom list of
 \lean{GeneralN.state\_law}:
 \begin{center}
@@ -914,8 +914,7 @@ between switch ports. The main source entry points are:
   \file{StateLaw.lean} & the theorem and its statement language\\
   \file{StateLawSmallN.lean} & $2^N$ ceiling; empty/teardrop/dogbone\\
   \file{StateLawLowerBound.lean} & the extremal family, $N \ge 3$\\
-  \file{StateLawNAddFourSharp.lean} & the total known-edge theorem and the sharp $N+4$ bound\\
-  \file{WiringCompletion.lean} & total completion and preservation of live runs\\
+  \file{StateLawNAddFourSharp.lean} & total completion, the known-edge theorem and the sharp $N+4$ bound\\
   \file{TrackTrace.lean}, \file{TrackTheta.lean} & traces, reflectors,
     theta engine\\
   \file{StateLawAxiomAudit.lean} & the axiom audit\\

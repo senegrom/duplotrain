@@ -545,18 +545,6 @@ macro "lb_ne" N:term : tactic => `(tactic| first
 def lbTimes (N : Nat) : List Nat :=
   (List.range (N - 1)) ++ [N, 2 * N - 1, 2 * N, 3 * N - 1, 4 * N - 1]
 
-/-- The vector visited at each chain time. -/
-theorem lb_vector_range {N : Nat} (h4 : 4 ≤ N) (h3 : 3 ≤ N)
-    {m : Nat} (hm : m ≤ N - 2) :
-    VectorCount.restrict N
-      (tonguesAt (lbWiring N h3) (lbStart N) m) =
-      VectorCount.restrict N (lbTA N m) := by
-  by_cases hcase : m ≤ N - 3
-  · simp [tonguesAt, lb_phaseA h3 hcase]
-  · have hm2 : m = N - 2 := by omega
-    subst hm2
-    simp [tonguesAt, lb_cfg_N2 h4 h3]
-
 /-- **The `N+4` lower bound, symbolically, for `N ≥ 4`.** -/
 theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
     ∃ w : Wiring,
@@ -602,7 +590,11 @@ theorem state_law_lower_bound_of_four {N : Nat} (h4 : 4 ≤ N) :
         apply List.map_congr_left
         intro m hm
         have hm' : m < N - 1 := List.mem_range.mp hm
-        exact lb_vector_range h4 h3 (by omega)
+        by_cases hcase : m ≤ N - 3
+        · simp [tonguesAt, lb_phaseA h3 hcase]
+        · have hm2 : m = N - 2 := by omega
+          subst hm2
+          simp [tonguesAt, lb_cfg_N2 h4 h3]
       have hR : [N, 2 * N - 1, 2 * N, 3 * N - 1, 4 * N - 1].map
           (fun k => VectorCount.restrict N
             (tonguesAt (lbWiring N h3) (lbStart N) k)) =

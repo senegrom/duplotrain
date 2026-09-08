@@ -103,26 +103,6 @@ theorem PartialSecondRunSharp.ChangedContact.changed_all_run_distinct_le_compres
   exact List.mem_append_left _ (List.mem_append_left _ (A.mem_sharpHistoryCore_of_mem
     (A.manufacturing_journey_mem_sharpHistory hA hk)))
 
-/-- Absolute coefficient-one bound for the entire original run once the
-first damaging continuation contact points backward. -/
-theorem PartialSecondRunSharp.ChangedContact.backward_all_run_distinct_le_N_add_three
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {A : ManufacturedReflector w g e}
-    (C : PartialSecondRunSharp.ChangedContact w A)
-    (hA : PathGrooves A.toSupported.paths A.activatedState)
-    (hbackward : C.x = C.oriented.1)
-    (times : List Nat)
-    (hlive : ∀ k ∈ times,
-      (stepN w k (g, A.baseState)).isSome)
-    (hnd : (times.map
-      (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
-    times.length ≤ N + 3 := by
-  have hcount := C.changed_all_run_distinct_le_compressedLead_add_budget hA times hlive hnd
-    (C.backward_all_time_zero_novelty hbackward _)
-  have hlength := C.compressedLead_length_le hN hA
-  omega
-
 /-- **Forward flip contact, the corner cover.**  After a forward
 first-changing contact into a flip reflector every sampled vector lies in the
 compressed contact history or is one of the two action corners of the

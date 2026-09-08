@@ -79,7 +79,7 @@ already have distinct writers. No first-writer predicate or search through
 earlier times is needed.
 
 `StateLawNAddFourSharp.lean` reduces arbitrary starts and partial wirings
-to this setting using `WiringCompletion.lean`:
+to this setting by completing the wiring:
 
 1. Complete every free port below `3*N` with the self-link `p -> p`.
    Symmetry is preserved because no old edge can point to a free port.
@@ -426,8 +426,8 @@ state and its two unused certificates are removed from the contact interfaces.
 ## Size
 
 The tree is the headline theorem, its local import closure, and the
-separate axiom audit: 31 files and 6,649 source lines, including the
-19-line audit. The closure of `StateLaw` alone has 30 modules and 6,630
+separate axiom audit: 25 files and 6,210 source lines, including the
+19-line audit. The closure of `StateLaw` alone has 24 modules and 6,191
 lines. Source lines count comments and blanks, not just proof tactics.
 Every public theorem lies in the headline proof's kernel dependency
 closure. There is no `sorry`, no additional axiom, and no `native_decide`;

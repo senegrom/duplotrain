@@ -118,21 +118,6 @@ theorem ManufacturedReflector.runway_trace_at
       exact R.runway_trace state
         (pathGrooves_pair.mp hpaths).1
 
-/-- The selected far arm enters the reflector mouth and performs precisely
-the advertised local action. -/
-theorem ManufacturedReflector.orientedFinish_arrive
-    {w : Wiring} {g e : Nat}
-    (A : ManufacturedReflector w g e) (state : Tongues)
-    (hpaths : PathGrooves A.toSupported.paths state) :
-    arrive state (A.orientedFinish state) =
-      (A.mouthConfig.1, A.toSupported.action.apply state) := by
-  cases A with
-  | stay R =>
-      change arrive state R.arm = (R.mouth, state)
-      exact passagesGrooved_singleton.mp
-        (pathGrooves_pair.mp hpaths).2
-  | flip R => exact R.oriented_finish_arrive state
-
 /-- Concrete travel splits into the selected no-change route, one contact,
 and the reverse runway. -/
 theorem ManufacturedReflector.travel_eq_oriented_add
@@ -165,9 +150,16 @@ theorem ManufacturedReflector.travel_two_phase_stepN
   have htrace := A.orientedRoute_trace state hpaths
   have hg := htrace.grooved_of_switchSimple (A.orientedRoute_simple state)
   have hpathsAfter := hpaths.after_avoiding_action A.action_avoids_own_support
+  have harrive : arrive state (A.orientedFinish state) =
+      (A.mouthConfig.1, A.toSupported.action.apply state) := by
+    cases A with
+    | stay R =>
+        change arrive state R.arm = (R.mouth, state)
+        exact passagesGrooved_singleton.mp (pathGrooves_pair.mp hpaths).2
+    | flip R => exact R.oriented_finish_arrive state
   have hreturn := (physicalTrace_contact_retraces_prefix_pointwise
     (A.runway_trace_at state hpaths) (hpathsAfter A.runway A.runway_mem_support)
-    A.entryEdge (A.orientedFinish_arrive state hpaths))
+    A.entryEdge harrive)
   apply stepN_cover_append htrace.sound ?_ ?_ d
     (by rwa [← A.travel_eq_oriented_add state])
   · intro t ht
@@ -208,6 +200,5 @@ theorem ManufacturedFlipReflector.capture_from_mouth_two_phase
   exact ⟨port, phase, hr, by
     simpa [A, ManufacturedReflector.toSupported, ManufacturedFlipReflector.toSupported,
       LocalAction.apply, flipAt_flipAt] using hp⟩
-
 
 end GeneralN

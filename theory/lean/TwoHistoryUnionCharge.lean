@@ -73,28 +73,6 @@ theorem ManufacturedReflector.mem_reusableSwitches
       ManufacturedStayReflector.toSupported, ManufacturedFlipReflector.toSupported,
       List.mem_map, List.mem_append, List.mem_cons] at hk ⊢ <;> grind
 
-/-- A productive passage in a switch-simple continuation cannot write an old
-reusable coordinate when the old support is grooved at both endpoints. -/
-theorem PhysicalTrace.productive_writer_not_old_reusable
-    {w : Wiring} {N g e : Nat}
-    (A : ManufacturedReflector w g e)
-    {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    (hbase : PathGrooves A.toSupported.paths start.2)
-    (hend : PathGrooves A.toSupported.paths finish.2)
-    {k : Nat} (hk : k < passages.length)
-    (hprod : RawProductiveAt w N start k) :
-    rawWriterAt w start k ∉ A.reusableSwitches := by
-  intro hreusable
-  have hsurvives := htrace.simple_raw_productive_writer_survives hsimple hk hprod
-  obtain ⟨path, hpath, old, hold, hswitch⟩ := A.mem_reusableSwitches hreusable
-  have hagree : start.2 (passageSwitch old) = finish.2 (passageSwitch old) :=
-    grooved_states_agree_on_passage (groove_forward (hbase path hpath old hold))
-      (groove_forward (hend path hpath old hold))
-  exact hsurvives (by simpa [← hswitch] using hagree.symm)
-
 /-- Removing the facing action mouth loses at most one exploration switch. -/
 theorem ManufacturedReflector.exploration_length_le_reusable_add_one
     {w : Wiring} {g e : Nat}
@@ -162,8 +140,13 @@ theorem ManufacturedReflector.reusable_add_continuation_writers_add_extras_le
     intro j hj
     obtain ⟨k, hk, rfl⟩ := List.mem_map.mp hj
     have hk := mem_rawProductiveTimes_iff.mp hk
-    exact ⟨rawProductiveAt_writer_lt hN hk.2,
-      htrace.productive_writer_not_old_reusable A hsimple hbase hend hk.1 hk.2⟩
+    refine ⟨rawProductiveAt_writer_lt hN hk.2, fun hreusable => ?_⟩
+    have hsurvives := htrace.simple_raw_productive_writer_survives hsimple hk.1 hk.2
+    obtain ⟨path, hpath, old, hold, hswitch⟩ := A.mem_reusableSwitches hreusable
+    have hagree : start.2 (passageSwitch old) = finish.2 (passageSwitch old) :=
+      grooved_states_agree_on_passage (groove_forward (hbase path hpath old hold))
+        (groove_forward (hend path hpath old hold))
+    exact hsurvives (by simpa [← hswitch] using hagree.symm)
   have hnd : (extras ++ (A.reusableSwitches ++ writers)).Nodup := by
     refine List.nodup_append.mpr ⟨hextrasNodup,
       List.nodup_append.mpr ⟨A.reusableSwitches_nodup, hwritersNodup, ?_⟩, ?_⟩ <;> grind

@@ -475,26 +475,6 @@ theorem ManufacturedFlipReflector.candy_tail_foreign_action
   rw [hcandy]
   exact List.mem_append_right _ (List.mem_cons_of_mem _ hp)
 
-/-- After the selected one-way route of a flip reflector reaches its far
-candy arm, one trailing passage applies the reflector's action and the train
-retraces the runway to the far boundary.  The exact reverse-runway trace is
-retained for later disjointness arguments. -/
-theorem ManufacturedFlipReflector.oriented_return_trace
-    {w : Wiring} {g e : Nat}
-    (R : ManufacturedFlipReflector w e g)
-    (state : Tongues)
-    (hpaths : PathGrooves R.toSupported.paths state) :
-    PhysicalTrace w
-      ((ManufacturedReflector.flip R).orientedFinish state, state)
-      (((ManufacturedReflector.flip R).orientedFinish state,
-          R.mouth) :: reversePassages R.runway)
-      (g, flipAt state R.actionSwitch) := by
-  exact physicalTrace_contact_retraces_prefix R.runwayTrace
-    (grooved_after_flip_other (pathGrooves_pair.mp hpaths).1
-      (R.support_foreign R.runway (by simp)))
-    R.entryEdge (R.oriented_finish_arrive state)
-
-
 section
 variable {w : Wiring} {g e outside : Nat}
   (R : ManufacturedFlipReflector w e g)
@@ -533,7 +513,9 @@ theorem ManufacturedFlipReflector.candy_completion_foreign
   have hfinish := arrive_exit_switch state ((ManufacturedReflector.flip R).orientedFinish state)
   rw [R.oriented_finish_arrive state] at hfinish
   change R.actionSwitch = (ManufacturedReflector.flip R).orientedFinish state / 3 at hfinish
-  refine ⟨htail.append (R.oriented_return_trace state hpaths), ?_⟩
+  refine ⟨htail.append (physicalTrace_contact_retraces_prefix R.runwayTrace
+    (grooved_after_flip_other (pathGrooves_pair.mp hpaths).1 (R.support_foreign R.runway (by simp)))
+    R.entryEdge (R.oriented_finish_arrive state)), ?_⟩
   intro passage hp
   rcases List.mem_append.mp hp with hp | hp
   · exact htailForeign passage hp
@@ -547,7 +529,6 @@ theorem ManufacturedFlipReflector.candy_completion_foreign
       have hequal := hsimple.passage_eq_of_mem holdRoute htarget
         ((R.runwayTrace.passage_exit_switch old holdRunway).symm.trans heq)
       exact hnotRunway (hequal ▸ holdRunway)
-
 
 end
 

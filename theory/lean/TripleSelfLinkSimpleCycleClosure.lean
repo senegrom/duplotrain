@@ -161,20 +161,4 @@ theorem history_then_settled_one_novelty
     apply List.mem_append_right
     simp [restrictedTonguesAt, tonguesAt, hglobal]
 
-/-- A prefix of length at most `N` followed by one settled vector has at
-most `N+2` distinct vectors, including the initial and boundary samples. -/
-theorem prefix_then_settled_distinct_le
-    {w : Wiring} {N L : Nat} {start atRepeat : Nat × Tongues} {settled : Tongues}
-    (hreach : stepN w L start = some atRepeat) (hL : L ≤ N)
-    (htail : ∀ d, 0 < d → ∃ port, stepN w d atRepeat = some (port, settled))
-    (times : List Nat)
-    (hnd : (times.map (restrictedTonguesAt w N start)).Nodup) :
-    times.length ≤ N + 2 := by
-  have hcover := history_then_settled_one_novelty hreach
-    (history := (List.range (L + 1)).map (restrictedTonguesAt w N start))
-    (fun k hk => List.mem_map.mpr ⟨k, List.mem_range.mpr (by omega), rfl⟩) htail times
-  have hcount := noveltyCoverOn_distinct_count hcover hnd
-  simp only [List.length_map, List.length_range] at hcount
-  omega
-
 end GeneralN

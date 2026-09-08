@@ -37,9 +37,9 @@ configuration and phase returned by ordinary traversal. Shortened reflectors
 reuse their original construction witnesses rather than rebuilding them in
 the later tongue state.
 
-The retained development has 31 Lean files and 6,649 source lines,
-including its 19-line axiom audit; the headline import closure has 30
-modules and 6,630 lines. Source lines include comments and blank lines.
+The retained development has 25 Lean files and 6,210 source lines,
+including its 19-line axiom audit; the headline import closure has 24
+modules and 6,191 lines. Source lines include comments and blank lines.
 The theorem statement, model, finite-state ceiling, attainment constructions,
 and exact axiom audit are unchanged. Git history retains superseded proofs.
 

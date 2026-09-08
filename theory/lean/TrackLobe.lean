@@ -157,27 +157,6 @@ theorem stem_lobe_isReflector_foreign
     (PhysicalTrace.cons hcontact hmouth (PhysicalTrace.nil _))).sound
   simpa [List.length_append, hlen] using hr
 
-/-- The switch-simple form of `stem_lobe_isReflector_foreign`. -/
-theorem stem_lobe_isReflector
-    (w : Wiring) {p x q outside : Nat}
-    (path : List Passage)
-    (hpstem : p % 3 = 0)
-    (hxbranch : x % 3 ≠ 0) (hqbranch : q % 3 ≠ 0)
-    (hpx : p / 3 = x / 3) (hpq : p / 3 = q / 3)
-    (hxq : x ≠ q)
-    (hsimple : SwitchSimple ((p, x) :: path))
-    (hlinked : LinkedPassages w ((p, x) :: path))
-    (hfinal : w.link (lastPassageExit x path) = some q)
-    (hmouth : w.link p = some outside) :
-    IsReflector w p outside (path.length + 2)
-      (fun u => PassagesGrooved u path)
-      (fun u => flipAt u (p / 3)) := by
-  have hpathForeign : ∀ passage ∈ path, passageSwitch passage ≠ p / 3 := by
-    grind [SwitchSimple, passageSwitch]
-  exact stem_lobe_isReflector_foreign w path
-    hpstem hxbranch hqbranch hpx hpq hxq hpathForeign
-    hlinked hfinal hmouth
-
 /-- Two distinct arms meeting across an arrival force a stem mouth. -/
 theorem crossed_arrivals_geometry {p x q : Nat} {a b c d : Tongues}
     (hold : arrive a p = (x, b)) (hnew : arrive c q = (p, d)) (hne : x ≠ q) :
@@ -264,8 +243,8 @@ theorem crossed_revisit_full_reflector
     (fun _ hmouth => by
       obtain ⟨_, hold⟩ := hexcursion.head_arrive.2
       obtain ⟨hp, hx, hq, hpx, hpq⟩ := crossed_arrivals_geometry hold hrepeat hxq
-      exact stem_lobe_isReflector w _ hp hx hq hpx hpq hxq hexcursionSimple
-        hexcursion.linked hexcursion.last_link hmouth)
+      exact stem_lobe_isReflector_foreign w _ hp hx hq hpx hpq hxq
+        (by grind [SwitchSimple, passageSwitch]) hexcursion.linked hexcursion.last_link hmouth)
     (fun _ hg => grooved_after_flip_other hg hforeign)
 
 end GeneralN

@@ -1,6 +1,5 @@
 name = "duplotrain"
 defaultTargets = [
-  "WiringCompletion",
   "StateLawBounds",
   "ChangedContactNAddFour",
   "ForeignSpliceNovelty",
@@ -10,7 +9,6 @@ defaultTargets = [
   "PairActionCorners",
   "PartialSecondRunSharp",
   "ProtectedPairNAddFour",
-  "RepeatedNoveltyDecomposition",
   "RunwaySpliceNovelty",
   "SharpCertificateClosure",
   "StateLaw",
@@ -19,11 +17,8 @@ defaultTargets = [
   "StateLawLowerBound",
   "StateLawNAddFourSharp",
   "StateLawSmallN",
-  "TrackFiniteAlternation",
   "TrackGlobalRepair",
   "TrackLobe",
-  "TrackNormalForm",
-  "TrackNovelReplay",
   "TrackNoveltyCover",
   "TrackTheta",
   "TrackTrace",
@@ -57,9 +52,6 @@ name = "PartialSecondRunSharp"
 name = "ProtectedPairNAddFour"
 
 [[lean_lib]]
-name = "RepeatedNoveltyDecomposition"
-
-[[lean_lib]]
 name = "RunwaySpliceNovelty"
 
 [[lean_lib]]
@@ -85,19 +77,10 @@ name = "StateLawSmallN"
 
 
 [[lean_lib]]
-name = "TrackFiniteAlternation"
-
-[[lean_lib]]
 name = "TrackGlobalRepair"
 
 [[lean_lib]]
 name = "TrackLobe"
-
-[[lean_lib]]
-name = "TrackNormalForm"
-
-[[lean_lib]]
-name = "TrackNovelReplay"
 
 [[lean_lib]]
 name = "TrackNoveltyCover"
@@ -120,6 +103,3 @@ name = "VectorCount"
 
 [[lean_lib]]
 name = "StateLawBounds"
-
-[[lean_lib]]
-name = "WiringCompletion"

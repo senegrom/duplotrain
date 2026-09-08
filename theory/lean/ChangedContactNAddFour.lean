@@ -84,23 +84,6 @@ def PartialSecondRunSharp.ChangedContact.approachWriterSwitches
       C.approach.length).map
     (rawWriterAt w (e, A.activatedState))
 
-/-- Reserving the flip action coordinate lowers the changed-contact history
-from `N+3` to `N+2`. -/
-theorem PartialSecondRunSharp.ChangedContact.compressedLead_length_le_N_add_two_of_action_absent
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q → p < 3 * N ∧ q < 3 * N)
-    {R : ManufacturedFlipReflector w g e}
-    (C : PartialSecondRunSharp.ChangedContact w (.flip R))
-    (hA : PathGrooves (ManufacturedReflector.flip R).toSupported.paths
-      (ManufacturedReflector.flip R).activatedState)
-    (habsent : R.actionSwitch ∉ C.approachWriterSwitches N) :
-    (C.compressedLead N).length ≤ N + 2 := by
-  have hbound := (ManufacturedReflector.flip R).continuationHistory_length_le
-    hN rfl C.approach_trace C.approach_simple hA C.old_grooves [R.actionSwitch]
-    (by simp) (by simpa using R.action_lt hN)
-    (by simpa using R.action_not_mem_reusable) (by simpa only [List.mem_singleton, forall_eq, PartialSecondRunSharp.ChangedContact.approachWriterSwitches] using habsent)
-  simpa [PartialSecondRunSharp.ChangedContact.compressedLead] using hbound
-
 /-- Every sharp changed contact is bounded by `N+4`.  Backward contacts and
 stay-reflector contacts already have zero local novelty; the flip-reflector
 case is exactly the runway-retrace theorem. -/
@@ -118,8 +101,9 @@ theorem PartialSecondRunSharp.ChangedContact.all_run_distinct_le_N_add_four
       (restrictedTonguesAt w N (g, A.baseState))).Nodup) :
     times.length <= N + 4 := by
   rcases C.direction with hbackward | hforward
-  · have hsmall := C.backward_all_run_distinct_le_N_add_three
-      hN hA hbackward times hlive hnd
+  · have hcount := C.changed_all_run_distinct_le_compressedLead_add_budget hA times hlive hnd
+      (C.backward_all_time_zero_novelty hbackward _)
+    have hlength := C.compressedLead_length_le hN hA
     omega
   · cases A with
     | stay R =>
@@ -149,7 +133,13 @@ theorem PartialSecondRunSharp.ChangedContact.all_run_distinct_le_N_add_four
         · have hcount := C.changed_all_run_distinct_le_compressedLead_add_budget
             (budget := 2) hA times hlive hnd
             ⟨_, by simp, C.forward_flip_corner_cover hforward _⟩
-          have hlength := C.compressedLead_length_le_N_add_two_of_action_absent hN hA haction
+          have hbound := (ManufacturedReflector.flip R).continuationHistory_length_le
+            hN rfl C.approach_trace C.approach_simple hA C.old_grooves [R.actionSwitch]
+            (by simp) (by simpa using R.action_lt hN) (by simpa using R.action_not_mem_reusable)
+            (by simpa only [List.mem_singleton, forall_eq,
+              PartialSecondRunSharp.ChangedContact.approachWriterSwitches] using haction)
+          have hlength : (C.compressedLead N).length ≤ N + 2 := by
+            simpa [PartialSecondRunSharp.ChangedContact.compressedLead] using hbound
           omega
 
 end GeneralN
