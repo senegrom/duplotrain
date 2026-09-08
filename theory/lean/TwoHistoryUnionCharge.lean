@@ -123,20 +123,23 @@ def ManufacturedReflector.constructionFirstWriterSwitches
       B.exploration.length).map
     (rawWriterAt w (g, B.baseState))
 
+section
+variable {w : Wiring} {N g e : Nat}
+  (hN : ∀ p q, w.link p = some q →
+    p < 3 * N ∧ q < 3 * N)
+  (A : ManufacturedReflector w g e)
+  {start finish : Nat × Tongues}
+  {passages : List Passage}
+  (htrace : PhysicalTrace w start passages finish)
+  (hsimple : SwitchSimple passages)
+  (hbase : PathGrooves A.toSupported.paths start.2)
+  (hend : PathGrooves A.toSupported.paths finish.2)
+include w N g e hN A start finish passages htrace hsimple hbase hend
+
 /-- The old reusable coordinates, the first productive writers of a
 support-preserving simple continuation, and any duplicate-free list of extra
 switches avoiding both share one ambient switch budget. -/
 theorem ManufacturedReflector.reusable_add_continuation_first_writers_add_extras_le
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    (hbase : PathGrooves A.toSupported.paths start.2)
-    (hend : PathGrooves A.toSupported.paths finish.2)
     (extras : List Nat)
     (hextrasNodup : extras.Nodup)
     (hextrasLt : ∀ s ∈ extras, s < N)
@@ -169,21 +172,13 @@ theorem ManufacturedReflector.reusable_add_continuation_first_writers_add_extras
 
 /-- The old reusable coordinates and the first productive writers of a
 support-preserving simple continuation share one ambient switch budget. -/
-theorem ManufacturedReflector.reusable_add_continuation_first_writers_le
-    {w : Wiring} {N g e : Nat}
-    (hN : ∀ p q, w.link p = some q →
-      p < 3 * N ∧ q < 3 * N)
-    (A : ManufacturedReflector w g e)
-    {start finish : Nat × Tongues}
-    {passages : List Passage}
-    (htrace : PhysicalTrace w start passages finish)
-    (hsimple : SwitchSimple passages)
-    (hbase : PathGrooves A.toSupported.paths start.2)
-    (hend : PathGrooves A.toSupported.paths finish.2) :
+theorem ManufacturedReflector.reusable_add_continuation_first_writers_le :
     A.reusableSwitches.length +
       (rawFirstWriterTimes w N start passages.length).length ≤ N := by
   simpa using A.reusable_add_continuation_first_writers_add_extras_le hN htrace hsimple
     hbase hend [] List.nodup_nil (by simp) (by simp) (by simp)
+
+end
 
 /-- The second construction compressed to its initial vector, the post-vector
 of each productive first writer in the switch-simple exploration, and its

@@ -500,7 +500,7 @@ switches, some switch is eventually revisited; the analysis of the
 
 The state-side consequences are the first two entries of the budget:
 
-\begin{lemma}[Construction history; \file{SharpStateLawAssembly.lean}]\label{lem:history}
+\begin{lemma}[Construction history; \file{ManufacturedPairNovelty.lean}]\label{lem:history}
   The complete first manufacturing journey --- switch-simple exploration,
   contact, and reverse runway --- exhibits at most $N+2$ distinct
   restricted vectors: the at most $N+1$ vectors along the switch-simple
@@ -554,8 +554,7 @@ continuation there --- plus explicitly named constant corners.  Two
 overlapping histories are never paid twice: when a second manufactured
 exploration follows a first, the union of the two construction histories,
 with their shared boundary vector erased, still fits the frame
-(\file{TwoHistoryUnionCharge.lean},
-\file{BoundaryOverlapTailCount.lean}).
+(\file{TwoHistoryUnionCharge.lean}).
 
 The endpoint-coordinate law also shortens this bookkeeping. On a
 switch-simple trace, each intermediate coordinate equals its initial or final
@@ -564,7 +563,7 @@ immediately before and after the write would both equal that common value.
 If the endpoints differ only at one coordinate, every intermediate vector is
 one of the endpoints, since all other coordinates are fixed and the remaining
 coordinate selects an endpoint
-(\file{TwoHistoryUnionCharge.lean}, \file{SimpleTraceOneNetChange.lean}).
+(\file{TrackTrace.lean}, \file{TrackLobe.lean}).
 
 \subsection{The probe tree after one reflector}\label{ssec:probe}
 
@@ -576,7 +575,7 @@ all originally live configurations. Totality makes both probes live.  The first-
 the first reflector generate a finite tree of outcomes, each closed by
 its own count (files \file{PartialSecondRunSharp.lean},
 \file{OneReflectorContinuation.lean},
-\file{FirstCycleCountSharp.lean}):
+\file{TripleSelfLinkSimpleCycleClosure.lean}):
 
 \begin{center}
 \begin{tabular}{lll}
@@ -612,13 +611,17 @@ $N+3$ or less.
 \end{lemma}
 
 \begin{lemma}[Protected pair; \file{ProtectedPairNAddFour.lean},
-  \file{PreReturnProtectedRoute.lean}, \file{CompleteRepairFour.lean}]
+  \file{PairActionCorners.lean}]
   \label{lem:pair}
   Suppose the second probe manufactures an opposite reflector, with the
   old support grooved at both endpoints of the second construction.
-  Use the same canonical construction history in every case. If the old
+  Use the same canonical construction history in every case, and view the
+  continuation as a suffix of the grooved pair run started at the protected
+  pre-return state: the four-corner theorem confines every later sample to
+  the pre-return and activated states and their two images under the old
+  reflector's action, of which the first two are historical. If the old
   reflector is a stay reflector, that history has at most $N+2$ entries
-  and the repair tail adds at most two fresh vectors. For a flip reflector,
+  and the tail adds at most two fresh vectors. For a flip reflector,
   split only on whether its private action coordinate occurs among the
   second construction's productive first writers. If absent, reserve that
   coordinate: again the budget is $(N+2)+2$. If present, its write forces a
@@ -769,8 +772,7 @@ positive covered excursions close the boundary invariant
 $\{e,p\}\times S$. Neither simplicity nor avoidance of $k$ is required for
 the approach. This replaces the separate capture, repair and avoidance period
 proofs for the protected facing exits
-(\file{TrackThetaPointwiseCore.lean}, \file{StateLawTwoCandidate.lean},
-\file{EarlyFacingConstant.lean}).
+(\file{TrackThetaPointwiseCore.lean}).
 
 Backward contacts and same-exit cycles use first-arrival synchronization
 instead. If $\operatorname{arrive}(u,p)=(x,v)$, the local switch law gives

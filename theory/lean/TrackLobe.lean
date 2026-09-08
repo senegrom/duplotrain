@@ -202,27 +202,6 @@ theorem crossed_arrivals_geometry {p x q : Nat} {a b c d : Tongues}
     p % 3 = 0 ∧ x % 3 ≠ 0 ∧ q % 3 ≠ 0 ∧ p / 3 = x / 3 ∧ p / 3 = q / 3 := by
   grind [arrive, branchPort]
 
-/-- Extract the universal nondegenerate lobe reflector directly from a
-crossed first-revisit excursion.  The stem/branch orientation is not assumed:
-it follows from the two recorded passages and `x ≠ q`. -/
-theorem crossed_excursion_core_reflector
-    (w : Wiring) {p x q outside : Nat} {u₀ u v : Tongues}
-    {path : List Passage}
-    (hexcursion :
-      PhysicalTrace w (p, u₀) ((p, x) :: path) (q, u))
-    (hsimple : SwitchSimple ((p, x) :: path))
-    (hrepeat : arrive u q = (p, v))
-    (hxq : x ≠ q)
-    (hmouth : w.link p = some outside) :
-    IsReflector w p outside (path.length + 2)
-      (fun state => PassagesGrooved state path)
-      (fun state => flipAt state (p / 3)) := by
-  obtain ⟨_, hold⟩ := hexcursion.head_arrive.2
-  obtain ⟨hp, hx, hq, hpx, hpq⟩ := crossed_arrivals_geometry hold hrepeat hxq
-  exact stem_lobe_isReflector w path hp hx hq hpx hpq hxq hsimple
-    hexcursion.linked hexcursion.last_link hmouth
-
-
 /-- If a switch-simple excursion returns at exactly its old exit port, its
 interior path is empty; the only possibility allowed by the raw `Wiring`
 model is a self-linked physical edge. -/
@@ -330,8 +309,11 @@ theorem crossed_revisit_full_reflector
   have hforeign : ∀ passage ∈ runway, passageSwitch passage ≠ p / 3 := by
     grind [SwitchSimple, passageSwitch]
   simpa only [Nat.add_assoc] using hrunway.sandwich_reflector hentry
-    (fun _ hmouth => crossed_excursion_core_reflector w hexcursion
-      hexcursionSimple hrepeat hxq hmouth)
+    (fun _ hmouth => by
+      obtain ⟨_, hold⟩ := hexcursion.head_arrive.2
+      obtain ⟨hp, hx, hq, hpx, hpq⟩ := crossed_arrivals_geometry hold hrepeat hxq
+      exact stem_lobe_isReflector w _ hp hx hq hpx hpq hxq hexcursionSimple
+        hexcursion.linked hexcursion.last_link hmouth)
     (fun _ hg => grooved_after_flip_other hg hforeign)
 
 
