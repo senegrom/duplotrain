@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from fractions import Fraction
 
 MAX_JSON_BYTES = 2 * 1024 * 1024
@@ -90,3 +91,14 @@ def check_layout_json(data: object) -> None:
             raise ValueError("accessory row out of bounds")
         if len(entry) == 3 and (type(entry[2]) is not int or abs(entry[2]) > 64):
             raise ValueError("accessory port out of bounds")
+
+
+def check_inventory(inventory: Mapping[str, int], pieces: Mapping) -> None:
+    """Both enumerators accept only known IDs and non-negative integer counts."""
+    if not isinstance(inventory, Mapping):
+        raise ValueError("inventory must be a mapping of piece ids to counts")
+    for piece_id, count in inventory.items():
+        if piece_id not in pieces:
+            raise ValueError(f"inventory names unknown piece {piece_id!r}")
+        if type(count) is not int or count < 0:
+            raise ValueError(f"inventory count for {piece_id!r} must be a non-negative integer")

@@ -244,23 +244,63 @@ perfect = find_perfect_loops({"curve": 12, "straight": 4}, pieces,
 #    rounded square -- each with one direction stone clipped on)
 ```
 
-With today's pieces, perfection has exactly three known sources: a closed loop plus a
+Known constructions with today's pieces include: a closed loop plus a
 direction stone; a **reversing terminator** (direction stone at a buffer face — every
 approach bounces off the wall) capping the ends of otherwise-open track (shuttles,
 capped teardrops); or reversing *topology* (dogbones — build them with
-`make_dogbone(pick_stem_tailed(solutions, pieces), pieces)`). Everything else tops out
-lower on the ladder, and `classify` will tell you why, with the exact doomed start.
+`make_dogbone(pick_stem_tailed(solutions, pieces), pieces)`). Use `classify` to
+check any construction and obtain a counterexample start when a property fails.
 
-**Exhaustive network search.** `enumerate_networks()` goes beyond single driving
-loops: it enumerates every *closed network* — all connectors mated or sealed,
-passing-loop and multi-cap topologies included — by always extending the canonically
-smallest open end (attach, or join two ends that mate), with end-aware collision
-handling and congruence dedup. `find_perfect_networks()` then tries the sensible
-direction-stone placements (buffer faces are forced; one mid-loop stone otherwise)
-and classifies each, so for bounded sizes the question "what are ALL the perfectly
-looping networks from this box?" is answered by proof, not by taste. Costs are
-honest: exhaustion is practical to roughly a dozen pieces (a 14-piece hunt is a
-few minutes); beyond that, compose constructively and verify with `classify`.
+**Network search.** `enumerate_networks()` goes beyond single driving loops:
+it grows connected *closed networks* — all connectors mated or sealed, passing-loop
+and multi-cap topologies included — by extending the canonically smallest open end.
+It shares the loop solver's sampled collision model, including bridge underpasses.
+`find_perfect_networks()` checks stone placement and classification **before**
+deduplicating an accepted centreline: a level crossing must not hide an otherwise
+identical straight that can carry a required stone. Custom-piece move symmetries
+likewise compare complete exact primitive paths and route incidence, not only ports.
+
+**Check whether the search finished.** `solve()` and `enumerate_networks()` expose
+`stats.complete`, `stats.stop_reason`, and `stats.max_pieces_searched`. Both
+`find_perfect_*()` helpers return a `PerfectResult`: it still supports the previous
+list operations (indexing, iteration, `len`, comparison with `[]`), and also exposes
+`.layouts` and `.stats`. A successful classification proves the returned candidate's
+behaviour; it does not mean the search found every candidate.
+
+```python
+from duplotrain import (
+    NetworkConfig, default_catalog, find_perfect_networks, IncompleteSearchError,
+)
+
+result = find_perfect_networks(
+    {"buffer": 2, "straight": 2, "level_crossing": 1},
+    default_catalog(), {"stone_direction": 2},
+    NetworkConfig(max_pieces=5, max_results=100),
+)
+print(len(result.layouts), result.stats.complete, result.stats.stop_reason)
+# An optional level crossing does not hide the all-straight perfect shuttle.
+
+try:
+    result.require_complete()
+except IncompleteSearchError as exc:
+    print("Partial search:", exc.result.stats.stop_reason)
+# Alternatively pass require_complete=True to either find_perfect_*() call.
+```
+
+`complete=True` means exhaustion over the inventory for the searched family, with
+`stop_reason="exhausted"`. Node, result, or piece caps instead report `node_limit`,
+`result_limit`, or `piece_limit` and leave `complete=False`; an empty partial result
+is not proof that no qualifying layout exists. `aborted` retains its narrower
+meaning of hitting the node limit. A piece-limited search is conservatively reported
+as incomplete even when all branches within that piece bound were visited.
+
+The network helper's **stone policy** guards every buffer-facing connector with a
+direction stone, then tries zero or one additional mid-piece stone on each eligible
+straight. It does not enumerate every combination of multiple optional stones.
+Exhaustion refers to that policy, the catalogue, and the sampled collision/congruence
+model — closure itself remains exact. For larger inventories, compose layouts
+constructively and verify their dynamics with `classify`. The slow end-to-end network
+test runs weekly and can also be started with the Extended search checks workflow.
 
 The switch dynamics yields a little theorem the machine confirms by exhaustion: a
 dead-end cap **reflects** a train back through the branch it came from, so a trailing
@@ -286,9 +326,10 @@ deduplicated by a canonical signature invariant under rotation, reversal **and
 reflection** — the mirror image is generated explicitly per piece from its geometry,
 since walking a chiral loop backwards is not its mirror image.
 
-Elevation is modelled (ramps carry `z`; closure requires returning to ground), and the
-collision clearance defaults to 120 mm — a DUPLO loco is ~100 mm tall, and the stock
-bridge crests at 76.8 mm, which is why the real one only passes toy cars underneath.
+Elevation is modelled (ramps carry `z`; closure requires returning to the anchor's
+height). Blanket collision clearance defaults to 120 mm; underpass-enabled pieces
+add a separate, provisional clearance rule near the bridge crest. Both search
+engines apply the same rule (see `duplotrain.collision` and the catalogue notes).
 
 **Arithmetic engines.** Exactness doesn't require Fractions: every real piece turns in
 30° steps and measures in twentieths of a millimetre, so positions live in the scaled

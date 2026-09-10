@@ -40,6 +40,8 @@ from .geometry import HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .lattice import ROT_COS_SIN, LatticePoint, LatticePose, from_alg_xy, z_from_alg
 from .layout import Layout
 from .pieces import PieceType
+from .symmetry import placement_key, pose_key
+from .validation import check_inventory
 
 __all__ = ["Move", "SolverConfig", "Solution", "SolveStats", "SolveResult", "solve"]
 
@@ -57,22 +59,14 @@ class Move:
     dheading: int
 
 
-def _traversal_key(piece: PieceType, entry: int, exit_port: int) -> tuple:
-    """Physical identity of one traversal: where the piece lands and where the walk exits.
-
-    Two traversals with equal keys place the piece identically in space and continue
-    from the same face -- they are the same action, whatever the port labels say.
-    """
+def _traversal_key(
+    piece: PieceType, entry: int, exit_port: int, *, mirror: bool = False
+) -> tuple:
+    """Full placed geometry, route incidence, and the chosen outward exit pose."""
     frame = piece.frame_for(entry, ORIGIN)
-    placed_ports = [
-        frame.then(port.pose.x, port.pose.y, port.pose.z, port.pose.heading)
-        for port in piece.ports
-    ]
-    exit_pose = placed_ports[exit_port]
-    return (
-        frozenset((p.x, p.y, p.z, p.heading) for p in placed_ports),
-        (exit_pose.x, exit_pose.y, exit_pose.z, exit_pose.heading),
-    )
+    port = piece.ports[exit_port].pose
+    exit_pose = frame.then(port.x, port.y, port.z, port.heading)
+    return placement_key(piece, frame, mirror), pose_key(exit_pose, mirror)
 
 
 def _canonical_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, int]]:
@@ -175,11 +169,7 @@ def _cached_mirror_traversals(
     canon = _canonical_traversals(piece)
     mirror: dict[tuple[int, int], tuple[int, int] | None] = {}
     for entry, exit_port in traversals:
-        ports_key, exit_key = _traversal_key(piece, entry, exit_port)
-        mirrored_key = (
-            frozenset((x, -y, z, (-h) % HEADING_STEPS) for (x, y, z, h) in ports_key),
-            (exit_key[0], -exit_key[1], exit_key[2], (-exit_key[3]) % HEADING_STEPS),
-        )
+        mirrored_key = _traversal_key(piece, entry, exit_port, mirror=True)
         partner = by_key.get(mirrored_key)
         mirror[(entry, exit_port)] = canon[partner] if partner is not None else None
     return tuple(mirror.items())
@@ -838,11 +828,7 @@ def solve(
         counters describing how the search went.
     """
     cfg = config or SolverConfig()
-    for piece_id, count in inventory.items():
-        if piece_id not in pieces:
-            raise ValueError(f"inventory names unknown piece {piece_id!r}")
-        if type(count) is not int or count < 0:
-            raise ValueError(f"inventory count for {piece_id!r} must be a non-negative integer")
+    check_inventory(inventory, pieces)
 
     if base is None:
         if grow_from is not None or close_onto is not None:

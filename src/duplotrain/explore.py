@@ -8,32 +8,36 @@ same line, and which straight carries the action stone doesn't change the curve 
 all.  Congruence is decided by canonicalising the sampled centreline point cloud over
 the 24 lattice rotations and reflection.
 
-**Perfection.**  By exhaustive simulation (:func:`duplotrain.drive.classify`), a
-perfectly looping layout must be fully mated (any reachable open end or buffer face
-admits a doomed start) and must reverse the train somewhere.  That leaves exactly two
-families with today's pieces:
+**Perfection.** By exhaustive simulation (:func:`duplotrain.drive.classify`),
+classify each candidate's train dynamics. Known constructions include a ring with a
+direction stone, reversing topology (dogbones), and buffered shuttles guarded by
+face stones. The search helpers expose their enumeration limits and stone-placement
+policy; a classification of a candidate is not a completeness proof for a search.
 
-* a closed loop carrying a direction-change stone -- every run ping-pongs around the
-  ring, sweeping every tile both ways;
-* reversing *topology*: the dogbone, two teardrop lobes stem-to-stem, which turns the
-  train around at each end with no stone at all.
-
-:func:`find_perfect_loops` enumerates the first family from an inventory;
-:func:`make_dogbone` builds the second from a solver-found teardrop.
+:func:`find_perfect_loops` searches the one-stone ring family;
+:func:`find_perfect_networks` searches closed networks with guarded buffers and at
+most one optional mid-piece direction stone. :func:`make_dogbone` constructs the
+stone-free family from a solver-found teardrop.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
+from typing import TYPE_CHECKING
 
 from .catalog import STONE_MOUNTS
 from .drive import LoopClassification, classify
 from .geometry import HEADING_STEPS, cos_sin
 from .layout import Layout
 from .pieces import PieceType
-from .solver import Solution, SolverConfig, solve
+from .solver import Solution, SolverConfig, SolveStats, solve
+
+if TYPE_CHECKING:
+    from .networks import NetworkConfig, NetworkStats
 
 __all__ = [
+    "PerfectResult",
+    "IncompleteSearchError",
     "congruence_key",
     "find_perfect_loops",
     "find_perfect_networks",
@@ -41,6 +45,41 @@ __all__ = [
     "pick_stem_tailed",
     "make_dogbone",
 ]
+
+
+class IncompleteSearchError(RuntimeError):
+    """A requested exhaustive search hit a bound; ``result`` retains partial work."""
+
+    def __init__(self, result: PerfectResult) -> None:
+        self.result = result
+        super().__init__(f"search incomplete: {result.stats.stop_reason}")
+
+
+class PerfectResult(list[tuple[Layout, LoopClassification]]):
+    """List-compatible perfect layouts plus the underlying enumeration status.
+
+    ``stats.complete`` means the searched family was exhausted over the inventory,
+    not a proof that our stone-placement policy covers every possible accessory
+    arrangement. ``require_complete`` rejects node, result and piece caps.
+    """
+
+    def __init__(
+        self, layouts: Iterable[tuple[Layout, LoopClassification]],
+        stats: SolveStats | NetworkStats,
+    ) -> None:
+        super().__init__(layouts)
+        self.stats = stats
+
+    @property
+    def layouts(self) -> list[tuple[Layout, LoopClassification]]:
+        """The same list, for callers using the explicit result-envelope API."""
+        return self
+
+    def require_complete(self) -> PerfectResult:
+        """Return this result, or raise with the partial result still attached."""
+        if not self.stats.complete:
+            raise IncompleteSearchError(self)
+        return self
 
 
 def congruence_key(layout: Layout, spacing: float = 8.0, decimals: int = 1) -> tuple:
@@ -89,14 +128,17 @@ def find_perfect_loops(
     pieces: Mapping[str, PieceType],
     config: SolverConfig | None = None,
     stone_id: str = "stone_direction",
-) -> list[tuple[Layout, LoopClassification]]:
+    *,
+    require_complete: bool = False,
+) -> PerfectResult:
     """Perfectly looping layouts buildable from *inventory* plus one direction stone.
 
     Runs the loop solver, clips the stone onto the first stone-mountable piece of
     each closed solution (which straight carries it is irrelevant to the curve), and
     keeps the layouts that classify as perfectly looping -- deduplicated up to
     congruence of their track curves, so a loop realised with a level crossing in
-    place of a straight does not count twice.
+    place of a straight does not count twice. Results retain ``stats``; pass
+    ``require_complete=True`` to reject a capped enumeration of this family.
     """
     result = solve(inventory, pieces, config)
     found: dict[tuple, tuple[Layout, LoopClassification]] = {}
@@ -120,7 +162,8 @@ def find_perfect_loops(
         verdict = classify(candidate)
         if verdict.perfectly_looping:
             found[key] = (candidate, verdict)
-    return list(found.values())
+    perfect = PerfectResult(found.values(), result.stats)
+    return perfect.require_complete() if require_complete else perfect
 
 
 def _lobe_recipe(teardrop: Solution, pieces: Mapping[str, PieceType]) -> list:
@@ -211,30 +254,34 @@ def find_perfect_networks(
     inventory: Mapping[str, int],
     pieces: Mapping[str, PieceType],
     stones: Mapping[str, int],
-    config=None,
-) -> list[tuple[Layout, LoopClassification]]:
-    """Exhaustively find perfectly looping networks from an inventory.
+    config: NetworkConfig | None = None,
+    *,
+    require_complete: bool = False,
+) -> PerfectResult:
+    """Search closed networks under the documented direction-stone policy.
 
-    Enumerates every closed network (:func:`duplotrain.networks.enumerate_networks`),
-    tries the sensible direction-stone placements on each, keeps those that classify
-    perfectly looping, and deduplicates by track-curve congruence.  Complete up to
-    the enumeration bounds in *config* -- for small inventories this genuinely
-    answers "these are ALL the perfect networks you can build".
+    Every collision-legal realization is eligible for classification BEFORE its
+    curve is deduplicated. This preserves different mountable-piece arrangements
+    with the same centreline. Results retain the enumeration statistics; pass
+    ``require_complete=True`` to reject node, result or piece-limited searches.
+    Exhaustion refers to this search and ``_stone_variants`` policy, not to all
+    conceivable placements of multiple optional stones.
     """
     from .networks import enumerate_networks
 
-    result = enumerate_networks(inventory, pieces, config)
-    found: dict[tuple, tuple[Layout, LoopClassification]] = {}
-    for layout in result.layouts:
-        key = congruence_key(layout)
-        if key in found:
-            continue
+    accepted: dict[int, tuple[Layout, LoopClassification]] = {}
+
+    def qualifies(layout: Layout) -> bool:
         for variant in _stone_variants(layout, stones):
             verdict = classify(variant)
             if verdict.perfectly_looping:
-                found[key] = (variant, verdict)
-                break
-    return list(found.values())
+                accepted[id(layout)] = (variant, verdict)
+                return True
+        return False
+
+    result = enumerate_networks(inventory, pieces, config, accept=qualifies)
+    perfect = PerfectResult((accepted[id(layout)] for layout in result.layouts), result.stats)
+    return perfect.require_complete() if require_complete else perfect
 
 
 def make_dogbone(

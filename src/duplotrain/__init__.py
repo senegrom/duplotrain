@@ -16,6 +16,8 @@ from .catalog import ACCESSORIES, default_catalog, load_catalog
 from .drive import DriveReport, LoopClassification, classify, drive, endless_run
 from .exact import Alg
 from .explore import (
+    IncompleteSearchError,
+    PerfectResult,
     congruence_key,
     find_perfect_loops,
     find_perfect_networks,
@@ -62,6 +64,8 @@ __all__ = [
     "congruence_key",
     "find_perfect_loops",
     "find_perfect_networks",
+    "PerfectResult",
+    "IncompleteSearchError",
     "enumerate_networks",
     "NetworkConfig",
     "make_dogbone",

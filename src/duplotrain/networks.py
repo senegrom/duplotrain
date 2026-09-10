@@ -20,20 +20,24 @@ i.e. up to rotation, translation and reflection of the embedded track.
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
+from .collision import DEFAULT_CLEARANCE, CollisionField
 from .explore import congruence_key
 from .geometry import ORIGIN
 from .layout import Layout
 from .pieces import PieceType
 from .solver import (
     Move,
+    SolverConfig,
     _compile_lattice,
     _FieldEngine,
     _moves_for,
+    _solution_overlaps,
     _traversal_key,
 )
+from .validation import check_inventory
 
 __all__ = ["NetworkConfig", "NetworkStats", "NetworkResult", "enumerate_networks"]
 
@@ -48,9 +52,19 @@ class NetworkConfig:
     max_results: int = 200
     max_nodes: int = 2_000_000
     use_all_pieces: bool = False
-    clearance: float = 120.0
+    clearance: float = DEFAULT_CLEARANCE
     collision_spacing: float = 8.0
     progress: object = None
+
+    def __post_init__(self) -> None:
+        # Keep the two public search configurations on the same numeric contract.
+        if type(self.max_pieces) is not int or self.max_pieces < 1:
+            raise ValueError("max_pieces must be a positive integer")
+        SolverConfig(
+            min_pieces=self.min_pieces, max_pieces=self.max_pieces,
+            max_results=self.max_results, max_nodes=self.max_nodes,
+            clearance=self.clearance, collision_spacing=self.collision_spacing,
+        )
 
 
 @dataclass
@@ -61,6 +75,10 @@ class NetworkStats:
     duration_s: float = 0.0
     aborted: bool = False
     engine: str = ""
+    #: Entire inventory exhausted, not merely the configured piece bound.
+    complete: bool = False
+    stop_reason: str = "not_started"
+    max_pieces_searched: int = 0
 
 
 @dataclass
@@ -90,16 +108,20 @@ def enumerate_networks(
     inventory: Mapping[str, int],
     pieces: Mapping[str, PieceType],
     config: NetworkConfig | None = None,
+    *,
+    accept: Callable[[Layout], bool] | None = None,
 ) -> NetworkResult:
     """All closed networks buildable from *inventory*, up to congruence.
 
     A network is closed when no connectable end remains: every port is mated to
-    another or is a sealed face (buffer bumper).  Collision-legal by construction.
+    another or is a sealed face (buffer bumper). Collision-legal by construction.
+    Optional *accept* filters collision-legal realizations BEFORE congruence dedup:
+    rejecting one must not hide a different, eligible realization of that curve.
+    ``max_results`` counts accepted distinct curves. Inspect ``stats.complete``
+    and ``stats.stop_reason`` before interpreting a result as exhaustive.
     """
     cfg = config or NetworkConfig()
-    for pid in inventory:
-        if pid not in pieces:
-            raise ValueError(f"inventory names unknown piece {pid!r}")
+    check_inventory(inventory, pieces)
 
     counts = {pid: n for pid, n in inventory.items() if n > 0}
     piece_ids = sorted(counts)
@@ -112,7 +134,9 @@ def enumerate_networks(
     eng = _compile_lattice(ORIGIN, ORIGIN, piece_obj, moves_by_piece)
     if eng is None:
         eng = _FieldEngine(ORIGIN, ORIGIN, piece_obj, moves_by_piece)
-    stats = NetworkStats(engine=eng.name)
+    stats = NetworkStats(
+        engine=eng.name, max_pieces_searched=min(total, cfg.max_pieces)
+    )
 
     # Per-placement sample clouds (world floats) for the two collision phases.
     sample_cache: dict[tuple[str, int, int], list[tuple[float, float, float]]] = {}
@@ -130,7 +154,7 @@ def enumerate_networks(
         return [(fx + x, fy + y, fz + z) for x, y, z in base]
 
     placements: list[tuple[str, object, int]] = []  # (pid, engine frame, entry used)
-    clouds: list[tuple[list[tuple[float, float, float]], float]] = []
+    field = CollisionField(clearance=cfg.clearance)
     links: dict[tuple[int, int], tuple[int, int]] = {}
     open_ends: dict[tuple[int, int], object] = {}  # end -> engine pose
     found: dict[tuple, Layout] = {}
@@ -143,49 +167,17 @@ def enumerate_networks(
             return _flat_xy(pose)
         return pose.xy()
 
-    def conservatively_clashes(pts: list, half_width: float, owner_exempt: int | None) -> bool:
-        """Overlap that cannot be excused by any future joint."""
+    def conservatively_clashes(
+        pts: list, half_width: float, owner_exempt: int, underpass: bool
+    ) -> bool:
+        """Only contact away from open ends rules out a future legal joint."""
         end_positions = [end_xy(p) for p in open_ends.values()]
-        for index, (cloud, other_hw) in enumerate(clouds):
-            if index == owner_exempt:
-                continue
-            limit = half_width + other_hw - 2.0
-            limit_sq = limit * limit
-            for x, y, z in pts:
-                near_end = any(
-                    (x - ex) * (x - ex) + (y - ey) * (y - ey) < JOINT_RADIUS * JOINT_RADIUS
-                    for ex, ey in end_positions
-                )
-                if near_end:
-                    continue
-                for px, py, pz, in cloud:
-                    if abs(z - pz) >= cfg.clearance:
-                        continue
-                    if (x - px) * (x - px) + (y - py) * (y - py) < limit_sq:
-                        return True
-        return False
-
-    def strictly_valid(layout: Layout) -> bool:
-        """Final pairwise check: only linked neighbours may touch."""
-        placement_clouds = []
-        for placement in layout:
-            pts = [p for line in placement.centrelines(cfg.collision_spacing) for p in line]
-            placement_clouds.append((pts, placement.piece.width / 2.0))
-        linked = {tuple(sorted((a[0], b[0]))) for a, b in layout.links.items()}
-        for i, (pa, ha) in enumerate(placement_clouds):
-            for j in range(i + 1, len(placement_clouds)):
-                if (i, j) in linked:
-                    continue
-                pb, hb = placement_clouds[j]
-                limit = ha + hb - 2.0
-                limit_sq = limit * limit
-                for x, y, z in pa:
-                    for px, py, pz in pb:
-                        if abs(z - pz) >= cfg.clearance:
-                            continue
-                        if (x - px) * (x - px) + (y - py) * (y - py) < limit_sq:
-                            return False
-        return True
+        away = [
+            (x, y, z) for x, y, z in pts
+            if not any((x - ex) ** 2 + (y - ey) ** 2 < JOINT_RADIUS ** 2
+                       for ex, ey in end_positions)
+        ]
+        return field.clashes(away, half_width, {owner_exempt}, underpass=underpass)
 
     # Layout reconstruction: replay placements in order.  Each placement after the
     # first was attached at a specific open end recorded during search.
@@ -210,9 +202,11 @@ def enumerate_networks(
         key = congruence_key(layout)
         if key in found:
             return
-        if not strictly_valid(layout):
+        if _solution_overlaps(layout, 0, cfg.clearance, cfg.collision_spacing):
             stats.rejected_collision += 1
             return
+        if accept is not None and not accept(layout):
+            return  # Do not reserve the curve key for an ineligible realization.
         found[key] = layout
 
     def dfs(used: int) -> bool:
@@ -267,11 +261,13 @@ def enumerate_networks(
                 for entry in orientations[pid]:
                     frame = eng.frame(pid, entry, target_pose)
                     pts = samples_for(pid, entry, frame)
-                    if conservatively_clashes(pts, piece.width / 2.0, target[0]):
+                    if conservatively_clashes(
+                        pts, piece.width / 2.0, target[0], piece.underpass
+                    ):
                         continue
                     index = len(placements)
                     placements.append((pid, frame, entry))
-                    clouds.append(([(x, y, z) for x, y, z in pts], piece.width / 2.0))
+                    field.add(index, pts, piece.width / 2.0, underpass=piece.underpass)
                     counts[pid] -= 1
                     del open_ends[target]
                     links[target] = (index, entry)
@@ -296,7 +292,7 @@ def enumerate_networks(
                     del links[(index, entry)]
                     open_ends[target] = target_pose
                     counts[pid] += 1
-                    clouds.pop()
+                    field.pop()
                     placements.pop()
                     if not keep:
                         return False
@@ -309,7 +305,7 @@ def enumerate_networks(
         frame = eng.frame(pid, entry, eng.start_cursor)
         placements.append((pid, frame, entry))
         pts = samples_for(pid, entry, frame)
-        clouds.append(([(x, y, z) for x, y, z in pts], piece.width / 2.0))
+        field.add(0, pts, piece.width / 2.0, underpass=piece.underpass)
         counts[pid] -= 1
         for port in range(len(piece.ports)):
             if port in piece.sealed:
@@ -324,10 +320,19 @@ def enumerate_networks(
         join_trace_all.pop()
         open_ends.clear()
         counts[pid] += 1
-        clouds.pop()
+        field.pop()
         placements.pop()
         if not keep:
             break
 
+    if stats.aborted:
+        stats.stop_reason = "node_limit"
+    elif len(found) >= cfg.max_results:
+        stats.stop_reason = "result_limit"
+    elif cfg.max_pieces < total:
+        stats.stop_reason = "piece_limit"
+    else:
+        stats.complete = True
+        stats.stop_reason = "exhausted"
     stats.duration_s = time.perf_counter() - started
     return NetworkResult(layouts=list(found.values()), stats=stats)
