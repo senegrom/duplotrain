@@ -618,11 +618,20 @@ class Session:
 
         if grow == close or grow not in opens or close not in opens:
             raise ValueError("pick two distinct open ends")
-        # Candidate indices change on every search, even on unchanged geometry.
-        # Give the result list its own revision so another tab cannot apply an
-        # index from the previous search to this one.
-        self._invalidate()
-        self._candidate_revision = self.revision
+        if self.layout.pose_of(grow).connects_to(self.layout.pose_of(close)):
+            raise ValueError(
+                "those ends already mate exactly; join them with Layout.join instead"
+            )
+
+        def publish(candidates: list[Solution], outcome: dict) -> dict:
+            # Candidate indices change even on unchanged geometry. Publish only
+            # after all validation/search work succeeds: failed oracle, solver or
+            # progress callbacks must leave revision and previous candidates alone.
+            self._invalidate()
+            self.candidates = candidates
+            self._candidate_revision = self.revision
+            return outcome
+
         remaining = self.remaining()
 
         # Height sanity: if the two ends differ in elevation by more than every
@@ -634,8 +643,7 @@ class Session:
                 for pid, n in remaining.items()
             )
             if dz > lift + 1e-6:
-                self.candidates = []
-                return {
+                return publish([], {
                     "found": 0,
                     "aborted": False,
                     "searched": 0,
@@ -647,17 +655,16 @@ class Session:
                         f"and the remaining pieces can climb at most {lift:.0f} mm "
                         "— the track up there can never come back down"
                     ),
-                }
+                })
 
         if not reversing:
             arcs = self._arc_closures(grow, close, max_results, max_pieces)
             if arcs:
-                self.candidates = arcs
-                return {
+                return publish(arcs, {
                     "found": len(arcs), "aborted": False, "searched": 0,
                     "complete": False, "stop_reason": "heuristic",
                     "max_pieces_searched": max_pieces,
-                }
+                })
         plain = {
             pid: n
             for pid, n in remaining.items()
@@ -668,7 +675,7 @@ class Session:
 
         searched = 0
         aborted = False
-        self.candidates = []
+        candidates = []
         for stage_index, inventory in enumerate(stages):
             budget = 25_000 if stage_index == 0 and len(stages) > 1 else 60_000
             result = solve(
@@ -690,16 +697,16 @@ class Session:
             searched += result.stats.nodes
             aborted = result.stats.aborted
             if result.solutions:
-                self.candidates = result.solutions[:max_results]
+                candidates = result.solutions[:max_results]
                 break
-        return {
-            "found": len(self.candidates),
+        return publish(candidates, {
+            "found": len(candidates),
             "aborted": aborted,
             "searched": searched,
             "complete": result.stats.complete and inventory == full,
             "stop_reason": (result.stats.stop_reason if inventory == full else "staged_search"),
             "max_pieces_searched": result.stats.max_pieces_searched,
-        }
+        })
 
     def apply_candidate(self, index: int, revision: int | None = None) -> None:
         if self._candidate_revision != self.revision or (

@@ -25,6 +25,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 from typing import TYPE_CHECKING
 
+from ._congruence import curve_points
 from .catalog import STONE_MOUNTS
 from .drive import LoopClassification, classify
 from .geometry import HEADING_STEPS, cos_sin
@@ -85,23 +86,15 @@ class PerfectResult(list[tuple[Layout, LoopClassification]]):
 def congruence_key(layout: Layout, spacing: float = 8.0, decimals: int = 1) -> tuple:
     """A key equal for layouts whose track curves are congruent in space.
 
-    The centrelines are sampled uniformly (sampling is congruence-equivariant: the
-    same curve yields the same points wherever it lies), centred on their centroid,
-    and canonicalised over the 24 lattice rotations x optional reflection by taking
-    the lexicographically smallest rounded point multiset.
+    Collinear line intervals and fixed lattice arc sectors are unioned before
+    sampling, so splitting a rail into shorter pieces or segments does not alter
+    the key. The exact normalized geometry supplies the translation origin;
+    rounded samples form a set, never a multiplicity-weighted cloud. Rotations
+    and reflection are canonicalised over the 24-step heading lattice.
     """
-    points: list[tuple[float, float, float]] = []
-    for placement in layout.placements:
-        for line in placement.centrelines(spacing):
-            points.extend(line)
-    if not points:
+    centred = curve_points(layout, spacing)
+    if not centred:
         return ()
-
-    n = len(points)
-    cx = sum(p[0] for p in points) / n
-    cy = sum(p[1] for p in points) / n
-    cz = sum(p[2] for p in points) / n
-    centred = [(x - cx, y - cy, z - cz) for x, y, z in points]
 
     best: tuple | None = None
     for mirror in (1.0, -1.0):
@@ -109,14 +102,14 @@ def congruence_key(layout: Layout, spacing: float = 8.0, decimals: int = 1) -> t
             c, s = cos_sin(steps)
             fc, fs = float(c), float(s)
             candidate = tuple(
-                sorted(
+                sorted({
                     (
                         round(fc * x - fs * (mirror * y), decimals),
                         round(fs * x + fc * (mirror * y), decimals),
                         round(z, decimals),
                     )
                     for x, y, z in centred
-                )
+                })
             )
             if best is None or candidate < best:
                 best = candidate

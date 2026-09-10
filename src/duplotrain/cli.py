@@ -22,7 +22,7 @@ from .catalog import default_catalog, load_catalog
 from .layout import layout_from_dict, layout_to_dict
 from .scoring import score_solution
 from .solver import SolverConfig, solve
-from .validation import MAX_JSON_BYTES
+from .validation import MAX_JSON_BYTES, check_inventory
 
 console = Console()
 
@@ -84,9 +84,9 @@ def _inventory_options(fn):
         fn = click.option(
             f"--{pid.replace('_', '-')}",
             pid,
-            type=int,
+            type=click.IntRange(min=0),
             default=0,
-            help=f"Number of '{pid}' pieces you own.",
+            help=f"Non-negative whole number of '{pid}' pieces you own.",
         )(fn)
     return fn
 
@@ -195,9 +195,13 @@ def solve_cmd(
     if inventory_path:
         try:
             with open(inventory_path, encoding="utf-8") as fh:
-                for k, v in json.load(fh).items():
-                    inventory[k] = inventory.get(k, 0) + int(v)
-        except (ValueError, TypeError) as exc:
+                raw_counts = json.load(fh)
+            # Validate the original values, before merging can mask a negative
+            # count or int() can truncate a fraction/accept a boolean.
+            check_inventory(raw_counts, catalog)
+            for k, v in raw_counts.items():
+                inventory[k] = inventory.get(k, 0) + v
+        except (ValueError, TypeError, OSError) as exc:
             raise click.ClickException(f"bad inventory file: {exc}") from exc
     if not inventory:
         raise click.UsageError(

@@ -8,10 +8,10 @@ or joining it to another open end that mates exactly.  Acting only on the smalle
 end removes permutation blow-up without losing completeness: any target network can
 be assembled in exactly that order.
 
-Collision handling is two-phase.  During search, an overlap only prunes when it
-happens *away from every open end* (contact near ends may legitimately become a
-joint later -- conservative, never cuts a valid network).  Every completed network
-then passes a strict pairwise check with only linked neighbours exempt.
+Collision handling is two-phase. During search, already attached neighbours and
+placements with exactly mating open connectors are exempt: they can still become
+directly linked. No fixed distance or piece width is assumed. Every completed
+network then passes a strict check with only actually linked neighbours exempt.
 
 Results are deduplicated by curve congruence (:func:`duplotrain.explore.congruence_key`),
 i.e. up to rotation, translation and reflection of the embedded track.
@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from .collision import DEFAULT_CLEARANCE, CollisionField
 from .explore import congruence_key
 from .geometry import ORIGIN
-from .layout import Layout
+from .layout import End, Layout
 from .pieces import PieceType
 from .solver import (
     Move,
@@ -40,9 +40,6 @@ from .solver import (
 from .validation import check_inventory
 
 __all__ = ["NetworkConfig", "NetworkStats", "NetworkResult", "enumerate_networks"]
-
-#: Contact within this range of an open end may become a legal joint; never prune on it.
-JOINT_RADIUS = 70.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,24 +157,19 @@ def enumerate_networks(
     found: dict[tuple, Layout] = {}
     started = time.perf_counter()
 
-    def end_xy(pose) -> tuple[float, float]:
-        if isinstance(pose, tuple):  # lattice flat pose
-            from .solver import _flat_xy
+    def potential_neighbours(port_poses: Mapping[int, object], target: End) -> set[int]:
+        """Owners that could become directly linked to the new, fixed placement.
 
-            return _flat_xy(pose)
-        return pose.xy()
-
-    def conservatively_clashes(
-        pts: list, half_width: float, owner_exempt: int, underpass: bool
-    ) -> bool:
-        """Only contact away from open ends rules out a future legal joint."""
-        end_positions = [end_xy(p) for p in open_ends.values()]
-        away = [
-            (x, y, z) for x, y, z in pts
-            if not any((x - ex) ** 2 + (y - ey) ** 2 < JOINT_RADIUS ** 2
-                       for ex, ey in end_positions)
-        ]
-        return field.clashes(away, half_width, {owner_exempt}, underpass=underpass)
+        The final audit exempts whole linked pieces, not just points near a joint.
+        A future direct joint must already have exactly mating open ports: neither
+        placement moves during search. Matching owners is therefore conservative
+        for wide, bent and multi-path pieces alike; a radius around a joint is not.
+        Merely nearby ends, wrong headings and different heights are not exempt.
+        """
+        return {target[0]} | {
+            end[0] for end, pose in open_ends.items()
+            if end != target and any(eng.connects(new, pose) for new in port_poses.values())
+        }
 
     # Layout reconstruction: replay placements in order.  Each placement after the
     # first was attached at a specific open end recorded during search.
@@ -261,8 +253,14 @@ def enumerate_networks(
                 for entry in orientations[pid]:
                     frame = eng.frame(pid, entry, target_pose)
                     pts = samples_for(pid, entry, frame)
-                    if conservatively_clashes(
-                        pts, piece.width / 2.0, target[0], piece.underpass
+                    port_poses = {
+                        port: eng.port_world(pid, port, frame)
+                        for port in range(len(piece.ports))
+                        if port != entry and port not in piece.sealed
+                    }
+                    if field.clashes(
+                        pts, piece.width / 2.0, potential_neighbours(port_poses, target),
+                        underpass=piece.underpass,
                     ):
                         continue
                     index = len(placements)
@@ -273,10 +271,7 @@ def enumerate_networks(
                     links[target] = (index, entry)
                     links[(index, entry)] = target
                     new_ends = []
-                    for port in range(len(piece.ports)):
-                        if port == entry or port in piece.sealed:
-                            continue
-                        pose = eng.port_world(pid, port, frame)
+                    for port, pose in port_poses.items():
                         open_ends[(index, port)] = pose
                         new_ends.append((index, port))
                     attach_trace.append((pid, entry, target))
