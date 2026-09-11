@@ -15,7 +15,11 @@ versioned Pyodide directory are immutable-cached forever.  The engine zip MUST
 carry the stamp in its filename: it was once served under a flat name with an
 immutable header, which pinned stale engines in returning visitors' browsers.
 
-Usage:  python webapp/build.py [--pyodide-version 0.27.7]
+Usage:  python webapp/build.py [--pyodide-version 0.27.7] [--pages]
+
+``--pages`` additionally embeds the policy as a ``<meta>`` tag for hosts that
+cannot send response headers (GitHub Pages); the stamped asset names keep
+such a host's fixed short cache safe.
 """
 
 from __future__ import annotations
@@ -172,6 +176,10 @@ _CSP = (
     "manifest-src 'self'; upgrade-insecure-requests"
 )
 
+#: The same policy for a <meta> tag: browsers ignore frame-ancestors there.
+_META_CSP = _CSP.replace("frame-ancestors 'none'; ", "")
+assert "frame-ancestors" not in _META_CSP and '"' not in _META_CSP
+
 HTACCESS = """\
 # duplotrain: Pyodide needs 'wasm-unsafe-eval' to compile its WebAssembly.
 # All scripts stay external and same-origin (no 'unsafe-inline' for scripts).
@@ -204,8 +212,11 @@ AddType application/wasm .wasm
 """
 
 
-def build_index() -> None:
-    """The editor split CSP-clean: page + external app.js, boot.js loaded first."""
+def build_index(meta_csp: bool = False) -> None:
+    """The editor split CSP-clean: page + external app.js, boot.js loaded first.
+
+    With *meta_csp* the policy is also embedded in the page for header-less hosts.
+    """
     editor = (ROOT / "src" / "duplotrain" / "static" / "editor.html").read_text(
         encoding="utf-8"
     )
@@ -232,6 +243,14 @@ def build_index() -> None:
         'let an exact-arithmetic solver close the loop. Runs entirely in your browser."/>',
         1,
     )
+    if meta_csp:
+        charset = '<meta charset="utf-8">\n'
+        if html.count(charset) != 1:
+            raise SystemExit("editor.html changed shape; update webapp/build.py")
+        html = html.replace(
+            charset,
+            charset + f'<meta http-equiv="Content-Security-Policy" content="{_META_CSP}">\n',
+        )
     (DIST / "index.html").write_text(html, encoding="utf-8", newline="\n")
     (DIST / ".htaccess").write_text(HTACCESS, encoding="utf-8", newline="\n")
     print(f"wrote {DIST / 'index.html'}, app.js and .htaccess")
@@ -249,6 +268,10 @@ def _stamp_file(source: Path, dest: Path, replacements: dict[str, str]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pyodide-version", default="0.27.7", choices=sorted(PYODIDE_SHA256))
+    parser.add_argument(
+        "--pages", action="store_true",
+        help="also embed the CSP as a <meta> tag (GitHub Pages cannot send headers)",
+    )
     args = parser.parse_args()
 
     # Verify dependencies before changing an existing deployable build.
@@ -259,7 +282,7 @@ def main() -> None:
     DIST.mkdir(parents=True, exist_ok=True)
     shutil.rmtree(DIST / "__pycache__", ignore_errors=True)
 
-    build_index()
+    build_index(meta_csp=args.pages)
 
     zip_bytes = build_source_zip()
     adapter = (WEBAPP / "adapter.py").read_bytes()

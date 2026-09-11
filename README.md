@@ -144,7 +144,10 @@ finished, not dangling.
 
 **Browser build:** the editor can run fully client-side using the identical Python
 engine under Pyodide. `webapp/build.py` produces the static bundle; nothing leaves
-the browser.
+the browser. The bundle is published at <https://senegrom.github.io/duplotrain/>
+by the *Deploy web app* workflow on every push to `main` that touches the engine
+or `webapp/`; that build passes `--pages`, which also embeds the content security
+policy as a `<meta>` tag because GitHub Pages cannot send response headers.
 
 `duplotrain gui` opens a local track editor in your browser (standard library server,
 nothing to install). Because DUPLO only ever connects on the exact lattice there is no
