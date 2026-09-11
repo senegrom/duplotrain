@@ -71,6 +71,20 @@ def _count(value: object) -> int:
     return value
 
 
+def _index(value: object, name: str) -> int:
+    """Reject coercible values (including booleans) before any editor mutation."""
+    if type(value) is not int or value < 0:
+        raise ValueError(f"{name} must be a non-negative integer")
+    return value
+
+
+def _end(value: object, name: str) -> End:
+    """Validate both indices before equality or membership can alias 0/1 to bool."""
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        raise ValueError(f"{name} must be a [placement, port] integer pair")
+    return _index(value[0], f"{name} placement"), _index(value[1], f"{name} port")
+
+
 def _signed_degrees(dheading: int) -> int:
     degrees = steps_to_degrees(dheading)
     return degrees - 360 if degrees >= 180 else degrees
@@ -360,6 +374,8 @@ class Session:
         piece = self.catalog[piece_id]
         if type(entry) is not int or not 0 <= entry < len(piece.ports) or entry in piece.sealed:
             raise ValueError("pick a valid, unsealed entry port")
+        if at is not None:
+            at = _end(at, "at")
         if at is not None and at not in self.layout.connectable_ends():
             raise ValueError("pick an open, unsealed end to attach to")
         if self.layout.placements:
@@ -373,13 +389,14 @@ class Session:
         self._push(layout)
 
     def join(self, a: End, b: End) -> None:
+        a, b = _end(a, "a"), _end(b, "b")
         opens = self.layout.connectable_ends()
         if a == b or a not in opens or b not in opens:
             raise ValueError("pick two distinct open ends to join")
         self._push(self.layout.join(a, b))
 
     def remove_piece(self, placement: int) -> None:
-        self._push(self.layout.remove(placement))
+        self._push(self.layout.remove(_index(placement, "placement")))
 
     def undo(self) -> None:
         if len(self.history) > 1:
@@ -414,6 +431,7 @@ class Session:
         """Toggle a stone at the selected position, or remove only that marker."""
         if stone_id not in ACCESSORIES:
             raise ValueError(f"unknown action stone {stone_id!r}")
+        placement = _index(placement, "placement")
         if not 0 <= placement < len(self.layout.placements):
             raise ValueError(f"no placement {placement}")
         piece = self.layout.placements[placement].piece
@@ -613,8 +631,14 @@ class Session:
             raise ValueError("search depth must be a whole number from 1 to 128")
         if type(max_results) is not int or not 1 <= max_results <= 50:
             raise ValueError("max_results must be a whole number from 1 to 50")
-        if not math.isfinite(slop) or slop < 0:
-            raise ValueError("slop must be finite and non-negative")
+        if type(slop) not in (int, float) or not math.isfinite(slop) or slop < 0:
+            raise ValueError("slop must be a finite, non-negative number")
+        if type(reversing) is not bool:
+            raise ValueError("reversing must be a boolean")
+        if grow is not None:
+            grow = _end(grow, "grow")
+        if close is not None:
+            close = _end(close, "close")
         opens = self.layout.connectable_ends()
         if grow is None or close is None:
             if len(opens) != 2:
@@ -642,15 +666,26 @@ class Session:
 
         remaining = self.remaining()
 
-        # Height sanity: if the two ends differ in elevation by more than every
-        # climbing piece left in the box can supply, no search can help.
+        # Inventory alone bounds height only when no open preplaced junction
+        # route can change elevation for free. Use the same eligible stub ends
+        # as the core solver; defer to its conservative bounds otherwise.
         dz = abs(float(self.layout.pose_of(grow).z) - float(self.layout.pose_of(close).z))
         if dz > 1e-9 and not reversing:
+            stub_ends = set(opens) - {grow, close}
+            climbing_transit = any(
+                placement.piece.ports[entry].pose.z != placement.piece.ports[exit_].pose.z
+                for index, placement in enumerate(self.layout.placements)
+                if placement.piece.is_junction
+                for entry in range(len(placement.piece.ports))
+                if (index, entry) in stub_ends
+                for exit_, _route in placement.piece.transit(entry)
+                if (index, exit_) in stub_ends
+            )
             lift = sum(
                 max((abs(float(m.dz)) for m in _moves_for(self.catalog[pid])), default=0.0) * n
                 for pid, n in remaining.items()
             )
-            if dz > lift + 1e-6:
+            if not climbing_transit and dz > lift + 1e-6:
                 return publish([], {
                     "found": 0,
                     "aborted": False,
@@ -721,6 +756,7 @@ class Session:
             revision is not None and revision != self.revision
         ):
             raise ValueError("candidate is stale (solve again)")
+        index = _index(index, "index")
         if not 0 <= index < len(self.candidates):
             raise ValueError("no such candidate (solve again)")
         chosen = self.candidates[index].layout
@@ -770,14 +806,13 @@ def dispatch_session(
             "Your action was not applied. Review the refreshed layout and try again."
         )
     if path == "/api/attach":
-        at = tuple(body["at"]) if body.get("at") is not None else None
-        session.attach(body["piece"], int(body["entry"]), at)
+        session.attach(body["piece"], body["entry"], body.get("at"))
     elif path == "/api/join":
-        session.join(tuple(body["a"]), tuple(body["b"]))
+        session.join(body["a"], body["b"])
     elif path == "/api/undo":
         session.undo()
     elif path == "/api/remove":
-        session.remove_piece(int(body["placement"]))
+        session.remove_piece(body["placement"])
     elif path == "/api/clear":
         session.clear()
     elif path == "/api/inventory":
@@ -788,20 +823,19 @@ def dispatch_session(
         session.add_set(str(body["code"]))
     elif path == "/api/stone":
         session.toggle_stone(
-            int(body["placement"]), str(body["id"]),
+            body["placement"], str(body["id"]),
             body.get("at_port"), remove_only=body.get("remove", False),
         )
     elif path == "/api/solve":
         outcome = session.solve_gap(
-            tuple(body["grow"]) if body.get("grow") else None,
-            tuple(body["close"]) if body.get("close") else None,
-            float(body.get("slop", 0.0)), int(body.get("max_results", 10)),
-            reversing=bool(body.get("reversing", False)), progress=progress,
-            max_pieces=int(body.get("max_pieces", 26)),
+            body.get("grow"), body.get("close"),
+            body.get("slop", 0.0), body.get("max_results", 10),
+            reversing=body.get("reversing", False), progress=progress,
+            max_pieces=body.get("max_pieces", 26),
         )
         return {**outcome, **session.state()}
     elif path == "/api/apply":
-        session.apply_candidate(int(body["index"]), body.get("revision"))
+        session.apply_candidate(body["index"], body.get("revision"))
     elif path == "/api/import":
         session._push(layout_from_dict(body.get("data"), session.catalog))
     elif path == "/api/restore":

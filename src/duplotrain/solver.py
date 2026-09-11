@@ -540,7 +540,8 @@ def _canonical_signature(
     ``cyclic=False``: their step sequences are paths anchored to the base, so
     rotation, reversal and mirroring would all conflate genuinely different
     completions.  ``base_pids`` names the pre-existing placements so transits through
-    them resolve to a piece id.
+    them resolve to a piece id. Their placement indices remain fixed, including
+    the closing stub: distinct junctions in a fixed base are not interchangeable.
     """
     # (instance, pid, entry, exit): `instance` identifies the physical piece.  Instance
     # ids share one space: base placements keep their layout index; grown pieces get
@@ -561,7 +562,7 @@ def _canonical_signature(
             visits.append((s.placement, pid_of(s.placement), s.entry, s.exit))
 
     def normalise(seq: list[tuple[int, str, int, int]]) -> tuple:
-        fresh: dict[int, int] = {}
+        fresh: dict[int, int] = {} if cyclic else {i: i for i in range(n_base)}
         out = []
         for inst, pid, entry, exit_ in seq:
             if inst not in fresh:
@@ -582,13 +583,14 @@ def _canonical_signature(
         return out
 
     if closing_stub is not None:
-        # A reversing loop is anchored at its open tail and closes into a junction
-        # stub: rotation and reversal are not symmetries, only reflection is.  The
+        # A fresh reversing loop is anchored at its open tail: only reflection
+        # is a symmetry. A completion is anchored to the entire fixed base, so
+        # even reflection can change the resulting layout. In both modes the
         # closing joint is part of the identity, appended as a final token.
         stub_inst, stub_port = closing_stub
 
         def with_join(seq, port: int) -> tuple:
-            fresh: dict[int, int] = {}
+            fresh: dict[int, int] = {} if cyclic else {i: i for i in range(n_base)}
             out = []
             for inst, pid, entry, exit_ in seq:
                 if inst not in fresh:
@@ -601,7 +603,7 @@ def _canonical_signature(
             return tuple(out) + (("J", ordinal, port),)
 
         candidates = [with_join(visits, stub_port)]
-        mirrored = mirror_of(visits)
+        mirrored = mirror_of(visits) if cyclic else None
         if mirrored is not None and port_mirror_for is not None:
             stub_pid = pid_of(stub_inst)
             mirrored_port = port_mirror_for.get(stub_pid, {}).get(stub_port)
