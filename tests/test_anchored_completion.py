@@ -99,11 +99,11 @@ def test_editor_height_bound_includes_transitable_preplaced_junctions(reverse):
 @pytest.mark.parametrize("cyclic", [False, True])
 def test_reversing_signature_reflection_only_applies_to_fresh_layouts(cyclic):
     from duplotrain.solver import (
-        _Place,
         _canonical_signature,
         _canonical_traversals,
         _mirror_ports,
         _mirror_traversals,
+        _Place,
     )
 
     catalog = default_catalog()
@@ -121,7 +121,7 @@ def test_reversing_signature_reflection_only_applies_to_fresh_layouts(cyclic):
 
 
 def test_anchored_signatures_preserve_closing_port_and_base_placement_identity():
-    from duplotrain.solver import _Place, _Transit, _canonical_signature
+    from duplotrain.solver import _canonical_signature, _Place, _Transit
 
     options = {"canon_for": {}, "base_pids": ["switch", "switch"], "cyclic": False}
     steps = [_Place("curve", 0, 1)]
