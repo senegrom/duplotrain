@@ -50,3 +50,52 @@ all three sources remain additive. File-read errors are reported as CLI errors.
 The focused regressions are in `tests/test_review_round2.py`,
 `tests/test_congruence.py`, `tests/test_solve_atomicity.py`, and
 `tests/test_cli_inventory.py`.
+
+## Completion paths can revisit all free junction ports
+
+The loop/completion solver compares every unsealed, unoccupied candidate port
+with the closing target and open junction stubs. A crossing can meet its target
+on the route used only after a later re-entry. These possible neighbours are
+exempt during placement; the independent final audit still requires actual
+links. Sealed ports, incompatible overhangs, and unrelated obstacles receive no
+such exemption. Forced fits use only the remaining slop budget.
+
+In completion mode, `SolverConfig(min_pieces=0)` permits a path consisting only
+of connections and transits through existing junctions. The search visits the
+zero-new-piece depth contour even with an empty inventory, but never emits an
+empty fresh loop. Minimum/use-all constraints and node/result caps still apply.
+The editor also permits these no-new-inventory completions. Already-mating
+selected endpoints should still be joined directly instead of searched.
+
+## Reversals start another ordered pass
+
+A face stone is silent only when departing from that face. Returning toward it
+after a mid-piece reversal encounters it normally. A face direction stone starts
+a fresh inward pass on the same piece, without following its external link; the
+midpoint and next connector are then encountered in order. Stop stones take
+precedence over direction stones at the same position. The ordinary repeated-state
+check also detects oscillations entirely inside one piece, including two guarded
+faces, without falsely claiming coverage of other track.
+
+`DriveReport.steps` now records each pass as `(placement, departure, reached)`.
+A face turnaround and its return are separate passes; a mid-piece bounce reaches
+its own departure port. Consequently face-reversing runs can have larger `steps`
+and `period` values than before. These are discrete pass counts, not travel times.
+No change is made to saved layout JSON or the formal lazy-switch theorem.
+
+## Remove the selected stone, not the last stone of that colour
+
+The editor carries `at_port` from each drawn marker through `/api/stone`:
+`null` selects the midpoint and an integer selects that connector face. Toggling
+matches type and position together. The Remove tool also sends `remove: true`,
+so a missing marker is an error rather than a request to add a new stone. Invalid
+positions/removal modes leave the session and revision untouched.
+
+Library callers can use `Layout.without_accessory(..., at_port=None)` or an
+integer for exact-position removal. Omitting the keyword retains the older
+last-of-colour behaviour. Removing one marker preserves other positions, counts,
+serialization round trips and undo.
+
+These contracts are exercised by `tests/test_review_round3.py`,
+`tests/test_stone_encounters.py`, `tests/test_stone_positions.py` and
+`tests/web/stone-selection.test.cjs`, including the HTTP and Pyodide dispatcher.

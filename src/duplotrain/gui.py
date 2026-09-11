@@ -408,18 +408,26 @@ class Session:
         })
 
     def toggle_stone(
-        self, placement: int, stone_id: str, at_port: int | None = None
+        self, placement: int, stone_id: str, at_port: int | None = None,
+        *, remove_only: bool = False,
     ) -> None:
-        """Clip a stone onto a placement (mid-piece or at a connector face), or
-        unclip it if one of that kind is already there."""
+        """Toggle a stone at the selected position, or remove only that marker."""
         if stone_id not in ACCESSORIES:
             raise ValueError(f"unknown action stone {stone_id!r}")
         if not 0 <= placement < len(self.layout.placements):
             raise ValueError(f"no placement {placement}")
-        if stone_id in self.layout.stones_on(placement):
-            self._push(self.layout.without_accessory(placement, stone_id))
-            return
         piece = self.layout.placements[placement].piece
+        if at_port is not None and (
+            type(at_port) is not int or not 0 <= at_port < len(piece.ports)
+        ):
+            raise ValueError("pick a valid stone position")
+        if type(remove_only) is not bool:
+            raise ValueError("remove must be a boolean")
+        if (stone_id, at_port) in self.layout.stone_entries_on(placement):
+            self._push(self.layout.without_accessory(placement, stone_id, at_port=at_port))
+            return
+        if remove_only:
+            raise ValueError("no such stone at the selected position")
         if piece.id not in STONE_MOUNTS:
             raise ValueError(f"action stones clip onto straights, not {piece.id!r}")
         if self.stones_remaining().get(stone_id, 0) <= 0:
@@ -683,7 +691,7 @@ class Session:
                 self.catalog,
                 SolverConfig(
                     slop=slop,
-                    min_pieces=1,
+                    min_pieces=0,
                     max_pieces=max_pieces,
                     max_results=max_results,
                     max_nodes=budget,
@@ -781,7 +789,7 @@ def dispatch_session(
     elif path == "/api/stone":
         session.toggle_stone(
             int(body["placement"]), str(body["id"]),
-            int(body["at_port"]) if body.get("at_port") is not None else None,
+            body.get("at_port"), remove_only=body.get("remove", False),
         )
     elif path == "/api/solve":
         outcome = session.solve_gap(

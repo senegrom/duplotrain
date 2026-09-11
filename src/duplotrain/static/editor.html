@@ -437,7 +437,7 @@ function stoneMarkPositions() {
       const [sx, sy] = worldToScreen(wx, wy);
       const r = Math.max(6, 14 * view.scale);
       const oy = (k - ((pl.stone_marks.length - 1) / 2)) * r * 2.2;
-      out.push({ placement: i, id: mark.id, x: sx, y: sy + oy, r });
+      out.push({ placement: i, id: mark.id, at_port: mark.at ?? null, x: sx, y: sy + oy, r });
     });
   });
   return out;
@@ -1078,7 +1078,9 @@ async function removeAt(sx, sy) {
   try {
     const mark = stoneMarkPositions().find(m => Math.hypot(m.x - sx, m.y - sy) < Math.max(16, m.r + 4));
     if (mark) {
-      S = await api("/api/stone", {placement: mark.placement, id: mark.id});
+      S = await api("/api/stone", {
+        placement: mark.placement, id: mark.id, at_port: mark.at_port, remove: true,
+      });
     } else {
       const hit = placementAt(sx, sy);
       if (hit === null) return;

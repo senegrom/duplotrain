@@ -16,7 +16,7 @@ import math
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import Any, Literal
 
 from .exact import Alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose, cos_sin
@@ -473,11 +473,29 @@ class Layout:
             self.accessories + (entry,),
         )
 
-    def without_accessory(self, placement: int, accessory_id: str) -> Layout:
-        """Remove one matching stone (the last one clipped on), wherever it sits."""
+    def without_accessory(
+        self, placement: int, accessory_id: str, *,
+        at_port: int | None | Literal["any"] = "any",
+    ) -> Layout:
+        """Remove one matching stone, preserving other stones of the same colour.
+
+        Omit ``at_port`` for legacy last-of-colour removal. Explicit ``None``
+        selects the midpoint; an integer selects that connector face only.
+        """
+        if at_port != "any":
+            if not 0 <= placement < len(self.placements):
+                raise ValueError(f"no placement {placement}")
+            if at_port is not None and (
+                type(at_port) is not int
+                or not 0 <= at_port < len(self.placements[placement].piece.ports)
+            ):
+                raise ValueError(f"placement {placement} has no port {at_port}")
         accessories = list(self.accessories)
         for i in range(len(accessories) - 1, -1, -1):
-            if accessories[i][0] == placement and accessories[i][1] == accessory_id:
+            entry = accessories[i]
+            position = entry[2] if len(entry) > 2 else None
+            if (entry[0] == placement and entry[1] == accessory_id
+                    and (at_port == "any" or position == at_port)):
                 accessories.pop(i)
                 break
         else:
@@ -488,7 +506,7 @@ class Layout:
         return [entry[1] for entry in self.accessories if entry[0] == placement]
 
     def stone_entries_on(self, placement: int) -> list[tuple[str, int | None]]:
-        """``(stone id, port position or None for mid-piece)`` for one placement."""
+        """``(stone id, port position or None)`` for one placement."""
         return [
             (entry[1], entry[2] if len(entry) > 2 else None)
             for entry in self.accessories

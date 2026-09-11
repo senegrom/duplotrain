@@ -53,7 +53,9 @@ class DriveReport:
     """
 
     outcome: str
-    steps: tuple[tuple[int, int, int], ...]  # (placement, entered port, exited port)
+    #: (placement, departure port, reached port). A mid-piece bounce returns to
+    #: its departure port; a face bounce starts another pass on the SAME piece.
+    steps: tuple[tuple[int, int, int], ...]
     cycle_start: int | None  # index into steps where the endless cycle begins
     reversals: int
     visited: frozenset[int]
@@ -193,17 +195,21 @@ def drive(
                     # Trailing move: we are pushing through toward a facing port, so
                     # the tongue is forced to the branch we came from.
                     states[placement] = entered
-            # Face stones at the port the train is heading for.
-            if any(sid == STOP_STONE and pos == exit_port for sid, pos in stones):
-                return finish("stopped", placement)
-            if any(
-                sid == DIRECTION_STONE and pos == exit_port and pos != entered
-                for sid, pos in stones
-            ):
-                exit_port = entered
-                reversals += 1
+        # A mid-piece reversal also approaches a connector face, including the
+        # one we originally entered through. Only the *initial departure* from
+        # that face is silent; a return toward it must encounter its stones.
+        if any(sid == STOP_STONE and pos == exit_port for sid, pos in stones):
+            return finish("stopped", placement)
 
         steps.append((placement, entered, exit_port))
+        if any(sid == DIRECTION_STONE and pos == exit_port for sid, pos in stones):
+            # Reflect at this face, without following its external link. The
+            # return is a fresh inward pass on this piece, so it visits the
+            # midpoint and the other face in order. Keeping it in the normal
+            # state machine detects even cycles wholly inside a single piece.
+            reversals += 1
+            entered = exit_port
+            continue
 
         if exit_port in piece.sealed:
             return finish("buffered", placement)

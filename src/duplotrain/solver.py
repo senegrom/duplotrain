@@ -702,6 +702,8 @@ class SolverConfig:
     """Knobs for the search."""
 
     slop: float = 0.0  # total closing gap allowed, mm; 0 = exact closures only
+    #: Newly placed pieces in completion mode; zero permits existing-junction
+    #: transits without spending inventory (an empty fresh loop is never emitted).
     min_pieces: int = 4
     #: Upper bound on pieces placed (loop length / grown completion length).  With a
     #: huge inventory an unbounded depth-first dive is the enemy: a 300 mm gap needs
@@ -753,8 +755,9 @@ class SolveStats:
     duration_s: float = 0.0
     aborted: bool = False  # stopped by max_nodes
     engine: str = ""  # which arithmetic backend ran
-    #: Solutions rejected by the final independent overlap audit.  Always 0 unless
-    #: a search-time exemption let an overlap slip through -- a bug worth reporting.
+    #: Candidates rejected by the final actual-link overlap audit. A potential
+    #: future joint exempted during search may not be realized in the final trace;
+    #: these overlapping candidates are counted here, never returned.
     dropped_overlap: int = 0
     #: True only after exhausting the entire inventory, not a capped search.
     complete: bool = False
@@ -1069,7 +1072,7 @@ def solve(
                 and overhang_of[placements[anchor_index][0]] > 0
             )
 
-        if used > 0 and eng.closes(cursor):
+        if steps and eng.closes(cursor):
             # The anchor face is occupied; whether or not this counts as a result,
             # nothing can continue through it.
             if eligible(used) and closing_link_legal():
@@ -1145,7 +1148,7 @@ def solve(
                     if gap is None:
                         continue
                     joint_gap = gap
-                if cfg.reversing_loops and used > 0 and eligible(used):
+                if cfg.reversing_loops and steps and eligible(used):
                     # Closing INTO the stub (rather than driving through) makes a
                     # reversing loop: the walk's end mates this branch, and the train
                     # thereafter shuttles out through the junction's other route.
@@ -1177,7 +1180,7 @@ def solve(
                         return False
 
         # -- place a new piece -----------------------------------------------------
-        if used >= depth_limit:
+        if used >= min(depth_limit, f_limit):
             return True
         candidates: list[tuple[float, str, int, int, object]] = []
         cursor_overhangs = (
@@ -1211,21 +1214,30 @@ def solve(
             )
             index = len(placements)
             ignore = {prev_index} if prev_index is not None else set()
-            # A move that closes the loop legitimately butts against the anchor
-            # piece; exempt it from colliding with that piece only.  Likewise a
-            # move landing on an open stub butts against that stub's piece.
-            if placements and eligible(used + 1):
-                if eng.closes(next_cursor) or (
-                    cfg.slop > 0.0
-                    and eng.near_anchor(next_cursor, cfg.slop - slack_used) is not None
-                ):
+            # Every free connector can become a later joint, not just the exit
+            # used by this traversal. A crossing's other route may already mate
+            # the target and only be linked after re-entry. Exempt these possible
+            # neighbours now; the final audit still requires actual links.
+            free_poses = [next_cursor]
+            free_poses.extend(
+                eng.port_world(pid, port, frame)
+                for port in range(len(piece.ports))
+                if port not in (entry, exit_port) and port not in piece.sealed
+            )
+            slack_left = cfg.slop - slack_used
+            if placements and not (
+                overhang_of[pid] > 0 and overhang_of[placements[anchor_index][0]] > 0
+            ):
+                if any(eng.closes(pose) or (
+                    cfg.slop > 0.0 and eng.near_anchor(pose, slack_left) is not None
+                ) for pose in free_poses):
                     ignore.add(anchor_index)
             for stub_index, _stub_port, stub_pose in stubs:
-                if eng.connects(next_cursor, stub_pose) or (
-                    cfg.slop > 0.0
-                    and eng.near_pose(next_cursor, stub_pose, cfg.slop - slack_used)
-                    is not None
-                ):
+                if overhang_of[pid] > 0 and overhang_of[placements[stub_index][0]] > 0:
+                    continue
+                if any(eng.connects(pose, stub_pose) or (
+                    cfg.slop > 0.0 and eng.near_pose(pose, stub_pose, slack_left) is not None
+                ) for pose in free_poses):
                     ignore.add(stub_index)
             if field._clashes_prepared(
                 grouped_pts, piece.width / 2.0, ignore, underpass=piece.underpass
@@ -1243,7 +1255,7 @@ def solve(
             new_stubs = 0
             if piece.is_junction:
                 for port_index in range(len(piece.ports)):
-                    if port_index in (entry, exit_port):
+                    if port_index in (entry, exit_port) or port_index in piece.sealed:
                         continue
                     stubs.append((index, port_index, eng.port_world(pid, port_index, frame)))
                     new_stubs += 1
@@ -1278,7 +1290,10 @@ def solve(
         # each admissible contour stays small and finds the SHORTEST completions
         # first.  Plain iterative deepening without the heuristic was tried and is
         # equally hopeless -- the contour bound is what tames the tree.
-        for f_limit in range(1, depth_limit + 1):
+        # A completion may only join/transit preplaced junctions. It still has
+        # a nonempty step trace, but uses no inventory and needs contour zero.
+        first_limit = 0 if cfg.min_pieces == 0 else 1
+        for f_limit in range(first_limit, depth_limit + 1):
             stats.max_pieces_searched = f_limit
             if not dfs(eng.start_cursor, 0, 0.0, start_prev):
                 break
