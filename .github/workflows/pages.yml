@@ -1,11 +1,12 @@
 name: Deploy web app
 on:
-  push:
+  # Deploy only a commit whose Application checks passed on main. Those checks
+  # run for every push that touches the application, so nothing app-relevant
+  # slips by; theory-only pushes neither run them nor need a deploy.
+  workflow_run:
+    workflows: ["Application checks"]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'src/duplotrain/**'
-      - 'webapp/**'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,6 +15,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   build:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -22,6 +27,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The exact commit the checks passed on, not whatever main is now.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
         with:
