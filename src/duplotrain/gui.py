@@ -967,7 +967,10 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 with session.lock:
                     self._json(200, dispatch_session(session, self.path, {}))
             else:
-                self._json(404, {"error": f"no route {self.path}"})
+                # A GET carrying a body (a mutation attempt) must be drained like
+                # any other rejected request, or the close resets the connection
+                # and the client never reads this refusal.
+                self._reject(404, f"no route {self.path}")
 
         def do_POST(self) -> None:  # noqa: N802
             self._body_bytes_read = 0
