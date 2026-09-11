@@ -54,6 +54,15 @@ WORKER_EXCLUDES = {
 
 WORKER_INIT = b'''"""Minimal package marker for the Pyodide editor worker."""\n'''
 
+
+def text_bytes(path: Path) -> bytes:
+    """A text file's bytes with LF newlines, whatever the checkout used.
+
+    A Windows checkout with autocrlf would otherwise ship CRLF sources and give
+    the same commit a different content stamp from the Linux CI build.
+    """
+    return path.read_bytes().replace(b"\r\n", b"\n")
+
 #: Everything Pyodide needs for `loadPyodide` + pure-Python imports.
 PYODIDE_FILES = [
     "pyodide.mjs",
@@ -143,25 +152,38 @@ def fetch_pyodide(version: str) -> Path:
     return target
 
 
-def build_source_zip() -> bytes:
-    """Zip the worker's Python modules for unpackArchive; returns the bytes.
+def worker_entries() -> list[tuple[str, bytes]]:
+    """The worker's Python modules as sorted ``(archive name, LF bytes)`` pairs.
 
     The editor is served separately. Desktop CLI/rendering files stay in the
     regular Python package, not in the worker (which imports neither).
-    Zip entries carry a fixed timestamp so the stamp depends on content alone.
     """
     src = ROOT / "src" / "duplotrain"
+    entries = []
+    for path in sorted(src.rglob("*")):
+        relative = path.relative_to(src)
+        if ("__pycache__" in relative.parts or not path.is_file()
+                or relative.as_posix() in WORKER_EXCLUDES):
+            continue
+        arcname = (Path("duplotrain") / relative).as_posix()
+        payload = WORKER_INIT if relative.as_posix() == "__init__.py" else text_bytes(path)
+        entries.append((arcname, payload))
+    return entries
+
+
+def build_source_zip(entries: list[tuple[str, bytes]] | None = None) -> bytes:
+    """Zip the worker's Python modules for unpackArchive; returns the bytes.
+
+    Zip entries carry a fixed timestamp. The stamp is taken over the entries
+    themselves (see ``main``), never over these bytes: zlib and zlib-ng compress
+    identical input differently, so the archive is not reproducible across
+    platforms even though its contents are.
+    """
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for path in sorted(src.rglob("*")):
-            relative = path.relative_to(src)
-            if ("__pycache__" in relative.parts or not path.is_file()
-                    or relative.as_posix() in WORKER_EXCLUDES):
-                continue
-            arcname = (Path("duplotrain") / relative).as_posix()
+        for arcname, payload in (worker_entries() if entries is None else entries):
             info = zipfile.ZipInfo(arcname, date_time=(2020, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
-            payload = WORKER_INIT if relative.as_posix() == "__init__.py" else path.read_bytes()
             zf.writestr(info, payload)
     return buffer.getvalue()
 
@@ -284,12 +306,17 @@ def main() -> None:
 
     build_index(meta_csp=args.pages)
 
-    zip_bytes = build_source_zip()
-    adapter = (WEBAPP / "adapter.py").read_bytes()
-    stamp_src = zip_bytes + adapter + (DIST / "app.js").read_bytes()
+    entries = worker_entries()
+    zip_bytes = build_source_zip(entries)
+    adapter = text_bytes(WEBAPP / "adapter.py")
+    # Content-only stamp: the same commit yields the same name on every platform.
+    digest = hashlib.sha256()
+    for arcname, payload in entries:
+        digest.update(arcname.encode("utf-8") + b"\n" + payload + b"\n")
+    digest.update(adapter + (DIST / "app.js").read_bytes())
     for name in ("boot.js", "worker.js"):
-        stamp_src += (WEBAPP / name).read_bytes()
-    stamp = hashlib.sha256(stamp_src).hexdigest()[:8]
+        digest.update(text_bytes(WEBAPP / name))
+    stamp = digest.hexdigest()[:8]
 
     for stale in DIST.glob("duplotrain-src*.zip"):
         stale.unlink()
@@ -313,7 +340,7 @@ def main() -> None:
             "__ADAPTER__": f"./adapter.py?v={stamp}",
         },
     )
-    shutil.copy2(WEBAPP / "adapter.py", DIST / "adapter.py")
+    (DIST / "adapter.py").write_bytes(adapter)
 
     dest = DIST / pyodide_dirname
     dest.mkdir(exist_ok=True)
