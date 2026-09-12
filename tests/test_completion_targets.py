@@ -43,7 +43,9 @@ def test_six_step_lookahead_reduces_long_gap_work_again():
     improved = solve(inventory, catalog, cfg, base=base)
     assert len(improved.solutions) == 8
     assert signatures(improved) == signatures(previous)
-    assert improved.stats.nodes < previous.stats.nodes // 2
+    # Longer linear bounds now help both settings; the six-step exact table
+    # still saves work on top of them.
+    assert improved.stats.nodes < previous.stats.nodes
     assert_budget(improved, cfg)
 
 

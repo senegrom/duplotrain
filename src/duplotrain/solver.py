@@ -546,6 +546,95 @@ def _compile_lattice(
 # --------------------------------------------------------------------------------------
 
 
+class _CompletionBounds:
+    """Exact linear envelopes, indexed by heading and maximum tail length.
+
+    A move adds a fixed displacement at a given heading. Minimum/maximum linear
+    projections therefore compose without enumerating positions: translate every
+    interval, then take the union's bounds. Intervals may describe different walks,
+    so membership is only necessary. This stays useful beyond the short exact table.
+    """
+
+    def __init__(self, eng) -> None:
+        if eng.name == "lattice":
+            self.project = self._lattice_projection
+            self.heading = lambda pose: pose[5]
+            zeros = [(0, 0, 0, 0, 0, heading) for heading in range(12)]
+        else:
+            self.project = self._field_projection
+            self.heading = lambda pose: pose.heading
+            zeros = [Pose.make(heading=heading) for heading in range(HEADING_STEPS)]
+        # Include full 3D deltas and every preplaced route, not only spare pieces.
+        moves = {apply_move(zeros[0]): apply_move
+                 for routes in eng.moves.values() for _entry, _exit, apply_move in routes}
+        self.deltas = []
+        for zero in zeros:
+            predecessors = (eng.reverse(move(eng.reverse(zero))) for move in moves.values())
+            self.deltas.append(tuple({
+                (self.heading(pose), self.project(pose)) for pose in predecessors
+            }))
+        coords = self.project(eng.anchor)
+        self.layers = [{self.heading(eng.anchor): (coords, coords)}]
+        self.saturated = False
+
+    @staticmethod
+    def _lattice_projection(pose) -> tuple:
+        a, b, c, d, _z, _heading = pose
+        # 26/15 approximates sqrt(3), making these projections nearly horizontal
+        # and vertical. They are EXACT integer linear forms, not rounded positions:
+        # the same forms bound moves and query cursors, so no tolerance is needed.
+        x, y = 30 * a + 26 * b + 15 * c, 15 * b + 26 * c + 30 * d
+        return (*pose[:5], x, y, x + y, x - y)
+
+    @staticmethod
+    def _field_projection(pose: Pose) -> tuple:
+        # Rational surrogates for 1, sqrt(2), sqrt(3), sqrt(6), scaled by 60.
+        # As above, any fixed rational linear forms are conservative. Retain all
+        # individual coefficients too, including exact height coefficients.
+        weights = (60, 85, 104, 147)
+        x = sum(w * c for w, c in zip(weights, pose.x.coeffs(), strict=True))
+        y = sum(w * c for w, c in zip(weights, pose.y.coeffs(), strict=True))
+        return (*pose.x.coeffs(), *pose.y.coeffs(), *pose.z.coeffs(), x, y, x + y, x - y)
+
+    def extend(self, traversals: int, max_work: int) -> int:
+        """Publish only complete layers and return the move expansions spent."""
+        spent = 0
+        while len(self.layers) <= traversals and not self.saturated:
+            previous = self.layers[-1]
+            work = sum(len(self.deltas[heading]) for heading in previous)
+            if work > max_work - spent:
+                break
+            spent += work
+            layer = dict(previous)  # at most k traversals also includes k - 1
+            for heading, (low, high) in previous.items():
+                for next_heading, delta in self.deltas[heading]:
+                    next_low = tuple(a + b for a, b in zip(low, delta, strict=True))
+                    next_high = tuple(a + b for a, b in zip(high, delta, strict=True))
+                    if next_heading in layer:
+                        old_low, old_high = layer[next_heading]
+                        next_low = tuple(map(min, old_low, next_low))
+                        next_high = tuple(map(max, old_high, next_high))
+                    layer[next_heading] = next_low, next_high
+            if layer == previous:
+                # Empty/zero-motion move pools can stabilize without spending any
+                # work. Reuse this fixed point for all depths instead of allocating
+                # unbounded identical layers for a large inventory.
+                self.saturated = True
+            else:
+                self.layers.append(layer)
+        return spent
+
+    def allows(self, cursor, traversals: int) -> bool:
+        if traversals >= len(self.layers) and not self.saturated:
+            return True  # the shared preprocessing budget could not finish this depth
+        layer = self.layers[min(traversals, len(self.layers) - 1)]
+        interval = layer.get(self.heading(cursor))
+        return interval is not None and all(
+            low <= value <= high
+            for low, value, high in zip(interval[0], self.project(cursor), interval[1], strict=True)
+        )
+
+
 class _CompletionReachability:
     """Bounded reverse reachability for planar poses and heights independently.
 
@@ -582,8 +671,12 @@ class _CompletionReachability:
         self.frontier = self.layers[0]
         self.height_layers = [frozenset((eng.height(eng.anchor),))]
         self.height_frontier = self.height_layers[0]
+        self.bounds = _CompletionBounds(eng)
 
     def allows(self, cursor, traversals: int) -> bool:
+        self.work_left -= self.bounds.extend(traversals, self.work_left)
+        if not self.bounds.allows(cursor, traversals):
+            return False
         if traversals > self.horizon:
             return True
         while len(self.layers) <= traversals:
@@ -843,8 +936,9 @@ class SolverConfig:
     #: the general field otherwise; "lattice"/"field" force one, for tests.
     engine: str = "auto"
     #: Exact reverse reachability for this many final traversals in completion
-    #: mode. Zero disables it; preprocessing is independently bounded to 4096 moves
-    #: (and at most max_nodes // 8). Slop fits bypass the exact table.
+    #: mode, supplemented by longer linear bounds. Zero disables both; they share
+    #: a preprocessing cap of 4096 moves (and at most max_nodes // 8). Slop fits
+    #: bypass both exact checks.
     completion_lookahead: int = 6
 
     def __post_init__(self) -> None:
@@ -888,6 +982,8 @@ class SolveStats:
     max_pieces_searched: int = 0
     completion_height_states: int = 0
     completion_work: int = 0
+    completion_bound_depth: int = 0
+    completion_bound_states: int = 0  # retained heading envelopes across all depths
 
 
 @dataclass
@@ -1176,16 +1272,14 @@ def solve(
     def eligible(used: int) -> bool:
         return used >= cfg.min_pieces and (not cfg.use_all_pieces or used == total_pieces)
 
-    # Per-search, bounded by piece types times the lookahead horizon. These queries
-    # describe a future junction's own geometry, independent of the growing path.
+    # These queries describe a future junction's own geometry, independent of the
+    # growing path. Cap the per-search cache now that bounds can check longer tails.
     future_closure: dict[tuple[str, int], bool] = {}
 
     def tail_possible(cursor, used: int, extra_pid: str | None = None) -> bool:
         if completion is None:
             return True
         slots = min(total_pieces, depth_limit, f_limit) - used
-        if slots > completion.horizon:
-            return True
         if extra_pid and cfg.reversing_loops and stub_capacity[extra_pid]:
             # Its new targets do not have frames yet. The recursive call checks
             # them after placement; do not guess their positions in this early test.
@@ -1220,10 +1314,13 @@ def solve(
                     if not counts[pid] or not reversing_queries[pid]:
                         continue
                     key = (pid, traversals - 1)
-                    if key not in future_closure:
-                        future_closure[key] = any(completion.allows(query, traversals - 1)
-                                                  for query in reversing_queries[pid])
-                    if future_closure[key]:
+                    possible = future_closure.get(key)
+                    if possible is None:
+                        possible = any(completion.allows(query, traversals - 1)
+                                       for query in reversing_queries[pid])
+                        if len(future_closure) < 4096:
+                            future_closure[key] = possible
+                    if possible:
                         return True
         return False
 
@@ -1548,6 +1645,8 @@ def solve(
         stats.completion_states = len(completion.layers[-1])
         stats.completion_height_states = len(completion.height_layers[-1])
         stats.completion_work = completion.work_limit - completion.work_left
+        stats.completion_bound_depth = len(completion.bounds.layers) - 1
+        stats.completion_bound_states = sum(map(len, completion.bounds.layers))
 
     ordered = sorted(
         solutions.values(),
