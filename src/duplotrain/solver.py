@@ -23,6 +23,7 @@ Pruning (all conservative, so the search stays exhaustive):
     * turn feasibility -- the remaining pieces (plus open stubs) must be able to swing
       the heading back to the anchor's;
     * reach -- the remaining pieces must be long enough to get home;
+    * exact completion reachability -- short tails must reach the target on the grid;
     * collisions -- a placement overlapping existing track is cut immediately.
 """
 
@@ -264,6 +265,10 @@ class _FieldEngine:
     def convert(self, pose: Pose) -> Pose:
         return pose
 
+    @staticmethod
+    def reverse(pose: Pose) -> Pose:
+        return pose.reversed()
+
     def frame(self, pid: str, entry: int, cursor: Pose) -> Pose:
         f0 = self._frames0.get((pid, entry))
         if f0 is None:
@@ -370,6 +375,10 @@ class _LatticeEngine:
         a, b, c, d, z, h = cursor
         da, db, dc, dd = rotated[h]
         return (a + da, b + db, c + dc, d + dd, z + dz, (h + turn) % 12)
+
+    @staticmethod
+    def reverse(pose: tuple) -> tuple:
+        return (*pose[:5], (pose[5] + 6) % 12)
 
     def frame(self, pid: str, entry: int, cursor: tuple) -> tuple:
         rotated, dz, turn = self._frames0[(pid, entry)]
@@ -495,8 +504,57 @@ def _compile_lattice(
 
 
 # --------------------------------------------------------------------------------------
-# Step traces and their canonical signatures
+# Exact short-tail reachability, followed by step traces and their signatures
 # --------------------------------------------------------------------------------------
+
+
+class _CompletionReachability:
+    """A bounded reverse search, ignoring stock counts, collisions and fixed frames.
+
+    Each complete layer contains ALL cursors that can reach the anchor in at most
+    that many traversals. Reversing a physical route is always another legal route,
+    so reversing the cursor, taking a move, and reversing again enumerates every
+    predecessor. Ignoring placement constraints makes this an overapproximation:
+    absence proves impossibility, while membership still needs the full DFS audit.
+
+    Never use a partly built layer. If the preprocessing budget runs out, retain
+    the completed shorter layers and let DFS handle the rest normally.
+    """
+
+    def __init__(self, eng, horizon: int, max_work: int) -> None:
+        self.eng = eng
+        self.horizon = horizon
+        self.work_left = max_work
+        # Different geometries can share an endpoint transform. Geometry is not a
+        # constraint here, so expand each distinct transform only once.
+        unique = {
+            apply_move(eng.anchor): apply_move
+            for moves in eng.moves.values()
+            for _entry, _exit, apply_move in moves
+        }
+        self.moves = tuple(unique.values())
+        self.layers = [frozenset((eng.anchor,))]
+        self.frontier = self.layers[0]
+
+    def allows(self, cursor, traversals: int) -> bool:
+        if traversals > self.horizon:
+            return True
+        while len(self.layers) <= traversals:
+            work = len(self.frontier) * len(self.moves)
+            if work > self.work_left:
+                return True
+            self.work_left -= work
+            previous = self.layers[-1]
+            frontier = set()
+            for pose in self.frontier:
+                backwards = self.eng.reverse(pose)
+                for apply_move in self.moves:
+                    predecessor = self.eng.reverse(apply_move(backwards))
+                    if predecessor not in previous:
+                        frontier.add(predecessor)
+            self.frontier = frontier
+            self.layers.append(previous | frontier)
+        return cursor in self.layers[traversals]
 
 
 @dataclass(frozen=True, slots=True)
@@ -729,6 +787,10 @@ class SolverConfig:
     #: problem fits the 30-degree grid (every built-in piece does) and falls back to
     #: the general field otherwise; "lattice"/"field" force one, for tests.
     engine: str = "auto"
+    #: Exact reverse reachability for this many final traversals in completion
+    #: mode. Zero disables it; preprocessing is independently bounded to 4096 moves
+    #: (and at most max_nodes // 8). Slop fits and changing reversing targets bypass it.
+    completion_lookahead: int = 4
 
     def __post_init__(self) -> None:
         for name in ("slop", "clearance", "collision_spacing"):
@@ -745,6 +807,8 @@ class SolverConfig:
             type(self.max_pieces) is not int or self.max_pieces < 1
         ):
             raise ValueError("max_pieces must be a positive integer or None")
+        if type(self.completion_lookahead) is not int or not 0 <= self.completion_lookahead <= 6:
+            raise ValueError("completion_lookahead must be an integer from 0 to 6")
 
 
 @dataclass
@@ -754,6 +818,8 @@ class SolveStats:
     pruned_turn: int = 0
     pruned_reach: int = 0
     pruned_collision: int = 0
+    pruned_completion: int = 0
+    completion_states: int = 0  # states in the largest complete reverse-search layer
     duration_s: float = 0.0
     aborted: bool = False  # stopped by max_nodes
     engine: str = ""  # which arithmetic backend ran
@@ -863,7 +929,9 @@ def solve(
     if base is not None:
         for placement in base.placements:
             piece_obj.setdefault(placement.piece.id, placement.piece)
-    moves_by_piece = {pid: _moves_for(pieces[pid]) for pid in piece_ids}
+    # Reverse reachability also needs routes through preplaced junctions, including
+    # types absent from the spare inventory. Only piece_ids may be newly placed.
+    moves_by_piece = {pid: _moves_for(piece) for pid, piece in piece_obj.items()}
     # Tie-break rank for move ordering: with a broad inventory many moves share a
     # heuristic score (a level crossing "ahead" lands exactly where a straight does);
     # plain running track must win those ties or the search drowns in exotic-piece
@@ -969,6 +1037,16 @@ def solve(
                 for port in range(len(placement.piece.ports))
             }
     stats.engine = eng.name
+    completion = (
+        _CompletionReachability(eng, cfg.completion_lookahead, min(4096, cfg.max_nodes // 8))
+        if base is not None and cfg.slop == 0 and cfg.completion_lookahead
+        else None
+    )
+    stub_capacity = {
+        pid: max(0, len(pieces[pid].ports) - len(pieces[pid].sealed) - 2)
+        if pieces[pid].is_junction else 0
+        for pid in piece_ids
+    }
 
     steps: list[object] = []
     stubs: list[tuple[int, int, object]] = []  # (placement index, port, engine pose)
@@ -1008,6 +1086,23 @@ def solve(
 
     def eligible(used: int) -> bool:
         return used >= cfg.min_pieces and (not cfg.use_all_pieces or used == total_pieces)
+
+    def tail_possible(cursor, used: int, extra_stubs: int = 0) -> bool:
+        if completion is None:
+            return True
+        slots = min(total_pieces, depth_limit, f_limit) - used
+        new_stubs = max(
+            (stub_capacity[pid] for pid in piece_ids if counts[pid]), default=0
+        ) if slots else 0
+        free_ports = len(stubs) + extra_stubs
+        # A transit spends two free ports, not a new piece. Pooling ports across
+        # junctions deliberately overestimates the number of free traversals.
+        traversals = slots + (free_ports + slots * new_stubs) // 2
+        # Reversing closures may target existing or future stubs, not just the
+        # anchor. An anchor-only test cannot rule those out.
+        if cfg.reversing_loops and (free_ports or new_stubs):
+            return True
+        return completion.allows(cursor, traversals)
 
     def emit(gap: float, reversing_target: tuple[int, int] | None = None) -> None:
         stats.closures_found += 1
@@ -1129,6 +1224,10 @@ def solve(
             stats.pruned_reach += 1
             return True
 
+        if not tail_possible(cursor, used):
+            stats.pruned_completion += 1
+            return True
+
         # -- transit an open stub the walk meets (exactly, or within the slop) ----
         if stubs:
             snapshot = list(stubs)
@@ -1208,6 +1307,12 @@ def solve(
         # the obvious completion of a small gap is found.
         candidates.sort(key=lambda c: (c[0], c[1], c[2], c[3], c[4]))
         for _heuristic, _prio, pid, entry, exit_port, next_cursor in candidates:
+            # Reject an impossible endpoint before sampling collision geometry or
+            # spending a DFS node. Leaving this piece in counts only enlarges the
+            # reachability bound, so this early check remains conservative.
+            if not tail_possible(next_cursor, used + 1, stub_capacity[pid]):
+                stats.pruned_completion += 1
+                continue
             piece = pieces[pid]
             frame = eng.frame(pid, entry, cursor)
             hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
@@ -1311,6 +1416,8 @@ def solve(
         stats.complete = True
         stats.stop_reason = "exhausted"
     stats.duration_s = time.perf_counter() - started
+    if completion is not None:
+        stats.completion_states = len(completion.layers[-1])
 
     ordered = sorted(
         solutions.values(),

@@ -244,6 +244,9 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
     from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
     from pathlib import Path
 
+    from duplotrain.catalog import default_catalog
+    from duplotrain.layout import layout_to_dict
+
     dist = os.environ.get("DUPLOTRAIN_STATIC_DIST")
     if not dist:
         pytest.skip("set DUPLOTRAIN_STATIC_DIST to a built webapp/dist directory")
@@ -319,6 +322,30 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         page.reload()
         expect(page.locator("#status")).to_contain_text("not exactly closed", timeout=90000)
         assert export_layout() == saved
+
+        # Exercise exact completion in WASM as well as import/restore. Keeping
+        # reversing enabled bypasses the editor's ring shortcut and reaches DFS.
+        half_circle = build_chain([(default_catalog()["curve"], 0, 1)] * 6)
+        page.locator("#importfile").set_input_files({
+            "name": "half-circle.json", "mimeType": "application/json",
+            "buffer": json.dumps(layout_to_dict(half_circle)).encode(),
+        })
+        expect(page.locator("#status")).to_contain_text("6 pieces")
+        for pid, count, remaining in (("curve", "12", "6/"), ("straight", "4", "4/")):
+            control = page.locator(f'[data-piece-id="{pid}"] input')
+            control.fill(count)
+            control.press("Tab")
+            expect(control).to_have_value(count)
+            expect(page.locator(f'[data-piece-id="{pid}"] .count')).to_have_text(remaining)
+        page.locator("#reversing").check()
+        page.locator("#solve").tap()
+        expect(page.locator(".cand")).to_have_count(3, timeout=30000)
+        candidate = page.locator(".cand").first
+        candidate.get_by_role("button", name="Preview", exact=True).tap()
+        candidate.get_by_role("button", name="Apply").tap()
+        expect(page.locator("#status")).to_contain_text("Closed! 12 pieces")
+        closed = export_layout()
+        assert len(closed["placements"]) == 12 and len(closed["links"]) == 12
         assert not errors
     finally:
         context.close()

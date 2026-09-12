@@ -26,12 +26,17 @@ provably periodic.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+import math
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
+from itertools import product
 
 from .layout import End, Layout
 
-__all__ = ["DriveReport", "drive", "endless_run", "classify", "drivable_universe"]
+__all__ = [
+    "ClassificationLimitError", "DriveReport", "drive", "endless_run", "classify",
+    "drivable_universe",
+]
 
 #: Stones that affect motion.
 STOP_STONE = "stone_stop"
@@ -39,6 +44,13 @@ DIRECTION_STONE = "stone_direction"
 
 #: Safety cap; unreachable in practice because state space is finite and small.
 MAX_STEPS = 100_000
+
+#: Bound exhaustive classification before attempting an exponential number of runs.
+DEFAULT_MAX_RUNS = 100_000
+
+
+class ClassificationLimitError(RuntimeError):
+    """The exhaustive classification exceeds its run budget; no verdict was made."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,8 +296,8 @@ def _all_starts(layout: Layout) -> list[End]:
     ]
 
 
-def _tongue_assignments(layout: Layout) -> list[dict[int, int]]:
-    """Every way the switch tongues could initially point."""
+def _tongue_choices(layout: Layout) -> list[tuple[int, list[int]]]:
+    """The independent switch choices, without expanding their Cartesian product."""
     choices: list[tuple[int, list[int]]] = []
     for index, placement in enumerate(layout.placements):
         piece = placement.piece
@@ -296,14 +308,15 @@ def _tongue_assignments(layout: Layout) -> list[dict[int, int]]:
             if len(options) > 1:
                 choices.append((index, options))
                 break
-    assignments: list[dict[int, int]] = [{}]
-    for index, options in choices:
-        assignments = [
-            {**assignment, index: option}
-            for assignment in assignments
-            for option in options
-        ]
-    return assignments
+    return choices
+
+
+def _tongue_assignments(layout: Layout) -> Iterator[dict[int, int]]:
+    """Yield each tongue setting, retaining only one assignment at a time."""
+    choices = _tongue_choices(layout)
+    indices = [index for index, _ in choices]
+    for setting in product(*(options for _, options in choices)):
+        yield dict(zip(indices, setting, strict=True))
 
 
 def _cycle_both_directions(report: DriveReport, layout: Layout) -> bool:
@@ -323,18 +336,33 @@ def _cycle_both_directions(report: DriveReport, layout: Layout) -> bool:
     )
 
 
-def classify(layout: Layout) -> LoopClassification:
+def classify(
+    layout: Layout, *, max_runs: int | None = DEFAULT_MAX_RUNS
+) -> LoopClassification:
     """Place a layout on the looping ladder by exhaustive simulation.
 
     Every start (piece and direction of travel) is driven under every initial tongue
     assignment; the state space of each run is finite, so each simulation provably
-    terminates or cycles.  Sound and complete for the semantics in this module.
+    terminates or cycles. Sound and complete for the semantics in this module.
+    If the required number of runs exceeds ``max_runs``, raise
+    :class:`ClassificationLimitError` before simulation, never return a partial
+    verdict. Pass a larger budget (or ``None`` for unbounded enumeration) explicitly.
     """
     if not layout.placements:
         raise ValueError("nothing to classify")
+    if max_runs is not None and (type(max_runs) is not int or max_runs < 1):
+        raise ValueError("max_runs must be a positive integer or None")
 
     starts = _all_starts(layout)
-    assignments = _tongue_assignments(layout)
+    required_runs = len(starts) * math.prod(
+        len(options) for _, options in _tongue_choices(layout)
+    )
+    if max_runs is not None and required_runs > max_runs:
+        raise ClassificationLimitError(
+            f"classification needs {required_runs:,} runs, exceeding max_runs={max_runs:,}; "
+            "increase max_runs to classify this layout"
+        )
+    assignments = _tongue_assignments(layout) if starts else ()
     everything = drivable_universe(layout)
 
     locally = False

@@ -211,6 +211,12 @@ and initial tongue setting, where a layout sits on the ladder:
 
 (`duplotrain classify layout.json` prints the verdict and a counterexample start.)
 
+Classification streams switch settings and checks the total run count before
+simulation. Above the default 100,000 runs it raises `ClassificationLimitError`
+without issuing a partial verdict. Increase `classify(layout, max_runs=...)` or
+`duplotrain classify layout.json --max-runs ...` for larger layouts; library callers
+can explicitly request unbounded enumeration with `max_runs=None`.
+
 Findings the simulator proves about real DUPLO:
 
 - Any reachable open end or buffer admits a doomed start (bounce off the tip, or park
@@ -329,6 +335,16 @@ figure-eights and re-joining branches emerge from that rule alone. Found loops a
 deduplicated by a canonical signature invariant under rotation, reversal **and
 reflection** — the mirror image is generated explicitly per piece from its geometry,
 since walking a chiral loop backwards is not its mirror image.
+
+Completion searches also work backward from the closing point to check whether
+the final few traversals can reach it exactly. This rejects impossible tails before
+collision sampling and saves the node budget for viable paths. It accounts for
+free transits through existing junctions and falls back to ordinary search for
+forced fits or changing reversing targets. `SolverConfig.completion_lookahead`
+defaults to 4 (0 disables it); its preprocessing uses at most 4096 move expansions
+and at most one eighth of `max_nodes`. `stats.pruned_completion` reports how many
+branches this check discarded. Full geometric and collision checks still decide
+which candidates are returned.
 
 Elevation is modelled (ramps carry `z`; closure requires returning to the anchor's
 height). Blanket collision clearance defaults to 120 mm; underpass-enabled pieces
