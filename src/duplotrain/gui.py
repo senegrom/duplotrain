@@ -11,7 +11,7 @@ ghosts and apply with a click.
 Implementation notes: standard-library HTTP server, one JSON API, all state
 server-side in a single :class:`Session` guarded by a lock (the editor is a local,
 single-user tool).  No dependencies beyond the package itself; the front end is one
-static HTML file shipped as package data.
+static HTML file and app icons shipped as package data.
 """
 
 from __future__ import annotations
@@ -38,6 +38,23 @@ from .validation import MAX_JSON_BYTES, MAX_SNAPSHOT_BYTES
 from .validation import check_layout_json as check_layout_json
 
 __all__ = ["Session", "make_server", "run"]
+
+# Only these packaged assets are HTTP routes; never resolve arbitrary request
+# paths against the filesystem. Keep icon URLs shared with the static build.
+_EDITOR_ASSETS = {
+    "/manifest.webmanifest": "application/manifest+json",
+    "/duplotrain-icon.svg": "image/svg+xml",
+    "/favicon.ico": "image/x-icon",
+    "/apple-touch-icon.png": "image/png",
+    "/icons/duplotrain-favicon-v1.ico": "image/x-icon",
+    **{
+        f"/icons/duplotrain-{name}-v1.png": "image/png"
+        for name in (
+            "tab-16", "tab-32", "apple-152", "apple-167", "apple-180",
+            "app-192", "app-512", "maskable-512",
+        )
+    },
+}
 
 #: A friendly default box so the editor is playable before anyone edits counts.
 DEFAULT_INVENTORY = {
@@ -997,6 +1014,10 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             if self.path in ("/", "/index.html"):
                 html = resources.files("duplotrain").joinpath("static/editor.html")
                 self._send(200, html.read_bytes(), "text/html; charset=utf-8")
+            elif content_type := _EDITOR_ASSETS.get(self.path.split("?", 1)[0]):
+                path = self.path.split("?", 1)[0]
+                asset = resources.files("duplotrain").joinpath("static" + path)
+                self._send(200, asset.read_bytes(), content_type)
             elif self.path in ("/api/state", "/api/export"):
                 with session.lock:
                     self._json(200, dispatch_session(session, self.path, {}))

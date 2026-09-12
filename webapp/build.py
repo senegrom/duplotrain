@@ -4,6 +4,7 @@ Output layout (everything self-hosted, no third-party requests at runtime):
 
     dist/
       index.html                    the editor, with boot.js injected
+      icons/ / manifest.webmanifest  favicon and installed-app identity
       boot.js / app.js / worker.js  bridge + editor + engine worker
       adapter.py                    the dispatch shim around duplotrain.gui.Session
       duplotrain-src-<stamp>.zip    the Python package, content-stamped
@@ -41,7 +42,6 @@ DIST = WEBAPP / "dist"
 VENDOR = WEBAPP / "vendor"
 
 WORKER_EXCLUDES = {
-    "static/editor.html",
     "cli.py",
     "render.py",
     # Public desktop helpers imported only by the regular package __init__.  The
@@ -155,14 +155,14 @@ def fetch_pyodide(version: str) -> Path:
 def worker_entries() -> list[tuple[str, bytes]]:
     """The worker's Python modules as sorted ``(archive name, LF bytes)`` pairs.
 
-    The editor is served separately. Desktop CLI/rendering files stay in the
+    The editor and all static assets are served separately. Desktop files stay in the
     regular Python package, not in the worker (which imports neither).
     """
     src = ROOT / "src" / "duplotrain"
     entries = []
     for path in sorted(src.rglob("*")):
         relative = path.relative_to(src)
-        if ("__pycache__" in relative.parts or not path.is_file()
+        if ("__pycache__" in relative.parts or relative.parts[0] == "static" or not path.is_file()
                 or relative.as_posix() in WORKER_EXCLUDES):
             continue
         arcname = (Path("duplotrain") / relative).as_posix()
@@ -275,6 +275,15 @@ def build_index(meta_csp: bool = False) -> None:
         )
     (DIST / "index.html").write_text(html, encoding="utf-8", newline="\n")
     (DIST / ".htaccess").write_text(HTACCESS, encoding="utf-8", newline="\n")
+    # Commit raster exports so the static build and installed Python editor use
+    # identical icons without needing image-rendering dependencies at build time.
+    static = ROOT / "src" / "duplotrain" / "static"
+    for source in sorted(static.rglob("*")):
+        if not source.is_file() or source.name == "editor.html":
+            continue
+        dest = DIST / source.relative_to(static)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dest)
     print(f"wrote {DIST / 'index.html'}, app.js and .htaccess")
 
 

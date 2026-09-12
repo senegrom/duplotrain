@@ -22,6 +22,7 @@ def test_worker_zip_is_deterministic_and_excludes_only_desktop_files():
         "duplotrain/" + p.relative_to(src).as_posix()
         for p in src.rglob("*")
         if p.is_file() and "__pycache__" not in p.parts
+        and p.relative_to(src).parts[0] != "static"
         and p.relative_to(src).as_posix() not in excluded
     }
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
@@ -29,6 +30,7 @@ def test_worker_zip_is_deterministic_and_excludes_only_desktop_files():
         assert archive.read("duplotrain/__init__.py") == build.WORKER_INIT
         assert all(info.date_time == (2020, 1, 1, 0, 0, 0) for info in archive.infolist())
         assert all("\\" not in name for name in archive.namelist())
+        assert not any(name.startswith("duplotrain/static/") for name in archive.namelist())
     assert all((src / name).is_file() for name in excluded)
 
 

@@ -27,6 +27,9 @@ out/
 *.png
 !docs/**/*.svg
 !docs/**/*.png
+!src/duplotrain/static/*.svg
+!src/duplotrain/static/*.png
+!src/duplotrain/static/icons/*.png
 
 # Web app build artifacts (deployed copy lives in the website repo)
 webapp/dist/

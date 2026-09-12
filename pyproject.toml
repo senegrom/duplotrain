@@ -32,7 +32,10 @@ duplotrain = "duplotrain.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-duplotrain = ["static/*.html"]
+duplotrain = [
+    "static/*.html", "static/*.webmanifest", "static/*.svg",
+    "static/*.ico", "static/*.png", "static/icons/*.png", "static/icons/*.ico",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
