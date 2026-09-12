@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>duplotrain</title>
+  <desc>A red toy locomotive with a blue cab and golden wheels on a looping track.</desc>
+  <defs>
+    <linearGradient id="green" x2=".8" y2="1">
+      <stop stop-color="#315c48"/><stop offset="1" stop-color="#102e26"/>
+    </linearGradient>
+    <linearGradient id="ivory" x2=".65" y2="1">
+      <stop stop-color="#fffdf1"/><stop offset="1" stop-color="#e9dec6"/>
+    </linearGradient>
+    <linearGradient id="red" x2="0" y2="1">
+      <stop stop-color="#f46b45"/><stop offset=".5" stop-color="#df452d"/>
+      <stop offset="1" stop-color="#ae2e23"/>
+    </linearGradient>
+    <linearGradient id="blue" x2=".7" y2="1">
+      <stop stop-color="#478dab"/><stop offset="1" stop-color="#21536f"/>
+    </linearGradient>
+    <linearGradient id="gold" x2=".5" y2="1">
+      <stop stop-color="#ffe4a0"/><stop offset="1" stop-color="#e6ad42"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#green)" d="M0 0h512v512H0z"/>
+  <rect x="72" y="80" width="380" height="384" rx="54" fill="#081e18" opacity=".4"/>
+  <rect x="62" y="64" width="380" height="384" rx="54" fill="#a39778"/>
+  <rect x="62" y="50" width="380" height="380" rx="54" fill="url(#ivory)"/>
+  <rect x="74" y="62" width="356" height="356" rx="43" fill="none" stroke="#fffefa" stroke-width="4"/>
+  <!-- The loop is a railway, with sleepers between its two rails. -->
+  <rect x="112" y="122" width="282" height="258" rx="108" fill="none" stroke="#c4c8bf" stroke-width="30"/>
+  <rect x="112" y="122" width="282" height="258" rx="108" fill="none" stroke="#929e95" stroke-width="30" stroke-dasharray="7 18"/>
+  <rect x="98" y="108" width="310" height="286" rx="122" fill="none" stroke="#61766b" stroke-width="5"/>
+  <rect x="126" y="136" width="254" height="230" rx="94" fill="none" stroke="#61766b" stroke-width="5"/>
+  <!-- Soft steam puffs keep the silhouette playful without any lettering. -->
+  <path d="M303 167c-12 0-20-8-20-18 0-10 8-18 20-18 3-15 16-23 30-18 11-14 34-12 41 4 19-2 31 20 19 34-6 7-13 9-25 7-8 13-24 15-35 7-10 9-22 10-30 2z" fill="#fffdf4"/>
+  <ellipse cx="318" cy="186" rx="12" ry="9" fill="#fffdf4"/>
+  <!-- A chunky toy engine: blue cab, red boiler, brass chimney and wheels. -->
+  <path d="M135 319h238l16 22H129z" fill="#ab9e7f" opacity=".4"/>
+  <rect x="136" y="216" width="96" height="96" rx="12" fill="url(#blue)" stroke="#244d60" stroke-width="5"/>
+  <rect x="154" y="230" width="58" height="51" rx="9" fill="#ffedb3"/>
+  <path d="M160 270v-27q0-7 7-7h36" fill="none" stroke="#fff9de" stroke-width="5" stroke-linecap="round"/>
+  <path d="M130 211q0-11 11-11h88q11 0 11 11v9H130z" fill="#21536f"/>
+  <path d="M142 205h84" stroke="#64a8c1" stroke-width="5" stroke-linecap="round"/>
+  <rect x="157" y="190" width="27" height="13" rx="5" fill="#478dab"/>
+  <rect x="195" y="190" width="27" height="13" rx="5" fill="#478dab"/>
+  <path d="M224 249h98q36 0 36 33v33H224z" fill="url(#red)" stroke="#a83023" stroke-width="5"/>
+  <path d="M236 256h80q15 0 23 10" fill="none" stroke="#ff9871" stroke-width="6" stroke-linecap="round"/>
+  <path d="M292 210h35l-4 38h-27z" fill="#294541"/>
+  <rect x="286" y="201" width="47" height="17" rx="6" fill="url(#gold)"/>
+  <path d="M260 250v59" stroke="#ffcb6e" stroke-width="9"/>
+  <path d="M351 278h15q8 0 8 8v15h-19" fill="url(#gold)" stroke="#b77e30" stroke-width="3"/>
+  <rect x="124" y="304" width="253" height="25" rx="8" fill="#ac3024"/>
+  <path d="M135 310h228" stroke="#f66c45" stroke-width="5" stroke-linecap="round"/>
+  <path d="m363 321 25 21h-37z" fill="#294541"/>
+  <g fill="url(#gold)" stroke="#294541" stroke-width="9">
+    <circle cx="166" cy="330" r="28"/>
+    <circle cx="238" cy="330" r="28"/>
+    <circle cx="321" cy="329" r="31"/>
+  </g>
+  <path d="M166 330h155" stroke="#ad7835" stroke-width="10" stroke-linecap="round"/>
+  <path d="M166 327h155" stroke="#fff0bc" stroke-width="6" stroke-linecap="round"/>
+  <g fill="#294541">
+    <circle cx="166" cy="330" r="7"/>
+    <circle cx="238" cy="330" r="7"/>
+    <circle cx="321" cy="329" r="8"/>
+  </g>
+</svg>

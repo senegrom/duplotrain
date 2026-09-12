@@ -1,0 +1,32 @@
+{
+  "id": "/duplotrain/",
+  "name": "duplotrain — Track Designer",
+  "short_name": "duplotrain",
+  "description": "Design DUPLO train track layouts and close the loop with the pieces you own.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f2ee",
+  "theme_color": "#163e32",
+  "icons": [
+    {
+      "src": "./icons/duplotrain-app-192-v1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/duplotrain-app-512-v1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/duplotrain-maskable-512-v1.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

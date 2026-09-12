@@ -150,6 +150,10 @@ passed on a push to `main`, at exactly that commit; that build passes `--pages`,
 which also embeds the content security policy as a `<meta>` tag because GitHub
 Pages cannot send response headers.
 
+The browser tab and Home Screen use the app's own toy-train icon. On iPhone or
+iPad, use Safari's **Share → Add to Home Screen**. The same icons are included in
+the local editor; see [app icons](docs/icons.md) for the editable source and exports.
+
 `duplotrain gui` opens a local track editor in your browser (standard library server,
 nothing to install). Because DUPLO only ever connects on the exact lattice there is no
 freeform dragging: arm a piece variant in the palette, click a red open-end arrow and
