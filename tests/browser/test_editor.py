@@ -363,6 +363,30 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         candidate.get_by_role("button", name="Apply").tap()
         expect(page.locator("#status")).to_contain_text("Closed! 14 pieces")
         assert len(export_layout()["placements"]) == 14
+
+        # A longer tail exercises heading-conditioned bounds beyond the six-step
+        # exact table. Preview and apply must preserve the hand-built base in WASM.
+        long_gap = build_chain([(catalog["straight"], 0, 1)] * 4
+                               + [(catalog["curve"], 0, 1)] * 2)
+        page.locator("#importfile").set_input_files({
+            "name": "long-gap.json", "mimeType": "application/json",
+            "buffer": json.dumps(layout_to_dict(long_gap)).encode(),
+        })
+        expect(page.locator("#status")).to_contain_text("6 pieces")
+        for pid, count, remaining in (("curve", "16", "14/"), ("straight", "12", "8/")):
+            control = page.locator(f'[data-piece-id="{pid}"] input')
+            control.fill(count)
+            control.press("Tab")
+            expect(page.locator(f'[data-piece-id="{pid}"] .count')).to_have_text(remaining)
+        page.locator("#solve").tap()
+        candidate = page.locator(".cand").first
+        expect(candidate).to_be_visible(timeout=30000)
+        candidate.get_by_role("button", name="Preview", exact=True).tap()
+        candidate.get_by_role("button", name="Apply").tap()
+        expect(page.locator("#status")).to_contain_text("Closed! 20 pieces")
+        closed = export_layout()
+        assert len(closed["placements"]) == 20 and len(closed["links"]) == 20
+        assert closed["placements"][:6] == layout_to_dict(long_gap)["placements"]
         assert not errors
     finally:
         context.close()

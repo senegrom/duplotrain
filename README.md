@@ -340,16 +340,19 @@ deduplicated by a canonical signature invariant under rotation, reversal **and
 reflection** — the mirror image is generated explicitly per piece from its geometry,
 since walking a chiral loop backwards is not its mirror image.
 
-Completion searches also work backward to check whether the final few traversals
-can reach a closing target. They track planar geometry and height independently
-in exact arithmetic, allowing a deeper check within the same memory budget.
+Completion searches also work backward to check whether the remaining traversals
+can reach a closing target. Short tails use exact planar-pose and height tables.
+Longer tails use exact linear bounds on coordinates, diagonals and height for
+each arrival heading, avoiding enumeration of every possible position.
 Existing junction ports and targets created by future junctions are included;
 free transits require two compatible ports on the same piece. Impossible tails
 are rejected before collision sampling. `SolverConfig.completion_lookahead`
-defaults to 6 (0 disables it); preprocessing uses at most 4096 move expansions
-and at most one eighth of `max_nodes`. Partial tables and forced fits fall back
-to ordinary search. `stats.pruned_completion` and `stats.completion_work` report
-the saved branches and preprocessing work. The full geometry and height must
+defaults to 6 for the short table (0 disables both checks); both checks share at
+most 4096 move expansions and one eighth of `max_nodes`. Partial tables and forced
+fits fall back to ordinary search. `stats.pruned_completion` and
+`stats.completion_work` report the saved branches and total preprocessing work;
+`stats.completion_bound_depth` reports how far the longer bounds reached.
+The full geometry and height must
 agree on an actual route, and the independent collision audit still checks every
 returned candidate. Reproduce the measurements with
 `PYTHONPATH=src python benchmarks/completion.py`.

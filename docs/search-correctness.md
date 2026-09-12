@@ -105,6 +105,36 @@ preprocessing exhaustion, and retain zero-piece and reversing witnesses. Further
 coverage is in `tests/test_completion_targets.py`, including rotated/elevated
 targets, both switch branches, projected false matches and future junctions.
 
+## Longer tails use heading-conditioned linear envelopes
+
+Beyond the short exact tables, each heading has minimum/maximum intervals for
+exact coordinate coefficients, height, and cardinal/diagonal linear projections.
+At a fixed heading every move adds a fixed vector. Translating intervals by that
+vector and taking their union's bounds therefore contains every predecessor.
+Each layer also includes the previous layer, so it bounds **at most** that many
+traversals. Independent intervals may describe different walks; this admits extra
+possibilities and cannot remove a real one.
+
+The cardinal/diagonal projections use rational weights resembling physical axes.
+For example, the lattice uses 26/15 in place of sqrt(3). These are exact integer
+linear forms on the lattice coefficients, not rounded world positions. Applying
+the same form to every displacement and query makes any such weights sound.
+The general field engine similarly uses rational forms on its exact coefficients,
+including all four height coefficients. No floating tolerance enters these bounds.
+
+All routes, free-transit allowances and present/future targets use the same
+conservative rules as the short tables. Slop bypasses both checks. Both share the
+existing `min(4096, max_nodes // 8)` preprocessing cap, and neither publishes an
+unfinished layer. Stable zero-motion envelopes are reused at every greater depth,
+so an empty move pool and a huge inventory cannot allocate endless identical
+layers. The future-target query cache is limited to 4096 entries per search.
+
+`completion_bound_depth` and `completion_bound_states` expose the largest complete
+depth and total retained heading envelopes. Regressions in
+`tests/test_completion_bounds.py` retain independently constructed exact tails,
+compare exhaustive results on both engines, exercise custom 15-degree curves and
+preprocessing exhaustion, and pin the two previously capped broad-inventory cases.
+
 ## Input and snapshot boundaries preserve exactness
 
 Arc angles are checked as exact multiples of 15 before any integer conversion.

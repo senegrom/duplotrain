@@ -50,6 +50,8 @@ def main():
             "stop": result.stats.stop_reason, "seconds": round(result.stats.duration_s, 4),
             "max_pieces_searched": result.stats.max_pieces_searched,
             "completion_work": getattr(result.stats, "completion_work", None),
+            "completion_bound_depth": getattr(result.stats, "completion_bound_depth", None),
+            "completion_bound_states": getattr(result.stats, "completion_bound_states", None),
         }), flush=True)
 
 

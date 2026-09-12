@@ -94,8 +94,8 @@ Reversing targets share the table through exact coordinate transforms. Free
 transits count only compatible ports on the same placement. Future junctions are
 included both in the feasibility test and in conservative distance/turn bounds.
 
-The table below compares merged commit `b3ba9d0` (four-step lookahead) with this
-version, using the same 25,000-node limit, 20-piece limit and eight-result limit.
+The table below compares merged commit `b3ba9d0` (four-step lookahead) with
+`0864c91`, using the same 25,000-node limit, 20-piece limit and eight-result limit.
 All previously returned candidates were retained in these cases.
 
 | Case | Previous nodes | New nodes | Results before / after |
@@ -110,7 +110,7 @@ All previously returned candidates were retained in these cases.
 | Switch, broad inventory | 25,001 | 25,001 | 0 / 0 |
 | Long gap | 17,209 | 7,464 | 8 / 8 |
 
-The two remaining broad cases still hit the cap. More aggressive pruning can
+At that revision, the two remaining broad cases still hit the cap. More aggressive pruning can
 examine more candidate moves before reaching a fixed DFS-node limit, so elapsed
 time need not fall for every capped case. The editor's plain-track stage handles
 both of these bases before trying a broad inventory.
@@ -121,3 +121,42 @@ identifies the imported source path. For comparison against an older checkout,
 point `PYTHONPATH` at that checkout's `src` and pass `--lookahead 4`.
 Performance regressions assert operation counts and retained solutions rather
 than machine-dependent time thresholds.
+
+## Completion search after PR #10
+
+Heading-conditioned envelopes now extend pruning beyond the six-step exact table.
+Each envelope retains minimum/maximum exact linear projections instead of every
+reachable position. Translations compose directly at each heading; diagonal
+projections preserve useful spatial constraints that coefficient intervals alone
+miss. This works with both arithmetic engines, all eligible existing transits,
+and present/future reversing targets. The envelopes and short tables share the
+same `min(4096, max_nodes // 8)` preprocessing cap.
+
+The same nine inputs and limits now give the following results against `5560675`
+(PR #10's solver plus the icon-only PR #9). All previous candidates were retained.
+
+| Case | Previous nodes | New nodes | Results before / after |
+| --- | ---: | ---: | ---: |
+| Half circle | 108 | 84 | 3 / 3, exhausted |
+| Two-curve start | 1,599 | 133 | 8 / 8 |
+| Mixed gap | 1,097 | 188 | 8 / 8 |
+| Bridge gap | 3,749 | 372 | 8 / 8 |
+| Bridge, broad inventory | 2,131 | 514 | 8 / 8 |
+| Mixed gap, broad inventory | 25,001 | 22,155 | 0 / 8 |
+| Switch plus plain spares | 1,587 | 204 | 8 / 8 |
+| Switch, broad inventory | 25,001 | 11,318 | 0 / 8 |
+| Long gap | 7,464 | 291 | 8 / 8 |
+
+Both previously capped cases now produce eight audited solutions within the
+existing 25,000-node budget. The long gap uses 96% fewer nodes and the bridge gap
+90% fewer. Bounds reach 8–16 traversals in these cases while retaining at most
+168 heading envelopes; total preprocessing stays below 2,900 expansions.
+
+There is a small setup cost: the half circle took roughly 10 ms instead of 7 ms
+in one local run. The broad mixed search also took longer (2.1 s versus 1.3 s),
+but reached eight solutions instead of stopping without one. The long gap fell
+from about 169 ms to 28 ms. These times are observations, not portable guarantees
+or test assertions. The benchmark now reports bound depth and retained envelope
+counts as well as total preprocessing work. Correctness and operation-count
+regressions are in `tests/test_completion_bounds.py`; the real Pyodide browser
+test closes, previews and applies the long gap under the production CSP.
