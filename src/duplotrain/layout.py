@@ -16,6 +16,7 @@ import math
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
+from types import MappingProxyType
 from typing import Any, Literal
 
 from .exact import Alg
@@ -182,8 +183,14 @@ class Layout:
     accessories: tuple[tuple, ...] = ()
 
     def __post_init__(self) -> None:
-        if self.links is None:
-            object.__setattr__(self, "links", {})
+        object.__setattr__(self, "placements", tuple(self.placements))
+        object.__setattr__(self, "links", MappingProxyType(dict(self.links or {})))
+        object.__setattr__(self, "accessories", tuple(tuple(a) for a in self.accessories))
+
+    def __reduce__(self):
+        # mappingproxy itself cannot be pickled/deep-copied. Reconstruct through
+        # the constructor so restored layouts retain the same immutable boundary.
+        return type(self), (self.placements, dict(self.links), self.accessories)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Layout):

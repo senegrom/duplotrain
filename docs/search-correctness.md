@@ -67,6 +67,50 @@ empty fresh loop. Minimum/use-all constraints and node/result caps still apply.
 The editor also permits these no-new-inventory completions. Already-mating
 selected endpoints should still be joined directly instead of searched.
 
+## Exact reverse reachability is an overapproximation
+
+For completion searches, a reverse breadth-first table contains all poses that
+can reach the anchor in at most four traversals by default. Both arithmetic
+engines use exact poses. The move pool includes routes through preplaced pieces,
+even when none of that type remain in inventory. Counts, placement frames and
+collisions are ignored in this table, so it can only enlarge the reachable set.
+Missing from a complete layer therefore proves a tail impossible; membership
+still requires the usual inventory, replay and actual-link overlap checks.
+
+A transit consumes two free ports and no new piece. The lookup depth includes
+the remaining placement slots plus an upper bound on transits from existing
+ports and those future junctions could add. An anchor-only lookup is bypassed
+while reversing targets can exist, and all slop searches bypass it. Partial
+reverse layers are never used to reject a candidate: a preprocessing cap simply
+falls back to DFS, without changing search completeness or stop reasons.
+
+`completion_lookahead=0` provides a reference search. Regressions compare complete
+solution signatures on both engines and custom 15-degree pieces, exercise
+preprocessing exhaustion, and retain zero-piece and reversing witnesses.
+
+## Input and snapshot boundaries preserve exactness
+
+Arc angles are checked as exact multiples of 15 before any integer conversion.
+For example, 30.9 degrees is rejected rather than changed into a 30-degree curve.
+Integral float/string inputs are normalized to integers while retaining signed
+and multi-turn sweeps. Layout construction copies and freezes the link graph,
+placements and accessory collections; copying and pickling retain that boundary.
+Editor responses copy nested accessory metadata, so modifying a response cannot
+change the catalogue or other sessions.
+
+## Classification never reports a budget-limited verdict
+
+Switch settings are generated lazily. Before simulation, `classify()` computes
+the number of starts times the product of switch choices and compares it with
+`max_runs` (100,000 by default). Exceeding the limit raises
+`ClassificationLimitError` without a classification. A larger explicit budget,
+or `None` in the library API, permits exhaustive enumeration. This avoids both
+materializing an exponential assignment list and silently treating an unfinished
+universal check as a proof. The CLI exposes the same budget as `--max-runs`.
+
+These boundaries are covered by `tests/test_review_boundaries.py` and
+`tests/test_completion_lookahead.py`.
+
 ## Reversals start another ordered pass
 
 A face stone is silent only when departing from that face. Returning toward it

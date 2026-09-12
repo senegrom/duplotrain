@@ -30,7 +30,7 @@ from functools import lru_cache
 from typing import Any, Literal
 
 from .exact import Alg, alg
-from .geometry import HEADING_STEPS, Pose, cos_sin, degrees_to_steps
+from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose, cos_sin, degrees_to_steps
 
 __all__ = [
     "Segment",
@@ -144,7 +144,18 @@ class Arc(Segment):
     turn_steps: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "turn_steps", degrees_to_steps(self.degrees))
+        # Validate before converting: int(30.9) would silently change the geometry
+        # and turn an off-grid catalogue piece into a falsely exact 30-degree arc.
+        try:
+            degrees = Fraction(self.degrees)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("arc degrees must be a whole multiple of 15") from exc
+        if isinstance(self.degrees, bool) or degrees % DEGREES_PER_STEP:
+            raise ValueError("arc degrees must be a whole multiple of 15")
+        object.__setattr__(self, "degrees", int(degrees))
+        object.__setattr__(
+            self, "turn_steps", int(degrees) // DEGREES_PER_STEP % HEADING_STEPS
+        )
 
     def delta(self) -> tuple[Alg, Alg, Alg]:
         # Entering at the origin heading +x, an arc turning left by theta ends at
@@ -376,7 +387,7 @@ def _parse_segment(spec: dict[str, Any]) -> Segment:
     if kind == "straight":
         return Straight(run=parse_length(spec["run"]))
     if kind == "arc":
-        return Arc(radius=parse_length(spec["radius"]), degrees=int(spec["degrees"]))
+        return Arc(radius=parse_length(spec["radius"]), degrees=spec["degrees"])
     if kind == "ramp":
         return Ramp(run=parse_length(spec["run"]), rise=parse_length(spec["rise"]))
     raise ValueError(f"unknown segment type {kind!r}")

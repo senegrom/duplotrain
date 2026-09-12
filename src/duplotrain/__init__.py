@@ -13,7 +13,14 @@ Quick taste::
 from typing import TYPE_CHECKING
 
 from .catalog import ACCESSORIES, default_catalog, load_catalog
-from .drive import DriveReport, LoopClassification, classify, drive, endless_run
+from .drive import (
+    ClassificationLimitError,
+    DriveReport,
+    LoopClassification,
+    classify,
+    drive,
+    endless_run,
+)
 from .exact import Alg
 from .explore import (
     IncompleteSearchError,
@@ -61,6 +68,7 @@ __all__ = [
     "classify",
     "DriveReport",
     "LoopClassification",
+    "ClassificationLimitError",
     "congruence_key",
     "find_perfect_loops",
     "find_perfect_networks",

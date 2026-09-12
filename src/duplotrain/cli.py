@@ -421,22 +421,29 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
 @main.command(name="classify")
 @click.argument("layout_file", type=click.Path(exists=True))
 @click.option(
+    "--max-runs", type=click.IntRange(min=1), default=100_000, show_default=True,
+    help="Maximum simulations; exceeding this budget produces no verdict.",
+)
+@click.option(
     "--catalog",
     "catalog_paths",
     multiple=True,
     type=click.Path(exists=True),
 )
-def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...]) -> None:
+def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...], max_runs: int) -> None:
     """Where does a saved layout sit on the looping ladder?
 
     Simulates a train from every placement, in both directions, under every initial
     switch-tongue setting, with the layout's action stones in effect.
     """
-    from .drive import classify
+    from .drive import ClassificationLimitError, classify
 
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
-    verdict = classify(layout)
+    try:
+        verdict = classify(layout, max_runs=max_runs)
+    except ClassificationLimitError as exc:
+        raise click.ClickException(str(exc).replace("max_runs", "--max-runs")) from exc
     ladder = [
         ("locally looping", verdict.locally_looping, "some placement runs forever"),
         ("looping", verdict.looping, "every placement runs forever"),

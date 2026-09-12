@@ -323,7 +323,7 @@ class Session:
                 "unlimited": self.unlimited,
             },
             "stones": {
-                "catalog": ACCESSORIES,
+                "catalog": {sid: dict(info) for sid, info in ACCESSORIES.items()},
                 "owned": {sid: self.stones.get(sid, 0) for sid in ACCESSORIES},
                 "remaining": self.stones_remaining(),
             },
