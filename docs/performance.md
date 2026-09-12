@@ -84,3 +84,40 @@ cell. The collision predicate, sample coordinates, grid size, clearance/underpas
 and neighbour exemptions are unchanged. Differential tests against the previous engine
 cover randomized add/query/pop sequences plus lattice, field, crossing, elevation and
 completion searches; ordinary regression tests keep the public behaviour covered.
+
+## Completion search after PR #8
+
+The reverse feasibility check now searches up to six traversals within the same
+4096-expansion cap (also limited to `max_nodes // 8`). Exact planar poses and
+heights are tracked separately, reducing the state multiplication from ramps.
+Reversing targets share the table through exact coordinate transforms. Free
+transits count only compatible ports on the same placement. Future junctions are
+included both in the feasibility test and in conservative distance/turn bounds.
+
+The table below compares merged commit `b3ba9d0` (four-step lookahead) with this
+version, using the same 25,000-node limit, 20-piece limit and eight-result limit.
+All previously returned candidates were retained in these cases.
+
+| Case | Previous nodes | New nodes | Results before / after |
+| --- | ---: | ---: | ---: |
+| Half circle | 294 | 108 | 3 / 3, exhausted |
+| Two-curve start | 4,083 | 1,599 | 8 / 8 |
+| Mixed gap | 2,917 | 1,097 | 8 / 8 |
+| Bridge gap | 11,837 | 3,749 | 8 / 8 |
+| Bridge, broad inventory | 25,001 | 2,131 | 0 / 8 |
+| Mixed gap, broad inventory | 25,001 | 25,001 | 0 / 0 |
+| Switch plus plain spares | 22,428 | 1,587 | 8 / 8 |
+| Switch, broad inventory | 25,001 | 25,001 | 0 / 0 |
+| Long gap | 17,209 | 7,464 | 8 / 8 |
+
+The two remaining broad cases still hit the cap. More aggressive pruning can
+examine more candidate moves before reaching a fixed DFS-node limit, so elapsed
+time need not fall for every capped case. The editor's plain-track stage handles
+both of these bases before trying a broad inventory.
+
+Run `PYTHONPATH=src python benchmarks/completion.py` to reproduce the inputs and
+report node counts, result counts, elapsed time and stop reasons. The output
+identifies the imported source path. For comparison against an older checkout,
+point `PYTHONPATH` at that checkout's `src` and pass `--lookahead 4`.
+Performance regressions assert operation counts and retained solutions rather
+than machine-dependent time thresholds.

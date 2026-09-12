@@ -346,6 +346,23 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         expect(page.locator("#status")).to_contain_text("Closed! 12 pieces")
         closed = export_layout()
         assert len(closed["placements"]) == 12 and len(closed["links"]) == 12
+
+        # A height mismatch forces the full-inventory stage, exercising projected
+        # reachability and future junction targets in the actual worker.
+        catalog = default_catalog()
+        bridge = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
+        page.locator("#importfile").set_input_files({
+            "name": "bridge-gap.json", "mimeType": "application/json",
+            "buffer": json.dumps(layout_to_dict(bridge)).encode(),
+        })
+        expect(page.locator("#status")).to_contain_text("7 pieces")
+        page.locator("#solve").tap()
+        candidate = page.locator(".cand").first
+        expect(candidate).to_be_visible(timeout=30000)
+        candidate.get_by_role("button", name="Preview", exact=True).tap()
+        candidate.get_by_role("button", name="Apply").tap()
+        expect(page.locator("#status")).to_contain_text("Closed! 14 pieces")
+        assert len(export_layout()["placements"]) == 14
         assert not errors
     finally:
         context.close()

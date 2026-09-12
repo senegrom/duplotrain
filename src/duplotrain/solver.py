@@ -269,6 +269,26 @@ class _FieldEngine:
     def reverse(pose: Pose) -> Pose:
         return pose.reversed()
 
+    @staticmethod
+    def level(pose: Pose) -> Pose:
+        return Pose(pose.x, pose.y, 0, pose.heading)
+
+    @staticmethod
+    def height(pose: Pose) -> Alg:
+        return pose.z
+
+    def retarget(self, cursor: Pose, target: Pose) -> Pose:
+        """Move target onto the anchor, applying the same rigid motion to cursor."""
+        turn = self.anchor.heading - target.heading
+        c, s = cos_sin(turn)
+        dx, dy = cursor.x - target.x, cursor.y - target.y
+        return Pose(
+            self.anchor.x + c * dx - s * dy,
+            self.anchor.y + s * dx + c * dy,
+            self.anchor.z + cursor.z - target.z,
+            cursor.heading + turn,
+        )
+
     def frame(self, pid: str, entry: int, cursor: Pose) -> Pose:
         f0 = self._frames0.get((pid, entry))
         if f0 is None:
@@ -379,6 +399,24 @@ class _LatticeEngine:
     @staticmethod
     def reverse(pose: tuple) -> tuple:
         return (*pose[:5], (pose[5] + 6) % 12)
+
+    @staticmethod
+    def level(pose: tuple) -> tuple:
+        return (*pose[:4], 0, pose[5])
+
+    @staticmethod
+    def height(pose: tuple) -> int:
+        return pose[4]
+
+    def retarget(self, cursor: tuple, target: tuple) -> tuple:
+        """Exact SE(2) change of target, with an independent height translation."""
+        anchor = self.anchor
+        turn = (anchor[5] - target[5]) % 12
+        a, b, c, d = (cursor[i] - target[i] for i in range(4))
+        for _ in range(turn):
+            a, b, c, d = -d, a, b + d, c
+        return (anchor[0] + a, anchor[1] + b, anchor[2] + c, anchor[3] + d,
+                anchor[4] + cursor[4] - target[4], (cursor[5] + turn) % 12)
 
     def frame(self, pid: str, entry: int, cursor: tuple) -> tuple:
         rotated, dz, turn = self._frames0[(pid, entry)]
@@ -509,10 +547,14 @@ def _compile_lattice(
 
 
 class _CompletionReachability:
-    """A bounded reverse search, ignoring stock counts, collisions and fixed frames.
+    """Bounded reverse reachability for planar poses and heights independently.
 
-    Each complete layer contains ALL cursors that can reach the anchor in at most
-    that many traversals. Reversing a physical route is always another legal route,
+    Each complete layer contains ALL projections of cursors that can reach the
+    anchor in at most that many traversals. Separating height from planar geometry
+    avoids multiplying states for bridge routes. The two projections may use
+    different routes; that only enlarges the set allowed by this check.
+
+    Reversing a physical route is always another legal route,
     so reversing the cursor, taking a move, and reversing again enumerates every
     predecessor. Ignoring placement constraints makes this an overapproximation:
     absence proves impossibility, while membership still needs the full DFS audit.
@@ -525,22 +567,28 @@ class _CompletionReachability:
         self.eng = eng
         self.horizon = horizon
         self.work_left = max_work
+        self.work_limit = max_work
         # Different geometries can share an endpoint transform. Geometry is not a
         # constraint here, so expand each distinct transform only once.
-        unique = {
-            apply_move(eng.anchor): apply_move
+        endpoints = [
+            (apply_move(eng.anchor), apply_move)
             for moves in eng.moves.values()
             for _entry, _exit, apply_move in moves
-        }
+        ]
+        unique = {eng.level(pose): move for pose, move in endpoints}
         self.moves = tuple(unique.values())
-        self.layers = [frozenset((eng.anchor,))]
+        self.rises = {eng.height(pose) - eng.height(eng.anchor) for pose, _ in endpoints}
+        self.layers = [frozenset((eng.level(eng.anchor),))]
         self.frontier = self.layers[0]
+        self.height_layers = [frozenset((eng.height(eng.anchor),))]
+        self.height_frontier = self.height_layers[0]
 
     def allows(self, cursor, traversals: int) -> bool:
         if traversals > self.horizon:
             return True
         while len(self.layers) <= traversals:
-            work = len(self.frontier) * len(self.moves)
+            work = (len(self.frontier) * len(self.moves)
+                    + len(self.height_frontier) * len(self.rises))
             if work > self.work_left:
                 return True
             self.work_left -= work
@@ -549,12 +597,19 @@ class _CompletionReachability:
             for pose in self.frontier:
                 backwards = self.eng.reverse(pose)
                 for apply_move in self.moves:
-                    predecessor = self.eng.reverse(apply_move(backwards))
+                    predecessor = self.eng.level(self.eng.reverse(apply_move(backwards)))
                     if predecessor not in previous:
                         frontier.add(predecessor)
+            previous_heights = self.height_layers[-1]
+            height_frontier = {
+                height + rise for height in self.height_frontier for rise in self.rises
+            } - previous_heights
             self.frontier = frontier
+            self.height_frontier = height_frontier
             self.layers.append(previous | frontier)
-        return cursor in self.layers[traversals]
+            self.height_layers.append(previous_heights | height_frontier)
+        return (self.eng.level(cursor) in self.layers[traversals]
+                and self.eng.height(cursor) in self.height_layers[traversals])
 
 
 @dataclass(frozen=True, slots=True)
@@ -789,8 +844,8 @@ class SolverConfig:
     engine: str = "auto"
     #: Exact reverse reachability for this many final traversals in completion
     #: mode. Zero disables it; preprocessing is independently bounded to 4096 moves
-    #: (and at most max_nodes // 8). Slop fits and changing reversing targets bypass it.
-    completion_lookahead: int = 4
+    #: (and at most max_nodes // 8). Slop fits bypass the exact table.
+    completion_lookahead: int = 6
 
     def __post_init__(self) -> None:
         for name in ("slop", "clearance", "collision_spacing"):
@@ -819,7 +874,7 @@ class SolveStats:
     pruned_reach: int = 0
     pruned_collision: int = 0
     pruned_completion: int = 0
-    completion_states: int = 0  # states in the largest complete reverse-search layer
+    completion_states: int = 0  # planar states in the largest complete reverse layer
     duration_s: float = 0.0
     aborted: bool = False  # stopped by max_nodes
     engine: str = ""  # which arithmetic backend ran
@@ -831,6 +886,8 @@ class SolveStats:
     complete: bool = False
     stop_reason: str = "not_started"
     max_pieces_searched: int = 0
+    completion_height_states: int = 0
+    completion_work: int = 0
 
 
 @dataclass
@@ -1048,6 +1105,38 @@ def solve(
         for pid in piece_ids
     }
 
+    def transit_bound(piece: PieceType, ports: set[int]) -> int:
+        # Only ports with an available route partner can participate in a transit.
+        # Each transit consumes two ports; this is an upper bound even when routes
+        # share a stem. In particular, separate switches' lone stubs cannot pair.
+        eligible_ports = {
+            port for route in piece.routes
+            if route.port_a in ports and route.port_b in ports
+            for port in (route.port_a, route.port_b)
+        }
+        return len(eligible_ports) // 2
+
+    future_transits: dict[str, int] = {}
+    reversing_queries: dict[str, tuple] = {}
+    if completion is not None:
+        for pid in piece_ids:
+            piece = pieces[pid]
+            capacity = 0
+            queries = set()
+            if piece.is_junction:
+                for entry, exit_port, apply_move in eng.moves[pid]:
+                    free = set(range(len(piece.ports))) - piece.sealed - {entry, exit_port}
+                    capacity = max(capacity, transit_bound(piece, free))
+                    if cfg.reversing_loops:
+                        frame = eng.frame(pid, entry, eng.anchor)
+                        out = apply_move(eng.anchor)
+                        queries.update(
+                            eng.retarget(out, eng.reverse(eng.port_world(pid, port, frame)))
+                            for port in free
+                        )
+            future_transits[pid] = capacity
+            reversing_queries[pid] = tuple(queries)
+
     steps: list[object] = []
     stubs: list[tuple[int, int, object]] = []  # (placement index, port, engine pose)
     placements: list[tuple[str, object]] = []  # (piece id, engine frame), in order
@@ -1087,22 +1176,56 @@ def solve(
     def eligible(used: int) -> bool:
         return used >= cfg.min_pieces and (not cfg.use_all_pieces or used == total_pieces)
 
-    def tail_possible(cursor, used: int, extra_stubs: int = 0) -> bool:
+    # Per-search, bounded by piece types times the lookahead horizon. These queries
+    # describe a future junction's own geometry, independent of the growing path.
+    future_closure: dict[tuple[str, int], bool] = {}
+
+    def tail_possible(cursor, used: int, extra_pid: str | None = None) -> bool:
         if completion is None:
             return True
         slots = min(total_pieces, depth_limit, f_limit) - used
-        new_stubs = max(
-            (stub_capacity[pid] for pid in piece_ids if counts[pid]), default=0
-        ) if slots else 0
-        free_ports = len(stubs) + extra_stubs
-        # A transit spends two free ports, not a new piece. Pooling ports across
-        # junctions deliberately overestimates the number of free traversals.
-        traversals = slots + (free_ports + slots * new_stubs) // 2
-        # Reversing closures may target existing or future stubs, not just the
-        # anchor. An anchor-only test cannot rule those out.
-        if cfg.reversing_loops and (free_ports or new_stubs):
+        if slots > completion.horizon:
             return True
-        return completion.allows(cursor, traversals)
+        if extra_pid and cfg.reversing_loops and stub_capacity[extra_pid]:
+            # Its new targets do not have frames yet. The recursive call checks
+            # them after placement; do not guess their positions in this early test.
+            return True
+        free_by_placement: dict[int, set[int]] = {}
+        for index, port, _pose in stubs:
+            free_by_placement.setdefault(index, set()).add(port)
+        transits = sum(
+            transit_bound(piece_obj[placements[index][0]], ports)
+            for index, ports in free_by_placement.items()
+        )
+        if extra_pid:
+            transits += future_transits[extra_pid]
+        capacity = max((future_transits[pid] for pid in piece_ids if counts[pid]), default=0)
+        transits += min(slots * capacity, sum(
+            counts[pid] * future_transits[pid] for pid in piece_ids
+        ))
+        traversals = slots + transits
+        if completion.allows(cursor, traversals):
+            return True
+        if cfg.reversing_loops:
+            for _index, _port, pose in stubs:
+                query = eng.retarget(cursor, eng.reverse(pose))
+                if completion.allows(query, traversals):
+                    return True
+            if slots:
+                # A future reversing target is created by one placement. Whatever
+                # precedes that placement, its exit must reach one of its free ports
+                # in at most the remaining traversals. Ignore all stock/geometry
+                # constraints here, retaining an overapproximation of every target.
+                for pid in piece_ids:
+                    if not counts[pid] or not reversing_queries[pid]:
+                        continue
+                    key = (pid, traversals - 1)
+                    if key not in future_closure:
+                        future_closure[key] = any(completion.allows(query, traversals - 1)
+                                                  for query in reversing_queries[pid])
+                    if future_closure[key]:
+                        return True
+        return False
 
     def emit(gap: float, reversing_target: tuple[int, int] | None = None) -> None:
         stats.closures_found += 1
@@ -1195,6 +1318,11 @@ def solve(
             for _pidx, _port, stub_pose in stubs:
                 home = min(home, eng.dist(cursor, stub_pose))
                 need = min(need, eng.stub_need24(cursor, stub_pose))
+            if any(counts[pid] and stub_capacity[pid] for pid in piece_ids):
+                # A junction not placed yet can create a closing target anywhere
+                # along the walk. Distance/heading to only today's targets cannot
+                # rule that out. The exact tail check includes these future targets.
+                home = need = 0
         stub_reach = sum(span_of[placements[s[0]][0]] for s in stubs)
         if home > remaining_span + stub_reach + (cfg.slop - slack_used) + 1e-6:
             stats.pruned_reach += 1
@@ -1310,7 +1438,7 @@ def solve(
             # Reject an impossible endpoint before sampling collision geometry or
             # spending a DFS node. Leaving this piece in counts only enlarges the
             # reachability bound, so this early check remains conservative.
-            if not tail_possible(next_cursor, used + 1, stub_capacity[pid]):
+            if not tail_possible(next_cursor, used + 1, pid):
                 stats.pruned_completion += 1
                 continue
             piece = pieces[pid]
@@ -1418,6 +1546,8 @@ def solve(
     stats.duration_s = time.perf_counter() - started
     if completion is not None:
         stats.completion_states = len(completion.layers[-1])
+        stats.completion_height_states = len(completion.height_layers[-1])
+        stats.completion_work = completion.work_limit - completion.work_left
 
     ordered = sorted(
         solutions.values(),

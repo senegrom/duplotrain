@@ -69,24 +69,41 @@ selected endpoints should still be joined directly instead of searched.
 
 ## Exact reverse reachability is an overapproximation
 
-For completion searches, a reverse breadth-first table contains all poses that
-can reach the anchor in at most four traversals by default. Both arithmetic
-engines use exact poses. The move pool includes routes through preplaced pieces,
-even when none of that type remain in inventory. Counts, placement frames and
-collisions are ignored in this table, so it can only enlarge the reachable set.
-Missing from a complete layer therefore proves a tail impossible; membership
-still requires the usual inventory, replay and actual-link overlap checks.
+For completion searches, reverse breadth-first tables contain all planar-pose
+and height projections that can reach the anchor in at most six traversals by
+default. Both arithmetic engines use exact values. Separating the projections
+avoids multiplying states for bridge routes: each may admit a different route,
+which enlarges the allowed set. The move pool includes routes through preplaced
+pieces, even when none remain in inventory. Stock counts, placement frames and
+collisions are also ignored. Absence from either complete projection proves a
+tail impossible; membership still requires actual coupled 3D geometry, inventory,
+replay and the final actual-link overlap check.
 
-A transit consumes two free ports and no new piece. The lookup depth includes
-the remaining placement slots plus an upper bound on transits from existing
-ports and those future junctions could add. An anchor-only lookup is bypassed
-while reversing targets can exist, and all slop searches bypass it. Partial
-reverse layers are never used to reject a candidate: a preprocessing cap simply
-falls back to DFS, without changing search completeness or stop reasons.
+A transit consumes two compatible free ports on one placement and no new piece.
+Each placement contributes at most half the number of free ports that have a
+free route partner. Summing that bound over placements, and adding a conservative
+bound for future placements, prevents lone stubs on separate switches from being
+counted as transits. No matching or collision assumption can undercount routes.
+
+Reversing targets use the same table after an exact rigid transformation moves
+the target onto the anchor. A future junction must first be placed, then reach
+one of its own spare ports within the remaining traversal budget. Precomputed
+queries cover every geometrically distinct placement and spare port, ignoring
+what precedes the placement. Distance and heading to the original endpoints
+cannot prune a branch while a future junction could supply another target. A
+regression pins a valid teardrop even when the selected original target is 100 m
+away; the previous endpoint-only bound incorrectly rejected it.
+
+All slop searches bypass the exact tables. Both projections share the same
+preprocessing budget, and a layer is published only when both are complete.
+Partial layers never reject a candidate: a cap falls back to DFS without changing
+completeness or stop reasons. `completion_work` records the actual expansions.
 
 `completion_lookahead=0` provides a reference search. Regressions compare complete
 solution signatures on both engines and custom 15-degree pieces, exercise
-preprocessing exhaustion, and retain zero-piece and reversing witnesses.
+preprocessing exhaustion, and retain zero-piece and reversing witnesses. Further
+coverage is in `tests/test_completion_targets.py`, including rotated/elevated
+targets, both switch branches, projected false matches and future junctions.
 
 ## Input and snapshot boundaries preserve exactness
 
