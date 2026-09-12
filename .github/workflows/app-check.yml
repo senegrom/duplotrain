@@ -89,3 +89,45 @@ jobs:
           DUPLOTRAIN_REQUIRE_BROWSER: '1'
           DUPLOTRAIN_BROWSER: ${{ matrix.browser }}
           DUPLOTRAIN_STATIC_DIST: ${{ github.workspace }}/webapp/dist
+  deploy:
+    # Publish to GitHub Pages only from a push to main whose checks all passed,
+    # at exactly the commit they ran on. Nothing here reads event data, so a
+    # pull request from a fork can neither trigger this job nor choose the code
+    # it builds; a separate workflow_run-triggered deploy could be reached by a
+    # fork branch named main.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [python, base-install, browser]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # build.py re-verifies the archive's SHA-256 on every build.
+          path: webapp/vendor/pyodide-core-0.27.7.tar.bz2
+          key: pyodide-core-0.27.7
+      - run: python webapp/build.py --pages
+      - name: Check the bundle
+        run: |
+          set -euo pipefail
+          test -f webapp/dist/index.html
+          grep -q 'http-equiv="Content-Security-Policy"' webapp/dist/index.html
+          ls webapp/dist/duplotrain-src-*.zip webapp/dist/pyodide-0.27.7/pyodide.asm.wasm
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: webapp/dist
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
