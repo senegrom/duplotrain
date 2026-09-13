@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import math
 import time
+from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
@@ -361,6 +362,24 @@ def _flat_xy(pose: tuple) -> tuple[float, float]:
     )
 
 
+# Exact multiplication by each of the twelve lattice rotations. These expand
+# R(a, b, c, d) = (-d, a, b + d, c), avoiding a rotation loop on every target query.
+_RETARGET_ROTATIONS = (
+    lambda a, b, c, d: (a, b, c, d),
+    lambda a, b, c, d: (-d, a, b + d, c),
+    lambda a, b, c, d: (-c, -d, a + c, b + d),
+    lambda a, b, c, d: (-b - d, -c, b, a + c),
+    lambda a, b, c, d: (-a - c, -b - d, a, b),
+    lambda a, b, c, d: (-b, -a - c, -d, a),
+    lambda a, b, c, d: (-a, -b, -c, -d),
+    lambda a, b, c, d: (d, -a, -b - d, -c),
+    lambda a, b, c, d: (c, d, -a - c, -b - d),
+    lambda a, b, c, d: (b + d, c, -b, -a - c),
+    lambda a, b, c, d: (a + c, b + d, -a, -b),
+    lambda a, b, c, d: (b, a + c, d, -a),
+)
+
+
 class _LatticeEngine:
     """Pose operations over the integer 30-degree lattice.
 
@@ -412,9 +431,10 @@ class _LatticeEngine:
         """Exact SE(2) change of target, with an independent height translation."""
         anchor = self.anchor
         turn = (anchor[5] - target[5]) % 12
-        a, b, c, d = (cursor[i] - target[i] for i in range(4))
-        for _ in range(turn):
-            a, b, c, d = -d, a, b + d, c
+        a, b, c, d = _RETARGET_ROTATIONS[turn](
+            cursor[0] - target[0], cursor[1] - target[1],
+            cursor[2] - target[2], cursor[3] - target[3],
+        )
         return (anchor[0] + a, anchor[1] + b, anchor[2] + c, anchor[3] + d,
                 anchor[4] + cursor[4] - target[4], (cursor[5] + turn) % 12)
 
@@ -672,8 +692,30 @@ class _CompletionReachability:
         self.height_layers = [frozenset((eng.height(eng.anchor),))]
         self.height_frontier = self.height_layers[0]
         self.bounds = _CompletionBounds(eng)
+        # Geometry-only answers are independent of stock, stubs, and collisions.
+        # Keep this cache on the search object; keys contain only immutable poses.
+        self.cache: OrderedDict[tuple, bool] = OrderedDict()
+        self.cache_hits = 0
+        self.checks = 0
 
     def allows(self, cursor, traversals: int) -> bool:
+        # Published layers never change. An unfinished depth also stays permissive:
+        # its next layer already exceeds the remaining budget, which only decreases.
+        # Reusing either answer cannot change later preprocessing or pruning.
+        key = (cursor, traversals)
+        result = self.cache.get(key)
+        if result is not None:
+            self.cache_hits += 1
+            self.cache.move_to_end(key)
+            return result
+        result = self._allows(cursor, traversals)
+        if len(self.cache) >= 4096:
+            self.cache.popitem(last=False)
+        self.cache[key] = result
+        return result
+
+    def _allows(self, cursor, traversals: int) -> bool:
+        self.checks += 1
         self.work_left -= self.bounds.extend(traversals, self.work_left)
         if not self.bounds.allows(cursor, traversals):
             return False
@@ -984,6 +1026,8 @@ class SolveStats:
     completion_work: int = 0
     completion_bound_depth: int = 0
     completion_bound_states: int = 0  # retained heading envelopes across all depths
+    completion_checks: int = 0  # geometric queries actually evaluated
+    completion_cache_hits: int = 0  # repeated queries answered by the per-search cache
 
 
 @dataclass
@@ -1276,14 +1320,10 @@ def solve(
     # growing path. Cap the per-search cache now that bounds can check longer tails.
     future_closure: dict[tuple[str, int], bool] = {}
 
-    def tail_possible(cursor, used: int, extra_pid: str | None = None) -> bool:
-        if completion is None:
-            return True
-        slots = min(total_pieces, depth_limit, f_limit) - used
-        if extra_pid and cfg.reversing_loops and stub_capacity[extra_pid]:
-            # Its new targets do not have frames yet. The recursive call checks
-            # them after placement; do not guess their positions in this early test.
-            return True
+    def tail_context():
+        # All candidate moves at this DFS node share these allowances and targets.
+        # Recursive visits build their own context after consuming stock/stubs;
+        # backtracking restores this node's state before the next candidate.
         free_by_placement: dict[int, set[int]] = {}
         for index, port, _pose in stubs:
             free_by_placement.setdefault(index, set()).add(port)
@@ -1291,18 +1331,32 @@ def solve(
             transit_bound(piece_obj[placements[index][0]], ports)
             for index, ports in free_by_placement.items()
         )
+        available = [pid for pid in piece_ids if counts[pid]]
+        capacity = max((future_transits[pid] for pid in available), default=0)
+        future = sum(counts[pid] * future_transits[pid] for pid in available)
+        targets = (tuple(eng.reverse(pose) for _index, _port, pose in stubs)
+                   if cfg.reversing_loops else ())
+        future_targets = tuple(pid for pid in available if reversing_queries[pid])
+        return transits, capacity, future, targets, future_targets
+
+    def tail_possible(cursor, used: int, context, extra_pid: str | None = None) -> bool:
+        if completion is None:
+            return True
+        slots = min(total_pieces, depth_limit, f_limit) - used
+        if extra_pid and cfg.reversing_loops and stub_capacity[extra_pid]:
+            # Its new targets need the placement frame. The recursive visit checks
+            # them after placement, with its own updated context.
+            return True
+        transits, capacity, future, targets, future_targets = context
         if extra_pid:
             transits += future_transits[extra_pid]
-        capacity = max((future_transits[pid] for pid in piece_ids if counts[pid]), default=0)
-        transits += min(slots * capacity, sum(
-            counts[pid] * future_transits[pid] for pid in piece_ids
-        ))
+        transits += min(slots * capacity, future)
         traversals = slots + transits
         if completion.allows(cursor, traversals):
             return True
         if cfg.reversing_loops:
-            for _index, _port, pose in stubs:
-                query = eng.retarget(cursor, eng.reverse(pose))
+            for target in targets:
+                query = eng.retarget(cursor, target)
                 if completion.allows(query, traversals):
                     return True
             if slots:
@@ -1310,9 +1364,7 @@ def solve(
                 # precedes that placement, its exit must reach one of its free ports
                 # in at most the remaining traversals. Ignore all stock/geometry
                 # constraints here, retaining an overapproximation of every target.
-                for pid in piece_ids:
-                    if not counts[pid] or not reversing_queries[pid]:
-                        continue
+                for pid in future_targets:
                     key = (pid, traversals - 1)
                     possible = future_closure.get(key)
                     if possible is None:
@@ -1449,7 +1501,8 @@ def solve(
             stats.pruned_reach += 1
             return True
 
-        if not tail_possible(cursor, used):
+        context = tail_context() if completion is not None else None
+        if not tail_possible(cursor, used, context):
             stats.pruned_completion += 1
             return True
 
@@ -1535,7 +1588,7 @@ def solve(
             # Reject an impossible endpoint before sampling collision geometry or
             # spending a DFS node. Leaving this piece in counts only enlarges the
             # reachability bound, so this early check remains conservative.
-            if not tail_possible(next_cursor, used + 1, pid):
+            if not tail_possible(next_cursor, used + 1, context, pid):
                 stats.pruned_completion += 1
                 continue
             piece = pieces[pid]
@@ -1610,27 +1663,33 @@ def solve(
     depth_limit = total_pieces
     if cfg.max_pieces is not None:
         depth_limit = min(depth_limit, cfg.max_pieces)
-    if base is None:
-        # Loop mode enumerates everything reachable; one full-depth pass.
-        f_limit = depth_limit
-        stats.max_pieces_searched = f_limit
-        dfs(eng.start_cursor, 0, 0.0, start_prev)
-    else:
-        # Completion mode runs IDA*: grow the pieces-needed contour until closures
-        # appear.  Uninformed depth-first dies here whenever the inventory is broad
-        # (it exhausts gigantic fruitless subtrees before ever backtracking), while
-        # each admissible contour stays small and finds the SHORTEST completions
-        # first.  Plain iterative deepening without the heuristic was tried and is
-        # equally hopeless -- the contour bound is what tames the tree.
-        # A completion may only join/transit preplaced junctions. It still has
-        # a nonempty step trace, but uses no inventory and needs contour zero.
-        first_limit = 0 if cfg.min_pieces == 0 else 1
-        for f_limit in range(first_limit, depth_limit + 1):
+    try:
+        if base is None:
+            # Loop mode enumerates everything reachable; one full-depth pass.
+            f_limit = depth_limit
             stats.max_pieces_searched = f_limit
-            if not dfs(eng.start_cursor, 0, 0.0, start_prev):
-                break
-            if len(solutions) >= cfg.max_results or stats.aborted:
-                break
+            dfs(eng.start_cursor, 0, 0.0, start_prev)
+        else:
+            # Completion mode runs IDA*: grow the pieces-needed contour until closures
+            # appear.  Uninformed depth-first dies here whenever the inventory is broad
+            # (it exhausts gigantic fruitless subtrees before ever backtracking), while
+            # each admissible contour stays small and finds the SHORTEST completions
+            # first.  Plain iterative deepening without the heuristic was tried and is
+            # equally hopeless -- the contour bound is what tames the tree.
+            # A completion may only join/transit preplaced junctions. It still has
+            # a nonempty step trace, but uses no inventory and needs contour zero.
+            first_limit = 0 if cfg.min_pieces == 0 else 1
+            for f_limit in range(first_limit, depth_limit + 1):
+                stats.max_pieces_searched = f_limit
+                if not dfs(eng.start_cursor, 0, 0.0, start_prev):
+                    break
+                if len(solutions) >= cfg.max_results or stats.aborted:
+                    break
+    finally:
+        if completion is not None:
+            # DFS has recursive closure references; release cached poses promptly,
+            # including on progress-callback errors, without waiting for cyclic GC.
+            completion.cache.clear()
     if stats.aborted:
         stats.stop_reason = "node_limit"
     elif len(solutions) >= cfg.max_results:
@@ -1645,6 +1704,8 @@ def solve(
         stats.completion_states = len(completion.layers[-1])
         stats.completion_height_states = len(completion.height_layers[-1])
         stats.completion_work = completion.work_limit - completion.work_left
+        stats.completion_checks = completion.checks
+        stats.completion_cache_hits = completion.cache_hits
         stats.completion_bound_depth = len(completion.bounds.layers) - 1
         stats.completion_bound_states = sum(map(len, completion.bounds.layers))
 

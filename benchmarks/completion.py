@@ -7,6 +7,7 @@ Wall times are observations, never test assertions.
 
 import argparse
 import json
+from statistics import median
 
 import duplotrain.solver as solver_module
 from duplotrain import SolverConfig, build_chain, default_catalog, solve
@@ -34,24 +35,33 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--lookahead", type=int, default=SolverConfig().completion_lookahead)
     parser.add_argument("--max-nodes", type=int, default=25_000)
+    parser.add_argument("--repeats", type=int, default=1, help="report the median of N searches")
     args = parser.parse_args()
+    if args.repeats < 1:
+        parser.error("--repeats must be positive")
     catalog = default_catalog()
     print(json.dumps({"source": solver_module.__file__, "lookahead": args.lookahead,
-                      "max_nodes": args.max_nodes, "max_pieces": 20, "max_results": 8}))
+                      "max_nodes": args.max_nodes, "max_pieces": 20, "max_results": 8,
+                      "repeats": args.repeats}))
     for name, chain, inventory, reversing in CASES:
         base = build_chain([(catalog[pid], 0, 1) for pid in chain])
         config = SolverConfig(min_pieces=0, max_pieces=20, max_results=8,
                               max_nodes=args.max_nodes, reversing_loops=reversing,
                               completion_lookahead=args.lookahead)
         ends = dict(grow_from=(0, 1), close_onto=(0, 0)) if chain[0] == "switch" else {}
-        result = solve(inventory, catalog, config, base=base, **ends)
+        times = []
+        for _ in range(args.repeats):
+            result = solve(inventory, catalog, config, base=base, **ends)
+            times.append(result.stats.duration_s)
         print(json.dumps({
             "case": name, "nodes": result.stats.nodes, "found": len(result.solutions),
-            "stop": result.stats.stop_reason, "seconds": round(result.stats.duration_s, 4),
+            "stop": result.stats.stop_reason, "seconds": round(median(times), 4),
             "max_pieces_searched": result.stats.max_pieces_searched,
             "completion_work": getattr(result.stats, "completion_work", None),
             "completion_bound_depth": getattr(result.stats, "completion_bound_depth", None),
             "completion_bound_states": getattr(result.stats, "completion_bound_states", None),
+            "completion_checks": getattr(result.stats, "completion_checks", None),
+            "completion_cache_hits": getattr(result.stats, "completion_cache_hits", None),
         }), flush=True)
 
 
