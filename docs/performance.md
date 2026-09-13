@@ -194,3 +194,66 @@ The output includes `completion_checks` and `completion_cache_hits`. Regression
 tests in `tests/test_completion_reuse.py` require identical enumeration and search
 counters with caching disabled, bound the cache, verify all twelve rotations,
 and exercise successful cleanup, callback errors, and catalogue isolation.
+
+## Slippage completion after PR #12
+
+Previously, any positive slop disabled all completion tables and linear bounds.
+Slippage now uses outward physical intervals, widening each direction by the
+remaining total gap budget. Complete short tables have an index of physical boxes
+by heading and x position, with a Euclidean lower-bound distance test. Exact
+heading/height constraints, cumulative joint gaps and the final collision audit
+are unchanged. Geometry and future-target caches include the remaining slop;
+indexes and query caches are released after each search, including callback errors.
+Preprocessing retains the existing `min(4096, max_nodes // 8)` expansion cap.
+
+The benchmark now contains the original nine exact cases plus **18 slippage
+cases**: 1/5 mm budgets on several inventories, 3-4-5 mm offset endpoints, a 4.9 mm
+near miss, broad and long forced closures, a climbing transit spending 1+2 mm,
+and a fractional-radius 15° piece. Rows report settings, exact/forced result counts,
+ordered result fingerprints, individual gaps, stop reasons, nodes, preprocessing,
+and median/minimum/maximum timings. Repeated results must have identical fingerprints.
+
+These are local Python 3.12 three-run medians against `3107f25`, using 20 added
+pieces, eight results and 25,000 DFS nodes. A node-limit row reports 25,001 because
+the existing counter records the visit that detects the limit.
+
+| Case | Before nodes | After nodes | Before time | After time | Results before / after |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Half circle, 1 mm | 1,007 | 82 | 23.4 ms | 13.9 ms | 3 / 3 |
+| Bridge, broad inventory, 5 mm | 25,001 | 514 | 866.3 ms | 49.5 ms | 0 / 8 |
+| Long gap, 5 mm | 25,001 | 370 | 817.9 ms | 46.2 ms | 4 / 8 |
+| Offset circle, insufficient 4.9 mm | 993 | 33 | 20.5 ms | 6.6 ms | 0 / 0 |
+| Offset circle, 5 mm | 1,002 | 83 | 22.6 ms | 13.6 ms | 3 / 3 forced |
+| Offset circle, broad inventory, 5 mm | 25,001 | 286 | 709.1 ms | 28.3 ms | 0 / 8 forced |
+| Offset long gap, 5 mm | 25,001 | 295 | 818.9 ms | 41.4 ms | 5 / 8 forced |
+| Switch, broad inventory, 5 mm | 25,001 | 19,899 | 738.5 ms | 1,875.5 ms | 0 / 8 |
+| Mixed gap, broad inventory, 5 mm | 25,001 | 25,001 | 724.1 ms | 1,821.1 ms | 0 / 0 |
+| Fractional 15° piece, 1 mm | 118 | 19 | 18.8 ms | 95.1 ms | 1 / 1 |
+
+The broad and long offset cases take about **25× and 20× less time**, respectively,
+while finding more forced fits. All nine exact cases retain their ordered result
+fingerprints and node counts. Exhausted slippage cases retain their fingerprints;
+regressions also compare complete layouts and retain the earlier candidates from
+capped searches. Timings are observations, not portable promises or test thresholds.
+
+Extra proof work is not free. The switch takes longer but now returns eight results.
+The mixed case still reaches the 25,000-node cap without a result. At the editor's
+existing 60,000-node budget, the 1/5 mm mixed cases now return eight results in
+29,936/30,339 states (2.23/2.33 s), whereas the previous solver returned none before
+that cap. Small field searches can spend more time building bounds than they save;
+the zero-inventory transit likewise grows from roughly 0.6 to 1.0 ms. These limits
+are kept in the benchmark rather than excluded from the measurements.
+
+Reproduce or select cases with:
+
+```sh
+PYTHONPATH=src python benchmarks/completion.py --suite slippage --repeats 3
+PYTHONPATH=src python benchmarks/completion.py --case offset_long_slop_5 --lookahead 0
+PYTHONPATH=src python benchmarks/completion.py --case mixed_full_slop_5 --max-nodes 60000
+PYTHONPATH=src python benchmarks/completion.py --case offset_circle_slop_5 --engine field
+```
+
+For a historical comparison, run the current benchmark script with `PYTHONPATH`
+pointing at the older checkout's `src`. Run timing comparisons sequentially, without
+competing test processes. The output identifies the imported solver path. CI lints
+the benchmark and runs operation-count, exhaustive-fit and real-worker regressions.

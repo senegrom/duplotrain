@@ -348,8 +348,10 @@ Existing junction ports and targets created by future junctions are included;
 free transits require two compatible ports on the same piece. Impossible tails
 are rejected before collision sampling. `SolverConfig.completion_lookahead`
 defaults to 6 for the short table (0 disables both checks); both checks share at
-most 4096 move expansions and one eighth of `max_nodes`. Partial tables and forced
-fits fall back to ordinary search. `stats.pruned_completion` and
+most 4096 move expansions and one eighth of `max_nodes`. Partial tables fall back
+to ordinary search. With slippage enabled, outward-rounded physical bounds and
+indexed nearby short tails allow the **remaining total** gap budget; heading and
+height still have to match. `stats.pruned_completion` and
 `stats.completion_work` report the saved branches and total preprocessing work;
 `stats.completion_bound_depth` reports how far the longer bounds reached.
 Repeated geometry queries use a per-search cache capped at 4096 entries;
@@ -357,6 +359,10 @@ Repeated geometry queries use a per-search cache capped at 4096 entries;
 reused queries. The full geometry and height must agree on an actual route, and
 the independent collision audit still checks every returned candidate. Reproduce
 the measurements with `PYTHONPATH=src python benchmarks/completion.py --repeats 3`.
+Use `--suite slippage` for 18 cases covering offset ends, bridges, reversing targets,
+intermediate joint gaps and custom 15° pieces. `--case NAME` selects individual
+cases; `--lookahead 0` runs the unpruned reference. Each JSON row includes the
+gap budget, engine, result fingerprint, forced-fit gaps, stop reason and median time.
 
 Elevation is modelled (ramps carry `z`; closure requires returning to the anchor's
 height). Blanket collision clearance defaults to 120 mm; underpass-enabled pieces

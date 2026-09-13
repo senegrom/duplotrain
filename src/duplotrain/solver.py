@@ -23,7 +23,7 @@ Pruning (all conservative, so the search stays exhaustive):
     * turn feasibility -- the remaining pieces (plus open stubs) must be able to swing
       the heading back to the anchor's;
     * reach -- the remaining pieces must be long enough to get home;
-    * exact completion reachability -- short tails must reach the target on the grid;
+    * completion reachability -- tails must reach the target within the remaining slop;
     * collisions -- a placement overlapping existing track is cut immediately.
 """
 
@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import math
 import time
+from bisect import bisect_left, bisect_right
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -562,28 +563,64 @@ def _compile_lattice(
 
 
 # --------------------------------------------------------------------------------------
-# Exact short-tail reachability, followed by step traces and their signatures
+# Bounded completion reachability, followed by step traces and their signatures
 # --------------------------------------------------------------------------------------
 
 
+# Outward rational enclosures of physical millimetres. Unlike the exact search's
+# coefficient projections, these remain valid when a tiny real gap has large,
+# cancelling radical coefficients. Integer arithmetic keeps rounding one-sided.
+_MM_SCALE = 10**9
+_ROOT_BOUNDS = tuple((math.isqrt(n * _MM_SCALE**2), math.isqrt(n * _MM_SCALE**2) + 1)
+                     for n in (2, 3, 6))
+_SLIP_AXES = ((1, 0), (0, 1), (1, 1), (1, -1), (2, 1), (2, -1), (1, 2), (1, -2))
+_SLIP_NORMS = tuple(math.isqrt((a * a + b * b) * _MM_SCALE**2) + 1
+                    for a, b in _SLIP_AXES)
+
+
+def _outward(low, high) -> tuple[int, int]:
+    low, high = math.floor(low), math.ceil(high)
+    # Also cover the solver's floating distance evaluation at translated layouts.
+    # This deliberately loose relative margin can only admit extra DFS work.
+    guard = (abs(low) + abs(high)) // 2**40 + 2
+    return low - guard, high + guard
+
+
+def _alg_interval(value: Alg) -> tuple[int, int]:
+    low = high = value.a * _MM_SCALE
+    for coefficient, (a, b) in zip(value.coeffs()[1:], _ROOT_BOUNDS, strict=True):
+        low += coefficient * (a if coefficient >= 0 else b)
+        high += coefficient * (b if coefficient >= 0 else a)
+    return _outward(low, high)
+
+
+def _physical_envelope(x, y, height) -> tuple[tuple, tuple]:
+    return (tuple(a * x[0] + b * y[0 if b >= 0 else 1] for a, b in _SLIP_AXES) + height,
+            tuple(a * x[1] + b * y[1 if b >= 0 else 0] for a, b in _SLIP_AXES) + height)
+
+
 class _CompletionBounds:
-    """Exact linear envelopes, indexed by heading and maximum tail length.
+    """Conservative linear envelopes, indexed by heading and maximum tail length.
 
     A move adds a fixed displacement at a given heading. Minimum/maximum linear
     projections therefore compose without enumerating positions: translate every
     interval, then take the union's bounds. Intervals may describe different walks,
-    so membership is only necessary. This stays useful beyond the short exact table.
+    so membership is only necessary. Exact searches project coefficients; slippage
+    searches enclose physical distances. Both remain useful beyond the short table.
     """
 
-    def __init__(self, eng) -> None:
+    def __init__(self, eng, *, slippage: bool = False) -> None:
         if eng.name == "lattice":
             self.project = self._lattice_projection
+            physical = self._lattice_envelope
             self.heading = lambda pose: pose[5]
             zeros = [(0, 0, 0, 0, 0, heading) for heading in range(12)]
         else:
             self.project = self._field_projection
+            physical = self._field_envelope
             self.heading = lambda pose: pose.heading
             zeros = [Pose.make(heading=heading) for heading in range(HEADING_STEPS)]
+        self.enclose = physical if slippage else lambda pose: (self.project(pose),) * 2
         # Include full 3D deltas and every preplaced route, not only spare pieces.
         moves = {apply_move(zeros[0]): apply_move
                  for routes in eng.moves.values() for _entry, _exit, apply_move in routes}
@@ -591,11 +628,27 @@ class _CompletionBounds:
         for zero in zeros:
             predecessors = (eng.reverse(move(eng.reverse(zero))) for move in moves.values())
             self.deltas.append(tuple({
-                (self.heading(pose), self.project(pose)) for pose in predecessors
+                (self.heading(pose), *self.enclose(pose)) for pose in predecessors
             }))
-        coords = self.project(eng.anchor)
-        self.layers = [{self.heading(eng.anchor): (coords, coords)}]
+        self.layers = [{self.heading(eng.anchor): self.enclose(eng.anchor)}]
         self.saturated = False
+
+    @staticmethod
+    def _lattice_envelope(pose) -> tuple[tuple, tuple]:
+        a, b, c, d, z, _heading = pose
+        root_low, root_high = _ROOT_BOUNDS[1]
+
+        def coordinate(rational, radical):
+            low = rational * _MM_SCALE + radical * (root_low if radical >= 0 else root_high)
+            high = rational * _MM_SCALE + radical * (root_high if radical >= 0 else root_low)
+            # Avoid float division, including for very large integer coefficients.
+            return _outward(low // 40, -(-high // 40))
+
+        return _physical_envelope(coordinate(2 * a + c, b), coordinate(2 * d + b, c), (z,))
+
+    @staticmethod
+    def _field_envelope(pose: Pose) -> tuple[tuple, tuple]:
+        return _physical_envelope(_alg_interval(pose.x), _alg_interval(pose.y), pose.z.coeffs())
 
     @staticmethod
     def _lattice_projection(pose) -> tuple:
@@ -627,9 +680,9 @@ class _CompletionBounds:
             spent += work
             layer = dict(previous)  # at most k traversals also includes k - 1
             for heading, (low, high) in previous.items():
-                for next_heading, delta in self.deltas[heading]:
-                    next_low = tuple(a + b for a, b in zip(low, delta, strict=True))
-                    next_high = tuple(a + b for a, b in zip(high, delta, strict=True))
+                for next_heading, delta_low, delta_high in self.deltas[heading]:
+                    next_low = tuple(a + b for a, b in zip(low, delta_low, strict=True))
+                    next_high = tuple(a + b for a, b in zip(high, delta_high, strict=True))
                     if next_heading in layer:
                         old_low, old_high = layer[next_heading]
                         next_low = tuple(map(min, old_low, next_low))
@@ -654,6 +707,18 @@ class _CompletionBounds:
             for low, value, high in zip(interval[0], self.project(cursor), interval[1], strict=True)
         )
 
+    def allows_near(self, cursor, traversals: int, slack: int) -> bool:
+        if traversals >= len(self.layers) and not self.saturated:
+            return True
+        interval = self.layers[min(traversals, len(self.layers) - 1)].get(self.heading(cursor))
+        if interval is None:
+            return False
+        low, high = self.enclose(cursor)
+        padding = tuple(-(-slack * norm // _MM_SCALE) for norm in _SLIP_NORMS)
+        padding += (0,) * (len(low) - len(_SLIP_AXES))
+        return all(a - pad <= d and c <= b + pad
+                   for a, b, c, d, pad in zip(*interval, low, high, padding, strict=True))
+
 
 class _CompletionReachability:
     """Bounded reverse reachability for planar poses and heights independently.
@@ -672,7 +737,7 @@ class _CompletionReachability:
     the completed shorter layers and let DFS handle the rest normally.
     """
 
-    def __init__(self, eng, horizon: int, max_work: int) -> None:
+    def __init__(self, eng, horizon: int, max_work: int, *, slippage: bool = False) -> None:
         self.eng = eng
         self.horizon = horizon
         self.work_left = max_work
@@ -691,33 +756,44 @@ class _CompletionReachability:
         self.frontier = self.layers[0]
         self.height_layers = [frozenset((eng.height(eng.anchor),))]
         self.height_frontier = self.height_layers[0]
-        self.bounds = _CompletionBounds(eng)
+        self.bounds = _CompletionBounds(eng, slippage=slippage)
+        self.near_indices: dict[int, dict] = {}
         # Geometry-only answers are independent of stock, stubs, and collisions.
         # Keep this cache on the search object; keys contain only immutable poses.
         self.cache: OrderedDict[tuple, bool] = OrderedDict()
         self.cache_hits = 0
         self.checks = 0
 
-    def allows(self, cursor, traversals: int) -> bool:
+    def allows(self, cursor, traversals: int, slack: float | None = None) -> bool:
         # Published layers never change. An unfinished depth also stays permissive:
         # its next layer already exceeds the remaining budget, which only decreases.
         # Reusing either answer cannot change later preprocessing or pruning.
-        key = (cursor, traversals)
+        key = (cursor, traversals) if slack is None else (cursor, traversals, slack)
         result = self.cache.get(key)
         if result is not None:
             self.cache_hits += 1
             self.cache.move_to_end(key)
             return result
-        result = self._allows(cursor, traversals)
+        result = self._allows(cursor, traversals, slack)
         if len(self.cache) >= 4096:
             self.cache.popitem(last=False)
         self.cache[key] = result
         return result
 
-    def _allows(self, cursor, traversals: int) -> bool:
+    def _allows(self, cursor, traversals: int, slack: float | None = None) -> bool:
         self.checks += 1
         self.work_left -= self.bounds.extend(traversals, self.work_left)
-        if not self.bounds.allows(cursor, traversals):
+        # One accumulated budget covers every remaining forced transit and the
+        # final joint. Translations add; heading and height never acquire tolerance.
+        padding = None
+        if slack is not None:
+            numerator, denominator = slack.as_integer_ratio()
+            padding = -(-numerator * _MM_SCALE // denominator) + 2
+        if padding is None:
+            possible = self.bounds.allows(cursor, traversals)
+        else:
+            possible = self.bounds.allows_near(cursor, traversals, padding)
+        if not possible:
             return False
         if traversals > self.horizon:
             return True
@@ -743,8 +819,47 @@ class _CompletionReachability:
             self.height_frontier = height_frontier
             self.layers.append(previous | frontier)
             self.height_layers.append(previous_heights | height_frontier)
-        return (self.eng.level(cursor) in self.layers[traversals]
-                and self.eng.height(cursor) in self.height_layers[traversals])
+        if self.eng.height(cursor) not in self.height_layers[traversals]:
+            return False
+        if padding is None:
+            return self.eng.level(cursor) in self.layers[traversals]
+        return self._near_layer(cursor, traversals, padding)
+
+    def _near_layer(self, cursor, traversals: int, slack: int) -> bool:
+        """Query a complete short layer by physical bounding boxes, not coefficients.
+
+        Sorted x intervals avoid scanning the whole layer for every candidate.
+        Box-to-box distance bounds the Euclidean gap from below. The DFS still
+        decides the actual fit and audits all of its links and collisions.
+        """
+        index = self.near_indices.get(traversals)
+        if index is None:
+            grouped: dict[int, list] = {}
+            for pose in self.layers[traversals]:
+                low, high = self.bounds.enclose(pose)
+                grouped.setdefault(self.bounds.heading(pose), []).append(
+                    (low[0], high[0], low[1], high[1]))
+            index = {}
+            for heading, boxes in grouped.items():
+                boxes.sort()
+                index[heading] = (boxes, tuple(box[0] for box in boxes),
+                                  max(box[1] - box[0] for box in boxes))
+            self.near_indices[traversals] = index
+        group = index.get(self.bounds.heading(cursor))
+        if group is None:
+            return False
+        boxes, starts, width = group
+        low, high = self.bounds.enclose(cursor)
+        left, right = low[0] - slack, high[0] + slack
+        bottom, top = low[1] - slack, high[1] + slack
+        for i in range(bisect_left(starts, left - width), bisect_right(starts, right)):
+            box = boxes[i]
+            if box[1] >= left and box[2] <= top and box[3] >= bottom:
+                dx = max(0, box[0] - high[0], low[0] - box[1])
+                dy = max(0, box[2] - high[1], low[1] - box[3])
+                if dx * dx + dy * dy <= slack * slack:
+                    return True
+        return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -977,10 +1092,10 @@ class SolverConfig:
     #: problem fits the 30-degree grid (every built-in piece does) and falls back to
     #: the general field otherwise; "lattice"/"field" force one, for tests.
     engine: str = "auto"
-    #: Exact reverse reachability for this many final traversals in completion
+    #: Reverse reachability for this many final traversals in completion
     #: mode, supplemented by longer linear bounds. Zero disables both; they share
     #: a preprocessing cap of 4096 moves (and at most max_nodes // 8). Slop fits
-    #: bypass both exact checks.
+    #: use physical distance enclosures with the remaining total gap budget.
     completion_lookahead: int = 6
 
     def __post_init__(self) -> None:
@@ -1235,8 +1350,9 @@ def solve(
             }
     stats.engine = eng.name
     completion = (
-        _CompletionReachability(eng, cfg.completion_lookahead, min(4096, cfg.max_nodes // 8))
-        if base is not None and cfg.slop == 0 and cfg.completion_lookahead
+        _CompletionReachability(eng, cfg.completion_lookahead, min(4096, cfg.max_nodes // 8),
+                                slippage=cfg.slop > 0)
+        if base is not None and cfg.completion_lookahead
         else None
     )
     stub_capacity = {
@@ -1318,7 +1434,7 @@ def solve(
 
     # These queries describe a future junction's own geometry, independent of the
     # growing path. Cap the per-search cache now that bounds can check longer tails.
-    future_closure: dict[tuple[str, int], bool] = {}
+    future_closure: dict[tuple, bool] = {}
 
     def tail_context():
         # All candidate moves at this DFS node share these allowances and targets.
@@ -1339,7 +1455,8 @@ def solve(
         future_targets = tuple(pid for pid in available if reversing_queries[pid])
         return transits, capacity, future, targets, future_targets
 
-    def tail_possible(cursor, used: int, context, extra_pid: str | None = None) -> bool:
+    def tail_possible(cursor, used: int, context, slack: float | None,
+                      extra_pid: str | None = None) -> bool:
         if completion is None:
             return True
         slots = min(total_pieces, depth_limit, f_limit) - used
@@ -1352,12 +1469,12 @@ def solve(
             transits += future_transits[extra_pid]
         transits += min(slots * capacity, future)
         traversals = slots + transits
-        if completion.allows(cursor, traversals):
+        if completion.allows(cursor, traversals, slack):
             return True
         if cfg.reversing_loops:
             for target in targets:
                 query = eng.retarget(cursor, target)
-                if completion.allows(query, traversals):
+                if completion.allows(query, traversals, slack):
                     return True
             if slots:
                 # A future reversing target is created by one placement. Whatever
@@ -1365,10 +1482,10 @@ def solve(
                 # in at most the remaining traversals. Ignore all stock/geometry
                 # constraints here, retaining an overapproximation of every target.
                 for pid in future_targets:
-                    key = (pid, traversals - 1)
+                    key = (pid, traversals - 1, slack)
                     possible = future_closure.get(key)
                     if possible is None:
-                        possible = any(completion.allows(query, traversals - 1)
+                        possible = any(completion.allows(query, traversals - 1, slack)
                                        for query in reversing_queries[pid])
                         if len(future_closure) < 4096:
                             future_closure[key] = possible
@@ -1502,7 +1619,8 @@ def solve(
             return True
 
         context = tail_context() if completion is not None else None
-        if not tail_possible(cursor, used, context):
+        query_slack = slack_left if cfg.slop > 0 else None
+        if not tail_possible(cursor, used, context, query_slack):
             stats.pruned_completion += 1
             return True
 
@@ -1588,7 +1706,7 @@ def solve(
             # Reject an impossible endpoint before sampling collision geometry or
             # spending a DFS node. Leaving this piece in counts only enlarges the
             # reachability bound, so this early check remains conservative.
-            if not tail_possible(next_cursor, used + 1, context, pid):
+            if not tail_possible(next_cursor, used + 1, context, query_slack, pid):
                 stats.pruned_completion += 1
                 continue
             piece = pieces[pid]
@@ -1690,6 +1808,7 @@ def solve(
             # DFS has recursive closure references; release cached poses promptly,
             # including on progress-callback errors, without waiting for cyclic GC.
             completion.cache.clear()
+            completion.near_indices.clear()
     if stats.aborted:
         stats.stop_reason = "node_limit"
     elif len(solutions) >= cfg.max_results:
