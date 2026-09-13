@@ -135,6 +135,27 @@ depth and total retained heading envelopes. Regressions in
 compare exhaustive results on both engines, exercise custom 15-degree curves and
 preprocessing exhaustion, and pin the two previously capped broad-inventory cases.
 
+## Reused geometric proofs are independent of search state
+
+The completion cache keys contain the full exact cursor pose, including height
+and heading, and the remaining traversal bound. The anchor and move pool are
+fixed within one solve. Published reachability layers never change, so both
+positive and negative answers from complete layers can be reused. A permissive
+answer from an unfinished layer also remains valid: the next layer already
+exceeds the remaining preprocessing budget, which can only decrease.
+
+Geometric cache entries contain no stock, free ports, collision decisions or candidate layouts.
+Each DFS node computes its current transit allowances and reversing targets once;
+its child visits compute their own values after consuming stock and ports. The
+parent's values remain valid when backtracking restores its state. Slop searches
+continue to bypass these exact checks.
+
+The 4096-entry LRU belongs to one solve and is explicitly emptied on normal return
+or a traversal exception. This avoids retaining its poses through the recursive
+DFS closure cycle. Tests compare complete results and all search counters against
+an uncached evaluator, retain permissive fallback after eviction, separate
+catalogues, and check callback-error cleanup.
+
 ## Input and snapshot boundaries preserve exactness
 
 Arc angles are checked as exact multiples of 15 before any integer conversion.

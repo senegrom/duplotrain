@@ -352,10 +352,11 @@ most 4096 move expansions and one eighth of `max_nodes`. Partial tables and forc
 fits fall back to ordinary search. `stats.pruned_completion` and
 `stats.completion_work` report the saved branches and total preprocessing work;
 `stats.completion_bound_depth` reports how far the longer bounds reached.
-The full geometry and height must
-agree on an actual route, and the independent collision audit still checks every
-returned candidate. Reproduce the measurements with
-`PYTHONPATH=src python benchmarks/completion.py`.
+Repeated geometry queries use a per-search cache capped at 4096 entries;
+`stats.completion_checks` and `stats.completion_cache_hits` report evaluated and
+reused queries. The full geometry and height must agree on an actual route, and
+the independent collision audit still checks every returned candidate. Reproduce
+the measurements with `PYTHONPATH=src python benchmarks/completion.py --repeats 3`.
 
 Elevation is modelled (ramps carry `z`; closure requires returning to the anchor's
 height). Blanket collision clearance defaults to 120 mm; underpass-enabled pieces

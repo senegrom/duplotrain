@@ -160,3 +160,37 @@ or test assertions. The benchmark now reports bound depth and retained envelope
 counts as well as total preprocessing work. Correctness and operation-count
 regressions are in `tests/test_completion_bounds.py`; the real Pyodide browser
 test closes, previews and applies the long gap under the production CSP.
+
+## Completion search after PR #11: reuse repeated checks
+
+Profiling `d6cbf01` showed 522,871 geometric reachability queries across the nine
+benchmark cases. Many ask the same question at different branches or depth
+contours. A per-search LRU cache now reuses those immutable geometric answers,
+with at most 4096 entries. Junction transit allowances and target poses are also
+computed once per DFS node, then reused by its candidate moves. Lattice target
+rotations use direct exact integer formulas instead of a repeated rotation loop.
+
+The cache is cleared in a `finally` block when traversal ends, including when a
+progress callback raises. This promptly releases its poses even if the recursive
+DFS closures have not yet been collected. Caches hold no layouts or sessions.
+
+All nine cases retain the same ordered solutions, node counts, pruning counters,
+preprocessing work, depth and stop reasons as `d6cbf01`. The largest cases show:
+
+| Case | Previous evaluations | New evaluations | Previous median | New median |
+| --- | ---: | ---: | ---: | ---: |
+| Mixed gap, broad inventory | 315,339 | 11,897 | 2.095 s | 1.440 s |
+| Switch, broad inventory | 196,709 | 21,922 | 1.249 s | 0.871 s |
+| Bridge, broad inventory | 4,772 | 398 | 46.8 ms | 39.6 ms |
+
+The two hardest cases take about 30% less time in this local three-run comparison;
+96% and 89% of their geometry queries are served from the cache. This does not
+increase the search or preprocessing budgets. Some small cases incur overhead:
+the long gap measured 31 ms versus 23 ms, while the half circle was 8 ms versus
+7 ms. Timings are observations rather than portable guarantees or assertions.
+
+Use `PYTHONPATH=src python benchmarks/completion.py --repeats 3` for median timings.
+The output includes `completion_checks` and `completion_cache_hits`. Regression
+tests in `tests/test_completion_reuse.py` require identical enumeration and search
+counters with caching disabled, bound the cache, verify all twelve rotations,
+and exercise successful cleanup, callback errors, and catalogue isolation.
