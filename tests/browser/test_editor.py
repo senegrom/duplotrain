@@ -399,7 +399,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
             "name": "offset-circle.json", "mimeType": "application/json",
             "buffer": json.dumps(layout_to_dict(forced_base)).encode(),
         })
-        expect(page.locator("#status")).to_contain_text("not exactly closed")
+        expect(page.locator("#status")).to_contain_text("2 open end(s). Forced fit: 5.000 mm")
         for pid, count, remaining in (("curve", "12", "6/"), ("straight", "4", "4/")):
             control = page.locator(f'[data-piece-id="{pid}"] input')
             control.fill(count)
