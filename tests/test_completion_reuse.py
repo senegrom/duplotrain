@@ -142,13 +142,14 @@ def test_direct_target_rotations_match_exact_lattice_arithmetic_on_every_basis()
 
 
 @pytest.mark.parametrize("interrupt", [False, True])
-def test_solver_releases_cached_poses_on_success_and_callback_failure(monkeypatch, interrupt):
+@pytest.mark.parametrize("slop", [0.0, 5.0])
+def test_solver_releases_cached_poses_on_success_and_callback_failure(monkeypatch, interrupt, slop):
     import duplotrain.solver as solver
 
     tables = []
 
-    def capture(*args):
-        table = _CompletionReachability(*args)
+    def capture(*args, **kwargs):
+        table = _CompletionReachability(*args, **kwargs)
         tables.append(table)
         return table
 
@@ -160,8 +161,9 @@ def test_solver_releases_cached_poses_on_success_and_callback_failure(monkeypatc
     base = build_chain([(catalog["straight"], 0, 1)] * 2 + [(catalog["curve"], 0, 1)] * 4)
     inventory = {"curve": 20, "straight": 6, "ramp": 2, "span": 2,
                  "switch": 2, "crossing": 1, "slope": 2}
-    config = SolverConfig(min_pieces=0, max_pieces=20, max_results=8, max_nodes=25_000,
-                          reversing_loops=True, progress=progress if interrupt else None)
+    config = SolverConfig(min_pieces=0, max_pieces=20, max_results=8, max_nodes=60_000,
+                          slop=slop, reversing_loops=True,
+                          progress=progress if interrupt else None)
     if interrupt:
         with pytest.raises(RuntimeError, match="cancelled by caller"):
             solve(inventory, catalog, config, base=base)
@@ -169,3 +171,4 @@ def test_solver_releases_cached_poses_on_success_and_callback_failure(monkeypatc
         assert len(solve(inventory, catalog, config, base=base).solutions) == 8
     assert len(tables) == 1 and tables[0].cache_hits > 0
     assert not tables[0].cache
+    assert not tables[0].near_indices

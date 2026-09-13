@@ -356,6 +356,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
             "buffer": json.dumps(layout_to_dict(bridge)).encode(),
         })
         expect(page.locator("#status")).to_contain_text("7 pieces")
+        page.locator("#slop").fill("1")
         page.locator("#solve").tap()
         candidate = page.locator(".cand").first
         expect(candidate).to_be_visible(timeout=30000)
@@ -387,6 +388,39 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         closed = export_layout()
         assert len(closed["placements"]) == 20 and len(closed["links"]) == 20
         assert closed["placements"][:6] == layout_to_dict(long_gap)["placements"]
+
+        # A connected imported base already has one forced joint. The new closing
+        # joint needs another 5 mm; preview/apply must keep both gaps visible.
+        from benchmarks.completion import cases
+
+        offset = next(case for case in cases(catalog) if case.name == "offset_circle_slop_5")
+        forced_base = offset.base.join((2, 1), (3, 0), force=True)
+        page.locator("#importfile").set_input_files({
+            "name": "offset-circle.json", "mimeType": "application/json",
+            "buffer": json.dumps(layout_to_dict(forced_base)).encode(),
+        })
+        expect(page.locator("#status")).to_contain_text("not exactly closed")
+        for pid, count, remaining in (("curve", "12", "6/"), ("straight", "4", "4/")):
+            control = page.locator(f'[data-piece-id="{pid}"] input')
+            control.fill(count)
+            control.press("Tab")
+            expect(page.locator(f'[data-piece-id="{pid}"] .count')).to_have_text(remaining)
+        page.locator("#slop").fill("5")
+        page.locator("#solve").tap()
+        expect(page.locator(".cand")).to_have_count(3, timeout=30000)
+        candidate = page.locator(".cand").first
+        expect(candidate).to_contain_text("forced 5")
+        candidate.get_by_role("button", name="Preview", exact=True).tap()
+        candidate.get_by_role("button", name="Apply").tap()
+        expect(page.locator("#status")).to_contain_text("Forced fit")
+        forced = export_layout()
+        assert len(forced["placements"]) == 12 and len(forced["links"]) == 12
+        assert forced["placements"][:6] == layout_to_dict(forced_base)["placements"]
+        from duplotrain.layout import layout_from_dict
+
+        issues = layout_from_dict(forced, default_catalog()).joint_issues()
+        assert len(issues) == 2
+        assert sum(joint["gap_mm"] for joint in issues) == pytest.approx(10)
         assert not errors
     finally:
         context.close()

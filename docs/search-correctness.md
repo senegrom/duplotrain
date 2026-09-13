@@ -94,8 +94,8 @@ cannot prune a branch while a future junction could supply another target. A
 regression pins a valid teardrop even when the selected original target is 100 m
 away; the previous endpoint-only bound incorrectly rejected it.
 
-All slop searches bypass the exact tables. Both projections share the same
-preprocessing budget, and a layer is published only when both are complete.
+Both projections share the same preprocessing budget, and a layer is published
+only when both are complete. Slop queries use the physical enclosures below.
 Partial layers never reject a candidate: a cap falls back to DFS without changing
 completeness or stop reasons. `completion_work` records the actual expansions.
 
@@ -123,7 +123,7 @@ The general field engine similarly uses rational forms on its exact coefficients
 including all four height coefficients. No floating tolerance enters these bounds.
 
 All routes, free-transit allowances and present/future targets use the same
-conservative rules as the short tables. Slop bypasses both checks. Both share the
+conservative rules as the short tables. Both share the
 existing `min(4096, max_nodes // 8)` preprocessing cap, and neither publishes an
 unfinished layer. Stable zero-motion envelopes are reused at every greater depth,
 so an empty move pool and a huge inventory cannot allocate endless identical
@@ -135,10 +135,51 @@ depth and total retained heading envelopes. Regressions in
 compare exhaustive results on both engines, exercise custom 15-degree curves and
 preprocessing exhaustion, and pin the two previously capped broad-inventory cases.
 
+## Slippage uses physical distances and one remaining budget
+
+A small physical displacement need not have small exact coefficients: large
+rational and radical terms can nearly cancel. Expanding the coefficient bounds
+by a number of millimetres would therefore discard valid forced fits. Slippage
+instead uses physical x/y projections, with eight directions bounding longer
+tails. Each direction is widened by its Euclidean norm times the remaining slop.
+Height coefficients and headings retain their exact constraints.
+
+Physical projections are enclosed by integer intervals at `10**9` units per mm.
+Integer square roots give rational lower/upper bounds on sqrt(2), sqrt(3) and
+sqrt(6). Multiplication by signed coefficients, outward division and interval
+addition preserve containment. An additional outward relative margin covers
+floating distance evaluation at large translated coordinates. Rounding can only
+increase the search space; these intervals never decide whether a solution is
+exact. The final joint checks and independent collision audit remain authoritative.
+
+Short layers retain their exact poses. A lazily built index groups their physical
+boxes by heading and sorts them by minimum x. Binary searches restrict candidate
+boxes; the minimum box-to-box Euclidean distance must fit the remaining budget.
+The maximum box width is included in the binary-search window, so overlapping or
+unusually wide intervals cannot be skipped. Indexes exist only for complete layers,
+with at most `(completion_lookahead + 1) * (completion_work + 1)` box entries.
+
+Every forced transit translates the remaining path without changing its heading
+or height. By the triangle inequality the accumulated displacement is at most
+the sum of those joint gaps. The bound therefore uses `slop - slack_used`, once
+for the entire tail, including the final joint. Rigid retargeting preserves that
+budget for existing and future reversing targets. Both geometry and future-target
+cache keys include the remaining budget, preventing an answer for one allowance
+from being reused for another. The indexes are cleared together with the query
+cache when a search finishes or its progress callback raises.
+
+`tests/test_completion_slippage.py` compares complete ordered solutions against
+lookahead-disabled searches on both engines, including 3-4-5 mm offset endpoints,
+1+2 mm intermediate/final gaps, forced reversing targets and large cancelling
+coefficients. Independent perturbed tails exercise the longer physical bounds.
+Additional cases cover 15° geometry, incomplete preprocessing, finite huge slop,
+cache limits and audited benchmark results. Browser coverage previews and applies
+a forced closure through the real Pyodide worker under the production CSP.
+
 ## Reused geometric proofs are independent of search state
 
 The completion cache keys contain the full exact cursor pose, including height
-and heading, and the remaining traversal bound. The anchor and move pool are
+and heading, the remaining traversal bound, and any remaining slop. The anchor and move pool are
 fixed within one solve. Published reachability layers never change, so both
 positive and negative answers from complete layers can be reused. A permissive
 answer from an unfinished layer also remains valid: the next layer already
@@ -147,8 +188,7 @@ exceeds the remaining preprocessing budget, which can only decrease.
 Geometric cache entries contain no stock, free ports, collision decisions or candidate layouts.
 Each DFS node computes its current transit allowances and reversing targets once;
 its child visits compute their own values after consuming stock and ports. The
-parent's values remain valid when backtracking restores its state. Slop searches
-continue to bypass these exact checks.
+parent's values remain valid when backtracking restores its state.
 
 The 4096-entry LRU belongs to one solve and is explicitly emptied on normal return
 or a traversal exception. This avoids retaining its poses through the recursive

@@ -51,12 +51,13 @@ def test_six_step_lookahead_reduces_long_gap_work_again():
 
 @pytest.mark.parametrize("engine", ["lattice", "field"])
 @pytest.mark.parametrize("branch", [1, 2])
-def test_retargeting_preserves_every_reversing_completion(engine, branch):
+@pytest.mark.parametrize("slop", [0.0, 5.0])
+def test_retargeting_preserves_every_reversing_completion(engine, branch, slop):
     catalog = default_catalog()
     base = build_chain([(catalog["switch"], 0, branch)],
                        start=Pose.make(x=317, y=-290, z=77, heading=4))
     cfg = SolverConfig(min_pieces=0, max_results=1000, max_nodes=100_000,
-                       engine=engine, reversing_loops=True)
+                       engine=engine, reversing_loops=True, slop=slop)
     options = dict(base=base, grow_from=(0, branch), close_onto=(0, 0))
     reference = solve({"curve": 12}, catalog, replace(cfg, completion_lookahead=0), **options)
     improved = solve({"curve": 12}, catalog, cfg, **options)
@@ -68,7 +69,8 @@ def test_retargeting_preserves_every_reversing_completion(engine, branch):
 
 
 @pytest.mark.parametrize("engine", ["lattice", "field"])
-def test_future_switch_can_close_even_when_original_target_is_unreachable(engine):
+@pytest.mark.parametrize("slop", [0.0, 5.0])
+def test_future_switch_can_close_even_when_original_target_is_unreachable(engine, slop):
     catalog = default_catalog()
     base = build_chain([(catalog["curve"], 0, 1)])
     base, far = base.with_piece(catalog["straight"], Pose.make(x=100_000))
@@ -83,7 +85,7 @@ def test_future_switch_can_close_even_when_original_target_is_unreachable(engine
     assert not _solution_overlaps(witness, len(base), 120, 8)
 
     cfg = SolverConfig(min_pieces=0, engine=engine, max_nodes=100_000,
-                       max_results=1000, reversing_loops=True)
+                       max_results=1000, reversing_loops=True, slop=slop)
     result = solve({"curve": 11, "switch": 1}, catalog, cfg,
                    base=base, grow_from=(0, 1), close_onto=(far, 0))
     assert result.stats.complete

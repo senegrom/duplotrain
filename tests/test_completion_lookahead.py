@@ -58,7 +58,7 @@ def test_incomplete_reverse_layer_falls_back_to_full_search(monkeypatch):
 
     original = solver._CompletionReachability
     monkeypatch.setattr(solver, "_CompletionReachability",
-                        lambda eng, horizon, max_work: original(eng, horizon, 1))
+                        lambda eng, horizon, max_work, **kw: original(eng, horizon, 1, **kw))
     catalog = default_catalog()
     base = build_chain([(catalog["curve"], 0, 1)] * 6)
     cfg = SolverConfig(min_pieces=0)
@@ -97,7 +97,7 @@ def test_exact_lookahead_does_not_discard_forced_fits(engine):
     assert fast.stats.complete and signatures(fast) == signatures(plain)
     assert len(fast.solutions) == 1
     assert fast.solutions[0].gap == 1 and not fast.solutions[0].exact
-    assert fast.stats.completion_states == 0
+    assert fast.stats.completion_states > 0
 
 
 def test_editor_can_apply_a_completion_from_the_improved_search():
