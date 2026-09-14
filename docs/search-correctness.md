@@ -316,3 +316,19 @@ serialization round trips and undo.
 These contracts are exercised by `tests/test_review_round3.py`,
 `tests/test_stone_encounters.py`, `tests/test_stone_positions.py` and
 `tests/web/stone-selection.test.cjs`, including the HTTP and Pyodide dispatcher.
+
+## Deferred collision binning keeps the sampled model
+
+A placement's centreline samples are binned into the collision grid only when a
+later candidate's bounding box comes within the interaction limit of its box. The
+box test is conservative in the model's own terms: two samples can only overlap
+when their planar distance is below `half_width + half_width - TOUCH_MARGIN`
+and their height difference is below the clearance, and a candidate whose box is
+that far from a placement's box in `x`, in `y`, or in height has no such pair.
+Underpass rules only exempt further pairs. Whenever the boxes do come within
+reach, every deferred placement in reach is binned before the unchanged point
+test runs, so the grid the test sees contains every placement that could matter.
+Backtracking removes a placement's cell entries by placement rather than by
+stack position, because a late-binned placement may sit below a newer one in a
+shared cell. The final overlap audit of every returned layout is unchanged and
+still bins eagerly.

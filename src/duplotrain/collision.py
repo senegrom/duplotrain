@@ -53,6 +53,18 @@ UNDERPASS_MIN = 42.0
 _Point = tuple[float, float, float]
 _Cell = tuple[int, int]
 _GroupedPoints = tuple[tuple[_Cell, list[_Point]], ...]
+#: (xmin, xmax, ymin, ymax, zmin, zmax) of one placement's samples.
+_Bounds = tuple[float, float, float, float, float, float]
+
+
+def bounds_of(points: list[_Point], offset: _Point | None = None) -> _Bounds:
+    """Axis-aligned bounds of *points*, translated by *offset* if given."""
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    zs = [p[2] for p in points]
+    ox, oy, oz = offset if offset is not None else (0.0, 0.0, 0.0)
+    # Translating every point by the same offset translates the extremes exactly.
+    return (ox + min(xs), ox + max(xs), oy + min(ys), oy + max(ys), oz + min(zs), oz + max(zs))
 
 
 @dataclass(slots=True)
@@ -74,6 +86,10 @@ class _Cloud:
     cells: tuple[_Cell, ...]
     underpass: bool = False
     previous_max_half_width: float = 0.0
+    bounds: _Bounds | None = None
+    #: ``(local points, offset)`` of a placement not yet binned into the grid. A
+    #: piece is only binned once a query's bounds come within reach of it.
+    deferred: tuple[list[_Point], _Point] | None = None
 
 
 @dataclass
@@ -194,14 +210,18 @@ class CollisionField:
         grouped: _GroupedPoints,
         half_width: float,
         underpass: bool = False,
+        bounds: _Bounds | None = None,
     ) -> None:
         """Insert samples already grouped by grid cell."""
+        if bounds is None:
+            bounds = bounds_of([p for _key, pts in grouped for p in pts])
         cloud = _Cloud(
             placement,
             half_width,
             tuple(key for key, _points in grouped),
             underpass,
             self._max_half_width,
+            bounds,
         )
         self._clouds.append(cloud)
         self._max_half_width = max(self._max_half_width, half_width)
@@ -210,6 +230,67 @@ class CollisionField:
             grid.setdefault(key, []).append(
                 _CellCloud(placement, half_width, cell_points, underpass)
             )
+
+    def add_deferred(
+        self,
+        placement: int,
+        points: list[_Point],
+        offset: _Point,
+        half_width: float,
+        bounds: _Bounds,
+        underpass: bool = False,
+    ) -> None:
+        """Record a placement whose samples are binned only when a query needs them.
+
+        *bounds* must enclose ``points`` translated by *offset*. Until some query's
+        bounds come within reach, the placement costs no translation or binning.
+        """
+        self._clouds.append(_Cloud(
+            placement, half_width, (), underpass, self._max_half_width, bounds,
+            (points, offset),
+        ))
+        self._max_half_width = max(self._max_half_width, half_width)
+
+    def _bin_deferred(self, cloud: _Cloud) -> None:
+        points, offset = cloud.deferred  # type: ignore[misc]
+        grouped = self._prepare(points, offset=offset)
+        cloud.cells = tuple(key for key, _points in grouped)
+        cloud.deferred = None
+        grid = self._grid
+        for key, cell_points in grouped:
+            grid.setdefault(key, []).append(
+                _CellCloud(cloud.placement, cloud.half_width, cell_points, cloud.underpass)
+            )
+
+    def near(self, bounds: _Bounds, half_width: float, ignore: set[int]) -> bool:
+        """Could samples inside *bounds* overlap any placement not in *ignore*?
+
+        False proves no sample pair can come within the interaction limit: the
+        boxes are at least that far apart in x or in y, or their heights differ
+        by the blanket clearance everywhere. True bins every deferred placement
+        within reach, so a following point test sees all of them in the grid.
+        """
+        xmin, xmax, ymin, ymax, zmin, zmax = bounds
+        clearance = self.clearance
+        near = False
+        for cloud in self._clouds:
+            if cloud.placement in ignore:
+                continue
+            b = cloud.bounds
+            limit = half_width + cloud.half_width - TOUCH_MARGIN
+            if (
+                xmin - b[1] >= limit
+                or b[0] - xmax >= limit
+                or ymin - b[3] >= limit
+                or b[2] - ymax >= limit
+                or zmin - b[5] >= clearance
+                or b[4] - zmax >= clearance
+            ):
+                continue
+            if cloud.deferred is not None:
+                self._bin_deferred(cloud)
+            near = True
+        return near
 
     def add(
         self,
@@ -225,16 +306,20 @@ class CollisionField:
     def pop(self) -> None:
         """Remove the most recently added placement (backtracking)."""
         cloud = self._clouds.pop()
-        # Each placement contributes one grouped suffix per occupied cell. LIFO
-        # backtracking therefore removes one cell-cloud at a time, independent of
-        # how many centreline samples happened to land in that cell.
+        # Each placement contributes one cell-cloud per occupied cell. A deferred
+        # placement binned late may sit below a newer one in a shared bucket, so
+        # remove by placement rather than assuming it is last.
         self._max_half_width = cloud.previous_max_half_width
+        if cloud.deferred is not None:
+            return
         grid = self._grid
+        placement = cloud.placement
         for key in cloud.cells:
             bucket = grid[key]
-            if bucket[-1].placement != cloud.placement:
-                raise RuntimeError("collision field must be popped in LIFO order")
-            bucket.pop()
+            if bucket[-1].placement == placement:
+                bucket.pop()
+            else:
+                bucket[:] = [c for c in bucket if c.placement != placement]
             if not bucket:
                 del grid[key]
 

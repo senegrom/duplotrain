@@ -302,3 +302,41 @@ backtracking and later free transits.
 PYTHONPATH=src python benchmarks/completion.py --case mixed_full_slop_1 --case mixed_full_slop_5 --repeats 3
 PYTHONPATH=src python benchmarks/completion.py --case turn_transit --case turn_transit_slop_4.9 --case turn_transit_slop_5
 ```
+
+## Deferred collision binning and cheaper candidate scoring
+
+Profiling the two broad-inventory cases showed a quarter of the time in the
+collision pipeline, almost all of it confirming that a candidate touches nothing:
+only 3 % of point tests found an overlap. Every accepted placement was translated
+and binned into the grid, and every candidate was tested against it, even though
+a piece two joints back is already out of reach.
+
+Placements are now stored with their sample bounds and binned lazily. A candidate
+first compares its own bounds against every placement it may not ignore; when the
+boxes are at least the interaction limit apart in `x` or `y`, or separated in
+height by the blanket clearance, no sample pair can overlap and the point test is
+skipped. Only placements whose boxes come within reach are binned, at most once.
+The sampled model, its spacing, clearance and underpass rules are unchanged: the
+box test can only say "no overlap is possible", never "overlap".
+
+The candidate loop also converts each child pose to floats once, scores it
+against the anchor and every open stub in one engine call, sorts without a key
+function, computes the per-node tail allowances once instead of per candidate,
+and memoises the transit bound of each junction port set.
+
+Three-run local medians on Python 3.14 against `765ce29`, 25,000-node budget,
+identical node counts, result fingerprints and pruning counters on all 30 cases:
+
+| Case | Before | After |
+| --- | ---: | ---: |
+| Mixed gap, broad inventory, exact | 1.313 s | 1.119 s |
+| Mixed gap, broad inventory, 1 mm | 2.834 s | 1.640 s |
+| Switch, broad inventory, exact | 1.212 s | 0.598 s |
+| Switch, broad inventory, 5 mm | 2.544 s | 1.646 s |
+| Bridge, broad inventory, exact | 54 ms | 30 ms |
+| Whole suite | 13.67 s | 8.66 s |
+
+`tests/test_performance_contracts.py` pins the contract: samples are prepared
+once per point test, once per deferred placement a later query reaches and once
+per base piece, and a successful point test hands its grouped samples straight to
+the field.

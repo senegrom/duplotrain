@@ -37,7 +37,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 
-from .collision import DEFAULT_CLEARANCE, CollisionField
+from .collision import DEFAULT_CLEARANCE, CollisionField, bounds_of
 from .exact import Alg
 from .geometry import HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .lattice import ROT_COS_SIN, LatticePoint, LatticePose, from_alg_xy, z_from_alg
@@ -346,6 +346,19 @@ class _FieldEngine:
         gap = (cursor.heading - stub_pose.heading - HEADING_STEPS // 2) % HEADING_STEPS
         return min(gap, HEADING_STEPS - gap)
 
+    @staticmethod
+    def stub_refs(stubs: list) -> tuple:
+        return tuple(pose for _index, _port, pose in stubs)
+
+    def candidate_score(self, child: Pose, stub_refs: tuple) -> float:
+        """Move-ordering score: distance plus turn penalty to the nearest target."""
+        score = self.heur_dist(child) + 64.0 * self.need_turn24(child)
+        for stub_pose in stub_refs:
+            score = min(
+                score, self.dist(child, stub_pose) + 64.0 * self.stub_need24(child, stub_pose)
+            )
+        return score
+
 
 _SQRT3 = math.sqrt(3.0)
 
@@ -498,6 +511,29 @@ class _LatticeEngine:
     def stub_need24(self, cursor: tuple, stub_pose: tuple) -> int:
         gap = (cursor[5] - stub_pose[5] - 6) % 12
         return 2 * min(gap, 12 - gap)
+
+    @staticmethod
+    def stub_refs(stubs: list) -> tuple:
+        # Float positions and headings of the open stubs, converted once per node.
+        return tuple((*_flat_xy(pose), pose[5]) for _index, _port, pose in stubs)
+
+    def candidate_score(self, child: tuple, stub_refs: tuple) -> float:
+        """Move-ordering score, identical to heur_dist/dist/need_turn24 arithmetic
+        but converting the child pose to floats once per candidate."""
+        a, b, c, d, z, h = child
+        x = (a + (b * _SQRT3 + c) / 2.0) / 20.0
+        y = (d + (c * _SQRT3 + b) / 2.0) / 20.0
+        anchor = self.anchor
+        ax, ay = self._approach
+        gap = (h - anchor[5]) % 12
+        score = (
+            math.hypot(x - ax, y - ay) + 0.125 * abs(z - anchor[4])
+            + 64.0 * (2 * min(gap, 12 - gap))
+        )
+        for sx, sy, sh in stub_refs:
+            gap = (h - sh - 6) % 12
+            score = min(score, math.hypot(x - sx, y - sy) + 64.0 * (2 * min(gap, 12 - gap)))
+        return score
 
 
 def _compile_lattice(
@@ -1271,21 +1307,13 @@ def solve(
     # Collision samples, precomputed per (piece, entry, frame rotation): the world
     # frame of a placement only ever differs by one of finitely many rotations plus a
     # translation, so the trig happens once here and the hot loop just adds offsets.
-    sample_cache: dict[tuple[str, int, int], list[tuple[float, float, float]]] = {}
+    sample_cache: dict[tuple[str, int, int], tuple[list[tuple[float, float, float]], tuple]] = {}
 
-    def placement_groups(
-        pid: str,
-        entry: int,
-        hkey: int,
-        cos_t: float,
-        sin_t: float,
-        fx: float,
-        fy: float,
-        fz: float,
-    ):
+    def placement_samples(pid: str, entry: int, hkey: int, cos_t: float, sin_t: float):
+        """Rotated local samples and their bounds; the hot loop only adds offsets."""
         key = (pid, entry, hkey)
-        base_pts = sample_cache.get(key)
-        if base_pts is None:
+        cached = sample_cache.get(key)
+        if cached is None:
             piece = pieces[pid]
             base_pts = []
             for line in piece.all_centrelines(cfg.collision_spacing):
@@ -1293,8 +1321,9 @@ def solve(
                     base_pts.append(
                         (cos_t * lx - sin_t * ly, sin_t * lx + cos_t * ly, lz)
                     )
-            sample_cache[key] = base_pts
-        return field._prepare(base_pts, offset=(fx, fy, fz))
+            cached = (base_pts, bounds_of(base_pts))
+            sample_cache[key] = cached
+        return cached
 
     stats = SolveStats()
     field = CollisionField(clearance=cfg.clearance)
@@ -1361,16 +1390,22 @@ def solve(
         for pid in piece_ids
     }
 
+    transit_bounds: dict[tuple[str, frozenset[int]], int] = {}
+
     def transit_bound(piece: PieceType, ports: set[int]) -> int:
         # Only ports with an available route partner can participate in a transit.
         # Each transit consumes two ports; this is an upper bound even when routes
         # share a stem. In particular, separate switches' lone stubs cannot pair.
-        eligible_ports = {
-            port for route in piece.routes
-            if route.port_a in ports and route.port_b in ports
-            for port in (route.port_a, route.port_b)
-        }
-        return len(eligible_ports) // 2
+        key = (piece.id, frozenset(ports))
+        bound = transit_bounds.get(key)
+        if bound is None:
+            eligible_ports = {
+                port for route in piece.routes
+                if route.port_a in ports and route.port_b in ports
+                for port in (route.port_a, route.port_b)
+            }
+            bound = transit_bounds[key] = len(eligible_ports) // 2
+        return bound
 
     future_transits: dict[str, int] = {}
     reversing_queries: dict[str, tuple] = {}
@@ -1471,32 +1506,43 @@ def solve(
         return (transits, capacity, future, targets, future_targets,
                 transit_turns, max_turn, max_free_turn, future_turns)
 
-    def tail_possible(cursor, used: int, context, slack: float | None,
+    def tail_budget(context, used: int) -> tuple:
+        """The allowances every query with this many pieces used shares."""
+        (transits, capacity, future, _targets, _future_targets,
+         transit_turns, max_turn, max_free_turn, future_turns) = context
+        slots = min(total_pieces, depth_limit, f_limit) - used
+        transits += min(slots * capacity, future)
+        transit_turns += min(slots * max_free_turn, future_turns)
+        # A free crossing traversal advances the path but cannot turn it. Keep
+        # its actual turning capacity separate from the relaxed traversal count.
+        return (slots, slots + transits, transit_turns,
+                min(slots * max_turn, remaining_turn))
+
+    def tail_possible(cursor, budget, context, slack: float | None,
                       extra_pid: str | None = None) -> bool:
         if completion is None:
             return True
-        slots = min(total_pieces, depth_limit, f_limit) - used
         if extra_pid and cfg.reversing_loops and stub_capacity[extra_pid]:
             # Its new targets need the placement frame. The recursive visit checks
             # them after placement, with its own updated context.
             return True
-        (transits, capacity, future, targets, future_targets,
-         transit_turns, max_turn, max_free_turn, future_turns) = context
+        slots, traversals, transit_turns, base_turns = budget
         if extra_pid:
-            transits += future_transits[extra_pid]
-            transit_turns += future_transits[extra_pid] * turn_of[extra_pid]
-        transits += min(slots * capacity, future)
-        transit_turns += min(slots * max_free_turn, future_turns)
-        traversals = slots + transits
-        # A free crossing traversal advances the path but cannot turn it. Keep
-        # its actual turning capacity separate from the relaxed traversal count.
-        turns = min(slots * max_turn, remaining_turn) + transit_turns
-        if eng.need_turn24(cursor) <= turns and completion.allows(cursor, traversals, slack):
+            free = future_transits[extra_pid]
+            if free:
+                traversals += free
+                transit_turns += free * turn_of[extra_pid]
+        turns = base_turns + transit_turns
+        allows = completion.allows
+        need_turn24 = eng.need_turn24
+        if need_turn24(cursor) <= turns and allows(cursor, traversals, slack):
             return True
         if cfg.reversing_loops:
+            targets, future_targets, max_turn = context[3], context[4], context[6]
+            retarget = eng.retarget
             for target in targets:
-                query = eng.retarget(cursor, target)
-                if eng.need_turn24(query) <= turns and completion.allows(query, traversals, slack):
+                query = retarget(cursor, target)
+                if need_turn24(query) <= turns and allows(query, traversals, slack):
                     return True
             if slots:
                 # A future reversing target is created by one placement. Whatever
@@ -1511,8 +1557,8 @@ def solve(
                     key = (pid, traversals - 1, tail_turns, slack)
                     possible = future_closure.get(key)
                     if possible is None:
-                        possible = any(eng.need_turn24(query) <= tail_turns
-                                       and completion.allows(query, traversals - 1, slack)
+                        possible = any(need_turn24(query) <= tail_turns
+                                       and allows(query, traversals - 1, slack)
                                        for query in reversing_queries[pid])
                         if len(future_closure) < 4096:
                             future_closure[key] = possible
@@ -1647,7 +1693,9 @@ def solve(
 
         context = tail_context() if completion is not None else None
         query_slack = slack_left if cfg.slop > 0 else None
-        if not tail_possible(cursor, used, context, query_slack):
+        if completion is not None and not tail_possible(
+            cursor, tail_budget(context, used), context, query_slack
+        ):
             stats.pruned_completion += 1
             return True
 
@@ -1706,41 +1754,45 @@ def solve(
         # -- place a new piece -----------------------------------------------------
         if used >= min(depth_limit, f_limit):
             return True
-        candidates: list[tuple[float, str, int, int, object]] = []
+        candidates: list[tuple[float, int, str, int, int, object]] = []
         cursor_overhangs = (
             prev_index is not None and overhang_of[placements[prev_index][0]] > 0
         )
+        stub_refs = eng.stub_refs(stubs) if cfg.reversing_loops and stubs else ()
+        candidate_score = eng.candidate_score
         for pid in piece_ids:
             if counts[pid] == 0:
                 continue
             if cursor_overhangs and overhang_of[pid] > 0:
                 continue  # the joint would stack two overhanging plates
+            rank = piece_rank[pid]
             for entry, exit_port, apply_move in eng.moves[pid]:
                 child = apply_move(cursor)
-                heuristic = eng.heur_dist(child) + 64.0 * eng.need_turn24(child)
-                if cfg.reversing_loops:
-                    for _pidx, _port, stub_pose in stubs:
-                        heuristic = min(
-                            heuristic,
-                            eng.dist(child, stub_pose)
-                            + 64.0 * eng.stub_need24(child, stub_pose),
-                        )
-                candidates.append((heuristic, piece_rank[pid], pid, entry, exit_port, child))
+                candidates.append(
+                    (candidate_score(child, stub_refs), rank, pid, entry, exit_port, child)
+                )
         # Try homeward moves first: irrelevant to completeness, decisive for how fast
-        # the obvious completion of a small gap is found.
-        candidates.sort(key=lambda c: (c[0], c[1], c[2], c[3], c[4]))
+        # the obvious completion of a small gap is found. (pid, entry, exit) is
+        # unique per candidate, so the sort never has to compare the poses.
+        candidates.sort()
+        child_budget = tail_budget(context, used + 1) if completion is not None else None
         for _heuristic, _prio, pid, entry, exit_port, next_cursor in candidates:
             # Reject an impossible endpoint before sampling collision geometry or
             # spending a DFS node. Leaving this piece in counts only enlarges the
             # reachability bound, so this early check remains conservative.
-            if not tail_possible(next_cursor, used + 1, context, query_slack, pid):
+            if completion is not None and not tail_possible(
+                next_cursor, child_budget, context, query_slack, pid
+            ):
                 stats.pruned_completion += 1
                 continue
             piece = pieces[pid]
             frame = eng.frame(pid, entry, cursor)
             hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
-            grouped_pts = placement_groups(
-                pid, entry, hkey, cos_t, sin_t, fx, fy, fz
+            base_pts, local_bounds = placement_samples(pid, entry, hkey, cos_t, sin_t)
+            bounds = (
+                local_bounds[0] + fx, local_bounds[1] + fx,
+                local_bounds[2] + fy, local_bounds[3] + fy,
+                local_bounds[4] + fz, local_bounds[5] + fz,
             )
             index = len(placements)
             ignore = {prev_index} if prev_index is not None else set()
@@ -1769,19 +1821,31 @@ def solve(
                     cfg.slop > 0.0 and eng.near_pose(pose, stub_pose, slack_left) is not None
                 ) for pose in free_poses):
                     ignore.add(stub_index)
-            if field._clashes_prepared(
-                grouped_pts, piece.width / 2.0, ignore, underpass=piece.underpass
-            ):
-                stats.pruned_collision += 1
-                continue
+            half_width = piece.width / 2.0
+            offset = (fx, fy, fz)
+            # Bin and test sample points only when some placement's bounds come
+            # within reach; a piece laid clear of everything is deferred as-is.
+            grouped_pts = None
+            if field.near(bounds, half_width, ignore):
+                grouped_pts = field._prepare(base_pts, offset=offset)
+                if field._clashes_prepared(
+                    grouped_pts, half_width, ignore, underpass=piece.underpass
+                ):
+                    stats.pruned_collision += 1
+                    continue
 
             counts[pid] -= 1
             remaining_span -= span_of[pid]
             remaining_turn -= turn_of[pid]
             placements.append((pid, frame))
-            field._add_prepared(
-                index, grouped_pts, piece.width / 2.0, underpass=piece.underpass
-            )
+            if grouped_pts is None:
+                field.add_deferred(
+                    index, base_pts, offset, half_width, bounds, underpass=piece.underpass
+                )
+            else:
+                field._add_prepared(
+                    index, grouped_pts, half_width, underpass=piece.underpass, bounds=bounds
+                )
             new_stubs = 0
             if piece.is_junction:
                 for port_index in range(len(piece.ports)):

@@ -273,35 +273,67 @@ def test_collision_groups_points_per_cell_and_reuses_query_neighbourhood():
     assert field._grid.gets == 9
 
 
-def test_solver_reuses_the_same_prepared_collision_groups(monkeypatch):
-    prepared_for_add = None
-    checked = added = 0
-    original_clashes = CollisionField._clashes_prepared
-    original_add = CollisionField._add_prepared
+def test_solver_bins_collision_samples_only_for_placements_within_reach(monkeypatch):
+    from collections import defaultdict
+
+    from duplotrain import build_chain
+
+    events = defaultdict(list)  # per field: what the solver asked of it, in order
+    originals = {name: getattr(CollisionField, name) for name in (
+        "_prepare", "_clashes_prepared", "_add_prepared", "add_deferred", "_bin_deferred",
+    )}
+
+    def measured_prepare(field, points, *, offset=None):
+        events[id(field)].append(("prepare",))
+        return originals["_prepare"](field, points, offset=offset)
 
     def measured_clashes(field, grouped, half_width, ignore, underpass=False):
-        nonlocal prepared_for_add, checked
-        checked += 1
-        hit = original_clashes(field, grouped, half_width, ignore, underpass)
-        prepared_for_add = None if hit else grouped
+        hit = originals["_clashes_prepared"](field, grouped, half_width, ignore, underpass)
+        events[id(field)].append(("check", id(grouped), hit))
         return hit
 
-    def measured_add(field, placement, grouped, half_width, underpass=False):
-        nonlocal prepared_for_add, added
-        assert grouped is prepared_for_add
-        added += 1
-        return original_add(field, placement, grouped, half_width, underpass)
+    def measured_add(field, placement, grouped, half_width, underpass=False, bounds=None):
+        events[id(field)].append(("add", id(grouped)))
+        return originals["_add_prepared"](field, placement, grouped, half_width, underpass, bounds)
 
+    def measured_defer(field, *args, **kwargs):
+        events[id(field)].append(("defer",))
+        return originals["add_deferred"](field, *args, **kwargs)
+
+    def measured_bin(field, cloud):
+        events[id(field)].append(("bin",))
+        return originals["_bin_deferred"](field, cloud)
+
+    monkeypatch.setattr(CollisionField, "_prepare", measured_prepare)
     monkeypatch.setattr(CollisionField, "_clashes_prepared", measured_clashes)
     monkeypatch.setattr(CollisionField, "_add_prepared", measured_add)
+    monkeypatch.setattr(CollisionField, "add_deferred", measured_defer)
+    monkeypatch.setattr(CollisionField, "_bin_deferred", measured_bin)
     catalog = default_catalog()
-    solve(
-        {"curve": 4, "straight": 2},
-        catalog,
-        SolverConfig(max_nodes=80, max_results=2),
-    )
-    assert checked > 0
-    assert added > 0
+    # A bridge gap: the deck and ramps bring some candidates within reach of
+    # track that is not their own neighbour, most candidates stay clear of it.
+    base = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
+    result = solve({"curve": 6, "straight": 4, "ramp": 1, "span": 2}, catalog,
+                   SolverConfig(min_pieces=0, max_pieces=20, max_results=8), base=base)
+    assert len(result.solutions) == 8
+    # The search field is the only one that defers placements (audits add eagerly).
+    (log,) = [log for log in events.values() if ("defer",) in log]
+    kinds = [event[0] for event in log]
+    checked, added, deferred, binned = (kinds.count(k) for k in ("check", "add", "defer", "bin"))
+    # The base pieces are added eagerly before the search starts.
+    assert kinds[:2 * len(base)] == ["prepare", "add"] * len(base)
+    added -= len(base)
+    assert checked > 0 and added > 0 and deferred > added
+    # Every accepted candidate is one DFS node, give or take the root re-entered
+    # by each IDA* contour and a child cut short by the result limit.
+    assert abs(added + deferred - result.stats.nodes) <= result.stats.max_pieces_searched + 1
+    # Samples are translated and binned once per point test, once per deferred
+    # placement a later query reached, and once per base piece; never otherwise.
+    assert kinds.count("prepare") == checked + binned + len(base)
+    # A successful point test hands its grouped samples straight to the field.
+    for i, event in enumerate(log[2 * len(base):], start=2 * len(base)):
+        if event[0] == "add":
+            assert log[i - 1] == ("check", event[1], False)
 
 
 def test_state_reuses_each_exact_port_transform_once(monkeypatch):
