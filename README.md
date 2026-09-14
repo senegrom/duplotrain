@@ -345,7 +345,9 @@ can reach a closing target. Short tails use exact planar-pose and height tables.
 Longer tails use exact linear bounds on coordinates, diagonals and height for
 each arrival heading, avoiding enumeration of every possible position.
 Existing junction ports and targets created by future junctions are included;
-free transits require two compatible ports on the same piece. Impossible tails
+free transits require two compatible ports on the same piece. A separate turn
+bound limits what the remaining stock and free routes can contribute: a crossing
+can advance the path without granting it another curve's turn. Impossible tails
 are rejected before collision sampling. `SolverConfig.completion_lookahead`
 defaults to 6 for the short table (0 disables both checks); both checks share at
 most 4096 move expansions and one eighth of `max_nodes`. Partial tables fall back
@@ -359,8 +361,10 @@ Repeated geometry queries use a per-search cache capped at 4096 entries;
 reused queries. The full geometry and height must agree on an actual route, and
 the independent collision audit still checks every returned candidate. Reproduce
 the measurements with `PYTHONPATH=src python benchmarks/completion.py --repeats 3`.
-Use `--suite slippage` for 18 cases covering offset ends, bridges, reversing targets,
-intermediate joint gaps and custom 15° pieces. `--case NAME` selects individual
+The benchmark has 30 cases; use `--suite slippage` for 20 covering offset ends,
+bridges, reversing targets, intermediate joint gaps and custom 15° pieces.
+Broad mixed inventory now finds eight closures within 25,000 nodes at both 1 and
+5 mm slop. `--case NAME` selects individual
 cases; `--lookahead 0` runs the unpruned reference. Each JSON row includes the
 gap budget, engine, result fingerprint, forced-fit gaps, stop reason and median time.
 

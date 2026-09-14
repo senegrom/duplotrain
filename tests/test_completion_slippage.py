@@ -46,6 +46,7 @@ def engine_for(catalog, engine, anchor=ORIGIN):
 @pytest.mark.parametrize("name", [
     "half_circle_slop_1", "offset_circle_slop_4.9", "offset_circle_slop_5",
     "offset_circle_slop_10", "transit_slop_2.9", "transit_slop_3",
+    "turn_transit_slop_4.9", "turn_transit_slop_5",
 ])
 def test_exhaustive_slippage_results_match_unpruned_search(inputs, engine, name):
     catalog, examples = inputs
@@ -72,7 +73,11 @@ def test_exhaustive_slippage_results_match_unpruned_search(inputs, engine, name)
         solution = improved.solutions[0]
         assert solution.gap == 3 and not solution.exact
         assert sorted(j["gap_mm"] for j in solution.layout.joint_issues()) == [1, 2]
-    elif name in ("transit_slop_2.9", "offset_circle_slop_4.9"):
+    elif name == "turn_transit_slop_5":
+        assert len(improved.solutions) == 1
+        assert not improved.solutions[0].exact
+        assert improved.solutions[0].gap == pytest.approx(5)
+    elif name in ("transit_slop_2.9", "offset_circle_slop_4.9", "turn_transit_slop_4.9"):
         assert not improved.solutions
 
 
@@ -90,6 +95,7 @@ def test_fractional_fifteen_degree_slippage_retains_its_completion(inputs):
 @pytest.mark.parametrize("name", [
     "bridge_full_slop_1", "switch_full_slop_5", "long_gap_slop_5",
     "offset_full_slop_5", "offset_long_slop_5",
+    "mixed_full", "mixed_full_slop_1", "mixed_full_slop_5",
 ])
 def test_slippage_benchmarks_find_more_audited_results_with_same_budget(inputs, name):
     catalog, examples = inputs

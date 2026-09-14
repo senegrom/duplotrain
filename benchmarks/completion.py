@@ -102,6 +102,21 @@ def cases(catalog):
                            ends=dict(grow_from=(left, 1), close_onto=(right, 0)),
                            suite="slippage"))
 
+    # No turning stock remains: the existing switch supplies the required 30°.
+    # Offset only the final joint, retaining exact heading and height.
+    base, junction = Layout().with_piece(catalog["switch"], ORIGIN)
+    base, left = base.attach(catalog["straight"], 1, (junction, 0))
+    end = base.pose_of((junction, 1))
+    for slop in (0.0, 4.9, 5.0):
+        target = Pose(end.x + (3 if slop else 0), end.y + (4 if slop else 0),
+                      end.z, end.heading)
+        positioned, right = base.with_piece(catalog["straight"],
+                                            catalog["straight"].frame_for(0, target))
+        name = f"turn_transit_slop_{slop:g}" if slop else "turn_transit"
+        result.append(Case(name, Layout(positioned.placements, {}), {}, slop=slop,
+                           ends=dict(grow_from=(left, 1), close_onto=(right, 0)),
+                           suite="slippage" if slop else "exact"))
+
     catalog["fine"] = parse_piece({"id": "fine", "paths": [{"segments": [
         {"type": "arc", "radius": "1537/3", "degrees": 15},
     ]}]})
