@@ -1443,17 +1443,33 @@ def solve(
         free_by_placement: dict[int, set[int]] = {}
         for index, port, _pose in stubs:
             free_by_placement.setdefault(index, set()).add(port)
-        transits = sum(
-            transit_bound(piece_obj[placements[index][0]], ports)
-            for index, ports in free_by_placement.items()
-        )
-        available = [pid for pid in piece_ids if counts[pid]]
-        capacity = max((future_transits[pid] for pid in available), default=0)
-        future = sum(counts[pid] * future_transits[pid] for pid in available)
+        transits = transit_turns = 0
+        for index, ports in free_by_placement.items():
+            if len(ports) < 2:
+                continue
+            pid = placements[index][0]
+            count = transit_bound(piece_obj[pid], ports)
+            transits += count
+            transit_turns += count * turn_of[pid]
+        capacity = future = max_turn = max_free_turn = future_turns = 0
+        future_targets = []
+        for pid in piece_ids:
+            count = counts[pid]
+            if not count:
+                continue
+            free = future_transits[pid]
+            turn = turn_of[pid]
+            capacity = max(capacity, free)
+            future += count * free
+            max_turn = max(max_turn, turn)
+            max_free_turn = max(max_free_turn, free * turn)
+            future_turns += count * free * turn
+            if reversing_queries[pid]:
+                future_targets.append(pid)
         targets = (tuple(eng.reverse(pose) for _index, _port, pose in stubs)
                    if cfg.reversing_loops else ())
-        future_targets = tuple(pid for pid in available if reversing_queries[pid])
-        return transits, capacity, future, targets, future_targets
+        return (transits, capacity, future, targets, future_targets,
+                transit_turns, max_turn, max_free_turn, future_turns)
 
     def tail_possible(cursor, used: int, context, slack: float | None,
                       extra_pid: str | None = None) -> bool:
@@ -1464,28 +1480,39 @@ def solve(
             # Its new targets need the placement frame. The recursive visit checks
             # them after placement, with its own updated context.
             return True
-        transits, capacity, future, targets, future_targets = context
+        (transits, capacity, future, targets, future_targets,
+         transit_turns, max_turn, max_free_turn, future_turns) = context
         if extra_pid:
             transits += future_transits[extra_pid]
+            transit_turns += future_transits[extra_pid] * turn_of[extra_pid]
         transits += min(slots * capacity, future)
+        transit_turns += min(slots * max_free_turn, future_turns)
         traversals = slots + transits
-        if completion.allows(cursor, traversals, slack):
+        # A free crossing traversal advances the path but cannot turn it. Keep
+        # its actual turning capacity separate from the relaxed traversal count.
+        turns = min(slots * max_turn, remaining_turn) + transit_turns
+        if eng.need_turn24(cursor) <= turns and completion.allows(cursor, traversals, slack):
             return True
         if cfg.reversing_loops:
             for target in targets:
                 query = eng.retarget(cursor, target)
-                if completion.allows(query, traversals, slack):
+                if eng.need_turn24(query) <= turns and completion.allows(query, traversals, slack):
                     return True
             if slots:
                 # A future reversing target is created by one placement. Whatever
                 # precedes that placement, its exit must reach one of its free ports
-                # in at most the remaining traversals. Ignore all stock/geometry
-                # constraints here, retaining an overapproximation of every target.
+                # in at most the remaining traversals. Ignoring the prefix's stock
+                # consumption and geometry keeps an overapproximation of every tail.
                 for pid in future_targets:
-                    key = (pid, traversals - 1, slack)
+                    # The junction creating this target consumes one placement
+                    # and its stock allowance before the tail starts.
+                    tail_turns = min((slots - 1) * max_turn,
+                                     remaining_turn - turn_of[pid]) + transit_turns
+                    key = (pid, traversals - 1, tail_turns, slack)
                     possible = future_closure.get(key)
                     if possible is None:
-                        possible = any(completion.allows(query, traversals - 1, slack)
+                        possible = any(eng.need_turn24(query) <= tail_turns
+                                       and completion.allows(query, traversals - 1, slack)
                                        for query in reversing_queries[pid])
                         if len(future_closure) < 4096:
                             future_closure[key] = possible

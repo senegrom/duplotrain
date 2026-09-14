@@ -236,9 +236,9 @@ fingerprints and node counts. Exhausted slippage cases retain their fingerprints
 regressions also compare complete layouts and retain the earlier candidates from
 capped searches. Timings are observations, not portable promises or test thresholds.
 
-Extra proof work is not free. The switch takes longer but now returns eight results.
-The mixed case still reaches the 25,000-node cap without a result. At the editor's
-existing 60,000-node budget, the 1/5 mm mixed cases now return eight results in
+Extra proof work is not free. In this pass the switch took longer but returned eight
+results, while the mixed case reached the 25,000-node cap without a result. At the editor's
+existing 60,000-node budget, the 1/5 mm mixed cases returned eight results in
 29,936/30,339 states (2.23/2.33 s), whereas the previous solver returned none before
 that cap. Small field searches can spend more time building bounds than they save;
 the zero-inventory transit likewise grows from roughly 0.6 to 1.0 ms. These limits
@@ -257,3 +257,48 @@ For a historical comparison, run the current benchmark script with `PYTHONPATH`
 pointing at the older checkout's `src`. Run timing comparisons sequentially, without
 competing test processes. The output identifies the imported solver path. CI lints
 the benchmark and runs operation-count, exhaustive-fit and real-worker regressions.
+
+## Stock-aware turning bounds for mixed inventories
+
+The next pass separates turning capacity from the relaxed number of traversals.
+A free crossing route still advances the path, but contributes no turn. The bound
+also accounts for scarce turning stock and the placement used to create a future
+reversing target. Existing and future curved junction transits retain conservative
+turn allowances. This rejects impossible tails before the geometric table query,
+without adding preprocessing or changing candidate order.
+
+The table compares local Python 3.12 three-run medians against `c320424`, using the
+same 20-piece and eight-result limits. The baseline uses 60,000 nodes so the mixed
+cases finish; the new solver uses the stricter 25,000-node limit. Both builds finish
+all listed searches with eight identical ordered results and the same completed
+preprocessing layers. Timings are observations, not test thresholds.
+
+| Case | Before nodes | After nodes | Before time | After time |
+| --- | ---: | ---: | ---: | ---: |
+| Mixed gap, broad inventory, exact | 22,155 | 16,451 | 1,502.2 ms | 1,107.7 ms |
+| Mixed gap, broad inventory, 1 mm | 29,936 | 24,111 | 2,429.0 ms | 1,839.9 ms |
+| Mixed gap, broad inventory, 5 mm | 30,339 | 24,514 | 2,365.9 ms | 1,903.5 ms |
+| Offset circle, broad inventory, 5 mm | 286 | 24 | 29.1 ms | 12.7 ms |
+| Switch, broad inventory, 1 mm | 19,701 | 19,451 | 1,949.2 ms | 2,044.7 ms |
+| Switch, broad inventory, 5 mm | 19,899 | 19,649 | 2,098.0 ms | 2,035.4 ms |
+
+The mixed slippage cases now find all eight results under the benchmark's default
+25,000-node cap, where the previous build found none. They use 19–20% fewer nodes
+and take 20–24% less time to find the same results. Exact mixed search takes 26%
+less time; the broad forced-offset case takes 56% less. All 27 existing cases
+retain their ordered result fingerprints. Extra turn bookkeeping is not a
+universal speedup: the 1 mm switch case is about 5% slower, and the small winding
+case rises from 14.2 to 19.2 ms despite unchanged nodes.
+
+Three additional cases bring the suite to **30 cases, including 20 with slippage**.
+They close through a preplaced switch without any spare pieces, requiring its
+30-degree turn with exact endpoints, a 5 mm forced joint, or an insufficient
+4.9 mm allowance. Regressions also preserve these witnesses in both directions
+and arithmetic engines, on both switch branches at rotated/elevated poses.
+Scarce-stock exhaustive comparisons and a custom curved junction exercise
+backtracking and later free transits.
+
+```sh
+PYTHONPATH=src python benchmarks/completion.py --case mixed_full_slop_1 --case mixed_full_slop_5 --repeats 3
+PYTHONPATH=src python benchmarks/completion.py --case turn_transit --case turn_transit_slop_4.9 --case turn_transit_slop_5
+```

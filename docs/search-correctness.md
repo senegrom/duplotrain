@@ -135,6 +135,39 @@ depth and total retained heading envelopes. Regressions in
 compare exhaustive results on both engines, exercise custom 15-degree curves and
 preprocessing exhaustion, and pin the two previously capped broad-inventory cases.
 
+## Traversal count and turning capacity are separate bounds
+
+The geometry tables relax stock by pooling all available route types. Counting a
+free crossing transit as another traversal is necessary for distance, but must not
+grant it a curve's turning capacity. Before querying geometry, completion search
+also bounds the total absolute heading change available to the tail, in exact
+15-degree steps.
+
+For `k` remaining placement slots, newly placed pieces contribute at most the
+smaller of `k * max_turn` and the sum of turning capacities in remaining stock.
+Existing free transits contribute their own piece's maximum route turn times
+their compatible-port transit allowance. Future free transits contribute at most
+the smaller of the allowance for `k` junctions and the sum over remaining stock.
+These bounds may select incompatible routes or piece types, but only overestimate
+capacity. The circular distance between headings cannot exceed the sum of route
+turns, so a larger required heading change rules out that target.
+
+The anchor and every existing reversing target are checked separately. For a
+future target, the junction that creates it consumes one placement and one copy
+of its turn allowance before the tail begins. Ignoring all earlier placements
+only enlarges the remaining resources. The future-target cache key includes this
+turn budget as well as traversal count and remaining slop; equal-length branches
+can have different amounts of turning stock. Early candidate checks conservatively
+leave the candidate in stock until its recursive visit.
+
+Slippage changes position, never heading, so it cannot enlarge the turn allowance.
+`tests/test_completion_turn_budget.py` compares complete ordered solutions with
+lookahead disabled on both arithmetic engines, including scarce stock, backtracking,
+free turning transits on rotated and elevated switches, and a custom junction
+traversed twice. Independent witnesses include forced joints and zero new pieces.
+The mixed-inventory benchmarks also pin eight audited results below 25,000 nodes
+for exact, 1 mm and 5 mm searches.
+
 ## Slippage uses physical distances and one remaining budget
 
 A small physical displacement need not have small exact coefficients: large
