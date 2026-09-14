@@ -25,10 +25,9 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 from typing import TYPE_CHECKING
 
-from ._congruence import curve_points
+from ._congruence import curve_key
 from .catalog import STONE_MOUNTS
 from .drive import LoopClassification, classify
-from .geometry import HEADING_STEPS, cos_sin
 from .layout import Layout
 from .pieces import PieceType
 from .solver import Solution, SolverConfig, SolveStats, solve
@@ -89,31 +88,11 @@ def congruence_key(layout: Layout, spacing: float = 8.0, decimals: int = 1) -> t
     Collinear line intervals and fixed lattice arc sectors are unioned before
     sampling, so splitting a rail into shorter pieces or segments does not alter
     the key. The exact normalized geometry supplies the translation origin;
-    rounded samples form a set, never a multiplicity-weighted cloud. Rotations
-    and reflection are canonicalised over the 24-step heading lattice.
+    rounded samples form a set, never a multiplicity-weighted cloud. An exact
+    canonical frame over the 24 rotations and reflection is chosen BEFORE any
+    float conversion, keeping decimal rounding ties invariant under rigid motion.
     """
-    centred = curve_points(layout, spacing)
-    if not centred:
-        return ()
-
-    best: tuple | None = None
-    for mirror in (1.0, -1.0):
-        for steps in range(HEADING_STEPS):
-            c, s = cos_sin(steps)
-            fc, fs = float(c), float(s)
-            candidate = tuple(
-                sorted({
-                    (
-                        round(fc * x - fs * (mirror * y), decimals),
-                        round(fs * x + fc * (mirror * y), decimals),
-                        round(z, decimals),
-                    )
-                    for x, y, z in centred
-                })
-            )
-            if best is None or candidate < best:
-                best = candidate
-    return best
+    return curve_key(layout, spacing, decimals)
 
 
 def find_perfect_loops(

@@ -353,8 +353,14 @@ class Layout:
         return (max_x - min_x, max_y - min_y)
 
     def track_length(self) -> float:
-        """Total running length of track, in mm."""
-        return sum(p.piece.paths[0].length() for p in self.placements)
+        """Length of the complete 3D centreline union, in mm.
+
+        Count every junction route, but count shared line/arc sections only once.
+        Unknown Segment subclasses contribute their declared length.
+        """
+        from ._congruence import curve_length
+
+        return curve_length(self)
 
     # -- construction ----------------------------------------------------------
 

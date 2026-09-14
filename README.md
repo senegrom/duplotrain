@@ -244,8 +244,12 @@ Findings the simulator proves about real DUPLO:
 Two layouts count as the same when their track centrelines are congruent curves in
 space (rotations, translations, reflections; `z` included, so bridges distinguish) —
 which straight carries the stone, or whether a level crossing stands in for a plain
-straight, doesn't change the curve. `congruence_key()` canonicalises the sampled
-centreline over the 24 lattice rotations × reflection, so non-isomorphic hunting is a
+straight, doesn't change the curve. `congruence_key()` normalizes the exact
+centreline union and chooses a canonical frame over the 24 lattice rotations ×
+reflection **before** sampling and rounding. Piece boundaries and decimal rounding
+ties therefore do not change the identity of an exactly congruent primitive curve.
+The resulting key is still approximate, controlled by `spacing` and `decimals`;
+regenerate previously cached keys after updating. Non-isomorphic hunting is a
 set of keys:
 
 ```python

@@ -22,12 +22,44 @@ collinear 3D segments become one interval, while arcs use the union of fixed
 therefore have the same curve key. The same holds for uneven segment splits,
 ramps of equal grade, arc splits and duplicate routes.
 
-The exact normalized geometry supplies the translation origin. Rounded samples
-are a set, so repeated points cannot reweight the centroid or result. The public
-`spacing` and `decimals` arguments still control the sampled, approximate key;
-this is not an exact congruence proof. Unknown `Segment` subclasses retain their
-own sampling method. Keys are implementation details rather than a persisted
+The exact normalized geometry supplies the translation origin and canonical
+orientation. Every rotation and reflection is applied to the exact primitives;
+coefficient tuples choose a deterministic minimum before any float conversion.
+Only that frame is sampled and rounded. This avoids rotating floating samples
+across decimal ties: a 255.9 mm rail retains its key under all 24 lattice rotations
+and reflection, as does the same geometry split into uneven shorter rails.
+Line endpoint ordering and circular sector ordering are canonical too.
+
+Rounded samples are a set, so repeated points cannot reweight the result. The
+public `spacing` and `decimals` arguments still control the sampled, approximate
+key; this is not an exact congruence proof. Unknown `Segment` subclasses have no
+exact primitive descriptor: they retain their own sampling method and the
+sampled-orbit fallback. Keys are implementation details rather than a persisted
 layout format; regenerate cached keys after updating the implementation.
+
+## Length includes the entire centreline union
+
+`Layout.track_length()` uses the same normalized 3D union rather than just the
+first path on each piece. A stock crossing contributes 256 mm, and a stock switch
+contributes both curved branches. Shared collinear sections and circular sectors
+are counted only once, including partially overlapping or differently segmented
+routes. Intersections at isolated points remove no length; parallel tracks at
+different elevations remain distinct. Multi-turn arcs trace their circle once.
+For unknown `Segment` subclasses, the declared `length()` is used; overlapping
+arbitrary custom shapes cannot be unioned without a primitive description.
+
+The returned value is a floating-point geometric length in millimetres, not the
+length of a particular train itinerary. CLI length reports and the compactness
+score now include secondary junction routes. Existing saved-layout JSON is
+unchanged; cached curve keys and derived scores should be regenerated.
+
+The regressions in `tests/test_review_round4.py` exercise decimal ties across all
+lattice symmetries, an exact independent oval oracle, shared-route length, and
+CLI output. They also verify the existing classifier safeguards on a connected
+25-switch layout: default budgets reject before simulation, while explicitly
+unbounded enumeration reaches the first simulation within an isolated process
+with only 64 MiB of additional address space. The latter test stops immediately;
+lazy allocation does not remove the exponential cost of complete classification.
 
 ## Failed searches leave the editor unchanged
 
