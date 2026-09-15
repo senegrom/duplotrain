@@ -433,3 +433,25 @@ of five runs, so machine load does not distort it), 25,000-node budget:
 | Switch, broad inventory, 5 mm | 0.91 s | 0.52 s |
 | Long gap, 5 mm | 47 ms | 31 ms |
 | Whole suite | 3.48 s | 2.20 s |
+
+## Keying networks: cached primitives, shared rotation products
+
+Profiling the network enumerator on the corpus showed nine tenths of its time
+in congruence keys: 1,792 closed networks keyed for 109 classes, each key
+rebuilding its placements' exact primitives with field arithmetic, rotating the
+frame candidates, and re-rotating the winner. Three changes, all keeping every
+key byte-identical (checked on all 671 corpus layouts):
+
+- A placement's exact primitives (line intervals, arc sectors, isolated points)
+  depend only on the piece and its frame, and an enumeration replays the same
+  placements in thousands of candidates, so they are cached (bounded, cleared
+  wholesale when full) and only the union is rebuilt per layout.
+- The four integer products of a point with one cosine and sine serve all four
+  quarter turns and both reflections, and one gcd serves the four quarter turns,
+  so the 48 frames cost six product sets and twelve reductions.
+- The winning frame's exact points are rebuilt from its integer vectors instead
+  of rotating the primitives again in the field.
+
+CPU time (minimum of two runs): keying the 671-layout corpus 4.47 s to 2.31 s;
+enumerating the corpus network problem with 109 classes 12.0 s to 7.0 s, the
+36-class switch problem 3.5 s to 2.3 s, identical result sets.

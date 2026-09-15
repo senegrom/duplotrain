@@ -95,6 +95,65 @@ class _Curve:
     origin: _Point
 
 
+#: Exact primitives of a placed piece depend only on the piece and its frame,
+#: and an enumeration replays the same placements in thousands of candidate
+#: layouts. Bounded: cleared wholesale when full.
+_PRIMITIVE_CACHE: dict[tuple, tuple] = {}
+_PRIMITIVE_CACHE_LIMIT = 8192
+
+
+def _placement_primitives(placement) -> tuple:
+    """(line intervals, arc sectors, isolated points, opaque segments) of one placement."""
+    key = (placement.piece, placement.frame)
+    cached = _PRIMITIVE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    lines: list = []
+    arcs: list = []
+    isolated: list = []
+    opaque: list = []
+    for path in placement.piece.paths:
+        cursor = placement.frame.then(*_xyz(path.start), path.start.heading)
+        for segment in path.segments:
+            end = cursor.then(*segment.delta(), segment.turn_steps)
+            a, b = _xyz(cursor), _xyz(end)
+            if type(segment) in (Straight, Ramp):
+                if a == b:
+                    isolated.append(a)
+                else:
+                    line = _line_key(a, b)
+                    lo, hi = a[line[0]], b[line[0]]
+                    if _compare(lo, hi) > 0:
+                        lo, hi = hi, lo
+                    lines.append((line, lo, hi))
+            elif type(segment) is Arc:
+                if not segment.radius or not segment.degrees:
+                    isolated.append(a)
+                else:
+                    sign = 1 if segment.degrees > 0 else -1
+                    c, s = cos_sin(cursor.heading)
+                    centre = (cursor.x - sign * segment.radius * s,
+                              cursor.y + sign * segment.radius * c, cursor.z)
+                    radius = segment.radius
+                    start = cursor.heading - sign * (HEADING_STEPS // 4)
+                    if _compare(radius, Alg(0)) < 0:
+                        radius = -radius
+                        start += HEADING_STEPS // 2
+                    count = abs(segment.degrees) // DEGREES_PER_STEP
+                    first = start if sign > 0 else start - count
+                    arcs.append(((centre, radius), frozenset(
+                        (first + i) % HEADING_STEPS for i in range(min(count, HEADING_STEPS))
+                    )))
+            else:
+                opaque.append((cursor, end, segment))
+            cursor = end
+    cached = (tuple(lines), tuple(arcs), tuple(isolated), tuple(opaque))
+    if len(_PRIMITIVE_CACHE) >= _PRIMITIVE_CACHE_LIMIT:
+        _PRIMITIVE_CACHE.clear()
+    _PRIMITIVE_CACHE[key] = cached
+    return cached
+
+
 def _normalise(layout: Layout) -> _Curve:
     """Union exact primitives and choose an equivariant translation origin."""
     line_groups = defaultdict(list)
@@ -102,41 +161,13 @@ def _normalise(layout: Layout) -> _Curve:
     isolated: set[_Point] = set()
     opaque = []
     for placement in layout:
-        for path in placement.piece.paths:
-            cursor = placement.frame.then(*_xyz(path.start), path.start.heading)
-            for segment in path.segments:
-                end = cursor.then(*segment.delta(), segment.turn_steps)
-                a, b = _xyz(cursor), _xyz(end)
-                if type(segment) in (Straight, Ramp):
-                    if a == b:
-                        isolated.add(a)
-                    else:
-                        key = _line_key(a, b)
-                        lo, hi = a[key[0]], b[key[0]]
-                        if _compare(lo, hi) > 0:
-                            lo, hi = hi, lo
-                        line_groups[key].append((lo, hi))
-                elif type(segment) is Arc:
-                    if not segment.radius or not segment.degrees:
-                        isolated.add(a)
-                    else:
-                        sign = 1 if segment.degrees > 0 else -1
-                        c, s = cos_sin(cursor.heading)
-                        centre = (cursor.x - sign * segment.radius * s,
-                                  cursor.y + sign * segment.radius * c, cursor.z)
-                        radius = segment.radius
-                        start = cursor.heading - sign * (HEADING_STEPS // 4)
-                        if _compare(radius, Alg(0)) < 0:
-                            radius = -radius
-                            start += HEADING_STEPS // 2
-                        count = abs(segment.degrees) // DEGREES_PER_STEP
-                        first = start if sign > 0 else start - count
-                        circles[centre, radius].update(
-                            (first + i) % HEADING_STEPS for i in range(min(count, HEADING_STEPS))
-                        )
-                else:
-                    opaque.append((cursor, end, segment))
-                cursor = end
+        lines, arcs, points, segments = _placement_primitives(placement)
+        for line, lo, hi in lines:
+            line_groups[line].append((lo, hi))
+        for circle, sectors in arcs:
+            circles[circle].update(sectors)
+        isolated.update(points)
+        opaque.extend(segments)
 
     lines = []
     features: set[_Point] = set()
@@ -261,15 +292,18 @@ def _mul4(u: tuple[int, ...], v: tuple[int, ...]) -> tuple[int, int, int, int]:
     )
 
 
-def _canonical_frame(curve: _Curve) -> tuple[int, bool]:
-    """The rotation and reflection whose exact frame identity is smallest.
+def _canonical_frame(curve: _Curve) -> _Curve:
+    """The frame whose exact identity is smallest, materialised exactly.
 
     Equivalent to comparing the exact identities of all 48 frames, but in integer
     arithmetic: every centred point becomes integer coefficient vectors over one
     common denominator, each rotation is an integer bilinear map, and a frame's
     identity is reduced by the gcd of its entries, so congruent curves that
     arrive with different denominators still compare equal and pick the same
-    frame. Only that frame is then materialised exactly and sampled.
+    frame. The four products of a point with one cosine and sine serve all four
+    quadrant rotations and both reflections. The winning frame's exact points are
+    rebuilt from its integer vectors, which is what rotating them in the field
+    would have produced.
     """
     exact: set[_Point] = set(curve.isolated)
     for a, b in curve.lines:
@@ -277,7 +311,7 @@ def _canonical_frame(curve: _Curve) -> tuple[int, bool]:
     for centre, _radius, _sectors in curve.circles:
         exact.add(centre)
     if not exact:
-        return 0, False
+        return _Curve((), (), frozenset(), (), (Alg(0), Alg(0), Alg(0)))
     centred = {
         point: tuple((value - offset).coeffs()
                      for value, offset in zip(point, curve.origin, strict=True))
@@ -293,45 +327,79 @@ def _canonical_frame(curve: _Curve) -> tuple[int, bool]:
                      for vector in vectors)
         for point, vectors in centred.items()
     }
+    heights = {point: tuple(4 * value for value in z) for point, (_x, _y, z) in ints.items()}
     circles = [(centre, radius.coeffs(), sectors) for centre, radius, sectors in curve.circles]
+    scale = 4 * denominator
     best = None
-    for mirror in (False, True):
-        for heading in range(HEADING_STEPS):
-            cosine, sine = _ROTATION_INTS[heading]
-            moved = {}
-            for point, (x, y, z) in ints.items():
+    for base in range(6):
+        cosine, sine = _ROTATION_INTS[base]
+        products = {
+            point: (_mul4(cosine, x), _mul4(sine, y), _mul4(sine, x), _mul4(cosine, y))
+            for point, (x, y, _z) in ints.items()
+        }
+        for mirror in (False, True):
+            # Reflect (y -> -y) first, then rotate by the base heading.
+            planar = {}
+            for point, (cx, sy, sx, cy) in products.items():
                 if mirror:
-                    y = tuple(-value for value in y)
-                cx, sy = _mul4(cosine, x), _mul4(sine, y)
-                sx, cy = _mul4(sine, x), _mul4(cosine, y)
-                moved[point] = (
-                    tuple(u - v for u, v in zip(cx, sy, strict=True)),
-                    tuple(u + v for u, v in zip(sx, cy, strict=True)),
-                    tuple(4 * value for value in z),
+                    planar[point] = (tuple(u + v for u, v in zip(cx, sy, strict=True)),
+                                     tuple(u - v for u, v in zip(sx, cy, strict=True)))
+                else:
+                    planar[point] = (tuple(u - v for u, v in zip(cx, sy, strict=True)),
+                                     tuple(u + v for u, v in zip(sx, cy, strict=True)))
+            # Quarter turns permute and negate entries, so one gcd serves all four.
+            common = scale
+            for x, y in planar.values():
+                for value in x:
+                    common = gcd(common, value)
+                for value in y:
+                    common = gcd(common, value)
+            for z in heights.values():
+                for value in z:
+                    common = gcd(common, value)
+            reduced_scale = scale // common
+            for quadrant in range(4):
+                heading = base + 6 * quadrant
+                reduced = {}
+                for point, (x, y) in planar.items():
+                    for _ in range(quadrant):
+                        x, y = tuple(-value for value in y), x
+                    reduced[point] = (
+                        tuple(value // common for value in x),
+                        tuple(value // common for value in y),
+                        tuple(value // common for value in heights[point]),
+                    )
+                identity = (
+                    reduced_scale,
+                    tuple(sorted(tuple(sorted((reduced[a], reduced[b]))) for a, b in curve.lines)),
+                    tuple(sorted(
+                        (reduced[centre], radius,
+                         tuple(sorted((heading - h - 1 if mirror else heading + h) % HEADING_STEPS
+                                      for h in sectors)))
+                        for centre, radius, sectors in circles
+                    )),
+                    tuple(sorted(reduced[point] for point in curve.isolated)),
                 )
-            common = 4 * denominator
-            for vectors in moved.values():
-                for vector in vectors:
-                    for value in vector:
-                        common = gcd(common, value)
-            reduced = {
-                point: tuple(tuple(value // common for value in vector) for vector in vectors)
-                for point, vectors in moved.items()
-            }
-            identity = (
-                4 * denominator // common,
-                tuple(sorted(tuple(sorted((reduced[a], reduced[b]))) for a, b in curve.lines)),
-                tuple(sorted(
-                    (reduced[centre], radius,
-                     tuple(sorted((heading - h - 1 if mirror else heading + h) % HEADING_STEPS
-                                  for h in sectors)))
-                    for centre, radius, sectors in circles
-                )),
-                tuple(sorted(reduced[point] for point in curve.isolated)),
-            )
-            if best is None or identity < best[0]:
-                best = (identity, heading, mirror)
-    return best[1], best[2]
+                if best is None or identity < best[0]:
+                    best = (identity, heading, mirror, reduced, reduced_scale)
+    _identity_, heading, mirror, reduced, reduced_scale = best
+
+    def exact_point(point: _Point) -> _Point:
+        return tuple(
+            Alg(*(Fraction(value, reduced_scale) for value in vector))
+            for vector in reduced[point]
+        )
+
+    moved = {point: exact_point(point) for point in reduced}
+    lines = tuple(tuple(sorted((moved[a], moved[b]), key=_point_key)) for a, b in curve.lines)
+    frame_circles = tuple(
+        (moved[centre], radius,
+         tuple(sorted((heading - h - 1 if mirror else heading + h) % HEADING_STEPS
+                      for h in sectors)))
+        for centre, radius, sectors in curve.circles
+    )
+    return _Curve(lines, frame_circles, frozenset(moved[p] for p in curve.isolated), (),
+                  (Alg(0), Alg(0), Alg(0)))
 
 
 def _spacing(spacing: float) -> None:
@@ -411,8 +479,7 @@ def curve_key(layout: Layout, spacing: float, decimals: int) -> tuple:
                     best_sample = candidate
         assert best_sample is not None
         return best_sample
-    heading, mirror = _canonical_frame(curve)
-    return rounded(_in_frame(curve, heading, mirror))
+    return rounded(_canonical_frame(curve))
 
 
 def curve_length(layout: Layout) -> float:
