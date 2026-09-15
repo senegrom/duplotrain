@@ -8,6 +8,7 @@ import pytest
 from duplotrain import ORIGIN, Pose, SolverConfig, build_chain, default_catalog, parse_piece, solve
 from duplotrain.solver import (
     _compile_lattice,
+    _completion_budget,
     _CompletionBounds,
     _FieldEngine,
     _flat,
@@ -84,7 +85,8 @@ def test_fifteen_degree_completion_beyond_the_exact_table_retains_all_results():
     base = build_chain([(catalog["fine"], 0, 1)] * 16,
                        start=Pose.make(x=317, y=-90, z=41, heading=5))
     inventory = {"fine": 8, "straight": 1}
-    cfg = SolverConfig(min_pieces=0, max_results=1000)
+    # A short exact horizon so the longer tails are decided by the envelopes.
+    cfg = SolverConfig(min_pieces=0, max_results=1000, completion_lookahead=6)
     reference = solve(inventory, catalog, replace(cfg, completion_lookahead=0), base=base)
     improved = solve(inventory, catalog, cfg, base=base)
     assert reference.stats.complete and improved.stats.complete
@@ -110,7 +112,7 @@ def test_previously_capped_broad_search_finds_audited_solutions(case):
     result = solve(inventory, catalog, cfg, base=base, **ends)
     assert len(result.solutions) == 8 and not result.stats.aborted
     assert result.stats.stop_reason == "result_limit" and not result.stats.complete
-    assert result.stats.completion_work <= min(4096, cfg.max_nodes // 8)
+    assert result.stats.completion_work <= _completion_budget(result.stats.nodes, cfg.max_nodes)
     assert result.stats.completion_bound_depth > cfg.completion_lookahead
     for solution in result.solutions:
         assert solution.exact and not solution.layout.joint_issues()
@@ -126,7 +128,7 @@ def test_long_gap_uses_less_than_a_thousand_nodes():
     cfg = SolverConfig(min_pieces=0, max_pieces=20, max_results=8, max_nodes=25_000)
     result = solve({"curve": 14, "straight": 8}, catalog, cfg, base=base)
     assert len(result.solutions) == 8 and result.stats.nodes < 1000
-    assert result.stats.completion_work <= min(4096, cfg.max_nodes // 8)
+    assert result.stats.completion_work <= _completion_budget(result.stats.nodes, cfg.max_nodes)
     assert result.stats.completion_bound_states <= 12 * (result.stats.completion_bound_depth + 1)
 
 

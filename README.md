@@ -353,8 +353,13 @@ free transits require two compatible ports on the same piece. A separate turn
 bound limits what the remaining stock and free routes can contribute: a crossing
 can advance the path without granting it another curve's turn. Impossible tails
 are rejected before collision sampling. `SolverConfig.completion_lookahead`
-defaults to 6 for the short table (0 disables both checks); both checks share at
-most 4096 move expansions and one eighth of `max_nodes`. Partial tables fall back
+defaults to 10 for the exact table (0 disables both checks). A free transit
+through a junction the tail places itself is only allowed once the remaining
+placements can fit that junction and the loop back to it, which the same tables
+bound; a transit through a junction already placed needs one of its entries to
+be reachable. Both checks share a preprocessing allowance of `min(4096, max_nodes // 8)`
+expansions plus 24 per node the search has spent, capped at 262,144, so short
+searches never pay for deep tables. Partial tables fall back
 to ordinary search. With slippage enabled, outward-rounded physical bounds and
 indexed nearby short tails allow the **remaining total** gap budget; heading and
 height still have to match. `stats.pruned_completion` and

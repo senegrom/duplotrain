@@ -340,3 +340,41 @@ identical node counts, result fingerprints and pruning counters on all 30 cases:
 once per point test, once per deferred placement a later query reaches and once
 per base piece, and a successful point test hands its grouped samples straight to
 the field.
+
+## Return-loop floors and a progressive table budget
+
+Profiling the remaining hard cases showed that most of their nodes came from one
+allowance: a crossing still in stock let every query count one extra traversal,
+because the tail might place it and later pass through it for free. That is true
+only if the tail can also drive a loop back to the crossing, and the reverse
+tables already know how many traversals such a loop needs at least. The
+allowance is now granted only when the remaining placements can fit the junction
+and that loop; a transit through a junction already placed is only counted while
+the walk can still reach one of its entries. Both rules are exact statements
+about the same reachability the tables prove, so results are unchanged.
+
+The tables are also built progressively: every search gets a base allowance of
+`min(4096, max_nodes // 8)` expansions, earns 24 more per DFS node and is capped
+at 262,144, with the exact horizon raised from six to ten placements. A depth not
+yet affordable stays permissive and is asked again later; only decided answers
+are cached. Short searches never pay for deep tables, long ones earn them.
+
+Three-run local medians on Python 3.14, 25,000-node budget, identical result
+fingerprints on all 30 cases against the deferred-binning build above:
+
+| Case | Nodes before | Nodes after | Before | After |
+| --- | ---: | ---: | ---: | ---: |
+| Mixed gap, broad inventory, exact | 16,451 | 2,690 | 1.119 s | 0.183 s |
+| Mixed gap, broad inventory, 1 mm | 24,111 | 3,080 | 1.640 s | 0.459 s |
+| Mixed gap, broad inventory, 5 mm | 24,514 | 3,160 | 1.548 s | 0.465 s |
+| Switch, broad inventory, exact | 11,068 | 3,999 | 0.598 s | 0.334 s |
+| Switch, broad inventory, 5 mm | 19,649 | 4,098 | 1.646 s | 0.887 s |
+| Bridge, broad inventory, exact | 514 | 79 | 30 ms | 16 ms |
+| Whole suite | | | 8.66 s | 3.72 s |
+
+Against `765ce29`, before any of today's changes, the suite went from 13.67 s to
+3.72 s. The price is paid by the smallest searches: long gaps with slippage take
+about 20 ms longer because they now build exact layers to depth eight or nine
+that a 200-node search cannot use. In the mixed case the tables prove that a
+return loop through the crossing needs more than seven traversals, so the
+allowance only applies to the first two placements of a ten-piece completion.

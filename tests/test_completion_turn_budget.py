@@ -92,3 +92,33 @@ def test_scarce_turning_stock_preserves_results_across_backtracking(engine, curv
         assert all(not s.exact for s in result.solutions)
     else:
         assert not result.solutions
+
+
+@pytest.mark.parametrize("engine", ["lattice", "field"])
+@pytest.mark.parametrize("bridge", [1, 2, 3])
+def test_return_loop_floor_grants_the_transit_exactly_when_the_loop_fits(engine, bridge):
+    catalog = default_catalog()
+    # The second route starts `bridge` straights beyond the first route's exit, so
+    # a tail must place the junction, lay exactly that many straights back to the
+    # second route and pass through it for free. The floor must allow precisely that.
+    start = catalog["curve"].paths[0].end().then(128 * bridge, 0, 0, 0)
+    catalog["double_curve"] = parse_piece({"id": "double_curve", "paths": [
+        {"segments": [{"type": "arc", "radius": 256, "degrees": 30}]},
+        {"start": {"x": start.x, "y": start.y, "heading_deg": start.degrees},
+         "segments": [{"type": "arc", "radius": 256, "degrees": 30}]},
+    ]})
+    base, left = Layout().with_piece(catalog["straight"], Pose.make(x=-128))
+    end = catalog["double_curve"].ports[3].pose
+    base, right = base.with_piece(catalog["straight"], catalog["straight"].frame_for(0, end))
+    witness, junction = base.attach(catalog["double_curve"], 0, (left, 1))
+    cursor = (junction, 1)
+    for _ in range(bridge):
+        witness, index = witness.attach(catalog["straight"], 0, cursor)
+        cursor = (index, 1)
+    witness = witness.join(cursor, (junction, 2)).join((junction, 3), (right, 0))
+    assert not witness.joint_issues()
+    cfg = SolverConfig(min_pieces=bridge + 1, max_results=1000, engine=engine,
+                       reversing_loops=True)
+    result = compare_searches(catalog, {"double_curve": 1, "straight": bridge + 1}, cfg,
+                              base, (left, 1), (right, 0))
+    assert any(s.layout == witness for s in result.solutions)

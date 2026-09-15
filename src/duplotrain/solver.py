@@ -607,6 +607,22 @@ def _compile_lattice(
 # coefficient projections, these remain valid when a tiny real gap has large,
 # cancelling radical coefficients. Integer arithmetic keeps rounding one-sided.
 _MM_SCALE = 10**9
+#: Reverse-table preprocessing is paid for progressively: every search gets a
+#: small base allowance, each DFS node spent earns more, and a hard cap bounds
+#: the total. Short searches never pay for deep tables; long ones earn them.
+_TABLE_WORK_PER_NODE = 24
+_TABLE_WORK_CAP = 1 << 18
+
+
+def _slack_padding(slack: float) -> int:
+    """Outward integer enclosure of a millimetre budget, in physical units."""
+    numerator, denominator = slack.as_integer_ratio()
+    return -(-numerator * _MM_SCALE // denominator) + 2
+
+
+def _completion_budget(nodes: int, max_nodes: int) -> int:
+    """Table expansions a search may have spent after *nodes* DFS nodes."""
+    return min(_TABLE_WORK_CAP, min(4096, max_nodes // 8) + _TABLE_WORK_PER_NODE * nodes)
 _ROOT_BOUNDS = tuple((math.isqrt(n * _MM_SCALE**2), math.isqrt(n * _MM_SCALE**2) + 1)
                      for n in (2, 3, 6))
 _SLIP_AXES = ((1, 0), (0, 1), (1, 1), (1, -1), (2, 1), (2, -1), (1, 2), (1, -2))
@@ -769,15 +785,32 @@ class _CompletionReachability:
     predecessor. Ignoring placement constraints makes this an overapproximation:
     absence proves impossibility, while membership still needs the full DFS audit.
 
-    Never use a partly built layer. If the preprocessing budget runs out, retain
-    the completed shorter layers and let DFS handle the rest normally.
+    Never use a partly built layer. Preprocessing is paid for progressively: a
+    small base allowance, more for every DFS node spent, a hard cap. A depth not
+    yet affordable stays permissive and is asked again later, so short searches
+    never pay for deep tables while long ones earn them.
+
+    The same layers bound the loop a walk must drive before it can pass through
+    a junction it places itself: ``transit_floor`` proves how many traversals such
+    a return loop needs at least, and a free transit through a junction still in
+    stock is only granted when the remaining placements can fit both.
     """
 
-    def __init__(self, eng, horizon: int, max_work: int, *, slippage: bool = False) -> None:
+    def __init__(self, eng, horizon: int, max_work: int, *, slippage: bool = False,
+                 slop: float = 0.0, budget=None) -> None:
         self.eng = eng
         self.horizon = horizon
-        self.work_left = max_work
+        #: In slippage mode the return-loop floors ask with the whole gap budget.
+        self.padding = _slack_padding(slop) if slippage and slop > 0 else None
+        #: *max_work* caps the total; *budget*, when given, is called for the
+        #: allowance currently earned (it only grows during one search).
         self.work_limit = max_work
+        self.work_used = 0
+        self._budget = budget
+        #: Whether the latest answer is final. A rejection always is, and so is a
+        #: membership found in a published layer; an answer that is permissive only
+        #: because a layer was not yet affordable must be asked again later.
+        self.decided = True
         # Different geometries can share an endpoint transform. Geometry is not a
         # constraint here, so expand each distinct transform only once.
         endpoints = [
@@ -799,52 +832,81 @@ class _CompletionReachability:
         self.cache: OrderedDict[tuple, bool] = OrderedDict()
         self.cache_hits = 0
         self.checks = 0
+        #: Per junction type the solver may place: from the exit of each of its
+        #: routes, the reversed pose of every spare port a later transit could
+        #: enter, retargeted onto the anchor.
+        self.return_queries: dict[str, tuple] = {}
+        self._floors: dict[str, tuple[int, int, bool]] = {}
+
+    @property
+    def work_left(self) -> int:
+        allowance = self.work_limit
+        if self._budget is not None:
+            allowance = min(allowance, self._budget())
+        return allowance - self.work_used
+
+    def transit_floor(self, pid: str) -> int:
+        """Traversals proven too few for a loop back to a junction of type *pid*.
+
+        No return query lies in any complete layer up to the returned depth, so
+        such a loop needs more traversals than that. Grows as layers are published
+        until the first layer containing a return query fixes it for good.
+        """
+        queries = self.return_queries.get(pid)
+        if not queries:
+            return -1
+        known, floor, final = self._floors.get(pid, (0, -1, False))
+        depth = len(self.layers)
+        if final or known >= depth:
+            return floor
+        level, height = self.eng.level, self.eng.height
+        for k in range(known, depth):
+            layer, heights = self.layers[k], self.height_layers[k]
+            if any(
+                height(query) in heights and (
+                    level(query) in layer if self.padding is None
+                    else self._near_layer(query, k, self.padding)
+                )
+                for query in queries
+            ):
+                floor, final = k - 1, True
+                break
+            floor = k
+        self._floors[pid] = (depth, floor, final)
+        return floor
 
     def allows(self, cursor, traversals: int, slack: float | None = None) -> bool:
-        # Published layers never change. An unfinished depth also stays permissive:
-        # its next layer already exceeds the remaining budget, which only decreases.
-        # Reusing either answer cannot change later preprocessing or pruning.
+        # Published layers never change, so a decided answer is exactly what a
+        # fresh evaluation would return; only decided answers are cached.
         key = (cursor, traversals) if slack is None else (cursor, traversals, slack)
         result = self.cache.get(key)
         if result is not None:
             self.cache_hits += 1
             self.cache.move_to_end(key)
+            self.decided = True
             return result
         result = self._allows(cursor, traversals, slack)
-        if len(self.cache) >= 4096:
-            self.cache.popitem(last=False)
-        self.cache[key] = result
+        if self.decided:
+            if len(self.cache) >= 4096:
+                self.cache.popitem(last=False)
+            self.cache[key] = result
         return result
 
-    def _allows(self, cursor, traversals: int, slack: float | None = None) -> bool:
-        self.checks += 1
-        self.work_left -= self.bounds.extend(traversals, self.work_left)
-        # One accumulated budget covers every remaining forced transit and the
-        # final joint. Translations add; heading and height never acquire tolerance.
-        padding = None
-        if slack is not None:
-            numerator, denominator = slack.as_integer_ratio()
-            padding = -(-numerator * _MM_SCALE // denominator) + 2
-        if padding is None:
-            possible = self.bounds.allows(cursor, traversals)
-        else:
-            possible = self.bounds.allows_near(cursor, traversals, padding)
-        if not possible:
-            return False
-        if traversals > self.horizon:
-            return True
+    def _ensure_layers(self, traversals: int) -> bool:
+        """Publish layers up to *traversals*; False leaves the query permissive."""
+        reverse, level = self.eng.reverse, self.eng.level
         while len(self.layers) <= traversals:
             work = (len(self.frontier) * len(self.moves)
                     + len(self.height_frontier) * len(self.rises))
             if work > self.work_left:
-                return True
-            self.work_left -= work
+                return False
+            self.work_used += work
             previous = self.layers[-1]
             frontier = set()
             for pose in self.frontier:
-                backwards = self.eng.reverse(pose)
+                backwards = reverse(pose)
                 for apply_move in self.moves:
-                    predecessor = self.eng.level(self.eng.reverse(apply_move(backwards)))
+                    predecessor = level(reverse(apply_move(backwards)))
                     if predecessor not in previous:
                         frontier.add(predecessor)
             previous_heights = self.height_layers[-1]
@@ -855,8 +917,33 @@ class _CompletionReachability:
             self.height_frontier = height_frontier
             self.layers.append(previous | frontier)
             self.height_layers.append(previous_heights | height_frontier)
+        return True
+
+    def _allows(self, cursor, traversals: int, slack: float | None = None) -> bool:
+        self.checks += 1
+        self.decided = True
+        self.work_used += self.bounds.extend(traversals, self.work_left)
+        # One accumulated budget covers every remaining forced transit and the
+        # final joint. Translations add; heading and height never acquire tolerance.
+        padding = None if slack is None else _slack_padding(slack)
+        if padding is None:
+            possible = self.bounds.allows(cursor, traversals)
+        else:
+            possible = self.bounds.allows_near(cursor, traversals, padding)
+        if not possible:
+            return False
+        # An envelope depth not yet affordable leaves its permissive answer open.
+        envelope_decided = traversals < len(self.bounds.layers) or self.bounds.saturated
+        if traversals > self.horizon:
+            self.decided = envelope_decided
+            return True
+        if not self._ensure_layers(traversals):
+            self.decided = False
+            return True
         if self.eng.height(cursor) not in self.height_layers[traversals]:
             return False
+        # A pose the exact table reaches lies inside every envelope of that depth,
+        # so a membership answer is final whether or not the envelope was built.
         if padding is None:
             return self.eng.level(cursor) in self.layers[traversals]
         return self._near_layer(cursor, traversals, padding)
@@ -1128,11 +1215,13 @@ class SolverConfig:
     #: problem fits the 30-degree grid (every built-in piece does) and falls back to
     #: the general field otherwise; "lattice"/"field" force one, for tests.
     engine: str = "auto"
-    #: Reverse reachability for this many final traversals in completion
+    #: Exact reverse reachability for this many final placements in completion
     #: mode, supplemented by longer linear bounds. Zero disables both; they share
-    #: a preprocessing cap of 4096 moves (and at most max_nodes // 8). Slop fits
-    #: use physical distance enclosures with the remaining total gap budget.
-    completion_lookahead: int = 6
+    #: a preprocessing allowance of min(4096, max_nodes // 8) expansions plus 24
+    #: per DFS node spent, capped at 262,144, so only long searches pay for deep
+    #: tables. Slop fits use physical distance enclosures with the remaining
+    #: total gap budget.
+    completion_lookahead: int = 10
 
     def __post_init__(self) -> None:
         for name in ("slop", "clearance", "collision_spacing"):
@@ -1149,8 +1238,8 @@ class SolverConfig:
             type(self.max_pieces) is not int or self.max_pieces < 1
         ):
             raise ValueError("max_pieces must be a positive integer or None")
-        if type(self.completion_lookahead) is not int or not 0 <= self.completion_lookahead <= 6:
-            raise ValueError("completion_lookahead must be an integer from 0 to 6")
+        if type(self.completion_lookahead) is not int or not 0 <= self.completion_lookahead <= 12:
+            raise ValueError("completion_lookahead must be an integer from 0 to 12")
 
 
 @dataclass
@@ -1378,9 +1467,14 @@ def solve(
                 for port in range(len(placement.piece.ports))
             }
     stats.engine = eng.name
+    # Free transits only ever traverse a junction's own routes: those of a base
+    # junction with open ports, or of a junction still in stock. The allowance
+    # cap bounds every transit count the search can ask for, one extra for the
+    # candidate junction a query may add before its stock is consumed.
     completion = (
-        _CompletionReachability(eng, cfg.completion_lookahead, min(4096, cfg.max_nodes // 8),
-                                slippage=cfg.slop > 0)
+        _CompletionReachability(eng, cfg.completion_lookahead, _TABLE_WORK_CAP,
+                                slippage=cfg.slop > 0, slop=cfg.slop,
+                                budget=lambda: _completion_budget(stats.nodes, cfg.max_nodes))
         if base is not None and cfg.completion_lookahead
         else None
     )
@@ -1390,22 +1484,24 @@ def solve(
         for pid in piece_ids
     }
 
-    transit_bounds: dict[tuple[str, frozenset[int]], int] = {}
+    eligible_cache: dict[tuple[str, frozenset[int]], frozenset[int]] = {}
 
-    def transit_bound(piece: PieceType, ports: set[int]) -> int:
+    def eligible_ports(piece: PieceType, ports) -> frozenset[int]:
         # Only ports with an available route partner can participate in a transit.
-        # Each transit consumes two ports; this is an upper bound even when routes
-        # share a stem. In particular, separate switches' lone stubs cannot pair.
         key = (piece.id, frozenset(ports))
-        bound = transit_bounds.get(key)
-        if bound is None:
-            eligible_ports = {
+        eligible = eligible_cache.get(key)
+        if eligible is None:
+            eligible = eligible_cache[key] = frozenset(
                 port for route in piece.routes
                 if route.port_a in ports and route.port_b in ports
                 for port in (route.port_a, route.port_b)
-            }
-            bound = transit_bounds[key] = len(eligible_ports) // 2
-        return bound
+            )
+        return eligible
+
+    def transit_bound(piece: PieceType, ports) -> int:
+        # Each transit consumes two ports; this is an upper bound even when routes
+        # share a stem. In particular, separate switches' lone stubs cannot pair.
+        return len(eligible_ports(piece, ports)) // 2
 
     future_transits: dict[str, int] = {}
     reversing_queries: dict[str, tuple] = {}
@@ -1414,19 +1510,28 @@ def solve(
             piece = pieces[pid]
             capacity = 0
             queries = set()
+            returns = set()
             if piece.is_junction:
                 for entry, exit_port, apply_move in eng.moves[pid]:
                     free = set(range(len(piece.ports))) - piece.sealed - {entry, exit_port}
                     capacity = max(capacity, transit_bound(piece, free))
+                    frame = eng.frame(pid, entry, eng.anchor)
+                    out = apply_move(eng.anchor)
                     if cfg.reversing_loops:
-                        frame = eng.frame(pid, entry, eng.anchor)
-                        out = apply_move(eng.anchor)
                         queries.update(
                             eng.retarget(out, eng.reverse(eng.port_world(pid, port, frame)))
                             for port in free
                         )
+                    # A later free transit enters a spare port that still has a
+                    # route partner; the walk must first loop back to it.
+                    returns.update(
+                        eng.retarget(out, eng.reverse(eng.port_world(pid, port, frame)))
+                        for port in eligible_ports(piece, free)
+                    )
             future_transits[pid] = capacity
             reversing_queries[pid] = tuple(queries)
+            if capacity:
+                completion.return_queries[pid] = tuple(returns)
 
     steps: list[object] = []
     stubs: list[tuple[int, int, object]] = []  # (placement index, port, engine pose)
@@ -1471,52 +1576,76 @@ def solve(
     # growing path. Cap the per-search cache now that bounds can check longer tails.
     future_closure: dict[tuple, bool] = {}
 
-    def tail_context():
+    def tail_context(cursor, used: int, slack: float | None):
         # All candidate moves at this DFS node share these allowances and targets.
         # Recursive visits build their own context after consuming stock/stubs;
         # backtracking restores this node's state before the next candidate.
         free_by_placement: dict[int, set[int]] = {}
         for index, port, _pose in stubs:
             free_by_placement.setdefault(index, set()).add(port)
-        transits = transit_turns = 0
+        slots = min(total_pieces, depth_limit, f_limit) - used
+        owned = []  # (placement, piece id, transit count, ports with a partner)
+        loose = slots
         for index, ports in free_by_placement.items():
             if len(ports) < 2:
                 continue
             pid = placements[index][0]
-            count = transit_bound(piece_obj[pid], ports)
-            transits += count
-            transit_turns += count * turn_of[pid]
-        capacity = future = max_turn = max_free_turn = future_turns = 0
+            eligible = eligible_ports(piece_obj[pid], ports)
+            count = len(eligible) // 2
+            if count:
+                owned.append((index, pid, count, eligible))
+                loose += count
+        max_turn = 0
+        future_items = []
         future_targets = []
         for pid in piece_ids:
             count = counts[pid]
             if not count:
                 continue
+            max_turn = max(max_turn, turn_of[pid])
             free = future_transits[pid]
-            turn = turn_of[pid]
-            capacity = max(capacity, free)
-            future += count * free
-            max_turn = max(max_turn, turn)
-            max_free_turn = max(max_free_turn, free * turn)
-            future_turns += count * free * turn
+            if free:
+                future_items.append((pid, free, count))
+                loose += count * free
             if reversing_queries[pid]:
                 future_targets.append(pid)
+        # A transit through a junction the walk already owns needs the walk to
+        # reach one of that junction's spare entries first. Ask with the loosest
+        # traversal count; a candidate one move on can reach no more than this.
+        transits = transit_turns = 0
+        for index, pid, count, eligible in owned:
+            if any(
+                completion.allows(eng.retarget(cursor, eng.reverse(pose)), loose, slack)
+                for stub_index, port, pose in stubs
+                if stub_index == index and port in eligible
+            ):
+                transits += count
+                transit_turns += count * turn_of[pid]
         targets = (tuple(eng.reverse(pose) for _index, _port, pose in stubs)
                    if cfg.reversing_loops else ())
-        return (transits, capacity, future, targets, future_targets,
-                transit_turns, max_turn, max_free_turn, future_turns)
+        return (transits, transit_turns, targets, future_targets, max_turn, future_items)
 
     def tail_budget(context, used: int) -> tuple:
         """The allowances every query with this many pieces used shares."""
-        (transits, capacity, future, _targets, _future_targets,
-         transit_turns, max_turn, max_free_turn, future_turns) = context
+        transits, transit_turns, _targets, _future_targets, max_turn, future_items = context
         slots = min(total_pieces, depth_limit, f_limit) - used
+        capacity = future = max_free_turn = future_turns = 0
+        for pid, free, count in future_items:
+            # Placing this junction and looping back to it must fit the remaining
+            # placements (existing free transits may shorten the loop); otherwise
+            # the tail cannot pass through it and it lends no traversal.
+            if slots - 1 + transits <= completion.transit_floor(pid):
+                continue
+            turn = turn_of[pid]
+            capacity = max(capacity, free)
+            future += count * free
+            max_free_turn = max(max_free_turn, free * turn)
+            future_turns += count * free * turn
         transits += min(slots * capacity, future)
         transit_turns += min(slots * max_free_turn, future_turns)
         # A free crossing traversal advances the path but cannot turn it. Keep
         # its actual turning capacity separate from the relaxed traversal count.
-        return (slots, slots + transits, transit_turns,
-                min(slots * max_turn, remaining_turn))
+        return (slots, slots + transits, transit_turns, min(slots * max_turn, remaining_turn))
 
     def tail_possible(cursor, budget, context, slack: float | None,
                       extra_pid: str | None = None) -> bool:
@@ -1529,7 +1658,9 @@ def solve(
         slots, traversals, transit_turns, base_turns = budget
         if extra_pid:
             free = future_transits[extra_pid]
-            if free:
+            # This move places the junction; the loop back to it must still fit
+            # the placements left after it.
+            if free and slots + context[0] > completion.transit_floor(extra_pid):
                 traversals += free
                 transit_turns += free * turn_of[extra_pid]
         turns = base_turns + transit_turns
@@ -1538,7 +1669,7 @@ def solve(
         if need_turn24(cursor) <= turns and allows(cursor, traversals, slack):
             return True
         if cfg.reversing_loops:
-            targets, future_targets, max_turn = context[3], context[4], context[6]
+            targets, future_targets, max_turn = context[2], context[3], context[4]
             retarget = eng.retarget
             for target in targets:
                 query = retarget(cursor, target)
@@ -1560,7 +1691,9 @@ def solve(
                         possible = any(need_turn24(query) <= tail_turns
                                        and allows(query, traversals - 1, slack)
                                        for query in reversing_queries[pid])
-                        if len(future_closure) < 4096:
+                        # Rejections are final; a positive is only worth keeping
+                        # once the table has decided it rather than deferred it.
+                        if (not possible or completion.decided) and len(future_closure) < 4096:
                             future_closure[key] = possible
                     if possible:
                         return True
@@ -1691,8 +1824,8 @@ def solve(
             stats.pruned_reach += 1
             return True
 
-        context = tail_context() if completion is not None else None
         query_slack = slack_left if cfg.slop > 0 else None
+        context = tail_context(cursor, used, query_slack) if completion is not None else None
         if completion is not None and not tail_possible(
             cursor, tail_budget(context, used), context, query_slack
         ):
@@ -1913,7 +2046,7 @@ def solve(
     if completion is not None:
         stats.completion_states = len(completion.layers[-1])
         stats.completion_height_states = len(completion.height_layers[-1])
-        stats.completion_work = completion.work_limit - completion.work_left
+        stats.completion_work = completion.work_used
         stats.completion_checks = completion.checks
         stats.completion_cache_hits = completion.cache_hits
         stats.completion_bound_depth = len(completion.bounds.layers) - 1

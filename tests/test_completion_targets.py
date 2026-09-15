@@ -16,6 +16,7 @@ from duplotrain import (
 )
 from duplotrain.solver import (
     _compile_lattice,
+    _completion_budget,
     _FieldEngine,
     _flat,
     _moves_for,
@@ -29,7 +30,7 @@ def signatures(result):
 
 
 def assert_budget(result, config):
-    assert result.stats.completion_work <= min(4096, config.max_nodes // 8)
+    assert result.stats.completion_work <= _completion_budget(result.stats.nodes, config.max_nodes)
     assert (result.stats.completion_states + result.stats.completion_height_states
             <= result.stats.completion_work + 2)
 

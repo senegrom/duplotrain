@@ -11,6 +11,7 @@ from duplotrain.exact import Alg
 from duplotrain.solver import (
     _MM_SCALE,
     _compile_lattice,
+    _completion_budget,
     _CompletionBounds,
     _CompletionReachability,
     _FieldEngine,
@@ -108,7 +109,7 @@ def test_slippage_benchmarks_find_more_audited_results_with_same_budget(inputs, 
     assert reference.stats.aborted and len(improved.solutions) == 8
     assert not improved.stats.aborted and improved.stats.nodes < reference.stats.nodes
     assert improved.solutions[:len(reference.solutions)] == reference.solutions
-    assert improved.stats.completion_work <= min(4096, cfg.max_nodes // 8)
+    assert improved.stats.completion_work <= _completion_budget(improved.stats.nodes, cfg.max_nodes)
     for solution in improved.solutions:
         assert not _solution_overlaps(solution.layout, len(case.base), 120, 8)
 

@@ -332,3 +332,38 @@ Backtracking removes a placement's cell entries by placement rather than by
 stack position, because a late-binned placement may sit below a newer one in a
 shared cell. The final overlap audit of every returned layout is unchanged and
 still bins eagerly.
+
+## Free transits need a reachable entry
+
+A free transit passes through a junction without spending a placement, so the
+completion tables were asked with one extra traversal per possible transit. Two
+exact conditions now gate that allowance.
+
+A junction still in stock can only be transited by a tail that first places it
+and then loops back to one of its spare ports that still has a route partner.
+For each junction type the solver stores the return queries: from the exit of
+every route, the reversed pose of every such port, retargeted onto the anchor
+exactly like reversing targets. `transit_floor` reports the largest complete
+layer depth in which no return query appears, so a return loop needs more
+traversals than that; in slippage mode the physical near test with the whole gap
+budget is used, and heights are checked exactly. The allowance is granted only
+when the remaining placements minus the junction itself, plus the free transits
+already available to shorten the loop, exceed the floor. A candidate junction is
+placed by its own move, so its loop must fit the placements left after it. The
+floor only grows as layers are published and becomes final at the first layer
+that contains a return query, so it can never overstate the loop.
+
+A junction already placed can only be transited after the walk reaches one of
+its spare entries. Each DFS node asks the tables, with the loosest traversal
+count and the remaining slop, whether the cursor can reach any such entry; a
+placement whose entries are all unreachable lends no traversal and no turn. A
+candidate one move on can reach no more than its parent, so the node's answer
+covers its candidates as well.
+
+Table preprocessing grows with the search effort. Every answer is either final
+(a rejection, or a membership found in a published layer, which no later layer
+can undo) or permissive because a depth was not yet affordable; only final
+answers are cached, and a permissive one is asked again when the allowance has
+grown. Comparing a cached search with an uncached one therefore gives the same
+decisions at every node; only the moment some layer was built can differ, which
+the regression in `tests/test_completion_reuse.py` allows for.

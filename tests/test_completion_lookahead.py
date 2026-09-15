@@ -114,7 +114,7 @@ def test_editor_can_apply_a_completion_from_the_improved_search():
     assert session.layout.placements[:len(base)] == base.placements
 
 
-@pytest.mark.parametrize("lookahead", [-1, 7, 1.5, True])
+@pytest.mark.parametrize("lookahead", [-1, 13, 1.5, True])
 def test_invalid_lookahead_is_rejected(lookahead):
     with pytest.raises(ValueError, match="completion_lookahead"):
         SolverConfig(completion_lookahead=lookahead)

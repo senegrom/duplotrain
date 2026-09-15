@@ -38,7 +38,12 @@ def table_for(engine, pids=("straight",), max_work=4096):
 def assert_same_search(cached, reference):
     assert cached.solutions == reference.solutions
     old, new = asdict(reference.stats), asdict(cached.stats)
-    for key in ("duration_s", "completion_cache_hits", "completion_checks"):
+    # Preprocessing grows with the search effort and a repeated query may extend
+    # it a little earlier when evaluated afresh; every answer and therefore every
+    # search decision is the same, only the moment some layer was built differs.
+    for key in ("duration_s", "completion_cache_hits", "completion_checks", "completion_work",
+                "completion_states", "completion_height_states", "completion_bound_depth",
+                "completion_bound_states"):
         old.pop(key)
         new.pop(key)
     assert old == new
@@ -161,8 +166,10 @@ def test_solver_releases_cached_poses_on_success_and_callback_failure(monkeypatc
     base = build_chain([(catalog["straight"], 0, 1)] * 2 + [(catalog["curve"], 0, 1)] * 4)
     inventory = {"curve": 20, "straight": 6, "ramp": 2, "span": 2,
                  "switch": 2, "crossing": 1, "slope": 2}
-    config = SolverConfig(min_pieces=0, max_pieces=20, max_results=8, max_nodes=60_000,
-                          slop=slop, reversing_loops=True,
+    # The eight-result search now ends before the first progress report, so the
+    # interrupted variant keeps searching until the callback fires.
+    config = SolverConfig(min_pieces=0, max_pieces=20, max_results=1000 if interrupt else 8,
+                          max_nodes=60_000, slop=slop, reversing_loops=True,
                           progress=progress if interrupt else None)
     if interrupt:
         with pytest.raises(RuntimeError, match="cancelled by caller"):
