@@ -15,6 +15,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import cmp_to_key, lru_cache
+from math import gcd, lcm
 from typing import TYPE_CHECKING
 
 from .exact import Alg
@@ -232,6 +233,107 @@ def _identity(curve: _Curve) -> tuple:
     )
 
 
+def _rotation_ints() -> tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]:
+    """Four times the exact cosine and sine of every heading, as integer vectors."""
+    table = []
+    for heading in range(HEADING_STEPS):
+        pair = []
+        for value in cos_sin(heading):
+            scaled = [coefficient * 4 for coefficient in value.coeffs()]
+            assert all(f.denominator == 1 for f in scaled)
+            pair.append(tuple(int(f) for f in scaled))
+        table.append(tuple(pair))
+    return tuple(table)
+
+
+_ROTATION_INTS = _rotation_ints()
+
+
+def _mul4(u: tuple[int, ...], v: tuple[int, ...]) -> tuple[int, int, int, int]:
+    """Product in Q(sqrt2, sqrt3) of two coefficient vectors over 1, sqrt2, sqrt3, sqrt6."""
+    a, b, c, d = u
+    p, q, r, s = v
+    return (
+        a * p + 2 * b * q + 3 * c * r + 6 * d * s,
+        a * q + b * p + 3 * (c * s + d * r),
+        a * r + c * p + 2 * (b * s + d * q),
+        a * s + d * p + b * r + c * q,
+    )
+
+
+def _canonical_frame(curve: _Curve) -> tuple[int, bool]:
+    """The rotation and reflection whose exact frame identity is smallest.
+
+    Equivalent to comparing the exact identities of all 48 frames, but in integer
+    arithmetic: every centred point becomes integer coefficient vectors over one
+    common denominator, each rotation is an integer bilinear map, and a frame's
+    identity is reduced by the gcd of its entries, so congruent curves that
+    arrive with different denominators still compare equal and pick the same
+    frame. Only that frame is then materialised exactly and sampled.
+    """
+    exact: set[_Point] = set(curve.isolated)
+    for a, b in curve.lines:
+        exact.update((a, b))
+    for centre, _radius, _sectors in curve.circles:
+        exact.add(centre)
+    if not exact:
+        return 0, False
+    centred = {
+        point: tuple((value - offset).coeffs()
+                     for value, offset in zip(point, curve.origin, strict=True))
+        for point in exact
+    }
+    denominator = 1
+    for vectors in centred.values():
+        for vector in vectors:
+            for coefficient in vector:
+                denominator = lcm(denominator, coefficient.denominator)
+    ints = {
+        point: tuple(tuple(int(coefficient * denominator) for coefficient in vector)
+                     for vector in vectors)
+        for point, vectors in centred.items()
+    }
+    circles = [(centre, radius.coeffs(), sectors) for centre, radius, sectors in curve.circles]
+    best = None
+    for mirror in (False, True):
+        for heading in range(HEADING_STEPS):
+            cosine, sine = _ROTATION_INTS[heading]
+            moved = {}
+            for point, (x, y, z) in ints.items():
+                if mirror:
+                    y = tuple(-value for value in y)
+                cx, sy = _mul4(cosine, x), _mul4(sine, y)
+                sx, cy = _mul4(sine, x), _mul4(cosine, y)
+                moved[point] = (
+                    tuple(u - v for u, v in zip(cx, sy, strict=True)),
+                    tuple(u + v for u, v in zip(sx, cy, strict=True)),
+                    tuple(4 * value for value in z),
+                )
+            common = 4 * denominator
+            for vectors in moved.values():
+                for vector in vectors:
+                    for value in vector:
+                        common = gcd(common, value)
+            reduced = {
+                point: tuple(tuple(value // common for value in vector) for vector in vectors)
+                for point, vectors in moved.items()
+            }
+            identity = (
+                4 * denominator // common,
+                tuple(sorted(tuple(sorted((reduced[a], reduced[b]))) for a, b in curve.lines)),
+                tuple(sorted(
+                    (reduced[centre], radius,
+                     tuple(sorted((heading - h - 1 if mirror else heading + h) % HEADING_STEPS
+                                  for h in sectors)))
+                    for centre, radius, sectors in circles
+                )),
+                tuple(sorted(reduced[point] for point in curve.isolated)),
+            )
+            if best is None or identity < best[0]:
+                best = (identity, heading, mirror)
+    return best[1], best[2]
+
+
 def _spacing(spacing: float) -> None:
     if not math.isfinite(spacing) or spacing <= 0:
         raise ValueError("spacing must be finite and positive")
@@ -298,25 +400,19 @@ def curve_key(layout: Layout, spacing: float, decimals: int) -> tuple:
         return tuple(sorted({tuple(round(v, decimals) for v in p)
                              for p in _sample(frame, spacing, mirror_opaque=mirror)}))
 
-    best_key = best_curve = None
-    best_sample: tuple | None = None
-    for mirror in (False, True):
-        for heading in range(HEADING_STEPS):
-            frame = _in_frame(curve, heading, mirror)
-            if curve.opaque:
-                # No exact primitive descriptor exists for arbitrary user Segment
-                # implementations. Preserve their sampled shape across the orbit.
-                candidate = rounded(frame, mirror)
+    if curve.opaque:
+        # No exact primitive descriptor exists for arbitrary user Segment
+        # implementations. Preserve their sampled shape across the orbit.
+        best_sample: tuple | None = None
+        for mirror in (False, True):
+            for heading in range(HEADING_STEPS):
+                candidate = rounded(_in_frame(curve, heading, mirror), mirror)
                 if best_sample is None or candidate < best_sample:
                     best_sample = candidate
-                continue
-            key = _identity(frame)
-            if best_key is None or key < best_key:
-                best_key, best_curve = key, frame
-    if best_sample is not None:
+        assert best_sample is not None
         return best_sample
-    assert best_curve is not None
-    return rounded(best_curve)
+    heading, mirror = _canonical_frame(curve)
+    return rounded(_in_frame(curve, heading, mirror))
 
 
 def curve_length(layout: Layout) -> float:

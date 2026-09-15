@@ -389,3 +389,18 @@ searches never do this: a base breaks the symmetry. On the corpus enumerations
 this halves the work exactly with identical results: the 12-curve, 2-straight
 loop search fell from 6,539 to 3,271 nodes and the level-crossing search from
 326,442 to 163,231. `stats.pruned_mirror` counts the skipped candidates.
+
+## Congruence keys choose their frame in integer arithmetic
+
+The exact-frame congruence key applied every lattice rotation and reflection to
+the exact primitives with field arithmetic before choosing the canonical frame,
+which made keying a layout about 3.5 times slower than the older sampled key.
+The frame is now chosen in integer arithmetic: every centred point becomes
+integer coefficient vectors over one common denominator, each rotation is an
+integer bilinear map (four times the exact cosine and sine are integer vectors
+in the same basis), and a frame's identity is reduced by the gcd of its entries
+so congruent curves that arrive with different denominators still compare
+equal. Only the chosen frame is then materialised exactly and sampled, so the
+key of a curve is unchanged whenever the same frame wins. On the 671-layout
+corpus, keying fell from 46.7 ms to 6.7 ms per layout, faster than the sampled
+key it replaced (13.4 ms), with the same 611 classes and no merges or splits.

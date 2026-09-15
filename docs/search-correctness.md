@@ -383,3 +383,20 @@ both are mirror-symmetric. A result-limited search may therefore return the
 left-handed representative of a class where it used to return the right-handed
 one; complete searches return the same signature set, as the corpus loop
 enumerations confirm.
+
+## The canonical frame is chosen on reduced integer identities
+
+Choosing the frame requires only a total order on the exact frame identities
+that every member of an orbit computes identically. Centred coordinates are
+rotation-equivariant, so all 48 frames of a curve and of any congruent curve
+form the same set of exact geometries. Each is represented by integer
+coefficient vectors over a common denominator and reduced by the gcd of all
+entries and that denominator; a rational vector set has exactly one such
+reduced form, so equal geometries get equal identities whatever denominators
+they arrived with, and the smallest identity names the same frame for every
+member of the orbit. Ties can only occur between frames with identical
+geometry, which sample to the same points. The chosen frame is materialised
+with the unchanged exact transform, so the sampled key is exactly the one that
+frame produced before; only which frame wins can differ from the previous
+implementation, so cached keys should be regenerated as before. Opaque custom
+segments keep the sampled-orbit fallback.
