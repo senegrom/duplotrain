@@ -1249,6 +1249,7 @@ class SolveStats:
     pruned_turn: int = 0
     pruned_reach: int = 0
     pruned_collision: int = 0
+    pruned_mirror: int = 0  # right-handed first turns skipped in loop mode
     pruned_completion: int = 0
     completion_states: int = 0  # planar states in the largest complete reverse layer
     duration_s: float = 0.0
@@ -1387,6 +1388,28 @@ def solve(
     piece_rank = {pid: _rank(pid) for pid in piece_ids}
     canon_for = {pid: _canonical_traversals(p) for pid, p in piece_obj.items()}
     mirror_for = {pid: _mirror_traversals(p) for pid, p in piece_obj.items()}
+
+    # Loop mode explores one handedness only. The mirror image of every loop is
+    # another loop with the same canonical signature, so a walk whose first
+    # turning move is right-handed can only repeat what its left-handed twin
+    # finds. That needs every stock traversal to have a buildable mirror twin; a
+    # single-handed piece would leave the twin loop unconstructible and its
+    # signature distinct. A base breaks the symmetry, so completion mode never does this.
+    def _move_sign(move: Move) -> int:
+        turn = move.dheading % HEADING_STEPS
+        if turn and turn != HEADING_STEPS // 2:
+            return 1 if turn < HEADING_STEPS // 2 else -1
+        if move.dy == 0:
+            return 0
+        return 1 if move.dy > 0 else -1
+
+    chirality = {
+        (move.piece_id, move.entry, move.exit): _move_sign(move)
+        for pid in piece_ids for move in moves_by_piece[pid]
+    }
+    one_handed = base is None and all(
+        twin is not None for pid in piece_ids for twin in mirror_for[pid].values()
+    )
     port_mirror_for = {pid: _mirror_ports(p) for pid, p in piece_obj.items()}
     span_of = {pid: _max_span(p) for pid, p in piece_obj.items()}
     turn_of = {pid: _turn_capacity(p) for pid, p in piece_obj.items()}
@@ -1736,12 +1759,14 @@ def solve(
             kind="loop" if reversing_target is None else "reversing",
         )
 
-    def dfs(cursor, used: int, slack_used: float, prev_index: int | None) -> bool:
+    def dfs(cursor, used: int, slack_used: float, prev_index: int | None,
+            handed: bool) -> bool:
         """Depth-first over moves; returns False when global limits say stop.
 
         *prev_index* is the placement owning the connector the walk currently stands
         on -- the last piece placed, or the junction just transited -- which the next
-        placement legitimately butts against.
+        placement legitimately butts against. *handed* is False only while a
+        one-handed loop search has not yet placed a turning move.
         """
         nonlocal remaining_span, remaining_turn
         if len(solutions) >= cfg.max_results:
@@ -1878,7 +1903,7 @@ def solve(
                         out_pose = eng.port_world(stub_pid, exit_port, frame)
                     stubs[:] = [s for k, s in enumerate(snapshot) if k not in (i, j)]
                     steps.append(_Transit(pidx, port, exit_port))
-                    keep_going = dfs(out_pose, used, slack_used + joint_gap, pidx)
+                    keep_going = dfs(out_pose, used, slack_used + joint_gap, pidx, handed)
                     steps.pop()
                     stubs[:] = snapshot
                     if not keep_going:
@@ -1900,6 +1925,9 @@ def solve(
                 continue  # the joint would stack two overhanging plates
             rank = piece_rank[pid]
             for entry, exit_port, apply_move in eng.moves[pid]:
+                if not handed and chirality[(pid, entry, exit_port)] < 0:
+                    stats.pruned_mirror += 1
+                    continue
                 child = apply_move(cursor)
                 candidates.append(
                     (candidate_score(child, stub_refs), rank, pid, entry, exit_port, child)
@@ -1988,7 +2016,8 @@ def solve(
                     new_stubs += 1
             steps.append(_Place(pid, entry, exit_port))
 
-            keep_going = dfs(next_cursor, used + 1, slack_used, index)
+            keep_going = dfs(next_cursor, used + 1, slack_used, index,
+                             handed or chirality[(pid, entry, exit_port)] != 0)
 
             steps.pop()
             for _ in range(new_stubs):
@@ -2010,7 +2039,7 @@ def solve(
             # Loop mode enumerates everything reachable; one full-depth pass.
             f_limit = depth_limit
             stats.max_pieces_searched = f_limit
-            dfs(eng.start_cursor, 0, 0.0, start_prev)
+            dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed)
         else:
             # Completion mode runs IDA*: grow the pieces-needed contour until closures
             # appear.  Uninformed depth-first dies here whenever the inventory is broad
@@ -2023,7 +2052,7 @@ def solve(
             first_limit = 0 if cfg.min_pieces == 0 else 1
             for f_limit in range(first_limit, depth_limit + 1):
                 stats.max_pieces_searched = f_limit
-                if not dfs(eng.start_cursor, 0, 0.0, start_prev):
+                if not dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed):
                     break
                 if len(solutions) >= cfg.max_results or stats.aborted:
                     break

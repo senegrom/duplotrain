@@ -367,3 +367,19 @@ answers are cached, and a permissive one is asked again when the allowance has
 grown. Comparing a cached search with an uncached one therefore gives the same
 decisions at every node; only the moment some layer was built can differ, which
 the regression in `tests/test_completion_reuse.py` allows for.
+
+## Loop mode explores one handedness
+
+A loop built from moves `m1 ... mn` has a mirror image built from their mirror
+twins, which the canonical signature already folds onto the same key. While a
+loop search has not yet placed a turning move (a move whose heading change or
+lateral offset is nonzero), right-handed candidates are skipped; every loop they
+would lead to is the mirror of a loop the left-handed branch finds, with the
+same achiral prefix. The rule is applied only when every stock traversal has a
+mirror twin, because a single-handed piece would make the twin loop
+unconstructible and its signature distinct, and never in completion mode, where
+the base fixes the handedness. Reversing closures and transits are unaffected:
+both are mirror-symmetric. A result-limited search may therefore return the
+left-handed representative of a class where it used to return the right-handed
+one; complete searches return the same signature set, as the corpus loop
+enumerations confirm.

@@ -378,3 +378,14 @@ about 20 ms longer because they now build exact layers to depth eight or nine
 that a 200-node search cannot use. In the mixed case the tables prove that a
 return loop through the crossing needs more than seven traversals, so the
 allowance only applies to the first two placements of a ten-piece completion.
+
+## One-handed loop search
+
+In loop mode the mirror image of every loop is another loop with the same
+canonical signature, found again by a walk whose first turning move goes the
+other way. When every stock traversal has a buildable mirror twin, the search
+now skips right-handed moves until a turning move has been placed. Completion
+searches never do this: a base breaks the symmetry. On the corpus enumerations
+this halves the work exactly with identical results: the 12-curve, 2-straight
+loop search fell from 6,539 to 3,271 nodes and the level-crossing search from
+326,442 to 163,231. `stats.pruned_mirror` counts the skipped candidates.
