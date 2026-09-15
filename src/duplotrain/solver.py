@@ -687,16 +687,32 @@ class _CompletionBounds:
 
     @staticmethod
     def _lattice_envelope(pose) -> tuple[tuple, tuple]:
+        # The same arithmetic as _outward and _physical_envelope over the lattice
+        # coordinates x = (2a + c + b*sqrt3) / 40 and y = (2d + b + c*sqrt3) / 40,
+        # written out flat: this runs once for every pose of every slippage layer.
         a, b, c, d, z, _heading = pose
         root_low, root_high = _ROOT_BOUNDS[1]
-
-        def coordinate(rational, radical):
-            low = rational * _MM_SCALE + radical * (root_low if radical >= 0 else root_high)
-            high = rational * _MM_SCALE + radical * (root_high if radical >= 0 else root_low)
-            # Avoid float division, including for very large integer coefficients.
-            return _outward(low // 40, -(-high // 40))
-
-        return _physical_envelope(coordinate(2 * a + c, b), coordinate(2 * d + b, c), (z,))
+        rational = (2 * a + c) * _MM_SCALE
+        if b >= 0:
+            low, high = rational + b * root_low, rational + b * root_high
+        else:
+            low, high = rational + b * root_high, rational + b * root_low
+        # Avoid float division, including for very large integer coefficients.
+        low, high = low // 40, -(-high // 40)
+        guard = (abs(low) + abs(high)) // 2**40 + 2
+        x0, x1 = low - guard, high + guard
+        rational = (2 * d + b) * _MM_SCALE
+        if c >= 0:
+            low, high = rational + c * root_low, rational + c * root_high
+        else:
+            low, high = rational + c * root_high, rational + c * root_low
+        low, high = low // 40, -(-high // 40)
+        guard = (abs(low) + abs(high)) // 2**40 + 2
+        y0, y1 = low - guard, high + guard
+        return (
+            (x0, y0, x0 + y0, x0 - y1, 2 * x0 + y0, 2 * x0 - y1, x0 + 2 * y0, x0 - 2 * y1, z),
+            (x1, y1, x1 + y1, x1 - y0, 2 * x1 + y1, 2 * x1 - y0, x1 + 2 * y1, x1 - 2 * y0, z),
+        )
 
     @staticmethod
     def _field_envelope(pose: Pose) -> tuple[tuple, tuple]:
@@ -823,10 +839,31 @@ class _CompletionReachability:
         self.rises = {eng.height(pose) - eng.height(eng.anchor) for pose, _ in endpoints}
         self.layers = [frozenset((eng.level(eng.anchor),))]
         self.frontier = self.layers[0]
+        self.frontiers = [self.frontier]  # the poses each layer added
         self.height_layers = [frozenset((eng.height(eng.anchor),))]
         self.height_frontier = self.height_layers[0]
         self.bounds = _CompletionBounds(eng, slippage=slippage)
         self.near_indices: dict[int, dict] = {}
+        self._boxes: dict = {}  # pose -> physical box, computed once per pose
+        # Moves are rigid, so a predecessor is the pose plus a delta that depends
+        # only on the heading. Tabulate it once instead of reversing, moving and
+        # reversing again for every expansion. Lattice poses are int tuples; the
+        # field keeps exact Pose deltas.
+        self._lattice = eng.name == "lattice"
+        headings = range(12) if self._lattice else range(HEADING_STEPS)
+        zero = ((lambda h: (0, 0, 0, 0, 0, h)) if self._lattice
+                else (lambda h: Pose.make(heading=h)))
+        self.predecessors = []
+        for heading in headings:
+            pose = zero(heading)
+            deltas = set()
+            for apply_move in self.moves:
+                predecessor = eng.level(eng.reverse(apply_move(eng.reverse(pose))))
+                if self._lattice:
+                    deltas.add((*predecessor[:4], predecessor[5]))
+                else:
+                    deltas.add((predecessor.x, predecessor.y, predecessor.heading))
+            self.predecessors.append(tuple(deltas))
         # Geometry-only answers are independent of stock, stubs, and collisions.
         # Keep this cache on the search object; keys contain only immutable poses.
         self.cache: OrderedDict[tuple, bool] = OrderedDict()
@@ -894,7 +931,7 @@ class _CompletionReachability:
 
     def _ensure_layers(self, traversals: int) -> bool:
         """Publish layers up to *traversals*; False leaves the query permissive."""
-        reverse, level = self.eng.reverse, self.eng.level
+        predecessors = self.predecessors
         while len(self.layers) <= traversals:
             work = (len(self.frontier) * len(self.moves)
                     + len(self.height_frontier) * len(self.rises))
@@ -903,17 +940,25 @@ class _CompletionReachability:
             self.work_used += work
             previous = self.layers[-1]
             frontier = set()
-            for pose in self.frontier:
-                backwards = reverse(pose)
-                for apply_move in self.moves:
-                    predecessor = level(reverse(apply_move(backwards)))
-                    if predecessor not in previous:
-                        frontier.add(predecessor)
+            if self._lattice:
+                for a, b, c, d, _z, heading in self.frontier:
+                    for da, db, dc, dd, next_heading in predecessors[heading]:
+                        predecessor = (a + da, b + db, c + dc, d + dd, 0, next_heading)
+                        if predecessor not in previous:
+                            frontier.add(predecessor)
+            else:
+                for pose in self.frontier:
+                    x, y = pose.x, pose.y
+                    for dx, dy, next_heading in predecessors[pose.heading]:
+                        predecessor = Pose(x + dx, y + dy, 0, next_heading)
+                        if predecessor not in previous:
+                            frontier.add(predecessor)
             previous_heights = self.height_layers[-1]
             height_frontier = {
                 height + rise for height in self.height_frontier for rise in self.rises
             } - previous_heights
             self.frontier = frontier
+            self.frontiers.append(frontier)
             self.height_frontier = height_frontier
             self.layers.append(previous | frontier)
             self.height_layers.append(previous_heights | height_frontier)
@@ -948,6 +993,36 @@ class _CompletionReachability:
             return self.eng.level(cursor) in self.layers[traversals]
         return self._near_layer(cursor, traversals, padding)
 
+    def _near_index(self, traversals: int) -> dict:
+        """Boxes of a layer by heading, sorted by their left edge.
+
+        Layers are cumulative, so the index of depth k is the index of depth k-1
+        plus the boxes of the poses that depth added; each pose's box is computed
+        once and shared by every depth that contains it.
+        """
+        boxes, enclose, heading_of = self._boxes, self.bounds.enclose, self.bounds.heading
+        start = max(k for k in range(traversals + 1) if k in self.near_indices or k == 0)
+        grouped: dict[int, list] = {}
+        if start in self.near_indices:
+            grouped = {heading: list(group[0])
+                       for heading, group in self.near_indices[start].items()}
+            start += 1
+        for depth in range(start, traversals + 1):
+            for pose in self.frontiers[depth] if depth else self.layers[0]:
+                box = boxes.get(pose)
+                if box is None:
+                    low, high = enclose(pose)
+                    box = boxes[pose] = (low[0], high[0], low[1], high[1])
+                grouped.setdefault(heading_of(pose), []).append(box)
+            index = {}
+            for heading, group in grouped.items():
+                group.sort()
+                index[heading] = (group, tuple(box[0] for box in group),
+                                  max(box[1] - box[0] for box in group))
+            self.near_indices[depth] = index
+            grouped = {heading: list(group) for heading, group in grouped.items()}
+        return self.near_indices[traversals]
+
     def _near_layer(self, cursor, traversals: int, slack: int) -> bool:
         """Query a complete short layer by physical bounding boxes, not coefficients.
 
@@ -957,17 +1032,7 @@ class _CompletionReachability:
         """
         index = self.near_indices.get(traversals)
         if index is None:
-            grouped: dict[int, list] = {}
-            for pose in self.layers[traversals]:
-                low, high = self.bounds.enclose(pose)
-                grouped.setdefault(self.bounds.heading(pose), []).append(
-                    (low[0], high[0], low[1], high[1]))
-            index = {}
-            for heading, boxes in grouped.items():
-                boxes.sort()
-                index[heading] = (boxes, tuple(box[0] for box in boxes),
-                                  max(box[1] - box[0] for box in boxes))
-            self.near_indices[traversals] = index
+            index = self._near_index(traversals)
         group = index.get(self.bounds.heading(cursor))
         if group is None:
             return False
@@ -1635,16 +1700,18 @@ def solve(
         # A transit through a junction the walk already owns needs the walk to
         # reach one of that junction's spare entries first. Ask with the loosest
         # traversal count; a candidate one move on can reach no more than this.
+        reverse, retarget, allows = eng.reverse, eng.retarget, completion.allows
+        entries = [(index, port, reverse(pose)) for index, port, pose in stubs]
         transits = transit_turns = 0
         for index, pid, count, eligible in owned:
             if any(
-                completion.allows(eng.retarget(cursor, eng.reverse(pose)), loose, slack)
-                for stub_index, port, pose in stubs
+                allows(retarget(cursor, entry), loose, slack)
+                for stub_index, port, entry in entries
                 if stub_index == index and port in eligible
             ):
                 transits += count
                 transit_turns += count * turn_of[pid]
-        targets = (tuple(eng.reverse(pose) for _index, _port, pose in stubs)
+        targets = (tuple(entry for _index, _port, entry in entries)
                    if cfg.reversing_loops else ())
         return (transits, transit_turns, targets, future_targets, max_turn, future_items)
 

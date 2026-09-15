@@ -404,3 +404,32 @@ equal. Only the chosen frame is then materialised exactly and sampled, so the
 key of a curve is unchanged whenever the same frame wins. On the 671-layout
 corpus, keying fell from 46.7 ms to 6.7 ms per layout, faster than the sampled
 key it replaced (13.4 ms), with the same 611 classes and no merges or splits.
+
+## Cheaper tables: incremental slippage indexes, predecessor deltas, flat envelopes
+
+Profiling the searches after the return-loop floors showed the reverse tables
+themselves as the next cost: layer expansion reversed, moved and reversed every
+pose for every move, slippage searches re-enclosed every pose of a cumulative
+layer for every depth they queried, and the lattice envelope was built from
+nested helpers and generator expressions once per pose of every layer.
+
+Moves are rigid, so a predecessor is the pose plus a delta that depends only on
+the heading; the deltas are tabulated once per search and expansion is one tuple
+addition. Slippage indexes are built incrementally: each pose's physical box is
+computed once, and the index of depth k extends the index of depth k-1 by the
+poses that depth added. The lattice envelope is one flat function with the same
+integer arithmetic (checked identical on 20,000 random poses). Each DFS node
+also reverses its open stubs once for both the transit and the target queries.
+
+Every node count, result fingerprint and pruning counter is unchanged on all 30
+benchmark cases and the seven differentials. CPU time (process time, minimum
+of five runs, so machine load does not distort it), 25,000-node budget:
+
+| Case | Before | After |
+| --- | ---: | ---: |
+| Mixed gap, broad inventory, 1 mm | 0.39 s | 0.25 s |
+| Mixed gap, broad inventory, 5 mm | 0.42 s | 0.25 s |
+| Switch, broad inventory, exact | 0.36 s | 0.28 s |
+| Switch, broad inventory, 5 mm | 0.91 s | 0.52 s |
+| Long gap, 5 mm | 47 ms | 31 ms |
+| Whole suite | 3.48 s | 2.20 s |
