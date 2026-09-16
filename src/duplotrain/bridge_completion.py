@@ -16,7 +16,7 @@ from .exact import ZERO
 from .geometry import ORIGIN
 from .layout import End, Layout, Placement, build_chain
 from .pieces import Path, PieceType, Port, Ramp, Route
-from .solver import Solution, SolveResult, SolverConfig, _solution_overlaps, solve
+from .solver import Solution, SolverConfig, SolveResult, _solution_overlaps, solve
 
 _BRIDGE_ID = "_completion_bridge"
 _RECIPE = (("ramp", 0, 1), ("span", 0, 1), ("span", 1, 0), ("ramp", 1, 0))
