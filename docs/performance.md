@@ -455,3 +455,33 @@ key byte-identical (checked on all 671 corpus layouts):
 CPU time (minimum of two runs): keying the 671-layout corpus 4.47 s to 2.31 s;
 enumerating the corpus network problem with 109 classes 12.0 s to 7.0 s, the
 36-class switch problem 3.5 s to 2.3 s, identical result sets.
+
+## Forward probes decide depths the tables have not built
+
+The exact tables stop at the depth the progressive budget has bought, and every
+query beyond it was answered by the loose envelopes. A pose reaches the anchor
+within `depth + gap` moves exactly when some pose at most `gap` forward moves
+ahead of it lies in the layer of `depth`, so a query up to three moves beyond
+the deepest built layer is now decided by expanding the queried pose forward
+and testing each frontier against that layer, with a cap of 1,024 expanded
+poses per probe. Probes answer only the queries actually asked, so they cost
+nothing for the tens of thousands of poses a deeper layer would hold, and
+their answers are exact and final. The base allowance alone builds five to six
+layers at once, so probes give exact answers at depths eight to nine from the
+first node, and up to twelve or thirteen once the search has earned the deeper
+layers.
+
+Result fingerprints are identical on all 30 benchmark cases, the seven
+differentials and the crossing-centric set. CPU time (process time, minimum of
+five runs), 25,000-node budget:
+
+| Case | Nodes before | Nodes after | Before | After |
+| --- | ---: | ---: | ---: | ---: |
+| Mixed gap, broad inventory, exact | 2,690 | 622 | 0.14 s | 0.05 s |
+| Mixed gap, broad inventory, 5 mm | 3,160 | 636 | 0.34 s | 0.11 s |
+| Switch, broad inventory, exact | 3,999 | 604 | 0.31 s | 0.05 s |
+| Switch, broad inventory, 5 mm | 4,098 | 604 | 0.55 s | 0.19 s |
+| Whole suite | | | 2.50 s | 0.83 s |
+
+At the start of this work the mixed case took 16,451 nodes and 1.12 s.
+`stats.completion_probes` reports the poses probes expanded.

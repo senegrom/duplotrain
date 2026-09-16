@@ -400,3 +400,20 @@ with the unchanged exact transform, so the sampled key is exactly the one that
 frame produced before; only which frame wins can differ from the previous
 implementation, so cached keys should be regenerated as before. Opaque custom
 segments keep the sampled-orbit fallback.
+
+## Forward probes are exact
+
+Let `L_d` be the complete layer of depth `d`: every projection that reaches the
+anchor in at most `d` traversals. A cursor lies in `L_{d+g}` if and only if some
+pose reached from it by at most `g` forward moves lies in `L_d`. If a route of
+length at most `d + g` exists, either it has at least `g` moves, and its pose
+after `g` moves has at most `d` moves left, or it is shorter and ends at the
+anchor, which every layer contains, after fewer than `g` moves. Conversely a
+pose in `L_d` reached after `i <= g` moves gives a route of at most `i + d`
+moves. The probe therefore expands the cursor forward level by level, over the
+same pooled moves the layers use, and tests each level against `L_d`; heights
+are checked separately against their own exact layer at the queried depth, as
+before. Slippage translates the remainder of a route at its forced joints, never
+the cursor's own first moves, so the same argument holds with the near test at
+depth `d`. A probe that exceeds its expansion cap leaves the query permissive
+and undecided, exactly like an unaffordable layer.

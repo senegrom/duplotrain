@@ -41,9 +41,9 @@ def assert_same_search(cached, reference):
     # Preprocessing grows with the search effort and a repeated query may extend
     # it a little earlier when evaluated afresh; every answer and therefore every
     # search decision is the same, only the moment some layer was built differs.
-    for key in ("duration_s", "completion_cache_hits", "completion_checks", "completion_work",
-                "completion_states", "completion_height_states", "completion_bound_depth",
-                "completion_bound_states"):
+    for key in ("duration_s", "completion_cache_hits", "completion_checks", "completion_probes",
+                "completion_work", "completion_states", "completion_height_states",
+                "completion_bound_depth", "completion_bound_states"):
         old.pop(key)
         new.pop(key)
     assert old == new
@@ -86,7 +86,9 @@ def test_broad_inventory_avoids_most_repeated_geometry_checks(monkeypatch):
     reference = solve(inventory, catalog, config, base=base)
     assert len(cached.solutions) == 8
     assert_same_search(cached, reference)
-    assert cached.stats.completion_checks < reference.stats.completion_checks // 5
+    # Forward probes made this search much shorter, so fewer queries repeat;
+    # the cache still answers well over three quarters of them.
+    assert cached.stats.completion_checks < reference.stats.completion_checks // 4
 
 
 @pytest.mark.parametrize("engine", ["lattice", "field"])

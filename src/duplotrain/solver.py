@@ -612,6 +612,11 @@ _MM_SCALE = 10**9
 #: the total. Short searches never pay for deep tables; long ones earn them.
 _TABLE_WORK_PER_NODE = 24
 _TABLE_WORK_CAP = 1 << 18
+#: A query a few moves beyond the deepest built layer is decided by expanding
+#: the queried pose forward that many moves and testing the frontier against
+#: that layer; this bounds the depth and the poses one probe may expand.
+_PROBE_DEPTH = 3
+_PROBE_WORK = 1024
 
 
 def _slack_padding(slack: float) -> int:
@@ -854,16 +859,23 @@ class _CompletionReachability:
         zero = ((lambda h: (0, 0, 0, 0, 0, h)) if self._lattice
                 else (lambda h: Pose.make(heading=h)))
         self.predecessors = []
+        self.successors = []
         for heading in headings:
             pose = zero(heading)
             deltas = set()
+            forward = set()
             for apply_move in self.moves:
                 predecessor = eng.level(eng.reverse(apply_move(eng.reverse(pose))))
+                successor = eng.level(apply_move(pose))
                 if self._lattice:
                     deltas.add((*predecessor[:4], predecessor[5]))
+                    forward.add((*successor[:4], successor[5]))
                 else:
                     deltas.add((predecessor.x, predecessor.y, predecessor.heading))
+                    forward.add((successor.x, successor.y, successor.heading))
             self.predecessors.append(tuple(deltas))
+            self.successors.append(tuple(forward))
+        self.probes = 0
         # Geometry-only answers are independent of stock, stubs, and collisions.
         # Keep this cache on the search object; keys contain only immutable poses.
         self.cache: OrderedDict[tuple, bool] = OrderedDict()
@@ -929,12 +941,26 @@ class _CompletionReachability:
             self.cache[key] = result
         return result
 
+    def _ensure_heights(self, traversals: int) -> bool:
+        """Publish height layers up to *traversals*; they stay small and cheap."""
+        while len(self.height_layers) <= traversals:
+            work = len(self.height_frontier) * len(self.rises)
+            if work > self.work_left:
+                return False
+            self.work_used += work
+            previous = self.height_layers[-1]
+            frontier = {
+                height + rise for height in self.height_frontier for rise in self.rises
+            } - previous
+            self.height_frontier = frontier
+            self.height_layers.append(previous | frontier)
+        return True
+
     def _ensure_layers(self, traversals: int) -> bool:
-        """Publish layers up to *traversals*; False leaves the query permissive."""
+        """Publish planar layers up to *traversals*; False leaves the query permissive."""
         predecessors = self.predecessors
         while len(self.layers) <= traversals:
-            work = (len(self.frontier) * len(self.moves)
-                    + len(self.height_frontier) * len(self.rises))
+            work = len(self.frontier) * len(self.moves)
             if work > self.work_left:
                 return False
             self.work_used += work
@@ -953,16 +979,49 @@ class _CompletionReachability:
                         predecessor = Pose(x + dx, y + dy, 0, next_heading)
                         if predecessor not in previous:
                             frontier.add(predecessor)
-            previous_heights = self.height_layers[-1]
-            height_frontier = {
-                height + rise for height in self.height_frontier for rise in self.rises
-            } - previous_heights
             self.frontier = frontier
             self.frontiers.append(frontier)
-            self.height_frontier = height_frontier
             self.layers.append(previous | frontier)
-            self.height_layers.append(previous_heights | height_frontier)
         return True
+
+    def _probe(self, cursor, depth: int, gap: int, padding: int | None) -> bool | None:
+        """Decide membership in the layer *gap* beyond *depth* by expanding forward.
+
+        A pose reaches the anchor within depth + gap moves exactly when some pose
+        at most gap forward moves ahead of it lies in the layer of depth: a route
+        of at least gap moves passes such a pose after gap moves, and a shorter
+        route ends at the anchor, which every layer contains. Slippage translates
+        the remainder of a route, never its first moves, so the near test at the
+        built depth serves the same purpose. None means the work cap was hit.
+        """
+        layer = self.layers[depth]
+        successors = self.successors
+        lattice = self._lattice
+        frontier = {self.eng.level(cursor)}
+        expanded = 0
+        for step in range(gap + 1):
+            if step:
+                grown = set()
+                if lattice:
+                    for a, b, c, d, _z, heading in frontier:
+                        for da, db, dc, dd, next_heading in successors[heading]:
+                            grown.add((a + da, b + db, c + dc, d + dd, 0, next_heading))
+                else:
+                    for pose in frontier:
+                        x, y = pose.x, pose.y
+                        for dx, dy, next_heading in successors[pose.heading]:
+                            grown.add(Pose(x + dx, y + dy, 0, next_heading))
+                frontier = grown
+                expanded += len(grown)
+                self.probes += len(grown)
+                if expanded > _PROBE_WORK:
+                    return None
+            if padding is None:
+                if not frontier.isdisjoint(layer):
+                    return True
+            elif any(self._near_layer(pose, depth, padding) for pose in frontier):
+                return True
+        return False
 
     def _allows(self, cursor, traversals: int, slack: float | None = None) -> bool:
         self.checks += 1
@@ -979,19 +1038,30 @@ class _CompletionReachability:
             return False
         # An envelope depth not yet affordable leaves its permissive answer open.
         envelope_decided = traversals < len(self.bounds.layers) or self.bounds.saturated
-        if traversals > self.horizon:
+        if traversals > self.horizon + _PROBE_DEPTH:
             self.decided = envelope_decided
             return True
-        if not self._ensure_layers(traversals):
+        if not self._ensure_heights(traversals):
             self.decided = False
             return True
         if self.eng.height(cursor) not in self.height_layers[traversals]:
             return False
         # A pose the exact table reaches lies inside every envelope of that depth,
         # so a membership answer is final whether or not the envelope was built.
-        if padding is None:
-            return self.eng.level(cursor) in self.layers[traversals]
-        return self._near_layer(cursor, traversals, padding)
+        if self._ensure_layers(min(traversals, self.horizon)) and traversals <= self.horizon:
+            if padding is None:
+                return self.eng.level(cursor) in self.layers[traversals]
+            return self._near_layer(cursor, traversals, padding)
+        depth = len(self.layers) - 1
+        gap = traversals - depth
+        if gap > _PROBE_DEPTH:
+            self.decided = False
+            return True
+        answer = self._probe(cursor, depth, gap, padding)
+        if answer is None:
+            self.decided = False
+            return True
+        return answer
 
     def _near_index(self, traversals: int) -> dict:
         """Boxes of a layer by heading, sorted by their left edge.
@@ -1333,6 +1403,7 @@ class SolveStats:
     completion_bound_depth: int = 0
     completion_bound_states: int = 0  # retained heading envelopes across all depths
     completion_checks: int = 0  # geometric queries actually evaluated
+    completion_probes: int = 0  # poses expanded by forward probes beyond the built layers
     completion_cache_hits: int = 0  # repeated queries answered by the per-search cache
 
 
@@ -2144,6 +2215,7 @@ def solve(
         stats.completion_height_states = len(completion.height_layers[-1])
         stats.completion_work = completion.work_used
         stats.completion_checks = completion.checks
+        stats.completion_probes = completion.probes
         stats.completion_cache_hits = completion.cache_hits
         stats.completion_bound_depth = len(completion.bounds.layers) - 1
         stats.completion_bound_states = sum(map(len, completion.bounds.layers))
