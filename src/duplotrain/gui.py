@@ -28,6 +28,7 @@ from importlib import resources
 from time import monotonic
 from typing import Any
 
+from .bridge_completion import bridge_completion
 from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
 from .geometry import ORIGIN, Pose, steps_to_degrees
 from .layout import End, Layout, layout_from_dict, layout_to_dict
@@ -634,16 +635,21 @@ class Session:
         reversing: bool = False,
         progress: object = None,
         max_pieces: int = 26,
+        search_effort: int = 1,
     ) -> dict:
         """Search for completions; returns {found, aborted, searched[, reason]}.
 
         An instant arc oracle runs first (ring closures the DFS misses), then
         the staged search: plain running track (curves + straights) first --
         that closes almost every real gap within a few thousand nodes -- then
-        the whole box only if needed.  A depth-first search over a BROAD
+        one complete standard bridge plus plain track, then the whole box only
+        if needed. Search effort scales every stage's node budget independently
+        of the real-piece depth limit. A depth-first search over a BROAD
         inventory otherwise drowns exploring exotic-piece subtrees before
         finding the obvious answer.
         """
+        if type(search_effort) is not int or not 1 <= search_effort <= 16:
+            raise ValueError("search effort must be a whole number from 1 to 16")
         if type(max_pieces) is not int or not 1 <= max_pieces <= 128:
             raise ValueError("search depth must be a whole number from 1 to 128")
         if type(max_results) is not int or not 1 <= max_results <= 50:
@@ -679,7 +685,7 @@ class Session:
             self._invalidate()
             self.candidates = candidates
             self._candidate_revision = self.revision
-            return outcome
+            return {**outcome, "search_effort": search_effort}
 
         remaining = self.remaining()
 
@@ -736,8 +742,29 @@ class Session:
         searched = 0
         aborted = False
         candidates = []
+
+        def stage_progress(nodes: int) -> None:
+            if progress is not None:
+                progress(searched + nodes)
+
         for stage_index, inventory in enumerate(stages):
+            if inventory == full:
+                bridge = bridge_completion(
+                    self.layout, self.catalog, remaining, grow, close,
+                    max_pieces=max_pieces, max_results=max_results,
+                    max_nodes=250_000 * search_effort, progress=stage_progress,
+                )
+                if bridge is not None:
+                    searched += bridge.stats.nodes
+                    if bridge.solutions:
+                        return publish(bridge.solutions, {
+                            "found": len(bridge.solutions), "searched": searched,
+                            "aborted": bridge.stats.aborted, "complete": False,
+                            "stop_reason": "bridge_search",
+                            "max_pieces_searched": bridge.stats.max_pieces_searched,
+                        })
             budget = 25_000 if stage_index == 0 and len(stages) > 1 else 60_000
+            budget *= search_effort
             result = solve(
                 inventory,
                 self.catalog,
@@ -747,8 +774,8 @@ class Session:
                     max_pieces=max_pieces,
                     max_results=max_results,
                     max_nodes=budget,
-                    reversing_loops=reversing,
-                    progress=progress,
+                    reversing_loops=reversing and inventory == full,
+                    progress=stage_progress,
                 ),
                 base=self.layout,
                 grow_from=grow,
@@ -849,6 +876,7 @@ def dispatch_session(
             body.get("slop", 0.0), body.get("max_results", 10),
             reversing=body.get("reversing", False), progress=progress,
             max_pieces=body.get("max_pieces", 26),
+            search_effort=body.get("search_effort", 1),
         )
         return {**outcome, **session.state()}
     elif path == "/api/apply":
@@ -896,7 +924,7 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             """Discard a rejected request's body before the connection closes.
 
             Closing a socket that still holds unread bytes is an abortive close,
-            and the reset discards the response written just before it, so the
+            and the reset discards the response written before it, so the
             client reports a connection error instead of reading the refusal.
 
             Never wait on a body that was promised but not sent: a declared

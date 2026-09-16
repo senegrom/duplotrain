@@ -924,12 +924,13 @@ el("solve").addEventListener("click", async () => {
 });
 
 el("expand-search").addEventListener("click", async () => {
+  if (solving || apiBusy || !S) return;
   el("max-pieces").value = Math.min(128, Math.max(1, Number(el("max-pieces").value)) * 2);
   if (!lastSolve || lastSolve.revision !== S.revision) { el("solve").click(); return; }
-  await runSolve(lastSolve.grow, lastSolve.close);
+  await runSolve(lastSolve.grow, lastSolve.close, Math.min(16, lastSolve.effort * 2));
 });
 
-async function runSolve(grow, close) {
+async function runSolve(grow, close, effort = 1) {
   if (solving || apiBusy || !S) return;
   selectTool();
   const maxPieces = Number(el("max-pieces").value);
@@ -938,21 +939,21 @@ async function runSolve(grow, close) {
     status("Use 1–128 added pieces and a finite, non-negative slop.", "err");
     return;
   }
-  lastSolve = {grow, close, revision: S.revision};
+  lastSolve = {grow, close, effort, revision: S.revision};
   el("expand-search").hidden = true;
   selectedCandidate = null;
   solving = true;
   el("solve").disabled = true;
-  status("searching…");
+  status(effort > 1 ? `searching… ${effort}× search budget` : "searching…");
   try {
     S = await api("/api/solve", {
       grow, close,
-      slop, max_pieces: maxPieces,
+      slop, max_pieces: maxPieces, search_effort: effort,
       max_results: 8,
       reversing: el("reversing").checked,
     });
     pickMode = null;
-    lastSolve = {grow, close, revision: S.revision};
+    lastSolve = {grow, close, effort, revision: S.revision};
     redraw();
     if (!S.candidates.length) {
       if (S.reason)
@@ -962,7 +963,7 @@ async function runSolve(grow, close) {
                `${(S.searched || 0).toLocaleString()} states). A closure may still exist.`, "err");
       else
         status("No completion fits the remaining inventory under these settings.", "err");
-      el("expand-search").hidden = !!S.complete || maxPieces >= 128;
+      el("expand-search").hidden = !!S.complete || (maxPieces >= 128 && effort >= 16);
     } else {
       status(`${S.candidates.length} suggestion(s)${S.complete ? "" : " (search limited)"} — Preview, then Apply.`);
     }
