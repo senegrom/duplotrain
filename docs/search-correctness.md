@@ -491,3 +491,19 @@ which only enlarges the allowed set; direct joins are the zero-traversal case.
 Regressions compare the enumerated layouts, in order, with and without the
 prune on rings, buffered bars, capped stars and networks with a switch or a
 crossing, and check that a teardrop closing into its own switch survives.
+
+## Lazy signature minima and assembled layouts
+
+The canonical signature is the lexicographic minimum of the normalised
+rotations of four sequences. Comparing tuples lexicographically decides on the
+first differing element, so after k elements only the rotations whose first k
+normalised elements equal the minimum prefix can still win; the lazy algorithm
+keeps exactly those and extends them by one element, using each rotation's own
+first-appearance numbering, and the survivors after the last element all have
+the minimum tuple. A solution's layout is the base's placements and links plus
+one placement per placed step, whose frame is the engine's exact frame of that
+placement converted back to the field, and one link per recorded joint: the
+entry of each placed piece to the previous exit, each transit's entry to the
+exit before it, and the final exit to the closing target. That is what the
+replay through the checked constructors builds, since those constructors derive
+the same frames and the search has already verified every joint they check.

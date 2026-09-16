@@ -223,3 +223,131 @@ def test_anchor_pose_is_origin(catalog):
     layout = result.solutions[0].layout
     entry = layout.pose_of((0, layout.placements[0].piece.routes[0].port_a))
     assert entry.same_point(ORIGIN)
+
+
+def test_canonical_signature_equals_the_exhaustive_rotation_minimum(catalog):
+    import random
+
+    from duplotrain.solver import (
+        _canonical_signature,
+        _canonical_traversals,
+        _mirror_traversals,
+        _Place,
+        _Transit,
+    )
+
+    pieces = {pid: catalog[pid] for pid in ("straight", "curve", "switch", "crossing")}
+    canon_for = {pid: _canonical_traversals(p) for pid, p in pieces.items()}
+    mirror_for = {pid: _mirror_traversals(p) for pid, p in pieces.items()}
+
+    def exhaustive(steps):
+        # The definition: normalise every rotation of the walk, its reversal,
+        # its mirror and the reversed mirror, and take the smallest.
+        place_pids = [s.piece_id for s in steps if isinstance(s, _Place)]
+        visits, ordinal = [], 0
+        for s in steps:
+            if isinstance(s, _Place):
+                visits.append((ordinal, s.piece_id, s.entry, s.exit))
+                ordinal += 1
+            else:
+                visits.append((s.placement, place_pids[s.placement], s.entry, s.exit))
+
+        def normalise(seq):
+            fresh, out = {}, []
+            for inst, pid, entry, exit_ in seq:
+                fresh.setdefault(inst, len(fresh))
+                entry, exit_ = canon_for[pid].get((entry, exit_), (entry, exit_))
+                out.append((fresh[inst], pid, entry, exit_))
+            return tuple(out)
+
+        def reverse(seq):
+            return [(inst, pid, x, e) for (inst, pid, e, x) in reversed(seq)]
+
+        sequences = [visits, reverse(visits)]
+        mirrored = []
+        for inst, pid, entry, exit_ in visits:
+            partner = mirror_for[pid].get((entry, exit_))
+            if partner is None:
+                mirrored = None
+                break
+            mirrored.append((inst, pid, *partner))
+        if mirrored is not None:
+            sequences += [mirrored, reverse(mirrored)]
+        n = len(visits)
+        return min(normalise(seq[start:] + seq[:start]) for seq in sequences for start in range(n))
+
+    rng = random.Random(2024)
+    for _ in range(300):
+        steps, junctions = [], []
+        for index in range(rng.randint(1, 9)):
+            pid = rng.choice(list(pieces))
+            piece = pieces[pid]
+            entry = rng.choice([p for p in range(len(piece.ports)) if piece.transit(p)])
+            exit_port = rng.choice([e for e, _route in piece.transit(entry)])
+            steps.append(_Place(pid, entry, exit_port))
+            if piece.is_junction:
+                junctions.append((index, piece, entry, exit_port))
+            if junctions and rng.random() < 0.3:
+                j, jpiece, jentry, jexit = rng.choice(junctions)
+                spare = [p for p in range(len(jpiece.ports)) if p not in (jentry, jexit)]
+                port = rng.choice(spare)
+                exits = [e for e, _route in jpiece.transit(port) if e not in (jentry, jexit)]
+                if exits:
+                    steps.append(_Transit(j, port, rng.choice(exits)))
+        assert _canonical_signature(steps, canon_for, mirror_for=mirror_for) == exhaustive(steps)
+
+
+def test_solution_layouts_equal_their_replayed_constructions(catalog):
+    from duplotrain import ORIGIN, Layout, build_chain
+    from duplotrain.solver import _Place, _replay, _Transit
+
+    # Two crossings in a row: a completion that transits both without a piece,
+    # and ones that add pieces around them.
+    crossings, a = Layout().with_piece(catalog["crossing"], ORIGIN)
+    crossings, b = crossings.attach(catalog["crossing"], 0, (a, 1))
+    crossings, left = crossings.attach(catalog["straight"], 1, (a, 0))
+    crossings, right = crossings.attach(catalog["straight"], 0, (b, 1))
+    crossings = Layout(crossings.placements, {})
+    searches = [
+        ({"curve": 12, "straight": 4}, SolverConfig(max_results=20), {}),
+        ({"curve": 12, "switch": 1}, SolverConfig(max_results=20, reversing_loops=True), {}),
+        ({}, SolverConfig(min_pieces=0),
+         dict(base=crossings, grow_from=(left, 1), close_onto=(right, 0))),
+        ({"curve": 12, "straight": 6}, SolverConfig(min_pieces=0, max_results=20),
+         dict(base=crossings, grow_from=(left, 1), close_onto=(right, 0))),
+        ({"curve": 12, "straight": 2}, SolverConfig(max_results=20, slop=3.0), {}),
+        ({"curve": 6, "straight": 4},
+         SolverConfig(min_pieces=0, max_results=20),
+         dict(base=build_chain([(catalog["curve"], 0, 1)] * 6))),
+        ({"curve": 12, "straight": 4, "switch": 1},
+         SolverConfig(min_pieces=0, max_results=20, reversing_loops=True),
+         dict(base=build_chain([(catalog["switch"], 0, 1)]), grow_from=(0, 1), close_onto=(0, 0))),
+    ]
+    checked = transits = 0
+    for inventory, config, options in searches:
+        result = solve(inventory, catalog, config, **options)
+        assert result.solutions
+        for solution in result.solutions:
+            base = options.get("base")
+            grow_from, close_onto = options.get("grow_from"), options.get("close_onto")
+            if base is not None and grow_from is None:
+                opens = base.connectable_ends()
+                grow_from, close_onto = opens[-1], opens[0]
+            final_target = None
+            if solution.kind == "reversing":
+                # The walk's last end mates the stub it closed into.
+                n_base = len(base) if base is not None else 0
+                cursor, index = None, n_base
+                for step in solution.steps:
+                    if isinstance(step, _Place):
+                        cursor, index = (index, step.exit), index + 1
+                    else:
+                        cursor = (step.placement, step.exit)
+                final_target = solution.layout.links[cursor]
+            replayed = _replay(solution.steps, catalog, force_final_join=solution.gap > 0,
+                               base=base, grow_from=grow_from, close_onto=close_onto,
+                               final_target=final_target)
+            assert isinstance(solution.layout, Layout) and replayed == solution.layout
+            checked += 1
+            transits += any(isinstance(step, _Transit) for step in solution.steps)
+    assert checked >= 30 and transits >= 1

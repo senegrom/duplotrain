@@ -44,7 +44,7 @@ from .collision import DEFAULT_CLEARANCE, CollisionField, bounds_of
 from .exact import Alg
 from .geometry import HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .lattice import ROT_COS_SIN, SCALE, LatticePoint, LatticePose, from_alg_xy, z_from_alg
-from .layout import Layout
+from .layout import Layout, Placement
 from .pieces import PieceType
 from .symmetry import placement_key, pose_key
 from .validation import check_inventory
@@ -1365,9 +1365,33 @@ def _canonical_signature(
         sequences.append([(inst, pid, x, e) for (inst, pid, e, x) in reversed(mirrored)])
 
     n = len(visits)
-    return min(
-        normalise(seq[start:] + seq[:start]) for seq in sequences for start in range(n)
-    )
+    # The lexicographic minimum over every rotation of every sequence, built
+    # one element at a time: only the rotations still tied on the prefix are
+    # extended, so a rotation that loses on an early element is never
+    # normalised in full. The result is exactly min(normalise(rotation)).
+    live = [(seq, start, {}) for seq in sequences for start in range(n)]
+    prefix = []
+    for k in range(n):
+        best = None
+        keep = []
+        for candidate in live:
+            seq, start, fresh = candidate
+            inst, pid, entry, exit_ = seq[(start + k) % n]
+            ordinal = fresh.get(inst)
+            if ordinal is None:
+                ordinal = fresh[inst] = len(fresh)
+            table = canon_for.get(pid)
+            if table is not None:
+                entry, exit_ = table.get((entry, exit_), (entry, exit_))
+            element = (ordinal, pid, entry, exit_)
+            if best is None or element < best:
+                best = element
+                keep = [candidate]
+            elif element == best:
+                keep.append(candidate)
+        prefix.append(best)
+        live = keep
+    return tuple(prefix)
 
 
 def _replay(
@@ -2001,6 +2025,39 @@ def solve(
                         return True
         return False
 
+    def assemble(reversing_target: tuple[int, int] | None) -> Layout:
+        """The layout of the current step trace, from the engine's exact frames.
+
+        Both engines keep exact frames and the trace records every joint, so this
+        is what ``_replay`` builds, without re-deriving frames or re-checking
+        joints the search has verified; ``_replay`` remains the reference.
+        """
+        placed = list(base.placements) if base is not None else []
+        links = dict(base.links) if base is not None else {}
+        cursor, target = grow_from, close_onto
+        index = len(base_pids)
+        for step in steps:
+            if isinstance(step, _Place):
+                pid, frame = placements[index]
+                placed.append(Placement(pieces[pid], eng.to_pose(frame)))
+                if cursor is None:
+                    target = (index, step.entry)
+                else:
+                    links[cursor] = (index, step.entry)
+                    links[(index, step.entry)] = cursor
+                cursor = (index, step.exit)
+                index += 1
+            else:
+                joint = (step.placement, step.entry)
+                links[cursor] = joint
+                links[joint] = cursor
+                cursor = (step.placement, step.exit)
+        if reversing_target is not None:
+            target = reversing_target
+        links[cursor] = target
+        links[target] = cursor
+        return Layout(placed, links, base.accessories if base is not None else ())
+
     def emit(gap: float, reversing_target: tuple[int, int] | None = None) -> None:
         stats.closures_found += 1
         signature = _canonical_signature(
@@ -2014,15 +2071,7 @@ def solve(
         )
         if signature in solutions and solutions[signature].gap <= gap:
             return
-        layout = _replay(
-            steps,
-            pieces,
-            force_final_join=gap > 0.0,
-            base=base,
-            grow_from=grow_from,
-            close_onto=close_onto,
-            final_target=reversing_target,
-        )
+        layout = assemble(reversing_target)
         if _solution_overlaps(
             layout, len(base_pids), cfg.clearance, cfg.collision_spacing
         ):

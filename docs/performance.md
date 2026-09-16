@@ -606,3 +606,28 @@ CPU time (process time), results identical:
 
 Enumerations whose stock keeps a buffer until the end gain little, because a
 buffer can cap any stranded end; the prune bites once the caps are placed.
+
+## Signatures by lazy minimum, solutions assembled from engine frames
+
+With loop searches pruned, nearly half of a closure-heavy loop search went into
+canonical signatures: every rotation of every closure, its reversal and its
+mirror were normalised in full before taking the smallest. The minimum is now
+built one element at a time, extending only the rotations still tied on the
+prefix, so a rotation that loses on an early element is never normalised. The
+result is the same tuple (checked against the exhaustive definition on 300
+random step traces with transits).
+
+Each solution's layout was replayed through the checked constructors, which
+re-derive every frame in field arithmetic and re-check every joint: about 4 ms
+per solution. Both engines keep exact frames and the step trace records every
+joint, so the layout is now assembled directly, exactly as the network
+enumerator does; the replay stays as the reference the regression compares
+against on loops, reversing loops, slop fits, completions and transits.
+
+CPU time (process time, minimum of three runs), results identical:
+
+| Search | Before | After |
+| --- | ---: | ---: |
+| 12 curves, 6 straights, all loops | 0.109 s | 0.062 s |
+| 12 curves, 2 straights, 2 level crossings | 0.109 s | 0.078 s |
+| 12 curves, 4 straights, 1 switch, 39 loops | 0.516 s | 0.312 s |
