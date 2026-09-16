@@ -646,11 +646,28 @@ def _outward(low, high) -> tuple[int, int]:
 
 
 def _alg_interval(value: Alg) -> tuple[int, int]:
-    low = high = value.a * _MM_SCALE
-    for coefficient, (a, b) in zip(value.coeffs()[1:], _ROOT_BOUNDS, strict=True):
-        low += coefficient * (a if coefficient >= 0 else b)
-        high += coefficient * (b if coefficient >= 0 else a)
-    return _outward(low, high)
+    # The same enclosure as summing Fraction coefficients times the radical
+    # bounds, over one common denominator in integers: floor and ceiling of the
+    # exact rational sums, then the outward guard. Fraction arithmetic would
+    # normalise by a gcd at every step.
+    fractions = value.coeffs()
+    denominator = 1
+    for coefficient in fractions:
+        denominator = denominator * coefficient.denominator // math.gcd(
+            denominator, coefficient.denominator)
+    numerators = [coefficient.numerator * (denominator // coefficient.denominator)
+                  for coefficient in fractions]
+    low = high = numerators[0] * _MM_SCALE
+    for numerator, (a, b) in zip(numerators[1:], _ROOT_BOUNDS, strict=True):
+        if numerator >= 0:
+            low += numerator * a
+            high += numerator * b
+        else:
+            low += numerator * b
+            high += numerator * a
+    low, high = low // denominator, -(-high // denominator)
+    guard = (abs(low) + abs(high)) // 2**40 + 2
+    return low - guard, high + guard
 
 
 def _physical_envelope(x, y, height) -> tuple[tuple, tuple]:
@@ -691,6 +708,7 @@ class _CompletionBounds:
             }))
         self.layers = [{self.heading(eng.anchor): self.enclose(eng.anchor)}]
         self.saturated = False
+        self._paddings: dict[int, tuple] = {}
 
     @staticmethod
     def _lattice_envelope(pose) -> tuple[tuple, tuple]:
@@ -789,8 +807,11 @@ class _CompletionBounds:
         if interval is None:
             return False
         low, high = self.enclose(cursor)
-        padding = tuple(-(-slack * norm // _MM_SCALE) for norm in _SLIP_NORMS)
-        padding += (0,) * (len(low) - len(_SLIP_AXES))
+        padding = self._paddings.get(slack)
+        if padding is None:
+            padding = tuple(-(-slack * norm // _MM_SCALE) for norm in _SLIP_NORMS)
+            padding += (0,) * (len(low) - len(_SLIP_AXES))
+            self._paddings[slack] = padding
         return all(a - pad <= d and c <= b + pad
                    for a, b, c, d, pad in zip(*interval, low, high, padding, strict=True))
 
@@ -1001,6 +1022,8 @@ class _CompletionReachability:
         layer = self.layers[depth]
         successors = self.successors
         lattice = self._lattice
+        boxes, enclose, heading_of = self._boxes, self.bounds.enclose, self.bounds.heading
+        near_group = self._near_group
         frontier = {self.eng.level(cursor)}
         expanded = 0
         for step in range(gap + 1):
@@ -1023,8 +1046,20 @@ class _CompletionReachability:
             if padding is None:
                 if not frontier.isdisjoint(layer):
                     return True
-            elif any(self._near_layer(pose, depth, padding) for pose in frontier):
-                return True
+                continue
+            index = self.near_indices.get(depth)
+            if index is None:
+                index = self._near_index(depth)
+            for pose in frontier:
+                group = index.get(heading_of(pose))
+                if group is None:
+                    continue
+                box = boxes.get(pose)
+                if box is None:
+                    low, high = enclose(pose)
+                    box = boxes[pose] = (low[0], high[0], low[1], high[1])
+                if near_group(box, group, padding):
+                    return True
         return False
 
     def _allows(self, cursor, traversals: int, slack: float | None = None) -> bool:
@@ -1092,7 +1127,9 @@ class _CompletionReachability:
             for heading, group in grouped.items():
                 group.sort()
                 index[heading] = (group, tuple(box[0] for box in group),
-                                  max(box[1] - box[0] for box in group))
+                                  max(box[1] - box[0] for box in group),
+                                  (group[0][0], max(box[1] for box in group),
+                                   min(box[2] for box in group), max(box[3] for box in group)))
             self.near_indices[depth] = index
             grouped = {heading: list(group) for heading, group in grouped.items()}
         return self.near_indices[traversals]
@@ -1110,15 +1147,30 @@ class _CompletionReachability:
         group = index.get(self.bounds.heading(cursor))
         if group is None:
             return False
-        boxes, starts, width = group
-        low, high = self.bounds.enclose(cursor)
-        left, right = low[0] - slack, high[0] + slack
-        bottom, top = low[1] - slack, high[1] + slack
+        box = self._boxes.get(cursor)
+        if box is None:
+            low, high = self.bounds.enclose(cursor)
+            box = self._boxes[cursor] = (low[0], high[0], low[1], high[1])
+        return self._near_group(box, group, slack)
+
+    @staticmethod
+    def _near_group(box: tuple, group: tuple, slack: int) -> bool:
+        """Is *box*, grown by *slack*, within reach of some box of one heading group?
+
+        The group's extremes reject most far-away queries with four comparisons;
+        the sorted scan then decides the rest exactly as before.
+        """
+        x0, x1, y0, y1 = box
+        left, right = x0 - slack, x1 + slack
+        bottom, top = y0 - slack, y1 + slack
+        boxes, starts, width, (gx0, gx1, gy0, gy1) = group
+        if gx1 < left or gx0 > right or gy1 < bottom or gy0 > top:
+            return False
         for i in range(bisect_left(starts, left - width), bisect_right(starts, right)):
-            box = boxes[i]
-            if box[1] >= left and box[2] <= top and box[3] >= bottom:
-                dx = max(0, box[0] - high[0], low[0] - box[1])
-                dy = max(0, box[2] - high[1], low[1] - box[3])
+            b = boxes[i]
+            if b[1] >= left and b[2] <= top and b[3] >= bottom:
+                dx = max(0, b[0] - x1, x0 - b[1])
+                dy = max(0, b[2] - y1, y0 - b[3])
                 if dx * dx + dy * dy <= slack * slack:
                     return True
         return False

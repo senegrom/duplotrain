@@ -516,3 +516,29 @@ CPU time (process time), single run, results identical unless noted:
 Twelve curves and two straights with a switch, reversing closures and 3 mm
 slop used to exhaust a two-million-node budget with 17 loops found; the search
 now completes in 2,843 nodes with 52.
+
+## Slippage probes: cached boxes and group rejection
+
+With the forward probes in place, the slippage searches spent most of their
+time in the probes' near tests: every frontier pose recomputed its physical
+envelope and scanned the sorted boxes of its heading, and almost every probe
+ends without any hit (351 of 354 in the switch case), so the scans were the
+common path. Only 7,216 distinct poses stood behind 38,737 near tests, so each
+queried pose's box is now cached alongside the layer poses' boxes, and every
+heading group of a near index records the extremes of its boxes so a query
+whose grown box lies outside them is rejected with four comparisons before any
+scan. The probe's near test is inlined with the same pre-test. Each padding
+tuple is computed once per slack value. The field engine's interval enclosure
+sums integer numerators over one common denominator instead of normalising a
+Fraction at every step; it returns the same integers (checked on 20,000 random
+field values and 3,000 random poses).
+
+Every answer, node count and result fingerprint is unchanged. CPU time (process
+time, minimum of five runs), 25,000-node budget:
+
+| Case | Before | After |
+| --- | ---: | ---: |
+| Switch, broad inventory, 1 mm | 0.14 s | 0.09 s |
+| Switch, broad inventory, 5 mm | 0.19 s | 0.09 s |
+| Mixed gap, broad inventory, 5 mm | 0.11 s | 0.08 s |
+| Custom 15-degree piece, 1 mm (field engine) | 0.06 s | 0.03 s |

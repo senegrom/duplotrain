@@ -434,3 +434,14 @@ node-limited one can only return more. The one-handed rule and the signature
 deduplication are unaffected. Regressions compare ordered results with and
 without the tables on both engines, with slop, with reversing closures, and on
 a search that used to exhaust its node budget.
+
+## Group extremes only pre-test the near scan
+
+A near test asks whether some box of the queried heading's group lies within
+the slack of the query's box. If the query's box grown by the slack does not
+overlap the smallest axis-aligned box containing the whole group, no member
+can be within reach, so rejecting it early is a necessary condition applied
+before the unchanged sorted scan; nothing is accepted that the scan would not
+accept. The cached box of a queried pose is the same integer enclosure the
+layer poses use. The integer form of the field engine's interval enclosure
+computes the same floor and ceiling as the Fraction sums it replaces.
