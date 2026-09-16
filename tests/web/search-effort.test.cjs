@@ -71,3 +71,24 @@ test("deeper search ignores a double click while a search is already running", a
   assert.equal(e.calls.length, 0);
   assert.equal(e.el("max-pieces").value, "26");
 });
+
+test("Close the loop safely ignores clicks before state loads and during another action", async () => {
+  const e = editor();
+  for (const setup of ["S = null", "S = {open_ends: []}; apiBusy = true", "apiBusy = false; solving = true"]) {
+    e.run(setup);
+    await e.el("solve").click();
+  }
+  assert.equal(e.calls.length, 0);
+});
+
+test("incomplete searches can be deepened even after suggestions are found", async () => {
+  const e = editor();
+  e.run(`api = async () => ({revision: 1, candidates: [{index: 0}],
+    complete: false, open_ends: [[23, 1], [25, 0]], can_undo: true});`);
+  await e.run("runSolve(null, null)");
+  assert.equal(e.el("expand-search").hidden, false);
+  e.run(`api = async () => ({revision: 2, candidates: [{index: 0}],
+    complete: true, open_ends: [[23, 1], [25, 0]], can_undo: true});`);
+  await e.run("runSolve(null, null)");
+  assert.equal(e.el("expand-search").hidden, true);
+});

@@ -1429,8 +1429,14 @@ class SolverConfig:
     #: tables. Slop fits use physical distance enclosures with the remaining
     #: total gap budget.
     completion_lookahead: int = 10
+    #: Optional extra acceptance audit, applied BEFORE the result limit. Rejected
+    #: candidates do not consume result slots. Used to validate expanded bridge
+    #: assemblies against their actual component joints, not macro exemptions.
+    solution_filter: object = None
 
     def __post_init__(self) -> None:
+        if self.solution_filter is not None and not callable(self.solution_filter):
+            raise ValueError("solution_filter must be callable or None")
         for name in ("slop", "clearance", "collision_spacing"):
             value = getattr(self, name)
             if not math.isfinite(value) or value < 0:
@@ -1466,6 +1472,7 @@ class SolveStats:
     #: future joint exempted during search may not be realized in the final trace;
     #: these overlapping candidates are counted here, never returned.
     dropped_overlap: int = 0
+    dropped_filter: int = 0  # candidates rejected by the optional acceptance audit
     #: True only after exhausting the entire inventory, not a capped search.
     complete: bool = False
     stop_reason: str = "not_started"
@@ -1962,7 +1969,7 @@ def solve(
         ):
             stats.dropped_overlap += 1
             return
-        solutions[signature] = Solution(
+        candidate = Solution(
             layout=layout,
             steps=tuple(steps),
             gap=gap,
@@ -1971,6 +1978,10 @@ def solve(
             signature=signature,
             kind="loop" if reversing_target is None else "reversing",
         )
+        if cfg.solution_filter is not None and not cfg.solution_filter(candidate):
+            stats.dropped_filter += 1
+            return
+        solutions[signature] = candidate
 
     def dfs(cursor, used: int, slack_used: float, prev_index: int | None,
             handed: bool) -> bool:

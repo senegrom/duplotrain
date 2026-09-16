@@ -256,7 +256,10 @@ class Layout:
             (a, b)
             for a, pose in poses
             for b in by_pose.get(pose.reversed(), ())
-            if a < b
+            if a < b and not (
+                self.placements[a[0]].piece.end_overhang > 0
+                and self.placements[b[0]].piece.end_overhang > 0
+            )
         ]
 
     def pose_of(self, end: End) -> Pose:
@@ -434,6 +437,8 @@ class Layout:
             ValueError: if either end is occupied, or (unless forced) the two do not
                 physically meet.
         """
+        if a == b:
+            raise ValueError("a connector cannot join to itself")
         for end in (a, b):
             if end in self.links:
                 raise ValueError(f"end {end} is already connected")

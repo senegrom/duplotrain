@@ -12,11 +12,12 @@ from dataclasses import replace
 
 from .catalog import default_catalog
 from .collision import DEFAULT_CLEARANCE
+from .completion_search import solve_completion as solve
 from .exact import ZERO
 from .geometry import ORIGIN
 from .layout import End, Layout, Placement, build_chain
 from .pieces import Path, PieceType, Port, Ramp, Route
-from .solver import Solution, SolverConfig, SolveResult, _solution_overlaps, solve
+from .solver import Solution, SolverConfig, SolveResult, _solution_overlaps
 
 _BRIDGE_ID = "_completion_bridge"
 _RECIPE = (("ramp", 0, 1), ("span", 0, 1), ("span", 1, 0), ("ramp", 1, 0))
@@ -103,37 +104,45 @@ def bridge_completion(
     inventory = {pid: n for pid in ("curve", "straight")
                  if (n := remaining.get(pid, 0)) > 0}
     inventory[_BRIDGE_ID] = 1
-    result = solve(
-        inventory, {**catalog, _BRIDGE_ID: macro},
-        SolverConfig(min_pieces=0, max_pieces=max_pieces - 3, max_results=max_results,
-                     max_nodes=max_nodes, progress=progress),
-        base=base, grow_from=grow, close_onto=close,
-    )
-    candidates: list[Solution] = []
     before = base.piece_counts
-    for candidate in result.solutions:
+    accepted: dict[tuple, Solution] = {}
+
+    def accept(candidate: Solution) -> bool:
+        if candidate.signature in accepted:
+            return True
         expanded = _expand(candidate.layout, parts)
         # Macro adjacency exemptions are broader than those of its components.
-        # Only the expanded actual-link audit is authoritative for publication.
+        # Audit BEFORE counting a result: invalid early macros must not fill all
+        # the result slots and hide valid bridges further along the search.
         if len(expanded) - len(base) > max_pieces or any(
             n - before.get(pid, 0) > remaining.get(pid, 0)
             for pid, n in expanded.piece_counts.items()
         ):
-            continue
+            return False
         if any(
             placement.frame.z != ZERO
             for placement in expanded.placements[len(base):]
             if placement.piece.id in ("curve", "straight", "ramp")
         ):
-            continue
+            return False
         if expanded.joint_issues() or _solution_overlaps(
             expanded, len(base), DEFAULT_CLEARANCE, 8.0
         ):
-            continue
-        candidates.append(replace(
+            return False
+        accepted[candidate.signature] = replace(
             candidate, layout=expanded, steps=(),
             signature=("standard_bridge", candidate.signature),
-        ))
+        )
+        return True
+
+    result = solve(
+        inventory, {**catalog, _BRIDGE_ID: macro},
+        SolverConfig(min_pieces=0, max_pieces=max_pieces - 3, max_results=max_results,
+                     max_nodes=max_nodes, progress=progress, solution_filter=accept),
+        base=base, grow_from=grow, close_onto=close,
+    )
+    candidates = [accepted[candidate.signature] for candidate in result.solutions
+                  if accept(candidate)]
     # Even an exhausted macro search proves nothing about the whole inventory.
     return SolveResult(candidates, replace(
         result.stats, complete=False, stop_reason="bridge_search",

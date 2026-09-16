@@ -170,3 +170,32 @@ def test_search_effort_scales_all_three_stages(monkeypatch):
         })
         assert calls == [25_000 * effort, 250_000 * effort, 60_000 * effort]
         assert result["search_effort"] == effort
+
+
+def test_two_ended_search_keeps_the_reported_gap_below_fifty_thousand_nodes():
+    base = load("bridge-gap.json")
+    session = Session(history=[base], unlimited=True)
+    outcome = session.solve_gap(None, None, 0, 8)
+    assert len(session.candidates) == 8
+    assert outcome["searched"] < 50_000
+    for candidate in session.candidates:
+        assert_extension(base, candidate.layout, session.remaining())
+
+
+def test_expanded_bridge_rejections_do_not_fill_result_slots(monkeypatch):
+    base = load("bridge-gap.json")
+    catalog = default_catalog()
+    original = bridge_module._solution_overlaps
+    attempts = 0
+
+    def reject_first(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        return attempts == 1 or original(*args, **kwargs)
+
+    monkeypatch.setattr(bridge_module, "_solution_overlaps", reject_first)
+    result = bridge_completion(base, catalog, {"curve": 16, "straight": 4, "ramp": 2, "span": 2},
+                               (23, 1), (25, 0), max_pieces=26, max_results=1, max_nodes=250_000)
+    assert len(result.solutions) == 1 and attempts >= 2
+    assert result.stats.dropped_filter >= 1
+    assert_extension(base, result.solutions[0].layout)

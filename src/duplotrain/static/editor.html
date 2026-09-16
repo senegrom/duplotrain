@@ -914,6 +914,7 @@ el("importfile").addEventListener("change", async (e) => {
   }
 });
 el("solve").addEventListener("click", async () => {
+  if (!S || solving || apiBusy) return;
   const opens = S.open_ends.length;
   if (opens > 2) {
     selectTool({pick: {stage: "grow", grow: null}});
@@ -963,10 +964,10 @@ async function runSolve(grow, close, effort = 1) {
                `${(S.searched || 0).toLocaleString()} states). A closure may still exist.`, "err");
       else
         status("No completion fits the remaining inventory under these settings.", "err");
-      el("expand-search").hidden = !!S.complete || (maxPieces >= 128 && effort >= 16);
     } else {
       status(`${S.candidates.length} suggestion(s)${S.complete ? "" : " (search limited)"} — Preview, then Apply.`);
     }
+    el("expand-search").hidden = !!S.complete || (maxPieces >= 128 && effort >= 16);
   } catch (e) {
     pickMode = null;
     status(e.message, "err");

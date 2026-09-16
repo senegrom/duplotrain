@@ -30,11 +30,12 @@ from typing import Any
 
 from .bridge_completion import bridge_completion
 from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
+from .completion_search import solve_completion as solve
 from .geometry import ORIGIN, Pose, steps_to_degrees
 from .layout import End, Layout, layout_from_dict, layout_to_dict
 from .pieces import PieceType
 from .sets import SETS, inventory_for_sets
-from .solver import Solution, SolverConfig, _moves_for, solve
+from .solver import Solution, SolverConfig, _moves_for
 from .validation import MAX_JSON_BYTES, MAX_SNAPSHOT_BYTES
 from .validation import check_layout_json as check_layout_json
 
@@ -500,6 +501,7 @@ class Session:
         }
         target = base.pose_of(close)
         s_delta = straight.exit_delta(0, 1)
+        s_back = straight.exit_delta(1, 0)
         c_delta = {entry: curve.exit_delta(entry, 1 - entry) for entry in (0, 1)}
 
         # Leveling units: (sequence of (piece, entry), float dz).  Monotone
@@ -573,7 +575,20 @@ class Session:
         found: list[Solution] = []
         seen_pre = {}
         prefixes = {}
+        suffixes = {}
+        seen_layouts = set()
         for pre, post in pairs:
+            if post not in suffixes:
+                # Walk the suffix BACK from the target once. Matching a prefix
+                # is then an exact pose lookup, not up to nine repeated chains
+                # of costly radical transforms for every prefix/post pair.
+                reverse_post = tuple((pid, 1 - side) for pid, side in reversed(post))
+                cursor = apply_unit(target, reverse_post)
+                matches = {}
+                for m in range(min(8, remaining.get("straight", 0)) + 1):
+                    matches.setdefault(cursor.reversed(), []).append(m)
+                    cursor = cursor.then(*s_back)
+                suffixes[post] = matches
             if pre not in seen_pre:
                 seen_pre[pre] = apply_unit(start, pre)
             start_pre = seen_pre[pre]
@@ -594,17 +609,12 @@ class Session:
                                 pose = pose.then(*c_delta[entry])
                             prefixes[prefix] = pose
                         pose = prefixes[prefix]
-                        for m in range(0, 9):
-                            if m:
-                                pose = pose.then(*s_delta)
+                        for m in suffixes[post].get(pose, ()):
                             if len(pre) + len(post) + j + k + m > max_pieces:
                                 continue
                             if j + m > remaining.get("straight", 0):
                                 continue
                             if not pre and not post and not k:
-                                continue
-                            end_pose = apply_unit(pose, post) if post else pose
-                            if not end_pose.connects_to(target):
                                 continue
                             try:
                                 closed = build(pre, j, k, entry, m, post)
@@ -612,6 +622,12 @@ class Session:
                                 continue
                             if _solution_overlaps(closed, n_base, 120.0, 8.0):
                                 continue
+                            # Different prefix/suffix splits (especially k=0)
+                            # can describe exactly the same added pieces.
+                            key = closed.placements[n_base:]
+                            if key in seen_layouts:
+                                continue
+                            seen_layouts.add(key)
                             found.append(
                                 Solution(
                                     layout=closed,

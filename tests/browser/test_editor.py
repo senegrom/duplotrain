@@ -645,3 +645,37 @@ def test_candidate_preview_selection_preserves_card_and_button_identity(editor):
     assert session.layout.is_closed
     assert page.locator(".cand").count() == 0
     assert not errors
+
+
+def test_reported_bridge_search_preview_apply_and_undo(editor):
+    import json
+    from pathlib import Path
+
+    from duplotrain.layout import layout_from_dict
+    from duplotrain.solver import _solution_overlaps
+
+    page, session, url, errors = editor
+    fixture = Path(__file__).parents[1] / "fixtures/bridge-gap.json"
+    base = layout_from_dict(json.loads(fixture.read_text()), session.catalog)
+    load(page, url)
+    page.locator("#importfile").set_input_files(str(fixture))
+    wait_count(page, 59)
+    page.locator("#unlimited").check()
+    page.wait_for_function("S.inventory.unlimited && !apiBusy")
+    page.locator("#reversing").uncheck()
+    page.locator("#solve").tap()
+    page.wait_for_selector(".cand", timeout=30000)
+    assert page.locator(".cand").count() == 8
+    assert page.locator("#expand-search").is_visible()
+    assert page.evaluate("S.searched") < 50000
+    candidate = page.locator(".cand").first
+    candidate.get_by_role("button", name="Preview", exact=True).tap()
+    candidate.get_by_role("button", name="Apply").tap()
+    wait_count(page, 83)
+    assert session.layout.placements[:59] == base.placements
+    assert session.layout.is_closed and not session.layout.joint_issues()
+    assert not _solution_overlaps(session.layout, 0, 120, 8)
+    page.locator("#undo").tap()
+    wait_count(page, 59)
+    assert session.layout == base
+    assert not errors
