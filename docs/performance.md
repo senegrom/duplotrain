@@ -542,3 +542,40 @@ time, minimum of five runs), 25,000-node budget:
 | Switch, broad inventory, 5 mm | 0.19 s | 0.09 s |
 | Mixed gap, broad inventory, 5 mm | 0.11 s | 0.08 s |
 | Custom 15-degree piece, 1 mm (field engine) | 0.06 s | 0.03 s |
+
+## Keying networks: screened frames, reused endpoints, cached keys
+
+Profiling the network enumerator again showed nine tenths of its time still in
+congruence keys, now split between choosing the frame, normalising the
+primitives, sampling the chosen frame and replaying every closed network
+through the layout constructors. Four changes, all leaving every key
+byte-identical:
+
+* A frame's identity orders lines, then circles, then isolated points, so a
+  frame whose reduced scale or smallest primitive already exceeds the best
+  one's cannot win; it is discarded before its sorted identity is built.
+  Quarter turns permute and negate the reduced vectors, so each point is
+  reduced once per base heading and reflection instead of once per quadrant.
+* Merged line intervals end at original segment ends, and arc sectors are
+  bounded by fixed lattice headings; the placement cache now holds those exact
+  points, so normalising a layout no longer recomputes them in the field.
+* The sampled key is a function of the exact canonical identity alone, so it
+  is cached per identity: an enumeration that finds a class sixteen times
+  samples it once.
+* The enumerator assembles each closed network directly from its exact engine
+  frames and its own link map instead of replaying every attachment and join.
+
+CPU time (process time, minimum of two runs):
+
+| Enumeration | Before | After |
+| --- | ---: | ---: |
+| Corpus keying, 671 layouts | 2.83 s | 1.70 s |
+| 2 buffers, 3 straights, 3 curves, up to 8 pieces | 6.45 s | 2.69 s |
+| 2 buffers, 1 switch, 3 straights, 2 curves, up to 8 | 2.16 s | 1.55 s |
+| 2 buffers, 1 switch, 2 straights, 4 curves, up to 9 | 16.2 s | 10.1 s |
+| 4 buffers, 2 switches, 2 straights, 2 curves, up to 8 | 6.69 s | 3.36 s |
+| 12 curves, 2 straights, up to 14 | 13.4 s | 13.1 s |
+
+The found layouts, their order, node counts and every congruence key are
+identical to the previous tree on all of these and on the perfect-network
+search.

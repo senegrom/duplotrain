@@ -152,3 +152,54 @@ def test_interval_ordering_does_not_round_away_a_nonzero_field_element():
 def test_invalid_congruence_spacing_is_rejected(spacing):
     with pytest.raises(ValueError, match="spacing"):
         congruence_key(track([line(128)]), spacing)
+
+
+def test_key_and_primitive_caches_are_bounded_and_transparent():
+    catalog = default_catalog()
+    from duplotrain import _congruence
+
+    _congruence._KEY_CACHE.clear()
+    _congruence._PRIMITIVE_CACHE.clear()
+    layouts = [build_chain([(catalog["straight"], 0, 1)] * n + [(catalog["curve"], 0, 1)] * m)
+               for n in range(1, 4) for m in range(0, 4)]
+    fresh = [congruence_key(layout) for layout in layouts]
+    assert len(_congruence._KEY_CACHE) == len(set(fresh))
+    cached = [congruence_key(layout) for layout in layouts]
+    assert cached == fresh
+    # A rotated, reflected copy hits the same cached key.
+    turned = transform(layouts[-1], 7, True)
+    assert congruence_key(turned) == fresh[-1]
+    _congruence._KEY_CACHE.clear()
+    assert congruence_key(turned) == fresh[-1]
+    for cache, limit in ((_congruence._KEY_CACHE, _congruence._KEY_CACHE_LIMIT),
+                         (_congruence._PRIMITIVE_CACHE, _congruence._PRIMITIVE_CACHE_LIMIT)):
+        cache.clear()
+        for i in range(limit + 5):
+            if len(cache) >= limit:
+                cache.clear()
+            cache[("filler", i)] = ()
+        assert len(cache) <= limit
+    _congruence._KEY_CACHE.clear()
+    _congruence._PRIMITIVE_CACHE.clear()
+
+
+def test_frame_screening_picks_the_exhaustive_minimum():
+    catalog = default_catalog()
+    from duplotrain import _congruence
+    from duplotrain._congruence import _canonical_frame, _identity, _in_frame, _normalise
+
+    for chain in (
+        [(catalog["curve"], 0, 1)] * 3 + [(catalog["straight"], 0, 1)],
+        [(catalog["straight"], 0, 1)] * 2 + [(catalog["switch"], 0, 1), (catalog["curve"], 0, 1)],
+        [(catalog["ramp"], 0, 1), (catalog["span"], 0, 1), (catalog["curve"], 0, 1)] * 2,
+        [(catalog["curve"], 0, 1)] * 12,
+    ):
+        layout = build_chain(chain)
+        curve = _normalise(layout)
+        identity, frame = _canonical_frame(curve)
+        # The winner's exact identity equals the smallest exact identity over all
+        # 48 frames computed the slow way, so the screen discarded no candidate.
+        exhaustive = min(_identity(_in_frame(curve, heading, mirror))
+                         for mirror in (False, True)
+                         for heading in range(_congruence.HEADING_STEPS))
+        assert _identity(frame) == exhaustive

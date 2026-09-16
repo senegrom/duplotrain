@@ -111,3 +111,47 @@ def test_perfect_networks_finds_the_stoned_loop(catalog):
         assert verdict.perfectly_looping
         # Exactly the one direction stone, clipped mid-piece on a straight.
         assert [entry[1] for entry in layout.accessories] == ["stone_direction"]
+
+
+def test_lattice_frames_convert_back_to_exact_layout_poses(catalog):
+    from duplotrain import build_chain
+    from duplotrain.geometry import ORIGIN
+    from duplotrain.solver import _compile_lattice, _flat, _moves_for, _pose_to_lattice
+
+    pieces = {pid: catalog[pid] for pid in ("straight", "curve", "switch", "ramp")}
+    moves = {pid: _moves_for(p) for pid, p in pieces.items()}
+    eng = _compile_lattice(ORIGIN, ORIGIN, pieces, moves)
+    layout = build_chain([(catalog["curve"], 0, 1), (catalog["straight"], 0, 1),
+                          (catalog["switch"], 0, 2), (catalog["ramp"], 1, 0),
+                          (catalog["curve"], 1, 0)])
+    for placement in layout:
+        frame = _flat(_pose_to_lattice(placement.frame))
+        assert eng.to_pose(frame) == placement.frame
+        assert _flat(_pose_to_lattice(eng.to_pose(frame))) == frame
+
+
+def test_enumerated_networks_equal_their_replayed_constructions(catalog):
+    # The layouts are assembled directly from engine frames and the search's own
+    # link map; replaying them through the checked constructors gives the same.
+    from duplotrain import Layout
+
+    result = enumerate_networks({"buffer": 2, "straight": 2, "curve": 3}, catalog,
+                                NetworkConfig(max_pieces=7, max_results=50, max_nodes=200_000))
+    assert result.layouts
+    for layout in result.layouts:
+        replayed = Layout()
+        for index, placement in enumerate(layout.placements):
+            if index == 0:
+                replayed, _ = replayed.with_piece(placement.piece, placement.frame)
+                continue
+            # Every later piece is linked to an earlier one: attach it there.
+            entry, at = next(
+                (port, other) for (i, port), other in layout.links.items()
+                if i == index and other[0] < index
+            )
+            replayed, new_index = replayed.attach(placement.piece, entry, at)
+            assert new_index == index
+        for a, b in layout.links.items():
+            if a < b and a not in replayed.links:
+                replayed = replayed.join(a, b)
+        assert replayed == layout and not layout.joint_issues()

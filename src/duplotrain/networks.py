@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from .collision import DEFAULT_CLEARANCE, CollisionField
 from .explore import congruence_key
 from .geometry import ORIGIN
-from .layout import End, Layout
+from .layout import End, Layout, Placement
 from .pieces import PieceType
 from .solver import (
     Move,
@@ -171,22 +171,14 @@ def enumerate_networks(
             if end != target and any(eng.connects(new, pose) for new in port_poses.values())
         }
 
-    # Layout reconstruction: replay placements in order.  Each placement after the
-    # first was attached at a specific open end recorded during search.
-    attach_trace: list[tuple[str, int, tuple[int, int] | None]] = []
-    join_trace_all: list[list[tuple[tuple[int, int], tuple[int, int]]]] = []
-
     def rebuild() -> Layout:
-        layout = Layout()
-        for (pid, entry, at), joins in zip(attach_trace, join_trace_all, strict=True):
-            piece = pieces[pid]
-            if at is None:
-                layout, _ = layout.with_piece(piece, piece.frame_for(entry, ORIGIN))
-            else:
-                layout, _ = layout.attach(piece, entry, at)
-            for a, b in joins:
-                layout = layout.join(a, b)
-        return layout
+        # Both engines keep exact frames, and the link map is the search's own
+        # symmetric one, so the layout is assembled directly rather than replaying
+        # every attachment and join through Layout's checked constructors.
+        return Layout(
+            [Placement(pieces[pid], eng.to_pose(frame)) for pid, frame, _entry in placements],
+            dict(links),
+        )
 
     def emit() -> None:
         stats.closed_found += 1
@@ -232,9 +224,7 @@ def enumerate_networks(
             del open_ends[other]
             links[target] = other
             links[other] = target
-            join_trace_all[-1].append((target, other))
             keep = dfs(used)
-            join_trace_all[-1].pop()
             del links[target]
             del links[other]
             open_ends[target] = target_pose
@@ -274,13 +264,9 @@ def enumerate_networks(
                     for port, pose in port_poses.items():
                         open_ends[(index, port)] = pose
                         new_ends.append((index, port))
-                    attach_trace.append((pid, entry, target))
-                    join_trace_all.append([])
 
                     keep = dfs(used + 1)
 
-                    attach_trace.pop()
-                    join_trace_all.pop()
                     for end in new_ends:
                         del open_ends[end]
                     del links[target]
@@ -306,13 +292,9 @@ def enumerate_networks(
             if port in piece.sealed:
                 continue
             open_ends[(0, port)] = eng.port_world(pid, port, frame)
-        attach_trace.append((pid, entry, None))
-        join_trace_all.append([])
 
         keep = dfs(1)
 
-        attach_trace.pop()
-        join_trace_all.pop()
         open_ends.clear()
         counts[pid] += 1
         field.pop()

@@ -37,12 +37,13 @@ from bisect import bisect_left, bisect_right
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from fractions import Fraction
 from functools import lru_cache
 
 from .collision import DEFAULT_CLEARANCE, CollisionField, bounds_of
 from .exact import Alg
 from .geometry import HEADING_STEPS, ORIGIN, Pose, cos_sin
-from .lattice import ROT_COS_SIN, LatticePoint, LatticePose, from_alg_xy, z_from_alg
+from .lattice import ROT_COS_SIN, SCALE, LatticePoint, LatticePose, from_alg_xy, z_from_alg
 from .layout import Layout
 from .pieces import PieceType
 from .symmetry import placement_key, pose_key
@@ -270,6 +271,10 @@ class _FieldEngine:
         return pose
 
     @staticmethod
+    def to_pose(frame: Pose) -> Pose:
+        return frame
+
+    @staticmethod
     def reverse(pose: Pose) -> Pose:
         return pose.reversed()
 
@@ -430,6 +435,17 @@ class _LatticeEngine:
         a, b, c, d, z, h = cursor
         da, db, dc, dd = rotated[h]
         return (a + da, b + db, c + dc, d + dd, z + dz, (h + turn) % 12)
+
+    @staticmethod
+    def to_pose(frame: tuple) -> Pose:
+        """The exact field pose of a lattice pose: the inverse of _pose_to_lattice."""
+        a, b, c, d, z, heading = frame
+        return Pose(
+            Alg(Fraction(2 * a + c, 2 * SCALE), 0, Fraction(b, 2 * SCALE), 0),
+            Alg(Fraction(2 * d + b, 2 * SCALE), 0, Fraction(c, 2 * SCALE), 0),
+            Alg(Fraction(z, SCALE)),
+            2 * heading,
+        )
 
     @staticmethod
     def reverse(pose: tuple) -> tuple:

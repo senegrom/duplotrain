@@ -445,3 +445,21 @@ before the unchanged sorted scan; nothing is accepted that the scan would not
 accept. The cached box of a queried pose is the same integer enclosure the
 layer poses use. The integer form of the field engine's interval enclosure
 computes the same floor and ceiling as the Fraction sums it replaces.
+
+## Screened frames and cached keys choose and name the same frame
+
+The canonical frame is the one with the smallest exact identity, a tuple that
+compares its reduced scale first, then its sorted lines, circles and isolated
+points. A frame whose reduced scale is larger than the best one's, or whose
+smallest primitive of the first nonempty component is larger, therefore has a
+larger identity whatever the rest of it holds, so discarding it before building
+the identity changes nothing; ties are only resolved by the full comparison.
+Reducing each point once and rotating by quadrant afterwards is exact because
+the gcd divides every entry, so negation and division commute. The key cache
+maps an identity to the sampled key that identity produced: the materialised
+frame is a function of the identity, and sampling is deterministic, so a cached
+key is the key a fresh computation returns. Endpoints and sector boundaries
+taken from the placement cache are the exact points the line and circle
+formulas evaluate to at those parameters. A regression compares the screened
+choice against the exhaustive minimum over all 48 frames and the cached keys
+against fresh ones.
