@@ -1,4 +1,4 @@
-"""Reverse reachability must accelerate completion without losing witnesses."""
+"""Reverse reachability must accelerate completions and loops without losing witnesses."""
 
 from dataclasses import replace
 
@@ -20,6 +20,10 @@ from duplotrain.solver import _solution_overlaps
 
 def signatures(result):
     return {(s.signature, s.gap, s.kind) for s in result.solutions}
+
+
+def ordered(result):
+    return [(s.signature, s.gap, s.kind) for s in result.solutions]
 
 
 @pytest.mark.parametrize("engine", ["lattice", "field"])
@@ -118,3 +122,46 @@ def test_editor_can_apply_a_completion_from_the_improved_search():
 def test_invalid_lookahead_is_rejected(lookahead):
     with pytest.raises(ValueError, match="completion_lookahead"):
         SolverConfig(completion_lookahead=lookahead)
+
+
+@pytest.mark.parametrize("engine", ["lattice", "field"])
+def test_loop_search_prunes_with_the_reverse_tables(engine):
+    # A fresh loop must return to the origin face: the tables built for
+    # completions apply unchanged, and a sound prune leaves the ordered results.
+    catalog = default_catalog()
+    cfg = SolverConfig(max_results=100, engine=engine)
+    plain = solve({"curve": 12, "straight": 2}, catalog, replace(cfg, completion_lookahead=0))
+    fast = solve({"curve": 12, "straight": 2}, catalog, cfg)
+    assert plain.stats.complete and fast.stats.complete
+    assert len(fast.solutions) == 2 and ordered(fast) == ordered(plain)
+    assert fast.stats.pruned_completion > 0 and fast.stats.completion_states > 1
+    assert fast.stats.nodes * 10 < plain.stats.nodes
+    assert all(not _solution_overlaps(s.layout, 0, 120, 8) for s in fast.solutions)
+
+
+def test_loop_search_keeps_slop_reversing_and_stub_witnesses():
+    catalog = default_catalog()
+    slop = SolverConfig(max_results=100, slop=3.0)
+    plain = solve({"curve": 12, "straight": 2}, catalog, replace(slop, completion_lookahead=0))
+    fast = solve({"curve": 12, "straight": 2}, catalog, slop)
+    assert plain.stats.complete and fast.stats.complete and ordered(fast) == ordered(plain)
+    assert fast.stats.nodes * 10 < plain.stats.nodes
+    # Closing into the switch's own branch, and looping through its stub.
+    reversing = SolverConfig(max_results=100, reversing_loops=True)
+    plain = solve({"curve": 12, "switch": 1}, catalog, replace(reversing, completion_lookahead=0))
+    fast = solve({"curve": 12, "switch": 1}, catalog, reversing)
+    assert plain.stats.complete and fast.stats.complete and ordered(fast) == ordered(plain)
+    assert {s.kind for s in fast.solutions} == {"loop", "reversing"}
+    assert fast.stats.nodes * 50 < plain.stats.nodes
+
+
+def test_loop_search_finishes_a_previously_capped_reversing_search():
+    catalog = default_catalog()
+    inventory = {"curve": 12, "straight": 2, "switch": 1}
+    cfg = SolverConfig(max_results=100, reversing_loops=True, slop=3.0, max_nodes=25_000)
+    plain = solve(inventory, catalog, replace(cfg, completion_lookahead=0))
+    fast = solve(inventory, catalog, cfg)
+    assert plain.stats.aborted and fast.stats.complete
+    assert set(ordered(plain)) <= set(ordered(fast))
+    assert len(fast.solutions) > len(plain.solutions)
+    assert all(not _solution_overlaps(s.layout, 0, 120, 8) for s in fast.solutions)

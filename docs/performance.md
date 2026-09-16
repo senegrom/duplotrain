@@ -485,3 +485,34 @@ five runs), 25,000-node budget:
 
 At the start of this work the mixed case took 16,451 nodes and 1.12 s.
 `stats.completion_probes` reports the poses probes expanded.
+
+## Loop searches use the reverse tables
+
+Fresh-loop searches had only the reach and turn prunes: a walk was cut when the
+remaining track could not span the distance home or swing the heading back, so
+a 17-piece search with one switch and every piece required spent 1.85 million
+nodes proving that no loop exists. A loop must return to its origin face exactly
+as a completion must reach its selected end, so the reverse reachability tables,
+envelopes, return-loop floors and forward probes now apply to both modes; the
+only change is which anchor the tables are built for. The prune is conservative,
+so complete and result-limited searches return the same solutions in the same
+order, and searches that used to hit their node budget now finish.
+
+CPU time (process time), single run, results identical unless noted:
+
+| Loop search | Nodes before | Nodes after | Before | After |
+| --- | ---: | ---: | ---: | ---: |
+| 12 curves, 6 straights | 91,651 | 1,915 | 1.20 s | 0.14 s |
+| 12 curves, 6 straights, 3 mm slop | 92,603 | 1,915 | 1.27 s | 0.20 s |
+| 12 curves, 4 straights, 1 switch, all pieces | 1,848,103 | 11,488 | 31.2 s | 0.22 s |
+| 10 curves, 4 straights, 1 crossing | 127,275 | 217 | 1.45 s | 0.03 s |
+| 8 curves, 2 straights, 2 ramps, 1 span | 106,973 | 16 | 1.05 s | 0.00 s |
+| 12 curves, 2 straights, 2 level crossings | 77,711 | 1,738 | 1.62 s | 0.12 s |
+| 12 curves, 6 straights, field engine | 91,651 | 1,915 | 12.6 s | 1.12 s |
+| 12 curves, 4 straights, 1 switch, 300,000-node cap | 300,001, 14 found | 11,488, 39 found, exhausted | 5.23 s | 0.58 s |
+| 8 curves, 4 straights, 2 switches, reversing, cap | 300,001, none | 1,946, none, exhausted | 4.94 s | 0.06 s |
+| 12 curves, 4 straights, 2 slopes, 2 ramps, 2 spans, cap | 300,001, 4 found | 4,481, 100 found | 7.16 s | 0.42 s |
+
+Twelve curves and two straights with a switch, reversing closures and 3 mm
+slop used to exhaust a two-million-node budget with 17 loops found; the search
+now completes in 2,843 nodes with 52.

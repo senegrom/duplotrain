@@ -344,8 +344,9 @@ deduplicated by a canonical signature invariant under rotation, reversal **and
 reflection** — the mirror image is generated explicitly per piece from its geometry,
 since walking a chiral loop backwards is not its mirror image.
 
-Completion searches also work backward to check whether the remaining traversals
-can reach a closing target. Short tails use exact planar-pose and height tables.
+Both search modes also work backward to check whether the remaining traversals
+can reach the closing target: a fresh loop must return to its origin face, a
+completion to the selected end. Short tails use exact planar-pose and height tables.
 Longer tails use exact linear bounds on coordinates, diagonals and height for
 each arrival heading, avoiding enumeration of every possible position.
 Existing junction ports and targets created by future junctions are included;

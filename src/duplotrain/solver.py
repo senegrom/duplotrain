@@ -23,7 +23,9 @@ Pruning (all conservative, so the search stays exhaustive):
     * turn feasibility -- the remaining pieces (plus open stubs) must be able to swing
       the heading back to the anchor's;
     * reach -- the remaining pieces must be long enough to get home;
-    * completion reachability -- tails must reach the target within the remaining slop;
+    * reverse reachability -- the traversals left must be able to bring the walk back
+      to its closing target (the origin face of a fresh loop, the selected end of a
+      completion) within the remaining slop;
     * collisions -- a placement overlapping existing track is cut immediately.
 """
 
@@ -797,7 +799,9 @@ class _CompletionReachability:
     """Bounded reverse reachability for planar poses and heights independently.
 
     Each complete layer contains ALL projections of cursors that can reach the
-    anchor in at most that many traversals. Separating height from planar geometry
+    anchor in at most that many traversals. The anchor is the closing target of
+    either search mode: a fresh loop must return to the origin face exactly as a
+    completion must reach its selected end. Separating height from planar geometry
     avoids multiplying states for bridge routes. The two projections may use
     different routes; that only enlarges the set allowed by this check.
 
@@ -1350,8 +1354,8 @@ class SolverConfig:
     #: problem fits the 30-degree grid (every built-in piece does) and falls back to
     #: the general field otherwise; "lattice"/"field" force one, for tests.
     engine: str = "auto"
-    #: Exact reverse reachability for this many final placements in completion
-    #: mode, supplemented by longer linear bounds. Zero disables both; they share
+    #: Exact reverse reachability for this many final placements of a loop or a
+    #: completion, supplemented by longer linear bounds. Zero disables both; they share
     #: a preprocessing allowance of min(4096, max_nodes // 8) expansions plus 24
     #: per DFS node spent, capped at 262,144, so only long searches pay for deep
     #: tables. Slop fits use physical distance enclosures with the remaining
@@ -1630,11 +1634,14 @@ def solve(
     # junction with open ports, or of a junction still in stock. The allowance
     # cap bounds every transit count the search can ask for, one extra for the
     # candidate junction a query may add before its stock is consumed.
+    # A fresh loop closes onto the origin face exactly as a completion closes onto
+    # its target, so the same reverse tables prune walks that cannot return with
+    # the traversals left in either mode.
     completion = (
         _CompletionReachability(eng, cfg.completion_lookahead, _TABLE_WORK_CAP,
                                 slippage=cfg.slop > 0, slop=cfg.slop,
                                 budget=lambda: _completion_budget(stats.nodes, cfg.max_nodes))
-        if base is not None and cfg.completion_lookahead
+        if cfg.completion_lookahead
         else None
     )
     stub_capacity = {

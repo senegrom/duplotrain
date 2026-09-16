@@ -417,3 +417,20 @@ before. Slippage translates the remainder of a route at its forced joints, never
 the cursor's own first moves, so the same argument holds with the near test at
 depth `d`. A probe that exceeds its expansion cap leaves the query permissive
 and undecided, exactly like an unaffordable layer.
+
+## Loop searches share the reverse tables
+
+A fresh loop closes when the walking end returns to the origin face exactly (or
+within the slop budget), which is the same condition a completion imposes on its
+selected end: the anchor of the reverse tables is the closing pose, the move
+pool is every traversal of every stock piece, and free transits, open stubs and
+reversing targets are handled by the same context. The traversals a loop has
+left are its remaining placements plus the transits its stubs and future
+junctions can lend, exactly as for a completion tail, so a cursor absent from
+the tables cannot close and its subtree contains no loop. The prune is
+conservative: it removes only subtrees without closures, so an exhaustive or
+result-limited loop search returns the same solutions in the same order, and a
+node-limited one can only return more. The one-handed rule and the signature
+deduplication are unaffected. Regressions compare ordered results with and
+without the tables on both engines, with slop, with reversing closures, and on
+a search that used to exhaust its node budget.
