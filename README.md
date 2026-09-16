@@ -346,7 +346,8 @@ since walking a chiral loop backwards is not its mirror image.
 
 Both search modes also work backward to check whether the remaining traversals
 can reach the closing target: a fresh loop must return to its origin face, a
-completion to the selected end. Short tails use exact planar-pose and height tables.
+completion to the selected end, and every open end of a network another open
+end or a junction it places. Short tails use exact planar-pose and height tables.
 Longer tails use exact linear bounds on coordinates, diagonals and height for
 each arrival heading, avoiding enumeration of every possible position.
 Existing junction ports and targets created by future junctions are included;

@@ -463,3 +463,31 @@ taken from the placement cache are the exact points the line and circle
 formulas evaluate to at those parameters. A regression compares the screened
 choice against the exhaustive minimum over all 48 frames and the cached keys
 against fresh ones.
+
+## Network open ends must stay mutually reachable
+
+Let the current partial network have open ends `O`, and let a closed network
+extend it by new pieces `N`, none of which has a sealed port or a connectable
+port that no route serves. Start a walk at any `e` in `O`: `e` is mated to a
+port of some piece in `N` (or directly to another end of `O`, a walk of length
+zero). Traverse a route of that piece and continue through whatever the exit
+port is mated to. Stop when the walk arrives at an end of `O`, or when it
+enters a piece it has traversed before through a port its earlier traversals
+did not use (a spare port of a junction). No walk can pass the same joint twice
+before one of these happens: passing a joint twice in the same direction means
+a piece was left twice through one port, so it was entered through two
+different ports, and the second entry was through a port unused before; passing
+it twice in opposite directions means an earlier joint repeated first. So the
+walk ends after at most `|N|` traversals, each piece traversed once, at the
+reversed pose of another end of `O` or at a spare port of a junction it placed.
+The first case is a reachability query of the loop solver's tables after the
+rigid motion that moves the target onto the anchor, over at most the remaining
+placements; the second is the solver's future-junction query, which depends
+only on the junction type and the remaining budget less one. Pieces with a
+sealed or route-less port can end a walk without mating anything, one end per
+such port, so a node is rejected only when more ends have no reachable target
+than the stock's caps can absorb. Collisions and stock counts are ignored,
+which only enlarges the allowed set; direct joins are the zero-traversal case.
+Regressions compare the enumerated layouts, in order, with and without the
+prune on rings, buffered bars, capped stars and networks with a switch or a
+crossing, and check that a teardrop closing into its own switch survives.

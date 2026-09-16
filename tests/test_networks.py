@@ -155,3 +155,57 @@ def test_enumerated_networks_equal_their_replayed_constructions(catalog):
             if a < b and a not in replayed.links:
                 replayed = replayed.join(a, b)
         assert replayed == layout and not layout.joint_issues()
+
+
+def _found(result):
+    return [(tuple((p.piece.id, p.frame) for p in layout.placements), dict(layout.links))
+            for layout in result.layouts]
+
+
+@pytest.mark.parametrize("inventory, config", [
+    ({"curve": 12}, dict(use_all_pieces=True, max_pieces=12)),
+    ({"straight": 3, "buffer": 2}, dict(use_all_pieces=True, max_pieces=5)),
+    ({"buffer": 2, "straight": 2, "curve": 2}, dict(max_pieces=6, max_results=100)),
+    ({"switch": 1, "curve": 4, "straight": 1, "buffer": 2}, dict(max_pieces=8, max_results=100)),
+    ({"crossing": 1, "curve": 4, "straight": 1, "buffer": 2}, dict(max_pieces=8, max_results=100)),
+])
+def test_reachability_prune_keeps_every_network_in_order(catalog, inventory, config):
+    cfg = NetworkConfig(max_nodes=500_000, **config)
+    plain = enumerate_networks(inventory, catalog, NetworkConfig(lookahead=0, max_nodes=500_000,
+                                                                 **config))
+    fast = enumerate_networks(inventory, catalog, cfg)
+    assert plain.stats.complete and fast.stats.complete
+    assert plain.stats.stop_reason == fast.stats.stop_reason == "exhausted"
+    assert _found(fast) == _found(plain)
+    assert fast.stats.nodes <= plain.stats.nodes
+    assert {congruence_key(layout) for layout in fast.layouts} == {
+        congruence_key(layout) for layout in plain.layouts}
+
+
+def test_reachability_prune_cuts_the_ring_enumeration(catalog):
+    plain = enumerate_networks({"curve": 12}, catalog,
+                               NetworkConfig(use_all_pieces=True, max_pieces=12, lookahead=0))
+    fast = enumerate_networks({"curve": 12}, catalog,
+                              NetworkConfig(use_all_pieces=True, max_pieces=12))
+    assert _found(fast) == _found(plain) and len(fast.layouts) == 1
+    assert fast.stats.pruned_reachability > 0
+    assert fast.stats.nodes * 50 < plain.stats.nodes
+
+
+def test_reachability_prune_respects_caps_and_junction_closures(catalog):
+    # Two open ends with two buffers in stock may both be capped; with one
+    # buffer only one end may be stranded; a teardrop closes into its own switch.
+    stranded = enumerate_networks({"straight": 4, "buffer": 2}, catalog,
+                                  NetworkConfig(use_all_pieces=True, max_pieces=6))
+    assert len(stranded.layouts) == 1 and stranded.stats.complete
+    teardrop = enumerate_networks({"switch": 1, "curve": 12, "buffer": 1}, catalog,
+                                  NetworkConfig(use_all_pieces=True, max_pieces=14,
+                                                max_results=50, max_nodes=500_000))
+    assert teardrop.layouts and teardrop.stats.complete
+    assert all(layout.is_closed for layout in teardrop.layouts)
+
+
+@pytest.mark.parametrize("lookahead", [-1, 13, 2.5, "10"])
+def test_invalid_network_lookahead_is_rejected(lookahead):
+    with pytest.raises(ValueError, match="completion_lookahead"):
+        NetworkConfig(lookahead=lookahead)

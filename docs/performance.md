@@ -579,3 +579,30 @@ CPU time (process time, minimum of two runs):
 The found layouts, their order, node counts and every congruence key are
 identical to the previous tree on all of these and on the perfect-network
 search.
+
+## Network enumeration prunes with the reverse tables
+
+The network enumerator had no reachability pruning at all: it grew every
+partial network until its piece bound, so enumerating the networks of twelve
+curves and two straights up to fourteen pieces spent 429,879 nodes on nine
+closures. Every open end of a closed network is mated, so from any open end of
+the current layout some walk over the new pieces reaches another current open
+end, or a spare port of a junction the walk placed itself (see
+`docs/search-correctness.md`); the loop solver's tables decide both questions
+after the rigid motion that puts the target on the anchor. A piece with a
+sealed or route-less port can cap an end instead, so a node is cut only when
+more ends are stranded than the stock can cap. `NetworkConfig.lookahead`
+(default 10, 0 disables) and `stats.pruned_reachability` expose the prune.
+
+CPU time (process time), results identical:
+
+| Enumeration | Nodes before | Nodes after | Before | After |
+| --- | ---: | ---: | ---: | ---: |
+| 12 curves, all pieces | 4,094 | 23 | 0.14 s | 0.00 s |
+| 2 buffers, 3 straights, 3 curves, up to 8 | 3,863 | 3,863 | 3.3 s | 3.2 s |
+| 2 buffers, 1 switch, 3 straights, 2 curves, up to 8 | 26,027 | 2,417 | 1.56 s | 0.62 s |
+| 12 curves, 2 straights, up to 14 | 429,879 | 257 | 13.3 s | 0.05 s |
+| 12 curves, 2 straights, 1 switch, up to 13 | 2,000,001 (capped, 1 found) | 79 (1 found) | 78 s | 0.02 s |
+
+Enumerations whose stock keeps a buffer until the end gain little, because a
+buffer can cap any stranded end; the prune bites once the caps are placed.

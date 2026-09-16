@@ -13,6 +13,13 @@ placements with exactly mating open connectors are exempt: they can still become
 directly linked. No fixed distance or piece width is assumed. Every completed
 network then passes a strict check with only actually linked neighbours exempt.
 
+Pruning reuses the loop solver's reverse reachability tables. In a closed
+network every open end of the current layout is mated, so some walk over the
+new pieces leads from it to another current open end, or to a spare port of a
+junction the walk itself placed; with the pieces left that walk must fit, or the
+subtree holds no closed network. A buffer in stock could cap any end instead,
+so the check is skipped while a piece with a sealed or route-less port remains.
+
 Results are deduplicated by curve congruence (:func:`duplotrain.explore.congruence_key`),
 i.e. up to rotation, translation and reflection of the embedded track.
 """
@@ -29,9 +36,12 @@ from .geometry import ORIGIN
 from .layout import End, Layout, Placement
 from .pieces import PieceType
 from .solver import (
+    _TABLE_WORK_CAP,
     Move,
     SolverConfig,
     _compile_lattice,
+    _completion_budget,
+    _CompletionReachability,
     _FieldEngine,
     _moves_for,
     _solution_overlaps,
@@ -52,6 +62,9 @@ class NetworkConfig:
     clearance: float = DEFAULT_CLEARANCE
     collision_spacing: float = 8.0
     progress: object = None
+    #: Exact reverse reachability for this many final placements, as
+    #: ``SolverConfig.completion_lookahead``; zero disables the pruning.
+    lookahead: int = 10
 
     def __post_init__(self) -> None:
         # Keep the two public search configurations on the same numeric contract.
@@ -61,6 +74,7 @@ class NetworkConfig:
             min_pieces=self.min_pieces, max_pieces=self.max_pieces,
             max_results=self.max_results, max_nodes=self.max_nodes,
             clearance=self.clearance, collision_spacing=self.collision_spacing,
+            completion_lookahead=self.lookahead,
         )
 
 
@@ -69,6 +83,7 @@ class NetworkStats:
     nodes: int = 0
     closed_found: int = 0  # before dedup / final validation
     rejected_collision: int = 0
+    pruned_reachability: int = 0  # subtrees whose open ends can no longer all mate
     duration_s: float = 0.0
     aborted: bool = False
     engine: str = ""
@@ -134,6 +149,68 @@ def enumerate_networks(
     stats = NetworkStats(
         engine=eng.name, max_pieces_searched=min(total, cfg.max_pieces)
     )
+
+    # Reverse reachability, anchored at the origin like the loop solver's: a
+    # query asks whether one pose can reach another within so many traversals
+    # of stock routes, after the rigid motion that puts the target on the anchor.
+    completion = (
+        _CompletionReachability(eng, cfg.lookahead, _TABLE_WORK_CAP,
+                                budget=lambda: _completion_budget(stats.nodes, cfg.max_nodes))
+        if cfg.lookahead else None
+    )
+    # A piece with a sealed port, or a connectable port no route serves, can
+    # terminate a walk without mating another end: each such port caps one
+    # open end, so stranded ends are only impossible beyond the stock's caps.
+    caps = {
+        pid: len(pieces[pid].sealed) + sum(
+            not pieces[pid].transit(port)
+            for port in range(len(pieces[pid].ports)) if port not in pieces[pid].sealed
+        )
+        for pid in piece_ids
+    }
+    caps = {pid: capacity for pid, capacity in caps.items() if capacity}
+    # A walk may also end at a spare port of a junction it placed itself. From
+    # that junction's exit the spare ports' reversed poses, retargeted onto the
+    # anchor, describe the loop back regardless of where the junction stands.
+    closing_queries: dict[str, tuple] = {}
+    for pid in piece_ids:
+        piece = pieces[pid]
+        if pid in caps or not piece.is_junction:
+            continue
+        queries = set()
+        for entry, exit_port, apply_move in eng.moves[pid]:
+            frame = eng.frame(pid, entry, eng.anchor)
+            out = apply_move(eng.anchor)
+            queries.update(
+                eng.retarget(out, eng.reverse(eng.port_world(pid, port, frame)))
+                for port in range(len(piece.ports))
+                if port not in (entry, exit_port) and port not in piece.sealed
+            )
+        closing_queries[pid] = tuple(queries)
+
+    def closable(used: int) -> bool:
+        """False proves that no closed network extends the current layout."""
+        if completion is None:
+            return True
+        budget = min(total, cfg.max_pieces) - used
+        allows = completion.allows
+        if budget and any(
+            counts[pid] and allows(query, budget - 1)
+            for pid, queries in closing_queries.items() for query in queries
+        ):
+            return True
+        capacity = sum(counts[pid] * ports for pid, ports in caps.items())
+        reverse, retarget = eng.reverse, eng.retarget
+        ends = list(open_ends.values())
+        mates = [reverse(pose) for pose in ends]
+        stranded = 0
+        for i, pose in enumerate(ends):
+            if not any(allows(retarget(pose, mate), budget)
+                       for j, mate in enumerate(mates) if j != i):
+                stranded += 1
+                if stranded > capacity:
+                    return False
+        return True
 
     # Per-placement sample clouds (world floats) for the two collision phases.
     sample_cache: dict[tuple[str, int, int], list[tuple[float, float, float]]] = {}
@@ -206,6 +283,9 @@ def enumerate_networks(
         if not open_ends:
             if used >= cfg.min_pieces and (not cfg.use_all_pieces or used == total):
                 emit()
+            return True
+        if not closable(used):
+            stats.pruned_reachability += 1
             return True
 
         target = min(open_ends)  # the canonical end everything must go through
