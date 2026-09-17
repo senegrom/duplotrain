@@ -8,8 +8,8 @@ import time
 import pytest
 
 from duplotrain.gui import Session
-from tests.editor_support import running_server
 from duplotrain.validation import MAX_JSON_BYTES
+from tests.editor_support import running_server
 
 
 @pytest.fixture()
