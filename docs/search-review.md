@@ -7,7 +7,10 @@ Compared with production commit `21d922664b9d77d15e4003a7f5d4db8487005576`.
 The editor now spends short, deterministic probes growing from each selected end,
 then uses the remaining allowance in the original direction. This is a **direction
 portfolio**, not a meet-in-the-middle or resumable search. All probes together obey
-the existing stage node budget. Easy searches stop after the first probe. A fully
+the existing stage node budget. Below 65,536 nodes the shares are a quarter, a half
+and a quarter again, and the final probe would repeat the first one node for node;
+the reverse probe then takes the rest of the allowance instead, so no part of the
+budget is spent twice on the same search. Easy searches stop after the first probe. A fully
 searched piece bound stops retries but is never presented as an exhausted inventory.
 Forced-fit searches (nonzero slop) and reversing-loop targets keep their original
 one-direction semantics. No collision or underpass threshold is relaxed.

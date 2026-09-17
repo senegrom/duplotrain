@@ -44,6 +44,12 @@ def solve_completion(
     exhausting the inventory, and ``complete`` keeps the core solver's meaning.
     Interrupted probes never make an impossibility claim. Retries restart rather
     than retain a search tree; their nodes all count against the shared allowance.
+
+    The search is deterministic, so a final probe in the original direction can
+    only get further than the first one with a larger budget. Below 65,536 nodes
+    the three shares are a quarter, a half and a quarter again: that last probe
+    would repeat the first one node for node and stop where it stopped. The
+    reverse probe then takes the rest of the allowance instead.
     """
     if config.reversing_loops or config.slop or config.max_nodes < 32:
         return solve(inventory, pieces, config, base=base,
@@ -56,10 +62,18 @@ def solve_completion(
         (grow_from, close_onto, config.max_nodes),
     )
     result = None
+    first_budget = None
     for grow, close, allowance in attempts:
         remaining = config.max_nodes - totals.nodes
         if remaining < 2:
             break
+        if first_budget is None:
+            first_budget = min(allowance, remaining) - 1
+        elif (grow, close) != (grow_from, close_onto):
+            # What the final probe would get after this one; if that cannot
+            # exceed the first probe's budget, it cannot find anything new.
+            if remaining - min(allowance, remaining) - 1 <= first_budget:
+                allowance = remaining
         # The core counts the node that detects its limit. Reserve that one so
         # the portfolio never exceeds the public allowance, even on tiny budgets.
         budget = min(allowance, remaining) - 1
