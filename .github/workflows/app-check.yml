@@ -19,6 +19,22 @@ concurrency:
   group: app-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '22'
+      - run: python -m pip install 'ruff>=0.6'
+      - run: ruff check src webapp tests benchmarks
+      - run: node --test tests/web/*.test.cjs
   python:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -43,8 +59,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: pip
-      - run: python -m pip install -e '.[dev]'
-      - run: ruff check src webapp tests benchmarks
+      - run: python -m pip install -e '.[test]'
       - run: python -m pytest -m 'not slow and not browser'
   base-install:
     runs-on: ubuntu-latest
@@ -62,7 +77,45 @@ jobs:
           python -c "import importlib.util; assert importlib.util.find_spec('matplotlib') is None"
           duplotrain solve --curve 12 -o out --top 2
           python -c "from pathlib import Path; assert list(Path('out').glob('*.json')); assert not list(Path('out').glob('*.png'))"
+  build:
+    # A read-only job builds one artifact at this run's exact checkout. Both
+    # browsers consume its ID; the privileged deploy job never rebuilds source.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      artifact_id: ${{ steps.bundle.outputs.artifact_id }}
+      sha256: ${{ steps.digest.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # build.py verifies this archive's SHA-256 before using it, even on hits.
+          path: webapp/vendor/pyodide-core-0.27.7.tar.bz2
+          key: pyodide-core-0.27.7
+      - run: python webapp/build.py --pages
+      - name: Check the bundle
+        run: |
+          set -euo pipefail
+          test -f webapp/dist/editor.js
+          test -f webapp/dist/editor.css
+          grep -q 'http-equiv="Content-Security-Policy"' webapp/dist/index.html
+          ls webapp/dist/duplotrain-src-*.zip webapp/dist/pyodide-0.27.7/pyodide.asm.wasm
+      - id: bundle
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          name: github-pages
+          path: webapp/dist
+          include-hidden-files: true
+      - name: Record the exact tar tested by both browsers
+        id: digest
+        run: echo "sha256=$(sha256sum "$RUNNER_TEMP/artifact.tar" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
   browser:
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -77,26 +130,39 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-        with:
-          node-version: '22'
-      - run: python -m pip install -e '.[dev]' playwright
+      - run: python -m pip install -e '.[browser]'
       - run: python -m playwright install --with-deps ${{ matrix.browser }}
-      - run: node --test tests/web/*.test.cjs
-      - run: python webapp/build.py
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: tested-bundle
+          merge-multiple: true
+      - name: Verify and unpack the same-run Pages artifact
+        env:
+          EXPECTED_SHA256: ${{ needs.build.outputs.sha256 }}
+        run: |
+          python - <<'PYCODE'
+          import hashlib
+          import os
+          import tarfile
+          from pathlib import Path
+          source = Path('tested-bundle/artifact.tar')
+          expected = os.environ['EXPECTED_SHA256']
+          if len(expected) != 64 or hashlib.sha256(source.read_bytes()).hexdigest() != expected:
+              raise SystemExit('Pages artifact checksum mismatch')
+          with tarfile.open(source) as archive:
+              archive.extractall('webapp/dist', filter='data')
+          PYCODE
       - run: python -m pytest tests/browser -m browser -v
         env:
           DUPLOTRAIN_REQUIRE_BROWSER: '1'
           DUPLOTRAIN_BROWSER: ${{ matrix.browser }}
           DUPLOTRAIN_STATIC_DIST: ${{ github.workspace }}/webapp/dist
   deploy:
-    # Publish to GitHub Pages only from a push to main whose checks all passed,
-    # at exactly the commit they ran on. Nothing here reads event data, so a
-    # pull request from a fork can neither trigger this job nor choose the code
-    # it builds; a separate workflow_run-triggered deploy could be reached by a
-    # fork branch named main.
+    # Same-run immutable artifact only, after every gate. No source checkout,
+    # cross-workflow artifact selection or build commands run with Pages privileges.
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    needs: [python, base-install, browser]
+    needs: [quality, python, base-install, build, browser]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -107,27 +173,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
-        with:
-          python-version: '3.12'
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          # build.py re-verifies the archive's SHA-256 on every build.
-          path: webapp/vendor/pyodide-core-0.27.7.tar.bz2
-          key: pyodide-core-0.27.7
-      - run: python webapp/build.py --pages
-      - name: Check the bundle
-        run: |
-          set -euo pipefail
-          test -f webapp/dist/index.html
-          grep -q 'http-equiv="Content-Security-Policy"' webapp/dist/index.html
-          ls webapp/dist/duplotrain-src-*.zip webapp/dist/pyodide-0.27.7/pyodide.asm.wasm
-      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: webapp/dist
       - id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        with:
+          artifact_name: github-pages
