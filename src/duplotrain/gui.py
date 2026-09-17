@@ -576,6 +576,18 @@ class Session:
         seen_pre = {}
         prefixes = {}
         suffixes = {}
+        # Build each relative run once, then compose it into any prefix's frame.
+        # Exact rigid transforms associate, so this replaces j+k transforms per
+        # trial with at most two without changing placements or template order.
+        straight_runs = [ORIGIN]
+        curve_runs = {0: [ORIGIN], 1: [ORIGIN]}
+
+        def run_delta(runs, delta, count):
+            while len(runs) <= count:
+                runs.append(runs[-1].then(*delta))
+            pose = runs[count]
+            return pose.x, pose.y, pose.z, pose.heading
+
         seen_layouts = set()
         for pre, post in pairs:
             if post not in suffixes:
@@ -598,15 +610,17 @@ class Session:
                         continue
                     if k > remaining.get("curve", 0):
                         break
-                    for j in range(0, 9):
+                    for j in range(min(8, remaining.get("straight", 0)) + 1):
+                        if len(pre) + len(post) + j + k > max_pieces:
+                            break
                         # Different post-units reuse the same exact prefix.
                         prefix = (pre, j, k, entry)
                         if prefix not in prefixes:
                             pose = start_pre
-                            for _ in range(j):
-                                pose = pose.then(*s_delta)
-                            for _ in range(k):
-                                pose = pose.then(*c_delta[entry])
+                            if j:
+                                pose = pose.then(*run_delta(straight_runs, s_delta, j))
+                            if k:
+                                pose = pose.then(*run_delta(curve_runs[entry], c_delta[entry], k))
                             prefixes[prefix] = pose
                         pose = prefixes[prefix]
                         for m in suffixes[post].get(pose, ()):

@@ -122,6 +122,67 @@ def _cached_moves(piece: PieceType) -> tuple[Move, ...]:
     return tuple(moves)
 
 
+def _completion_moves(
+    pieces: Mapping[str, PieceType],
+    stock: Mapping[str, int],
+    base: Layout | None,
+    grow_from: tuple[int, int] | None,
+    close_onto: tuple[int, int] | None,
+) -> dict[str, list[Move]]:
+    """Relax only traversals the search can actually use.
+
+    Stock types may be placed in any orientation. A base-only type contributes
+    only routes whose two ports are still free on ONE preplaced junction, not a
+    union of free ports from different instances. Occupied ports, sealed faces
+    and the two selected endpoints never become transit entries. Transits consume
+    ports and never reopen them, so this initial superset stays conservative.
+
+    Keep all types in the result (possibly with no moves): the engines still need
+    their port geometry for targets, and collision/replay use the complete base.
+    Canonical representatives retain the exact endpoint transform of a route.
+    """
+    available: dict[str, set[tuple[int, int]]] = {}
+    if base is not None:
+        for index, placement in enumerate(base):
+            piece = placement.piece
+            if stock.get(piece.id, 0) > 0 or not piece.is_junction:
+                continue
+            free = {
+                port for port in range(len(piece.ports))
+                if port not in piece.sealed and (index, port) not in base.links
+                and (index, port) not in (grow_from, close_onto)
+            }
+            if len(free) < 2:
+                continue
+            canon = _canonical_traversals(piece)
+            available.setdefault(piece.id, set()).update(
+                canon[entry, exit_port]
+                for entry in free for exit_port, _route in piece.transit(entry)
+                if exit_port in free
+            )
+    return {
+        pid: [move for move in _moves_for(piece)
+              if stock.get(pid, 0) > 0
+              or (move.entry, move.exit) in available.get(pid, ())]
+        for pid, piece in pieces.items()
+    }
+
+
+def _stock_span_budget(
+    counts: Mapping[str, int], spans: Sequence[tuple[float, str]], slots: int,
+    consumed: str | None = None,
+) -> float:
+    """Sum the longest available spans fitting *slots* (spans sorted descending)."""
+    reach = 0.0
+    for span, pid in spans:
+        take = min(slots, counts[pid] - (pid == consumed))
+        reach += take * span
+        slots -= take
+        if slots == 0:
+            break
+    return reach
+
+
 def _mirror_ports(piece: PieceType) -> dict[int, int | None]:
     """Map each port to the port its mirror image lands on, if any.
 
@@ -713,7 +774,7 @@ class _CompletionBounds:
             self.heading = lambda pose: pose.heading
             zeros = [Pose.make(heading=heading) for heading in range(HEADING_STEPS)]
         self.enclose = physical if slippage else lambda pose: (self.project(pose),) * 2
-        # Include full 3D deltas and every preplaced route, not only spare pieces.
+        # Include full 3D deltas of stock and usable preplaced routes.
         moves = {apply_move(zeros[0]): apply_move
                  for routes in eng.moves.values() for _entry, _exit, apply_move in routes}
         self.deltas = []
@@ -1582,9 +1643,9 @@ def solve(
     if base is not None:
         for placement in base.placements:
             piece_obj.setdefault(placement.piece.id, placement.piece)
-    # Reverse reachability also needs routes through preplaced junctions, including
-    # types absent from the spare inventory. Only piece_ids may be newly placed.
-    moves_by_piece = {pid: _moves_for(piece) for pid, piece in piece_obj.items()}
+    # Closed base pieces are obstacles, not spare traversal moves. Base-only
+    # junctions contribute just their still-usable free routes to the relaxation.
+    moves_by_piece = _completion_moves(piece_obj, counts, base, grow_from, close_onto)
     # Tie-break rank for move ordering: with a broad inventory many moves share a
     # heuristic score (a level crossing "ahead" lands exactly where a straight does);
     # plain running track must win those ties or the search drowns in exotic-piece
@@ -1809,6 +1870,14 @@ def solve(
     # heading steps, so pieces-needed >= max(dist/span, need/turn).
     max_span_any = max(span_of.values(), default=1.0) or 1.0
     max_turn_any = max(turn_of.values(), default=0)
+    # Without new junctions, each remaining placement contributes at most one
+    # stock span. The global longest piece is too optimistic once a scarce bridge
+    # has been spent. Take the longest ACTUALLY remaining pieces that fit this
+    # contour; existing free transits are discounted separately with stub_reach.
+    stock_spans = sorted(((span_of[pid], pid) for pid in piece_ids), reverse=True)
+    simple_stock = base is not None and all(
+        not piece_obj[pid].is_junction for pid in piece_ids
+    )
 
     def eligible(used: int) -> bool:
         return used >= cfg.min_pieces and (not cfg.use_all_pieces or used == total_pieces)
@@ -2052,6 +2121,12 @@ def solve(
         if need > remaining_turn + stub_turns:
             stats.pruned_turn += 1
             return True
+        if simple_stock:
+            slots = min(total_pieces, depth_limit, f_limit) - used
+            reach = _stock_span_budget(counts, stock_spans, slots)
+            if home > reach + stub_reach + (cfg.slop - slack_used) + 1e-6:
+                stats.pruned_reach += 1
+                return True
         # IDA* contour (completion mode): at least this many more pieces are needed.
         # Transits through open stubs advance the walk without costing a piece, so
         # the admissible estimate must discount what the stubs could contribute
@@ -2161,7 +2236,20 @@ def solve(
         # unique per candidate, so the sort never has to compare the poses.
         candidates.sort()
         child_budget = tail_budget(context, used + 1) if completion is not None else None
+        # With no free junctions or reversing targets, reject an out-of-reach
+        # child before exact tail queries, collision work, or another DFS node.
+        child_reach = None
+        if simple_stock and not stubs and not cfg.reversing_loops:
+            slots = min(total_pieces, depth_limit, f_limit) - used - 1
+            child_reach = {
+                pid: _stock_span_budget(counts, stock_spans, slots, consumed=pid)
+                for pid in piece_ids if counts[pid]
+            }
         for _heuristic, _prio, pid, entry, exit_port, next_cursor in candidates:
+            if (child_reach is not None
+                    and eng.dist_home(next_cursor) > child_reach[pid] + slack_left + 1e-6):
+                stats.pruned_reach += 1
+                continue
             # Reject an impossible endpoint before sampling collision geometry or
             # spending a DFS node. Leaving this piece in counts only enlarges the
             # reachability bound, so this early check remains conservative.

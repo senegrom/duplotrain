@@ -57,6 +57,18 @@ def test_reported_gap_does_not_rebuild_every_suffix_for_every_prefix(monkeypatch
 
     monkeypatch.setattr(Pose, "then", counted)
     assert not session._arc_closures((25, 0), (23, 1), 8, 26)
-    # The original shortcut made over 20,000 exact transforms on this case.
-    # A call-count ceiling is stable across hardware; no wall-clock assertions.
-    assert calls < 10_000
+    # The earlier suffix lookup still made over 4,000 transforms. Composed runs
+    # reduce this to about 1,440; use an operation ceiling, not wall-clock timing.
+    assert calls < 2_000
+
+
+@pytest.mark.parametrize("straights", [0, 1, 2, 4])
+def test_composed_arc_runs_preserve_finite_stock_order(straights):
+    catalog = default_catalog()
+    base = build_chain([(catalog["curve"], 0, 1)] * 6)
+    session = Session(history=[base], inventory={"curve": 12, "straight": straights})
+    found = session._arc_closures((5, 1), (0, 0), 50, 26)
+    assert [len(s.layout) for s in found] == [12 + 2 * i for i in range(straights // 2 + 1)]
+    for candidate in found:
+        assert not candidate.layout.joint_issues()
+        assert not _solution_overlaps(candidate.layout, 0, 120, 8)
