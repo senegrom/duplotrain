@@ -3,28 +3,21 @@
 import http.client
 import json
 import socket
-import threading
 import time
 
 import pytest
 
-from duplotrain.gui import Session, make_server
+from duplotrain.gui import Session
 from duplotrain.validation import MAX_JSON_BYTES
+from tests.editor_support import running_server
 
 
 @pytest.fixture()
 def local_editor():
     session = Session()
     session.attach("straight", 0, None)
-    server = make_server(session, port=0)
-    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-    thread.start()
-    try:
+    with running_server(session) as server:
         yield session, server.server_port
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()
 
 
 def request(port, method="POST", path="/api/clear", headers=None, body=b"{}", half_close=False):

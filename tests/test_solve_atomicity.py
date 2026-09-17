@@ -1,17 +1,14 @@
 """Rejected or interrupted editor searches must not consume a revision."""
 
-import http.client
-import importlib.util
 import json
-import threading
-from pathlib import Path
 
 import pytest
 
-import duplotrain.gui as gui
+import duplotrain.editor as editor
 from duplotrain import build_chain, default_catalog
-from duplotrain.gui import Session, dispatch_session, make_server
+from duplotrain.gui import Session, dispatch_session
 from duplotrain.solver import Solution, SolveResult, SolveStats
+from tests.editor_support import load_adapter, post, running_server, unchanged
 
 
 def session_with_candidate():
@@ -23,11 +20,6 @@ def session_with_candidate():
     session.revision = session._candidate_revision = 9
     session.candidates = [Solution(closed, (), 0.0, True, 0, ())]
     return session
-
-
-def unchanged(session):
-    return (session.snapshot(), list(session.history), session.revision,
-            list(session.candidates), session._candidate_revision)
 
 
 @pytest.mark.parametrize("failure", ["oracle", "solver", "second_stage", "progress"])
@@ -51,7 +43,7 @@ def test_search_failures_preserve_existing_usable_candidates(monkeypatch, failur
             config.progress(4096)
         return fail()
 
-    monkeypatch.setattr(gui, "solve", search)
+    monkeypatch.setattr(editor, "solve", search)
     with pytest.raises(ValueError, match="injected search failure"):
         dispatch_session(session, "/api/solve", {"revision": 9}, progress=fail)
     assert unchanged(session) == before
@@ -73,7 +65,7 @@ def test_successful_search_publishes_exactly_one_new_revision(monkeypatch, resul
         ])])
     monkeypatch.setattr(Session, "_arc_closures", lambda self, *args:
                         candidates if result_kind == "oracle" else [])
-    monkeypatch.setattr(gui, "solve", lambda *args, **kwargs: SolveResult(
+    monkeypatch.setattr(editor, "solve", lambda *args, **kwargs: SolveResult(
         candidates if result_kind == "solver" else [],
         SolveStats(complete=True, stop_reason="exhausted"),
     ))
@@ -95,39 +87,17 @@ def unjoined_circle_session():
 
 def test_http_error_does_not_make_the_next_explicit_join_stale():
     session = unjoined_circle_session()
-    server = make_server(session, 0)
-    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-    thread.start()
-
-    def post(path, body):
-        conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
-        try:
-            conn.request("POST", path, json.dumps(body), {"Content-Type": "application/json"})
-            response = conn.getresponse()
-            return response.status, json.loads(response.read())
-        finally:
-            conn.close()
-
-    try:
+    with running_server(session) as server:
         before = unchanged(session)
-        status, result = post("/api/solve", {"revision": 0, "reversing": True})
+        status, result = post(server, "/api/solve", {"revision": 0, "reversing": True})
         assert status == 409 and "already mate" in result["error"]
         assert unchanged(session) == before
-        status, result = post("/api/join", {"revision": 0, "a": [0, 0], "b": [11, 1]})
+        status, result = post(server, "/api/join", {"revision": 0, "a": [0, 0], "b": [11, 1]})
         assert status == 200 and result["layout"]["exactly_closed"]
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()
 
 
 def test_pyodide_error_preserves_the_same_revision_contract():
-    spec = importlib.util.spec_from_file_location(
-        "atomic_adapter", Path(__file__).parents[1] / "webapp" / "adapter.py"
-    )
-    adapter = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(adapter)
-    adapter.session = unjoined_circle_session()
+    adapter = load_adapter(unjoined_circle_session())
     before = unchanged(adapter.session)
     result = json.loads(adapter.dispatch("/api/solve", '{"revision":0,"reversing":true}'))
     assert "already mate" in result["__error"]

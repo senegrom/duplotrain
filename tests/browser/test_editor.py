@@ -340,6 +340,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         page.locator("#reversing").check()
         page.locator("#solve").tap()
         expect(page.locator(".cand")).to_have_count(3, timeout=30000)
+        assert page.evaluate("S.candidates.every(c => c.preview.format === 'duplotrain-preview/1')")
         candidate = page.locator(".cand").first
         candidate.get_by_role("button", name="Preview", exact=True).tap()
         candidate.get_by_role("button", name="Apply").tap()
@@ -408,6 +409,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         page.locator("#slop").fill("5")
         page.locator("#solve").tap()
         expect(page.locator(".cand")).to_have_count(3, timeout=30000)
+        assert page.evaluate("S.candidates.every(c => c.preview.format === 'duplotrain-preview/1')")
         candidate = page.locator(".cand").first
         expect(candidate).to_contain_text("forced 5")
         candidate.get_by_role("button", name="Preview", exact=True).tap()
@@ -630,6 +632,7 @@ def test_candidate_preview_selection_preserves_card_and_button_identity(editor):
     page.locator("#reversing").uncheck()
     page.locator("#solve").tap()
     page.wait_for_selector(".cand")
+    assert page.evaluate("S.candidates[0].preview.format") == "duplotrain-preview/1"
     page.evaluate("window.retainedCard = document.querySelector('.cand'); "
                   "window.retainedPreview = window.retainedCard.querySelector('button')")
     card = page.locator(".cand").first
@@ -666,6 +669,8 @@ def test_reported_bridge_search_preview_apply_and_undo(editor):
     page.locator("#solve").tap()
     page.wait_for_selector(".cand", timeout=30000)
     assert page.locator(".cand").count() == 8
+    assert page.evaluate("S.candidates.every(c => c.preview.format === 'duplotrain-preview/1' "
+                         "&& c.preview.base_count === 59 && c.preview.placements.length === 24)")
     assert page.locator("#expand-search").is_visible()
     assert page.evaluate("S.searched") < 50000
     candidate = page.locator(".cand").first

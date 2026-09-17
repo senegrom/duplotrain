@@ -1,11 +1,8 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
 const vm = require("node:vm");
-const path = require("node:path");
-const html = fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static/editor.html"), "utf8");
-const source = html.split("<script>")[1].split("// ---------- Checkpoint persistence ----------")[0];
+const {loadEditor} = require("./editor-harness.cjs");
 
 function editor() {
   const calls = [], classes = new Set(), elements = new Map();
@@ -26,7 +23,7 @@ function editor() {
       return {ok: true, json: async () => ({revision: 8})};
     },
   });
-  vm.runInContext(source, context);
+  loadEditor(context);
   vm.runInContext("S = {revision: 7};", context);
   return {context, calls, classes, el, redraws: () => redraws,
     run: code => vm.runInContext(code, context)};
@@ -43,7 +40,7 @@ test("every edit captures its viewed revision for HTTP and worker transports", a
     };
     for (const name of paths) await e.run(`api("/api/${name}", {placement: 1})`);
     assert.equal(e.calls.length, paths.length);
-    for (const {options} of e.calls) assert.deepEqual(JSON.parse(options.body), {revision: 7, placement: 1});
+    for (const {options} of e.calls) assert.deepEqual(JSON.parse(options.body), {revision: 7, placement: 1, preview_format: "duplotrain-preview/1"});
     assert.equal(e.classes.size, 0);
   }
 });
@@ -51,14 +48,15 @@ test("every edit captures its viewed revision for HTTP and worker transports", a
 test("candidate revision is not silently replaced by the latest viewed revision", async () => {
   const e = editor();
   await e.run('api("/api/apply", {index: 0, revision: 3})');
-  assert.deepEqual(JSON.parse(e.calls[0].options.body), {revision: 3, index: 0});
+  assert.deepEqual(JSON.parse(e.calls[0].options.body), {revision: 3, index: 0, preview_format: "duplotrain-preview/1"});
 });
 
 test("read-only requests do not require or inject an edit revision", async () => {
   const e = editor();
   await e.run('api("/api/state")');
   await e.run('api("/api/export", {})');
-  assert.equal(e.calls[0].options.method, undefined);
+  assert.equal(e.calls[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(e.calls[0].options.body), {preview_format: "duplotrain-preview/1"});
   assert.equal(e.calls[1].options.body, "{}");
 });
 

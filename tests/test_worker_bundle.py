@@ -7,6 +7,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).parents[1]
 spec = importlib.util.spec_from_file_location("worker_build", ROOT / "webapp/build.py")
 build = importlib.util.module_from_spec(spec)
@@ -34,7 +36,8 @@ def test_worker_zip_is_deterministic_and_excludes_only_desktop_files():
     assert all((src / name).is_file() for name in excluded)
 
 
-def test_isolated_worker_zip_runs_all_editor_operations(tmp_path):
+@pytest.mark.parametrize("compact", [False, True])
+def test_isolated_worker_zip_runs_all_editor_operations(tmp_path, compact):
     archive = tmp_path / "engine.zip"
     archive.write_bytes(build.build_source_zip())
     (tmp_path / "adapter.py").write_bytes((ROOT / "webapp/adapter.py").read_bytes())
@@ -42,9 +45,14 @@ def test_isolated_worker_zip_runs_all_editor_operations(tmp_path):
 import sys, json
 sys.path[:0] = sys.argv[1:3]
 import adapter
-from duplotrain import gui
-assert "engine.zip" in gui.__file__, gui.__file__
+from duplotrain import editor
+assert "engine.zip" in editor.__file__, editor.__file__
+assert "duplotrain.gui" not in sys.modules
+assert "http.server" not in sys.modules
+assert "webbrowser" not in sys.modules
 def api(path, body):
+    if sys.argv[3] == "compact" and path != "/api/export":
+        body = {**body, "preview_format": "duplotrain-preview/1"}
     result = json.loads(adapter.dispatch(path, json.dumps(body)))
     assert "__error" not in result, result
     return result
@@ -53,6 +61,9 @@ s = api("/api/attach", {"piece": "curve", "entry": 0, "revision": s["revision"]}
 s = api("/api/attach", {"piece": "curve", "entry": 0, "at": [0, 1], "revision": s["revision"]})
 s = api("/api/solve", {"max_results": 1, "revision": s["revision"]})
 assert s["found"] == 1
+assert (s["candidates"][0]["preview"].get("format") == "duplotrain-preview/1") == (
+    sys.argv[3] == "compact"
+)
 s = api("/api/apply", {"index": 0, "revision": s["revision"]})
 assert s["layout"]["exactly_closed"]
 snapshot = s["snapshot"]
@@ -67,5 +78,6 @@ r = json.loads(adapter.dispatch("/api/clear", json.dumps({"revision": 0})))
 assert r["code"] == "stale_revision"
 assert api("/api/state", {})["snapshot"] == snapshot
 '''
-    subprocess.run([sys.executable, "-I", "-c", code, str(archive), str(tmp_path)],
+    subprocess.run([sys.executable, "-I", "-c", code, str(archive), str(tmp_path),
+                    "compact" if compact else "legacy"],
                    cwd=tmp_path, check=True, capture_output=True, text=True, timeout=30)

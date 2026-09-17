@@ -1,17 +1,14 @@
 """Regression tests for stale edits, recoverable snapshots and exact mate indexing."""
 
 import copy
-import http.client
-import importlib.util
 import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from fractions import Fraction
-from pathlib import Path
 
 import pytest
 
-import duplotrain.gui as gui
+import duplotrain.editor as editor
 from duplotrain.catalog import default_catalog
 from duplotrain.geometry import Pose
 from duplotrain.gui import (
@@ -19,16 +16,11 @@ from duplotrain.gui import (
     RevisionConflictError,
     Session,
     dispatch_session,
-    make_server,
 )
 from duplotrain.layout import Layout, Placement, layout_from_dict, layout_to_dict
 from duplotrain.solver import Solution
 from duplotrain.validation import MAX_ACCESSORIES, MAX_PLACEMENTS
-
-
-def unchanged(session):
-    return (session.snapshot(), list(session.history), session.revision,
-            list(session.candidates), session._candidate_revision)
+from tests.editor_support import load_adapter, post, running_server, unchanged
 
 
 @pytest.mark.parametrize("path", sorted(MUTATING_ROUTES))
@@ -50,25 +42,8 @@ def local_session():
     session.attach("straight", 0, None)
     session.attach("curve", 0, (0, 1))
     session.attach("switch", 0, (1, 1))
-    server = make_server(session, 0)
-    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-    thread.start()
-    try:
+    with running_server(session) as server:
         yield session, server
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()
-
-
-def post(server, path, body):
-    conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
-    try:
-        conn.request("POST", path, json.dumps(body), {"Content-Type": "application/json"})
-        response = conn.getresponse()
-        return response.status, json.loads(response.read())
-    finally:
-        conn.close()
 
 
 def test_two_tabs_cannot_delete_a_reindexed_piece(local_session):
@@ -128,11 +103,7 @@ def test_repeated_search_invalidates_the_previous_candidate_indices(monkeypatch)
 
 
 def test_pyodide_revision_conflicts_match_http():
-    spec = importlib.util.spec_from_file_location(
-        "integrity_adapter", Path(__file__).parents[1] / "webapp" / "adapter.py"
-    )
-    adapter = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(adapter)
+    adapter = load_adapter()
     result = json.loads(adapter.dispatch("/api/attach", json.dumps({
         "piece": "straight", "entry": 0, "revision": 0,
     })))
@@ -208,7 +179,7 @@ def test_save_size_budget_is_checked_before_any_session_change(monkeypatch, acti
     session = Session()
     session.attach("straight", 0, None)
     before = unchanged(session)
-    monkeypatch.setattr(gui, "MAX_SNAPSHOT_BYTES", len(json.dumps(session.snapshot()).encode()))
+    monkeypatch.setattr(editor, "MAX_SNAPSHOT_BYTES", len(json.dumps(session.snapshot()).encode()))
     with pytest.raises(ValueError, match="too large to save"):
         if action == "attach":
             session.attach("straight", 0, (0, 1))

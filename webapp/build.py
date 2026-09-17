@@ -5,8 +5,8 @@ Output layout (everything self-hosted, no third-party requests at runtime):
     dist/
       index.html                    the editor, with boot.js injected
       icons/ / manifest.webmanifest  favicon and installed-app identity
-      boot.js / app.js / worker.js  bridge + editor + engine worker
-      adapter.py                    the dispatch shim around duplotrain.gui.Session
+      boot.js / editor.js / worker.js  bridge + editor + engine worker
+      adapter.py                    the dispatch shim around duplotrain.editor.Session
       duplotrain-src-<stamp>.zip    the Python package, content-stamped
       pyodide-<version>/            Pyodide core (downloaded once into vendor/)
 
@@ -43,9 +43,10 @@ VENDOR = WEBAPP / "vendor"
 
 WORKER_EXCLUDES = {
     "cli.py",
+    "gui.py",  # local HTTP host; the worker imports editor.Session
     "render.py",
     # Public desktop helpers imported only by the regular package __init__.  The
-    # browser worker talks to gui.Session directly and does not need these modules.
+    # browser worker talks to editor.Session directly and does not need these modules.
     "drive.py",
     "explore.py",
     "networks.py",
@@ -235,29 +236,20 @@ AddType application/wasm .wasm
 
 
 def build_index(meta_csp: bool = False) -> None:
-    """The editor split CSP-clean: page + external app.js, boot.js loaded first.
+    """Copy the shared editor assets and inject the static worker boot script.
 
-    With *meta_csp* the policy is also embedded in the page for header-less hosts.
+    JavaScript and CSS are normal source files, not fragments extracted from HTML.
     """
-    editor = (ROOT / "src" / "duplotrain" / "static" / "editor.html").read_text(
-        encoding="utf-8"
-    )
-    start_marker = "<script>\n\"use strict\";"
-    end_marker = "</script>\n</body>"
-    if start_marker not in editor or end_marker not in editor:
-        raise SystemExit("editor.html changed shape; update webapp/build.py")
-    head, rest = editor.split(start_marker, 1)
-    script, tail = rest.rsplit(end_marker, 1)
-    (DIST / "app.js").write_text(
-        '"use strict";' + script, encoding="utf-8", newline="\n"
-    )
-
-    html = (
-        head
-        + '<script src="./boot.js?v=__V__"></script>\n'
-        + '<script src="./app.js?v=__V__"></script>\n</body>'
-        + tail
-    )
+    static = ROOT / "src" / "duplotrain" / "static"
+    html = text_bytes(static / "editor.html").decode("utf-8")
+    boot_marker = "<!-- Worker boot is inserted here by the static build. -->"
+    if html.count(boot_marker) != 1:
+        raise SystemExit("editor.html needs one worker boot marker")
+    html = html.replace(boot_marker, '<script src="./boot.js?v=__V__" defer></script>')
+    for asset in ("editor.js", "editor.css"):
+        html = html.replace(f'./{asset}"', f'./{asset}?v=__V__"')
+    # Old in-place builds must not retain a now-unused, extracted script.
+    (DIST / "app.js").unlink(missing_ok=True)
     html = html.replace(
         "<title>duplotrain editor</title>",
         "<title>duplotrain — DUPLO track designer</title>\n"
@@ -283,8 +275,11 @@ def build_index(meta_csp: bool = False) -> None:
             continue
         dest = DIST / source.relative_to(static)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, dest)
-    print(f"wrote {DIST / 'index.html'}, app.js and .htaccess")
+        if source.suffix in (".js", ".css"):
+            dest.write_bytes(text_bytes(source))
+        else:
+            shutil.copy2(source, dest)
+    print(f"wrote {DIST / 'index.html'}, editor assets and .htaccess")
 
 
 def _stamp_file(source: Path, dest: Path, replacements: dict[str, str]) -> None:
@@ -322,7 +317,9 @@ def main() -> None:
     digest = hashlib.sha256()
     for arcname, payload in entries:
         digest.update(arcname.encode("utf-8") + b"\n" + payload + b"\n")
-    digest.update(adapter + (DIST / "app.js").read_bytes())
+    digest.update(adapter + args.pyodide_version.encode("ascii"))
+    for name in ("editor.js", "editor.css", "editor.html"):
+        digest.update(text_bytes(ROOT / "src/duplotrain/static" / name))
     for name in ("boot.js", "worker.js"):
         digest.update(text_bytes(WEBAPP / name))
     stamp = digest.hexdigest()[:8]

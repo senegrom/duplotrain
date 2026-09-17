@@ -23,6 +23,8 @@ dependencies = [
 
 [project.optional-dependencies]
 render = ["matplotlib>=3.8"]
+test = ["pytest>=8.0", "matplotlib>=3.8"]
+browser = ["pytest>=8.0", "playwright>=1.45"]
 dev = ["pytest>=8.0", "matplotlib>=3.8", "ruff>=0.6"]
 
 [project.scripts]
@@ -33,7 +35,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 duplotrain = [
-    "static/*.html", "static/*.webmanifest", "static/*.svg",
+    "static/*.html", "static/*.js", "static/*.css", "static/*.webmanifest", "static/*.svg",
     "static/*.ico", "static/*.png", "static/icons/*.png", "static/icons/*.ico",
 ]
 

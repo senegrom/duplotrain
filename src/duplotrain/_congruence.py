@@ -491,10 +491,6 @@ def _sample(
     return points
 
 
-def curve_points(layout: Layout, spacing: float) -> list[tuple[float, float, float]]:
-    """Sample the normalized union in its centred, unrotated frame."""
-    _spacing(spacing)
-    return _sample(_in_frame(_normalise(layout), 0, False), spacing)
 
 
 #: The sampled key is a function of the exact canonical identity alone, and an

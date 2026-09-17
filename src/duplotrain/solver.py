@@ -578,10 +578,6 @@ class _LatticeEngine:
     def dist_home(self, cursor: tuple) -> float:
         return self.dist(cursor, self.anchor)
 
-    def heur_dist(self, cursor: tuple) -> float:
-        x, y = _flat_xy(cursor)
-        ax, ay = self._approach
-        return math.hypot(x - ax, y - ay) + 0.125 * abs(cursor[4] - self.anchor[4])
 
     def need_turn24(self, cursor: tuple) -> int:
         gap = (cursor[5] - self.anchor[5]) % 12
@@ -597,7 +593,7 @@ class _LatticeEngine:
         return tuple((*_flat_xy(pose), pose[5]) for _index, _port, pose in stubs)
 
     def candidate_score(self, child: tuple, stub_refs: tuple) -> float:
-        """Move-ordering score, identical to heur_dist/dist/need_turn24 arithmetic
+        """Move-ordering score, combining approach distance and turn cost
         but converting the child pose to floats once per candidate."""
         a, b, c, d, z, h = child
         x = (a + (b * _SQRT3 + c) / 2.0) / 20.0
@@ -714,12 +710,6 @@ _SLIP_NORMS = tuple(math.isqrt((a * a + b * b) * _MM_SCALE**2) + 1
                     for a, b in _SLIP_AXES)
 
 
-def _outward(low, high) -> tuple[int, int]:
-    low, high = math.floor(low), math.ceil(high)
-    # Also cover the solver's floating distance evaluation at translated layouts.
-    # This deliberately loose relative margin can only admit extra DFS work.
-    guard = (abs(low) + abs(high)) // 2**40 + 2
-    return low - guard, high + guard
 
 
 def _alg_interval(value: Alg) -> tuple[int, int]:
