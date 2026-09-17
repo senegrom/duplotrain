@@ -658,3 +658,15 @@ CPU time (process time, minimum of two runs); layouts, order and keys identical:
 
 The result-limited enumeration stops inside its first pass, so only the binning
 helps it.
+
+## Centring congruence keys in integers
+
+Choosing the canonical frame starts by centring every exact point on the
+translation origin and clearing denominators. Both steps used field arithmetic:
+three exact subtractions per point and a Fraction product per coefficient, and
+the origin itself was an exact average summed term by term. Every coefficient of
+every point and of the origin is now put over one common denominator in
+integers. A common factor left in the vectors cancels in the gcd reduction that
+defines the identity, so the identity, the chosen frame and the key are
+unchanged: all 671 corpus keys are byte-identical, and keying the corpus takes
+about a tenth less CPU time (2.23 s to 2.00 s on a loaded machine).

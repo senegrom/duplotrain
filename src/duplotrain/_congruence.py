@@ -234,8 +234,25 @@ def _normalise(layout: Layout) -> _Curve:
         features.update((_xyz(start), _xyz(end)))
     # Unique normalized endpoints/sector boundaries transform as a set. Averaging
     # them exactly makes translation independent of segmentation and duplication.
-    origin = tuple(sum((p[i] for p in features), Alg(0)) / len(features)
-                   if features else Alg(0) for i in range(3))
+    # The exact average is summed in integers over one common denominator, with
+    # one Fraction per coefficient at the end.
+    if features:
+        rows = [tuple(value.coeffs() for value in point) for point in features]
+        denominator = 1
+        for point in rows:
+            for row in point:
+                for coefficient in row:
+                    denominator = lcm(denominator, coefficient.denominator)
+        count = len(rows) * denominator
+        sums = [[0, 0, 0, 0] for _ in range(3)]
+        for point in rows:
+            for i, row in enumerate(point):
+                total = sums[i]
+                for j, coefficient in enumerate(row):
+                    total[j] += coefficient.numerator * (denominator // coefficient.denominator)
+        origin = tuple(Alg(*(Fraction(value, count) for value in total)) for total in sums)
+    else:
+        origin = (Alg(0), Alg(0), Alg(0))
     return _Curve(tuple(lines), tuple((c, r, tuple(sorted(sectors)))
                                      for (c, r), sectors in circles.items()),
                   frozenset(isolated), tuple(opaque), origin)
@@ -336,20 +353,32 @@ def _canonical_frame(curve: _Curve) -> tuple[tuple, _Curve]:
         exact.add(centre)
     if not exact:
         return (0, (), (), ()), _Curve((), (), frozenset(), (), (Alg(0), Alg(0), Alg(0)))
-    centred = {
-        point: tuple((value - offset).coeffs()
-                     for value, offset in zip(point, curve.origin, strict=True))
-        for point in exact
-    }
+    # Centre in integer arithmetic: every coefficient of every point and of the
+    # origin over one common denominator. A common factor left in the vectors
+    # cancels in the gcd reduction below, so the identity is the same as with
+    # lowest-terms centred coordinates.
+    rows = {point: tuple(value.coeffs() for value in point) for point in exact}
+    origin_rows = tuple(value.coeffs() for value in curve.origin)
     denominator = 1
-    for vectors in centred.values():
+    for vectors in rows.values():
         for vector in vectors:
             for coefficient in vector:
                 denominator = lcm(denominator, coefficient.denominator)
+    for vector in origin_rows:
+        for coefficient in vector:
+            denominator = lcm(denominator, coefficient.denominator)
+    origin_ints = tuple(
+        tuple(coefficient.numerator * (denominator // coefficient.denominator)
+              for coefficient in vector)
+        for vector in origin_rows
+    )
     ints = {
-        point: tuple(tuple(int(coefficient * denominator) for coefficient in vector)
-                     for vector in vectors)
-        for point, vectors in centred.items()
+        point: tuple(
+            tuple(coefficient.numerator * (denominator // coefficient.denominator) - offset
+                  for coefficient, offset in zip(vector, origin_vector, strict=True))
+            for vector, origin_vector in zip(vectors, origin_ints, strict=True)
+        )
+        for point, vectors in rows.items()
     }
     heights = {point: tuple(4 * value for value in z) for point, (_x, _y, z) in ints.items()}
     circles = [(centre, radius.coeffs(), sectors) for centre, radius, sectors in curve.circles]
