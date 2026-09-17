@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 import duplotrain.bridge_completion as bridge_module
-import duplotrain.gui as gui
+import duplotrain.editor as editor
 from duplotrain import build_chain, default_catalog
 from duplotrain.bridge_completion import _bridge, _expand, bridge_completion
 from duplotrain.geometry import ORIGIN
@@ -160,8 +160,8 @@ def test_search_effort_scales_all_three_stages(monkeypatch):
         return SolveResult([], SolveStats())
 
     monkeypatch.setattr(Session, "_arc_closures", lambda *args: [])
-    monkeypatch.setattr(gui, "solve", search)
-    monkeypatch.setattr(gui, "bridge_completion", bridges)
+    monkeypatch.setattr(editor, "solve", search)
+    monkeypatch.setattr(editor, "bridge_completion", bridges)
     for effort in (1, 2, 16):
         session = Session(history=[base], unlimited=True)
         calls.clear()

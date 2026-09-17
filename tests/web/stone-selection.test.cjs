@@ -1,12 +1,8 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const vm = require("node:vm");
-const html = fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static/editor.html"), "utf8");
-const positions = html.slice(html.indexOf("function stoneMarkPositions()"), html.indexOf("function placementAt("));
-const removal = html.slice(html.indexOf("async function removeAt("), html.indexOf('canvas.addEventListener("contextmenu"'));
+const {loadEditor} = require("./editor-harness.cjs");
 
 function editor(marks) {
   const requests = [], messages = [];
@@ -19,7 +15,7 @@ function editor(marks) {
     redraw() {}, status(message) { messages.push(message); },
     api: async (route, body) => { requests.push({route, body}); return state; },
   });
-  vm.runInContext(positions + "\n" + removal, context);
+  loadEditor(context);
   return {requests, messages, context, run: code => vm.runInContext(code, context)};
 }
 

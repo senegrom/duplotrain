@@ -2,7 +2,7 @@
 
 import json
 
-from duplotrain.gui import RevisionConflictError, Session, dispatch_session
+from duplotrain.editor import RevisionConflictError, Session, dispatch_session
 from duplotrain.validation import MAX_JSON_BYTES
 
 session = Session()

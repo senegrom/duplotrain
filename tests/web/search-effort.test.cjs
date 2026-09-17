@@ -1,12 +1,8 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const vm = require("node:vm");
-const html = fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static/editor.html"), "utf8");
-const source = html.slice(html.indexOf('el("solve").addEventListener'),
-  html.indexOf("// Pointer events support"));
+const {loadEditor} = require("./editor-harness.cjs");
 
 function editor() {
   const elements = new Map(), calls = [];
@@ -23,9 +19,8 @@ function editor() {
       return {revision: calls.length, candidates: [], complete: false,
         open_ends: [[23, 1], [25, 0]], can_undo: true, stop_reason: "node_limit"};
     }});
-  vm.runInContext(`let S = {revision: 0, open_ends: [[23, 1], [25, 0]]};
-    let solving = false, apiBusy = false, lastSolve = null;
-    let selectedCandidate = null, pickMode = null;\n` + source, context);
+  context.S = {revision: 0, open_ends: [[23, 1], [25, 0]]};
+  loadEditor(context, {events: true});
   return {el, calls, run: code => vm.runInContext(code, context)};
 }
 

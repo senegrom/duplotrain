@@ -1,11 +1,8 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const vm = require("node:vm");
-const html = fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static/editor.html"), "utf8");
-const source = html.slice(html.indexOf("// Retain controls"), html.indexOf("function redraw()"));
+const {loadEditor} = require("./editor-harness.cjs");
 
 function editor() {
   let created = 0;
@@ -50,7 +47,7 @@ function editor() {
     selectTool(tool = {}) { context.armed = tool.piece || null; context.armedStone = tool.stone || null; },
     api: async (route, body) => { calls.push({route, body}); return context.S; },
   });
-  vm.runInContext(source, context);
+  loadEditor(context);
   return {context, el, calls, created: () => created,
     run: code => vm.runInContext(code, context)};
 }

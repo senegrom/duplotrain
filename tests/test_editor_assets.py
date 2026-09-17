@@ -3,25 +3,18 @@
 import http.client
 import json
 import re
-import threading
 from importlib import resources
 
 import pytest
 
-from duplotrain.gui import _EDITOR_ASSETS, Session, make_server
+from duplotrain.gui import _EDITOR_ASSETS, Session
+from tests.editor_support import running_server
 
 
 @pytest.fixture()
 def editor_port():
-    server = make_server(Session(), port=0)
-    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-    thread.start()
-    try:
+    with running_server(Session()) as server:
         yield server.server_port
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join()
 
 
 def get(port, path):
@@ -50,7 +43,7 @@ def test_every_allowlisted_asset_is_served_verbatim(editor_port, path):
 def test_editor_html_and_manifest_reference_only_allowlisted_assets():
     # docs/icons.md: bump the revision in the HTML, manifest and allowlist together.
     html = packaged("/editor.html").decode("utf-8")
-    referenced = set(re.findall(r'<link[^>]*href="\./([^"]+)"', html))
+    referenced = set(re.findall(r'<(?:link[^>]*href|script[^>]*src)="\./([^"]+)"', html))
     assert "manifest.webmanifest" in referenced
     manifest = json.loads(packaged("/manifest.webmanifest"))
     referenced.update(icon["src"].removeprefix("./") for icon in manifest["icons"])

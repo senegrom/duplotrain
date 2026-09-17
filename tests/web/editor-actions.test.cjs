@@ -1,14 +1,8 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const vm = require("node:vm");
-const html = fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static/editor.html"), "utf8");
-const source = html.split("<script>")[1].split("// ---------- Checkpoint persistence ----------")[0] +
-  html.slice(html.indexOf("// Retain controls"), html.indexOf("function redraw()")) +
-  html.slice(html.indexOf('el("export").addEventListener'), html.indexOf('el("solve").addEventListener')) +
-  html.slice(html.indexOf('el("unlimited").addEventListener'), html.indexOf("\nresize();"));
+const {loadEditor} = require("./editor-harness.cjs");
 
 function state(revision, piece = "straight", unlimited = false) {
   const layout = {format: "duplotrain-layout/1", placements: [{piece}], links: [], accessories: []};
@@ -54,7 +48,7 @@ function editor(transport = "http") {
     },
   });
   if (transport === "worker") context.window.duplotrainApi = async (url, body) => dispatch(url, body);
-  vm.runInContext(source, context);
+  loadEditor(context, {events: true});
   context.initial = current;
   vm.runInContext("S = initial; renderPalette();", context);
   return {context, el, calls, downloads, messages,

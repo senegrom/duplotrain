@@ -1,16 +1,14 @@
 """Malformed indices must never become edits in HTTP, Pyodide or direct dispatch."""
 
-import http.client
-import importlib.util
 import json
-import threading
-from pathlib import Path
+from contextlib import ExitStack
 
 import pytest
 
 from duplotrain import ORIGIN, Layout, Placement, Pose, default_catalog
-from duplotrain.gui import Session, dispatch_session, make_server
+from duplotrain.gui import Session, dispatch_session
 from duplotrain.solver import Solution
+from tests.editor_support import load_adapter, post, running_server, unchanged
 
 
 def session_with_candidates():
@@ -25,60 +23,34 @@ def session_with_candidates():
     return session
 
 
-def unchanged(session):
-    return (session.snapshot(), list(session.history), session.revision,
-            list(session.candidates), session._candidate_revision)
-
-
 @pytest.fixture(params=["direct", "http", "pyodide"])
 def endpoint(request):
     session = session_with_candidates()
-    server = thread = adapter = None
-    if request.param == "http":
-        server = make_server(session, 0)
-        thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-        thread.start()
-    elif request.param == "pyodide":
-        spec = importlib.util.spec_from_file_location(
-            "validation_adapter", Path(__file__).parents[1] / "webapp" / "adapter.py",
-        )
-        adapter = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(adapter)
-        adapter.session = session
+    with ExitStack() as stack:
+        server = stack.enter_context(running_server(session)) if request.param == "http" else None
+        adapter = load_adapter(session) if request.param == "pyodide" else None
 
-    def reject(path, body):
-        before = unchanged(session)
-        candidates = session.candidates
-        body = {"revision": session.revision, **body}
-        if request.param == "direct":
-            with pytest.raises(ValueError):
-                dispatch_session(session, path, body)
-        elif request.param == "pyodide":
-            result = json.loads(adapter.dispatch(path, json.dumps(body)))
-            assert "__error" in result and result.get("code") != "stale_revision"
-        else:
-            conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
-            try:
-                conn.request("POST", path, json.dumps(body), {"Content-Type": "application/json"})
-                response = conn.getresponse()
-                result = json.loads(response.read())
-                assert response.status == 409
+        def reject(path, body):
+            before = unchanged(session)
+            candidates = session.candidates
+            body = {"revision": session.revision, **body}
+            if request.param == "direct":
+                with pytest.raises(ValueError):
+                    dispatch_session(session, path, body)
+            elif request.param == "pyodide":
+                result = json.loads(adapter.dispatch(path, json.dumps(body)))
+                assert "__error" in result and result.get("code") != "stale_revision"
+            else:
+                status, result = post(server, path, body)
+                assert status == 409
                 assert "error" in result and result.get("code") != "stale_revision"
-            finally:
-                conn.close()
-        assert unchanged(session) == before
-        assert session.candidates is candidates
-        # A rejected request must not stale an already-published valid candidate.
-        session.apply_candidate(0, session.revision)
-        assert session.layout.links[(0, 1)] == (1, 0)
+            assert unchanged(session) == before
+            assert session.candidates is candidates
+            # A rejected request must not stale an already-published valid candidate.
+            session.apply_candidate(0, session.revision)
+            assert session.layout.links[(0, 1)] == (1, 0)
 
-    try:
         yield session, reject
-    finally:
-        if server is not None:
-            server.shutdown()
-            server.server_close()
-            thread.join()
 
 
 INTEGER_FIELDS = [

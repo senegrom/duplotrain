@@ -1,15 +1,12 @@
 """A selected stone is identified by type AND position, on every API transport."""
 
-import http.client
-import importlib.util
 import json
-import threading
-from pathlib import Path
 
 import pytest
 
 from duplotrain import build_chain, default_catalog, layout_from_dict, layout_to_dict
-from duplotrain.gui import Session, dispatch_session, make_server
+from duplotrain.gui import Session, dispatch_session
+from tests.editor_support import load_adapter, post, running_server
 
 
 def positioned_session():
@@ -92,34 +89,17 @@ def test_explicit_removal_of_missing_marker_never_adds_it():
 @pytest.mark.parametrize("position", [None, 0, 1])
 def test_http_removal_preserves_selected_position(position):
     session = positioned_session()
-    server = make_server(session, 0)
-    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
-    thread.start()
-    conn = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
-    try:
-        conn.request("POST", "/api/stone", json.dumps(request(session, position)),
-                     {"Content-Type": "application/json"})
-        response = conn.getresponse()
-        state = json.loads(response.read())
-        assert response.status == 200
+    with running_server(session) as server:
+        status, state = post(server, "/api/stone", request(session, position))
+        assert status == 200
         assert state["layout"]["placements"][0]["stone_marks"] == [
             {"id": "stone_lights", "at": p} for p in (None, 0, 1) if p != position
         ]
-    finally:
-        conn.close()
-        server.shutdown()
-        server.server_close()
-        thread.join()
 
 
 @pytest.mark.parametrize("position", [None, 0, 1])
 def test_pyodide_adapter_preserves_selected_position(position):
-    spec = importlib.util.spec_from_file_location(
-        "position_adapter", Path(__file__).parents[1] / "webapp" / "adapter.py"
-    )
-    adapter = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(adapter)
-    adapter.session = positioned_session()
+    adapter = load_adapter(positioned_session())
     body = json.dumps(request(adapter.session, position))
     state = json.loads(adapter.dispatch("/api/stone", body))
     assert "__error" not in state

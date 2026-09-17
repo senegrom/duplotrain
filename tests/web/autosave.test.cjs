@@ -1,13 +1,10 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
 const vm = require("node:vm");
 const {randomUUID} = require("node:crypto");
-const path = require("node:path");
-const html = fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static/editor.html"), "utf8");
-const source = html.split("// ---------- Checkpoint persistence ----------")[1]
-  .split("// ---------- End checkpoint persistence ----------")[0];
+const {loadEditor} = require("./editor-harness.cjs");
+
 const KEY = "duplotrain-session/2:/";
 const LEGACY = "duplotrain-session/1:/";
 
@@ -45,7 +42,7 @@ function tab(store) {
     assert.equal(endpoint, "/api/restore");
     return {revision: 1, snapshot: body.data};
   };
-  vm.runInContext(source, context);
+  loadEditor(context, {events: true});
   return {context, notice, events,
     init: () => vm.runInContext("initializeRecovery()", context),
     save: () => vm.runInContext("saveSession()", context),
