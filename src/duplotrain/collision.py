@@ -7,11 +7,10 @@ laid side by side are a feature, not a collision).
 
 Height is respected two ways.  Points whose elevations differ by at least
 ``clearance`` pass over each other freely -- a blanket rule no current piece can
-reach.  Separately, pieces flagged ``underpass`` (the bridge arch span: an open
-arch, unlike the solid ramps) let track run beneath wherever their deck stands at
-least ``UNDERPASS_MIN`` higher: with the current bridge profile that opens a window
-around the mid-bridge crest only, matching the user's observation that a train
-passes under the arch there but never under the ramps.
+reach. Separately, pieces flagged ``underpass`` let track run beneath wherever their
+deck stands at least ``UNDERPASS_MIN`` higher. The current catalogue flags both spans and ramps:
+the spans and the highest portions of the ramps can clear track, while the lower
+ramp sections stay solid. These provisional thresholds are not new measurements.
 
 Directly-linked placements are exempt from mutual checking: neighbouring pieces meet at
 their shared joint by construction, and that contact is not an overlap.  The one thing
@@ -34,8 +33,8 @@ __all__ = ["CollisionField", "TOUCH_MARGIN", "DEFAULT_CLEARANCE", "UNDERPASS_MIN
 TOUCH_MARGIN = 2.0
 
 #: Vertical separation (mm) at which one track clears another regardless of piece
-#: type.  No in-system elevation reaches it; solid pieces (ramps) therefore never
-#: admit track beneath them.
+#: type. No in-system elevation reaches it; lower clearances require the
+#: ``underpass`` flag and the height-specific rule below.
 DEFAULT_CLEARANCE = 120.0
 
 #: An ``underpass`` piece (the bridge arch, and the ramps near their high ends)
@@ -52,6 +51,33 @@ UNDERPASS_MIN = 42.0
 
 _Point = tuple[float, float, float]
 _Cell = tuple[int, int]
+# This broad-phase index contains sample BOUNDS, not samples. Keep it independent
+# of the narrow-phase cell size, and cap both insertion and query work for custom
+# long/diagonal pieces. Small fields and oversized queries retain the linear path.
+_BOUNDS_CELL = 256.0
+_BOUNDS_MAX_CELLS = 64
+_BOUNDS_INDEX_MIN = 128
+
+
+def _bound_cells(bounds: tuple[float, ...], padding: float = 0.0) -> tuple[_Cell, ...] | None:
+    """Cells touching a padded planar box, or None for the bounded linear fallback."""
+    edges = (bounds[0] - padding, bounds[1] + padding,
+             bounds[2] - padding, bounds[3] + padding)
+    if not all(math.isfinite(edge) for edge in edges):
+        return None
+    if padding > 0:
+        # Outward rounding must not lose a borderline cloud through subtraction
+        # rounding at a cell boundary; near() still applies the original predicate.
+        edges = tuple(math.nextafter(edge, -math.inf if i % 2 == 0 else math.inf)
+                      for i, edge in enumerate(edges))
+        if not all(math.isfinite(edge) for edge in edges):
+            return None
+    xmin, xmax, ymin, ymax = (int(edge // _BOUNDS_CELL) for edge in edges)
+    if (xmax - xmin + 1) * (ymax - ymin + 1) > _BOUNDS_MAX_CELLS:
+        return None
+    return tuple((x, y) for x in range(xmin, xmax + 1) for y in range(ymin, ymax + 1))
+
+
 _GroupedPoints = tuple[tuple[_Cell, list[_Point]], ...]
 #: (xmin, xmax, ymin, ymax, zmin, zmax) of one placement's samples.
 _Bounds = tuple[float, float, float, float, float, float]
@@ -90,6 +116,8 @@ class _Cloud:
     #: ``(local points, offset)`` of a placement not yet binned into the grid. A
     #: piece is only binned once a query's bounds come within reach of it.
     deferred: tuple[list[_Point], _Point] | None = None
+    #: None means either not yet indexed, or deliberately outside the bounded grid.
+    bound_cells: tuple[_Cell, ...] | None = None
 
 
 @dataclass
@@ -107,6 +135,46 @@ class CollisionField:
     _clouds: list[_Cloud] = field(default_factory=list)
     _grid: dict[_Cell, list[_CellCloud]] = field(default_factory=dict)
     _max_half_width: float = 0.0
+    _bounds_grid: dict[_Cell, list[_Cloud]] | None = None
+    _wide_clouds: list[_Cloud] = field(default_factory=list)
+
+    def _index_bounds(self, cloud: _Cloud) -> None:
+        """Register a cloud when the optional broad-phase index is active."""
+        if self._bounds_grid is None:
+            return
+        keys = _bound_cells(cloud.bounds)
+        cloud.bound_cells = keys
+        if keys is None:
+            self._wide_clouds.append(cloud)
+        else:
+            for key in keys:
+                self._bounds_grid.setdefault(key, []).append(cloud)
+
+    def _near_clouds(self, bounds: _Bounds, half_width: float) -> list[_Cloud] | tuple[_Cloud, ...]:
+        """Return a conservative local superset; exact bounds are still checked below.
+
+        Stored boxes are unpadded. Expand the query by the largest possible pair
+        radius, then check each surviving cloud with its OWN radius in ``near``.
+        The index is lazy: final audits call ``clashes`` directly and never pay
+        to build it. Deferred clouds participate before their samples are binned.
+        """
+        if len(self._clouds) < _BOUNDS_INDEX_MIN:
+            return self._clouds
+        reach = max(0.0, half_width + self._max_half_width - TOUCH_MARGIN)
+        keys = _bound_cells(bounds, reach)
+        if keys is None or len(keys) * 4 > len(self._clouds):
+            return self._clouds
+        if self._bounds_grid is None:
+            self._bounds_grid = {}
+            for cloud in self._clouds:
+                self._index_bounds(cloud)
+        # A box may occupy several cells. Deduplicate CLOUDS, not placement IDs:
+        # callers are permitted to add multiple clouds for the same placement.
+        found = {}
+        for key in keys:
+            for cloud in self._bounds_grid.get(key, ()):
+                found[id(cloud)] = cloud
+        return (*self._wide_clouds, *found.values())
 
     def _prepare(
         self,
@@ -224,6 +292,7 @@ class CollisionField:
             bounds,
         )
         self._clouds.append(cloud)
+        self._index_bounds(cloud)
         self._max_half_width = max(self._max_half_width, half_width)
         grid = self._grid
         for key, cell_points in grouped:
@@ -245,10 +314,12 @@ class CollisionField:
         *bounds* must enclose ``points`` translated by *offset*. Until some query's
         bounds come within reach, the placement costs no translation or binning.
         """
-        self._clouds.append(_Cloud(
+        cloud = _Cloud(
             placement, half_width, (), underpass, self._max_half_width, bounds,
             (points, offset),
-        ))
+        )
+        self._clouds.append(cloud)
+        self._index_bounds(cloud)
         self._max_half_width = max(self._max_half_width, half_width)
 
     def _bin_deferred(self, cloud: _Cloud) -> None:
@@ -265,6 +336,7 @@ class CollisionField:
     def near(self, bounds: _Bounds, half_width: float, ignore: set[int]) -> bool:
         """Could samples inside *bounds* overlap any placement not in *ignore*?
 
+        Large fields query a bounded spatial index first; small fields scan directly.
         False proves no sample pair can come within the interaction limit: the
         boxes are at least that far apart in x or in y, or their heights differ
         by the blanket clearance everywhere. True bins every deferred placement
@@ -273,7 +345,7 @@ class CollisionField:
         xmin, xmax, ymin, ymax, zmin, zmax = bounds
         clearance = self.clearance
         near = False
-        for cloud in self._clouds:
+        for cloud in self._near_clouds(bounds, half_width):
             if cloud.placement in ignore:
                 continue
             b = cloud.bounds
@@ -306,6 +378,16 @@ class CollisionField:
     def pop(self) -> None:
         """Remove the most recently added placement (backtracking)."""
         cloud = self._clouds.pop()
+        # Unlike the sample grid, this index is always populated in push order.
+        # Removing a deferred cloud must remove its bounds too, before returning.
+        if self._bounds_grid is not None and cloud.bound_cells is None:
+            self._wide_clouds.pop()
+        elif self._bounds_grid is not None:
+            for key in cloud.bound_cells:
+                bucket = self._bounds_grid[key]
+                bucket.pop()
+                if not bucket:
+                    del self._bounds_grid[key]
         # Each placement contributes one cell-cloud per occupied cell. A deferred
         # placement binned late may sit below a newer one in a shared bucket, so
         # remove by placement rather than assuming it is last.
