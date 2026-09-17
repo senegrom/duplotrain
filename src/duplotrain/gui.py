@@ -8,6 +8,7 @@ existing desktop callers; the browser worker imports :mod:`duplotrain.editor`.
 from __future__ import annotations
 
 import json
+import socket
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -125,6 +126,41 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             self.close_connection = True
             self._json(status, {"error": message})
             return False
+
+        #: After the response, discard at most this much input for at most this
+        #: long while waiting for the client to close.
+        LINGER_BYTES = 64 * 1024
+        LINGER_SECONDS = 0.5
+
+        def finish(self) -> None:
+            """Close gracefully, whatever the request's framing was.
+
+            A close with unread input, or input arriving after the close, resets
+            the connection, and on Windows the reset discards a response the
+            client has not read yet. The drain above only helps when one valid
+            length says how much to expect: it cannot cover a chunked request,
+            repeated or malformed lengths, or a body sent with a successful GET.
+            So every connection ends the same way: flush the response, send FIN,
+            then discard input until the client closes, bounded in size and time.
+            A client that has read its response closes at once.
+            """
+            try:
+                self.wfile.flush()
+                self.connection.shutdown(socket.SHUT_WR)
+                deadline = monotonic() + self.LINGER_SECONDS
+                remaining = self.LINGER_BYTES
+                while remaining > 0:
+                    time_left = deadline - monotonic()
+                    if time_left <= 0:
+                        break
+                    self.connection.settimeout(time_left)
+                    chunk = self.connection.recv(min(remaining, 4096))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+            except OSError:
+                pass
+            super().finish()
 
         def _trusted_request(self) -> bool:
             # Binding to loopback alone does not stop CSRF or DNS rebinding.

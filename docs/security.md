@@ -20,6 +20,16 @@ rejected before dispatch. Body reads have a timeout. Responses prohibit framing
 and MIME sniffing. A rejected request must leave the entire session unchanged;
 `tests/test_http_security.py` verifies this using real local sockets.
 
+Every connection is closed gracefully. A close with unread input, or input that
+arrives after the close, resets the connection, and on Windows the reset discards
+a response the client has not read yet. Draining a rejected body first only works
+when one valid length says how much to expect; it cannot cover a chunked request,
+repeated or malformed lengths, or a body sent with a successful GET, and those
+lost their answer whenever the body arrived after the server had replied. The
+handler therefore flushes its response, sends FIN, and discards input until the
+client closes, for at most 64 KiB and half a second. Regressions send each such
+body late and still read the status, and check that the wait is bounded.
+
 The static Pyodide application uses the shared in-process dispatcher instead of
 this HTTP listener; its transport and engine rules have not changed.
 

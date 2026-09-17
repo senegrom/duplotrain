@@ -222,3 +222,53 @@ def test_get_with_a_late_body_still_reads_the_refusal(local_editor):
     assert response.status == 404
     assert "error" in payload
     assert session.state() == before
+
+
+@pytest.mark.parametrize("head, body, expected", [
+    pytest.param("GET / HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 200, id="page"),
+    pytest.param("GET /api/state HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 200, id="state"),
+    pytest.param("POST /api/clear HTTP/1.1\r\nTransfer-Encoding: chunked\r\n",
+                 b"2\r\n{}\r\n0\r\n\r\n", 409, id="chunked"),
+    pytest.param("POST /api/clear HTTP/1.1\r\nContent-Length: 2\r\nContent-Length: 2\r\n",
+                 b"{}", 409, id="two-lengths"),
+    pytest.param("POST /api/clear HTTP/1.1\r\nContent-Length: +2\r\n", b"{}", 409,
+                 id="malformed-length"),
+    pytest.param("OPTIONS /api/clear HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 403,
+                 id="options"),
+])
+def test_a_late_body_never_costs_the_client_its_response(local_editor, head, body, expected):
+    """The response must survive input that arrives after it was written.
+
+    Without one valid length the server cannot know how much to drain first, and
+    a successful GET never expected a body at all. Closing with those bytes
+    unread, or receiving them after the close, resets the connection; on Windows
+    the reset discards the response before the client reads it. The graceful
+    close waits for the client instead, so every framing reads its answer.
+    """
+    session, port = local_editor
+    before = session.state()
+    with socket.create_connection(("127.0.0.1", port), timeout=3) as sock:
+        sock.sendall(
+            f"{head}Host: 127.0.0.1:{port}\r\nContent-Type: application/json\r\n\r\n".encode()
+        )
+        time.sleep(0.1)  # the server has answered, and would have closed, by now
+        sock.sendall(body)
+        response = http.client.HTTPResponse(sock, method=head.split(" ", 1)[0])
+        response.begin()
+        response.read()
+    assert response.status == expected
+    assert session.state() == before
+
+
+def test_the_graceful_close_is_bounded_when_the_client_never_closes(local_editor):
+    _, port = local_editor
+    with socket.create_connection(("127.0.0.1", port), timeout=3) as sock:
+        sock.sendall(f"GET /api/state HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n".encode())
+        response = http.client.HTTPResponse(sock, method="GET")
+        response.begin()
+        assert response.status == 200 and response.read()
+        started = time.monotonic()
+        # Keep our side open: the server must give up on its own and close.
+        sock.settimeout(3)
+        assert sock.recv(1) == b""
+        assert time.monotonic() - started < 2.0
