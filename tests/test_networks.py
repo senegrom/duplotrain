@@ -209,3 +209,49 @@ def test_reachability_prune_respects_caps_and_junction_closures(catalog):
 def test_invalid_network_lookahead_is_rejected(lookahead):
     with pytest.raises(ValueError, match="completion_lookahead"):
         NetworkConfig(lookahead=lookahead)
+
+
+@pytest.mark.parametrize("inventory, max_pieces, use_all, expected", [
+    ({"buffer": 2, "straight": 2, "curve": 2}, 6, False, 21),
+    ({"switch": 1, "curve": 4, "straight": 1, "buffer": 2}, 8, False, 49),
+    ({"crossing": 1, "straight": 4, "buffer": 4}, 9, True, 11),
+    ({"switch": 1, "curve": 3, "buffer": 3}, 7, True, 40),
+    ({"crossing": 1, "curve": 4, "buffer": 2, "straight": 1}, 8, False, 49),
+    ({"switch": 2, "straight": 2, "buffer": 4}, 8, True, 33),
+])
+def test_root_passes_find_every_class_once(catalog, inventory, max_pieces, use_all, expected):
+    # Class counts pinned from the enumerator before a pass withdrew the types
+    # whose passes came earlier. Every representative is rooted at the smallest
+    # type it contains: the pass of that type found it first.
+    result = enumerate_networks(inventory, catalog, NetworkConfig(
+        max_pieces=max_pieces, use_all_pieces=use_all, max_results=100, max_nodes=500_000))
+    assert result.stats.complete and len(result.layouts) == expected
+    assert len({congruence_key(layout) for layout in result.layouts}) == expected
+    for layout in result.layouts:
+        assert layout.placements[0].piece.id == min(p.piece.id for p in layout.placements)
+
+
+def test_network_field_bins_only_placements_a_query_reached(catalog, monkeypatch):
+    from duplotrain.collision import CollisionField
+
+    names = ("_prepare", "_clashes_prepared", "add_deferred", "_bin_deferred")
+    originals = {name: getattr(CollisionField, name) for name in names}
+    calls = dict.fromkeys(names, 0)
+
+    def counting(name):
+        def method(field, *args, **kwargs):
+            calls[name] += 1
+            return originals[name](field, *args, **kwargs)
+        return method
+
+    for name in names:
+        monkeypatch.setattr(CollisionField, name, counting(name))
+    result = enumerate_networks({"buffer": 2, "straight": 3, "curve": 3}, catalog,
+                                NetworkConfig(max_pieces=8, max_results=500, max_nodes=200_000))
+    assert len(result.layouts) == 109
+    # Samples are translated and binned once per point test, once per deferred
+    # placement a later query reached, and once per root pass; the audits of the
+    # found networks prepare eagerly, twice per placement of at most eight.
+    assert calls["add_deferred"] > 0 and calls["_clashes_prepared"] > 0
+    search = calls["_prepare"] - 2 * sum(len(layout) for layout in result.layouts)
+    assert search <= calls["_clashes_prepared"] + calls["_bin_deferred"] + 3

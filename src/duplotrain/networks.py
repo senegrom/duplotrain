@@ -6,7 +6,9 @@ no single walk needs to cover everything.  The enumerator grows a layout by alwa
 extending its **canonically smallest open end** -- either attaching a new piece there,
 or joining it to another open end that mates exactly.  Acting only on the smallest
 end removes permutation blow-up without losing completeness: any target network can
-be assembled in exactly that order.
+be assembled in exactly that order.  Each piece type roots the search once; a pass
+withdraws the types whose passes came earlier, since every network containing one of
+them was found by then and the withdrawn subtrees could only rediscover them.
 
 Collision handling is two-phase. During search, already attached neighbours and
 placements with exactly mating open connectors are exempt: they can still become
@@ -30,7 +32,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
-from .collision import DEFAULT_CLEARANCE, CollisionField
+from .collision import DEFAULT_CLEARANCE, CollisionField, bounds_of
 from .explore import congruence_key
 from .geometry import ORIGIN
 from .layout import End, Layout, Placement
@@ -188,11 +190,16 @@ def enumerate_networks(
             )
         closing_queries[pid] = tuple(queries)
 
+    # Types withdrawn from the current root pass (see the root loop below),
+    # and the pieces the pass can still place.
+    withdrawn: dict[str, int] = {}
+    pass_total = [total]
+
     def closable(used: int) -> bool:
         """False proves that no closed network extends the current layout."""
         if completion is None:
             return True
-        budget = min(total, cfg.max_pieces) - used
+        budget = min(pass_total[0], cfg.max_pieces) - used
         allows = completion.allows
         if budget and any(
             counts[pid] and allows(query, budget - 1)
@@ -212,20 +219,26 @@ def enumerate_networks(
                     return False
         return True
 
-    # Per-placement sample clouds (world floats) for the two collision phases.
-    sample_cache: dict[tuple[str, int, int], list[tuple[float, float, float]]] = {}
+    # Per-placement sample clouds: rotated local samples and their bounds are
+    # cached per (piece, entry, heading); a candidate only adds its offset, and
+    # the field bins the samples once some placement's bounds come within reach.
+    sample_cache: dict[tuple[str, int, int], tuple[list, tuple]] = {}
 
-    def samples_for(pid: str, entry: int, frame) -> list[tuple[float, float, float]]:
+    def samples_for(pid: str, entry: int, frame) -> tuple[list, tuple, tuple]:
+        """Rotated local samples, the world offset, and the world bounds."""
         hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
         key = (pid, entry, hkey)
-        base = sample_cache.get(key)
-        if base is None:
+        cached = sample_cache.get(key)
+        if cached is None:
             base = []
             for line in pieces[pid].all_centrelines(cfg.collision_spacing):
                 for lx, ly, lz in line:
                     base.append((cos_t * lx - sin_t * ly, sin_t * lx + cos_t * ly, lz))
-            sample_cache[key] = base
-        return [(fx + x, fy + y, fz + z) for x, y, z in base]
+            cached = sample_cache[key] = (base, bounds_of(base))
+        base, local = cached
+        bounds = (local[0] + fx, local[1] + fx, local[2] + fy, local[3] + fy,
+                  local[4] + fz, local[5] + fz)
+        return base, (fx, fy, fz), bounds
 
     placements: list[tuple[str, object, int]] = []  # (pid, engine frame, entry used)
     field = CollisionField(clearance=cfg.clearance)
@@ -322,20 +335,36 @@ def enumerate_networks(
                     continue
                 for entry in orientations[pid]:
                     frame = eng.frame(pid, entry, target_pose)
-                    pts = samples_for(pid, entry, frame)
+                    base_pts, offset, bounds = samples_for(pid, entry, frame)
                     port_poses = {
                         port: eng.port_world(pid, port, frame)
                         for port in range(len(piece.ports))
                         if port != entry and port not in piece.sealed
                     }
-                    if field.clashes(
-                        pts, piece.width / 2.0, potential_neighbours(port_poses, target),
-                        underpass=piece.underpass,
-                    ):
-                        continue
+                    half_width = piece.width / 2.0
+                    exempt = potential_neighbours(port_poses, target)
+                    # Bin and test the samples only when some placement's bounds
+                    # come within reach; a piece laid clear of everything is
+                    # deferred as-is, exactly as in the loop solver.
+                    grouped = None
+                    if field.near(bounds, half_width, exempt):
+                        grouped = field._prepare(base_pts, offset=offset)
+                        if field._clashes_prepared(
+                            grouped, half_width, exempt, underpass=piece.underpass
+                        ):
+                            continue
                     index = len(placements)
                     placements.append((pid, frame, entry))
-                    field.add(index, pts, piece.width / 2.0, underpass=piece.underpass)
+                    if grouped is None:
+                        field.add_deferred(
+                            index, base_pts, offset, half_width, bounds,
+                            underpass=piece.underpass,
+                        )
+                    else:
+                        field._add_prepared(
+                            index, grouped, half_width, underpass=piece.underpass,
+                            bounds=bounds,
+                        )
                     counts[pid] -= 1
                     del open_ends[target]
                     links[target] = (index, entry)
@@ -359,14 +388,25 @@ def enumerate_networks(
                         return False
         return True
 
-    # Root: each distinct piece type starts the network once, anchored at the origin.
+    # Root: each distinct piece type starts the network once, anchored at the
+    # origin. A network is found by the pass of every type it contains, so a
+    # pass withdraws every type whose own pass came earlier: those passes found
+    # each network containing it already, and the withdrawn subtrees could only
+    # rediscover them. The classes found, and the order they are found in, are
+    # therefore unchanged. When every piece is required, only the first pass can
+    # use the whole inventory.
     for pid in piece_ids:
+        if withdrawn and cfg.use_all_pieces:
+            break
         piece = pieces[pid]
         entry = orientations[pid][0]
         frame = eng.frame(pid, entry, eng.start_cursor)
         placements.append((pid, frame, entry))
-        pts = samples_for(pid, entry, frame)
-        field.add(0, pts, piece.width / 2.0, underpass=piece.underpass)
+        base_pts, offset, bounds = samples_for(pid, entry, frame)
+        field._add_prepared(
+            0, field._prepare(base_pts, offset=offset), piece.width / 2.0,
+            underpass=piece.underpass, bounds=bounds,
+        )
         counts[pid] -= 1
         for port in range(len(piece.ports)):
             if port in piece.sealed:
@@ -381,6 +421,11 @@ def enumerate_networks(
         placements.pop()
         if not keep:
             break
+        withdrawn[pid] = counts[pid]
+        counts[pid] = 0
+        pass_total[0] = total - sum(withdrawn.values())
+    for pid, count in withdrawn.items():
+        counts[pid] = count
 
     if stats.aborted:
         stats.stop_reason = "node_limit"

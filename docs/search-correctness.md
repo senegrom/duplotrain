@@ -507,3 +507,22 @@ entry of each placed piece to the previous exit, each transit's entry to the
 exit before it, and the final exit to the closing target. That is what the
 replay through the checked constructors builds, since those constructors derive
 the same frames and the search has already verified every joint they check.
+
+## A root pass may withdraw the types rooted before it
+
+The pass rooted at type `t` enumerates, exhaustively within the piece bound,
+every closed network that contains a piece of type `t`: any such network can be
+assembled in canonical-end order from any of its pieces. The search only reaches
+a later pass when every earlier pass ran to exhaustion, because a result or node
+limit stops the whole enumeration. So when the pass for `u` starts, every network
+containing an earlier type is already recorded or was rejected, and a network's
+acceptance does not depend on its root: congruent realizations have the same
+stone variants and drive identically. Withdrawing the earlier types therefore
+removes only subtrees whose closed networks were all duplicates, and the
+remaining subtrees are visited in the same order, so the found layouts and their
+order are unchanged. One theoretical difference remains: the sampled overlap
+audit works in floating point, so a network exactly on its threshold could in
+principle be rejected in one embedding and pass in another; the previous
+enumerator would then have audited it again from another root. No layout in the
+differential corpus is near the threshold. With `use_all_pieces` no later pass
+can use the whole inventory, so those passes are skipped.

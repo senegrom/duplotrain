@@ -631,3 +631,30 @@ CPU time (process time, minimum of three runs), results identical:
 | 12 curves, 6 straights, all loops | 0.109 s | 0.062 s |
 | 12 curves, 2 straights, 2 level crossings | 0.109 s | 0.078 s |
 | 12 curves, 4 straights, 1 switch, 39 loops | 0.516 s | 0.312 s |
+
+## Network root passes withdraw the types already rooted
+
+Each piece type roots the network search once, and a network was found by the
+pass of every type it contains: the buffer-and-curve enumeration found 1,792
+closed networks for 109 classes, and keyed every one of them. The pass of a type
+finds every network containing that type, so a later pass withdraws every type
+whose own pass came earlier; the subtrees it no longer visits could only
+rediscover networks already found. The classes found, their representatives and
+the order they are found in are unchanged, and when every piece is required only
+the first pass can ever use the whole inventory. The enumerator also bins
+collision samples only once some placement's bounds come within reach, exactly
+as the loop solver does, instead of translating and binning every candidate
+twice.
+
+CPU time (process time, minimum of two runs); layouts, order and keys identical:
+
+| Enumeration | Nodes before | Nodes after | Before | After |
+| --- | ---: | ---: | ---: | ---: |
+| 2 buffers, 3 straights, 3 curves, up to 8 | 3,863 | 770 | 2.66 s | 0.61 s |
+| 2 buffers, 1 switch, 3 straights, 2 curves, up to 8 | 2,417 | 523 | 0.66 s | 0.16 s |
+| 2 buffers, 1 switch, 2 straights, 4 curves, up to 9 | 12,541 | 2,558 | 4.61 s | 1.02 s |
+| 4 buffers, 2 switches, 2 straights, 2 curves, 500 results | 12,734 | 12,734 | 3.73 s | 3.30 s |
+| Perfect networks, 1 switch, 2 buffers | 2,417 | 523 | 0.75 s | 0.17 s |
+
+The result-limited enumeration stops inside its first pass, so only the binning
+helps it.
