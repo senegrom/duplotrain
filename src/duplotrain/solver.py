@@ -2443,12 +2443,15 @@ def solve(
                 if len(solutions) >= cfg.max_results or stats.aborted:
                     break
     finally:
+        # The recursive function owns a cell pointing to itself. Break that
+        # cycle once the stack has unwound, so collision fields, geometry and
+        # callbacks do not linger until cyclic GC between editor search stages.
+        dfs = None
         if completion is not None:
             completion.nodes_spent += stats.nodes
             if tables is None:
-                # DFS has recursive closure references; release cached poses
-                # promptly, including on progress-callback errors, without
-                # waiting for cyclic GC. Kept tables keep their answers.
+                # Per-search answers are disposable, including on callback
+                # errors. Explicitly retained tables keep their answers.
                 completion.cache.clear()
                 completion.near_indices.clear()
     if stats.aborted:

@@ -6,15 +6,16 @@ Wall times are observations only; search-node counts are the regression contract
 """
 
 import argparse
+import hashlib
 import json
 from collections import Counter
 from pathlib import Path
 from statistics import median
-from time import perf_counter
+from time import perf_counter, process_time
 
 import duplotrain.gui as gui
 from duplotrain import build_chain, default_catalog
-from duplotrain.layout import layout_from_dict
+from duplotrain.layout import layout_from_dict, layout_to_dict
 from duplotrain.solver import _solution_overlaps
 
 
@@ -51,18 +52,28 @@ def main():
                       "max_pieces": 26, "max_results": 8, "slop": 0}))
     for name, base, grow, close, unlimited, owned in cases:
         timings = []
+        cpu_timings = []
         for _ in range(args.repeats):
             session = gui.Session(history=[base], unlimited=unlimited,
                                   **({"inventory": owned} if owned is not None else {}))
             started = perf_counter()
+            cpu_started = process_time()
             result = session.solve_gap(grow, close, 0, 8)
+            cpu_timings.append(process_time() - cpu_started)
             timings.append(perf_counter() - started)
             for candidate in session.candidates:
                 assert candidate.layout.placements[:len(base)] == base.placements
                 assert all(candidate.layout.links[a] == b for a, b in base.links.items())
                 assert not candidate.layout.joint_issues()
                 assert not _solution_overlaps(candidate.layout, 0, 120, 8)
+        # The ordered exact layouts and signatures must agree across checkouts,
+        # not merely the number of solutions. This is outside the timed region.
+        evidence = [(layout_to_dict(s.layout), repr(s.signature), s.gap, s.exact, s.kind)
+                    for s in session.candidates]
+        digest = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
         print(json.dumps({"case": name, "seconds": round(median(timings), 4),
+                          "cpu_seconds": round(median(cpu_timings), 4),
+                          "solutions_sha256": digest,
                           "nodes": result["searched"], "found": result["found"],
                           "added": [len(s.layout) - len(base) for s in session.candidates],
                           "stop": result["stop_reason"]}), flush=True)
