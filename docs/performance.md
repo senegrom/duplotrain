@@ -670,3 +670,39 @@ integers. A common factor left in the vectors cancels in the gcd reduction that
 defines the identity, so the identity, the chosen frame and the key are
 unchanged: all 671 corpus keys are byte-identical, and keying the corpus takes
 about a tenth less CPU time (2.23 s to 2.00 s on a loaded machine).
+
+## Loop closing tries both ends in doubling turns
+
+The editor's direction portfolio gave the forward direction a quarter of a
+stage's node allowance, the reverse direction a half, and any remainder to the
+forward direction again. Which end is the hard one is not known in advance: on
+the reported bridge gap, growing from one end proves the plain stage impossible
+in 113 nodes and finds all eight bridge completions in 605, while the other end
+wanders for as long as it is allowed. Closing that gap from the wrong end spent
+6,250 nodes of the plain stage and 16,384 of the bridge stage on it before the
+reverse turn settled each stage: 97% of 23,352 nodes.
+
+The two directions now alternate, each turn with twice the previous budget,
+starting at 1,024 nodes; the rest of the allowance goes to the turn it no longer
+fits, a direction only gets a turn when that turn's budget exceeds its previous
+one, each direction keeps its reverse tables between turns (a search can hand
+its tables to the next search of the same ends and stock), a probe starts with
+the table allowance of the whole stage rather than one eighth of its own small
+budget, and the direction that settles a stage is tried first in the next stage.
+Every turn boundary reports the shared node count, so long searches keep their
+heartbeat.
+
+Editor searches (`benchmarks/editor_completion.py` settings: eight results, 26
+pieces, zero slop; CPU time of one `solve_gap` call); the same eight completions
+are found in every case:
+
+| Case | Nodes before | Nodes after | Before | After |
+| --- | ---: | ---: | ---: | ---: |
+| Reported gap, finite stock, forward | 23,352 | 1,742 | 1.67 s | 0.27 s |
+| Reported gap, finite stock, reverse | 740 | 718 | 0.19 s | 0.20 s |
+| Reported gap, unlimited, forward | 23,488 | 1,878 | 1.91 s | 0.38 s |
+| Reported gap, unlimited, reverse | 878 | 854 | 0.34 s | 0.31 s |
+| Mixed gap | 139 | 138 | | |
+
+The reverse cases lose a few nodes because a probe now starts with the whole
+stage's table allowance instead of one eighth of its own.

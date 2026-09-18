@@ -775,6 +775,9 @@ class Session:
         searched = 0
         aborted = False
         candidates = []
+        # One closing problem: every stage tries first the direction that
+        # settled the previous one, and reuses the reverse tables it built.
+        memo: dict = {}
 
         def stage_progress(nodes: int) -> None:
             if progress is not None:
@@ -786,6 +789,7 @@ class Session:
                     self.layout, self.catalog, remaining, grow, close,
                     max_pieces=max_pieces, max_results=max_results,
                     max_nodes=250_000 * search_effort, progress=stage_progress,
+                    memo=memo,
                 )
                 if bridge is not None:
                     searched += bridge.stats.nodes
@@ -813,6 +817,7 @@ class Session:
                 base=self.layout,
                 grow_from=grow,
                 close_onto=close,
+                memo=memo,
             )
             searched += result.stats.nodes
             aborted = result.stats.aborted

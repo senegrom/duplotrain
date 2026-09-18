@@ -4,14 +4,20 @@ Compared with production commit `21d922664b9d77d15e4003a7f5d4db8487005576`.
 
 ## Search changes
 
-The editor now spends short, deterministic probes growing from each selected end,
-then uses the remaining allowance in the original direction. This is a **direction
-portfolio**, not a meet-in-the-middle or resumable search. All probes together obey
-the existing stage node budget. Below 65,536 nodes the shares are a quarter, a half
-and a quarter again, and the final probe would repeat the first one node for node;
-the reverse probe then takes the rest of the allowance instead, so no part of the
-budget is spent twice on the same search. Easy searches stop after the first probe. A fully
-searched piece bound stops retries but is never presented as an exhausted inventory.
+The editor grows from either selected end in turns: the two directions alternate,
+each turn with twice the previous budget, starting at 1,024 nodes (a sixteenth
+of a small allowance), and the rest of the allowance goes to the turn it no
+longer fits. This is a **direction portfolio**, not a meet-in-the-middle or
+resumable search, and all turns together obey the existing stage node budget.
+The search is deterministic, so a direction is only given a turn when that
+turn's budget exceeds its previous one; each direction keeps its reverse
+reachability tables between its turns, and the direction that settles a stage is
+tried first in the next stage of the same closing problem. On the reported
+bridge gap, growing from one end proves the plain stage impossible in about a
+hundred nodes while the other end wanders for tens of thousands; the fixed
+forward-first split spent 97% of its 23,352 nodes on that end. Easy searches
+stop after the first turn. A fully searched piece bound stops retries but is
+never presented as an exhausted inventory.
 Forced-fit searches (nonzero slop) and reversing-loop targets keep their original
 one-direction semantics. No collision or underpass threshold is relaxed.
 

@@ -700,9 +700,11 @@ def _slack_padding(slack: float) -> int:
     return -(-numerator * _MM_SCALE // denominator) + 2
 
 
-def _completion_budget(nodes: int, max_nodes: int) -> int:
+def _completion_budget(nodes: int, max_nodes: int, base: int | None = None) -> int:
     """Table expansions a search may have spent after *nodes* DFS nodes."""
-    return min(_TABLE_WORK_CAP, min(4096, max_nodes // 8) + _TABLE_WORK_PER_NODE * nodes)
+    if base is None:
+        base = min(4096, max_nodes // 8)
+    return min(_TABLE_WORK_CAP, base + _TABLE_WORK_PER_NODE * nodes)
 _ROOT_BOUNDS = tuple((math.isqrt(n * _MM_SCALE**2), math.isqrt(n * _MM_SCALE**2) + 1)
                      for n in (2, 3, 6))
 _SLIP_AXES = ((1, 0), (0, 1), (1, 1), (1, -1), (2, 1), (2, -1), (1, 2), (1, -2))
@@ -968,6 +970,9 @@ class _CompletionReachability:
             self.predecessors.append(tuple(deltas))
             self.successors.append(tuple(forward))
         self.probes = 0
+        #: DFS nodes spent by earlier searches that reused these tables; the
+        #: progressive allowance keeps counting from there.
+        self.nodes_spent = 0
         # Geometry-only answers are independent of stock, stubs, and collisions.
         # Keep this cache on the search object; keys contain only immutable poses.
         self.cache: OrderedDict[tuple, bool] = OrderedDict()
@@ -1504,6 +1509,9 @@ class SolverConfig:
     #: tables. Slop fits use physical distance enclosures with the remaining
     #: total gap budget.
     completion_lookahead: int = 10
+    #: The table allowance a search starts with, instead of min(4096, max_nodes // 8):
+    #: a short probe that is part of a larger search keeps the larger one's tables.
+    completion_base_work: int | None = None
     #: Optional extra acceptance audit, applied BEFORE the result limit. Rejected
     #: candidates do not consume result slots. Used to validate expanded bridge
     #: assemblies against their actual component joints, not macro exemptions.
@@ -1528,6 +1536,10 @@ class SolverConfig:
             raise ValueError("max_pieces must be a positive integer or None")
         if type(self.completion_lookahead) is not int or not 0 <= self.completion_lookahead <= 12:
             raise ValueError("completion_lookahead must be an integer from 0 to 12")
+        if self.completion_base_work is not None and (
+            type(self.completion_base_work) is not int or self.completion_base_work < 0
+        ):
+            raise ValueError("completion_base_work must be a non-negative integer or None")
 
 
 @dataclass
@@ -1599,6 +1611,7 @@ def solve(
     base: Layout | None = None,
     grow_from: tuple[int, int] | None = None,
     close_onto: tuple[int, int] | None = None,
+    tables: dict | None = None,
 ) -> SolveResult:
     """Find closed loops buildable from *inventory*.
 
@@ -1620,6 +1633,10 @@ def solve(
         base: existing layout to complete.
         grow_from: open end of *base* the new track grows out of.
         close_onto: open end of *base* the new track must finally mate with.
+        tables: a dict the caller keeps while it searches one problem repeatedly
+            (the same *base* and catalogue, possibly with other ends, stock or
+            budgets): the reverse reachability tables one search builds serve the
+            next search of the same ends and stock, and keep growing with it.
 
     Returns:
         Distinct solutions (loop mode: deduplicated up to rotation, reflection and
@@ -1787,12 +1804,30 @@ def solve(
     # A fresh loop closes onto the origin face exactly as a completion closes onto
     # its target, so the same reverse tables prune walks that cannot return with
     # the traversals left in either mode.
-    completion = (
-        _CompletionReachability(eng, cfg.completion_lookahead, _TABLE_WORK_CAP,
-                                slippage=cfg.slop > 0, slop=cfg.slop,
-                                budget=lambda: _completion_budget(stats.nodes, cfg.max_nodes))
-        if cfg.completion_lookahead
-        else None
+    completion = None
+    if cfg.completion_lookahead:
+        # The tables depend on the anchor, the move pool and the slop mode only,
+        # so a repeated search of the same ends and stock can keep the previous
+        # search's tables and the allowance they earned.
+        key = (grow_from, close_onto, tuple(sorted(counts.items())), cfg.slop,
+               cfg.completion_lookahead, eng.name)
+        if tables is not None:
+            completion = tables.get(key)
+            if completion is not None and completion.eng.anchor != eng.anchor:
+                completion = None
+        if completion is None:
+            completion = _CompletionReachability(eng, cfg.completion_lookahead, _TABLE_WORK_CAP,
+                                                 slippage=cfg.slop > 0, slop=cfg.slop)
+            if tables is not None:
+                tables[key] = completion
+        else:
+            completion.eng = eng
+        spent = completion.nodes_spent
+        completion._budget = lambda: _completion_budget(
+            spent + stats.nodes, cfg.max_nodes, cfg.completion_base_work)
+    before = (
+        (completion.work_used, completion.checks, completion.probes, completion.cache_hits)
+        if completion is not None else (0, 0, 0, 0)
     )
     stub_capacity = {
         pid: max(0, len(pieces[pid].ports) - len(pieces[pid].sealed) - 2)
@@ -2409,10 +2444,13 @@ def solve(
                     break
     finally:
         if completion is not None:
-            # DFS has recursive closure references; release cached poses promptly,
-            # including on progress-callback errors, without waiting for cyclic GC.
-            completion.cache.clear()
-            completion.near_indices.clear()
+            completion.nodes_spent += stats.nodes
+            if tables is None:
+                # DFS has recursive closure references; release cached poses
+                # promptly, including on progress-callback errors, without
+                # waiting for cyclic GC. Kept tables keep their answers.
+                completion.cache.clear()
+                completion.near_indices.clear()
     if stats.aborted:
         stats.stop_reason = "node_limit"
     elif len(solutions) >= cfg.max_results:
@@ -2426,10 +2464,11 @@ def solve(
     if completion is not None:
         stats.completion_states = len(completion.layers[-1])
         stats.completion_height_states = len(completion.height_layers[-1])
-        stats.completion_work = completion.work_used
-        stats.completion_checks = completion.checks
-        stats.completion_probes = completion.probes
-        stats.completion_cache_hits = completion.cache_hits
+        # Reused tables report only what this search added.
+        stats.completion_work = completion.work_used - before[0]
+        stats.completion_checks = completion.checks - before[1]
+        stats.completion_probes = completion.probes - before[2]
+        stats.completion_cache_hits = completion.cache_hits - before[3]
         stats.completion_bound_depth = len(completion.bounds.layers) - 1
         stats.completion_bound_states = sum(map(len, completion.bounds.layers))
 

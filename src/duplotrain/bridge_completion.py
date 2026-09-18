@@ -86,6 +86,7 @@ def bridge_completion(
     max_results: int,
     max_nodes: int,
     progress: object = None,
+    memo: dict | None = None,
 ) -> SolveResult | None:
     """Try one conventional bridge, counting all four components against the limits.
 
@@ -139,7 +140,7 @@ def bridge_completion(
         inventory, {**catalog, _BRIDGE_ID: macro},
         SolverConfig(min_pieces=0, max_pieces=max_pieces - 3, max_results=max_results,
                      max_nodes=max_nodes, progress=progress, solution_filter=accept),
-        base=base, grow_from=grow, close_onto=close,
+        base=base, grow_from=grow, close_onto=close, memo=memo,
     )
     candidates = [accepted[candidate.signature] for candidate in result.solutions
                   if accept(candidate)]
