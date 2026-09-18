@@ -97,15 +97,26 @@ class Alg:
 
     def __add__(self, other: AlgLike) -> Alg:
         o = Alg.coerce(other)
+        # Alg values are immutable; identity operations can share an operand.
+        if not o:
+            return self
+        if not self:
+            return o
         return Alg(self.a + o.a, self.b + o.b, self.c + o.c, self.d + o.d)
 
     __radd__ = __add__
 
     def __neg__(self) -> Alg:
+        if not self:
+            return self
         return Alg(-self.a, -self.b, -self.c, -self.d)
 
     def __sub__(self, other: AlgLike) -> Alg:
         o = Alg.coerce(other)
+        if not o:
+            return self
+        if not self:
+            return -o
         return Alg(self.a - o.a, self.b - o.b, self.c - o.c, self.d - o.d)
 
     def __rsub__(self, other: AlgLike) -> Alg:
@@ -118,9 +129,25 @@ class Alg:
         # Scaling by a rational is common in pose transforms. Keep it exact,
         # but avoid the full field product and all its zero cross-terms.
         if not (b2 or c2 or d2):
+            if not a2:
+                return o
+            if a2 == 1:
+                return self
+            if a2 == -1:
+                return -self
             return Alg(a1 * a2, b1 * a2, c1 * a2, d1 * a2)
         if not (b1 or c1 or d1):
+            if not a1:
+                return self
+            if a1 == 1:
+                return o
+            if a1 == -1:
+                return -o
             return Alg(a2 * a1, b2 * a1, c2 * a1, d2 * a1)
+        # Ordinary 30-degree track stays in Q(sqrt3). The sqrt2/sqrt6
+        # coefficients are exactly zero, so do not calculate their cross-terms.
+        if not (b1 or d1 or b2 or d2):
+            return Alg(a1 * a2 + 3 * c1 * c2, 0, a1 * c2 + c1 * a2, 0)
         # Using sqrt2*sqrt3 = sqrt6, sqrt2*sqrt6 = 2*sqrt3, sqrt3*sqrt6 = 3*sqrt2,
         # sqrt2^2 = 2, sqrt3^2 = 3, sqrt6^2 = 6.
         return Alg(

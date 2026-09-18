@@ -94,6 +94,21 @@ def cos_sin(steps: int) -> tuple[Alg, Alg]:
     return _ROTATIONS[steps % HEADING_STEPS]
 
 
+def _rotate_xy(x: Alg, y: Alg, steps: int) -> tuple[Alg, Alg]:
+    """Rotate exactly; quarter turns only exchange or negate coordinates."""
+    heading = steps % HEADING_STEPS
+    c, s = _ROTATIONS[heading]  # Also preserve the table's integer-index validation.
+    if heading == 0:
+        return x, y
+    if heading == 6:
+        return -y, x
+    if heading == 12:
+        return -x, -y
+    if heading == 18:
+        return y, -x
+    return c * x - s * y, s * x + c * y
+
+
 @dataclass(frozen=True, slots=True)
 class Pose:
     """A position and facing on the track lattice.
@@ -135,11 +150,10 @@ class Pose:
         rotated into world space by the current heading, ``dz`` is added directly, and
         the headings compose additively on the lattice.
         """
-        c, s = cos_sin(self.heading)
-        dx_a, dy_a = alg(dx), alg(dy)
+        rx, ry = _rotate_xy(alg(dx), alg(dy), self.heading)
         return Pose(
-            self.x + c * dx_a - s * dy_a,
-            self.y + s * dx_a + c * dy_a,
+            self.x + rx,
+            self.y + ry,
             self.z + alg(dz),
             self.heading + dheading,
         )
@@ -150,10 +164,10 @@ class Pose:
 
     def rotated_about_origin(self, steps: int) -> Pose:
         """Rotate the whole pose about the world origin."""
-        c, s = cos_sin(steps)
+        rx, ry = _rotate_xy(self.x, self.y, steps)
         return Pose(
-            c * self.x - s * self.y,
-            s * self.x + c * self.y,
+            rx,
+            ry,
             self.z,
             self.heading + steps,
         )
