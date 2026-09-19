@@ -81,6 +81,26 @@ def _heading_trig(heading: int) -> tuple[float, float]:
     return math.cos(theta), math.sin(theta)
 
 
+@lru_cache(maxsize=2048)
+def _centreline_points(
+    piece: PieceType, frame: Pose, spacing: float
+) -> tuple[tuple[float, float, float], ...]:
+    """Every sampled centreline point of one placement, as an immutable cloud.
+
+    The same multiply/add order as :meth:`Placement.centrelines`, so every float
+    is bit-identical; only the result is kept. An editor closing audits dozens of
+    candidates over the same base and starts several searches over it, each of
+    which used to re-sample every base placement.
+    """
+    cos_t, sin_t = _heading_trig(frame.heading)
+    ox, oy, oz = frame.xyz()
+    return tuple(
+        (ox + cos_t * x - sin_t * y, oy + sin_t * x + cos_t * y, oz + z)
+        for line in piece.all_centrelines(spacing)
+        for x, y, z in line
+    )
+
+
 
 
 @lru_cache(maxsize=2048)
@@ -149,6 +169,10 @@ class Placement:
         """World pose of one of this piece's connectors (heading points outward)."""
         local = self.piece.ports[port].pose
         return _port_pose(self.frame, local)
+
+    def centreline_points(self, spacing: float = 8.0) -> tuple[tuple[float, float, float], ...]:
+        """All sampled points of every route, cached per piece, frame and spacing."""
+        return _centreline_points(self.piece, self.frame, spacing)
 
     def centrelines(self, spacing: float = 8.0) -> list[list[tuple[float, float, float]]]:
         """Every route through the piece, sampled in world coordinates."""

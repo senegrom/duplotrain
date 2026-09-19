@@ -144,3 +144,37 @@ def test_ground_track_never_passes_under_the_lower_ramp(catalog):
         layout = bridge_with_ground_track(catalog, cross_x=cross_x)
         assert strict_overlap_pairs(layout) != [], cross_x
         assert _solution_overlaps(layout, 0, 120.0, 8.0), cross_x
+
+
+def test_shared_overlap_audit_matches_the_standalone_audit_and_restores_its_field():
+    from duplotrain import Layout, build_chain, default_catalog, solve
+    from duplotrain.solver import SolverConfig, _OverlapAudit, _solution_overlaps
+
+    catalog = default_catalog()
+    base = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
+    audit = _OverlapAudit(base, 120.0, 8.0)
+    assert len(audit.field) == len(base)
+    result = solve({"curve": 6, "straight": 4, "ramp": 1, "span": 2}, catalog,
+                   SolverConfig(min_pieces=0, max_results=8), base=base)
+    candidates = [s.layout for s in result.solutions]
+    # Layouts that overlap: fold the closing track back through the base and
+    # through a fresh piece laid on top of an earlier one.
+    clash = build_chain([(catalog["curve"], 0, 1)] * 6)
+    clash, index = clash.attach(catalog["straight"], 0, (5, 1))
+    clash, _ = clash.attach(catalog["straight"], 1, (index, 1))
+    onto_base = Layout(base.placements + (base.placements[2],), dict(base.links))
+    candidates += [clash, onto_base, base, Layout()]
+    verdicts = set()
+    for layout in candidates:
+        n_base = len(base) if layout.placements[:len(base)] == base.placements else 0
+        expected = _solution_overlaps(layout, n_base, 120.0, 8.0)
+        assert audit.overlaps(layout) is expected
+        assert len(audit.field) == len(base)  # every candidate was popped again
+        verdicts.add(expected)
+    assert verdicts == {True, False}
+    # A layout over another base is audited standalone, and the loop-mode
+    # auditor without a base behaves like the plain function.
+    empty = _OverlapAudit(None, 120.0, 8.0)
+    for layout in candidates:
+        assert empty.overlaps(layout) is _solution_overlaps(layout, 0, 120.0, 8.0)
+        assert len(empty.field) == 0

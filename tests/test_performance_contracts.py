@@ -17,6 +17,7 @@ from duplotrain.gui import Session
 from duplotrain.layout import (
     Layout,
     Placement,
+    _centreline_points,
     _heading_trig,
     _local_footprint_bounds,
     _port_pose,
@@ -131,6 +132,7 @@ def test_all_shared_caches_are_bounded():
     assert _rotated_local_pose.cache_parameters()["maxsize"] == 2048
     assert _heading_trig.cache_parameters()["maxsize"] == 24
     assert _local_footprint_bounds.cache_parameters()["maxsize"] == 2048
+    assert _centreline_points.cache_parameters()["maxsize"] == 2048
     assert _cached_canonical_traversals.cache_parameters()["maxsize"] == 128
     assert _cached_mirror_ports.cache_parameters()["maxsize"] == 128
     assert _cached_mirror_traversals.cache_parameters()["maxsize"] == 128
@@ -384,3 +386,18 @@ def test_alg_hash_memo_is_not_a_constructor_field():
     assert hash(pickle.loads(pickle.dumps(x))) == hash(x)
     assert hash(copy.deepcopy(x)) == hash(x)
     assert repr(x) == repr(Alg(1, 2, 3, 4))
+
+
+def test_cached_sample_clouds_are_bit_identical_and_immutable():
+    from duplotrain import build_chain
+
+    catalog = default_catalog()
+    layout = build_chain([(catalog["curve"], 0, 1), (catalog["straight"], 0, 1),
+                          (catalog["ramp"], 0, 1), (catalog["switch"], 0, 2)])
+    for placement in layout:
+        for spacing in (8.0, 10.0):
+            flat = [p for line in placement.centrelines(spacing) for p in line]
+            cloud = placement.centreline_points(spacing)
+            assert isinstance(cloud, tuple) and list(cloud) == flat
+            assert all(a == b and str(a) == str(b) for a, b in zip(cloud, flat, strict=True))
+            assert placement.centreline_points(spacing) is cloud  # cached

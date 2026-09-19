@@ -72,3 +72,55 @@ def test_composed_arc_runs_preserve_finite_stock_order(straights):
     for candidate in found:
         assert not candidate.layout.joint_issues()
         assert not _solution_overlaps(candidate.layout, 0, 120, 8)
+
+
+def test_lattice_oracle_geometry_matches_the_exact_geometry():
+    from fractions import Fraction
+
+    import duplotrain.editor as editor
+    from duplotrain import Layout, Pose, build_chain
+    from duplotrain.editor import Session, _ExactArcGeometry, _LatticeArcGeometry
+
+    catalog = default_catalog()
+    bases = [
+        build_chain([(catalog["curve"], 0, 1)] * 6),
+        build_chain([(catalog["curve"], 0, 1)] * 2),
+        build_chain([(catalog["straight"], 0, 1)] * 2 + [(catalog["curve"], 0, 1)] * 4),
+        build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)]),
+        build_chain([(catalog["ramp"], 0, 1), (catalog["span"], 0, 1)]),
+    ]
+    first = build_chain([(catalog["curve"], 0, 1)] * 3)
+    second = build_chain([(catalog["curve"], 0, 1)] * 3,
+                         start=first.pose_of((2, 1)).then(128, 0, 0, 0))
+    bases.append(Layout(first.placements + second.placements, {**first.links, **{
+        (i + 3, p): (j + 3, q) for (i, p), (j, q) in second.links.items()}}))
+    compiled = []
+    for base in bases:
+        ends = base.connectable_ends()
+        for grow, close in ((ends[-1], ends[0]), (ends[0], ends[-1])):
+            for unlimited in (True, False):
+                session = Session(history=[base], unlimited=unlimited)
+                start, target = base.pose_of(grow), base.pose_of(close)
+                lattice = _LatticeArcGeometry.compile(catalog, start, target)
+                assert lattice is not None
+                compiled.append(lattice)
+                fast = session._arc_closures(grow, close, 8, 26)
+                with pytest.MonkeyPatch.context() as mp:
+                    mp.setattr(editor._LatticeArcGeometry, "compile",
+                               classmethod(lambda cls, *a: None))
+                    exact = session._arc_closures(grow, close, 8, 26)
+                assert [s.layout for s in fast] == [s.layout for s in exact]
+                assert [s.signature for s in fast] == [s.signature for s in exact]
+    # The two geometries agree step by step, not only on the candidates found.
+    exact = _ExactArcGeometry(catalog, Pose.make(), Pose.make(x=128, heading=6))
+    lattice = compiled[0]
+    for pid, entry, exit_port in _LatticeArcGeometry.STEPS:
+        for count in (1, 2, 5):
+            pose = exact.run(pid, entry, exit_port, count)(Pose.make(x=64, y=-128, heading=4))
+            fast = lattice.run(pid, entry, exit_port, count)(_LatticeArcGeometry.compile(
+                catalog, Pose.make(x=64, y=-128, heading=4), Pose.make()).start)
+            assert editor._flat(editor._pose_to_lattice(pose)) == fast
+    # An off-lattice end (a third of a millimetre, or a 15-degree heading)
+    # falls back to the exact geometry.
+    assert _LatticeArcGeometry.compile(catalog, Pose.make(x=Fraction(1, 3)), Pose.make()) is None
+    assert _LatticeArcGeometry.compile(catalog, Pose.make(heading=1), Pose.make()) is None

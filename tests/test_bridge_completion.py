@@ -128,7 +128,8 @@ def test_macro_uses_real_piece_and_stock_limits_and_reaudits(monkeypatch):
     # Use the fixture's actual base and inventory; independently reject the expanded audit.
     base = load("bridge-gap.json")
     remaining = {"curve": 16, "straight": 4, "ramp": 2, "span": 2}
-    monkeypatch.setattr(bridge_module, "_solution_overlaps", lambda *args: True)
+    monkeypatch.setattr(bridge_module, "_OverlapAudit", type(
+        "RejectAll", (bridge_module._OverlapAudit,), {"overlaps": lambda self, layout: True}))
     result = bridge_completion(base, catalog, remaining, (25, 0), (23, 1),
                                max_pieces=24, max_results=1, max_nodes=1234)
     stock, config = calls[0]
@@ -185,15 +186,16 @@ def test_two_ended_search_keeps_the_reported_gap_below_fifty_thousand_nodes():
 def test_expanded_bridge_rejections_do_not_fill_result_slots(monkeypatch):
     base = load("bridge-gap.json")
     catalog = default_catalog()
-    original = bridge_module._solution_overlaps
     attempts = 0
 
-    def reject_first(*args, **kwargs):
-        nonlocal attempts
-        attempts += 1
-        return attempts == 1 or original(*args, **kwargs)
+    # Only the bridge stage's own auditor rejects; the core solver keeps its own.
+    class RejectFirst(bridge_module._OverlapAudit):
+        def overlaps(self, layout):
+            nonlocal attempts
+            attempts += 1
+            return attempts == 1 or super().overlaps(layout)
 
-    monkeypatch.setattr(bridge_module, "_solution_overlaps", reject_first)
+    monkeypatch.setattr(bridge_module, "_OverlapAudit", RejectFirst)
     result = bridge_completion(base, catalog, {"curve": 16, "straight": 4, "ramp": 2, "span": 2},
                                (23, 1), (25, 0), max_pieces=26, max_results=1, max_nodes=250_000)
     assert len(result.solutions) == 1 and attempts >= 2

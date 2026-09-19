@@ -17,7 +17,7 @@ from .exact import ZERO
 from .geometry import ORIGIN
 from .layout import End, Layout, Placement, build_chain
 from .pieces import Path, PieceType, Port, Ramp, Route
-from .solver import Solution, SolverConfig, SolveResult, _solution_overlaps
+from .solver import Solution, SolverConfig, SolveResult, _OverlapAudit
 
 _BRIDGE_ID = "_completion_bridge"
 _RECIPE = (("ramp", 0, 1), ("span", 0, 1), ("span", 1, 0), ("ramp", 1, 0))
@@ -107,6 +107,7 @@ def bridge_completion(
     inventory[_BRIDGE_ID] = 1
     before = base.piece_counts
     accepted: dict[tuple, Solution] = {}
+    audit = _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
 
     def accept(candidate: Solution) -> bool:
         if candidate.signature in accepted:
@@ -126,9 +127,7 @@ def bridge_completion(
             if placement.piece.id in ("curve", "straight", "ramp")
         ):
             return False
-        if expanded.joint_issues() or _solution_overlaps(
-            expanded, len(base), DEFAULT_CLEARANCE, 8.0
-        ):
+        if expanded.joint_issues() or audit.overlaps(expanded):
             return False
         accepted[candidate.signature] = replace(
             candidate, layout=expanded, steps=(),

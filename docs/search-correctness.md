@@ -526,3 +526,26 @@ principle be rejected in one embedding and pass in another; the previous
 enumerator would then have audited it again from another root. No layout in the
 differential corpus is near the threshold. With `use_all_pieces` no later pass
 can use the whole inventory, so those passes are skipped.
+
+## Lattice oracle poses and shared audits
+
+The arc oracle only compares poses for exact equality and composes rigid
+motions. The lattice engine's flat tuples represent exactly the poses whose
+coordinates lie on the 30-degree lattice, and two such poses are equal as
+tuples exactly when they are equal as field poses, so composing a candidate's
+prefix and suffix on the lattice and comparing there decides the same matches
+as the field arithmetic did. Rigid motions associate, so stepping through a
+unit piece by piece yields the pose its composed transform yielded. When an
+end or a traversal does not fit the lattice the oracle keeps the exact
+geometry; a regression compares the two geometries candidate for candidate on
+a dozen closings and step for step on every traversal.
+
+The shared auditor builds the collision field over the base placements in
+index order and then, for each candidate, checks and pushes its new placements
+in index order, exactly the sequence the standalone audit performs from an
+empty field, and pops them afterwards; popping restores the field's grid and
+width bookkeeping exactly, as the collision tests assert. A candidate that does
+not begin with the base is audited standalone. The cell-box pre-test rejects a
+stored cell cloud only when its box and the query cell's box are at least the
+pair's limit apart along an axis, in which case every sample pair is at least
+that far apart and the strict distance test would reject each of them.

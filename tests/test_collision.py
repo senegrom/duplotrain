@@ -73,3 +73,54 @@ def test_z_clearance_lets_high_track_over_low():
     field = CollisionField(clearance=50.0)
     field.add(0, ground, 32.0)
     assert not field.clashes(deck_at_77, 32.0, ignore=set())  # user-lowered bar
+
+
+def test_cell_box_pretest_never_changes_a_verdict():
+    """The box test only skips cell clouds that no sample pair could bring within
+    the limit; every verdict must equal the plain pairwise scan's."""
+    import random
+
+    from duplotrain.collision import DEFAULT_CLEARANCE, TOUCH_MARGIN, UNDERPASS_MIN
+
+    rng = random.Random(11)
+
+    def cloud(n, spread=600.0):
+        cx, cy = rng.uniform(-spread, spread), rng.uniform(-spread, spread)
+        cz = rng.choice([0.0, 0.0, 57.6, 76.8])
+        return [(cx + rng.uniform(-70, 70), cy + rng.uniform(-70, 70), cz) for _ in range(n)]
+
+    def naive(stored, points, half, ignore, underpass):
+        for index, (pts, width, arch) in enumerate(stored):
+            if index in ignore:
+                continue
+            limit = half + width - TOUCH_MARGIN
+            for x, y, z in points:
+                for px, py, pz in pts:
+                    dz = z - pz
+                    if dz >= DEFAULT_CLEARANCE or dz <= -DEFAULT_CLEARANCE:
+                        continue
+                    if arch and dz <= -UNDERPASS_MIN:
+                        continue
+                    if underpass and dz >= UNDERPASS_MIN:
+                        continue
+                    if (x - px) ** 2 + (y - py) ** 2 < limit * limit:
+                        return True
+        return False
+
+    verdicts = {True: 0, False: 0}
+    for _ in range(40):
+        field = CollisionField()
+        stored = []
+        for index in range(rng.randint(1, 12)):
+            pts, width = cloud(rng.randint(3, 40)), rng.choice([32.0, 32.0, 80.0])
+            arch = rng.random() < 0.3
+            field.add(index, pts, width, underpass=arch)
+            stored.append((pts, width, arch))
+        for _ in range(25):
+            points, half = cloud(rng.randint(3, 30), 500.0), rng.choice([32.0, 80.0])
+            ignore = {rng.randrange(len(stored))} if rng.random() < 0.3 else set()
+            underpass = rng.random() < 0.3
+            expected = naive(stored, points, half, ignore, underpass)
+            assert field.clashes(points, half, ignore, underpass=underpass) is expected
+            verdicts[expected] += 1
+    assert verdicts[True] > 50 and verdicts[False] > 50

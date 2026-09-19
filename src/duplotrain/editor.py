@@ -18,10 +18,11 @@ from .bridge_completion import bridge_completion
 from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
 from .completion_search import solve_completion as solve
 from .geometry import ORIGIN, Pose, steps_to_degrees
+from .lattice import LatticePoint, from_alg_xy, z_from_alg
 from .layout import End, Layout, Placement, layout_from_dict, layout_to_dict
 from .pieces import PieceType
 from .sets import SETS, inventory_for_sets
-from .solver import Solution, SolverConfig, _moves_for
+from .solver import Solution, SolverConfig, _flat, _moves_for, _OverlapAudit, _pose_to_lattice
 from .validation import MAX_SNAPSHOT_BYTES
 from .validation import check_layout_json as check_layout_json
 
@@ -79,6 +80,105 @@ def _end(value: object, name: str) -> End:
 def _signed_degrees(dheading: int) -> int:
     degrees = steps_to_degrees(dheading)
     return degrees - 360 if degrees >= 180 else degrees
+
+
+class _ExactArcGeometry:
+    """Pose arithmetic for the arc oracle in the exact field (any catalogue)."""
+
+    def __init__(self, catalog: Mapping[str, PieceType], start: Pose, target: Pose) -> None:
+        self._catalog = catalog
+        self.start, self.target = start, target
+        self._runs: dict[tuple, list] = {}
+
+    def step(self, pid: str, entry: int, exit_port: int):
+        delta = self._catalog[pid].exit_delta(entry, exit_port)
+        return lambda pose: pose.then(*delta)
+
+    def run(self, pid: str, entry: int, exit_port: int, count: int):
+        """One transform equal to *count* steps, composed once and reused."""
+        runs = self._runs.setdefault((pid, entry, exit_port), [ORIGIN])
+        step = self.step(pid, entry, exit_port)
+        while len(runs) <= count:
+            runs.append(step(runs[-1]))
+        pose = runs[count]
+        x, y, z, heading = pose.x, pose.y, pose.z, pose.heading
+        return lambda cursor: cursor.then(x, y, z, heading)
+
+    @staticmethod
+    def reverse(pose: Pose) -> Pose:
+        return pose.reversed()
+
+    @staticmethod
+    def heading(pose: Pose) -> int:
+        return pose.heading
+
+
+class _LatticeArcGeometry:
+    """The same arithmetic on the integer lattice: a step is one tuple addition.
+
+    Poses are the solver's flat lattice tuples, which are equal exactly when the
+    field poses are, so the oracle's exact matching of prefixes against suffixes
+    is unchanged. Available only when the ends and every traversal fit the
+    30-degree lattice; standard track always does.
+    """
+
+    STEPS = tuple((pid, entry, 1 - entry)
+                  for pid in ("straight", "curve", "ramp", "span") for entry in (0, 1))
+
+    @classmethod
+    def compile(cls, catalog: Mapping[str, PieceType], start: Pose, target: Pose):
+        start_l, target_l = _pose_to_lattice(start), _pose_to_lattice(target)
+        if start_l is None or target_l is None:
+            return None
+        steps = {}
+        for pid, entry, exit_port in cls.STEPS:
+            dx, dy, dz, dheading = catalog[pid].exit_delta(entry, exit_port)
+            delta, rise = from_alg_xy(dx, dy), z_from_alg(dz)
+            if dheading % 2 or delta is None or rise is None:
+                return None
+            steps[pid, entry, exit_port] = (cls._rotations(delta), rise, dheading // 2)
+        geometry = cls()
+        geometry.start, geometry.target = _flat(start_l), _flat(target_l)
+        geometry._steps = steps
+        geometry._runs: dict[tuple, list] = {}
+        geometry._run_steps: dict[tuple, tuple] = {}
+        return geometry
+
+    @staticmethod
+    def _rotations(point: LatticePoint) -> tuple:
+        return tuple(point.rotated(heading).key() for heading in range(12))
+
+    @staticmethod
+    def _apply(rot12: tuple, dz: int, turn: int):
+        def apply(pose: tuple) -> tuple:
+            a, b, c, d, z, heading = pose
+            da, db, dc, dd = rot12[heading]
+            return (a + da, b + db, c + dc, d + dd, z + dz, (heading + turn) % 12)
+        return apply
+
+    def step(self, pid: str, entry: int, exit_port: int):
+        return self._apply(*self._steps[pid, entry, exit_port])
+
+    def run(self, pid: str, entry: int, exit_port: int, count: int):
+        key = (pid, entry, exit_port)
+        cached = self._run_steps.get((key, count))
+        if cached is None:
+            runs = self._runs.setdefault(key, [(0, 0, 0, 0, 0, 0)])
+            step = self.step(*key)
+            while len(runs) <= count:
+                runs.append(step(runs[-1]))
+            a, b, c, d, z, heading = runs[count]
+            cached = self._run_steps[key, count] = self._apply(
+                self._rotations(LatticePoint(a, b, c, d)), z, heading)
+        return cached
+
+    @staticmethod
+    def reverse(pose: tuple) -> tuple:
+        return (*pose[:5], (pose[5] + 6) % 12)
+
+    @staticmethod
+    def heading(pose: tuple) -> int:
+        return pose[5] * 2
 
 
 @dataclass
@@ -489,8 +589,6 @@ class Session:
         Heading and height prefilters keep it to a few thousand exact pose
         checks.
         """
-        from .solver import _solution_overlaps
-
         if not all(pid in self.catalog for pid in ("curve", "straight", "ramp", "span")):
             return []
         remaining = self.remaining()
@@ -503,9 +601,16 @@ class Session:
             for pid in ("ramp", "span") for side in (0, 1)
         }
         target = base.pose_of(close)
-        s_delta = straight.exit_delta(0, 1)
-        s_back = straight.exit_delta(1, 0)
-        c_delta = {entry: curve.exit_delta(entry, 1 - entry) for entry in (0, 1)}
+        # Thousands of exact pose checks: on the lattice each is one tuple add.
+        geometry = (
+            _LatticeArcGeometry.compile(self.catalog, base.pose_of(grow), target)
+            or _ExactArcGeometry(self.catalog, base.pose_of(grow), target)
+        )
+        s_back = geometry.step("straight", 1, 0)
+        unit_steps = {
+            (pid, side): geometry.step(pid, side, 1 - side)
+            for pid in ("ramp", "span") for side in (0, 1)
+        }
 
         # Leveling units: (sequence of (piece, entry), float dz).  Monotone
         # ramp/span runs of length <= 4 both ways, the empty unit, and the full
@@ -541,18 +646,12 @@ class Session:
 
         piece_of = {"ramp": ramp, "span": span}
 
-        # One exact rigid transform per demanded unit, local to this search.
-        unit_deltas = {}
-
         def apply_unit(pose, seq):
-            if not seq:
-                return pose
-            if seq not in unit_deltas:
-                unit = ORIGIN
-                for pid, side in seq:
-                    unit = unit.then(*deltas[pid, side])
-                unit_deltas[seq] = (unit.x, unit.y, unit.z, unit.heading)
-            return pose.then(*unit_deltas[seq])
+            # Rigid motions compose associatively, so stepping through a unit
+            # gives exactly the pose its composed transform gave.
+            for pid, side in seq:
+                pose = unit_steps[pid, side](pose)
+            return pose
 
         def build(pre, j, k, entry, m, post):
             work, cursor = base, grow
@@ -573,24 +672,16 @@ class Session:
                 cursor = (idx, 1 - entry_side)
             return work.join(cursor, close)
 
-        start = base.pose_of(grow)
-        want_heading = (target.heading + 12) % 24
+        start, target = geometry.start, geometry.target
+        want_heading = (geometry.heading(target) + 12) % 24
+        audit = _OverlapAudit(base, 120.0, 8.0)
         found: list[Solution] = []
         seen_pre = {}
         prefixes = {}
         suffixes = {}
         # Build each relative run once, then compose it into any prefix's frame.
-        # Exact rigid transforms associate, so this replaces j+k transforms per
-        # trial with at most two without changing placements or template order.
-        straight_runs = [ORIGIN]
-        curve_runs = {0: [ORIGIN], 1: [ORIGIN]}
-
-        def run_delta(runs, delta, count):
-            while len(runs) <= count:
-                runs.append(runs[-1].then(*delta))
-            pose = runs[count]
-            return pose.x, pose.y, pose.z, pose.heading
-
+        # Rigid transforms associate, so this replaces j+k transforms per trial
+        # with at most two without changing placements or template order.
         seen_layouts = set()
         for pre, post in pairs:
             if post not in suffixes:
@@ -601,15 +692,15 @@ class Session:
                 cursor = apply_unit(target, reverse_post)
                 matches = {}
                 for m in range(min(8, remaining.get("straight", 0)) + 1):
-                    matches.setdefault(cursor.reversed(), []).append(m)
-                    cursor = cursor.then(*s_back)
+                    matches.setdefault(geometry.reverse(cursor), []).append(m)
+                    cursor = s_back(cursor)
                 suffixes[post] = matches
             if pre not in seen_pre:
                 seen_pre[pre] = apply_unit(start, pre)
             start_pre = seen_pre[pre]
             for entry, turn in ((0, 2), (1, -2)):
                 for k in range(0 if (pre or post) else 1, 14):
-                    if (start_pre.heading + turn * k) % 24 != want_heading:
+                    if (geometry.heading(start_pre) + turn * k) % 24 != want_heading:
                         continue
                     if k > remaining.get("curve", 0):
                         break
@@ -621,9 +712,9 @@ class Session:
                         if prefix not in prefixes:
                             pose = start_pre
                             if j:
-                                pose = pose.then(*run_delta(straight_runs, s_delta, j))
+                                pose = geometry.run("straight", 0, 1, j)(pose)
                             if k:
-                                pose = pose.then(*run_delta(curve_runs[entry], c_delta[entry], k))
+                                pose = geometry.run("curve", entry, 1 - entry, k)(pose)
                             prefixes[prefix] = pose
                         pose = prefixes[prefix]
                         for m in suffixes[post].get(pose, ()):
@@ -637,7 +728,7 @@ class Session:
                                 closed = build(pre, j, k, entry, m, post)
                             except ValueError:
                                 continue
-                            if _solution_overlaps(closed, n_base, 120.0, 8.0):
+                            if audit.overlaps(closed):
                                 continue
                             # Different prefix/suffix splits (especially k=0)
                             # can describe exactly the same added pieces.

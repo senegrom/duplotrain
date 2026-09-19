@@ -706,3 +706,45 @@ are found in every case:
 
 The reverse cases lose a few nodes because a probe now starts with the whole
 stage's table allowance instead of one eighth of its own.
+
+## Editor closings: the oracle on the lattice, audits over one base
+
+With the search itself small, profiling whole editor closings showed the time
+around it. On an ordinary plain-track gap the arc oracle took four fifths of
+the closing: its prefix and suffix poses were composed with exact field
+transforms, about 1,500 per call. Every candidate audit sampled and binned the
+whole base again, and the narrow-phase collision check compared every sample
+pair of neighbouring cells even when the two cell clouds could not reach each
+other. Four changes, none of which alters a sampled float, a verdict or a
+candidate:
+
+* The oracle composes its poses on the integer lattice whenever the ends and
+  the four track pieces fit it (standard track always does): a step is one
+  tuple addition, and lattice poses are equal exactly when the field poses
+  are, so the exact matching of prefixes against suffixes is unchanged. The
+  exact geometry remains for custom catalogues, and the candidates are still
+  built and audited exactly as before. Over 584 corpus closings the oracle
+  returns byte-identical candidates in 2.3 s instead of 18.2 s.
+* Each placement's sample cloud is cached per piece, frame and spacing, with
+  the same multiply/add order as before, so every float is bit-identical.
+* Each cell cloud records the box of its samples; a query cell whose own box is
+  at least the pair's limit away in x or in y is skipped before the pairwise
+  scan, which only ever rejects pairs the scan would have rejected.
+* One overlap auditor per closing problem samples and bins the base once;
+  every candidate's new placements are checked and pushed in the standalone
+  audit's order and popped again, restoring the field exactly. The solver's own
+  closures, the oracle's candidates and the bridge stage's expansions share it.
+
+CPU time of one `solve_gap` call (process time, minimum of five runs; the
+timer resolves 15.6 ms), same candidates in every case:
+
+| Case | Before | After |
+| --- | ---: | ---: |
+| Winding circle (oracle) | 47 ms | under 1 ms |
+| Mixed gap (oracle, then 138 nodes) | 47 ms | 16 ms |
+| Reported bridge gap, forward | 250 ms | 219 ms |
+| Reported bridge gap, reverse | 188 ms | 125 ms |
+
+The arc oracle alone: winding circle 56 ms to 3.8 ms, mixed gap 53 ms to
+2.8 ms, and the two cases that find eight candidates at once, whose remaining
+cost is building and auditing them, 12 ms to 6 and 9 ms.

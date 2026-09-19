@@ -1456,7 +1456,7 @@ def _solution_overlaps(
         neighbours.setdefault(ai, set()).add(bi)
     check = CollisionField(clearance=clearance)
     for index, placement in enumerate(layout.placements):
-        pts = [p for line in placement.centrelines(spacing) for p in line]
+        pts = placement.centreline_points(spacing)
         half = placement.piece.width / 2.0
         arch = placement.piece.underpass
         if index >= n_base and check.clashes(
@@ -1465,6 +1465,51 @@ def _solution_overlaps(
             return True
         check.add(index, pts, half, underpass=arch)
     return False
+
+
+class _OverlapAudit:
+    """The overlap audit of :func:`_solution_overlaps` over one fixed base.
+
+    A closing problem audits every candidate over the same base placements, so
+    they are sampled and binned once; each candidate's new placements are then
+    checked and pushed in the same order the standalone audit uses, and popped
+    again afterwards, which restores the field exactly. A layout that does not
+    start with the base is audited standalone.
+    """
+
+    def __init__(self, base: Layout | None, clearance: float, spacing: float) -> None:
+        self.base = base.placements if base is not None else ()
+        self.clearance, self.spacing = clearance, spacing
+        self.field = CollisionField(clearance=clearance)
+        for index, placement in enumerate(self.base):
+            self.field.add(index, placement.centreline_points(spacing),
+                           placement.piece.width / 2.0, underpass=placement.piece.underpass)
+
+    def overlaps(self, layout: Layout) -> bool:
+        placements = layout.placements
+        n_base = len(self.base)
+        if placements[:n_base] != self.base:
+            return _solution_overlaps(layout, n_base, self.clearance, self.spacing)
+        neighbours: dict[int, set[int]] = {}
+        for (ai, _ap), (bi, _bp) in layout.links.items():
+            if ai >= n_base:
+                neighbours.setdefault(ai, set()).add(bi)
+        field, spacing = self.field, self.spacing
+        pushed = 0
+        try:
+            for index in range(n_base, len(placements)):
+                placement = placements[index]
+                pts = placement.centreline_points(spacing)
+                half = placement.piece.width / 2.0
+                arch = placement.piece.underpass
+                if field.clashes(pts, half, neighbours.get(index, set()), underpass=arch):
+                    return True
+                field.add(index, pts, half, underpass=arch)
+                pushed += 1
+        finally:
+            for _ in range(pushed):
+                field.pop()
+        return False
 
 
 # --------------------------------------------------------------------------------------
@@ -1891,14 +1936,9 @@ def solve(
     if base is not None:
         for index, placement in enumerate(base.placements):
             placements.append((placement.piece.id, None))  # base frames never re-used
-            pts = [
-                p
-                for line in placement.centrelines(cfg.collision_spacing)
-                for p in line
-            ]
             field.add(
                 index,
-                pts,
+                placement.centreline_points(cfg.collision_spacing),
                 placement.piece.width / 2.0,
                 underpass=placement.piece.underpass,
             )
@@ -2093,6 +2133,8 @@ def solve(
         links[target] = cursor
         return Layout(placed, links, base.accessories if base is not None else ())
 
+    audit: list = []  # one _OverlapAudit over the base, built on the first closure
+
     def emit(gap: float, reversing_target: tuple[int, int] | None = None) -> None:
         stats.closures_found += 1
         signature = _canonical_signature(
@@ -2107,9 +2149,9 @@ def solve(
         if signature in solutions and solutions[signature].gap <= gap:
             return
         layout = assemble(reversing_target)
-        if _solution_overlaps(
-            layout, len(base_pids), cfg.clearance, cfg.collision_spacing
-        ):
+        if not audit:
+            audit.append(_OverlapAudit(base, cfg.clearance, cfg.collision_spacing))
+        if audit[0].overlaps(layout):
             stats.dropped_overlap += 1
             return
         candidate = Solution(

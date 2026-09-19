@@ -101,6 +101,16 @@ class _CellCloud:
     half_width: float
     points: list[_Point]
     underpass: bool
+    #: (xmin, xmax, ymin, ymax) of ``points``: a query cell whose own box lies
+    #: at least the interaction limit away in x or in y holds no clashing pair.
+    box: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
+
+
+def _cell_cloud(placement: int, half_width: float, points: list, underpass: bool) -> _CellCloud:
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    return _CellCloud(placement, half_width, points, underpass,
+                      (min(xs), max(xs), min(ys), max(ys)))
 
 
 @dataclass(slots=True)
@@ -234,6 +244,19 @@ class CollisionField:
         reach = half_width + self._max_half_width - TOUCH_MARGIN
         r = max(1, math.ceil(reach / cell))
         for (cx, cy), cell_points in grouped:
+            # The box of this cell's samples: a stored cloud whose box lies at
+            # least the pair's limit away in x or in y cannot come within it.
+            qx0 = qx1 = cell_points[0][0]
+            qy0 = qy1 = cell_points[0][1]
+            for x, y, _z in cell_points:
+                if x < qx0:
+                    qx0 = x
+                elif x > qx1:
+                    qx1 = x
+                if y < qy0:
+                    qy0 = y
+                elif y > qy1:
+                    qy1 = y
             for gx in range(cx - r, cx + r + 1):
                 for gy in range(cy - r, cy + r + 1):
                     bucket = grid.get((gx, gy))
@@ -243,6 +266,10 @@ class CollisionField:
                         if cloud.placement in ignore:
                             continue
                         limit = half_width + cloud.half_width - TOUCH_MARGIN
+                        bx0, bx1, by0, by1 = cloud.box
+                        if (bx0 - qx1 >= limit or qx0 - bx1 >= limit
+                                or by0 - qy1 >= limit or qy0 - by1 >= limit):
+                            continue
                         limit2 = limit * limit
                         stored_underpass = cloud.underpass
                         for x, y, z in cell_points:
@@ -297,7 +324,7 @@ class CollisionField:
         grid = self._grid
         for key, cell_points in grouped:
             grid.setdefault(key, []).append(
-                _CellCloud(placement, half_width, cell_points, underpass)
+                _cell_cloud(placement, half_width, cell_points, underpass)
             )
 
     def add_deferred(
@@ -330,7 +357,7 @@ class CollisionField:
         grid = self._grid
         for key, cell_points in grouped:
             grid.setdefault(key, []).append(
-                _CellCloud(cloud.placement, cloud.half_width, cell_points, cloud.underpass)
+                _cell_cloud(cloud.placement, cloud.half_width, cell_points, cloud.underpass)
             )
 
     def near(self, bounds: _Bounds, half_width: float, ignore: set[int]) -> bool:
