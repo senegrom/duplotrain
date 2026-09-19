@@ -885,6 +885,30 @@ class _CompletionBounds:
                    for a, b, c, d, pad in zip(*interval, low, high, padding, strict=True))
 
 
+# A planar lattice pose packed into one int: the four coordinates, offset by
+# _PACK_BIAS, in 32-bit fields above the heading. Keys are equal exactly when the
+# planar poses are, and a move adds a constant per heading, so a reverse layer
+# grows by one int addition per pose and move instead of building a tuple.
+# Coordinates beyond 2^31 lattice units (107 km) would not fit; no layout comes
+# near, and the search's own poses stay within its horizon of the base.
+_PACK_BIAS = 1 << 31
+_PACK_MASK = (1 << 32) - 1
+
+
+def _pack_lattice(pose: tuple) -> int:
+    """The key of a lattice pose's planar part, whatever its height."""
+    a, b, c, d, _z, heading = pose
+    return (((a + _PACK_BIAS) << 100) + ((b + _PACK_BIAS) << 68)
+            + ((c + _PACK_BIAS) << 36) + ((d + _PACK_BIAS) << 4) + heading)
+
+
+def _unpack_lattice(key: int) -> tuple:
+    """The planar lattice pose of a key: the inverse of :func:`_pack_lattice`."""
+    return ((key >> 100) - _PACK_BIAS, ((key >> 68) & _PACK_MASK) - _PACK_BIAS,
+            ((key >> 36) & _PACK_MASK) - _PACK_BIAS, ((key >> 4) & _PACK_MASK) - _PACK_BIAS,
+            0, key & 15)
+
+
 class _CompletionReachability:
     """Bounded reverse reachability for planar poses and heights independently.
 
@@ -936,7 +960,11 @@ class _CompletionReachability:
         unique = {eng.level(pose): move for pose, move in endpoints}
         self.moves = tuple(unique.values())
         self.rises = {eng.height(pose) - eng.height(eng.anchor) for pose, _ in endpoints}
-        self.layers = [frozenset((eng.level(eng.anchor),))]
+        # Lattice tables hold packed planar poses (see _pack_lattice) and key()
+        # maps a cursor into them; the field keeps exact levelled Pose objects.
+        self._lattice = eng.name == "lattice"
+        self.key = _pack_lattice if self._lattice else eng.level
+        self.layers = [frozenset((self.key(eng.anchor),))]
         self.frontier = self.layers[0]
         self.frontiers = [self.frontier]  # the poses each layer added
         self.height_layers = [frozenset((eng.height(eng.anchor),))]
@@ -944,11 +972,19 @@ class _CompletionReachability:
         self.bounds = _CompletionBounds(eng, slippage=slippage)
         self.near_indices: dict[int, dict] = {}
         self._boxes: dict = {}  # pose -> physical box, computed once per pose
+        # Slippage reads a table entry's heading and box through its key; a
+        # queried cursor keeps its own entry under its own tuple.
+        if self._lattice:
+            enclose = self.bounds.enclose
+            self._heading = lambda key: key & 15
+            self._enclose = lambda key: enclose(_unpack_lattice(key))
+        else:
+            self._heading, self._enclose = self.bounds.heading, self.bounds.enclose
         # Moves are rigid, so a predecessor is the pose plus a delta that depends
         # only on the heading. Tabulate it once instead of reversing, moving and
-        # reversing again for every expansion. Lattice poses are int tuples; the
-        # field keeps exact Pose deltas.
-        self._lattice = eng.name == "lattice"
+        # reversing again for every expansion. A lattice delta is the difference
+        # of two packed poses, so one int addition applies it; the field keeps
+        # exact Pose deltas.
         headings = range(12) if self._lattice else range(HEADING_STEPS)
         zero = ((lambda h: (0, 0, 0, 0, 0, h)) if self._lattice
                 else (lambda h: Pose.make(heading=h)))
@@ -962,8 +998,9 @@ class _CompletionReachability:
                 predecessor = eng.level(eng.reverse(apply_move(eng.reverse(pose))))
                 successor = eng.level(apply_move(pose))
                 if self._lattice:
-                    deltas.add((*predecessor[:4], predecessor[5]))
-                    forward.add((*successor[:4], successor[5]))
+                    origin = _pack_lattice(pose)
+                    deltas.add(_pack_lattice(predecessor) - origin)
+                    forward.add(_pack_lattice(successor) - origin)
                 else:
                     deltas.add((predecessor.x, predecessor.y, predecessor.heading))
                     forward.add((successor.x, successor.y, successor.heading))
@@ -1005,12 +1042,12 @@ class _CompletionReachability:
         depth = len(self.layers)
         if final or known >= depth:
             return floor
-        level, height = self.eng.level, self.eng.height
+        key, height = self.key, self.eng.height
         for k in range(known, depth):
             layer, heights = self.layers[k], self.height_layers[k]
             if any(
                 height(query) in heights and (
-                    level(query) in layer if self.padding is None
+                    key(query) in layer if self.padding is None
                     else self._near_layer(query, k, self.padding)
                 )
                 for query in queries
@@ -1064,9 +1101,9 @@ class _CompletionReachability:
             previous = self.layers[-1]
             frontier = set()
             if self._lattice:
-                for a, b, c, d, _z, heading in self.frontier:
-                    for da, db, dc, dd, next_heading in predecessors[heading]:
-                        predecessor = (a + da, b + db, c + dc, d + dd, 0, next_heading)
+                for key in self.frontier:
+                    for delta in predecessors[key & 15]:
+                        predecessor = key + delta
                         if predecessor not in previous:
                             frontier.add(predecessor)
             else:
@@ -1094,17 +1131,17 @@ class _CompletionReachability:
         layer = self.layers[depth]
         successors = self.successors
         lattice = self._lattice
-        boxes, enclose, heading_of = self._boxes, self.bounds.enclose, self.bounds.heading
+        boxes, enclose, heading_of = self._boxes, self._enclose, self._heading
         near_group = self._near_group
-        frontier = {self.eng.level(cursor)}
+        frontier = {self.key(cursor)}
         expanded = 0
         for step in range(gap + 1):
             if step:
                 grown = set()
                 if lattice:
-                    for a, b, c, d, _z, heading in frontier:
-                        for da, db, dc, dd, next_heading in successors[heading]:
-                            grown.add((a + da, b + db, c + dc, d + dd, 0, next_heading))
+                    for key in frontier:
+                        for delta in successors[key & 15]:
+                            grown.add(key + delta)
                 else:
                     for pose in frontier:
                         x, y = pose.x, pose.y
@@ -1161,7 +1198,7 @@ class _CompletionReachability:
         # so a membership answer is final whether or not the envelope was built.
         if self._ensure_layers(min(traversals, self.horizon)) and traversals <= self.horizon:
             if padding is None:
-                return self.eng.level(cursor) in self.layers[traversals]
+                return self.key(cursor) in self.layers[traversals]
             return self._near_layer(cursor, traversals, padding)
         depth = len(self.layers) - 1
         gap = traversals - depth
@@ -1181,7 +1218,7 @@ class _CompletionReachability:
         plus the boxes of the poses that depth added; each pose's box is computed
         once and shared by every depth that contains it.
         """
-        boxes, enclose, heading_of = self._boxes, self.bounds.enclose, self.bounds.heading
+        boxes, enclose, heading_of = self._boxes, self._enclose, self._heading
         start = max(k for k in range(traversals + 1) if k in self.near_indices or k == 0)
         grouped: dict[int, list] = {}
         if start in self.near_indices:

@@ -762,3 +762,28 @@ This also removes a latent rejection: a base holding a deliberate forced fit
 used to fail every bridge candidate on its own joint, while the plain stage
 never audited base joints at all. Such a base now keeps its candidates, and
 its own forced fits are reported unchanged.
+
+## Reverse tables of packed integers
+
+On the lattice a reverse layer held planar poses as six-int tuples and grew by
+building one tuple per pose and move. A planar lattice pose now packs into one
+int: the four coordinates, offset into 32-bit fields, above the heading. Two
+keys are equal exactly when the planar poses are, and a move is a constant per
+heading, so a layer grows by one int addition per pose and move, membership
+queries and probes hash small ints instead of tuples, and a table holds one
+object per state instead of seven. The field engine keeps its exact poses.
+Slippage still reads a state's heading and box, through the key.
+
+Back-to-back process time, minimum of five runs per case, identical results and
+node counts throughout:
+
+| Measure | Before | After |
+| --- | ---: | ---: |
+| Completion benchmark suite, 30 cases | 0.81 to 0.83 s | 0.78 s |
+| Reported bridge gap, forward closing | 188 to 203 ms | 156 ms |
+| Reported bridge gap, reverse closing | 141 ms | 125 ms |
+| Building 15,372 states to depth 7 (ramps and spans) | 7.6 ms | 6.4 ms |
+
+The closings gain more than the table build alone because every query, probe
+and transit floor now hashes an int; the search-heavy bridge closings improve
+by a tenth to a fifth, the small suite cases by a twentieth.

@@ -560,3 +560,16 @@ index and every base link, so the joints it can change are precisely those
 touching an index at or beyond the base size, which is what the stage audits.
 A regression closes the reported gap over a base with a curve set a millimetre
 off and checks that the candidate's only joint issues are the base's own.
+
+## Packed lattice keys
+
+A key is injective on planar poses whose coordinates stay below 2^31 lattice
+units, 107 km, which no accepted layout approaches, and it ignores the height,
+exactly as the levelled tuple did: the height layers remain separate. A move's
+packed delta is the difference of the keys of its endpoint and its origin at
+each heading, and adding it to any key of that heading yields the key of the
+moved pose, because no coordinate field can borrow or carry within the bound.
+A regression builds the reverse layers with tuples from the same moves and
+checks every published layer and frontier against the packed tables state for
+state, the per-heading deltas against the packed differences of the moves, and
+three hundred cursors at every depth up to the probe range for the same answer.
