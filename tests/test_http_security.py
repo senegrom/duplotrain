@@ -139,7 +139,8 @@ def test_same_origin_and_non_browser_json_clients_work(local_editor, host, brows
 @pytest.mark.parametrize("path", [
     "/api/clear", "/api/undo", "/api/inventory", "/api/import", "/api/restore",
     "/api/attach", "/api/remove", "/api/solve", "/api/apply", "/api/stone",
-    "/api/join", "/api/unlimited", "/api/add_set",
+    "/api/join", "/api/unlimited", "/api/add_set", "/api/redo",
+    "/api/project/open", "/api/check", "/api/drive", "/api/cancel",
 ])
 def test_every_mutation_is_guarded_before_dispatch(local_editor, path):
     _, port = local_editor

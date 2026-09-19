@@ -31,7 +31,7 @@ function editor() {
 
 test("every edit captures its viewed revision for HTTP and worker transports", async () => {
   const paths = ["attach", "join", "undo", "remove", "clear", "inventory", "unlimited",
-                 "add_set", "stone", "solve", "apply", "import", "restore"];
+                 "add_set", "stone", "solve", "apply", "import", "restore", "redo", "project/open", "check", "drive"];
   for (const transport of ["http", "worker"]) {
     const e = editor();
     if (transport === "worker") e.context.window.duplotrainApi = async (url, body) => {

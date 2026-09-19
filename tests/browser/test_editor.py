@@ -290,6 +290,12 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
             page.locator("#export").tap()
         return json.loads(Path(info.value.path()).read_text())
 
+    page.add_init_script("""
+      const NativeWorker = window.Worker;
+      window.Worker = class extends NativeWorker {
+        constructor(...args) { super(...args); window.__testWorker = this; }
+      };
+    """)
     try:
         page.goto(f"https://127.0.0.1:{server.server_port}/")
         expect(page.locator("#status")).to_contain_text("Engine ready", timeout=90000)
@@ -344,7 +350,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         candidate = page.locator(".cand").first
         candidate.get_by_role("button", name="Preview", exact=True).tap()
         candidate.get_by_role("button", name="Apply").tap()
-        expect(page.locator("#status")).to_contain_text("Closed! 12 pieces")
+        expect(page.locator("#status")).to_contain_text("Connectors closed")
         closed = export_layout()
         assert len(closed["placements"]) == 12 and len(closed["links"]) == 12
 
@@ -363,7 +369,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         expect(candidate).to_be_visible(timeout=30000)
         candidate.get_by_role("button", name="Preview", exact=True).tap()
         candidate.get_by_role("button", name="Apply").tap()
-        expect(page.locator("#status")).to_contain_text("Closed! 14 pieces")
+        expect(page.locator("#status")).to_contain_text("Connectors closed")
         assert len(export_layout()["placements"]) == 14
 
         # A longer tail exercises heading-conditioned bounds beyond the six-step
@@ -385,7 +391,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         expect(candidate).to_be_visible(timeout=30000)
         candidate.get_by_role("button", name="Preview", exact=True).tap()
         candidate.get_by_role("button", name="Apply").tap()
-        expect(page.locator("#status")).to_contain_text("Closed! 20 pieces")
+        expect(page.locator("#status")).to_contain_text("Connectors closed")
         closed = export_layout()
         assert len(closed["placements"]) == 20 and len(closed["links"]) == 20
         assert closed["placements"][:6] == layout_to_dict(long_gap)["placements"]
@@ -423,6 +429,25 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         issues = layout_from_dict(forced, default_catalog()).joint_issues()
         assert len(issues) == 2
         assert sum(joint["gap_mm"] for joint in issues) == pytest.approx(10)
+        exercise_project_history_and_tools(page)
+        # Force a genuine worker failure after confirmed work. Emergency downloads
+        # must use the displayed snapshot, then a new worker must restore it.
+        confirmed = page.evaluate("S.snapshot")
+        page.evaluate("""() => {
+          const worker = window.__testWorker;
+          if (!worker) throw new Error("test worker was not captured");
+          worker.dispatchEvent(new ErrorEvent("error", {
+            message: "test engine failure", cancelable: true
+          }));
+        }""")
+        with page.expect_download() as recovered:
+            page.get_by_role("button", name="Download last confirmed session", exact=True).tap()
+        assert json.loads(Path(recovered.value.path()).read_text()) == confirmed
+        page.get_by_role(
+            "button", name="Restart engine and restore last confirmed session", exact=True,
+        ).tap()
+        expect(page.locator("#status")).to_contain_text("Engine restarted", timeout=90000)
+        assert page.evaluate("S.snapshot") == confirmed
         assert not errors
     finally:
         context.close()
@@ -683,4 +708,138 @@ def test_reported_bridge_search_preview_apply_and_undo(editor):
     page.locator("#undo").tap()
     wait_count(page, 59)
     assert session.layout == base
+    assert not errors
+
+
+def exercise_project_history_and_tools(page):
+    """Run identical new UI flows on the HTTP host and the real WASM worker."""
+    import json
+    from pathlib import Path
+
+    from playwright.sync_api import expect
+
+    from duplotrain.catalog import default_catalog
+    from duplotrain.layout import layout_to_dict
+
+    layout = build_chain([(default_catalog()["curve"], 0, 1)] * 12).join((0, 0), (11, 1))
+    project = {
+        "format": "duplotrain-project/1", "name": "Portable circle",
+        "session": {"format": "duplotrain-session/1", "layout": layout_to_dict(layout),
+                    "inventory": {"curve": 15}, "stones": {"stone_stop": 3}, "unlimited": False},
+        "preferences": {"search": {"max_pieces": 52, "slop": 0, "reversing": False}},
+    }
+    page.locator("#projectfile").set_input_files({
+        "name": "circle.project.json", "mimeType": "application/json",
+        "buffer": json.dumps(project).encode(),
+    })
+    wait_count(page, 12)
+    expect(page.locator("#max-pieces")).to_have_value("52")
+    expect(page.locator("#project-name")).to_have_value("Portable circle")
+    field = page.locator('[data-piece-id="curve"] input')
+    # Locator assertions wait for accepted UI state without dynamic string eval;
+    # this helper also runs under the production CSP in the real worker test.
+    field.fill("2")
+    field.press("Tab")
+    expect(page.locator('[data-piece-id="curve"] .count')).to_have_text("0/")
+    expect(field).to_have_value("2")
+    page.locator("#undo").tap()
+    expect(page.locator('[data-piece-id="curve"] .count')).to_have_text("3/")
+    expect(field).to_have_value("15")
+    assert page.evaluate("S.layout.placements.length") == 12
+    page.locator("#redo").tap()
+    expect(page.locator('[data-piece-id="curve"] .count')).to_have_text("0/")
+    expect(field).to_have_value("2")
+    page.locator("#check-layout").tap()
+    expect(page.locator("#diagnostics")).to_contain_text("Connectors: exactly closed")
+    expect(page.locator("#diagnostics")).to_contain_text("Overlaps: 0")
+    expect(page.locator("#diagnostics")).to_contain_text("10")
+    # A rejected inventory edit must restore its confirmed value, not show -1.
+    field.fill("-1")
+    field.press("Tab")
+    expect(field).to_have_value("2")
+    page.locator("details").filter(has=page.locator("#test-train")).locator("summary").tap()
+    page.locator("#train-start").select_option("[0,0]")
+    page.locator("#test-train").tap()
+    expect(page.locator("#train-report")).to_contain_text("from this start: endless")
+    page.locator("#train-step").tap()
+    expect(page.locator("#train-report")).to_contain_text("Step 1/12")
+    page.locator("#train-play").tap()
+    page.locator("#train-pause").tap()
+    page.locator("details").filter(has=page.locator("#save-project")).locator("summary").tap()
+    with page.expect_download() as download:
+        page.locator("#save-project").tap()
+    portable = json.loads(Path(download.value.path()).read_text())
+    assert portable["session"] == page.evaluate("S.snapshot")
+    assert portable["preferences"]["search"]["max_pieces"] == 52
+    page.locator("#save-local").tap()
+    page.locator("#save-local").tap()
+    expect(page.locator("#project-slots option")).to_have_count(2)
+    page.locator("#clear").tap()
+    wait_count(page, 0)
+    page.locator("#projectfile").set_input_files({
+        "name": "saved.project.json", "mimeType": "application/json",
+        "buffer": json.dumps(portable).encode(),
+    })
+    wait_count(page, 12)
+    assert page.evaluate("S.snapshot") == portable["session"]
+    page.locator("#undo").tap()
+    wait_count(page, 0)
+    page.locator("#redo").tap()
+    wait_count(page, 12)
+
+
+def test_project_history_diagnostics_and_train_ui(editor):
+    page, _session, url, errors = editor
+    load(page, url)
+    exercise_project_history_and_tools(page)
+    assert not errors
+
+
+def test_endpoint_selection_clears_after_import_and_keyboard_attach(editor):
+    import json
+
+    from duplotrain.layout import layout_to_dict
+
+    page, session, url, errors = editor
+    session.attach("switch", 0, None)
+    load(page, url)
+    page.locator("#solve").tap()
+    page.evaluate("activateEnd([0, 1])")
+    assert page.evaluate("pickMode.grow") == [0, 1]
+    curve = build_chain([(session.catalog["curve"], 0, 1)])
+    page.locator("#importfile").set_input_files({
+        "name": "replacement.json", "mimeType": "application/json",
+        "buffer": json.dumps(layout_to_dict(curve)).encode(),
+    })
+    page.wait_for_function("S.layout.placements[0].piece === 'curve' && !apiBusy")
+    assert page.evaluate("pickMode") is None
+    page.locator("details").filter(has=page.locator("#end-select")).locator("summary").tap()
+    page.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
+    page.locator("#end-select").select_option("[0,1]")
+    page.locator("#use-end").tap()
+    wait_count(page, 2)
+    assert session.layout.links[(0, 1)] == (1, 0)
+    assert not errors
+
+
+def test_overlap_chooser_and_elevation_picking(editor):
+    from duplotrain.geometry import Pose
+    from duplotrain.layout import Placement
+
+    page, session, url, errors = editor
+    piece = session.catalog["straight"]
+    session.history = [Layout((Placement(piece, Pose.make(z=200)),
+                               Placement(piece, Pose.make())))]
+    load(page, url)
+    assert page.evaluate("placementAt(...worldToScreen(64, 0))") == 0
+    page.locator("#delete-tool").tap()
+    # Use the real canvas removal path; ambiguity must not immediately delete.
+    page.evaluate("removeAt(...worldToScreen(64, 0))")
+    assert len(session.layout) == 2
+    page.locator("#overlap-picker select").select_option("1")
+    page.get_by_role("button", name="Remove highlighted piece").tap()
+    wait_count(page, 1)
+    assert float(session.layout.placements[0].frame.z) == 200
+    page.locator("#undo").tap()
+    wait_count(page, 2)
     assert not errors

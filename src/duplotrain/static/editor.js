@@ -63,7 +63,7 @@ let autosaveReady = false;
 function selectTool({piece = null, stone = null, pick = null, remove = false} = {}) {
   armed = piece;
   armedStone = stone;
-  pickMode = pick;
+  pickMode = pick ? {...pick, revision: S && S.revision} : null;
   deleting = remove;
   const button = document.getElementById("delete-tool");
   button.classList.toggle("armed", remove);
@@ -218,54 +218,35 @@ function previewPlacements(candidate, state = S) {
       candidate.base_revision !== state.revision ||
       !Number.isInteger(candidate.base_count) || candidate.base_count < 0 ||
       candidate.base_count > state.layout.placements.length) return null;
-  return state.layout.placements.slice(0, candidate.base_count).concat(candidate.placements);
+  const base = state.layout.placements, previous = previewCache.get(candidate);
+  if (previous?.base === base && previous.added === candidate.placements &&
+      previous.count === candidate.base_count && previous.revision === state.revision) return previous.placements;
+  const placements = base.slice(0, candidate.base_count).concat(candidate.placements);
+  previewCache.set(candidate, {base, added: candidate.placements, count: candidate.base_count,
+    revision: state.revision, placements});
+  return placements;
 }
 
 function drawLayout(layout, ghost) {
-  for (const pl of layout.placements) {
-    const w = pl.width * view.scale;
-    for (const line of pl.lines) {
-      const zs = line.map((p) => p[2] || 0);
-      const climbs = Math.max(...zs) - Math.min(...zs) > 1 || zs[0] > 1;
-      if (!ghost && climbs) {
-        // Per-segment strokes tinted by height: the ramp visibly warms as it
-        // climbs, and a second stacked climb shifts into the level-2 colours.
-        ctx.lineWidth = w;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        for (let i = 0; i + 1 < line.length; i++) {
-          const [ax, ay] = worldToScreen(line[i][0], line[i][1]);
-          const [bx, by] = worldToScreen(line[i + 1][0], line[i + 1][1]);
-          ctx.beginPath();
-          ctx.moveTo(ax, ay);
-          ctx.lineTo(bx, by);
-          ctx.strokeStyle = elevColor((zs[i] + zs[i + 1]) / 2);
-          ctx.stroke();
-        }
-      } else {
-        ctx.beginPath();
-        line.forEach(([x, y], i) => {
-          const [sx, sy] = worldToScreen(x, y);
-          i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy);
-        });
-        ctx.lineWidth = w;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.strokeStyle = ghost ? "rgba(44,138,75,.35)" : "#b9bec4";
-        ctx.stroke();
+  // Same-height segments of one piece share a fill/stroke, while ramps keep
+  // their local elevation order. This avoids thousands of separate flat strokes.
+  for (const batch of drawingBatches(layout.placements)) {
+    ctx.beginPath();
+    for (const segment of batch) {
+      segment.edge.forEach(([x, y], i) => {
+        const [sx, sy] = worldToScreen(x, y); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy);
+      });
+      ctx.closePath();
+    }
+    ctx.fillStyle = ghost ? "rgba(44,138,75,.35)" : elevColor(batch[0].z); ctx.fill();
+    if (!ghost) {
+      ctx.beginPath();
+      for (const segment of batch) for (const rail of segment.rails) {
+        const a = worldToScreen(rail[0][0], rail[0][1]), b = worldToScreen(rail[1][0], rail[1][1]);
+        ctx.moveTo(...a); ctx.lineTo(...b);
       }
-      if (!ghost) {                       // rails
-        ctx.lineWidth = Math.max(1, 1.5 * view.scale);
-        ctx.strokeStyle = "#6d7278";
-        for (const off of [24, -24]) {
-          ctx.beginPath();
-          offsetLine(line, off).forEach(([x, y], i) => {
-            const [sx, sy] = worldToScreen(x, y);
-            i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy);
-          });
-          ctx.stroke();
-        }
-      }
+      ctx.lineWidth = Math.max(1, 1.5 * view.scale); ctx.lineCap = "butt";
+      ctx.strokeStyle = "#6d7278"; ctx.stroke();
     }
   }
 }
@@ -316,19 +297,7 @@ function stoneMarkPositions() {
 }
 
 function placementAt(sx, sy) {
-  if (!S) return null;
-  let best = null;
-  S.layout.placements.forEach((pl, i) => {
-    const reach = Math.max(14, (pl.width / 2) * view.scale);
-    for (const line of pl.lines) {
-      for (const [x, y] of line) {
-        const [px, py] = worldToScreen(x, y);
-        const d = Math.hypot(px - sx, py - sy);
-        if (d < reach && (!best || d < best.d)) best = { placement: i, d };
-      }
-    }
-  });
-  return best ? best.placement : null;
+  return placementsAt(sx, sy)[0]?.placement ?? null;
 }
 
 function stoneMountAt(sx, sy) {
@@ -350,7 +319,8 @@ function stoneMountAt(sx, sy) {
   return best;
 }
 
-function draw() {
+function paint() {
+  if (!ctx || !canvas) return;
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   if (!S) return;
@@ -440,6 +410,7 @@ function draw() {
       }
     }
   });
+  drawHighlights();
   if (S.layout.placements.length === 0) {
     ctx.fillStyle = "#7a828a";
     ctx.font = "15px system-ui";
@@ -449,10 +420,10 @@ function draw() {
   }
 }
 
-function fitView() {
-  if (!S || !S.layout.placements.length) { view = { x: 0, y: 0, scale: 0.9 }; return; }
+function fitView(placements = S && S.layout.placements) {
+  if (!placements || !placements.length) { view = { x: 0, y: 0, scale: 0.9 }; return; }
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-  for (const pl of S.layout.placements)
+  for (const pl of placements)
     for (const line of pl.lines)
       for (const [x, y] of line) {
         x0 = Math.min(x0, x); x1 = Math.max(x1, x);
@@ -491,7 +462,7 @@ function refreshStatus() {
            `${first.problems.join(", ")}; height difference ${first.height_mm.toPrecision(4)} mm, ` +
            `heading error ${first.heading_error_deg}°.`, "err");
   } else if (S.layout.exactly_closed && n) {
-    status(`Closed! ${n} pieces, ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`, "closed");
+    status(`Connectors closed — use Check layout for overlaps and stock. ${n} pieces, ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`, "closed");
   } else if (pickMode) {
     status(pickMode.stage === "grow" ? "Pick the end to GROW from (click a red arrow)"
                                      : "Now pick the end to CLOSE onto");
@@ -509,6 +480,9 @@ function refreshStatus() {
   }
   el("solve").disabled = solving || opens < 2;
   el("undo").disabled = solving || !S.can_undo;
+  el("redo").disabled = solving || !S.can_redo;
+  el("undo").title = S.undo_label ? `Undo ${S.undo_label}` : "Nothing to undo";
+  el("redo").title = S.redo_label ? `Redo ${S.redo_label}` : "Nothing to redo";
 }
 
 // Retain controls while their catalogue structure is unchanged. In particular,
@@ -538,8 +512,7 @@ function renderPalette() {
       input.setAttribute("aria-label", `${piece.name} owned`);
       input.title = "how many you own";
       input.addEventListener("change", async () => {
-        try { S = await api("/api/inventory", { counts: { [piece.id]: input.value } }); redraw(); }
-        catch (e) { status(e.message, "err"); }
+        await submitInventory(piece.id, input, false);
       });
       count.append(label, input);
       row.append(name, count);
@@ -616,13 +589,24 @@ function renderStones() {
         selectTool(armedStone === sid ? {} : {stone: sid});
         renderPalette(); renderStones(); refreshStatus(); draw();
       });
-      box.append(b);
-      return {sid, name: info.name.replace(" stone", ""), button: b};
+      const input = document.createElement("input");
+      input.type = "number"; input.min = 0; input.max = 10000; input.step = 1;
+      input.setAttribute("aria-label", `${info.name} owned`);
+      input.addEventListener("change", () => submitInventory(sid, input, true));
+      const row = document.createElement("div");
+      row.className = "stone-inventory";
+      row.append(b, input);
+      box.append(row);
+      return {sid, name: info.name.replace(" stone", ""), button: b, input, owned: null};
     });
     stoneKey = key;
   }
   const unlimited = !!S.inventory.unlimited;
-  for (const {sid, name, button} of stoneRows) {
+  for (const row of stoneRows) {
+    const {sid, name, button, input} = row;
+    const owned = S.stones.owned?.[sid] ?? 0;
+    input.hidden = unlimited;
+    if (row.owned !== owned) { input.value = owned; row.owned = owned; }
     const remaining = S.stones.remaining[sid] ?? 0;
     const label = `${name} ×${unlimited ? "∞" : remaining}`;
     if (button.textContent !== label) button.textContent = label;
@@ -700,6 +684,7 @@ function renderCandidates() {
 }
 
 function redraw() {
+  discardStaleInteraction();
   if (!fitted) { fitView(); fitted = true; }
   renderPalette(); renderSets(); renderStones(); renderCandidates();
   const rev = el("reversing");
@@ -707,6 +692,7 @@ function redraw() {
     rev.checked = (S.stones.owned.stone_direction || 0) > 0;
   }
   if (lastSolve && lastSolve.revision !== S.revision) el("expand-search").hidden = true;
+  renderNavigation();
   refreshStatus(); draw(); saveSession();
 }
 
@@ -735,10 +721,13 @@ async function runSolve(grow, close, effort = 1) {
   selectedCandidate = null;
   solving = true;
   el("solve").disabled = true;
+  solveOperation = globalThis.crypto?.randomUUID?.() || null;
+  el("cancel-search").hidden = false;
   status(effort > 1 ? `searching… ${effort}× search budget` : "searching…");
   try {
     S = await api("/api/solve", {
       grow, close,
+      ...(solveOperation ? {operation_id: solveOperation} : {}),
       slop, max_pieces: maxPieces, search_effort: effort,
       max_results: 8,
       reversing: el("reversing").checked,
@@ -763,6 +752,8 @@ async function runSolve(grow, close, effort = 1) {
     status(e.message, "err");
   } finally {
     solving = false;
+    solveOperation = null;
+    el("cancel-search").hidden = true;
     el("solve").disabled = !S || S.open_ends.length < 2;
     el("undo").disabled = !S || !S.can_undo;
   }
@@ -790,21 +781,16 @@ function pairMetrics() {
 
 async function activateAt(sx, sy) {
   if (!S || apiBusy || solving) return;
+  if (pickMode && pickMode.revision !== S.revision) {
+    pickMode = null;
+    status("The layout changed. Select the endpoints again.", "err");
+    return;
+  }
   const hit = openEndScreenPos().map(p => ({...p, distance: Math.hypot(p.x - sx, p.y - sy)}))
     .filter(p => p.distance < 22).sort((a, b) => a.distance - b.distance)[0];
   try {
     if (pickMode) {
-      if (!hit) return;
-      if (pickMode.stage === "grow") {
-        selectTool({pick: {stage: "close", grow: hit.end}});
-        refreshStatus(); draw();
-      } else {
-        if (hit.end[0] === pickMode.grow[0] && hit.end[1] === pickMode.grow[1]) {
-          status("Choose a different open end to close onto.", "err");
-          return;
-        }
-        await runSolve(pickMode.grow, hit.end);
-      }
+      if (hit) await activateEnd(hit.end);
     } else if (deleting) {
       await removeAt(sx, sy);
     } else if (armedStone) {
@@ -817,12 +803,15 @@ async function activateAt(sx, sy) {
       S = await api("/api/attach", {piece: armed.piece, entry: armed.entry, at: null});
       fitted = false; redraw();
     } else if (armed && hit) {
-      S = await api("/api/attach", {piece: armed.piece, entry: armed.entry, at: hit.end});
-      redraw();
+      await activateEnd(hit.end);
     } else if (hit && S.matable.length) {
       const mate = S.matable.find(([a, b]) =>
         (a[0] === hit.end[0] && a[1] === hit.end[1]) || (b[0] === hit.end[0] && b[1] === hit.end[1]));
       if (mate) { S = await api("/api/join", {a: mate[0], b: mate[1]}); redraw(); }
+    } else {
+      const hits = placementsAt(sx, sy);
+      if (hits.length > 1) showOverlapPicker(hits);
+      else { selectedPiece = hits[0]?.placement ?? null; draw(); }
     }
   } catch (err) { status(err.message, "err"); }
 }
@@ -835,6 +824,8 @@ async function removeAt(sx, sy) {
         placement: mark.placement, id: mark.id, at_port: mark.at_port, remove: true,
       });
     } else {
+      const hits = placementsAt(sx, sy);
+      if (hits.length > 1) { showOverlapPicker(hits, true); return; }
       const hit = placementAt(sx, sy);
       if (hit === null) return;
       S = await api("/api/remove", {placement: hit});
@@ -846,6 +837,7 @@ async function removeAt(sx, sy) {
 
 // Bind only after the page is ready; tests can load the whole source without starting it.
 function bindEditorEvents() {
+  bindExtraEvents();
   window.addEventListener("storage", (event) => {
     if (!autosaveReady || (event.key !== null && event.key !== STORAGE_KEY)) return;
     try {
@@ -882,14 +874,7 @@ function bindEditorEvents() {
   el("export").addEventListener("click", () => {
     try {
       if (!S) throw new Error("The editor is still loading; try exporting again when it finishes.");
-      const data = S.snapshot.layout;
-      const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "layout.json";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      downloadJSON(S.snapshot.layout, "layout.json");
     } catch (e) { status(e.message, "err"); }
   });
   el("import").addEventListener("click", () => el("importfile").click());
@@ -913,6 +898,7 @@ function bindEditorEvents() {
     if (selection !== importSequence) return;
     try {
       S = await api("/api/import", { data, revision });
+      clearTransient();
       fitted = false;
       redraw();
       if (selection === importSequence && !S.layout.joint_issues.length)
@@ -950,7 +936,13 @@ function bindEditorEvents() {
   });
   canvas.addEventListener("pointermove", (e) => {
     const old = pointers.get(e.pointerId);
-    if (!old) return;
+    if (!old) {
+      if (S && e.pointerType !== "touch") {
+        const p = canvasPoint(e);
+        hoveredPiece = placementAt(p.x, p.y); draw();
+      }
+      return;
+    }
     const p = canvasPoint(e);
     if (pointers.size > 1) {
       const before = pairMetrics();
@@ -1011,10 +1003,14 @@ function bindEditorEvents() {
     if (!S || apiBusy || e.target.closest("input, textarea, [contenteditable='true']")) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
       e.preventDefault();
-      el("undo").click();
+      el(e.shiftKey ? "redo" : "undo").click();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+      e.preventDefault(); el("redo").click();
     }
     if (e.key === "Escape") {
-      selectTool();
+      selectTool(); selectedPiece = null; hoveredPiece = null;
+      el("overlap-picker").hidden = true;
       renderPalette(); renderStones(); refreshStatus(); draw();
     }
   });
@@ -1029,9 +1025,15 @@ function initializeEditor() {
   canvas = el("canvas");
   ctx = canvas.getContext("2d");
   bindEditorEvents();
+  renderProjects();
   resize();
   if (window.duplotrainBoot) {
-    window.duplotrainBoot({ refresh, status, readyStatus: (message) => {
+    window.duplotrainBoot({ refresh, status,
+      checkpoint: () => S && S.snapshot,
+      downloadLayout: () => S && downloadJSON(S.snapshot.layout, "layout-recovered.json"),
+      downloadSession: () => S && downloadJSON(S.snapshot, "session-recovered.json"),
+      restored: (state) => { S = state; clearTransient(); redraw(); },
+      readyStatus: (message) => {
       if (!S.layout.joint_issues.length) status(message);
     }});
   } else {
@@ -1040,3 +1042,382 @@ function initializeEditor() {
 }
 
 document.addEventListener("DOMContentLoaded", initializeEditor, {once: true});
+
+// ---------- Revision-scoped tools, diagnostics and projects ----------
+let interactionRevision = null, navigationRevision = null;
+let selectedPiece = null, hoveredPiece = null, highlightedPieces = [];
+let trainTrace = null, trainStep = -1, trainTimer = null, solveOperation = null;
+let framePending = false;
+const segmentCache = new WeakMap(), batchCache = new WeakMap(), previewCache = new WeakMap();
+const PROJECT_FORMAT = "duplotrain-project/1";
+const PROJECT_PREFIX = PROJECT_FORMAT + ":" + location.pathname + ":";
+
+function draw() {
+  if (framePending) return;
+  if (typeof requestAnimationFrame !== "function") { paint(); return; }
+  framePending = true;
+  requestAnimationFrame(() => { framePending = false; paint(); });
+}
+
+function stopTrain() {
+  if (trainTimer !== null) clearInterval(trainTimer);
+  trainTimer = null;
+}
+function clearTransient() {
+  pickMode = null; selectedCandidate = null; preview = null; lastSolve = null;
+  selectedPiece = null; hoveredPiece = null; highlightedPieces = [];
+  stopTrain(); trainTrace = null; trainStep = -1;
+  navigationRevision = null;
+  for (const id of ["overlap-picker", "expand-search"]) if (el(id)) el(id).hidden = true;
+  for (const id of ["diagnostics", "train-report"]) if (el(id)) el(id).textContent = "";
+  for (const id of ["train-play", "train-step"]) if (el(id)) el(id).disabled = true;
+}
+function discardStaleInteraction() {
+  if (!S) return;
+  if (interactionRevision !== null && interactionRevision !== S.revision) {
+    // Keep deliberately armed pieces/stones, but never reassign old index picks.
+    const last = lastSolve;
+    clearTransient();
+    if (last?.revision === S.revision) lastSolve = last;
+  }
+  if (pickMode && pickMode.revision !== S.revision) pickMode = null;
+  interactionRevision = S.revision;
+}
+
+async function submitInventory(id, input, stone) {
+  const submitted = input.value;
+  try { S = await api("/api/inventory", {counts: {[id]: submitted}}); redraw(); }
+  catch (error) {
+    // Do not destroy a newer unsubmitted draft while the previous request waits.
+    if (input.value === submitted) input.value = (stone ? S.stones.owned : S.inventory.owned)[id] ?? 0;
+    status(error.message, "err");
+  }
+}
+
+function strokeSegment(a, b, width, color, cap = "round") {
+  const [ax, ay] = worldToScreen(a[0], a[1]), [bx, by] = worldToScreen(b[0], b[1]);
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+  ctx.lineWidth = width; ctx.lineCap = cap; ctx.lineJoin = "round";
+  ctx.strokeStyle = color; ctx.stroke();
+}
+const interpolate = (a, b, t) => [0, 1, 2].map(i => (a[i] || 0) + ((b[i] || 0) - (a[i] || 0)) * t);
+function drawingSegments(placements) {
+  if (segmentCache.has(placements)) return segmentCache.get(placements);
+  const segments = [];
+  placements.forEach((pl, placement) => {
+    for (const line of pl.lines) {
+      const rails = [offsetLine(line, 24), offsetLine(line, -24)];
+      const edges = [offsetLine(line, pl.width / 2), offsetLine(line, -pl.width / 2)];
+      for (let i = 0; i + 1 < line.length; i++) {
+        const a = line[i], b = line[i + 1];
+        // Bound ramp-local paint order even for sparse/custom preview geometry.
+        const divisions = Math.min(256, Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 8)));
+        for (let j = 0; j < divisions; j++) {
+          const from = j / divisions, to = (j + 1) / divisions;
+          const start = interpolate(a, b, from), end = interpolate(a, b, to);
+          segments.push({placement, a: start, b: end, width: pl.width,
+            z: (start[2] + end[2]) / 2,
+            edge: [interpolate(edges[0][i], edges[0][i + 1], from),
+              interpolate(edges[0][i], edges[0][i + 1], to),
+              interpolate(edges[1][i], edges[1][i + 1], to),
+              interpolate(edges[1][i], edges[1][i + 1], from)],
+            rails: rails.map(r => [interpolate(r[i], r[i + 1], from), interpolate(r[i], r[i + 1], to)])});
+        }
+      }
+    }
+  });
+  segments.sort((a, b) => a.z - b.z || a.placement - b.placement);
+  segments.forEach((s, order) => { s.order = order; });
+  segmentCache.set(placements, segments);
+  return segments;
+}
+function drawingBatches(placements) {
+  if (batchCache.has(placements)) return batchCache.get(placements);
+  const batches = [];
+  for (const segment of drawingSegments(placements)) {
+    const batch = batches[batches.length - 1], previous = batch?.[0];
+    if (previous && previous.z === segment.z && previous.placement === segment.placement) batch.push(segment);
+    else batches.push([segment]);
+  }
+  batchCache.set(placements, batches);
+  return batches;
+}
+
+function placementsAt(sx, sy) {
+  if (!S) return [];
+  const hits = new Map();
+  for (const seg of drawingSegments(S.layout.placements)) {
+    const [ax, ay] = worldToScreen(seg.a[0], seg.a[1]), [bx, by] = worldToScreen(seg.b[0], seg.b[1]);
+    const dx = bx - ax, dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / (dx * dx + dy * dy || 1)));
+    const d = Math.hypot(sx - ax - t * dx, sy - ay - t * dy);
+    const half = seg.width * view.scale / 2;
+    if (d >= Math.max(14, half)) continue;
+    const hit = {placement: seg.placement, d, z: seg.z, order: seg.order, painted: d < half};
+    const prev = hits.get(hit.placement);
+    if (!prev || compareHits(hit, prev) < 0) hits.set(hit.placement, hit);
+  }
+  return [...hits.values()].sort(compareHits);
+}
+function compareHits(a, b) {
+  // Painted area wins over hit-padding; within it the last painted surface wins.
+  return Number(b.painted) - Number(a.painted) ||
+    (a.painted && b.painted ? b.z - a.z || b.placement - a.placement : a.d - b.d) || a.d - b.d;
+}
+function drawHighlights() {
+  const indices = new Set([...highlightedPieces, selectedPiece, hoveredPiece]);
+  for (const index of indices) {
+    const pl = S.layout.placements[index];
+    if (!pl) continue;
+    for (const line of pl.lines) for (let i = 0; i + 1 < line.length; i++)
+      strokeSegment(line[i], line[i + 1], 3, "#2f6fdb");
+  }
+  if (trainTrace?.revision === S.revision) {
+    const step = trainTrace.steps[trainStep];
+    const pl = S.layout.placements[step ? step[0] : trainTrace.start[0]];
+    if (pl) for (const line of pl.lines) for (let i = 0; i + 1 < line.length; i++)
+      strokeSegment(line[i], line[i + 1], 5, "#9a3c9c");
+  }
+}
+function focusPieces(indices) {
+  highlightedPieces = indices.filter(i => Number.isInteger(i) && S.layout.placements[i]);
+  if (highlightedPieces.length) { fitView(highlightedPieces.map(i => S.layout.placements[i])); fitted = true; }
+  draw();
+}
+function showOverlapPicker(hits, remove = false) {
+  const box = el("overlap-picker"), revision = S.revision;
+  box.replaceChildren(); box.hidden = false;
+  const title = document.createElement("strong");
+  title.textContent = remove ? "Choose the piece to remove" : "Overlapping pieces";
+  const select = document.createElement("select"); select.setAttribute("aria-label", "Overlapping piece");
+  hits.forEach(hit => {
+    const option = document.createElement("option"); option.value = hit.placement;
+    option.textContent = `#${hit.placement + 1} ${S.layout.placements[hit.placement].name} · ${hit.z.toFixed(1)} mm`;
+    select.append(option);
+  });
+  selectedPiece = hits[0].placement;
+  select.addEventListener("change", () => { if (S.revision === revision) { selectedPiece = Number(select.value); draw(); } });
+  const confirm = document.createElement("button"); confirm.textContent = remove ? "Remove highlighted piece" : "Select highlighted piece";
+  confirm.addEventListener("click", async () => {
+    if (S.revision !== revision || apiBusy) return;
+    if (remove) {
+      try { S = await api("/api/remove", {placement: selectedPiece, revision}); redraw(); }
+      catch (error) { status(error.message, "err"); }
+    }
+    box.hidden = true; draw();
+  });
+  const cancel = document.createElement("button"); cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => { box.hidden = true; selectedPiece = null; draw(); });
+  box.append(title, select, confirm, cancel); select.focus(); draw();
+}
+
+async function activateEnd(end) {
+  if (!S || apiBusy || solving) return;
+  if (pickMode && pickMode.revision !== S.revision) { pickMode = null; status("Select the endpoints again.", "err"); return; }
+  if (!S.open_ends.some(e => e[0] === end[0] && e[1] === end[1])) return;
+  if (pickMode?.stage === "grow") {
+    selectTool({pick: {stage: "close", grow: end}}); refreshStatus(); draw();
+  } else if (pickMode) {
+    if (pickMode.grow[0] === end[0] && pickMode.grow[1] === end[1]) {
+      status("Choose a different open end to close onto.", "err"); return;
+    }
+    await runSolve(pickMode.grow, end);
+  } else if (armed) {
+    S = await api("/api/attach", {piece: armed.piece, entry: armed.entry, at: end}); redraw();
+  } else {
+    const mate = S.matable.find(pair => pair.some(e => e[0] === end[0] && e[1] === end[1]));
+    if (mate) { S = await api("/api/join", {a: mate[0], b: mate[1]}); redraw(); }
+    else status("Arm a piece or choose Close the loop first.");
+  }
+}
+function renderNavigation() {
+  if (!S || navigationRevision === S.revision || !document.createElement) return;
+  const pieces = el("piece-select"), ends = el("end-select"), starts = el("train-start");
+  if (!pieces?.replaceChildren || !ends?.replaceChildren || !starts?.replaceChildren) return;
+  pieces.replaceChildren(); ends.replaceChildren(); starts.replaceChildren();
+  const add = (select, value, label) => {
+    const option = document.createElement("option"); option.value = value; option.textContent = label; select.append(option);
+  };
+  S.layout.placements.forEach((pl, i) => {
+    add(pieces, i, `#${i + 1} ${pl.name}`);
+    pl.ports.forEach(p => {
+      if (!p.sealed) add(starts, JSON.stringify([i, p.port]), `#${i + 1} ${pl.name} — enter ${p.name}`);
+    });
+  });
+  S.open_ends.forEach(end => add(ends, JSON.stringify(end), `#${end[0] + 1} ${S.layout.placements[end[0]].name} — port ${end[1]}`));
+  for (const id of ["remove-selected", "test-train"]) el(id).disabled = !S.layout.placements.length;
+  el("use-end").disabled = !S.open_ends.length;
+  navigationRevision = S.revision;
+}
+async function checkLayout() {
+  try {
+    const report = await api("/api/check", {});
+    if (report.revision !== S.revision) return;
+    const box = el("diagnostics"); box.replaceChildren();
+    const row = (text, indices = []) => {
+      const line = document.createElement(indices.length ? "button" : "p"); line.textContent = text;
+      if (indices.length) line.addEventListener("click", () => { if (S.revision === report.revision) focusPieces(indices); });
+      box.append(line);
+    };
+    row(report.connector_closed ? "Connectors: exactly closed" : `Connectors: ${report.open_ends.length} open end(s)`, report.open_ends.map(e => e[0]));
+    report.joint_issues.forEach(j => row(`Joint #${j.a[0] + 1} ↔ #${j.b[0] + 1}: ${j.problems.join(", ")}`, [j.a[0], j.b[0]]));
+    row(`Overlaps: ${report.overlaps.length}${report.overlap_check_complete ? "" : "+ (report limit reached; check incomplete)"}`);
+    report.overlaps.forEach(pair => row(`Overlap: piece #${pair[0] + 1} and #${pair[1] + 1}`, pair));
+    row(report.missing.length ? `Stock shortages${report.sandbox ? " (sandbox ignores these)" : ""}:` : "Stock: sufficient");
+    report.missing.forEach(m => row(`${m.name}: ${m.missing} missing (${m.used} used, ${m.owned} owned)`, m.placements));
+    row(`Provisional geometry: ${report.provisional.length} piece(s)`, report.provisional);
+    row(report.model_note);
+  } catch (error) { status(error.message, "err"); }
+}
+
+function downloadJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob), anchor = document.createElement("a");
+  anchor.href = url; anchor.download = filename; anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function projectSnapshot() {
+  if (!S?.snapshot) throw new Error("Wait for the editor to finish loading");
+  const name = el("project-name").value.trim() || "Untitled track";
+  const max_pieces = Number(el("max-pieces").value), slop = Number(el("slop").value);
+  if (name.length > 80 || !Number.isInteger(max_pieces) || max_pieces < 1 || max_pieces > 128 || !Number.isFinite(slop) || slop < 0 || slop > 1e9)
+    throw new Error("Use a name up to 80 characters and valid search settings before saving");
+  return {format: PROJECT_FORMAT, name, session: S.snapshot,
+    preferences: {view: {...view}, search: {max_pieces, slop, reversing: el("reversing").checked}}};
+}
+async function openProject(data, revision = S && S.revision) {
+  // Emergency session downloads use the already supported session format.
+  if (data?.format === "duplotrain-session/1") data = {format: PROJECT_FORMAT, name: "Recovered session", session: data, preferences: {}};
+  const next = await api("/api/project/open", {data, revision});
+  S = next; clearTransient();
+  el("project-name").value = next.project.name;
+  const prefs = next.project.preferences;
+  if (prefs.search) {
+    el("max-pieces").value = prefs.search.max_pieces; el("slop").value = prefs.search.slop;
+    el("reversing").checked = prefs.search.reversing; el("reversing").dataset.touched = "1";
+  }
+  if (prefs.view) { view = {...prefs.view}; fitted = true; } else fitted = false;
+  redraw(); status(`Opened project: ${next.project.name}`);
+}
+function renderProjects() {
+  const select = el("project-slots"); select.replaceChildren();
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key.startsWith(PROJECT_PREFIX)) continue;
+      const option = document.createElement("option"); option.value = key;
+      const raw = localStorage.getItem(key);
+      try {
+        if (raw.length > 2 * 1024 * 1024) throw new Error("too large");
+        const data = JSON.parse(raw); option.textContent = data.name || "Untitled track";
+      } catch (_) { option.textContent = "Unreadable saved project (kept)"; }
+      select.append(option);
+    }
+  } catch (error) { status(`Local projects unavailable: ${error.message}. Download a project instead.`, "err"); }
+}
+async function saveLocalProject() {
+  try {
+    const data = projectSnapshot(), raw = JSON.stringify(data);
+    if (raw.length > 2 * 1024 * 1024) throw new Error("project larger than 2 MB");
+    // Append-only UUID slots avoid cross-tab overwrites, even for identical names.
+    const key = PROJECT_PREFIX + crypto.randomUUID();
+    localStorage.setItem(key, raw); renderProjects(); el("project-slots").value = key;
+    status("Saved a new local project copy. Download project for a portable backup.");
+  } catch (error) { status(`Project not saved: ${error.message}`, "err"); }
+}
+async function readProjectFile(event) {
+  const file = event.target.files?.[0]; event.target.value = "";
+  if (!file) return;
+  const sequence = ++importSequence, revision = S && S.revision;
+  try {
+    if (file.size > 2 * 1024 * 1024) throw new Error("file larger than 2 MB");
+    const data = JSON.parse(await file.text());
+    if (sequence !== importSequence) return;
+    await openProject(data, revision);
+  } catch (error) { if (sequence === importSequence) status(`Project not opened: ${error.message}`, "err"); }
+}
+async function testTrain() {
+  stopTrain();
+  try {
+    const start = JSON.parse(el("train-start").value);
+    const trace = await api("/api/drive", {start, max_steps: 10000});
+    if (trace.revision !== S.revision) return;
+    trainTrace = trace; trainStep = -1; showTrainStep(); draw();
+  } catch (error) { status(error.message, "err"); }
+}
+function showTrainStep() {
+  if (!trainTrace || trainTrace.revision !== S?.revision) { stopTrain(); return; }
+  const t = trainTrace, step = t.steps[trainStep];
+  el("train-report").textContent = t.outcome === "limit" ? "10,000-step limit reached; no verdict made." :
+    `Model result from this start: ${t.outcome}. ${t.visited.length} pieces visited; ${t.reversals} reversal(s)` +
+    `${t.period === null ? "" : `; cycle ${t.period} steps`}. Default switch tongues; not a claim about every start.` +
+    (step ? ` Step ${trainStep + 1}/${t.steps.length}: #${step[0] + 1}, port ${step[1]} → ${step[2]}.` : "");
+  el("train-step").disabled = !t.steps.length;
+  el("train-play").disabled = !t.steps.length;
+  draw();
+}
+function advanceTrain() {
+  if (!trainTrace || trainTrace.revision !== S?.revision || !trainTrace.steps.length) { stopTrain(); return; }
+  if (trainStep + 1 >= trainTrace.steps.length) {
+    if (trainTrace.cycle_start !== null) trainStep = trainTrace.cycle_start;
+    else { stopTrain(); return; }
+  } else trainStep++;
+  showTrainStep();
+}
+async function cancelSearch() {
+  if (!solving) return;
+  try {
+    if (window.duplotrainCancel) await window.duplotrainCancel();
+    else if (solveOperation) {
+      const result = await fetch("/api/cancel", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({operation_id: solveOperation})});
+      if (!result.ok) throw new Error("Cancellation request was rejected");
+      const response = await result.json();
+      status(response.cancelled ? "Cancelling search at its next checkpoint…" : "Search already finished or is not yet active; retry cancellation.");
+    } else status("Cancellation is unavailable for this request; the current layout can still be exported.");
+  } catch (error) { status(error.message, "err"); }
+}
+function bindExtraEvents() {
+  const on = (id, action) => el(id)?.addEventListener("click", action);
+  on("redo", async () => { try { S = await api("/api/redo", {}); redraw(); } catch (error) { status(error.message, "err"); } });
+  on("cancel-search", cancelSearch);
+  on("check-layout", checkLayout);
+  on("fit-preview", () => { const pl = previewPlacements(preview); if (pl) { fitView(pl); fitted = true; draw(); } });
+  on("use-end", async () => { try { await activateEnd(JSON.parse(el("end-select").value)); } catch (e) { status(e.message, "err"); } });
+  on("place-first", async () => {
+    if (!S || S.layout.placements.length || !armed) { status("Arm a piece on an empty layout first."); return; }
+    try { S = await api("/api/attach", {piece: armed.piece, entry: armed.entry, at: null}); fitted = false; redraw(); } catch (e) { status(e.message, "err"); }
+  });
+  on("remove-selected", async () => {
+    if (apiBusy || !S) return;
+    const placement = Number(el("piece-select").value);
+    if (!S.layout.placements[placement]) return;
+    try { S = await api("/api/remove", {placement}); redraw(); } catch (e) { status(e.message, "err"); }
+  });
+  el("piece-select")?.addEventListener("change", () => { selectedPiece = Number(el("piece-select").value); focusPieces([selectedPiece]); });
+  el("end-select")?.addEventListener("change", () => { try { focusPieces([JSON.parse(el("end-select").value)[0]]); } catch (_) {} });
+  on("save-project", () => { try { downloadJSON(projectSnapshot(), "project.json"); } catch (e) { status(e.message, "err"); } });
+  on("open-project", () => el("projectfile").click());
+  el("projectfile")?.addEventListener("change", readProjectFile);
+  on("save-local", saveLocalProject);
+  on("load-local", async () => {
+    const revision = S && S.revision;
+    try {
+      const raw = localStorage.getItem(el("project-slots").value);
+      if (!raw || raw.length > 2 * 1024 * 1024) throw new Error("No readable project selected");
+      await openProject(JSON.parse(raw), revision);
+    } catch (e) { status(e.message, "err"); }
+  });
+  on("refresh-projects", renderProjects);
+  on("test-train", testTrain); on("train-step", () => { stopTrain(); advanceTrain(); });
+  on("train-play", () => {
+    stopTrain();
+    if (trainTrace?.revision !== S?.revision || !trainTrace?.steps.length) return;
+    if (trainTrace.cycle_start === null && trainStep + 1 >= trainTrace.steps.length) trainStep = -1;
+    advanceTrain(); trainTimer = setInterval(advanceTrain, 500);
+  });
+  on("train-pause", stopTrain);
+  canvas.addEventListener("pointerleave", () => { hoveredPiece = null; draw(); });
+  canvas.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); el("use-end").click(); }
+  });
+}

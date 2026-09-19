@@ -25,11 +25,21 @@
   <div id="save-status" role="status"></div>
   <div id="actions">
     <button id="undo">↩ undo</button>
+    <button id="redo">↪ redo</button>
     <button id="clear" class="ghost">clear</button>
     <button id="export">⭳ export JSON</button>
     <button id="import">⭱ import JSON</button>
     <input id="importfile" type="file" accept=".json,application/json" style="display:none">
   </div>
+  <details>
+    <summary>Projects and backups</summary>
+    <label>Project name <input id="project-name" maxlength="80" value="Untitled track"></label>
+    <div class="buttons"><button id="save-project">Download project</button><button id="open-project">Open project</button></div>
+    <input id="projectfile" type="file" accept=".json,application/json" hidden>
+    <p>Projects include track, owned pieces and stones, sandbox, view and search settings. Layout JSON stays compatible.</p>
+    <label>Local projects <select id="project-slots"></select></label>
+    <div class="buttons"><button id="save-local">Save new local copy</button><button id="load-local">Open local copy</button><button id="refresh-projects">Refresh list</button></div>
+  </details>
   <h2>Close the loop</h2>
   <div class="solverow">
     <label>slop <input id="slop" type="number" min="0" step="0.5" value="0"> mm</label>
@@ -42,7 +52,29 @@
     <input id="max-pieces" type="number" min="1" max="128" step="1" value="26"> added pieces
   </label>
   <button id="expand-search" hidden>Search deeper</button>
+  <button id="cancel-search" hidden>Cancel search</button>
   <div id="cands"></div>
+  <details open>
+    <summary>Check layout</summary>
+    <button id="check-layout">Check layout</button>
+    <div id="diagnostics" aria-live="polite"></div>
+  </details>
+  <details>
+    <summary>Test train</summary>
+    <label>Starting piece and inward direction <select id="train-start"></select></label>
+    <button id="test-train">Test train</button>
+    <div class="buttons"><button id="train-play" disabled>Play trace</button><button id="train-pause">Pause</button><button id="train-step" disabled>Step</button></div>
+    <div id="train-report" role="status"></div>
+  </details>
+  <details>
+    <summary>Keyboard / precise selection</summary>
+    <label>Piece <select id="piece-select"></select></label>
+    <button id="remove-selected">Remove selected piece</button>
+    <label>Open end <select id="end-select"></select></label>
+    <button id="use-end">Use selected end</button>
+    <button id="place-first">Place armed first piece</button>
+    <p>Arm a piece or choose Close the loop, then use an end. Ctrl/Cmd+Z: undo; Shift+Z or Ctrl+Y: redo.</p>
+  </details>
   <h2>Your sets <span style="font-weight:400">(one click adds its pieces)</span></h2>
   <div id="sets" style="display:flex;flex-wrap:wrap;gap:6px"></div>
   <label class="solverow" style="font-size:12px" title="sandbox: ignore inventory limits — place anything, and the solver may draw from a bottomless box">
@@ -54,13 +86,15 @@
   <div id="palette"></div>
 </div>
 <div id="stage">
-  <canvas id="canvas" aria-label="Track layout. Choose a piece, then tap an open end to attach it."></canvas>
+  <canvas id="canvas" tabindex="0" aria-label="Track layout. Choose a piece, then tap an open end to attach it."></canvas>
   <div id="toolbar" role="toolbar" aria-label="Canvas controls">
     <button id="zoom-in" aria-label="Zoom in">+</button>
     <button id="zoom-out" aria-label="Zoom out">−</button>
     <button id="fit">Fit layout</button>
+    <button id="fit-preview">Fit preview</button>
     <button id="delete-tool" aria-pressed="false">Remove</button>
   </div>
+  <div id="overlap-picker" hidden></div>
   <div id="hint">drag: pan · pinch / wheel / + −: zoom · red arrow: attach · Remove: tap a piece</div>
 </div>
 <!-- Worker boot is inserted here by the static build. -->
