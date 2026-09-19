@@ -127,7 +127,10 @@ def bridge_completion(
             if placement.piece.id in ("curve", "straight", "ramp")
         ):
             return False
-        if expanded.joint_issues() or audit.overlaps(expanded):
+        # The base and its links are unchanged, so only joints of new placements
+        # can differ from the search's exact fits; a base with a deliberate forced
+        # fit keeps its bridge candidates.
+        if expanded.joint_issues(since=len(base)) or audit.overlaps(expanded):
             return False
         accepted[candidate.signature] = replace(
             candidate, layout=expanded, steps=(),

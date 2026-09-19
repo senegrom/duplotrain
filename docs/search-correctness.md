@@ -549,3 +549,27 @@ not begin with the base is audited standalone. The cell-box pre-test rejects a
 stored cell cloud only when its box and the query cell's box are at least the
 pair's limit apart along an axis, in which case every sample pair is at least
 that far apart and the strict distance test would reject each of them.
+
+## Joint audits from an index
+
+`joint_issues(since=k)` reports exactly the entries of the full audit whose
+joint touches a placement at index k or later, in the audit's order; a
+regression checks every k against the filtered full report, with and without
+supplied port poses. The bridge expansion keeps every base placement at its
+index and every base link, so the joints it can change are precisely those
+touching an index at or beyond the base size, which is what the stage audits.
+A regression closes the reported gap over a base with a curve set a millimetre
+off and checks that the candidate's only joint issues are the base's own.
+
+## Packed lattice keys
+
+A key is injective on planar poses whose coordinates stay below 2^31 lattice
+units, 107 km, which no accepted layout approaches, and it ignores the height,
+exactly as the levelled tuple did: the height layers remain separate. A move's
+packed delta is the difference of the keys of its endpoint and its origin at
+each heading, and adding it to any key of that heading yields the key of the
+moved pose, because no coordinate field can borrow or carry within the bound.
+A regression builds the reverse layers with tuples from the same moves and
+checks every published layer and frontier against the packed tables state for
+state, the per-heading deltas against the packed differences of the moves, and
+three hundred cursors at every depth up to the probe range for the same answer.

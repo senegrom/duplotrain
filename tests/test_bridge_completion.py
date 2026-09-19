@@ -201,3 +201,25 @@ def test_expanded_bridge_rejections_do_not_fill_result_slots(monkeypatch):
     assert len(result.solutions) == 1 and attempts >= 2
     assert result.stats.dropped_filter >= 1
     assert_extension(base, result.solutions[0].layout)
+
+
+def test_bridge_stage_audits_only_the_joints_it_adds():
+    from duplotrain.geometry import Pose
+    from duplotrain.layout import Layout, Placement
+
+    base, catalog = load("bridge-gap.json"), default_catalog()
+    # A deliberate forced fit inside the base: one curve sits a millimetre off.
+    p = base.placements[40]
+    shifted = Placement(p.piece, Pose.make(p.frame.x + 1, p.frame.y, p.frame.z, p.frame.heading))
+    base = Layout(base.placements[:40] + (shifted,) + base.placements[41:],
+                  dict(base.links), base.accessories)
+    forced = base.joint_issues()
+    assert [issue["problems"] for issue in forced] == [["planar gap"]] * 2
+    result = bridge_completion(base, catalog, {"curve": 16, "straight": 4, "ramp": 2, "span": 2},
+                               (23, 1), (25, 0), max_pieces=26, max_results=1, max_nodes=250_000)
+    assert len(result.solutions) == 1
+    completed = result.solutions[0].layout
+    assert completed.placements[:len(base)] == base.placements
+    assert completed.is_closed and completed.joint_issues(since=len(base)) == []
+    assert completed.joint_issues() == forced  # the base's own forced fits, nothing new
+    assert not _solution_overlaps(completed, 0, 120.0, 8.0)

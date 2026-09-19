@@ -181,3 +181,65 @@ def test_solver_releases_cached_poses_on_success_and_callback_failure(monkeypatc
     assert len(tables) == 1 and tables[0].cache_hits > 0
     assert not tables[0].cache
     assert not tables[0].near_indices
+
+
+def test_packed_lattice_tables_hold_exactly_the_tuple_layers_and_answers():
+    import random
+
+    from duplotrain.solver import _pack_lattice, _unpack_lattice
+
+    rng = random.Random(7)
+    span = 3_000_000  # 150 m of lattice units either way
+    poses = [(rng.randint(-span, span), rng.randint(-span, span), rng.randint(-span, span),
+              rng.randint(-span, span), rng.randint(-40, 40), rng.randrange(12))
+             for _ in range(2000)]
+    # Keys are injective on planar poses, ignore the height and expose the heading.
+    assert len({_pack_lattice(p) for p in poses}) == len({(*p[:4], p[5]) for p in poses})
+    for pose in poses:
+        assert _unpack_lattice(_pack_lattice(pose)) == (*pose[:4], 0, pose[5])
+        assert _pack_lattice(pose) & 15 == pose[5]
+    # A move adds the packed difference of its endpoints, whatever the pose.
+    rich, _ = table_for("lattice", ("straight", "curve", "ramp", "span"))
+    eng = rich.eng
+    for heading in range(12):
+        zero = (0, 0, 0, 0, 0, heading)
+        forward = {_pack_lattice(eng.level(move(zero))) - _pack_lattice(zero)
+                   for move in rich.moves}
+        backward = {_pack_lattice(eng.level(eng.reverse(move(eng.reverse(zero)))))
+                    - _pack_lattice(zero) for move in rich.moves}
+        assert set(rich.successors[heading]) == forward
+        assert set(rich.predecessors[heading]) == backward
+        for pose in poses[:40]:
+            pose = (*pose[:4], 0, heading)
+            for move in rich.moves:
+                delta = _pack_lattice(eng.level(move(zero))) - _pack_lattice(zero)
+                assert _pack_lattice(eng.level(move(pose))) == _pack_lattice(pose) + delta
+    # The reverse layers built with tuples, which the packed tables replace.
+    table, _ = table_for("lattice", ("straight", "curve"), max_work=1 << 22)
+    eng = table.eng
+    layers = [{eng.level(eng.anchor)}]
+    frontiers = [layers[0]]
+    for _ in range(9):
+        grown = {eng.level(eng.reverse(move(eng.reverse(pose))))
+                 for pose in frontiers[-1] for move in table.moves}
+        frontiers.append(grown - layers[-1])
+        layers.append(layers[-1] | frontiers[-1])
+    assert table._ensure_layers(6) and len(table.layers) == 7
+    for depth in range(7):
+        assert {_unpack_lattice(key) for key in table.layers[depth]} == layers[depth]
+        assert {_unpack_lattice(key) for key in table.frontiers[depth]} == frontiers[depth]
+    # Answers: exact at built depths, and beyond them wherever a probe decided.
+    members = rng.sample(sorted(layers[9]), 150)
+    strays = []
+    for _ in range(150):
+        pose = eng.anchor
+        for _step in range(rng.randrange(1, 10)):
+            pose = rng.choice(table.moves)(pose)
+        strays.append(eng.level(pose))
+    for cursor in members + strays:
+        for depth in range(10):
+            answer = table.allows(cursor, depth)
+            if depth <= 6 or table.decided:
+                assert answer == (cursor in layers[depth]), (cursor, depth)
+            else:
+                assert answer is True

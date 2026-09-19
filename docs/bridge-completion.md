@@ -13,8 +13,10 @@ height profile. It is enabled only for the standard bridge geometry, sufficient
 stock (two ramps and two spans), and two ground-level ends. Reserving three extra
 piece slots accounts for its four real components. Before publication, every macro
 is expanded into normal catalogue placements and checked for inventory, real-piece
-depth, exact joints, and collisions against the actual link graph. Action stones and
-all existing placements and links are retained. No macro appears in saved layouts.
+depth, exact joints among the new placements, and collisions against the actual
+link graph. Action stones and all existing placements and links are retained, so a
+base with a deliberate forced fit keeps its candidates. No macro appears in saved
+layouts.
 
 `search_effort` is an integer API parameter from 1 to 16, defaulting to 1. It scales
 the plain, bridge and full-inventory budgets of 25,000, 250,000 and 60,000 nodes. If
