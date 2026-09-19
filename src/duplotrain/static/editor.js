@@ -938,8 +938,9 @@ function bindEditorEvents() {
     const old = pointers.get(e.pointerId);
     if (!old) {
       if (S && e.pointerType !== "touch") {
-        const p = canvasPoint(e);
-        hoveredPiece = placementAt(p.x, p.y); draw();
+        const p = canvasPoint(e), hovered = placementAt(p.x, p.y);
+        // Repaint only when the highlight can differ, not on every mouse move.
+        if (hovered !== hoveredPiece) { hoveredPiece = hovered; draw(); }
       }
       return;
     }

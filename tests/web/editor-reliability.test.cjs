@@ -259,6 +259,25 @@ test("train trace steps, pauses and expires without claiming all starting states
   assert.equal(h.run("trainTrace"), null); assert.equal(h.el("train-play").disabled, true);
 });
 
+test("hovering within the same piece does not schedule another repaint", () => {
+  const h = harness({state: scene([track([[0, 0, 0], [200, 0, 0]])]), events: true, schedule: true});
+  const move = (x, y) => h.el("canvas").listeners.pointermove(
+    {pointerId: 7, pointerType: "mouse", clientX: x, clientY: y});
+  const flush = () => { while (h.frames.length) h.frames.shift()(); };
+  move(260, 250);
+  assert.equal(h.frames.length, 1);
+  assert.equal(h.run("hoveredPiece"), 0);
+  flush();
+  move(300, 252);
+  assert.equal(h.frames.length, 0);
+  move(250, 480);
+  assert.equal(h.frames.length, 1);
+  assert.equal(h.run("hoveredPiece"), null);
+  flush();
+  move(260, 480);
+  assert.equal(h.frames.length, 0);
+});
+
 test("fit preview includes extension geometry rather than only the current base", async () => {
   let fitted;
   const h = harness({events: true, overrides: {fitView: p => { fitted = p; }}});

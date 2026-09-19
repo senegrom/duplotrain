@@ -35,7 +35,8 @@ sampled 2D view, not a solid-geometry renderer or a new physical collision model
 Equal-height ties follow placement order, consistently in paint and selection.
 Picking uses distance to line segments instead of the nearest sample point.
 
-Hover and selection highlight the affected piece. When several tracks overlap,
+Hover and selection highlight the affected piece; moving the pointer within one
+piece or across empty canvas schedules no repaint. When several tracks overlap,
 Remove opens a keyboard-accessible chooser and requires confirmation of the
 highlighted piece. Changing revision invalidates that confirmation. Stone removal
 keeps its existing more-specific marker hit testing.
