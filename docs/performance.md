@@ -748,3 +748,17 @@ timer resolves 15.6 ms), same candidates in every case:
 The arc oracle alone: winding circle 56 ms to 3.8 ms, mixed gap 53 ms to
 2.8 ms, and the two cases that find eight candidates at once, whose remaining
 cost is building and auditing them, 12 ms to 6 and 9 ms.
+
+## Bridge candidates: only the new joints are audited
+
+Every expanded bridge candidate was audited joint by joint over the whole
+layout, about 5 ms for the reported 59-piece gap, although the base placements
+and their links are carried over unchanged and only the joints of the four new
+components and their two connections can differ from the search's exact fits.
+`Layout.joint_issues` takes `since`, the placement index from which joints are
+audited, and the bridge stage passes the size of the base. The audit of a
+candidate is now proportional to the bridge, not to the layout it completes.
+This also removes a latent rejection: a base holding a deliberate forced fit
+used to fail every bridge candidate on its own joint, while the plain stage
+never audited base joints at all. Such a base now keeps its candidates, and
+its own forced fits are reported unchanged.

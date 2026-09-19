@@ -301,18 +301,21 @@ class Layout:
         return bool(self.placements) and not self.connectable_ends()
 
     def joint_issues(
-        self, port_poses: Mapping[End, Pose] | None = None
+        self, port_poses: Mapping[End, Pose] | None = None, *, since: int = 0
     ) -> list[dict[str, Any]]:
         """Audit each recorded joint once, independently of topological closure.
 
         Nonzero planar gaps may be deliberate forced fits; importing them is
         allowed, but they must never be called exact. Elevation/heading mismatches
         and incompatible connector bodies cannot be excused by planar slop.
-        This checks joints, not collisions elsewhere along the pieces.
+        This checks joints, not collisions elsewhere along the pieces. With
+        *since*, only joints touching a placement at index *since* or later are
+        audited: the entries of the full audit that involve such a placement, in
+        the same order.
         """
         issues = []
         for a, b in sorted(self.links.items()):
-            if a >= b:
+            if a >= b or (a[0] < since and b[0] < since):
                 continue
             if port_poses is None:
                 pa, pb = self.pose_of(a), self.pose_of(b)
