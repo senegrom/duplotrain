@@ -34,8 +34,8 @@ from itertools import product
 from .layout import End, Layout
 
 __all__ = [
-    "ClassificationLimitError", "DriveReport", "drive", "endless_run", "classify",
-    "drivable_universe",
+    "ClassificationLimitError", "DriveLimitError", "DriveReport", "drive",
+    "endless_run", "classify", "drivable_universe",
 ]
 
 #: Stones that affect motion.
@@ -47,6 +47,10 @@ MAX_STEPS = 100_000
 
 #: Bound exhaustive classification before attempting an exponential number of runs.
 DEFAULT_MAX_RUNS = 100_000
+
+
+class DriveLimitError(RuntimeError):
+    """A selected train run reached its explicit step budget; no verdict was made."""
 
 
 class ClassificationLimitError(RuntimeError):
@@ -120,6 +124,7 @@ def drive(
     layout: Layout,
     start: End | None = None,
     switch_states: Mapping[int, int] | None = None,
+    *, max_steps: int = MAX_STEPS,
 ) -> DriveReport:
     """Simulate a train from *start* until it stops, derails, or provably loops.
 
@@ -130,7 +135,11 @@ def drive(
             first piece's first port.
         switch_states: initial tongue positions, ``placement -> exit port``; defaults
             to every tongue aimed at its lowest-numbered branch.
+        max_steps: bounded run length; raises DriveLimitError rather than making
+            a verdict when the limit is reached. Defaults to MAX_STEPS.
     """
+    if type(max_steps) is not int or not 1 <= max_steps <= MAX_STEPS:
+        raise ValueError("max_steps must be an integer from 1 to MAX_STEPS")
     if not layout.placements:
         raise ValueError("nothing to drive on")
     if start is None:
@@ -163,7 +172,7 @@ def drive(
             final_switch_states=dict(states),
         )
 
-    for _ in range(MAX_STEPS):
+    for _ in range(max_steps):
         key = (placement, entered, tuple(sorted(states.items())))
         if key in seen:
             return DriveReport(
@@ -230,7 +239,7 @@ def drive(
             return finish("derailed", placement)
         placement, entered = link
 
-    raise RuntimeError("drive() exceeded MAX_STEPS; state space should be finite")
+    raise DriveLimitError("drive() exceeded its MAX_STEPS budget; no verdict was made")
 
 
 def endless_run(

@@ -12,6 +12,7 @@ function editor(marks) {
   const context = vm.createContext({
     S: state, apiBusy: false, solving: false, view: {scale: 1},
     worldToScreen: (x, y) => [x, y], placementAt: () => 0,
+    placementsAt: () => [{placement: 0, d: 0, z: 0}],
     redraw() {}, status(message) { messages.push(message); },
     api: async (route, body) => { requests.push({route, body}); return state; },
   });
