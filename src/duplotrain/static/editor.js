@@ -61,6 +61,7 @@ let autosaveReady = false;
 
 // Tool changes are exclusive: a stone can never intercept an endpoint pick.
 function selectTool({piece = null, stone = null, pick = null, remove = false} = {}) {
+  closeOverlapPicker();
   armed = piece;
   armedStone = stone;
   pickMode = pick ? {...pick, revision: S && S.revision} : null;
@@ -693,7 +694,7 @@ function redraw() {
   }
   if (lastSolve && lastSolve.revision !== S.revision) el("expand-search").hidden = true;
   renderNavigation();
-  refreshStatus(); draw(); saveSession();
+  refreshStatus(); updateProjectStatus(); draw(); saveSession();
 }
 
 async function refresh() {
@@ -781,6 +782,7 @@ function pairMetrics() {
 
 async function activateAt(sx, sy) {
   if (!S || apiBusy || solving) return;
+  closeOverlapPicker(); clearHover();
   if (pickMode && pickMode.revision !== S.revision) {
     pickMode = null;
     status("The layout changed. Select the endpoints again.", "err");
@@ -817,6 +819,7 @@ async function activateAt(sx, sy) {
 }
 async function removeAt(sx, sy) {
   if (!S || apiBusy || solving) return;
+  closeOverlapPicker(); clearHover();
   try {
     const mark = stoneMarkPositions().find(m => Math.hypot(m.x - sx, m.y - sy) < Math.max(16, m.r + 4));
     if (mark) {
@@ -839,6 +842,7 @@ async function removeAt(sx, sy) {
 function bindEditorEvents() {
   bindExtraEvents();
   window.addEventListener("storage", (event) => {
+    if (event.key === null || (typeof event.key === "string" && event.key.startsWith(PROJECT_PREFIX))) renderProjects();
     if (!autosaveReady || (event.key !== null && event.key !== STORAGE_KEY)) return;
     try {
       // Read current storage: an event describing an older revision may be delayed.
@@ -926,6 +930,7 @@ function bindEditorEvents() {
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !S) return;
     e.preventDefault();
+    clearHover();
     const p = canvasPoint(e);
     pointers.set(e.pointerId, {...p, startX: p.x, startY: p.y, moved: false});
     canvas.setPointerCapture(e.pointerId);
@@ -938,9 +943,8 @@ function bindEditorEvents() {
     const old = pointers.get(e.pointerId);
     if (!old) {
       if (S && e.pointerType !== "touch") {
-        const p = canvasPoint(e), hovered = placementAt(p.x, p.y);
-        // Repaint only when the highlight can differ, not on every mouse move.
-        if (hovered !== hoveredPiece) { hoveredPiece = hovered; draw(); }
+        const p = canvasPoint(e);
+        queueHover(p.x, p.y);
       }
       return;
     }
@@ -977,7 +981,7 @@ function bindEditorEvents() {
   });
   for (const event of ["pointercancel", "lostpointercapture"]) {
     canvas.addEventListener(event, (e) => {
-      pointers.delete(e.pointerId);
+      pointers.delete(e.pointerId); clearHover();
       if (!pointers.size) multiTouch = false;
     });
   }
@@ -1048,26 +1052,60 @@ document.addEventListener("DOMContentLoaded", initializeEditor, {once: true});
 let interactionRevision = null, navigationRevision = null;
 let selectedPiece = null, hoveredPiece = null, highlightedPieces = [];
 let trainTrace = null, trainStep = -1, trainTimer = null, solveOperation = null;
-let framePending = false;
+let framePending = false, pendingHover = null, activeOverlap = null;
+let trainConfigSequence = 0, initialSwitches = {};
+const hitBoundsCache = new WeakMap();
 const segmentCache = new WeakMap(), batchCache = new WeakMap(), previewCache = new WeakMap();
 const PROJECT_FORMAT = "duplotrain-project/1";
 const PROJECT_PREFIX = PROJECT_FORMAT + ":" + location.pathname + ":";
+let projectBaseline = null, projectBaselineSlot = null, projectManagement = null;
+const snapshotKeyCache = new WeakMap();
+let projectRows = new Map();
 
-function draw() {
+let repaintPending = false;
+function draw() { scheduleFrame(true); }
+function scheduleFrame(repaint) {
+  repaintPending = repaintPending || repaint;
   if (framePending) return;
-  if (typeof requestAnimationFrame !== "function") { paint(); return; }
+  const finish = () => {
+    framePending = false;
+    const changed = flushHover(), render = repaintPending || changed;
+    repaintPending = false;
+    updateProjectStatus();
+    // Preserve the upstream optimization: unchanged hover never repaints track.
+    if (render) paint();
+  };
+  if (typeof requestAnimationFrame !== "function") { finish(); return; }
   framePending = true;
-  requestAnimationFrame(() => { framePending = false; paint(); });
+  requestAnimationFrame(finish);
 }
 
+function queueHover(x, y) {
+  pendingHover = S ? {x, y, revision: S.revision, placements: S.layout.placements} : null;
+  scheduleFrame(false);
+}
+function flushHover() {
+  const pointer = pendingHover; pendingHover = null;
+  if (!pointer || pointers.size || activeOverlap || pointer.revision !== S?.revision ||
+      pointer.placements !== S?.layout.placements) return false;
+  const hovered = placementAt(pointer.x, pointer.y), changed = hovered !== hoveredPiece;
+  hoveredPiece = hovered;
+  return changed;
+}
+function clearHover() { pendingHover = null; hoveredPiece = null; }
+function closeOverlapPicker() {
+  activeOverlap = null;
+  const box = el("overlap-picker");
+  if (box) box.hidden = true;
+}
 function stopTrain() {
   if (trainTimer !== null) clearInterval(trainTimer);
   trainTimer = null;
 }
 function clearTransient() {
   pickMode = null; selectedCandidate = null; preview = null; lastSolve = null;
-  selectedPiece = null; hoveredPiece = null; highlightedPieces = [];
-  stopTrain(); trainTrace = null; trainStep = -1;
+  selectedPiece = null; clearHover(); highlightedPieces = []; closeOverlapPicker();
+  invalidateTrain(); initialSwitches = {};
   navigationRevision = null;
   for (const id of ["overlap-picker", "expand-search"]) if (el(id)) el(id).hidden = true;
   for (const id of ["diagnostics", "train-report"]) if (el(id)) el(id).textContent = "";
@@ -1144,10 +1182,37 @@ function drawingBatches(placements) {
   return batches;
 }
 
+function hitCandidates(sx, sy, placements) {
+  let bounds = hitBoundsCache.get(placements);
+  if (!bounds) {
+    bounds = placements.map(pl => {
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const line of pl.lines) for (const [x, y] of line) {
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+        y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      }
+      return {x0, x1, y0, y1, width: pl.width};
+    });
+    hitBoundsCache.set(placements, bounds);
+  }
+  const candidates = new Set();
+  bounds.forEach((b, i) => {
+    const a = worldToScreen(b.x0, b.y0), c = worldToScreen(b.x1, b.y1);
+    // Outward guard is deliberately permissive at translated/zoomed boundaries.
+    const pad = Math.max(14, b.width * view.scale / 2) +
+      1e-7 + 1e-9 * Math.max(1, ...a.map(Math.abs), ...c.map(Math.abs));
+    if (![...a, ...c, pad].every(Number.isFinite) ||
+        (sx >= Math.min(a[0], c[0]) - pad && sx <= Math.max(a[0], c[0]) + pad &&
+         sy >= Math.min(a[1], c[1]) - pad && sy <= Math.max(a[1], c[1]) + pad)) candidates.add(i);
+  });
+  return candidates;
+}
 function placementsAt(sx, sy) {
   if (!S) return [];
-  const hits = new Map();
+  const hits = new Map(), candidates = hitCandidates(sx, sy, S.layout.placements);
+  if (!candidates.size) return [];
   for (const seg of drawingSegments(S.layout.placements)) {
+    if (!candidates.has(seg.placement)) continue;
     const [ax, ay] = worldToScreen(seg.a[0], seg.a[1]), [bx, by] = worldToScreen(seg.b[0], seg.b[1]);
     const dx = bx - ax, dy = by - ay;
     const t = Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / (dx * dx + dy * dy || 1)));
@@ -1166,7 +1231,18 @@ function compareHits(a, b) {
     (a.painted && b.painted ? b.z - a.z || b.placement - a.placement : a.d - b.d) || a.d - b.d;
 }
 function drawHighlights() {
-  const indices = new Set([...highlightedPieces, selectedPiece, hoveredPiece]);
+  const indices = new Set(activeOverlap ? [activeOverlap.target] : [...highlightedPieces, selectedPiece, hoveredPiece]);
+  if (trainTrace?.revision === S.revision && trainTrace.complete) {
+    const overlays = [["train-unvisited", trainTrace.unvisited, "#be6712"],
+      ["train-cycle", trainTrace.cycle_pieces, "#168277"]];
+    for (const [id, pieces, color] of overlays) if (el(id)?.checked) {
+      for (const index of pieces || []) {
+        const pl = S.layout.placements[index];
+        if (pl) for (const line of pl.lines) for (let i = 0; i + 1 < line.length; i++)
+          strokeSegment(line[i], line[i + 1], 6, color);
+      }
+    }
+  }
   for (const index of indices) {
     const pl = S.layout.placements[index];
     if (!pl) continue;
@@ -1175,45 +1251,64 @@ function drawHighlights() {
   }
   if (trainTrace?.revision === S.revision) {
     const step = trainTrace.steps[trainStep];
-    const pl = S.layout.placements[step ? step[0] : trainTrace.start[0]];
+    const terminal = trainStep === trainTrace.steps.length ? trainTrace.terminal : null;
+    const pl = S.layout.placements[terminal ? terminal.placement : step ? step[0] : trainTrace.start[0]];
     if (pl) for (const line of pl.lines) for (let i = 0; i + 1 < line.length; i++)
       strokeSegment(line[i], line[i + 1], 5, "#9a3c9c");
   }
 }
 function focusPieces(indices) {
+  closeOverlapPicker(); clearHover();
   highlightedPieces = indices.filter(i => Number.isInteger(i) && S.layout.placements[i]);
   if (highlightedPieces.length) { fitView(highlightedPieces.map(i => S.layout.placements[i])); fitted = true; }
   draw();
 }
 function showOverlapPicker(hits, remove = false) {
+  closeOverlapPicker(); clearHover();
+  if (!S || !hits.length) return;
   const box = el("overlap-picker"), revision = S.revision;
+  const choices = new Set(hits.map(h => h.placement).filter(i => Number.isInteger(i) && S.layout.placements[i]));
+  if (!choices.size) return;
+  const dialog = {revision, choices, target: [...choices][0]}; activeOverlap = dialog;
   box.replaceChildren(); box.hidden = false;
   const title = document.createElement("strong");
   title.textContent = remove ? "Choose the piece to remove" : "Overlapping pieces";
   const select = document.createElement("select"); select.setAttribute("aria-label", "Overlapping piece");
-  hits.forEach(hit => {
+  hits.filter(h => choices.has(h.placement)).forEach(hit => {
     const option = document.createElement("option"); option.value = hit.placement;
     option.textContent = `#${hit.placement + 1} ${S.layout.placements[hit.placement].name} · ${hit.z.toFixed(1)} mm`;
     select.append(option);
   });
-  selectedPiece = hits[0].placement;
-  select.addEventListener("change", () => { if (S.revision === revision) { selectedPiece = Number(select.value); draw(); } });
+  selectedPiece = dialog.target;
+  select.addEventListener("change", () => {
+    const target = Number(select.value);
+    if (activeOverlap !== dialog || S?.revision !== revision || !choices.has(target)) return;
+    dialog.target = target; selectedPiece = target; draw();
+  });
   const confirm = document.createElement("button"); confirm.textContent = remove ? "Remove highlighted piece" : "Select highlighted piece";
   confirm.addEventListener("click", async () => {
-    if (S.revision !== revision || apiBusy) return;
+    const target = dialog.target;
+    if (activeOverlap !== dialog || S?.revision !== revision || apiBusy ||
+        !choices.has(target) || !S.layout.placements[target] || Number(select.value) !== target) return;
+    selectedPiece = target;
     if (remove) {
-      try { S = await api("/api/remove", {placement: selectedPiece, revision}); redraw(); }
-      catch (error) { status(error.message, "err"); }
+      try { S = await api("/api/remove", {placement: target, revision}); redraw(); }
+      catch (error) { status(error.message, "err"); return; }
     }
-    box.hidden = true; draw();
+    if (activeOverlap === dialog) closeOverlapPicker();
+    draw();
   });
   const cancel = document.createElement("button"); cancel.textContent = "Cancel";
-  cancel.addEventListener("click", () => { box.hidden = true; selectedPiece = null; draw(); });
+  cancel.addEventListener("click", () => {
+    if (activeOverlap !== dialog) return;
+    closeOverlapPicker(); selectedPiece = null; draw();
+  });
   box.append(title, select, confirm, cancel); select.focus(); draw();
 }
 
 async function activateEnd(end) {
   if (!S || apiBusy || solving) return;
+  closeOverlapPicker(); clearHover();
   if (pickMode && pickMode.revision !== S.revision) { pickMode = null; status("Select the endpoints again.", "err"); return; }
   if (!S.open_ends.some(e => e[0] === end[0] && e[1] === end[1])) return;
   if (pickMode?.stage === "grow") {
@@ -1248,6 +1343,7 @@ function renderNavigation() {
   S.open_ends.forEach(end => add(ends, JSON.stringify(end), `#${end[0] + 1} ${S.layout.placements[end[0]].name} — port ${end[1]}`));
   for (const id of ["remove-selected", "test-train"]) el(id).disabled = !S.layout.placements.length;
   el("use-end").disabled = !S.open_ends.length;
+  renderSwitches();
   navigationRevision = S.revision;
 }
 async function checkLayout() {
@@ -1277,6 +1373,32 @@ function downloadJSON(data, filename) {
   anchor.href = url; anchor.download = filename; anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+function projectContentKey(data) {
+  // Snapshots are immutable API responses. Cache their large serialization;
+  // panning/hover frames only serialize the small presentation fields.
+  let snapshot = snapshotKeyCache.get(data.session);
+  if (snapshot === undefined) { snapshot = JSON.stringify(data.session); snapshotKeyCache.set(data.session, snapshot); }
+  const p = data.preferences;
+  return JSON.stringify([data.name, snapshot, p.view.x, p.view.y, p.view.scale,
+    p.search.max_pieces, p.search.slop, p.search.reversing]);
+}
+function markProjectSaved(data, slot = null) {
+  projectBaseline = projectContentKey(data); projectBaselineSlot = slot;
+  updateProjectStatus();
+}
+function updateProjectStatus() {
+  const notice = el("project-status");
+  if (!notice) return;
+  let message;
+  try {
+    if (!S?.snapshot) message = "No project loaded.";
+    else if (projectBaseline === null) message = "No project copy saved/opened in this tab. Autosave is separate.";
+    else message = projectContentKey(projectSnapshot()) === projectBaseline ?
+      "Unchanged since last project save/open. Autosave is separate." :
+      "Changed since last project save/open — save a new copy. Autosave is separate.";
+  } catch (_) { message = "Unsaved project settings are invalid; correct them before saving."; }
+  if (notice.textContent !== message) notice.textContent = message;
+}
 function projectSnapshot() {
   if (!S?.snapshot) throw new Error("Wait for the editor to finish loading");
   const name = el("project-name").value.trim() || "Untitled track";
@@ -1290,7 +1412,7 @@ async function openProject(data, revision = S && S.revision) {
   // Emergency session downloads use the already supported session format.
   if (data?.format === "duplotrain-session/1") data = {format: PROJECT_FORMAT, name: "Recovered session", session: data, preferences: {}};
   const next = await api("/api/project/open", {data, revision});
-  S = next; clearTransient();
+  S = next; clearTransient(); closeProjectManagement();
   el("project-name").value = next.project.name;
   const prefs = next.project.preferences;
   if (prefs.search) {
@@ -1298,34 +1420,122 @@ async function openProject(data, revision = S && S.revision) {
     el("reversing").checked = prefs.search.reversing; el("reversing").dataset.touched = "1";
   }
   if (prefs.view) { view = {...prefs.view}; fitted = true; } else fitted = false;
-  redraw(); status(`Opened project: ${next.project.name}`);
+  redraw(); markProjectSaved(projectSnapshot()); status(`Opened project: ${next.project.name}`);
+}
+function readLocalProject(key, raw) {
+  if (typeof key !== "string" || !key.startsWith(PROJECT_PREFIX) ||
+      typeof raw !== "string" || raw.length > 2 * 1024 * 1024) throw new Error("No readable project selected");
+  const data = JSON.parse(raw);
+  if (!data || data.format !== PROJECT_FORMAT || typeof data.name !== "string" ||
+      !data.name.trim() || data.name.length > 80 || data.session?.format !== "duplotrain-session/1" ||
+      !Array.isArray(data.session?.layout?.placements)) throw new Error("Unreadable saved project");
+  return data;
+}
+function closeProjectManagement() {
+  projectManagement = null;
+  if (el("project-manage")) el("project-manage").hidden = true;
 }
 function renderProjects() {
-  const select = el("project-slots"); select.replaceChildren();
+  const select = el("project-slots"), previous = select.value;
+  const rows = [];
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (!key.startsWith(PROJECT_PREFIX)) continue;
-      const option = document.createElement("option"); option.value = key;
+      if (typeof key !== "string" || !key.startsWith(PROJECT_PREFIX)) continue;
       const raw = localStorage.getItem(key);
+      if (raw === null) continue; // another tab removed it during enumeration
+      let data = null, time = 0;
       try {
-        if (raw.length > 2 * 1024 * 1024) throw new Error("too large");
-        const data = JSON.parse(raw); option.textContent = data.name || "Untitled track";
-      } catch (_) { option.textContent = "Unreadable saved project (kept)"; }
+        data = readLocalProject(key, raw);
+        const parsed = typeof data.saved_at === "string" ? Date.parse(data.saved_at) : NaN;
+        if (Number.isFinite(parsed)) time = parsed;
+      } catch (_) { /* Kept visible; never silently discard an unreadable copy. */ }
+      const suffix = key.slice(PROJECT_PREFIX.length);
+      const version = suffix.length > 12 ? suffix.slice(0, 8) + "…" + suffix.slice(-4) : suffix;
+      const label = data ? `${data.name} · ${time ? new Date(time).toLocaleString() : "date unknown"} · ` +
+        `${data.session.layout.placements.length} pieces · ${version}` : `Unreadable saved project (kept) · ${version}`;
+      rows.push({key, raw, data, time, label});
+    }
+    rows.sort((a, b) => b.time - a.time || a.key.localeCompare(b.key));
+    projectRows = new Map(rows.map(row => [row.key, row])); select.replaceChildren();
+    for (const row of rows) {
+      const option = document.createElement("option"); option.value = row.key; option.textContent = row.label;
       select.append(option);
+    }
+    if (projectRows.has(previous)) select.value = previous;
+    if (projectManagement && projectRows.get(projectManagement.key)?.raw !== projectManagement.raw) {
+      closeProjectManagement(); status("The selected backup changed in another tab; review its latest copy before editing.", "err");
+    }
+    if (projectBaselineSlot && !projectRows.has(projectBaselineSlot)) {
+      projectBaseline = null; projectBaselineSlot = null; updateProjectStatus();
     }
   } catch (error) { status(`Local projects unavailable: ${error.message}. Download a project instead.`, "err"); }
 }
 async function saveLocalProject() {
   try {
-    const data = projectSnapshot(), raw = JSON.stringify(data);
+    const data = {...projectSnapshot(), saved_at: new Date().toISOString()}, raw = JSON.stringify(data);
     if (raw.length > 2 * 1024 * 1024) throw new Error("project larger than 2 MB");
-    // Append-only UUID slots avoid cross-tab overwrites, even for identical names.
+    // New saves stay non-overwriting; only explicit management edits a known key.
     const key = PROJECT_PREFIX + crypto.randomUUID();
-    localStorage.setItem(key, raw); renderProjects(); el("project-slots").value = key;
+    if (localStorage.getItem(key) !== null) throw new Error("Copy ID already exists; retry to create a new copy");
+    localStorage.setItem(key, raw); closeProjectManagement(); renderProjects(); el("project-slots").value = key;
+    markProjectSaved(data, key);
     status("Saved a new local project copy. Download project for a portable backup.");
   } catch (error) { status(`Project not saved: ${error.message}`, "err"); }
 }
+function manageLocalProject(action) {
+  closeProjectManagement();
+  try {
+    if (!["rename", "delete"].includes(action)) throw new Error("Unknown backup action");
+    const key = el("project-slots").value, row = projectRows.get(key);
+    if (!row || localStorage.getItem(key) !== row.raw) throw new Error("Selected backup changed; refresh the list first");
+    if (!navigator.locks) throw new Error("Safe backup management unavailable; download or save a new copy instead");
+    if (action === "rename" && !row.data) throw new Error("Cannot rename an unreadable backup; existing copy kept");
+    const box = el("project-manage"), operation = {key, raw: row.raw, action};
+    projectManagement = operation; box.replaceChildren(); box.hidden = false;
+    const title = document.createElement("p");
+    title.textContent = `${action === "rename" ? "Rename" : "Delete permanently"}: ${row.label}`;
+    box.append(title);
+    let input;
+    if (action === "rename") {
+      const label = document.createElement("label"); label.textContent = "New backup name ";
+      input = document.createElement("input"); input.value = row.data.name; input.maxLength = 80;
+      input.setAttribute("aria-label", "New backup name"); label.append(input); box.append(label);
+    }
+    const confirm = document.createElement("button"); confirm.textContent = action === "rename" ? "Confirm rename" : "Confirm delete";
+    confirm.addEventListener("click", async () => {
+      if (projectManagement !== operation) return;
+      const name = input?.value.trim();
+      if (action === "rename" && (!name || name.length > 80)) { status("Use a backup name of 1–80 characters.", "err"); return; }
+      confirm.disabled = true;
+      try {
+        // All destructive management uses an origin-scoped per-slot lock. The
+        // exact selected bytes are rechecked INSIDE the lock (no stale overwrite).
+        const changed = await navigator.locks.request(PROJECT_PREFIX + "manage:" + key, () => {
+          if (projectManagement !== operation) return false;
+          if (localStorage.getItem(key) !== operation.raw) throw new Error("Backup changed in another tab; refresh and review it again");
+          if (action === "delete") localStorage.removeItem(key);
+          else {
+            const data = readLocalProject(key, operation.raw);
+            const replacement = JSON.stringify({...data, name});
+            if (replacement.length > 2 * 1024 * 1024) throw new Error("Renamed backup exceeds the size limit");
+            localStorage.setItem(key, replacement);
+          }
+          return true;
+        });
+        if (!changed) return;
+        if (projectManagement === operation) closeProjectManagement();
+        renderProjects(); updateProjectStatus();
+        status(action === "rename" ? "Renamed the selected backup; current design unchanged." : "Deleted only the selected local backup; current design unchanged.");
+      } catch (error) { status(`Backup not changed: ${error.message}`, "err"); }
+      finally { confirm.disabled = false; }
+    });
+    const cancel = document.createElement("button"); cancel.textContent = "Cancel backup change";
+    cancel.addEventListener("click", () => { if (projectManagement === operation) closeProjectManagement(); });
+    box.append(confirm, cancel); (input || cancel).focus();
+  } catch (error) { status(error.message, "err"); }
+}
+
 async function readProjectFile(event) {
   const file = event.target.files?.[0]; event.target.value = "";
   if (!file) return;
@@ -1337,34 +1547,79 @@ async function readProjectFile(event) {
     await openProject(data, revision);
   } catch (error) { if (sequence === importSequence) status(`Project not opened: ${error.message}`, "err"); }
 }
+function invalidateTrain() {
+  closeOverlapPicker();
+  stopTrain(); trainTrace = null; trainStep = -1; trainConfigSequence++;
+  for (const id of ["train-play", "train-step", "train-unvisited", "train-cycle"])
+    if (el(id)) el(id).disabled = true;
+  for (const id of ["train-unvisited", "train-cycle"]) if (el(id)) el(id).checked = false;
+  if (el("train-report")) el("train-report").textContent = "";
+}
+function renderSwitches() {
+  const box = el("train-switches");
+  if (!box?.replaceChildren) return;
+  box.replaceChildren(); initialSwitches = {};
+  for (const item of S.train_switches || []) {
+    initialSwitches[item.placement] = item.default;
+    const label = document.createElement("label"), select = document.createElement("select");
+    const name = `Initial switch #${item.placement + 1}`;
+    label.textContent = name + " "; select.setAttribute("aria-label", name);
+    for (const choice of item.options) {
+      const option = document.createElement("option"); option.value = choice.port;
+      option.textContent = choice.name; select.append(option);
+    }
+    select.value = item.default;
+    const revision = S.revision;
+    select.addEventListener("change", () => {
+      if (S?.revision !== revision) return;
+      const value = Number(select.value);
+      if (!item.options.some(o => o.port === value)) return;
+      initialSwitches[item.placement] = value; invalidateTrain(); draw();
+    });
+    label.append(select); box.append(label);
+  }
+}
 async function testTrain() {
-  stopTrain();
+  invalidateTrain();
+  const sequence = trainConfigSequence;
   try {
     const start = JSON.parse(el("train-start").value);
-    const trace = await api("/api/drive", {start, max_steps: 10000});
-    if (trace.revision !== S.revision) return;
+    const trace = await api("/api/drive", {start, max_steps: 10000, switch_states: {...initialSwitches}});
+    if (sequence !== trainConfigSequence || trace.revision !== S.revision) return;
     trainTrace = trace; trainStep = -1; showTrainStep(); draw();
-  } catch (error) { status(error.message, "err"); }
+  } catch (error) { if (sequence === trainConfigSequence) status(error.message, "err"); }
 }
+function traceLength(trace = trainTrace) { return trace ? trace.steps.length + (trace.terminal ? 1 : 0) : 0; }
 function showTrainStep() {
   if (!trainTrace || trainTrace.revision !== S?.revision) { stopTrain(); return; }
   const t = trainTrace, step = t.steps[trainStep];
-  el("train-report").textContent = t.outcome === "limit" ? "10,000-step limit reached; no verdict made." :
-    `Model result from this start: ${t.outcome}. ${t.visited.length} pieces visited; ${t.reversals} reversal(s)` +
-    `${t.period === null ? "" : `; cycle ${t.period} steps`}. Default switch tongues; not a claim about every start.` +
-    (step ? ` Step ${trainStep + 1}/${t.steps.length}: #${step[0] + 1}, port ${step[1]} → ${step[2]}.` : "");
-  el("train-step").disabled = !t.steps.length;
-  el("train-play").disabled = !t.steps.length;
+  const terminal = trainStep === t.steps.length ? t.terminal : null;
+  const count = t.visited_drivable?.length ?? t.visited?.length ?? 0;
+  const total = t.drivable_count ?? S.layout.placements.length;
+  const reason = {stop_stone: "stop stone", buffer: "buffer", open_end: "open end", dead_route: "no onward route"};
+  el("train-report").textContent = t.outcome === "limit" ? `${t.limit || 10000}-step limit reached; no verdict or coverage claim made.` :
+    `Model result from this start: ${t.outcome}. ${count} / ${total} drivable pieces visited; ${t.reversals} reversal(s)` +
+    `${t.period === null ? "" : `; cycle ${t.period} steps`}. Selected initial switches; not a claim about every start.` +
+    (step ? ` Step ${trainStep + 1}/${t.steps.length}: #${step[0] + 1}, port ${step[1]} → ${step[2]}.` : "") +
+    (terminal ? ` Final event: #${terminal.placement + 1}, entered port ${terminal.entry}, ` +
+      `${terminal.at_port === null ? "midpoint" : `at port ${terminal.at_port}`} — ${reason[terminal.reason] || terminal.reason}.` : "");
+  const available = traceLength(t) > 0;
+  el("train-step").disabled = !available || (t.cycle_start === null && trainStep + 1 >= traceLength(t));
+  el("train-play").disabled = !available;
+  el("train-unvisited").disabled = !t.complete || !t.unvisited?.length;
+  el("train-cycle").disabled = !t.complete || !t.cycle_pieces?.length;
   draw();
 }
 function advanceTrain() {
-  if (!trainTrace || trainTrace.revision !== S?.revision || !trainTrace.steps.length) { stopTrain(); return; }
-  if (trainStep + 1 >= trainTrace.steps.length) {
+  if (!trainTrace || trainTrace.revision !== S?.revision || !traceLength()) { stopTrain(); return; }
+  if (trainStep + 1 >= traceLength()) {
     if (trainTrace.cycle_start !== null) trainStep = trainTrace.cycle_start;
     else { stopTrain(); return; }
   } else trainStep++;
+  if (trainTrace.cycle_start === null && trainStep + 1 >= traceLength()) stopTrain();
   showTrainStep();
 }
+
 async function cancelSearch() {
   if (!solving) return;
   try {
@@ -1396,28 +1651,40 @@ function bindExtraEvents() {
   });
   el("piece-select")?.addEventListener("change", () => { selectedPiece = Number(el("piece-select").value); focusPieces([selectedPiece]); });
   el("end-select")?.addEventListener("change", () => { try { focusPieces([JSON.parse(el("end-select").value)[0]]); } catch (_) {} });
-  on("save-project", () => { try { downloadJSON(projectSnapshot(), "project.json"); } catch (e) { status(e.message, "err"); } });
+  on("save-project", () => {
+    try { const data = projectSnapshot(); downloadJSON(data, "project.json"); markProjectSaved(data); }
+    catch (e) { status(e.message, "err"); }
+  });
   on("open-project", () => el("projectfile").click());
   el("projectfile")?.addEventListener("change", readProjectFile);
   on("save-local", saveLocalProject);
   on("load-local", async () => {
     const revision = S && S.revision;
     try {
-      const raw = localStorage.getItem(el("project-slots").value);
-      if (!raw || raw.length > 2 * 1024 * 1024) throw new Error("No readable project selected");
-      await openProject(JSON.parse(raw), revision);
+      const key = el("project-slots").value, raw = localStorage.getItem(key);
+      const data = readLocalProject(key, raw);
+      await openProject(data, revision);
+      projectBaselineSlot = key; closeProjectManagement();
     } catch (e) { status(e.message, "err"); }
   });
   on("refresh-projects", renderProjects);
-  on("test-train", testTrain); on("train-step", () => { stopTrain(); advanceTrain(); });
+  on("rename-local", () => manageLocalProject("rename"));
+  on("delete-local", () => manageLocalProject("delete"));
+  el("project-slots")?.addEventListener("change", closeProjectManagement);
+  for (const id of ["project-name", "max-pieces", "slop", "reversing"])
+    el(id)?.addEventListener("input", updateProjectStatus);
+  on("test-train", testTrain); on("train-step", () => { closeOverlapPicker(); stopTrain(); advanceTrain(); });
   on("train-play", () => {
-    stopTrain();
-    if (trainTrace?.revision !== S?.revision || !trainTrace?.steps.length) return;
-    if (trainTrace.cycle_start === null && trainStep + 1 >= trainTrace.steps.length) trainStep = -1;
-    advanceTrain(); trainTimer = setInterval(advanceTrain, 500);
+    closeOverlapPicker(); stopTrain();
+    if (trainTrace?.revision !== S?.revision || !traceLength()) return;
+    if (trainTrace.cycle_start === null && trainStep + 1 >= traceLength()) trainStep = -1;
+    advanceTrain();
+    if (trainTrace.cycle_start !== null || trainStep + 1 < traceLength()) trainTimer = setInterval(advanceTrain, 500);
   });
   on("train-pause", stopTrain);
-  canvas.addEventListener("pointerleave", () => { hoveredPiece = null; draw(); });
+  el("train-start")?.addEventListener("change", () => { invalidateTrain(); draw(); });
+  for (const id of ["train-unvisited", "train-cycle"]) el(id)?.addEventListener("change", draw);
+  canvas.addEventListener("pointerleave", () => { clearHover(); draw(); });
   canvas.addEventListener("keydown", e => {
     if (e.key === "Enter") { e.preventDefault(); el("use-end").click(); }
   });

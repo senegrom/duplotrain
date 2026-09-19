@@ -7,14 +7,16 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from dataclasses import asdict
 from typing import TYPE_CHECKING, Any
 
 from .catalog import ACCESSORIES
 from .collision import DEFAULT_CLEARANCE, CollisionField, bounds_of
-from .drive import DriveLimitError, drive
+from .drive import DriveLimitError, drivable_universe, drive
 
 if TYPE_CHECKING:
     from .editor import Session
+    from .layout import Layout
 
 PROJECT_FORMAT = "duplotrain-project/1"
 
@@ -124,8 +126,55 @@ def check_session(session: Session) -> dict[str, Any]:
             "model_note": "Sampled model check (8 mm); not a physical-clearance guarantee."}
 
 
-def trace_train(session: Session, start: object, max_steps: object = 10000) -> dict[str, Any]:
-    """One selected inward start and default switch tongues, not a universal claim."""
+def switch_choices(layout: Layout) -> list[dict[str, Any]]:
+    """The drive model's facing-port choices, not external connector links."""
+    choices = []
+    for index, placement in enumerate(layout):
+        piece = placement.piece
+        if not piece.is_junction:
+            continue
+        for port in range(len(piece.ports)):
+            options = sorted(exit_port for exit_port, _ in piece.transit(port))
+            if len(options) > 1:
+                choices.append({"placement": index, "default": min(options),
+                                "options": [{"port": p, "name": piece.ports[p].name}
+                                            for p in options]})
+                break
+    return choices
+
+
+def _initial_switches(layout: Layout, settings: object) -> dict[int, int]:
+    choices = {c["placement"]: c for c in switch_choices(layout)}
+    states = {i: c["default"] for i, c in choices.items()}
+    if settings is None:
+        return states
+    if not isinstance(settings, dict):
+        raise ValueError("initial switch choices must be an object")
+    seen = set()
+    for key, port in settings.items():
+        # JSON object keys are strings; reject bools, floats and noncanonical
+        # spellings rather than coercing them to another piece's switch.
+        if type(key) is int:
+            index = key
+        elif isinstance(key, str) and key.isascii() and key.isdecimal() and len(key) <= 5:
+            index = int(key)
+            if str(index) != key:
+                raise ValueError("invalid switch placement")
+        else:
+            raise ValueError("invalid switch placement")
+        if index not in choices or index in seen:
+            raise ValueError("pick a valid switch placement once")
+        if type(port) is not int or port not in {p["port"] for p in choices[index]["options"]}:
+            raise ValueError("pick a valid switch exit port")
+        seen.add(index)
+        states[index] = port
+    return states
+
+
+def trace_train(
+    session: Session, start: object, max_steps: object = 10000, *, switch_states: object = None,
+) -> dict[str, Any]:
+    """One selected inward start and initial switches, never a universal claim."""
     from .editor import _end
 
     start = _end(start, "start")
@@ -138,15 +187,27 @@ def trace_train(session: Session, start: object, max_steps: object = 10000) -> d
         raise ValueError("pick an unsealed entry port for the train")
     if type(max_steps) is not int or not 1 <= max_steps <= 10000:
         raise ValueError("train trace limit must be 1–10000 steps")
+    initial = _initial_switches(layout, switch_states)
     if layout.joint_issues():
         raise ValueError("Fix incompatible joints before testing the train")
+    universe = drivable_universe(layout)
+    common = {"revision": session.revision, "start": list(start),
+              "initial_switch_states": initial, "total_pieces": len(layout),
+              "drivable_count": len(universe), "terminal": None}
     try:
-        report = drive(layout, start=start, max_steps=max_steps)
+        report = drive(layout, start=start, switch_states=initial, max_steps=max_steps)
     except DriveLimitError:
-        return {"revision": session.revision, "start": list(start), "outcome": "limit",
-                "steps": [], "limit": max_steps, "complete": False}
-    return {"revision": session.revision, "start": list(start), "outcome": report.outcome,
+        # No partial/unvisited coverage or terminal-position claim at the limit.
+        return {**common, "outcome": "limit", "steps": [], "limit": max_steps,
+                "complete": False, "visited": [], "visited_drivable": [],
+                "unvisited": None, "cycle_pieces": [], "cycle_start": None, "period": None}
+    cycle = (report.steps[report.cycle_start:] if report.cycle_start is not None else ())
+    return {**common, "outcome": report.outcome,
             "steps": [list(step) for step in report.steps], "cycle_start": report.cycle_start,
             "period": report.period, "reversals": report.reversals,
             "visited": sorted(report.visited), "covers": report.covers(layout),
+            "visited_drivable": sorted(report.visited & universe),
+            "unvisited": sorted(universe - report.visited),
+            "cycle_pieces": sorted({step[0] for step in cycle}),
+            "terminal": asdict(report.terminal) if report.terminal is not None else None,
             "final_switch_states": dict(report.final_switch_states), "complete": True}

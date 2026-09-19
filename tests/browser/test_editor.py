@@ -38,12 +38,11 @@ def load(page, url):
 
 
 def wait_count(page, count):
-    # S is null until the first refresh resolves, and playwright treats a thrown
-    # predicate as a hard error rather than "not ready yet", so guard the reload race.
-    page.wait_for_function(
-        "count => S !== null && S.layout.placements.length === count && !apiBusy",
-        arg=count,
-    )
+    # This helper also runs against the real worker under production CSP.
+    # Wait on rendered navigation instead of evaluating a string predicate.
+    from playwright.sync_api import expect
+
+    expect(page.locator("#piece-select option")).to_have_count(count)
 
 
 def place_straight(page):
@@ -742,9 +741,11 @@ def exercise_project_history_and_tools(page):
     field.press("Tab")
     expect(page.locator('[data-piece-id="curve"] .count')).to_have_text("0/")
     expect(field).to_have_value("2")
+    expect(page.locator("#project-status")).to_contain_text("Changed since last project")
     page.locator("#undo").tap()
     expect(page.locator('[data-piece-id="curve"] .count')).to_have_text("3/")
     expect(field).to_have_value("15")
+    expect(page.locator("#project-status")).to_contain_text("Unchanged since last project")
     assert page.evaluate("S.layout.placements.length") == 12
     page.locator("#redo").tap()
     expect(page.locator('[data-piece-id="curve"] .count')).to_have_text("0/")
@@ -757,7 +758,8 @@ def exercise_project_history_and_tools(page):
     field.fill("-1")
     field.press("Tab")
     expect(field).to_have_value("2")
-    page.locator("details").filter(has=page.locator("#test-train")).locator("summary").tap()
+    panel = page.locator("details").filter(has=page.locator("#test-train"))
+    panel.locator(":scope > summary").tap()
     page.locator("#train-start").select_option("[0,0]")
     page.locator("#test-train").tap()
     expect(page.locator("#train-report")).to_contain_text("from this start: endless")
@@ -765,7 +767,8 @@ def exercise_project_history_and_tools(page):
     expect(page.locator("#train-report")).to_contain_text("Step 1/12")
     page.locator("#train-play").tap()
     page.locator("#train-pause").tap()
-    page.locator("details").filter(has=page.locator("#save-project")).locator("summary").tap()
+    panel = page.locator("details").filter(has=page.locator("#save-project"))
+    panel.locator(":scope > summary").tap()
     with page.expect_download() as download:
         page.locator("#save-project").tap()
     portable = json.loads(Path(download.value.path()).read_text())
@@ -774,6 +777,21 @@ def exercise_project_history_and_tools(page):
     page.locator("#save-local").tap()
     page.locator("#save-local").tap()
     expect(page.locator("#project-slots option")).to_have_count(2)
+    labels = page.locator("#project-slots option").all_text_contents()
+    assert len(set(labels)) == 2 and all("12 pieces" in label for label in labels)
+    expect(page.locator("#project-status")).to_contain_text("Unchanged since last project")
+    page.locator("#rename-local").tap()
+    page.get_by_label("New backup name", exact=True).fill("Circle backup renamed")
+    page.get_by_role("button", name="Confirm rename", exact=True).tap()
+    expect(page.locator("#project-slots option:checked")).to_contain_text("Circle backup renamed")
+    expect(page.locator("#project-name")).to_have_value("Portable circle")
+    page.locator("#delete-local").tap()
+    page.get_by_role("button", name="Cancel backup change", exact=True).tap()
+    expect(page.locator("#project-slots option")).to_have_count(2)
+    page.locator("#delete-local").tap()
+    page.get_by_role("button", name="Confirm delete", exact=True).tap()
+    expect(page.locator("#project-slots option")).to_have_count(1)
+    wait_count(page, 12)
     page.locator("#clear").tap()
     wait_count(page, 0)
     page.locator("#projectfile").set_input_files({
@@ -786,6 +804,7 @@ def exercise_project_history_and_tools(page):
     wait_count(page, 0)
     page.locator("#redo").tap()
     wait_count(page, 12)
+    exercise_train_finishing(page)
 
 
 def test_project_history_diagnostics_and_train_ui(editor):
@@ -813,7 +832,8 @@ def test_endpoint_selection_clears_after_import_and_keyboard_attach(editor):
     })
     page.wait_for_function("S.layout.placements[0].piece === 'curve' && !apiBusy")
     assert page.evaluate("pickMode") is None
-    page.locator("details").filter(has=page.locator("#end-select")).locator("summary").tap()
+    panel = page.locator("details").filter(has=page.locator("#end-select"))
+    panel.locator(":scope > summary").tap()
     page.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
     page.locator("#end-select").select_option("[0,1]")
     page.locator("#use-end").tap()
@@ -829,17 +849,99 @@ def test_overlap_chooser_and_elevation_picking(editor):
     page, session, url, errors = editor
     piece = session.catalog["straight"]
     session.history = [Layout((Placement(piece, Pose.make(z=200)),
-                               Placement(piece, Pose.make())))]
+                               Placement(piece, Pose.make()),
+                               Placement(piece, Pose.make(x=1000))))]
     load(page, url)
     assert page.evaluate("placementAt(...worldToScreen(64, 0))") == 0
     page.locator("#delete-tool").tap()
     # Use the real canvas removal path; ambiguity must not immediately delete.
     page.evaluate("removeAt(...worldToScreen(64, 0))")
-    assert len(session.layout) == 2
+    assert len(session.layout) == 3
+    panel = page.locator("details").filter(has=page.locator("#piece-select"))
+    panel.locator(":scope > summary").tap()
+    page.locator("#piece-select").select_option("2")
+    from playwright.sync_api import expect
+
+    expect(page.locator("#overlap-picker")).to_be_hidden()
+    assert len(session.layout) == 3
+    page.evaluate("removeAt(...worldToScreen(64, 0))")
     page.locator("#overlap-picker select").select_option("1")
     page.get_by_role("button", name="Remove highlighted piece").tap()
-    wait_count(page, 1)
-    assert float(session.layout.placements[0].frame.z) == 200
-    page.locator("#undo").tap()
     wait_count(page, 2)
+    assert float(session.layout.placements[0].frame.z) == 200
+    assert float(session.layout.placements[1].frame.x) == 1000
+    page.locator("#undo").tap()
+    wait_count(page, 3)
+    assert not errors
+
+
+def exercise_train_finishing(page):
+    """Terminal playback and explicit coverage/settings on both real hosts."""
+    import json
+    from pathlib import Path
+
+    from playwright.sync_api import expect
+
+    from duplotrain.catalog import default_catalog
+    from duplotrain.layout import layout_to_dict
+
+    c = default_catalog()
+    stopped = build_chain([(c["straight"], 0, 1)] * 2).with_accessory(1, "stone_stop")
+    page.locator("#importfile").set_input_files({
+        "name": "stopped.json", "mimeType": "application/json",
+        "buffer": json.dumps(layout_to_dict(stopped)).encode(),
+    })
+    wait_count(page, 2)
+    page.locator("#train-start").select_option("[0,0]")
+    page.locator("#test-train").tap()
+    expect(page.locator("#train-report")).to_contain_text("from this start: stopped")
+    expect(page.locator("#train-report")).to_contain_text("2 / 2 drivable pieces visited")
+    page.locator("#train-step").tap()
+    expect(page.locator("#train-report")).to_contain_text("Step 1/1: #1")
+    page.locator("#train-step").tap()
+    expect(page.locator("#train-report")).to_contain_text("Final event: #2")
+    expect(page.locator("#train-step")).to_be_disabled()
+    assert page.evaluate("trainTrace.steps.length") == 1
+    assert page.evaluate("trainTrace.terminal.placement") == 1
+    page.locator("#train-play").tap()
+    expect(page.locator("#train-report")).to_contain_text("Final event: #2")
+
+    completed = (Path(__file__).parent.parent / "fixtures" / "bridge-completed.json").read_bytes()
+    page.locator("#importfile").set_input_files({
+        "name": "bridge-completed.json", "mimeType": "application/json", "buffer": completed,
+    })
+    wait_count(page, 83)
+    page.locator("#train-start").select_option("[0,0]")
+    page.locator("#test-train").tap()
+    expect(page.locator("#train-report")).to_contain_text("41 / 83 drivable pieces visited")
+    expect(page.locator("#train-report")).to_contain_text("cycle 26 steps")
+    page.locator("#train-unvisited").check()
+    page.locator("#train-cycle").check()
+    assert page.evaluate("trainTrace.unvisited.length") == 42
+    assert page.evaluate("trainTrace.cycle_pieces.length") == 26
+    page.locator("#train-switches").locator("..").locator(":scope > summary").tap()
+    page.get_by_label("Initial switch #4", exact=True).select_option("2")
+    expect(page.locator("#train-report")).to_have_text("")
+    expect(page.locator("#train-cycle")).not_to_be_checked()
+    expect(page.locator("#train-step")).to_be_disabled()
+    page.locator("#test-train").tap()
+    expect(page.locator("#train-report")).to_contain_text("Selected initial switches")
+    assert page.evaluate("trainTrace.initial_switch_states['3']") == 2
+
+
+def test_clear_empty_keeps_redo_in_the_editor(editor):
+    from playwright.sync_api import expect
+
+    page, session, url, errors = editor
+    load(page, url)
+    place_straight(page)
+    page.locator("#undo").tap()
+    wait_count(page, 0)
+    expect(page.locator("#redo")).to_be_enabled()
+    revision = session.revision
+    page.locator("#clear").tap()
+    expect(page.locator("#redo")).to_be_enabled()
+    page.locator("#redo").tap()
+    wait_count(page, 1)
+    assert session.revision == revision + 1
     assert not errors

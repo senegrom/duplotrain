@@ -33,12 +33,15 @@
   </div>
   <details>
     <summary>Projects and backups</summary>
+    <div id="project-status" role="status"></div>
     <label>Project name <input id="project-name" maxlength="80" value="Untitled track"></label>
     <div class="buttons"><button id="save-project">Download project</button><button id="open-project">Open project</button></div>
     <input id="projectfile" type="file" accept=".json,application/json" hidden>
     <p>Projects include track, owned pieces and stones, sandbox, view and search settings. Layout JSON stays compatible.</p>
     <label>Local projects <select id="project-slots"></select></label>
     <div class="buttons"><button id="save-local">Save new local copy</button><button id="load-local">Open local copy</button><button id="refresh-projects">Refresh list</button></div>
+    <div class="buttons"><button id="rename-local">Rename selected copy</button><button id="delete-local">Delete selected copy</button></div>
+    <div id="project-manage" hidden></div>
   </details>
   <h2>Close the loop</h2>
   <div class="solverow">
@@ -62,9 +65,14 @@
   <details>
     <summary>Test train</summary>
     <label>Starting piece and inward direction <select id="train-start"></select></label>
+    <details><summary>Initial switch positions</summary><div id="train-switches"></div>
+      <p>Choices apply to this test only; trailing passes may change switches. Editing the layout resets them.</p>
+    </details>
     <button id="test-train">Test train</button>
     <div class="buttons"><button id="train-play" disabled>Play trace</button><button id="train-pause">Pause</button><button id="train-step" disabled>Step</button></div>
     <div id="train-report" role="status"></div>
+    <label><input id="train-unvisited" type="checkbox" disabled> Highlight unvisited drivable track (orange)</label>
+    <label><input id="train-cycle" type="checkbox" disabled> Highlight repeating-cycle pieces (teal)</label>
   </details>
   <details>
     <summary>Keyboard / precise selection</summary>
