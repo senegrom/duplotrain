@@ -2,99 +2,132 @@
 "use strict";
 
 (function () {
-  let worker = null;
-  let ready = false;
-  let seq = 0;
+  let worker = null, ready = false, seq = 0;
+  let options, overlay, msg, rejectReady, bootTimer, idleTimer;
+  let recoveryButtons = false, restarting = false;
   const pending = new Map();
 
+  function clearTimers() { clearTimeout(bootTimer); clearTimeout(idleTimer); }
+  function stop(error) {
+    clearTimers(); ready = false;
+    if (worker) worker.terminate();
+    worker = null;
+    if (rejectReady) { rejectReady(error); rejectReady = null; }
+    for (const call of pending.values()) call.reject(error);
+    pending.clear();
+  }
+  function button(text, callback) {
+    const b = document.createElement("button"); b.textContent = text;
+    b.addEventListener("click", () => {
+      try { const result = callback(); if (result?.catch) result.catch(fail); }
+      catch (error) { msg.textContent = error.message; }
+    });
+    overlay.append(b);
+  }
+  function fail(error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    stop(err);
+    msg.textContent = "Track engine unavailable: " + err.message.slice(0, 300);
+    if (!overlay.isConnected) document.body.append(overlay);
+    if (!recoveryButtons) {
+      recoveryButtons = true;
+      if (options.checkpoint?.()) {
+        button("Download last confirmed layout", options.downloadLayout);
+        button("Download last confirmed session", options.downloadSession);
+        button("Restart engine and restore last confirmed session", restart);
+      }
+      button("Reload and recover autosave", () => location.reload());
+    }
+  }
+  function heartbeat() {
+    clearTimeout(idleTimer);
+    // This is an inactivity timeout, not a cap on a search that reports progress.
+    if (pending.size) idleTimer = setTimeout(() => fail(new Error(
+      "No engine response or progress for two minutes. The last confirmed session can be downloaded."
+    )), 120000);
+  }
   window.duplotrainApi = (path, body) => new Promise((resolve, reject) => {
     if (!worker || !ready) return reject(new Error("engine is not ready"));
     const id = ++seq;
     try {
       const encoded = body === undefined ? null : JSON.stringify(body);
       pending.set(id, {resolve, reject});
-      worker.postMessage({id, path, body: encoded});
-    } catch (error) {
-      pending.delete(id);
-      reject(error);
-    }
-  }).then((res) => {
+      worker.postMessage({id, path, body: encoded}); heartbeat();
+    } catch (error) { pending.delete(id); heartbeat(); reject(error); }
+  }).then(res => {
     const data = JSON.parse(res);
     if (data.__error) {
-      const error = new Error(data.__error);
-      error.code = data.code;
-      error.state = data.state;
+      const error = new Error(data.__error); error.code = data.code; error.state = data.state;
       throw error;
     }
     return data;
   });
 
-  window.duplotrainBoot = async ({refresh, status, readyStatus = status}) => {
-    const overlay = document.createElement("div");
-    overlay.style.cssText =
-      "position:fixed;inset:0;background:rgba(244,242,238,.96);z-index:50;" +
-      "display:flex;flex-direction:column;align-items:center;justify-content:center;" +
-      "font:15px/1.6 system-ui;color:#2b2f33;text-align:center;padding:20px";
-    const msg = document.createElement("div");
-    msg.textContent = "Loading the track engine… (cached on this device for later visits)";
-    overlay.append(msg);
-    document.body.append(overlay);
-    let rejectReady;
-    let timer;
-    const fail = (error) => {
-      clearTimeout(timer);
-      ready = false;
-      if (worker) worker.terminate();
-      worker = null;
-      const err = error instanceof Error ? error : new Error(String(error));
-      if (rejectReady) rejectReady(err);
-      for (const call of pending.values()) call.reject(err);
-      pending.clear();
-      // Error text is untrusted; never insert it as HTML.
-      msg.textContent = "Track engine unavailable: " + err.message.slice(0, 300);
-      if (!overlay.isConnected) document.body.append(overlay);
-      if (!overlay.querySelector("button")) {
-        const retry = document.createElement("button");
-        retry.textContent = "Reload and recover autosave";
-        retry.addEventListener("click", () => location.reload());
-        overlay.append(retry);
-      }
-    };
+  async function start(snapshot = null) {
+    msg.textContent = snapshot ? "Restarting the track engine; restoring the last confirmed session…" :
+      "Loading the track engine… (cached on this device for later visits)";
+    if (!overlay.isConnected) document.body.append(overlay);
     try {
-      const booted = new Promise((resolve, reject) => {
+      await new Promise((resolve, reject) => {
         rejectReady = reject;
-        worker = new Worker("./worker.js?v=__BUILD__");
-        worker.onerror = (event) => {
+        const current = new Worker("./worker.js?v=__BUILD__");
+        worker = current;
+        current.onerror = event => {
           event.preventDefault();
-          fail(new Error(event.message || "worker error"));
+          if (worker === current) fail(new Error(event.message || "worker error"));
         };
-        worker.onmessageerror = () => fail(new Error("invalid worker message"));
-        worker.addEventListener("message", ({data}) => {
+        current.onmessageerror = () => { if (worker === current) fail(new Error("invalid worker message")); };
+        current.addEventListener("message", ({data}) => {
+          // Late responses from an old generation must never restore old state.
+          if (worker !== current) return;
           if (data && data.bootError) { fail(new Error(data.bootError)); return; }
           if (data && data.ready) {
-            ready = true;
-            clearTimeout(timer);
-            resolve();
+            ready = true; clearTimeout(bootTimer); rejectReady = null; resolve(); return;
+          }
+          if (typeof data === "number" && Number.isFinite(data)) {
+            if (pending.size) { heartbeat(); options.status(`searching… ${data.toLocaleString()} states explored`); }
             return;
           }
-          if (typeof data === "number") {
-            if (pending.size) status(`searching… ${data.toLocaleString()} states explored`);
-            return;
-          }
-          const {id, res, err} = data || {};
-          const call = pending.get(id);
+          const {id, res, err} = data || {}, call = pending.get(id);
           if (!call) return;
-          pending.delete(id);
-          if (err) call.reject(new Error(err));
-          else call.resolve(res);
+          pending.delete(id); heartbeat();
+          if (err) call.reject(new Error(err)); else call.resolve(res);
         });
-        timer = setTimeout(() => fail(new Error("engine loading timed out")), 60000);
+        bootTimer = setTimeout(() => fail(new Error("engine loading timed out")), 60000);
       });
-      await booted;
-      rejectReady = null;
-      await refresh();
+      if (snapshot) {
+        const state = await window.duplotrainApi("/api/restore", {
+          data: snapshot, revision: 0, preview_format: "duplotrain-preview/1",
+        });
+        await options.restored(state);
+      } else await options.refresh();
       overlay.remove();
-      readyStatus("Engine ready — runs in your browser · build __BUILD__");
+      (options.readyStatus || options.status)(snapshot ?
+        "Engine restarted; last confirmed session restored. Previous undo history and suggestions were reset." :
+        "Engine ready — runs in your browser · build __BUILD__");
     } catch (error) { fail(error); }
+  }
+  async function restart() {
+    if (restarting) return;
+    restarting = true;
+    try {
+      const snapshot = options.checkpoint?.();
+      // Copy before terminating; recovery never falls back to a different tab's save.
+      const saved = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
+      const error = new Error("Search cancelled; restarting from the last confirmed session");
+      error.code = "cancelled"; stop(error);
+      await start(saved);
+    } finally { restarting = false; }
+  }
+  window.duplotrainCancel = restart;
+  window.duplotrainBoot = async supplied => {
+    options = supplied;
+    overlay = document.createElement("div");
+    overlay.style.cssText =
+      "position:fixed;inset:0;background:rgba(244,242,238,.96);z-index:50;" +
+      "display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;" +
+      "font:15px/1.6 system-ui;color:#2b2f33;text-align:center;padding:20px";
+    msg = document.createElement("div"); overlay.append(msg); document.body.append(overlay);
+    await start();
   };
 })();

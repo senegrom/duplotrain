@@ -63,3 +63,22 @@
     input[type="number"] { min-height: 40px; }
     .variants { gap: 8px; }
   }
+
+  [hidden] { display: none !important; }
+  details { border: 1px solid #e2e0da; border-radius: 8px; padding: 8px; }
+  summary { cursor: pointer; font-weight: 600; }
+  details label { display: block; margin: 8px 0; }
+  details select, #project-name { width: 100%; max-width: 100%; font: inherit; }
+  details p { font-size: 12px; }
+  .buttons { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  #diagnostics { max-height: 300px; overflow-y: auto; }
+  #diagnostics button { display: block; text-align: left; margin-top: 4px; width: 100%; }
+  #overlap-picker { position: absolute; z-index: 3; top: 70px; left: 12px; right: 12px;
+    padding: 12px; background: white; border: 2px solid var(--accent); border-radius: 8px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  #overlap-picker select { max-width: 100%; }
+  .stone-inventory { display: flex; width: 100%; gap: 6px; align-items: center; }
+  .stone-inventory button { flex: 1; }
+  .stone-inventory input { width: 60px; }
+  select:focus-visible, canvas:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); }
+  body.busy #cancel-search, body.busy #export, body.busy #save-project { pointer-events: auto; opacity: 1; }

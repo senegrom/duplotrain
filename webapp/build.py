@@ -47,7 +47,6 @@ WORKER_EXCLUDES = {
     "render.py",
     # Public desktop helpers imported only by the regular package __init__.  The
     # browser worker talks to editor.Session directly and does not need these modules.
-    "drive.py",
     "explore.py",
     "networks.py",
     "scoring.py",

@@ -116,3 +116,82 @@ test("adapter conflicts preserve their code and current state through the worker
     return true;
   });
 });
+
+async function recoverableBoot(h, extra = {}) {
+  const snapshot = {format: "duplotrain-session/1", layout: {format: "duplotrain-layout/1", placements: [{piece: "curve"}]},
+    inventory: {curve: 17}, stones: {stone_stop: 2}, unlimited: false};
+  const restored = [], downloads = [], notices = [];
+  const promise = h.window.duplotrainBoot({refresh: async () => {}, status: v => notices.push(v),
+    checkpoint: () => snapshot, downloadLayout: () => downloads.push(snapshot.layout),
+    downloadSession: () => downloads.push(snapshot), restored: v => restored.push(v), ...extra});
+  h.workers[0].emit({ready: true}); await promise;
+  return {snapshot, restored, downloads, notices};
+}
+
+test("failure overlay exports the last confirmed layout and session without the worker", async () => {
+  const h = harness(), r = await recoverableBoot(h);
+  h.workers[0].onerror({message: "offline", preventDefault() {}});
+  const actions = h.body.children[0].children.filter(c => c.tag === "button");
+  assert.equal(actions.length, 4);
+  actions.find(b => b.textContent === "Download last confirmed layout").click();
+  actions.find(b => b.textContent === "Download last confirmed session").click();
+  assert.deepEqual(r.downloads, [r.snapshot.layout, r.snapshot]);
+  assert.equal(h.workers[0].sent.length, 0);
+});
+
+test("cancel restarts with an isolated copy of this tab's snapshot and ignores late responses", async () => {
+  const h = harness(), r = await recoverableBoot(h);
+  const original = structuredClone(r.snapshot);
+  const pending = assert.rejects(h.window.duplotrainApi("/api/solve", {}), e => e.code === "cancelled");
+  const first = h.workers[0], solving = first.sent[0];
+  const recovery = h.window.duplotrainCancel();
+  assert.equal(first.terminated, true);
+  r.snapshot.inventory.curve = 999; // no alias into the captured recovery payload
+  first.emit({id: solving.id, res: '{"revision":999}'});
+  const second = h.workers[1]; second.emit({ready: true});
+  await new Promise(resolve => setImmediate(resolve));
+  const restore = second.sent[0];
+  assert.equal(restore.path, "/api/restore");
+  assert.deepEqual(JSON.parse(restore.body).data, original);
+  assert.equal(JSON.parse(restore.body).revision, 0);
+  second.emit({id: restore.id, res: '{"revision":1,"restored":true}'});
+  await recovery; await pending;
+  assert.equal(r.restored.length, 1); assert.equal(r.restored[0].revision, 1);
+  assert.match(r.notices.at(-1), /history and suggestions were reset/);
+  assert.equal(h.timers.size, 0);
+});
+
+test("progress renews the inactivity watchdog, silence rejects pending operations", async () => {
+  const h = harness(); await recoverableBoot(h);
+  const pending = assert.rejects(h.window.duplotrainApi("/api/solve", {}), /No engine response or progress/);
+  const old = [...h.timers.keys()][0];
+  h.workers[0].emit(5000);
+  assert.equal(h.timers.has(old), false); assert.equal(h.timers.size, 1);
+  [...h.timers.values()][0]();
+  await pending;
+  assert.equal(h.workers[0].terminated, true); assert.equal(h.timers.size, 0);
+});
+
+test("failed recovery keeps emergency downloads available and never publishes restored state", async () => {
+  const h = harness(), r = await recoverableBoot(h);
+  const recovery = h.window.duplotrainCancel();
+  h.workers[1].emit({ready: true}); await new Promise(resolve => setImmediate(resolve));
+  const restore = h.workers[1].sent[0];
+  h.workers[1].emit({id: restore.id, res: '{"__error":"restore failed"}'});
+  await recovery;
+  assert.equal(r.restored.length, 0);
+  const overlay = h.body.children[0];
+  assert.match(overlay.children[0].textContent, /restore failed/);
+  overlay.children.find(c => c.textContent === "Download last confirmed session").click();
+  assert.deepEqual(r.downloads, [r.snapshot]);
+});
+
+test("repeated cancellation during restart creates only one replacement worker", async () => {
+  const h = harness(); await recoverableBoot(h);
+  const first = h.window.duplotrainCancel(); const second = h.window.duplotrainCancel();
+  assert.equal(h.workers.length, 2);
+  h.workers[1].emit({ready: true}); await new Promise(resolve => setImmediate(resolve));
+  const restore = h.workers[1].sent[0]; h.workers[1].emit({id: restore.id, res: '{"revision":1}'});
+  await Promise.all([first, second]);
+  assert.equal(h.workers.length, 2);
+});

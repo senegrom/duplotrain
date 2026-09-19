@@ -181,6 +181,16 @@ class _LatticeArcGeometry:
         return pose[5] * 2
 
 
+@dataclass(frozen=True)
+class _EditState:
+    """Small history record; exact immutable layouts remain structurally shared."""
+
+    inventory: tuple[tuple[str, int], ...]
+    stones: tuple[tuple[str, int], ...]
+    unlimited: bool
+    label: str
+
+
 @dataclass
 class Session:
     """The editor's server-side state: the layout being built, and how it got there."""
@@ -197,6 +207,28 @@ class Session:
     lock: threading.Lock = field(default_factory=threading.Lock)
     revision: int = 0
     _candidate_revision: int | None = None
+    _history_state: list[_EditState] = field(default_factory=list, init=False, repr=False)
+    _future: list[tuple[Layout, _EditState]] = field(default_factory=list, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if not self.history:
+            self.history = [Layout()]
+        self._history_state = [self._edit_state("layout change") for _ in self.history]
+
+    def _edit_state(self, label: str) -> _EditState:
+        return _EditState(tuple(self.inventory.items()), tuple(self.stones.items()),
+                          self.unlimited, label)
+
+    def _sync_history(self) -> None:
+        # Keep the historical public ``history=[Layout(...)]`` construction seam.
+        if len(self._history_state) != len(self.history):
+            self._history_state = [self._edit_state("layout change") for _ in self.history]
+            self._future.clear()
+        self._history_state[-1] = self._edit_state(self._history_state[-1].label)
+
+    def _restore_edit(self, edit: _EditState) -> None:
+        self.inventory, self.stones = dict(edit.inventory), dict(edit.stones)
+        self.unlimited = edit.unlimited
 
     # -- state ------------------------------------------------------------------
 
@@ -234,9 +266,7 @@ class Session:
         if type(on) is not bool:
             raise ValueError("unlimited must be a boolean")
         if self.unlimited != on:
-            self._check_snapshot({**self.snapshot(), "unlimited": on})
-            self.unlimited = on
-            self._invalidate()
+            self._commit(self.layout, unlimited=on, label="sandbox change")
 
     @staticmethod
     def _check_snapshot(snapshot: dict[str, Any]) -> None:
@@ -247,12 +277,29 @@ class Session:
         if len(json.dumps(snapshot, ensure_ascii=True).encode("utf-8")) > MAX_SNAPSHOT_BYTES:
             raise ValueError("session is too large to save; remove pieces before adding more")
 
-    def _push(self, layout: Layout) -> None:
-        self._check_snapshot(self.snapshot(layout=layout))
+    def _commit(
+        self, layout: Layout, *, inventory: dict[str, int] | None = None,
+        stones: dict[str, int] | None = None, unlimited: bool | None = None,
+        label: str = "layout change",
+    ) -> None:
+        inventory = dict(self.inventory if inventory is None else inventory)
+        stones = dict(self.stones if stones is None else stones)
+        unlimited = self.unlimited if unlimited is None else unlimited
+        self._check_snapshot({**self.snapshot(layout=layout), "inventory": inventory,
+                              "stones": stones, "unlimited": unlimited})
+        # Validation is complete before any history, ownership or revision changes.
+        self._sync_history()
         self.history.append(layout)
+        self.inventory, self.stones, self.unlimited = inventory, stones, unlimited
+        self._history_state.append(self._edit_state(label))
         if len(self.history) > 200:
             del self.history[1:2]
+            del self._history_state[1:2]
+        self._future.clear()
         self._invalidate()
+
+    def _push(self, layout: Layout, label: str = "layout change") -> None:
+        self._commit(layout, label=label)
 
     # -- serialisation for the front end ----------------------------------------
 
@@ -346,9 +393,8 @@ class Session:
             **self.snapshot(layout=layout),
             "inventory": inventory, "stones": stones, "unlimited": unlimited,
         })
-        # _push may reject geometry/size; do not change owned counts beforehand.
-        self._push(layout)
-        self.inventory, self.stones, self.unlimited = inventory, stones, unlimited
+        self._commit(layout, inventory=inventory, stones=stones, unlimited=unlimited,
+                     label="project restore")
 
     @staticmethod
     def _validated_counts(counts: object, known: Mapping) -> dict[str, int]:
@@ -441,6 +487,9 @@ class Session:
             ],
             "palette": palette,
             "can_undo": len(self.history) > 1,
+            "can_redo": bool(self._future),
+            "undo_label": self._history_state[-1].label if len(self.history) > 1 else None,
+            "redo_label": self._future[-1][1].label if self._future else None,
             "revision": self.revision,
             "snapshot": self.snapshot(),
             "candidates": [
@@ -508,25 +557,35 @@ class Session:
             from .geometry import ORIGIN
 
             layout, _ = self.layout.with_piece(piece, piece.frame_for(entry, ORIGIN))
-        self._push(layout)
+        self._push(layout, "attach piece")
 
     def join(self, a: End, b: End) -> None:
         a, b = _end(a, "a"), _end(b, "b")
         opens = self.layout.connectable_ends()
         if a == b or a not in opens or b not in opens:
             raise ValueError("pick two distinct open ends to join")
-        self._push(self.layout.join(a, b))
+        self._push(self.layout.join(a, b), "join ends")
 
     def remove_piece(self, placement: int) -> None:
-        self._push(self.layout.remove(_index(placement, "placement")))
+        self._push(self.layout.remove(_index(placement, "placement")), "remove piece")
 
     def undo(self) -> None:
         if len(self.history) > 1:
-            self.history.pop()
+            self._sync_history()
+            self._future.append((self.history.pop(), self._history_state.pop()))
+            self._restore_edit(self._history_state[-1])
+            self._invalidate()
+
+    def redo(self) -> None:
+        if self._future:
+            layout, edit = self._future.pop()
+            self.history.append(layout)
+            self._history_state.append(edit)
+            self._restore_edit(edit)
             self._invalidate()
 
     def clear(self) -> None:
-        self._push(Layout())
+        self._push(Layout(), "clear layout")
 
     def set_inventory(self, counts: Mapping[str, Any]) -> None:
         validated = self._validated_counts(counts, {**self.catalog, **ACCESSORIES})
@@ -534,9 +593,8 @@ class Session:
         for pid, n in validated.items():
             (inventory if pid in self.catalog else stones)[pid] = n
         if inventory != self.inventory or stones != self.stones:
-            self._check_snapshot({**self.snapshot(), "inventory": inventory, "stones": stones})
-            self.inventory, self.stones = inventory, stones
-            self._invalidate()
+            self._commit(self.layout, inventory=inventory, stones=stones,
+                         label="inventory change")
 
     def add_set(self, code: str) -> None:
         """Add one boxed set, applying the same atomic count checks as manual edits."""
@@ -564,7 +622,8 @@ class Session:
         if type(remove_only) is not bool:
             raise ValueError("remove must be a boolean")
         if (stone_id, at_port) in self.layout.stone_entries_on(placement):
-            self._push(self.layout.without_accessory(placement, stone_id, at_port=at_port))
+            self._push(self.layout.without_accessory(placement, stone_id, at_port=at_port),
+                       "remove stone")
             return
         if remove_only:
             raise ValueError("no such stone at the selected position")
@@ -572,7 +631,7 @@ class Session:
             raise ValueError(f"action stones clip onto straights, not {piece.id!r}")
         if self.stones_remaining().get(stone_id, 0) <= 0:
             raise ValueError(f"no {stone_id!r} left (edit the inventory)")
-        self._push(self.layout.with_accessory(placement, stone_id, at_port=at_port))
+        self._push(self.layout.with_accessory(placement, stone_id, at_port=at_port), "place stone")
 
     def _arc_closures(
         self, grow: End, close: End, max_results: int, max_pieces: int = 26
@@ -760,6 +819,7 @@ class Session:
         progress: object = None,
         max_pieces: int = 26,
         search_effort: int = 1,
+        cancel_check: object = None,
     ) -> dict:
         """Search for completions; returns {found, aborted, searched[, reason]}.
 
@@ -803,6 +863,8 @@ class Session:
             )
 
         def publish(candidates: list[Solution], outcome: dict) -> dict:
+            if cancel_check is not None:
+                cancel_check()
             # Candidate indices change even on unchanged geometry. Publish only
             # after all validation/search work succeeds: failed oracle, solver or
             # progress callbacks must leave revision and previous candidates alone.
@@ -871,6 +933,8 @@ class Session:
         memo: dict = {}
 
         def stage_progress(nodes: int) -> None:
+            if cancel_check is not None:
+                cancel_check()
             if progress is not None:
                 progress(searched + nodes)
 
@@ -937,12 +1001,16 @@ class Session:
         if any(n - used.get(pid, 0) > remaining.get(pid, 0)
                for pid, n in chosen.piece_counts.items()):
             raise ValueError("candidate exceeds the current inventory (solve again)")
-        self._push(chosen)
+        self._push(chosen, "apply completion")
 
 
 # --------------------------------------------------------------------------------------
 # Shared API dispatch
 # --------------------------------------------------------------------------------------
+
+
+class SearchCancelledError(ValueError):
+    """A cooperative cancellation left the last confirmed session untouched."""
 
 
 class UnknownRouteError(ValueError):
@@ -956,12 +1024,14 @@ class RevisionConflictError(ValueError):
 MUTATING_ROUTES = frozenset({
     "/api/attach", "/api/join", "/api/undo", "/api/remove", "/api/clear",
     "/api/inventory", "/api/unlimited", "/api/add_set", "/api/stone",
-    "/api/solve", "/api/apply", "/api/import", "/api/restore",
+    "/api/solve", "/api/apply", "/api/import", "/api/restore", "/api/redo",
+    "/api/project/open",
 })
 
 
 def dispatch_session(
-    session: Session, path: str, body: object, progress: object = None
+    session: Session, path: str, body: object, progress: object = None,
+    cancel_check: object = None,
 ) -> dict[str, Any]:
     """Shared HTTP/Pyodide API. Call with the session lock on threaded hosts."""
     if not isinstance(body, dict):
@@ -973,7 +1043,7 @@ def dispatch_session(
         return session.state(preview_format=preview_format)
     if path == "/api/export":
         return layout_to_dict(session.layout)
-    if path not in MUTATING_ROUTES:
+    if path not in MUTATING_ROUTES and path not in ("/api/check", "/api/drive"):
         raise UnknownRouteError(f"no route {path}")
     revision = body.get("revision")
     if type(revision) is not int or revision != session.revision:
@@ -987,6 +1057,8 @@ def dispatch_session(
         session.join(body["a"], body["b"])
     elif path == "/api/undo":
         session.undo()
+    elif path == "/api/redo":
+        session.redo()
     elif path == "/api/remove":
         session.remove_piece(body["placement"])
     elif path == "/api/clear":
@@ -1003,20 +1075,37 @@ def dispatch_session(
             body.get("at_port"), remove_only=body.get("remove", False),
         )
     elif path == "/api/solve":
+        if cancel_check is not None:
+            cancel_check()
         outcome = session.solve_gap(
             body.get("grow"), body.get("close"),
             body.get("slop", 0.0), body.get("max_results", 10),
             reversing=body.get("reversing", False), progress=progress,
             max_pieces=body.get("max_pieces", 26),
-            search_effort=body.get("search_effort", 1),
+            search_effort=body.get("search_effort", 1), cancel_check=cancel_check,
         )
         return {**outcome, **session.state(preview_format=preview_format)}
     elif path == "/api/apply":
         session.apply_candidate(body["index"], body.get("revision"))
     elif path == "/api/import":
-        session._push(layout_from_dict(body.get("data"), session.catalog))
+        session._push(layout_from_dict(body.get("data"), session.catalog), "import layout")
     elif path == "/api/restore":
         session.restore(body.get("data"))
+    elif path == "/api/project/open":
+        from .editor_tools import validate_project
+
+        project = validate_project(body.get("data"))
+        session.restore(project["session"])
+        return {**session.state(preview_format=preview_format),
+                "project": {"name": project["name"], "preferences": project["preferences"]}}
+    elif path == "/api/check":
+        from .editor_tools import check_session
+
+        return check_session(session)
+    elif path == "/api/drive":
+        from .editor_tools import trace_train
+
+        return trace_train(session, body.get("start"), body.get("max_steps", 10000))
     else:
         raise UnknownRouteError(f"no route {path}")
     return session.state(preview_format=preview_format)
