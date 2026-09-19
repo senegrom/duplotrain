@@ -736,14 +736,19 @@ def exercise_project_history_and_tools(page):
     expect(page.locator("#max-pieces")).to_have_value("52")
     expect(page.locator("#project-name")).to_have_value("Portable circle")
     field = page.locator('[data-piece-id="curve"] input')
+    # Locator assertions wait for accepted UI state without dynamic string eval;
+    # this helper also runs under the production CSP in the real worker test.
     field.fill("2")
     field.press("Tab")
-    page.wait_for_function("!apiBusy && S.inventory.owned.curve === 2")
+    expect(page.locator('[data-piece-id="curve"] .count')).to_have_text("0/")
+    expect(field).to_have_value("2")
     page.locator("#undo").tap()
-    page.wait_for_function("!apiBusy && S.inventory.owned.curve === 15")
+    expect(page.locator('[data-piece-id="curve"] .count')).to_have_text("3/")
+    expect(field).to_have_value("15")
     assert page.evaluate("S.layout.placements.length") == 12
     page.locator("#redo").tap()
-    page.wait_for_function("!apiBusy && S.inventory.owned.curve === 2")
+    expect(page.locator('[data-piece-id="curve"] .count')).to_have_text("0/")
+    expect(field).to_have_value("2")
     page.locator("#check-layout").tap()
     expect(page.locator("#diagnostics")).to_contain_text("Connectors: exactly closed")
     expect(page.locator("#diagnostics")).to_contain_text("Overlaps: 0")
