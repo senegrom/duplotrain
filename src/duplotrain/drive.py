@@ -34,7 +34,7 @@ from itertools import product
 from .layout import End, Layout
 
 __all__ = [
-    "ClassificationLimitError", "DriveLimitError", "DriveReport", "drive",
+    "ClassificationLimitError", "DriveLimitError", "DriveReport", "DriveTerminal", "drive",
     "endless_run", "classify", "drivable_universe",
 ]
 
@@ -58,6 +58,21 @@ class ClassificationLimitError(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class DriveTerminal:
+    """A stopping event, not an extra traversal in ``DriveReport.steps``.
+
+    ``entry`` is the inward port of the final pass; ``at_port`` is the reached
+    face, or None for a midpoint stop. Reasons are stop_stone, buffer, open_end
+    and dead_route. Endless runs have no terminal event.
+    """
+
+    placement: int
+    entry: int
+    at_port: int | None
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class DriveReport:
     """What happened to the train.
 
@@ -76,6 +91,7 @@ class DriveReport:
     reversals: int
     visited: frozenset[int]
     final_switch_states: Mapping[int, int]
+    terminal: DriveTerminal | None = None
 
     @property
     def period(self) -> int | None:
@@ -162,7 +178,9 @@ def drive(
     seen: dict[tuple, int] = {}
     reversals = 0
 
-    def finish(outcome: str, here: int) -> DriveReport:
+    def finish(
+        outcome: str, here: int, reason: str, at_port: int | None = None,
+    ) -> DriveReport:
         return DriveReport(
             outcome=outcome,
             steps=tuple(steps),
@@ -170,6 +188,7 @@ def drive(
             reversals=reversals,
             visited=frozenset(p for p, _e, _x in steps) | {here},
             final_switch_states=dict(states),
+            terminal=DriveTerminal(here, entered, at_port, reason),
         )
 
     for _ in range(max_steps):
@@ -193,7 +212,7 @@ def drive(
         # it starts past the trigger (DUPLO locos are longer than anything beyond),
         # so entering *via* that port leaves it silent.
         if any(sid == STOP_STONE and pos is None for sid, pos in stones):
-            return finish("stopped", placement)
+            return finish("stopped", placement, "stop_stone")
 
         if any(sid == DIRECTION_STONE and pos is None for sid, pos in stones):
             # One reversal per pass: in, trigger, back out the way it came.
@@ -202,7 +221,7 @@ def drive(
         else:
             options = [exit_port for exit_port, _route in piece.transit(entered)]
             if not options:
-                return finish("derailed", placement)  # a dead route (cannot happen today)
+                return finish("derailed", placement, "dead_route", entered)
             if len(options) > 1:
                 # Facing move: follow the tongue (fall back to the first branch if
                 # the recorded state isn't one of these options).
@@ -220,7 +239,7 @@ def drive(
         # one we originally entered through. Only the *initial departure* from
         # that face is silent; a return toward it must encounter its stones.
         if any(sid == STOP_STONE and pos == exit_port for sid, pos in stones):
-            return finish("stopped", placement)
+            return finish("stopped", placement, "stop_stone", exit_port)
 
         steps.append((placement, entered, exit_port))
         if any(sid == DIRECTION_STONE and pos == exit_port for sid, pos in stones):
@@ -233,10 +252,10 @@ def drive(
             continue
 
         if exit_port in piece.sealed:
-            return finish("buffered", placement)
+            return finish("buffered", placement, "buffer", exit_port)
         link = layout.links.get((placement, exit_port))
         if link is None:
-            return finish("derailed", placement)
+            return finish("derailed", placement, "open_end", exit_port)
         placement, entered = link
 
     raise DriveLimitError("drive() exceeded its MAX_STEPS budget; no verdict was made")

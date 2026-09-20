@@ -17,6 +17,7 @@ from typing import Any
 from .bridge_completion import bridge_completion
 from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
 from .completion_search import solve_completion as solve
+from .editor_tools import switch_choices
 from .geometry import ORIGIN, Pose, steps_to_degrees
 from .lattice import LatticePoint, from_alg_xy, z_from_alg
 from .layout import End, Layout, Placement, layout_from_dict, layout_to_dict
@@ -465,6 +466,7 @@ class Session:
             "layout": self._layout_json(layout, port_poses),
             "open_ends": [list(end) for end in layout.connectable_ends()],
             "matable": mates,
+            "train_switches": switch_choices(layout),
             "inventory": {
                 "owned": {pid: self.inventory.get(pid, 0) for pid in self.catalog},
                 "remaining": self.remaining(),
@@ -585,7 +587,10 @@ class Session:
             self._invalidate()
 
     def clear(self) -> None:
-        self._push(Layout(), "clear layout")
+        # Clearing nothing is not an edit: preserve redo, candidates and revision.
+        # Deliberate import/restore and candidate publication keep their semantics.
+        if self.layout.placements:
+            self._push(Layout(), "clear layout")
 
     def set_inventory(self, counts: Mapping[str, Any]) -> None:
         validated = self._validated_counts(counts, {**self.catalog, **ACCESSORIES})
@@ -1105,7 +1110,8 @@ def dispatch_session(
     elif path == "/api/drive":
         from .editor_tools import trace_train
 
-        return trace_train(session, body.get("start"), body.get("max_steps", 10000))
+        return trace_train(session, body.get("start"), body.get("max_steps", 10000),
+                           switch_states=body.get("switch_states"))
     else:
         raise UnknownRouteError(f"no route {path}")
     return session.state(preview_format=preview_format)

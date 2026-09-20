@@ -82,3 +82,10 @@
   .stone-inventory input { width: 60px; }
   select:focus-visible, canvas:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); }
   body.busy #cancel-search, body.busy #export, body.busy #save-project { pointer-events: auto; opacity: 1; }
+
+/* Backup management is explicit and separate from the current design. */
+#project-manage { border:1px solid #c9c3b8; padding:8px; margin-top:8px; }
+#project-manage p { overflow-wrap:anywhere; }
+#project-status { font-size:12px; margin:6px 0; }
+#project-slots { max-width:100%; }
+#train-switches label { display:block; margin:5px 0; }
