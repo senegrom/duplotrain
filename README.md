@@ -163,6 +163,15 @@ solver — candidates are listed with their gap (exact or forced), preview as gh
 hover, and apply with a click. Export/import round-trips the same exact-geometry JSON
 the CLI uses.
 
+Beyond closing loops, the editor keeps a bounded undo/redo history of track, owned
+pieces and sandbox mode, checks a layout for open connectors, sampled overlaps and
+stock shortages, saves and opens portable projects (the session plus view and search
+settings) with append-only local copies, and traces a test train from a chosen start
+through the drive model. [docs/editor.md](docs/editor.md) states those contracts;
+[docs/performance.md](docs/performance.md) and
+[docs/search-correctness.md](docs/search-correctness.md) describe how the searches
+stay fast and why their pruning is sound.
+
 The same completion search is available as a library call — "I built this much by
 hand, close it for me":
 

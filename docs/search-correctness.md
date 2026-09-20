@@ -102,8 +102,8 @@ selected endpoints should still be joined directly instead of searched.
 ## Exact reverse reachability is an overapproximation
 
 For completion searches, reverse breadth-first tables contain all planar-pose
-and height projections that can reach the anchor in at most six traversals by
-default. Both arithmetic engines use exact values. Separating the projections
+and height projections that can reach the anchor in at most k traversals, for
+k up to the horizon of ten. Both arithmetic engines use exact values. Separating the projections
 avoids multiplying states for bridge routes: each may admit a different route,
 which enlarges the allowed set. The move pool includes routes through preplaced
 pieces, even when none remain in inventory. Stock counts, placement frames and
@@ -155,9 +155,9 @@ The general field engine similarly uses rational forms on its exact coefficients
 including all four height coefficients. No floating tolerance enters these bounds.
 
 All routes, free-transit allowances and present/future targets use the same
-conservative rules as the short tables. Both share the
-existing `min(4096, max_nodes // 8)` preprocessing cap, and neither publishes an
-unfinished layer. Stable zero-motion envelopes are reused at every greater depth,
+conservative rules as the short tables. Both share the progressive
+preprocessing allowance (`min(4096, max_nodes // 8)` expansions at once, 24
+more per DFS node, at most 262,144), and neither publishes an unfinished layer. Stable zero-motion envelopes are reused at every greater depth,
 so an empty move pool and a huge inventory cannot allocate endless identical
 layers. The future-target query cache is limited to 4096 entries per search.
 
@@ -199,6 +199,21 @@ free turning transits on rotated and elevated switches, and a custom junction
 traversed twice. Independent witnesses include forced joints and zero new pieces.
 The mixed-inventory benchmarks also pin eight audited results below 25,000 nodes
 for exact, 1 mm and 5 mm searches.
+
+## Stock-aware reach and base routes
+
+For an inventory without new junctions, the remaining reach of a tail is
+bounded by the longest available pieces that fit the current contour, with the
+candidate piece subtracted before its child is checked, so one spent bridge
+cannot make every later move look able to span a bridge's length. The early
+child check applies only to states without open stubs or reversing-loop
+targets; an inventory with new junctions keeps the plain rules, because a
+junction may later supply free transits. The tables pool every stock traversal
+and only the usable routes of base-only junctions: both route ports must be
+open on the same placement, and sealed, linked and selected endpoint ports
+serve no transit. No base piece is ignored as an obstacle, and free ports only
+disappear during growth, so the initial route set stays an overapproximation
+throughout backtracking.
 
 ## Slippage uses physical distances and one remaining budget
 
@@ -294,11 +309,14 @@ precedence over direction stones at the same position. The ordinary repeated-sta
 check also detects oscillations entirely inside one piece, including two guarded
 faces, without falsely claiming coverage of other track.
 
-`DriveReport.steps` now records each pass as `(placement, departure, reached)`.
+`DriveReport.steps` records each pass as `(placement, departure, reached)`.
 A face turnaround and its return are separate passes; a mid-piece bounce reaches
-its own departure port. Consequently face-reversing runs can have larger `steps`
-and `period` values than before. These are discrete pass counts, not travel times.
-No change is made to saved layout JSON or the formal lazy-switch theorem.
+its own departure port, so face-reversing runs have correspondingly larger
+`steps` and `period` values. These are discrete pass counts, not travel times.
+`DriveReport.terminal` records the stopping event (stop stone, buffer, open end
+or dead route) with its piece, inward entry and reached face without adding a
+pass; endless runs have none. Saved layout JSON and the formal lazy-switch
+theorem are untouched.
 
 ## Remove the selected stone, not the last stone of that colour
 
@@ -332,6 +350,17 @@ Backtracking removes a placement's cell entries by placement rather than by
 stack position, because a late-binned placement may sit below a newer one in a
 shared cell. The final overlap audit of every returned layout is unchanged and
 still bins eagerly.
+
+## The bounds index only screens
+
+A field of at least 128 clouds keeps a lazy 256 mm grid of sample bounding
+boxes for the broad phase. A query expands by its own half-width plus the
+greatest stored half-width less the touching margin, boxes spanning more than
+64 cells live in a fallback list, oversized or non-finite queries take the
+linear path, and grid boundaries round outward, so every cloud the linear scan
+would consider is returned; each returned cloud is still tested with its own
+width, the box inequalities and the sampled points. Clouds are deduplicated by
+identity, and the index belongs to one field.
 
 ## Free transits need a reachable entry
 

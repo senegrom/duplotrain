@@ -38,8 +38,6 @@ must export as ordinary pieces, preserve the base, close exactly, and pass a com
 layout collision audit. Applying and undoing the candidate must retain the base.
 
 The default infinite-pieces request (`max_pieces=26`, `max_results=8`, zero slop)
-originally found eight 24-piece extensions in 190,000 aggregate search nodes.
-The subsequent direction-portfolio and suffix-lookup review reduces this to 32,441
-nodes with the same settings, and the alternating direction schedule to
-1,878 nodes; see [the full review and benchmark](search-review.md). These are model-validated layouts, not new measurements of real
-bridge clearance.
+finds eight 24-piece extensions in 1,878 nodes from the default end and 854 from
+the other; with the finite box, 1,742 and 718. These are model-validated
+layouts, not measurements of real bridge clearance.
