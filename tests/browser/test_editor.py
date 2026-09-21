@@ -962,7 +962,8 @@ def exercise_geometry_optimisations(page):
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawLayout({placements}, false);
         const [sx, sy] = worldToScreen(x, y), ratio = window.devicePixelRatio || 1;
-        return Array.from(ctx.getImageData(Math.floor(sx * ratio), Math.floor(sy * ratio), 1, 1).data);
+        return Array.from(ctx.getImageData(
+          Math.floor(sx * ratio), Math.floor(sy * ratio), 1, 1).data);
       };
       try {
         view = {x: 0, y: 0, scale: 0.8};
