@@ -119,6 +119,14 @@ Tracks, 10882 Track pack) and the 2024 sets (10425 Tunnel, 10426 Bridge expansio
 with per-set piece counts from the published inventories — repeat a flag to own a
 set twice. Sets also contribute their **action stones** (below).
 
+`duplotrain check` audits the geometry of every recorded joint, not just whether the
+connectors have link records: it exits 1 for empty or open layouts, non-exact joints
+and incompatible headings, elevations or connector plates. `--slop 5` accepts up to
+5 mm of **total** planar joint gap in a fully linked layout with a forced-fit warning;
+it never excuses elevation or heading errors and checks no collisions away from the
+joints. The editor recomputes joint warnings after import and reload, so an exported
+forced fit cannot become an “exact” layout.
+
 ## Action stones and reversing loops
 
 The coloured inserts that clip onto a straight are modelled as accessories: red stop,
@@ -161,7 +169,12 @@ it snaps on. Junction stubs are clickable ends like any other, piece counts come
 your editable inventory, and **Close the loop** hands the layout to the completion
 solver — candidates are listed with their gap (exact or forced), preview as ghosts on
 hover, and apply with a click. Export/import round-trips the same exact-geometry JSON
-the CLI uses.
+the CLI uses. On phones the canvas sits above the scrolling controls: drag to pan,
+pinch or use +/− to zoom, and use the Remove tool to delete a stone or piece.
+Completion cards require Preview before Apply, and inventory changes invalidate old
+suggestions. Searches report whether the inventory was exhausted or a node, result or
+piece limit stopped them; Search deeper raises the added-piece limit from 26 up to
+128, and an unsuccessful capped search never proves that no layout exists.
 
 Beyond closing loops, the editor keeps a bounded undo/redo history of track, owned
 pieces and sandbox mode, checks a layout for open connectors, sampled overlaps and
@@ -423,9 +436,26 @@ python -m pytest -m "not slow"              # skip the ~2 min full-enumeration p
 python -m pytest -m "not slow and not browser"  # what application CI runs first
 ```
 
-Tests marked `browser` need playwright plus a downloaded browser. Missing defaults
-skip locally; explicit browser paths and all browser startup failures in CI fail. See *Editor recovery and application checks* below for the
-full local command sequence.
+The full local sequence, which is what application CI runs on every push and pull
+request (plus a clean base installation without matplotlib; the Lean workflow checks
+proof changes independently):
+
+```sh
+python -m pip install -e '.[dev]'
+ruff check src webapp
+python -m pytest -m 'not slow and not browser'
+node --test tests/web/*.test.cjs
+# Browser integration, including the real Pyodide worker:
+python -m pip install playwright
+python -m playwright install chromium webkit
+python webapp/build.py
+DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m pytest tests/browser -m browser
+DUPLOTRAIN_BROWSER=webkit DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m pytest tests/browser -m browser
+```
+
+Tests marked `browser` need playwright plus a downloaded browser. Locally, only an
+absent default browser may skip them; CI sets `DUPLOTRAIN_REQUIRE_BROWSER=1`, and
+explicit browser paths and every browser startup failure are errors.
 
 The suite covers the number field, the pose lattice, piece derivation, the documented
 geometric identities (the `L,R,R,L` snake equals four straights exactly; `R,R,L,L`
@@ -448,63 +478,3 @@ Rendered output of the exhaustive searches, in [`docs/`](docs/):
 
 *Not affiliated with the LEGO Group. LEGO and DUPLO are trademarks of the LEGO Group.*
 
-
-## Editor recovery and application checks
-
-The editor automatically saves exact layout geometry, owned track and stone counts,
-and sandbox mode in this browser's local storage. A fresh engine restores that session;
-an already-running local server keeps its newer session. Storage is device/browser-local,
-not a cloud backup. Export JSON for a portable copy of the layout. Storage or recovery
-errors are shown without overwriting an unreadable checkpoint. Clear remains undoable
-within the current session; undo history is not persisted across engine restarts.
-
-On phones, the canvas sits above the scrolling controls. Drag to pan, pinch or use
-+/− to zoom, and use the visible Remove tool to delete a stone or piece. Completion
-cards require Preview before Apply. Inventory changes invalidate old suggestions.
-
-Completion searches report whether the inventory was exhausted or a node, result or
-piece limit stopped the search. The editor starts at 26 added pieces; Search deeper
-increases that limit, up to 128. An unsuccessful capped search is not a proof that
-no layout exists. Arc shortcuts and staged searches are explicitly non-exhaustive.
-
-Run application checks locally:
-
-```sh
-python -m pip install -e '.[dev]'
-ruff check src webapp
-python -m pytest -m 'not slow and not browser'
-node --test tests/web/*.test.cjs
-# Browser integration, including the real Pyodide worker:
-python -m pip install playwright
-python -m playwright install chromium webkit
-python webapp/build.py
-DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m pytest tests/browser -m browser
-DUPLOTRAIN_BROWSER=webkit DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m pytest tests/browser -m browser
-```
-
-Application CI runs these checks on pushes and pull requests, including a clean base
-installation without matplotlib. The independent Lean workflow checks proof changes.
-Package license metadata reads the repository's LICENSE file (GNU AGPL v3), rather
-than declaring an inconsistent MIT license.
-
-### Autosave conflicts and geometric checks
-
-Autosave checkpoints carry unique revisions. Web Locks serialize cross-tab writes;
-a tab that detects another writer pauses autosave and asks you to export its work
-before reloading. Redrawing or closing a stale tab never rewrites a newer checkpoint.
-Previous saves migrate read-only into a new storage key, isolated from tabs still
-running the old editor. When safe locking or storage is unavailable, the editor
-warns you to export instead. Saves remain browser-local, not a backup service.
-
-`duplotrain check layout.json` checks the geometry of every recorded joint, not
-just whether all connectors have link records. It exits 1 for empty/open layouts,
-non-exact joints, and incompatible headings, elevations, or connector plates.
-`--slop 5` explicitly accepts up to 5 mm of **total** planar joint gap in a fully
-linked layout, with a forced-fit warning; it never excuses elevation or heading
-errors and is not a physical-fit guarantee. Collisions away from joints are not
-checked by this command. The editor recomputes joint warnings after import and
-reload, so exported forced fits cannot silently become “exact” layouts.
-
-Browser CI requires Playwright and its binaries (`DUPLOTRAIN_REQUIRE_BROWSER=1`).
-Only absent, unconfigured defaults may skip locally; crashes and bad custom paths
-are errors. Dependabot checks Python and GitHub Actions dependencies weekly.

@@ -77,6 +77,21 @@ are reported, and reaching that bound marks the check incomplete. A clean
 report is a model result at 8 mm sampling, not a physical-clearance guarantee,
 and manual layouts stay editable whatever it says.
 
+## Autosave
+
+The editor saves the exact layout, the owned track and stone counts and the
+sandbox flag in the browser's local storage after every change. A fresh engine
+restores that session; a local server that is already running keeps its newer
+session. Checkpoints carry unique revisions and Web Locks serialise writes
+across tabs: a tab that sees another writer pauses its autosave and asks you to
+export before reloading, and redrawing or closing a stale tab never rewrites a
+newer checkpoint. Saves from older editor versions migrate read-only into a new
+storage key, isolated from tabs still running the old editor. Without safe
+locking or storage the editor warns you to export instead, and a storage or
+recovery error is shown without overwriting an unreadable checkpoint. Autosave
+is device- and browser-local, not a backup: export JSON or save a project for a
+portable copy. Undo history is not persisted across engine restarts.
+
 ## Projects and local copies
 
 Export JSON keeps the `duplotrain-layout/1` format. A project

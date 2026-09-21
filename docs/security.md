@@ -37,7 +37,8 @@ this HTTP listener; its transport and engine rules have not changed.
 
 Both workflows use read-only repository tokens, disable checkout credential
 persistence, and pin actions to upstream commit SHAs. Version comments allow
-Dependabot to maintain those pins. The Lean workflow downloads the versioned
+Dependabot to maintain those pins, and it checks Python and GitHub Actions
+dependencies weekly. The Lean workflow downloads the versioned
 elan Linux release archive, checks its reviewed SHA-256 before extracting or
 executing it, and keeps the existing `lean-toolchain` version and axiom audit.
 
