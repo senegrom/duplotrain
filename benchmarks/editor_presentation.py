@@ -73,8 +73,10 @@ def main():
         args.states_dir.mkdir(parents=True, exist_ok=True)
     for name, session in sessions:
         report, check_ms = timed(lambda session=session: check_session(session), args.repeats)
-        body, state_ms = timed(lambda session=session: encoded(session.state(preview_format=PREVIEW_FORMAT)),
-                               args.repeats)
+        body, state_ms = timed(
+            lambda session=session: encoded(session.state(preview_format=PREVIEW_FORMAT)),
+            args.repeats,
+        )
         pair_checks, original = 0, CollisionField.near
 
         def counted(*a, original=original, **kw):
