@@ -186,6 +186,15 @@ class CollisionField:
                 found[id(cloud)] = cloud
         return (*self._wide_clouds, *found.values())
 
+    def nearby_placements(self, bounds: _Bounds, half_width: float) -> list[int]:
+        """Sorted, distinct IDs conservatively shortlisted by the bounds index.
+
+        This is not an overlap verdict: callers must still check each pair with
+        ``near`` and ``clashes``, applying their own neighbour exemptions. Small
+        fields and oversized queries return all IDs. Deferred samples stay deferred.
+        """
+        return sorted({cloud.placement for cloud in self._near_clouds(bounds, half_width)})
+
     def _prepare(
         self,
         points: list[_Point],

@@ -12,6 +12,7 @@ import math
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any
 
 from .bridge_completion import bridge_completion
@@ -81,6 +82,21 @@ def _end(value: object, name: str) -> End:
 def _signed_degrees(dheading: int) -> int:
     degrees = steps_to_degrees(dheading)
     return degrees - 360 if degrees >= 180 else degrees
+
+
+@lru_cache(maxsize=2048)
+def _drawing_lines(placement: Placement) -> tuple:
+    """Immutable presentation geometry only; never retain a Session or its links."""
+    return tuple(
+        tuple((round(x, 2), round(y, 2), round(z, 2)) for x, y, z in line)
+        for line in placement.centrelines(spacing=10.0)
+    )
+
+
+@lru_cache(maxsize=32)
+def _drawing_size(placements: tuple[Placement, ...]) -> tuple[float, float]:
+    """Bounded footprint reuse for immutable geometry, independent of topology."""
+    return Layout(placements).size()
 
 
 class _ExactArcGeometry:
@@ -309,10 +325,7 @@ class Session:
         """Disposable drawing data, never a substitute for the exact placement."""
         return {
             "width": placement.piece.width,
-            "lines": [
-                [[round(x, 2), round(y, 2), round(z, 2)] for x, y, z in line]
-                for line in placement.centrelines(spacing=10.0)
-            ],
+            "lines": [[list(point) for point in line] for line in _drawing_lines(placement)],
         }
 
     def _layout_json(
@@ -359,7 +372,7 @@ class Session:
                     ],
                 }
             )
-        width, height = layout.size()
+        width, height = _drawing_size(layout.placements)
         joint_issues = layout.joint_issues(port_poses)
         return {
             "placements": placements,
@@ -390,10 +403,7 @@ class Session:
         if type(unlimited) is not bool:
             raise ValueError("unlimited must be a boolean")
         layout = layout_from_dict(data.get("layout"), self.catalog)
-        self._check_snapshot({
-            **self.snapshot(layout=layout),
-            "inventory": inventory, "stones": stones, "unlimited": unlimited,
-        })
+        # _commit validates the complete proposed snapshot before any mutation.
         self._commit(layout, inventory=inventory, stones=stones, unlimited=unlimited,
                      label="project restore")
 
@@ -514,7 +524,7 @@ class Session:
                 "base_count": shared,
                 "placements": [self._drawing_json(p) for p in sol.layout.placements[shared:]],
             }
-            width, height = sol.layout.size()
+            width, height = _drawing_size(sol.layout.placements)
             size_cm = [round(width / 10, 1), round(height / 10, 1)]
         else:
             preview = self._layout_json(sol.layout)

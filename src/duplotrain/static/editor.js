@@ -1054,8 +1054,12 @@ let selectedPiece = null, hoveredPiece = null, highlightedPieces = [];
 let trainTrace = null, trainStep = -1, trainTimer = null, solveOperation = null;
 let framePending = false, pendingHover = null, activeOverlap = null;
 let trainConfigSequence = 0, initialSwitches = {};
-const hitBoundsCache = new WeakMap();
-const segmentCache = new WeakMap(), batchCache = new WeakMap(), previewCache = new WeakMap();
+const geometryCache = new WeakMap(), previewCache = new WeakMap();
+function drawingGeometry(placements) {
+  let geometry = geometryCache.get(placements);
+  if (!geometry) { geometry = {}; geometryCache.set(placements, geometry); }
+  return geometry;
+}
 const PROJECT_FORMAT = "duplotrain-project/1";
 const PROJECT_PREFIX = PROJECT_FORMAT + ":" + location.pathname + ":";
 let projectBaseline = null, projectBaselineSlot = null, projectManagement = null;
@@ -1070,8 +1074,8 @@ function scheduleFrame(repaint) {
   const finish = () => {
     framePending = false;
     const changed = flushHover(), render = repaintPending || changed;
+    if (repaintPending) updateProjectStatus();
     repaintPending = false;
-    updateProjectStatus();
     // Preserve the upstream optimization: unchanged hover never repaints track.
     if (render) paint();
   };
@@ -1141,7 +1145,8 @@ function strokeSegment(a, b, width, color, cap = "round") {
 }
 const interpolate = (a, b, t) => [0, 1, 2].map(i => (a[i] || 0) + ((b[i] || 0) - (a[i] || 0)) * t);
 function drawingSegments(placements) {
-  if (segmentCache.has(placements)) return segmentCache.get(placements);
+  const geometry = drawingGeometry(placements);
+  if (geometry.segments) return geometry.segments;
   const segments = [];
   placements.forEach((pl, placement) => {
     for (const line of pl.lines) {
@@ -1149,8 +1154,10 @@ function drawingSegments(placements) {
       const edges = [offsetLine(line, pl.width / 2), offsetLine(line, -pl.width / 2)];
       for (let i = 0; i + 1 < line.length; i++) {
         const a = line[i], b = line[i + 1];
-        // Bound ramp-local paint order even for sparse/custom preview geometry.
-        const divisions = Math.min(256, Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 8)));
+        // Flat sampled chords have no height-order ambiguity; only climbing
+        // edges need subdivisions for ramp-local paint and selection order.
+        const divisions = (a[2] || 0) === (b[2] || 0) ? 1 :
+          Math.min(256, Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 8)));
         for (let j = 0; j < divisions; j++) {
           const from = j / divisions, to = (j + 1) / divisions;
           const start = interpolate(a, b, from), end = interpolate(a, b, to);
@@ -1166,24 +1173,27 @@ function drawingSegments(placements) {
     }
   });
   segments.sort((a, b) => a.z - b.z || a.placement - b.placement);
-  segments.forEach((s, order) => { s.order = order; });
-  segmentCache.set(placements, segments);
+  geometry.segments = segments;
+  geometry.byPlacement = placements.map(() => []);
+  for (const segment of segments) geometry.byPlacement[segment.placement].push(segment);
   return segments;
 }
 function drawingBatches(placements) {
-  if (batchCache.has(placements)) return batchCache.get(placements);
+  const geometry = drawingGeometry(placements);
+  if (geometry.batches) return geometry.batches;
   const batches = [];
   for (const segment of drawingSegments(placements)) {
     const batch = batches[batches.length - 1], previous = batch?.[0];
     if (previous && previous.z === segment.z && previous.placement === segment.placement) batch.push(segment);
     else batches.push([segment]);
   }
-  batchCache.set(placements, batches);
+  geometry.batches = batches;
   return batches;
 }
 
 function hitCandidates(sx, sy, placements) {
-  let bounds = hitBoundsCache.get(placements);
+  const geometry = drawingGeometry(placements);
+  let bounds = geometry.bounds;
   if (!bounds) {
     bounds = placements.map(pl => {
       let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
@@ -1193,7 +1203,7 @@ function hitCandidates(sx, sy, placements) {
       }
       return {x0, x1, y0, y1, width: pl.width};
     });
-    hitBoundsCache.set(placements, bounds);
+    geometry.bounds = bounds;
   }
   const candidates = new Set();
   bounds.forEach((b, i) => {
@@ -1211,15 +1221,18 @@ function placementsAt(sx, sy) {
   if (!S) return [];
   const hits = new Map(), candidates = hitCandidates(sx, sy, S.layout.placements);
   if (!candidates.size) return [];
-  for (const seg of drawingSegments(S.layout.placements)) {
-    if (!candidates.has(seg.placement)) continue;
+  drawingSegments(S.layout.placements);
+  const grouped = drawingGeometry(S.layout.placements).byPlacement;
+  // Preserve each piece's elevation-ordered segments, but visit only pieces in
+  // the conservative shortlist rather than testing every segment's membership.
+  for (const placement of candidates) for (const seg of grouped[placement]) {
     const [ax, ay] = worldToScreen(seg.a[0], seg.a[1]), [bx, by] = worldToScreen(seg.b[0], seg.b[1]);
     const dx = bx - ax, dy = by - ay;
     const t = Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / (dx * dx + dy * dy || 1)));
     const d = Math.hypot(sx - ax - t * dx, sy - ay - t * dy);
     const half = seg.width * view.scale / 2;
     if (d >= Math.max(14, half)) continue;
-    const hit = {placement: seg.placement, d, z: seg.z, order: seg.order, painted: d < half};
+    const hit = {placement: seg.placement, d, z: seg.z, painted: d < half};
     const prev = hits.get(hit.placement);
     if (!prev || compareHits(hit, prev) < 0) hits.set(hit.placement, hit);
   }
@@ -1379,8 +1392,8 @@ function projectContentKey(data) {
   let snapshot = snapshotKeyCache.get(data.session);
   if (snapshot === undefined) { snapshot = JSON.stringify(data.session); snapshotKeyCache.set(data.session, snapshot); }
   const p = data.preferences;
-  return JSON.stringify([data.name, snapshot, p.view.x, p.view.y, p.view.scale,
-    p.search.max_pieces, p.search.slop, p.search.reversing]);
+  return {snapshot, settings: JSON.stringify([data.name, p.view.x, p.view.y, p.view.scale,
+    p.search.max_pieces, p.search.slop, p.search.reversing])};
 }
 function markProjectSaved(data, slot = null) {
   projectBaseline = projectContentKey(data); projectBaselineSlot = slot;
@@ -1393,9 +1406,12 @@ function updateProjectStatus() {
   try {
     if (!S?.snapshot) message = "No project loaded.";
     else if (projectBaseline === null) message = "No project copy saved/opened in this tab. Autosave is separate.";
-    else message = projectContentKey(projectSnapshot()) === projectBaseline ?
-      "Unchanged since last project save/open. Autosave is separate." :
-      "Changed since last project save/open — save a new copy. Autosave is separate.";
+    else {
+      const current = projectContentKey(projectSnapshot());
+      message = current.snapshot === projectBaseline.snapshot && current.settings === projectBaseline.settings ?
+        "Unchanged since last project save/open. Autosave is separate." :
+        "Changed since last project save/open — save a new copy. Autosave is separate.";
+    }
   } catch (_) { message = "Unsaved project settings are invalid; correct them before saving."; }
   if (notice.textContent !== message) notice.textContent = message;
 }

@@ -81,7 +81,8 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             self.wfile.write(payload)
 
         def _json(self, status: int, data: Any) -> None:
-            self._send(status, json.dumps(data).encode("utf-8"), "application/json")
+            payload = json.dumps(data, separators=(",", ":")).encode("utf-8")
+            self._send(status, payload, "application/json")
 
         #: Discard at most this much of a rejected body, for at most this long.
         DRAIN_BYTES = 64 * 1024

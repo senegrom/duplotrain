@@ -82,14 +82,21 @@ def check_session(session: Session) -> dict[str, Any]:
         neighbours.setdefault(a, set()).add(b)
     overlaps = []
     clouds = []
+    # Small layouts keep the original linear path. On larger layouts the shared
+    # deferred field indexes bounds, while the original one-piece fields retain
+    # exactly the same narrow-phase predicates and pair ordering.
+    spatial = CollisionField(clearance=DEFAULT_CLEARANCE) if len(layout) >= 128 else None
     complete = True
     for i, placement in enumerate(layout):
-        points = [p for line in placement.centrelines(8.0) for p in line]
+        points = placement.centreline_points(8.0)
         width = placement.piece.width / 2
         bounds = bounds_of(points)
-        for j, cloud in enumerate(clouds):
+        candidates = (spatial.nearby_placements(bounds, width)
+                      if spatial is not None else range(len(clouds)))
+        for j in candidates:
             if j in neighbours.get(i, ()):
                 continue
+            cloud = clouds[j]
             if cloud.near(bounds, width, set()) and cloud.clashes(
                 points, width, set(), underpass=placement.piece.underpass,
             ):
@@ -102,6 +109,9 @@ def check_session(session: Session) -> dict[str, Any]:
         cloud = CollisionField(clearance=DEFAULT_CLEARANCE)
         cloud.add(i, points, width, underpass=placement.piece.underpass)
         clouds.append(cloud)
+        if spatial is not None:
+            spatial.add_deferred(i, points, (0.0, 0.0, 0.0), width, bounds,
+                                 underpass=placement.piece.underpass)
     used_stones = Counter(entry[1] for entry in layout.accessories)
     missing = []
     for used, owned, catalog in (

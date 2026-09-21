@@ -23,10 +23,11 @@ def dispatch(path: str, body_json: str | None) -> str:
         if body_json and len(body_json.encode("utf-8")) > MAX_JSON_BYTES:
             raise ValueError("request body larger than 2 MB")
         body = json.loads(body_json) if body_json else {}
-        return json.dumps(dispatch_session(session, path, body, progress=_progress))
+        result = dispatch_session(session, path, body, progress=_progress)
+        return json.dumps(result, separators=(",", ":"))
     except RevisionConflictError as exc:
         return json.dumps({
             "__error": str(exc), "code": "stale_revision", "state": session.state(),
-        })
+        }, separators=(",", ":"))
     except (ValueError, KeyError, TypeError, IndexError, OverflowError, RecursionError) as exc:
-        return json.dumps({"__error": str(exc)})
+        return json.dumps({"__error": str(exc)}, separators=(",", ":"))

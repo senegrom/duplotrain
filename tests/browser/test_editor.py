@@ -429,6 +429,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         assert len(issues) == 2
         assert sum(joint["gap_mm"] for joint in issues) == pytest.approx(10)
         exercise_project_history_and_tools(page)
+        exercise_geometry_optimisations(page)
         # Force a genuine worker failure after confirmed work. Emergency downloads
         # must use the displayed snapshot, then a new worker must restore it.
         confirmed = page.evaluate("S.snapshot")
@@ -944,4 +945,53 @@ def test_clear_empty_keeps_redo_in_the_editor(editor):
     page.locator("#redo").tap()
     wait_count(page, 1)
     assert session.revision == revision + 1
+    assert not errors
+
+
+def exercise_geometry_optimisations(page):
+    """Real canvas pixels and picking agree for flat chords and local ramp heights.
+
+    Run with the same function under local hosting and production-CSP Pyodide.
+    No eval, CSP bypass, screenshots with machine-specific text, or test-only
+    rendering branch is needed.
+    """
+    result = page.evaluate("""() => {
+      const oldView = view, oldState = S;
+      const track = (lines) => ({lines, width: 64});
+      const sample = (placements, x, y) => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawLayout({placements}, false);
+        const [sx, sy] = worldToScreen(x, y), ratio = window.devicePixelRatio || 1;
+        return Array.from(ctx.getImageData(Math.floor(sx * ratio), Math.floor(sy * ratio), 1, 1).data);
+      };
+      try {
+        view = {x: 0, y: 0, scale: 0.8};
+        const flat = track([[[-128, 0, 0], [128, 0, 0]]]);
+        const detailed = track([Array.from({length: 65}, (_, i) => [-128 + i*4, 0, 0])]);
+        const sparsePixel = sample([flat], 12, 8), detailedPixel = sample([detailed], 12, 8);
+        const ramp = track([[[-128, 0, 0], [128, 0, 120]]]);
+        const level = track([[[-128, 0, 60], [128, 0, 60]]]);
+        const low = sample([ramp, level], -80, 8), lowReference = sample([level], -80, 8);
+        const high = sample([ramp, level], 80, 8), highReference = sample([ramp], 80, 8);
+        S = {...oldState, layout: {...oldState.layout, placements: [ramp, level]}};
+        const pick = (x, y) => placementAt(...worldToScreen(x, y));
+        return {sparsePixel, detailedPixel, low, lowReference, high, highReference,
+          picks: [pick(-80, 8), pick(80, 8)],
+          flatSegments: drawingSegments([flat]).length,
+          rampSegments: drawingSegments([ramp]).length};
+      } finally { view = oldView; S = oldState; draw(); }
+    }""")
+    assert result["sparsePixel"] == result["detailedPixel"]
+    assert result["low"] == result["lowReference"]
+    assert result["high"] == result["highReference"]
+    assert result["low"] != result["high"]
+    assert result["picks"] == [1, 0]
+    assert result["flatSegments"] == 1
+    assert result["rampSegments"] == 32
+
+
+def test_flat_chords_ramp_pixels_and_picking(editor):
+    page, _session, url, errors = editor
+    load(page, url)
+    exercise_geometry_optimisations(page)
     assert not errors
