@@ -45,6 +45,8 @@ async function api(path, body) {
   }
 }
 
+// One API snapshot owner. The companion geometry, projects and train scripts
+// read this state; successful API operations publish their new snapshot here.
 let S = null;                 // last /api/state payload
 let armed = null;             // {piece, entry, label}
 let armedStone = null;        // stone id
@@ -209,58 +211,6 @@ function elevColor(z) {
     }
   }
   return "rgb(185,190,196)";
-}
-
-function previewPlacements(candidate, state = S) {
-  if (!candidate) return null;
-  if (!candidate.format) return candidate.placements; // legacy API response
-  if (candidate.format !== "duplotrain-preview/1" || !state ||
-      !Array.isArray(candidate.placements) ||
-      candidate.base_revision !== state.revision ||
-      !Number.isInteger(candidate.base_count) || candidate.base_count < 0 ||
-      candidate.base_count > state.layout.placements.length) return null;
-  const base = state.layout.placements, previous = previewCache.get(candidate);
-  if (previous?.base === base && previous.added === candidate.placements &&
-      previous.count === candidate.base_count && previous.revision === state.revision) return previous.placements;
-  const placements = base.slice(0, candidate.base_count).concat(candidate.placements);
-  previewCache.set(candidate, {base, added: candidate.placements, count: candidate.base_count,
-    revision: state.revision, placements});
-  return placements;
-}
-
-function drawLayout(layout, ghost) {
-  // Same-height segments of one piece share a fill/stroke, while ramps keep
-  // their local elevation order. This avoids thousands of separate flat strokes.
-  for (const batch of drawingBatches(layout.placements)) {
-    ctx.beginPath();
-    for (const segment of batch) {
-      segment.edge.forEach(([x, y], i) => {
-        const [sx, sy] = worldToScreen(x, y); i ? ctx.lineTo(sx, sy) : ctx.moveTo(sx, sy);
-      });
-      ctx.closePath();
-    }
-    ctx.fillStyle = ghost ? "rgba(44,138,75,.35)" : elevColor(batch[0].z); ctx.fill();
-    if (!ghost) {
-      ctx.beginPath();
-      for (const segment of batch) for (const rail of segment.rails) {
-        const a = worldToScreen(rail[0][0], rail[0][1]), b = worldToScreen(rail[1][0], rail[1][1]);
-        ctx.moveTo(...a); ctx.lineTo(...b);
-      }
-      ctx.lineWidth = Math.max(1, 1.5 * view.scale); ctx.lineCap = "butt";
-      ctx.strokeStyle = "#6d7278"; ctx.stroke();
-    }
-  }
-}
-
-function offsetLine(line, d) {
-  const out = [];
-  for (let i = 0; i < line.length; i++) {
-    const a = line[Math.max(0, i - 1)], b = line[Math.min(line.length - 1, i + 1)];
-    let nx = -(b[1] - a[1]), ny = b[0] - a[0];
-    const len = Math.hypot(nx, ny) || 1;
-    out.push([line[i][0] + nx / len * d, line[i][1] + ny / len * d]);
-  }
-  return out;
 }
 
 function openEndScreenPos() {
@@ -1048,24 +998,14 @@ function initializeEditor() {
 
 document.addEventListener("DOMContentLoaded", initializeEditor, {once: true});
 
-// ---------- Revision-scoped tools, diagnostics and projects ----------
+// ---------- Revision-scoped tools and diagnostics ----------
+// Pure drawing caches live in editor-geometry.js, project bookkeeping in
+// editor-projects.js and trace state in editor-train.js. All deferred sources
+// are loaded before the single DOMContentLoaded initializer above runs.
 let interactionRevision = null, navigationRevision = null;
 let selectedPiece = null, hoveredPiece = null, highlightedPieces = [];
-let trainTrace = null, trainStep = -1, trainTimer = null, solveOperation = null;
+let solveOperation = null;
 let framePending = false, pendingHover = null, activeOverlap = null;
-let trainConfigSequence = 0, initialSwitches = {};
-const geometryCache = new WeakMap(), previewCache = new WeakMap();
-function drawingGeometry(placements) {
-  let geometry = geometryCache.get(placements);
-  if (!geometry) { geometry = {}; geometryCache.set(placements, geometry); }
-  return geometry;
-}
-const PROJECT_FORMAT = "duplotrain-project/1";
-const PROJECT_PREFIX = PROJECT_FORMAT + ":" + location.pathname + ":";
-let projectBaseline = null, projectBaselineSlot = null, projectManagement = null;
-const snapshotKeyCache = new WeakMap();
-let projectRows = new Map();
-
 let repaintPending = false;
 function draw() { scheduleFrame(true); }
 function scheduleFrame(repaint) {
@@ -1102,10 +1042,6 @@ function closeOverlapPicker() {
   const box = el("overlap-picker");
   if (box) box.hidden = true;
 }
-function stopTrain() {
-  if (trainTimer !== null) clearInterval(trainTimer);
-  trainTimer = null;
-}
 function clearTransient() {
   pickMode = null; selectedCandidate = null; preview = null; lastSolve = null;
   selectedPiece = null; clearHover(); highlightedPieces = []; closeOverlapPicker();
@@ -1137,112 +1073,6 @@ async function submitInventory(id, input, stone) {
   }
 }
 
-function strokeSegment(a, b, width, color, cap = "round") {
-  const [ax, ay] = worldToScreen(a[0], a[1]), [bx, by] = worldToScreen(b[0], b[1]);
-  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
-  ctx.lineWidth = width; ctx.lineCap = cap; ctx.lineJoin = "round";
-  ctx.strokeStyle = color; ctx.stroke();
-}
-const interpolate = (a, b, t) => [0, 1, 2].map(i => (a[i] || 0) + ((b[i] || 0) - (a[i] || 0)) * t);
-function drawingSegments(placements) {
-  const geometry = drawingGeometry(placements);
-  if (geometry.segments) return geometry.segments;
-  const segments = [];
-  placements.forEach((pl, placement) => {
-    for (const line of pl.lines) {
-      const rails = [offsetLine(line, 24), offsetLine(line, -24)];
-      const edges = [offsetLine(line, pl.width / 2), offsetLine(line, -pl.width / 2)];
-      for (let i = 0; i + 1 < line.length; i++) {
-        const a = line[i], b = line[i + 1];
-        // Flat sampled chords have no height-order ambiguity; only climbing
-        // edges need subdivisions for ramp-local paint and selection order.
-        const divisions = (a[2] || 0) === (b[2] || 0) ? 1 :
-          Math.min(256, Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 8)));
-        for (let j = 0; j < divisions; j++) {
-          const from = j / divisions, to = (j + 1) / divisions;
-          const start = interpolate(a, b, from), end = interpolate(a, b, to);
-          segments.push({placement, a: start, b: end, width: pl.width,
-            z: (start[2] + end[2]) / 2,
-            edge: [interpolate(edges[0][i], edges[0][i + 1], from),
-              interpolate(edges[0][i], edges[0][i + 1], to),
-              interpolate(edges[1][i], edges[1][i + 1], to),
-              interpolate(edges[1][i], edges[1][i + 1], from)],
-            rails: rails.map(r => [interpolate(r[i], r[i + 1], from), interpolate(r[i], r[i + 1], to)])});
-        }
-      }
-    }
-  });
-  segments.sort((a, b) => a.z - b.z || a.placement - b.placement);
-  geometry.segments = segments;
-  geometry.byPlacement = placements.map(() => []);
-  for (const segment of segments) geometry.byPlacement[segment.placement].push(segment);
-  return segments;
-}
-function drawingBatches(placements) {
-  const geometry = drawingGeometry(placements);
-  if (geometry.batches) return geometry.batches;
-  const batches = [];
-  for (const segment of drawingSegments(placements)) {
-    const batch = batches[batches.length - 1], previous = batch?.[0];
-    if (previous && previous.z === segment.z && previous.placement === segment.placement) batch.push(segment);
-    else batches.push([segment]);
-  }
-  geometry.batches = batches;
-  return batches;
-}
-
-function hitCandidates(sx, sy, placements) {
-  const geometry = drawingGeometry(placements);
-  let bounds = geometry.bounds;
-  if (!bounds) {
-    bounds = placements.map(pl => {
-      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-      for (const line of pl.lines) for (const [x, y] of line) {
-        x0 = Math.min(x0, x); x1 = Math.max(x1, x);
-        y0 = Math.min(y0, y); y1 = Math.max(y1, y);
-      }
-      return {x0, x1, y0, y1, width: pl.width};
-    });
-    geometry.bounds = bounds;
-  }
-  const candidates = new Set();
-  bounds.forEach((b, i) => {
-    const a = worldToScreen(b.x0, b.y0), c = worldToScreen(b.x1, b.y1);
-    // Outward guard is deliberately permissive at translated/zoomed boundaries.
-    const pad = Math.max(14, b.width * view.scale / 2) +
-      1e-7 + 1e-9 * Math.max(1, ...a.map(Math.abs), ...c.map(Math.abs));
-    if (![...a, ...c, pad].every(Number.isFinite) ||
-        (sx >= Math.min(a[0], c[0]) - pad && sx <= Math.max(a[0], c[0]) + pad &&
-         sy >= Math.min(a[1], c[1]) - pad && sy <= Math.max(a[1], c[1]) + pad)) candidates.add(i);
-  });
-  return candidates;
-}
-function placementsAt(sx, sy) {
-  if (!S) return [];
-  const hits = new Map(), candidates = hitCandidates(sx, sy, S.layout.placements);
-  if (!candidates.size) return [];
-  drawingSegments(S.layout.placements);
-  const grouped = drawingGeometry(S.layout.placements).byPlacement;
-  // Preserve each piece's elevation-ordered segments, but visit only pieces in
-  // the conservative shortlist rather than testing every segment's membership.
-  for (const placement of candidates) for (const seg of grouped[placement]) {
-    const [ax, ay] = worldToScreen(seg.a[0], seg.a[1]), [bx, by] = worldToScreen(seg.b[0], seg.b[1]);
-    const dx = bx - ax, dy = by - ay;
-    const t = Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / (dx * dx + dy * dy || 1)));
-    const d = Math.hypot(sx - ax - t * dx, sy - ay - t * dy);
-    const half = seg.width * view.scale / 2;
-    if (d >= Math.max(14, half)) continue;
-    const hit = {placement: seg.placement, d, z: seg.z, painted: d < half};
-    const prev = hits.get(hit.placement);
-    if (!prev || compareHits(hit, prev) < 0) hits.set(hit.placement, hit);
-  }
-  return [...hits.values()].sort(compareHits);
-}
-function compareHits(a, b) {
-  // Painted area wins over hit-padding; within it the last painted surface wins.
-  return Number(b.painted) - Number(a.painted) ||
-    (a.painted && b.painted ? b.z - a.z || b.placement - a.placement : a.d - b.d) || a.d - b.d;
-}
 function drawHighlights() {
   const indices = new Set(activeOverlap ? [activeOverlap.target] : [...highlightedPieces, selectedPiece, hoveredPiece]);
   if (trainTrace?.revision === S.revision && trainTrace.complete) {
@@ -1378,262 +1208,6 @@ async function checkLayout() {
     row(`Provisional geometry: ${report.provisional.length} piece(s)`, report.provisional);
     row(report.model_note);
   } catch (error) { status(error.message, "err"); }
-}
-
-function downloadJSON(data, filename) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
-  const url = URL.createObjectURL(blob), anchor = document.createElement("a");
-  anchor.href = url; anchor.download = filename; anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-function projectContentKey(data) {
-  // Snapshots are immutable API responses. Cache their large serialization;
-  // panning/hover frames only serialize the small presentation fields.
-  let snapshot = snapshotKeyCache.get(data.session);
-  if (snapshot === undefined) { snapshot = JSON.stringify(data.session); snapshotKeyCache.set(data.session, snapshot); }
-  const p = data.preferences;
-  return {snapshot, settings: JSON.stringify([data.name, p.view.x, p.view.y, p.view.scale,
-    p.search.max_pieces, p.search.slop, p.search.reversing])};
-}
-function markProjectSaved(data, slot = null) {
-  projectBaseline = projectContentKey(data); projectBaselineSlot = slot;
-  updateProjectStatus();
-}
-function updateProjectStatus() {
-  const notice = el("project-status");
-  if (!notice) return;
-  let message;
-  try {
-    if (!S?.snapshot) message = "No project loaded.";
-    else if (projectBaseline === null) message = "No project copy saved/opened in this tab. Autosave is separate.";
-    else {
-      const current = projectContentKey(projectSnapshot());
-      message = current.snapshot === projectBaseline.snapshot && current.settings === projectBaseline.settings ?
-        "Unchanged since last project save/open. Autosave is separate." :
-        "Changed since last project save/open — save a new copy. Autosave is separate.";
-    }
-  } catch (_) { message = "Unsaved project settings are invalid; correct them before saving."; }
-  if (notice.textContent !== message) notice.textContent = message;
-}
-function projectSnapshot() {
-  if (!S?.snapshot) throw new Error("Wait for the editor to finish loading");
-  const name = el("project-name").value.trim() || "Untitled track";
-  const max_pieces = Number(el("max-pieces").value), slop = Number(el("slop").value);
-  if (name.length > 80 || !Number.isInteger(max_pieces) || max_pieces < 1 || max_pieces > 128 || !Number.isFinite(slop) || slop < 0 || slop > 1e9)
-    throw new Error("Use a name up to 80 characters and valid search settings before saving");
-  return {format: PROJECT_FORMAT, name, session: S.snapshot,
-    preferences: {view: {...view}, search: {max_pieces, slop, reversing: el("reversing").checked}}};
-}
-async function openProject(data, revision = S && S.revision) {
-  // Emergency session downloads use the already supported session format.
-  if (data?.format === "duplotrain-session/1") data = {format: PROJECT_FORMAT, name: "Recovered session", session: data, preferences: {}};
-  const next = await api("/api/project/open", {data, revision});
-  S = next; clearTransient(); closeProjectManagement();
-  el("project-name").value = next.project.name;
-  const prefs = next.project.preferences;
-  if (prefs.search) {
-    el("max-pieces").value = prefs.search.max_pieces; el("slop").value = prefs.search.slop;
-    el("reversing").checked = prefs.search.reversing; el("reversing").dataset.touched = "1";
-  }
-  if (prefs.view) { view = {...prefs.view}; fitted = true; } else fitted = false;
-  redraw(); markProjectSaved(projectSnapshot()); status(`Opened project: ${next.project.name}`);
-}
-function readLocalProject(key, raw) {
-  if (typeof key !== "string" || !key.startsWith(PROJECT_PREFIX) ||
-      typeof raw !== "string" || raw.length > 2 * 1024 * 1024) throw new Error("No readable project selected");
-  const data = JSON.parse(raw);
-  if (!data || data.format !== PROJECT_FORMAT || typeof data.name !== "string" ||
-      !data.name.trim() || data.name.length > 80 || data.session?.format !== "duplotrain-session/1" ||
-      !Array.isArray(data.session?.layout?.placements)) throw new Error("Unreadable saved project");
-  return data;
-}
-function closeProjectManagement() {
-  projectManagement = null;
-  if (el("project-manage")) el("project-manage").hidden = true;
-}
-function renderProjects() {
-  const select = el("project-slots"), previous = select.value;
-  const rows = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (typeof key !== "string" || !key.startsWith(PROJECT_PREFIX)) continue;
-      const raw = localStorage.getItem(key);
-      if (raw === null) continue; // another tab removed it during enumeration
-      let data = null, time = 0;
-      try {
-        data = readLocalProject(key, raw);
-        const parsed = typeof data.saved_at === "string" ? Date.parse(data.saved_at) : NaN;
-        if (Number.isFinite(parsed)) time = parsed;
-      } catch (_) { /* Kept visible; never silently discard an unreadable copy. */ }
-      const suffix = key.slice(PROJECT_PREFIX.length);
-      const version = suffix.length > 12 ? suffix.slice(0, 8) + "…" + suffix.slice(-4) : suffix;
-      const label = data ? `${data.name} · ${time ? new Date(time).toLocaleString() : "date unknown"} · ` +
-        `${data.session.layout.placements.length} pieces · ${version}` : `Unreadable saved project (kept) · ${version}`;
-      rows.push({key, raw, data, time, label});
-    }
-    rows.sort((a, b) => b.time - a.time || a.key.localeCompare(b.key));
-    projectRows = new Map(rows.map(row => [row.key, row])); select.replaceChildren();
-    for (const row of rows) {
-      const option = document.createElement("option"); option.value = row.key; option.textContent = row.label;
-      select.append(option);
-    }
-    if (projectRows.has(previous)) select.value = previous;
-    if (projectManagement && projectRows.get(projectManagement.key)?.raw !== projectManagement.raw) {
-      closeProjectManagement(); status("The selected backup changed in another tab; review its latest copy before editing.", "err");
-    }
-    if (projectBaselineSlot && !projectRows.has(projectBaselineSlot)) {
-      projectBaseline = null; projectBaselineSlot = null; updateProjectStatus();
-    }
-  } catch (error) { status(`Local projects unavailable: ${error.message}. Download a project instead.`, "err"); }
-}
-async function saveLocalProject() {
-  try {
-    const data = {...projectSnapshot(), saved_at: new Date().toISOString()}, raw = JSON.stringify(data);
-    if (raw.length > 2 * 1024 * 1024) throw new Error("project larger than 2 MB");
-    // New saves stay non-overwriting; only explicit management edits a known key.
-    const key = PROJECT_PREFIX + crypto.randomUUID();
-    if (localStorage.getItem(key) !== null) throw new Error("Copy ID already exists; retry to create a new copy");
-    localStorage.setItem(key, raw); closeProjectManagement(); renderProjects(); el("project-slots").value = key;
-    markProjectSaved(data, key);
-    status("Saved a new local project copy. Download project for a portable backup.");
-  } catch (error) { status(`Project not saved: ${error.message}`, "err"); }
-}
-function manageLocalProject(action) {
-  closeProjectManagement();
-  try {
-    if (!["rename", "delete"].includes(action)) throw new Error("Unknown backup action");
-    const key = el("project-slots").value, row = projectRows.get(key);
-    if (!row || localStorage.getItem(key) !== row.raw) throw new Error("Selected backup changed; refresh the list first");
-    if (!navigator.locks) throw new Error("Safe backup management unavailable; download or save a new copy instead");
-    if (action === "rename" && !row.data) throw new Error("Cannot rename an unreadable backup; existing copy kept");
-    const box = el("project-manage"), operation = {key, raw: row.raw, action};
-    projectManagement = operation; box.replaceChildren(); box.hidden = false;
-    const title = document.createElement("p");
-    title.textContent = `${action === "rename" ? "Rename" : "Delete permanently"}: ${row.label}`;
-    box.append(title);
-    let input;
-    if (action === "rename") {
-      const label = document.createElement("label"); label.textContent = "New backup name ";
-      input = document.createElement("input"); input.value = row.data.name; input.maxLength = 80;
-      input.setAttribute("aria-label", "New backup name"); label.append(input); box.append(label);
-    }
-    const confirm = document.createElement("button"); confirm.textContent = action === "rename" ? "Confirm rename" : "Confirm delete";
-    confirm.addEventListener("click", async () => {
-      if (projectManagement !== operation) return;
-      const name = input?.value.trim();
-      if (action === "rename" && (!name || name.length > 80)) { status("Use a backup name of 1–80 characters.", "err"); return; }
-      confirm.disabled = true;
-      try {
-        // All destructive management uses an origin-scoped per-slot lock. The
-        // exact selected bytes are rechecked INSIDE the lock (no stale overwrite).
-        const changed = await navigator.locks.request(PROJECT_PREFIX + "manage:" + key, () => {
-          if (projectManagement !== operation) return false;
-          if (localStorage.getItem(key) !== operation.raw) throw new Error("Backup changed in another tab; refresh and review it again");
-          if (action === "delete") localStorage.removeItem(key);
-          else {
-            const data = readLocalProject(key, operation.raw);
-            const replacement = JSON.stringify({...data, name});
-            if (replacement.length > 2 * 1024 * 1024) throw new Error("Renamed backup exceeds the size limit");
-            localStorage.setItem(key, replacement);
-          }
-          return true;
-        });
-        if (!changed) return;
-        if (projectManagement === operation) closeProjectManagement();
-        renderProjects(); updateProjectStatus();
-        status(action === "rename" ? "Renamed the selected backup; current design unchanged." : "Deleted only the selected local backup; current design unchanged.");
-      } catch (error) { status(`Backup not changed: ${error.message}`, "err"); }
-      finally { confirm.disabled = false; }
-    });
-    const cancel = document.createElement("button"); cancel.textContent = "Cancel backup change";
-    cancel.addEventListener("click", () => { if (projectManagement === operation) closeProjectManagement(); });
-    box.append(confirm, cancel); (input || cancel).focus();
-  } catch (error) { status(error.message, "err"); }
-}
-
-async function readProjectFile(event) {
-  const file = event.target.files?.[0]; event.target.value = "";
-  if (!file) return;
-  const sequence = ++importSequence, revision = S && S.revision;
-  try {
-    if (file.size > 2 * 1024 * 1024) throw new Error("file larger than 2 MB");
-    const data = JSON.parse(await file.text());
-    if (sequence !== importSequence) return;
-    await openProject(data, revision);
-  } catch (error) { if (sequence === importSequence) status(`Project not opened: ${error.message}`, "err"); }
-}
-function invalidateTrain() {
-  closeOverlapPicker();
-  stopTrain(); trainTrace = null; trainStep = -1; trainConfigSequence++;
-  for (const id of ["train-play", "train-step", "train-unvisited", "train-cycle"])
-    if (el(id)) el(id).disabled = true;
-  for (const id of ["train-unvisited", "train-cycle"]) if (el(id)) el(id).checked = false;
-  if (el("train-report")) el("train-report").textContent = "";
-}
-function renderSwitches() {
-  const box = el("train-switches");
-  if (!box?.replaceChildren) return;
-  box.replaceChildren(); initialSwitches = {};
-  for (const item of S.train_switches || []) {
-    initialSwitches[item.placement] = item.default;
-    const label = document.createElement("label"), select = document.createElement("select");
-    const name = `Initial switch #${item.placement + 1}`;
-    label.textContent = name + " "; select.setAttribute("aria-label", name);
-    for (const choice of item.options) {
-      const option = document.createElement("option"); option.value = choice.port;
-      option.textContent = choice.name; select.append(option);
-    }
-    select.value = item.default;
-    const revision = S.revision;
-    select.addEventListener("change", () => {
-      if (S?.revision !== revision) return;
-      const value = Number(select.value);
-      if (!item.options.some(o => o.port === value)) return;
-      initialSwitches[item.placement] = value; invalidateTrain(); draw();
-    });
-    label.append(select); box.append(label);
-  }
-}
-async function testTrain() {
-  invalidateTrain();
-  const sequence = trainConfigSequence;
-  try {
-    const start = JSON.parse(el("train-start").value);
-    const trace = await api("/api/drive", {start, max_steps: 10000, switch_states: {...initialSwitches}});
-    if (sequence !== trainConfigSequence || trace.revision !== S.revision) return;
-    trainTrace = trace; trainStep = -1; showTrainStep(); draw();
-  } catch (error) { if (sequence === trainConfigSequence) status(error.message, "err"); }
-}
-function traceLength(trace = trainTrace) { return trace ? trace.steps.length + (trace.terminal ? 1 : 0) : 0; }
-function showTrainStep() {
-  if (!trainTrace || trainTrace.revision !== S?.revision) { stopTrain(); return; }
-  const t = trainTrace, step = t.steps[trainStep];
-  const terminal = trainStep === t.steps.length ? t.terminal : null;
-  const count = t.visited_drivable?.length ?? t.visited?.length ?? 0;
-  const total = t.drivable_count ?? S.layout.placements.length;
-  const reason = {stop_stone: "stop stone", buffer: "buffer", open_end: "open end", dead_route: "no onward route"};
-  el("train-report").textContent = t.outcome === "limit" ? `${t.limit || 10000}-step limit reached; no verdict or coverage claim made.` :
-    `Model result from this start: ${t.outcome}. ${count} / ${total} drivable pieces visited; ${t.reversals} reversal(s)` +
-    `${t.period === null ? "" : `; cycle ${t.period} steps`}. Selected initial switches; not a claim about every start.` +
-    (step ? ` Step ${trainStep + 1}/${t.steps.length}: #${step[0] + 1}, port ${step[1]} → ${step[2]}.` : "") +
-    (terminal ? ` Final event: #${terminal.placement + 1}, entered port ${terminal.entry}, ` +
-      `${terminal.at_port === null ? "midpoint" : `at port ${terminal.at_port}`} — ${reason[terminal.reason] || terminal.reason}.` : "");
-  const available = traceLength(t) > 0;
-  el("train-step").disabled = !available || (t.cycle_start === null && trainStep + 1 >= traceLength(t));
-  el("train-play").disabled = !available;
-  el("train-unvisited").disabled = !t.complete || !t.unvisited?.length;
-  el("train-cycle").disabled = !t.complete || !t.cycle_pieces?.length;
-  draw();
-}
-function advanceTrain() {
-  if (!trainTrace || trainTrace.revision !== S?.revision || !traceLength()) { stopTrain(); return; }
-  if (trainStep + 1 >= traceLength()) {
-    if (trainTrace.cycle_start !== null) trainStep = trainTrace.cycle_start;
-    else { stopTrain(); return; }
-  } else trainStep++;
-  if (trainTrace.cycle_start === null && trainStep + 1 >= traceLength()) stopTrain();
-  showTrainStep();
 }
 
 async function cancelSearch() {

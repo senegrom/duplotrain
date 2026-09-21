@@ -28,7 +28,9 @@ __all__ = ["Session", "make_server", "run"]
 # Only these packaged assets are HTTP routes; never resolve arbitrary request
 # paths against the filesystem. Keep icon URLs shared with the static build.
 _EDITOR_ASSETS = {
-    "/editor.js": "text/javascript; charset=utf-8",
+    **{f"/{name}": "text/javascript; charset=utf-8" for name in (
+        "editor.js", "editor-geometry.js", "editor-projects.js", "editor-train.js",
+    )},
     "/editor.css": "text/css; charset=utf-8",
     "/manifest.webmanifest": "application/manifest+json",
     "/duplotrain-icon.svg": "image/svg+xml",

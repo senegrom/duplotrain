@@ -27,7 +27,7 @@ def test_build_copies_external_sources_without_extracting_html(monkeypatch, tmp_
     )
     assert 'href="./editor.css?v=__V__"' in html
     assert ('http-equiv="Content-Security-Policy"' in html) == pages
-    for name in ("editor.js", "editor.css"):
+    for name in (*build.EDITOR_SCRIPTS, "editor.css"):
         assert (tmp_path / name).read_bytes() == build.text_bytes(
             ROOT / "src/duplotrain/static" / name
         )
@@ -52,7 +52,7 @@ def synthetic_runtime_build(monkeypatch, tmp_path):
     return source, dist
 
 
-@pytest.mark.parametrize("name", ["editor.js", "editor.css", "editor.html"])
+@pytest.mark.parametrize("name", [*build.EDITOR_SCRIPTS, "editor.css", "editor.html"])
 def test_all_frontend_sources_change_the_stamp_and_rebuild_is_deterministic(
     synthetic_runtime_build, name,
 ):
@@ -117,3 +117,17 @@ def test_ci_keeps_both_versions_both_browsers_and_minimal_install():
     assert 'not slow and not browser' in jobs["python"]
     assert 'find_spec(\'matplotlib\') is None' in jobs["base-install"]
     assert 'duplotrain solve' in jobs["base-install"]
+
+
+def test_deferred_scripts_match_the_build_allowlist_and_single_snapshot_owner():
+    from duplotrain.gui import _EDITOR_ASSETS
+
+    static = ROOT / "src/duplotrain/static"
+    html = (static / "editor.html").read_text()
+    names = re.findall(r'<script src="\./([^"?]+)" defer></script>', html)
+    assert tuple(names) == build.EDITOR_SCRIPTS
+    assert all("/" + name in _EDITOR_ASSETS for name in names)
+    sources = [(static / name).read_text() for name in names]
+    assert sum(source.count("let S = null;") for source in sources) == 1
+    assert sum(source.count('document.addEventListener("DOMContentLoaded"')
+               for source in sources) == 1

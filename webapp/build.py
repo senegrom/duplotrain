@@ -41,6 +41,8 @@ WEBAPP = ROOT / "webapp"
 DIST = WEBAPP / "dist"
 VENDOR = WEBAPP / "vendor"
 
+EDITOR_SCRIPTS = ("editor.js", "editor-geometry.js", "editor-projects.js", "editor-train.js")
+
 WORKER_EXCLUDES = {
     "cli.py",
     "gui.py",  # local HTTP host; the worker imports editor.Session
@@ -245,7 +247,7 @@ def build_index(meta_csp: bool = False) -> None:
     if html.count(boot_marker) != 1:
         raise SystemExit("editor.html needs one worker boot marker")
     html = html.replace(boot_marker, '<script src="./boot.js?v=__V__" defer></script>')
-    for asset in ("editor.js", "editor.css"):
+    for asset in (*EDITOR_SCRIPTS, "editor.css"):
         html = html.replace(f'./{asset}"', f'./{asset}?v=__V__"')
     # Old in-place builds must not retain a now-unused, extracted script.
     (DIST / "app.js").unlink(missing_ok=True)
@@ -317,7 +319,7 @@ def main() -> None:
     for arcname, payload in entries:
         digest.update(arcname.encode("utf-8") + b"\n" + payload + b"\n")
     digest.update(adapter + args.pyodide_version.encode("ascii"))
-    for name in ("editor.js", "editor.css", "editor.html"):
+    for name in (*EDITOR_SCRIPTS, "editor.css", "editor.html"):
         digest.update(text_bytes(ROOT / "src/duplotrain/static" / name))
     for name in ("boot.js", "worker.js"):
         digest.update(text_bytes(WEBAPP / name))
