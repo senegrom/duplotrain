@@ -3,7 +3,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const source = fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static/editor.js"), "utf8");
+const scripts = ["editor.js", "editor-geometry.js", "editor-projects.js", "editor-train.js"];
+const sources = scripts.map(name => [name,
+  fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static", name), "utf8")]);
 const stateNames = new Set(["S", "armed", "armedStone", "preview", "pickMode", "view", "fitted",
   "deleting", "selectedCandidate", "solving", "lastSolve", "recoveryAttempted", "autosaveReady", "apiBusy"]);
 
@@ -24,7 +26,7 @@ function loadEditor(context, {events = false} = {}) {
   context.document.addEventListener ??= () => {};
   context.document.getElementById ??= overrides.el || element;
   context.navigator ??= {};
-  vm.runInContext(source, context, {filename: "editor.js"});
+  for (const [filename, source] of sources) vm.runInContext(source, context, {filename});
   for (const [name, value] of Object.entries(overrides)) {
     if (stateNames.has(name)) {
       context.__injected = value;
