@@ -72,12 +72,12 @@ def main():
     if args.states_dir:
         args.states_dir.mkdir(parents=True, exist_ok=True)
     for name, session in sessions:
-        report, check_ms = timed(lambda: check_session(session), args.repeats)
-        body, state_ms = timed(lambda: encoded(session.state(preview_format=PREVIEW_FORMAT)),
+        report, check_ms = timed(lambda session=session: check_session(session), args.repeats)
+        body, state_ms = timed(lambda session=session: encoded(session.state(preview_format=PREVIEW_FORMAT)),
                                args.repeats)
         pair_checks, original = 0, CollisionField.near
 
-        def counted(*a, **kw):
+        def counted(*a, original=original, **kw):
             nonlocal pair_checks
             pair_checks += 1
             return original(*a, **kw)
