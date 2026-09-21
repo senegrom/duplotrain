@@ -169,7 +169,7 @@ def test_shared_overlap_audit_matches_the_standalone_audit_and_restores_its_fiel
         n_base = len(base) if layout.placements[:len(base)] == base.placements else 0
         expected = _solution_overlaps(layout, n_base, 120.0, 8.0)
         assert audit.overlaps(layout) is expected
-        assert len(audit.field) == len(base)  # every candidate was popped again
+        assert len(audit.field) == len(base) + len(audit.pushed)  # the field is the kept prefix
         verdicts.add(expected)
     assert verdicts == {True, False}
     # A layout over another base is audited standalone, and the loop-mode
@@ -177,4 +177,70 @@ def test_shared_overlap_audit_matches_the_standalone_audit_and_restores_its_fiel
     empty = _OverlapAudit(None, 120.0, 8.0)
     for layout in candidates:
         assert empty.overlaps(layout) is _solution_overlaps(layout, 0, 120.0, 8.0)
-        assert len(empty.field) == 0
+        assert len(empty.field) == len(empty.pushed)
+
+
+def test_shared_overlap_audit_accepts_equal_copies_of_the_base_and_shorter_layouts():
+    from duplotrain import Layout, build_chain, default_catalog
+    from duplotrain.geometry import Pose
+    from duplotrain.layout import Placement
+    from duplotrain.solver import _OverlapAudit, _solution_overlaps
+
+    catalog = default_catalog()
+    base = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
+    audit = _OverlapAudit(base, 120.0, 8.0)
+    # Equal frames in fresh objects: not the base's placements, but the same base.
+    copies = tuple(Placement(p.piece, Pose.make(p.frame.x, p.frame.y, p.frame.z, p.frame.heading))
+                   for p in base.placements)
+    assert all(c is not p and c == p for c, p in zip(copies, base.placements, strict=True))
+    extra = Placement(catalog["straight"], base.pose_of(base.connectable_ends()[-1]))
+    onto_base = Layout(base.placements + (base.placements[2],), dict(base.links))
+    # Whatever the prefix, the verdict is the standalone audit's over this base:
+    # equal copies take the shared path, anything else falls back to it.
+    for layout in (Layout(copies + (extra,), dict(base.links)), onto_base,
+                   Layout(copies[:3], {}), Layout(), base):
+        assert audit.overlaps(layout) is _solution_overlaps(layout, len(base), 120.0, 8.0)
+        assert len(audit.field) == len(base) + len(audit.pushed)
+
+
+def test_shared_overlap_audit_keeps_a_prefix_only_with_the_same_links():
+    """Consecutive loop solutions share placements; transits and closings change
+    which earlier placements a kept piece is linked to, so a kept prefix must
+    carry the same link sets, and every verdict must equal the standalone audit's."""
+    import random
+
+    from duplotrain import Layout, SolverConfig, default_catalog, solve
+    from duplotrain.layout import Placement
+    from duplotrain.solver import _OverlapAudit, _solution_overlaps
+
+    catalog = default_catalog()
+    result = solve({"curve": 12, "straight": 4, "switch": 2}, catalog,
+                   SolverConfig(max_results=60, reversing_loops=True, max_nodes=60_000))
+    layouts = [s.layout for s in result.solutions]
+    assert len(layouts) == 60
+    # Overlapping variants: a piece laid twice, and the same track without its
+    # links, whose neighbours then count as overlaps.
+    for layout in layouts[:20]:
+        doubled = layout.placements + (Placement(layout.placements[3].piece,
+                                                 layout.placements[3].frame),)
+        layouts.append(Layout(doubled, dict(layout.links), layout.accessories))
+        layouts.append(Layout(layout.placements, {}, layout.accessories))
+    rng = random.Random(11)
+    orders = [layouts, layouts[::-1], rng.sample(layouts, len(layouts))]
+    for order in orders:
+        audit = _OverlapAudit(None, 120.0, 8.0)
+        kept = 0
+        for layout in order:
+            before = list(audit.pushed)
+            expected = _solution_overlaps(layout, 0, 120.0, 8.0)
+            assert audit.overlaps(layout) is expected
+            assert len(audit.field) == len(audit.pushed)
+            # Every kept entry is the same object, checked under the same links.
+            shared = sum(1 for a, b in zip(before, audit.pushed, strict=False) if a is b)
+            kept += shared
+            for index, (placement, links) in enumerate(audit.pushed):
+                current = layout.placements[index]  # a kept entry is an earlier object
+                assert placement is current or (placement.piece is current.piece
+                                                and placement.frame is current.frame)
+                assert links == {b[0] for a, b in layout.links.items() if a[0] == index}
+        assert kept > 0

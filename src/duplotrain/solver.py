@@ -462,6 +462,23 @@ _RETARGET_ROTATIONS = (
 )
 
 
+@lru_cache(maxsize=4096)
+def _lattice_pose(frame: tuple) -> Pose:
+    """The exact field pose of a lattice pose: the inverse of _pose_to_lattice.
+
+    Equal frames give the same object, so the placements assembled from them
+    hit the sample and primitive caches by identity instead of comparing
+    twelve exact coefficients.
+    """
+    a, b, c, d, z, heading = frame
+    return Pose(
+        Alg(Fraction(2 * a + c, 2 * SCALE), 0, Fraction(b, 2 * SCALE), 0),
+        Alg(Fraction(2 * d + b, 2 * SCALE), 0, Fraction(c, 2 * SCALE), 0),
+        Alg(Fraction(z, SCALE)),
+        2 * heading,
+    )
+
+
 class _LatticeEngine:
     """Pose operations over the integer 30-degree lattice.
 
@@ -497,16 +514,7 @@ class _LatticeEngine:
         da, db, dc, dd = rotated[h]
         return (a + da, b + db, c + dc, d + dd, z + dz, (h + turn) % 12)
 
-    @staticmethod
-    def to_pose(frame: tuple) -> Pose:
-        """The exact field pose of a lattice pose: the inverse of _pose_to_lattice."""
-        a, b, c, d, z, heading = frame
-        return Pose(
-            Alg(Fraction(2 * a + c, 2 * SCALE), 0, Fraction(b, 2 * SCALE), 0),
-            Alg(Fraction(2 * d + b, 2 * SCALE), 0, Fraction(c, 2 * SCALE), 0),
-            Alg(Fraction(z, SCALE)),
-            2 * heading,
-        )
+    to_pose = staticmethod(_lattice_pose)
 
     @staticmethod
     def reverse(pose: tuple) -> tuple:
@@ -1504,14 +1512,21 @@ def _solution_overlaps(
     return False
 
 
+_NO_LINKS: frozenset[int] = frozenset()
+
+
 class _OverlapAudit:
     """The overlap audit of :func:`_solution_overlaps` over one fixed base.
 
     A closing problem audits every candidate over the same base placements, so
-    they are sampled and binned once; each candidate's new placements are then
-    checked and pushed in the same order the standalone audit uses, and popped
-    again afterwards, which restores the field exactly. A layout that does not
-    start with the base is audited standalone.
+    they are sampled and binned once. Consecutive candidates of one search
+    share their first placements, so the field keeps a candidate's placements
+    and the next candidate pops only those it does not share. A placement's
+    verdict depends on the placements before it, its own samples and the
+    indices it is linked to, so a kept placement, identified by its piece and
+    frame objects and an unchanged link set, has already seen exactly the point
+    tests the standalone audit runs. A layout that does not start with the base
+    is audited standalone.
     """
 
     def __init__(self, base: Layout | None, clearance: float, spacing: float) -> None:
@@ -1521,31 +1536,47 @@ class _OverlapAudit:
         for index, placement in enumerate(self.base):
             self.field.add(index, placement.centreline_points(spacing),
                            placement.piece.width / 2.0, underpass=placement.piece.underpass)
+        #: The placements beyond the base in the field, with the links they were
+        #: checked under, in field order.
+        self.pushed: list[tuple[Placement, frozenset[int] | set[int]]] = []
 
     def overlaps(self, layout: Layout) -> bool:
         placements = layout.placements
         n_base = len(self.base)
-        if placements[:n_base] != self.base:
+        # Assembled and expanded layouts carry the base's own placement objects,
+        # so identity settles the prefix without comparing exact frames.
+        if len(placements) < n_base or (
+            any(p is not q for p, q in zip(placements, self.base, strict=False))
+            and placements[:n_base] != self.base
+        ):
             return _solution_overlaps(layout, n_base, self.clearance, self.spacing)
-        neighbours: dict[int, set[int]] = {}
+        linked: dict[int, set[int]] = {}
         for (ai, _ap), (bi, _bp) in layout.links.items():
             if ai >= n_base:
-                neighbours.setdefault(ai, set()).add(bi)
-        field, spacing = self.field, self.spacing
-        pushed = 0
-        try:
-            for index in range(n_base, len(placements)):
-                placement = placements[index]
-                pts = placement.centreline_points(spacing)
-                half = placement.piece.width / 2.0
-                arch = placement.piece.underpass
-                if field.clashes(pts, half, neighbours.get(index, set()), underpass=arch):
-                    return True
-                field.add(index, pts, half, underpass=arch)
-                pushed += 1
-        finally:
-            for _ in range(pushed):
-                field.pop()
+                linked.setdefault(ai, set()).add(bi)
+        field, spacing, pushed = self.field, self.spacing, self.pushed
+        keep = 0
+        for placement, (kept, ignore) in zip(placements[n_base:], pushed, strict=False):
+            if placement is not kept and (
+                placement.piece is not kept.piece or placement.frame is not kept.frame
+            ):
+                break
+            if linked.get(n_base + keep, _NO_LINKS) != ignore:
+                break
+            keep += 1
+        while len(pushed) > keep:
+            field.pop()
+            pushed.pop()
+        for index in range(n_base + keep, len(placements)):
+            placement = placements[index]
+            pts = placement.centreline_points(spacing)
+            half = placement.piece.width / 2.0
+            arch = placement.piece.underpass
+            ignore = linked.get(index, _NO_LINKS)
+            if field.clashes(pts, half, ignore, underpass=arch):
+                return True
+            field.add(index, pts, half, underpass=arch)
+            pushed.append((placement, ignore))
         return False
 
 

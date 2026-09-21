@@ -197,3 +197,13 @@ def test_auto_engine_falls_back_for_off_lattice_pieces(catalog):
 
     with pytest.raises(ValueError, match="lattice"):
         solve({"odd45": 1, "curve": 12}, pieces, SolverConfig(engine="lattice"))
+
+
+def test_equal_lattice_frames_convert_to_one_exact_pose():
+    from duplotrain.solver import _flat, _LatticeEngine, _pose_to_lattice
+
+    frame = (2560, -40, 80, 0, 200, 5)
+    pose = _LatticeEngine.to_pose(frame)
+    assert _LatticeEngine.to_pose(tuple(frame)) is pose
+    assert _flat(_pose_to_lattice(pose)) == frame
+    assert _LatticeEngine.to_pose((0, 0, 0, 0, 0, 0)) == ORIGIN

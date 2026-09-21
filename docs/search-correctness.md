@@ -570,11 +570,19 @@ geometry; a regression compares the two geometries candidate for candidate on
 a dozen closings and step for step on every traversal.
 
 The shared auditor builds the collision field over the base placements in
-index order and then, for each candidate, checks and pushes its new placements
-in index order, exactly the sequence the standalone audit performs from an
-empty field, and pops them afterwards; popping restores the field's grid and
-width bookkeeping exactly, as the collision tests assert. A candidate that does
-not begin with the base is audited standalone. The cell-box pre-test rejects a
+index order and then, for each candidate, keeps the leading placements it
+shares with the previous candidate and checks and pushes the rest in index
+order. A placement's verdict in the standalone audit depends only on the
+placements before it, on its own samples and on the set of indices it is linked
+to, so a kept placement, one whose piece and frame are the same objects and
+whose link set is unchanged (a later transit or closing can link an earlier
+placement to a new neighbour, which ends the kept prefix), has already passed
+exactly the point tests the standalone audit would run, and the new placements
+see the same field. Popping the rest restores the field's grid and width
+bookkeeping exactly, as the collision tests assert. A candidate that does not
+begin with the base is audited standalone. A regression audits sixty reversing
+loop solutions and their overlapping variants in emission, reverse and random
+order against the standalone audit. The cell-box pre-test rejects a
 stored cell cloud only when its box and the query cell's box are at least the
 pair's limit apart along an axis, in which case every sample pair is at least
 that far apart and the strict distance test would reject each of them.

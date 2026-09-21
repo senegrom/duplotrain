@@ -29,9 +29,12 @@ Q(sqrt 3) evaluates only its two nonzero coefficient formulas, quarter-turn
 rotations swap and negate coordinates, and hashes are memoised lazily. Port
 transforms split the 24 possible rotations from per-placement translation.
 Caches are bounded and keyed by geometry, never by session: 128 piece
-traversals, 128 local centreline samples, 4,096 port transforms, 2,048 sample
-clouds per piece, frame and spacing, and the translation-invariant footprint of
-a piece at each of its 24 headings. No validation result, revision check,
+traversals, 128 local centreline samples, 4,096 port transforms, 4,096 exact
+poses of lattice frames (equal frames give one object, so the placements
+assembled from them hit the sample and primitive caches by identity instead of
+comparing twelve coefficients), 2,048 sample clouds per piece, frame and
+spacing, and the translation-invariant footprint of a piece at each of its 24
+headings. No validation result, revision check,
 collision decision or mutable session response is cached. The recursive DFS
 clears its own closure reference when a search ends, so a finished collision
 workspace is released at once rather than at the next cyclic collection.
@@ -95,9 +98,11 @@ costs nothing. A prepared query resolves each neighbouring cell once for all
 its samples, and a stored cell cloud whose box is at least the pair's limit
 away is skipped before the pairwise scan. Fields of at least 128 clouds keep a
 lazy 256 mm index of bounding boxes for the broad phase, with a fallback list
-for boxes spanning more than 64 cells. One overlap auditor per closing problem
-samples and bins the base once and checks each candidate's new placements by
-push and pop, restoring the field exactly. The sampled model, its spacing,
+for boxes spanning more than 64 cells. One overlap auditor per search
+samples and bins the base once, recognises the base's own placement objects
+by identity, and keeps in its field the placements a candidate shares with the
+previous one, so consecutive solutions of a depth-first search, which share
+most of their placements, each audit only their own tail. The sampled model, its spacing,
 clearance and underpass rules are the same everywhere; every shortcut only
 skips pairs the point test would reject.
 
@@ -144,16 +149,18 @@ and the mating lists.
 
 ## Representative times
 
-Process CPU time on one machine, minimum of several runs, with results
+Process CPU time on one machine, the mean of many runs, with results
 identical to the reference searches without tables.
 
 | Search | Nodes | Time |
 | --- | ---: | ---: |
 | Completion benchmark suite, 30 cases | | 0.78 s |
-| Reported bridge gap, finite stock, forward / reverse | 1,742 / 718 | 156 / 125 ms |
+| Reported bridge gap, finite stock, forward / reverse | 1,742 / 718 | 126 / 82 ms |
 | Reported bridge gap, unlimited stock, forward / reverse | 1,878 / 854 | |
 | Ordinary plain-track gap (oracle, then a short search) | 138 | 16 ms |
-| All loops of 12 curves and 6 straights | 1,915 | 0.06 s |
+| All loops of 12 curves and 6 straights | 1,915 | 0.07 s |
+| Reversing loops of 12 curves, 4 straights and 2 switches, 100 results | 793 | 57 ms |
+| Loops of 16 curves, 8 straights, 2 switches and a crossing, 100 results | 350 | 27 ms |
 | 17-piece loop search with one switch, every piece required | 11,488 | 0.22 s |
 | Networks of 2 buffers, 3 straights and 3 curves up to 8 pieces, 109 classes | 770 | 0.61 s |
 | Keying the 671-layout corpus | | 2.0 s |
