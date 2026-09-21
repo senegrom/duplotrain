@@ -1,8 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const vm = require("node:vm");
-const {loadEditor} = require("./editor-harness.cjs");
+const {harness} = require("./reliability-harness.cjs");
 
 function state(revision, piece = "straight", unlimited = false) {
   const layout = {format: "duplotrain-layout/1", placements: [{piece}], links: [], accessories: []};
@@ -11,16 +10,7 @@ function state(revision, piece = "straight", unlimited = false) {
 }
 
 function editor(transport = "http") {
-  const elements = new Map(), calls = [], downloads = [], messages = [];
-  const el = id => {
-    if (!elements.has(id)) elements.set(id, {
-      listeners: {}, value: "", checked: false, classList: {toggle() {}},
-      setAttribute() {}, replaceChildren() {},
-      addEventListener(event, callback) { this.listeners[event] = callback; },
-      fire(event) { return this.listeners[event]({target: this}); },
-    });
-    return elements.get(id);
-  };
+  const calls = [], downloads = [], messages = [];
   let current = state(7);
   const dispatch = (url, body) => {
     calls.push({url, body});
@@ -32,12 +22,10 @@ function editor(transport = "http") {
       state(current.revision + 1, body.data.placements[0].piece);
     return current;
   };
-  const context = vm.createContext({
-    window: {}, el, Blob, setTimeout() {}, status: message => messages.push(message),
-    document: {body: {classList: {add() {}, remove() {}}}, getElementById: el,
-      createElement: () => ({click() {}})},
+  // The editor's own api() is under test; only its transport is stubbed.
+  const h = harness({state: current, events: true, omit: ["api"], overrides: {
+    Blob, status: message => messages.push(message),
     URL: {createObjectURL(blob) { downloads.push(blob); return "blob:layout"; }, revokeObjectURL() {}},
-    redraw: () => vm.runInContext("renderPalette()", context),
     fetch: async (url, options) => {
       try {
         const data = dispatch(url, options.body && JSON.parse(options.body));
@@ -46,15 +34,13 @@ function editor(transport = "http") {
         return {ok: false, json: async () => ({...error, error: error.message})};
       }
     },
-  });
-  if (transport === "worker") context.window.duplotrainApi = async (url, body) => dispatch(url, body);
-  loadEditor(context, {events: true});
-  context.initial = current;
-  vm.runInContext("S = initial; renderPalette();", context);
-  return {context, el, calls, downloads, messages,
-    server: value => { current = value; },
-    run: code => vm.runInContext(code, context),
-    import(file) { el("importfile").files = [file]; return el("importfile").fire("change"); },
+  }});
+  h.context.redraw = () => h.run("renderPalette()");
+  if (transport === "worker") h.context.window.duplotrainApi = async (url, body) => dispatch(url, body);
+  h.run("renderPalette();");
+  return {context: h.context, el: h.el, calls, downloads, messages,
+    server: value => { current = value; }, run: h.run,
+    import(file) { h.el("importfile").files = [file]; return h.el("importfile").fire("change"); },
   };
 }
 

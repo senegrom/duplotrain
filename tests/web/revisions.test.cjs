@@ -1,32 +1,21 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const vm = require("node:vm");
-const {loadEditor} = require("./editor-harness.cjs");
+const {harness} = require("./reliability-harness.cjs");
 
 function editor() {
-  const calls = [], classes = new Set(), elements = new Map();
+  const calls = [];
   let redraws = 0;
-  const el = id => {
-    if (!elements.has(id)) elements.set(id, {
-      hidden: false, classList: {toggle() {}}, setAttribute() {},
-    });
-    return elements.get(id);
-  };
-  const context = vm.createContext({
-    window: {}, document: {body: {classList: {
-      add: name => classes.add(name), remove: name => classes.delete(name),
-    }}, getElementById: el}, el,
+  // The editor's own api() is under test; only its transport is stubbed.
+  const h = harness({state: {revision: 7}, omit: ["api"], overrides: {
     redraw: () => { redraws++; },
     fetch: async (url, options) => {
       calls.push({url, options});
       return {ok: true, json: async () => ({revision: 8})};
     },
-  });
-  loadEditor(context);
-  vm.runInContext("S = {revision: 7};", context);
-  return {context, calls, classes, el, redraws: () => redraws,
-    run: code => vm.runInContext(code, context)};
+  }});
+  return {context: h.context, calls, classes: h.context.document.body.classes, el: h.el,
+    redraws: () => redraws, run: h.run};
 }
 
 test("every edit captures its viewed revision for HTTP and worker transports", async () => {

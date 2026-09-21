@@ -1,27 +1,18 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const vm = require("node:vm");
-const {loadEditor} = require("./editor-harness.cjs");
+const {harness} = require("./reliability-harness.cjs");
 
 function editor() {
-  const elements = new Map(), calls = [];
-  const el = id => {
-    if (!elements.has(id)) elements.set(id, {
-      value: id === "max-pieces" ? "26" : "0", checked: false, hidden: true,
-      addEventListener(_event, fn) { this.click = fn; },
-    });
-    return elements.get(id);
-  };
-  const context = vm.createContext({el, selectTool() {}, redraw() {}, status() {},
+  const calls = [];
+  const h = harness({state: {revision: 0, open_ends: [[23, 1], [25, 0]]}, events: true, overrides: {
+    selectTool() {}, redraw() {},
     api: async (url, body) => {
       calls.push(JSON.parse(JSON.stringify({url, body})));
       return {revision: calls.length, candidates: [], complete: false,
         open_ends: [[23, 1], [25, 0]], can_undo: true, stop_reason: "node_limit"};
-    }});
-  context.S = {revision: 0, open_ends: [[23, 1], [25, 0]]};
-  loadEditor(context, {events: true});
-  return {el, calls, run: code => vm.runInContext(code, context)};
+    }}});
+  return {el: h.el, calls, run: h.run};
 }
 
 test("deeper retries retain endpoints and increase both depth and effort", async () => {

@@ -1,55 +1,29 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const vm = require("node:vm");
-const {loadEditor} = require("./editor-harness.cjs");
+const {harness} = require("./reliability-harness.cjs");
 
 function editor() {
-  let created = 0;
-  class Element {
-    constructor(tag) {
-      created++;
-      this.tagName = tag; this.children = []; this.listeners = {};
-      this.dataset = {}; this.style = {}; this.attributes = {};
-      this.textContent = ""; this.value = ""; this.disabled = false; this.hidden = false;
-      const classes = new Set();
-      this.classList = {
-        toggle(name, on) { if (on) classes.add(name); else classes.delete(name); },
-        contains: name => classes.has(name),
-      };
-    }
-    append(...children) { this.children.push(...children); }
-    replaceChildren(...children) { this.children = children; }
-    addEventListener(event, callback) { this.listeners[event] = callback; }
-    setAttribute(name, value) { this.attributes[name] = String(value); }
-    async fire(event, data = {}) { return this.listeners[event](data); }
-  }
-  const elements = new Map(), calls = [];
-  const el = id => {
-    if (!elements.has(id)) elements.set(id, new Element("div"));
-    return elements.get(id);
+  const calls = [];
+  const state = {
+    revision: 4,
+    palette: [{id: "straight", name: "Straight", variants: [
+      {entry: 0, exit: 1, label: "ahead"},
+    ]}],
+    inventory: {unlimited: false, owned: {straight: 8}, remaining: {straight: 7}},
+    stones: {catalog: {stop: {name: "Stop stone", effect: "Stop", color: "red"}},
+      remaining: {stop: 1}},
+    sets: [{code: "123", name: "Box", year: 2026, pieces: {straight: 8}}],
+    candidates: [],
   };
-  const context = vm.createContext({
-    document: {createElement: tag => new Element(tag)}, el,
-    armed: null, armedStone: null, selectedCandidate: null, preview: null, fitted: true,
-    draw() {}, refreshStatus() {}, redraw() {}, status() {},
-    S: {
-      revision: 4,
-      palette: [{id: "straight", name: "Straight", variants: [
-        {entry: 0, exit: 1, label: "ahead"},
-      ]}],
-      inventory: {unlimited: false, owned: {straight: 8}, remaining: {straight: 7}},
-      stones: {catalog: {stop: {name: "Stop stone", effect: "Stop", color: "red"}},
-        remaining: {stop: 1}},
-      sets: [{code: "123", name: "Box", year: 2026, pieces: {straight: 8}}],
-      candidates: [],
-    },
-    selectTool(tool = {}) { context.armed = tool.piece || null; context.armedStone = tool.stone || null; },
-    api: async (route, body) => { calls.push({route, body}); return context.S; },
-  });
-  loadEditor(context);
-  return {context, el, calls, created: () => created,
-    run: code => vm.runInContext(code, context)};
+  const h = harness({state, overrides: {
+    armedStone: null, selectedCandidate: null, refreshStatus() {}, redraw() {},
+    api: async (route, body) => { calls.push({route, body}); return h.context.S; },
+  }});
+  h.context.selectTool = (tool = {}) => {
+    h.context.armed = tool.piece || null; h.context.armedStone = tool.stone || null;
+  };
+  return {context: h.context, el: h.el, calls, created: h.created, run: h.run};
 }
 
 function candidate(index = 0, revision = 4) {
@@ -76,7 +50,7 @@ test("inventory changes update values and availability without replacing control
   e.context.S.inventory.owned.straight = 14;
   e.context.S.inventory.remaining.straight = 0;
   e.run("renderPalette()");
-  assert.equal(row.input.value, 14);
+  assert.equal(row.input.value, "14");  // a DOM input's value is a string
   assert.equal(row.label.textContent, "0/");
   assert.equal(row.buttons[0].button.disabled, true);
   e.context.S.inventory.unlimited = true;

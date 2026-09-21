@@ -1,4 +1,9 @@
 "use strict";
+// One DOM and browser stub for the editor's node tests: the complete editor
+// source runs in a vm context whose elements record listeners, classes and
+// attributes, whose storage, locks and timers are in-memory, and whose api and
+// status calls are recorded. Tests pass their own state and overrides; a name
+// in `omit` keeps the editor's own definition instead of the stub.
 const vm = require("node:vm");
 const {loadEditor} = require("./editor-harness.cjs");
 
@@ -14,14 +19,22 @@ function scene(placements = [], revision = 1) {
 function track(line, name = "track") {
   return {name, width: 40, lines: [line], ports: [], mid: line[0], stone_marks: []};
 }
-function harness({state = scene(), events = false, schedule = false, overrides = {}} = {}) {
+function harness({state = scene(), events = false, schedule = false, overrides = {}, omit = []} = {}) {
   const elements = new Map(), calls = [], notices = [], windowEvents = {}, frames = [], intervals = new Map();
   const saved = new Map();
+  let created = 0;
   class Element {
     constructor(tag = "div") {
-      this.tag = tag; this.children = []; this.listeners = {}; this.dataset = {}; this.style = {};
+      created++;
+      this.tag = tag; this.tagName = tag; this.children = []; this.listeners = {}; this.dataset = {}; this.style = {};
       this.attributes = {}; this._value = ""; this.textContent = ""; this.disabled = false; this.hidden = false;
-      this.classList = {toggle() {}, add() {}, remove() {}};
+      this.checked = false;
+      const classes = this.classes = new Set();
+      this.classList = {
+        add: name => classes.add(name), remove: name => classes.delete(name),
+        toggle(name, on) { if (on ?? !classes.has(name)) classes.add(name); else classes.delete(name); },
+        contains: name => classes.has(name),
+      };
       this.clientWidth = 500; this.clientHeight = 500;
     }
     set value(v) { this._value = String(v); }
@@ -30,7 +43,8 @@ function harness({state = scene(), events = false, schedule = false, overrides =
     replaceChildren(...children) { this.children = children; this._value = ""; }
     setAttribute(k, v) { this.attributes[k] = String(v); }
     addEventListener(event, action) { this.listeners[event] = action; }
-    click() { if (!this.disabled) return this.listeners.click?.({target: this}); }
+    fire(event, data = {target: this}) { return this.listeners[event]?.(data); }
+    click() { if (!this.disabled) return this.fire("click"); }
     focus() { context.document.activeElement = this; }
     closest() { return null; }
     getBoundingClientRect() { return {left: 0, top: 0}; }
@@ -39,6 +53,12 @@ function harness({state = scene(), events = false, schedule = false, overrides =
     if (!elements.has(id)) elements.set(id, new Element(id.includes("select") || id === "train-start" || id === "project-slots" ? "select" : "div"));
     return elements.get(id);
   };
+  const stubs = {
+    status: (text, kind) => notices.push({text, kind}),
+    api: async (path, body) => { calls.push({path, body}); return state; },
+    saveSession() {}, setTimeout() {}, ...(schedule ? {} : {draw() {}}),
+  };
+  for (const name of omit) delete stubs[name];
   const context = vm.createContext({
     S: state, fitted: true, pickMode: null, armed: null, preview: null, view: {x: 0, y: 0, scale: 1},
     window: {addEventListener(name, fn) { windowEvents[name] = fn; }},
@@ -48,17 +68,16 @@ function harness({state = scene(), events = false, schedule = false, overrides =
     localStorage: {get length() { return saved.size; }, key(i) { return [...saved.keys()][i]; },
       getItem(k) { return saved.get(k) ?? null; }, setItem(k, v) { saved.set(k, String(v)); }, removeItem(k) { saved.delete(k); }},
     crypto: {randomUUID: () => `project-${saved.size + 1}`},
-    status: (text, kind) => notices.push({text, kind}),
-    api: async (path, body) => { calls.push({path, body}); return state; },
     requestAnimationFrame(fn) { frames.push(fn); },
     setInterval(fn) { const id = Symbol(); intervals.set(id, fn); return id; },
     clearInterval(id) { intervals.delete(id); },
-    saveSession() {}, ...(schedule ? {} : {draw() {}}), ...overrides,
+    ...stubs, ...overrides,
   });
   loadEditor(context, {events});
   const run = code => vm.runInContext(code, context);
   el("max-pieces").value = 26; el("slop").value = 0; el("reversing").checked = false;
-  return {context, run, el, calls, notices, saved, intervals, frames, windowEvents, Element};
+  return {context, run, el, calls, notices, saved, intervals, frames, windowEvents, Element,
+    created: () => created};
 }
 
 module.exports = {harness, scene, track};
