@@ -6,9 +6,14 @@ dispatcher shared by every host. `duplotrain.gui` is only the local HTTP host,
 its static asset routes and the desktop launcher; the browser build runs the
 same editor module in a Pyodide worker and talks to it through the same
 dispatcher. HTML, CSS and JavaScript are packaged source files served by both
-hosts. The static build injects the worker bootstrap, stamps the bundle with
-the content of every file, and leaves the CLI, the HTTP host, rendering,
-exhaustive enumeration and scoring out of the worker archive. Local hosting
+hosts: `editor.js` owns the API snapshot and the interaction state, and three
+companion deferred scripts hold derived canvas and picking geometry, project
+and backup presentation, and train presentation; their load order and the
+single DOMContentLoaded initialiser are part of the tested contract, and the
+local host serves them from an explicit allowlist. The static build injects
+the worker bootstrap, stamps the bundle with the content of every file, and
+leaves the CLI, the HTTP host, rendering, exhaustive enumeration and scoring
+out of the worker archive. Local hosting
 security and the revision protocol are described in [security.md](security.md).
 
 ## History
@@ -36,14 +41,15 @@ identity and the selected option, and any other tool invalidates an old dialog.
 
 ## Drawing and picking
 
-Pieces are painted and picked as elevation-ordered segments: ramps are
-subdivided at 8 mm intervals (at most 256 per segment) so their order near a
-crossing follows local height, equal heights follow placement order, and
-picking measures the distance to segments rather than to sample points.
-World-space rails, segments and paint batches are cached per layout revision,
-flat segments of one piece share a fill and stroke, and repaints are coalesced
-into animation frames. Hover hit-testing runs at most once per frame at the
-latest pointer position, after a cached bounding-box prefilter, and repaints
+Pieces are painted and picked as elevation-ordered segments: climbing edges
+are subdivided at 8 mm intervals (at most 256 per segment) so their order near
+a crossing follows local height, flat chords stay whole, equal heights follow
+placement order, and picking measures the distance to segments rather than to
+sample points. One lazily built record per layout holds its world-space
+segments, per-piece groups, paint batches and bounds, flat segments of one
+piece share a fill and stroke, and repaints are coalesced into animation
+frames. Hover hit-testing runs at most once per frame at the latest pointer
+position, visits only the pieces whose bounds contain the pointer, and repaints
 only when the hovered piece changes; clicks pick immediately. This is a sampled
 2D view, not a solid renderer or a collision model.
 
@@ -72,8 +78,10 @@ reports the shortages.
 incompatible joints, sampled overlaps between non-neighbouring pieces under the
 solver's width, height and underpass rules, shortages of track and action
 stones against the owned counts, and pieces the catalogue marks provisional.
-Each finding focuses and highlights its pieces. At most 200 overlapping pairs
-are reported, and reaching that bound marks the check incomplete. A clean
+Each finding focuses and highlights its pieces. Layouts of 128 pieces or more
+shortlist candidate pairs through the collision field's bounds index and run
+the unchanged pair tests on that superset. At most 200 overlapping pairs are
+reported, and reaching that bound marks the check incomplete. A clean
 report is a model result at 8 mm sampling, not a physical-clearance guarantee,
 and manual layouts stay editable whatever it says.
 
@@ -107,7 +115,9 @@ shows name, time, piece count and identifier, newest first, keeping unreadable
 copies visible. Rename and delete act on the selected copy only, recheck its
 exact bytes inside a per-slot Web Lock, and are refused where locks are
 unavailable. A separate indicator reports whether the content, name, viewport
-or search settings changed since the last project save or open in this tab.
+or search settings changed since the last project save or open in this tab; it
+compares a cached session string with a small settings key and is refreshed on
+explicit redraws, not on hover frames.
 Autosave is independent of all of this, and local copies are not a backup
 service.
 

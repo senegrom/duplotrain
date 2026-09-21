@@ -16,8 +16,10 @@ stop reasons, preprocessing work and median times; `--suite`, `--case`,
 editor closings of the reported 59-piece bridge gap in both directions and
 both inventory modes and hashes the ordered exact layouts,
 `benchmarks/collision_index.py --count-bounds` scales that problem with
-synthetic remote circles, and `benchmarks/editor_payload.py` measures state
-serialisation. Point `PYTHONPATH` at an older checkout to run the same script
+synthetic remote circles, `benchmarks/editor_payload.py` measures state
+serialisation, and `benchmarks/editor_presentation.py` times Check layout and
+warm state responses on the completed layout and on synthetic layouts of 539
+and 1,499 pieces. Point `PYTHONPATH` at an older checkout to run the same script
 against it, and compare CPU time rather than wall time when other work shares
 the machine.
 
@@ -147,6 +149,24 @@ unchanged. Candidate previews use a compact drawing-only contract, and state
 serialisation shares each connector pose between the layout, the joint audit
 and the mating lists.
 
+## Editor presentation
+
+The drawing lines of an exact placement, rounded and route-preserving, are
+cached in a 2,048-entry LRU and copied into fresh lists for every response, and
+a 32-entry LRU keeps the footprint of a placement tuple, so a state or candidate
+response does not resample or remeasure geometry it has already served; neither
+cache holds a session, revision, link or ownership. Both hosts send compact
+JSON, which leaves every parsed value unchanged and trims an eight-suggestion
+response by an eighth. Check layout keeps its all-pairs scan below 128 pieces;
+larger layouts shortlist candidate pairs through the collision field's bounds
+index, a conservative superset, and run the unchanged pair tests on them, which
+turns the quadratic scan of a 1,499-piece layout into a few thousand pair tests.
+In the browser, flat chords are drawn whole and only climbing edges are
+subdivided for paint order, one lazily built record per layout holds segments,
+per-piece groups, batches and bounds, picking visits only the pieces whose
+bounds contain the pointer, and the project indicator compares a cached session
+string with a small settings key on explicit redraws only.
+
 ## Representative times
 
 Process CPU time on one machine, the mean of many runs, with results
@@ -165,6 +185,8 @@ identical to the reference searches without tables.
 | Networks of 2 buffers, 3 straights and 3 curves up to 8 pieces, 109 classes | 770 | 0.61 s |
 | Keying the 671-layout corpus | | 2.0 s |
 | The arc oracle over 584 corpus closings | | 2.3 s |
+| Check layout on a synthetic 1,499-piece layout | | 60 ms |
+| Warm state with eight compact suggestions, reported gap | | 8.7 ms |
 
 Before this work the loop search with a switch spent 1.85 million nodes and
 31 s, the bridge gap 190,000 nodes and 8.5 s, and the suite 13.7 s.
