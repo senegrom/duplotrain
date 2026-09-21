@@ -223,9 +223,14 @@ def test_state_and_candidate_return_values_cannot_poison_later_responses(monkeyp
         calls.append(layout)
         return original(layout)
 
+    from duplotrain.editor import _drawing_size
+
     monkeypatch.setattr(Layout, "size", measured_size)
+    _drawing_size.cache_clear()
     candidate = session._candidate_json(0, session.candidates[0])
-    assert calls == [session.layout]  # the preview already computes the size
+    assert calls == [session.layout]  # the cold preview computes the size once
+    assert session._candidate_json(0, session.candidates[0]) == candidate
+    assert calls == [session.layout]  # repeated immutable geometry reuses it
     candidate["size_cm"][0] = -1
     assert candidate["preview"]["size_cm"][0] != -1
 
