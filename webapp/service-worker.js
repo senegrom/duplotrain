@@ -1,11 +1,14 @@
 /* Opt-in, complete-version offline installation. Stamped by build.py. */
 "use strict";
 const BUILD = "__BUILD__";
+// A version is named by the digest of its exact manifest, so any changed byte
+// installs as a new version, even one the build stamp does not cover.
+const VERSION = "__VERSION__";
 const ASSETS = __ASSETS__;
 const SCOPE = self.registration.scope;
 const PREFIX = "duplotrain-offline/1:" + encodeURIComponent(SCOPE) + ":";
-const CACHE = PREFIX + BUILD;
-const MARKER = new URL(".offline-complete-" + BUILD, SCOPE).href;
+const CACHE = PREFIX + VERSION;
+const MARKER = new URL(".offline-complete-" + VERSION, SCOPE).href;
 const INDEX = new URL("index.html", SCOPE).href;
 let installing = null;
 const absolute = path => new URL(path, SCOPE).href;
@@ -18,6 +21,34 @@ async function offlineStatus() {
   for (const asset of ASSETS) if (!(await cache.match(absolute(asset.url)))) return {build: BUILD, ready: false};
   return {build: BUILD, ready: true, assets: ASSETS.length};
 }
+// One verified asset. The download fails once no bytes arrive for a minute,
+// however long a slow but steady link needs for the largest runtime file.
+async function download(asset) {
+  const url = absolute(asset.url);
+  if (new URL(url).origin !== new URL(SCOPE).origin || !url.startsWith(SCOPE))
+    throw new Error("Offline asset outside application scope");
+  const controller = new AbortController();
+  let timer;
+  const alive = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(), 60000); };
+  alive();
+  try {
+    const response = await fetch(url, {cache: "no-store", credentials: "same-origin", redirect: "error", signal: controller.signal});
+    if (!response.ok || response.type === "opaque") throw new Error(`Offline download failed: ${asset.url}`);
+    const data = new Uint8Array(asset.bytes), reader = response.body.getReader();
+    let size = 0;
+    for (;;) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      alive();
+      if (size + value.byteLength > data.byteLength) throw new Error(`Offline version verification failed: ${asset.url}`);
+      data.set(value, size); size += value.byteLength;
+    }
+    if (size !== data.byteLength || hex(await crypto.subtle.digest("SHA-256", data)) !== asset.sha256)
+      throw new Error(`Offline version verification failed: ${asset.url}`);
+    return {response, data};
+  } catch (error) { controller.abort(); throw error; }
+  finally { clearTimeout(timer); }
+}
 async function installVersion() {
   if (installing) return installing;
   installing = (async () => {
@@ -27,24 +58,12 @@ async function installVersion() {
     await cache.delete(MARKER);
     try {
       for (const asset of ASSETS) {
-        const url = absolute(asset.url);
-        if (new URL(url).origin !== new URL(SCOPE).origin || !url.startsWith(SCOPE))
-          throw new Error("Offline asset outside application scope");
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 60000);
-        let response, data;
-        try {
-          response = await fetch(url, {cache: "no-store", credentials: "same-origin", redirect: "error", signal: controller.signal});
-          if (!response.ok || response.type === "opaque") throw new Error(`Offline download failed: ${asset.url}`);
-          data = await response.arrayBuffer();
-        } finally { clearTimeout(timeout); }
-        if (data.byteLength !== asset.bytes || hex(await crypto.subtle.digest("SHA-256", data)) !== asset.sha256)
-          throw new Error(`Offline version verification failed: ${asset.url}`);
+        const {response, data} = await download(asset);
         // Reconstruct with original headers, preserving MIME and CSP. Avoid a
         // stale Content-Encoding/Length after fetch has decoded the response.
         const headers = new Headers(response.headers);
         headers.delete("Content-Encoding"); headers.set("Content-Length", String(data.byteLength));
-        await cache.put(url, new Response(data, {status: 200, headers}));
+        await cache.put(absolute(asset.url), new Response(data, {status: 200, headers}));
       }
       // The marker also records when this version completed, for pruning.
       await cache.put(MARKER, new Response(BUILD, {headers: {"Content-Type": "text/plain",
@@ -59,22 +78,31 @@ async function installVersion() {
   })();
   try { return await installing; } finally { installing = null; }
 }
-// Keep this version and the newest older complete one, which tabs opened before
-// the update still run; older versions only take space. A cache without its
-// marker may be a newer version still installing, so it is left alone.
-async function pruneOlderVersions() {
+// Tabs opened before an update run the version that was active until now. So
+// activation stamps its marker, then keeps, besides itself, the older complete
+// version activated most recently (by install time for versions never stamped)
+// and deletes the rest: a superseded waiting update served no tab. A cache
+// without its marker may be a newer version still installing: left alone.
+async function activateVersion() {
+  const cache = await caches.open(CACHE), marker = await cache.match(MARKER);
+  if (marker) {
+    const headers = new Headers(marker.headers);
+    headers.set("X-Activated", String(Date.now()));
+    await cache.put(MARKER, new Response(await marker.text(), {headers}));
+  }
   const complete = [];
   for (const name of await caches.keys()) {
     if (!name.startsWith(PREFIX) || name === CACHE) continue;
-    const marker = await (await caches.open(name)).match(absolute(".offline-complete-" + name.slice(PREFIX.length)));
-    if (marker) complete.push({name, installed: Number(marker.headers.get("X-Installed")) || 0});
+    const older = await (await caches.open(name)).match(absolute(".offline-complete-" + name.slice(PREFIX.length)));
+    if (older) complete.push({name, activated: Number(older.headers.get("X-Activated")) || 0,
+      installed: Number(older.headers.get("X-Installed")) || 0});
   }
-  complete.sort((a, b) => b.installed - a.installed);
+  complete.sort((a, b) => b.activated - a.activated || b.installed - a.installed);
   for (const {name} of complete.slice(1)) await caches.delete(name);
 }
 self.addEventListener("install", event => event.waitUntil(installVersion()));
 self.addEventListener("activate", event => event.waitUntil(
-  pruneOlderVersions().then(() => self.clients.claim())));
+  activateVersion().then(() => self.clients.claim())));
 // Do not skipWaiting automatically: changing versions must not reload or
 // replace an unsaved editor. Already-open clients keep their exact asset URLs.
 self.addEventListener("message", event => {

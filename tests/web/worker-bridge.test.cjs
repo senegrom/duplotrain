@@ -160,8 +160,11 @@ test("restart restores an isolated copy of this tab's snapshot and ignores late 
   restart().click();
   assert.equal(first.terminated, true);
   r.snapshot.inventory.curve = 999; // no alias into the captured recovery payload
+  // Late messages from the old engine, even a failure, never touch the new one.
   first.emit({id: ticking.id, res: '{"revision":999}'});
-  const second = h.workers[1]; second.emit({ready: true});
+  first.emit({bootError: "late failure from the old engine"});
+  const second = h.workers[1]; assert.equal(second.terminated, undefined);
+  second.emit({ready: true});
   await turns(1);
   const restore = second.sent[0];
   assert.equal(restore.path, "/api/restore");

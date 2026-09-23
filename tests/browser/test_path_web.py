@@ -74,6 +74,10 @@ def exercise_interactive_features(page):
     expect(page.locator("#status")).to_contain_text("imported 10 pieces.")
     expect(page.locator("#end-select option")).to_have_count(4)
     page.locator("#max-pieces").fill("2")
+    # Close all gaps plans exact, non-reversing joins, whatever Close the loop's
+    # slop and reversing settings are.
+    page.locator("#reversing").check()
+    page.locator("#slop").fill("5")
     page.locator("#close-all").click()
     expect(page.locator("#status")).to_contain_text("alternative(s) found", timeout=90000)
     first = page.locator(".cand").first
@@ -126,7 +130,7 @@ def exercise_cached_canvas(page):
     assert result["reused"] and result["invalidated"]
 
 
-def exercise_offline_reload(page):
+def exercise_offline_reload(browser_type, confirmed):
     """Boot the unchanged offline build with genuine transport/certificate trust.
 
     WebKit upgrades localhost HTTP subresources under the production CSP. Use
@@ -140,8 +144,6 @@ def exercise_offline_reload(page):
     dist = Path(os.environ["DUPLOTRAIN_STATIC_DIST"])
     policy = re.search(r'Content-Security-Policy "([^"\n]+)"',
                        (dist / ".htaccess").read_text()).group(1)
-    confirmed = page.evaluate("S.snapshot")
-    browser_type = page.context.browser.browser_type
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -273,6 +275,20 @@ def _exercise_offline_reload(page, stop_server):
     finally:
         if emulate_offline:
             page.context.set_offline(False)
+
+
+def test_built_app_reloads_offline(browser):
+    if not os.environ.get("DUPLOTRAIN_STATIC_DIST"):
+        pytest.skip("set DUPLOTRAIN_STATIC_DIST to a built webapp/dist directory")
+    if (browser.browser_type.name == "webkit"
+            and os.environ.get("DUPLOTRAIN_TEST_SYSTEM_CA") != "1"):
+        pytest.skip("the WebKit offline reload needs the opted-in disposable CI runner "
+                    "(DUPLOTRAIN_TEST_SYSTEM_CA=1, see tests/browser/tls.py)")
+    from duplotrain.editor import Session
+
+    session = Session()
+    session.attach("straight", 0, None)
+    exercise_offline_reload(browser.browser_type, session.snapshot())
 
 
 def test_interactive_search_more_multi_gap_and_route_witness(editor):

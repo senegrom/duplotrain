@@ -91,8 +91,6 @@ def test_network_dedup_does_not_return_the_same_buffered_bar_twice():
     assert len(same_bar) == 1, "the long rail and two short rails were counted twice"
 
 
-
-
 def test_true_wide_piece_overlap_is_still_rejected():
     catalog = default_catalog()
     catalog["curve"] = parse_piece({

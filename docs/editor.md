@@ -156,7 +156,8 @@ active.
 
 ## Interactive completion
 
-Find more increases the distinct-alternative quota independently of Search harder.
+Find more increases the quota of distinct alternatives (the same track found
+from either end counts once) independently of Search harder.
 Single-pair searches retain their exact DFS checkpoint, publish validated previews
 in bounded chunks, and support pause/resume with eight-card pages and candidate
 ranking. Close all gaps uses bounded backtracking with shared stock and offers
@@ -189,8 +190,13 @@ all requested runs complete within the bounds; see [search-jobs.md](search-jobs.
 The browser-engine app offers **Make available offline** on HTTPS or localhost.
 It is opt-in; simply opening the app does not install a service worker. The build
 emits a manifest of the exact editor, engine, runtime, icon and manifest assets,
-including byte lengths and SHA-256 digests. An offline version is marked ready
-only after all resources verify and the completion marker is written. Cached
+including byte lengths and SHA-256 digests. An offline version is named by the
+digest of that manifest, so a build whose served bytes differ installs as a new
+version even where its build stamp is unchanged (the Pages CSP tag, the web
+manifest and the icons are not part of the stamp). An offline version is marked
+ready only after all resources verify and the completion marker is written. A
+download fails once no bytes arrive for a minute, not when a slow but steady
+link needs longer for a large runtime file. Cached
 responses preserve the build's CSP and MIME headers. Project/autosave data is
 not stored in these application-code caches.
 
@@ -203,8 +209,9 @@ first: an explicit reload still resets in-memory undo and search progress.
 A failed installation, failed digest or storage quota error does not replace an
 older verified version or delete unrelated application caches. Versioned asset
 URLs keep old live tabs on coherent resources: activating a version keeps the
-newest older complete version, which tabs opened before the update still run,
-and deletes older ones; a version that is still installing is left alone.
+version that was active before it, which tabs opened before the update still
+run, and deletes the other older versions, such as a waiting update that was
+superseded; a version that is still installing is left alone.
 Browser eviction or missing entries can remove offline availability, so readiness
 is checked and installation can be repaired online. This is not a permanent
 storage guarantee or a substitute for portable project backups. The desktop local
@@ -230,7 +237,8 @@ Playwright's offline emulation. WebKit upgrades loopback subresources to HTTPS
 under that policy, and its release builds have no CA-file override, so the
 WebKit job serves HTTPS with a short-lived test CA that it installs, by explicit
 opt-in (`DUPLOTRAIN_TEST_SYSTEM_CA=1`), in the disposable GitHub-hosted runner's
-trust store and removes afterwards, even on failure; the helper refuses any
-other machine, so that check runs only in CI. WebKit's offline emulation aborts
+trust store and removes afterwards, even on failure. The helper refuses any
+other machine, so elsewhere the WebKit variant of this test is skipped with that
+reason. WebKit's offline emulation aborts
 service-worker navigations, so there the stopped server alone proves the
 origin is gone.

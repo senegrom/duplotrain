@@ -21,11 +21,11 @@ layouts.
 `search_effort` is an integer API parameter from 1 to 16, defaulting to 1. It scales
 the plain, bridge and full-inventory budgets of 25,000, 250,000 and 60,000 nodes. If
 the plain inventory is already the whole box, that search uses the full budget.
-The **Search deeper** button doubles both the added-piece ceiling (capped at 128)
-and effort (capped at 16), preserving the selected endpoints. It remains available
-at 128 pieces while there is still room to increase effort. A fresh search resets
-effort to 1. Progress counters accumulate across stages instead of restarting.
-Retries restart the search with a larger budget; they do not resume a saved frontier.
+Progress counters accumulate across stages instead of restarting. A synchronous
+`/api/solve` retry starts over with its larger budget. The editor's interactive
+search resumes instead: **Search harder** doubles the added-piece ceiling (capped
+at 128) and the stage budgets (up to 16 times) of the same job, keeping its
+suspended searches and the selected endpoints (see [search-jobs.md](search-jobs.md)).
 
 ## Regression case
 

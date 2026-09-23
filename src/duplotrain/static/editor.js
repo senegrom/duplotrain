@@ -17,8 +17,11 @@ async function send(path, body) {
   }
   return data;
 }
-async function api(path, body) {
+async function api(path, body, fromJob = false) {
   if (apiBusy) throw new Error("An action is still running; try again when it finishes.");
+  // Between its ticks a search or route analysis still owns the session: another
+  // action would change it or take the engine from the job's next tick.
+  if (jobLoop && !fromJob) throw new Error("A search or route analysis is running; pause it first.");
   apiBusy = true;
   refreshBusy();
   try {

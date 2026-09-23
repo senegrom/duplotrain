@@ -173,9 +173,10 @@ hover, and apply with a click. Export/import round-trips the same exact-geometry
 the CLI uses. On phones the canvas sits above the scrolling controls: drag to pan,
 pinch or use +/− to zoom, and use the Remove tool to delete a stone or piece.
 Completion cards require Preview before Apply, and inventory changes invalidate old
-suggestions. Searches report whether the inventory was exhausted or a node, result or
-piece limit stopped them; Search deeper raises the added-piece limit from 26 up to
-128, and an unsuccessful capped search never proves that no layout exists.
+suggestions. A search is a resumable job: it reports whether it exhausted the
+inventory or stopped at its limits, Find more asks it for more alternatives, and
+Search harder raises its node budgets and added-piece limit (up to 128); a search
+stopped at a limit never proves that no layout exists.
 
 Beyond closing loops, the editor keeps a bounded undo/redo history of track, owned
 pieces and sandbox mode, checks a layout for open connectors, sampled overlaps and

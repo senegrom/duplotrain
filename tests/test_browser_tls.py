@@ -40,8 +40,8 @@ def test_browser_test_ca_is_explicit_and_checks_hostname(tmp_path):
         url = f"https://localhost:{server.server_port}/"
         with urlopen(url, context=trusted, timeout=5) as response:
             assert response.read() == b"verified TLS"
-        # A fresh database has no trust in this ephemeral CA.
-        untrusted = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        # The platform's own trust store has no trust in this ephemeral CA.
+        untrusted = ssl.create_default_context()
         untrusted.minimum_version = ssl.TLSVersion.TLSv1_2
         with pytest.raises(URLError, match="CERTIFICATE_VERIFY_FAILED"):
             urlopen(url, context=untrusted, timeout=5)

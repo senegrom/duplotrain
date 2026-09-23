@@ -15,6 +15,7 @@ import json
 import math
 import time
 import uuid
+from collections import Counter
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -138,10 +139,32 @@ def layout_key(layout):
                           .encode()).hexdigest()
 
 
+def physical_key(layout, start=0):
+    """Identity of the track from placement *start* on, over a shared prefix.
+
+    Connectors have no gender: a piece placed from its other end has another
+    frame and port order but lies in the same place. So a piece is its id with
+    the set of its world connector poses, and a link joins two such poses or a
+    connector of the shared prefix, named by index.
+    """
+    placements = layout.placements
+
+    def end(placement, port):
+        return (placement, port) if placement < start else placements[placement].port_pose(port)
+
+    pieces = Counter((p.piece.id, frozenset(map(p.port_pose, range(len(p.piece.ports)))))
+                     for p in placements[start:])
+    links = frozenset(frozenset((end(*a), end(*b))) for a, b in layout.links.items())
+    return frozenset(pieces.items()), links, layout.accessories
+
+
 def valid_extension(base, candidate, stock, max_pieces, options, *, all_gaps=False,
                     audit=None):
     """Acceptance checks of one candidate over *base*.
 
+    *base* already fits the room and keep-out limits: a job checks its layout
+    once, and the partial bases of a plan consist of accepted additions. So only
+    the added placements are checked against them.
     *audit*, the problem's shared overlap auditor, is for geometry nobody audited
     yet: an expanded bridge macro. Every other producer already audited exactly
     these placements with the same clearance and spacing.
@@ -154,7 +177,7 @@ def valid_extension(base, candidate, stock, max_pieces, options, *, all_gaps=Fal
             or any(n - base.piece_counts.get(pid, 0) > stock.get(pid, 0)
                    for pid, n in layout.piece_counts.items())
             or (all_gaps and layout.connectable_ends())
-            or not fits_space(layout, options)):
+            or not fits_space(layout.placements[len(base):], options)):
         return False
     new_issues = [issue for issue in layout.joint_issues()
                   if tuple(issue["a"]) not in base.links]
@@ -419,7 +442,7 @@ class SearchJob:
                 "Existing track crosses the room/keep-out limits; no pieces were moved")
         self.solutions: list[Solution] = []
         self.reason: str | None = None  # a proof that no ordinary completion exists
-        self.keys: set[str] = set()
+        self.keys: set = set()
         self.last_touch = time.monotonic()
         self.status = "running"
         self.stage = "templates"
@@ -457,7 +480,8 @@ class SearchJob:
                                      "layout": layout_to_dict(candidate.layout)})
         except ValueError:
             return
-        key = layout_key(candidate.layout)
+        # The same track found from either end is one alternative.
+        key = physical_key(candidate.layout, len(self.base))
         if key not in self.keys:
             self.keys.add(key)
             self.solutions.append(candidate)
@@ -488,8 +512,8 @@ class SearchJob:
                 continue
             if slots <= 0:
                 continue
-            pair = PairSearch(base, self.catalog, stock, grow, close, slots, 1, 0, False,
-                              self.options)
+            pair = PairSearch(base, self.catalog, stock, grow, close, slots, self.effort, 0,
+                              False, self.options)
             self.multis.append(pair)
             seen = set()
             try:
@@ -505,7 +529,7 @@ class SearchJob:
                     if event["kind"] != "solution":
                         continue
                     candidate = event["solution"]
-                    key = layout_key(candidate.layout)
+                    key = physical_key(candidate.layout, len(base))
                     if key in seen or len(candidate.layout.connectable_ends()) >= len(opens):
                         continue
                     seen.add(key)
@@ -659,6 +683,9 @@ def dispatch_search(session, path, body):
         if old is not None:
             old.close()
         session._interactive_job = job
+        # This job's previews carry the current revision, as the last published
+        # suggestions do: withdraw those, so an index names only this job's.
+        session.candidates, session._candidate_revision = [], None
     else:
         if (not isinstance(old, SearchJob) or body.get("job_id") != old.id
                 or old.revision != session.revision):

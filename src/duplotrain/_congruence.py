@@ -520,8 +520,6 @@ def _sample(
     return points
 
 
-
-
 #: The sampled key is a function of the exact canonical identity alone, and an
 #: enumeration keys every congruent duplicate it finds. Bounded: cleared when full.
 _KEY_CACHE: dict[tuple, tuple] = {}

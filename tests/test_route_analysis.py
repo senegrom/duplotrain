@@ -85,7 +85,7 @@ def test_step_limited_runs_produce_no_terminal_or_coverage_claim(completed):
     job.close()
 
 
-def test_stop_and_open_end_produce_loadable_counterexample():
+def test_an_open_end_produces_a_loadable_counterexample():
     c = default_catalog()
     layout = build_chain([(c["straight"], 0, 1)] * 2)
     job = RouteJob(Session(history=[layout]), {})
@@ -94,6 +94,25 @@ def test_stop_and_open_end_produce_loadable_counterexample():
     witness = result["counterexample"]
     assert drive(layout, start=tuple(witness["start"]),
                  switch_states=witness["switch_states"]).outcome == witness["outcome"]
+    job.close()
+
+
+def test_the_counterexample_breaks_the_weakest_property_that_fails():
+    # A ring through a switch with an open spur: some runs loop over the whole
+    # track, others leave by the spur. Not every run loops, so the counterexample
+    # is one that does not, as drive.classify reports it.
+    c = default_catalog()
+    ring = build_chain([(c["switch"], 0, 1)] + [(c["curve"], 0, 1)] * 11)
+    ends = ring.connectable_ends()
+    layout = ring.join(*next((a, b) for a in ends for b in ends
+                             if a < b and ring.pose_of(a).connects_to(ring.pose_of(b))))
+    job = RouteJob(Session(history=[layout]), {})
+    result = finished(job)
+    assert not result["classification"]["looping"]
+    witness = result["counterexample"]
+    assert witness["outcome"] != "endless"
+    assert (tuple(witness["start"]), witness["switch_states"],
+            witness["outcome"]) == classify(layout).counterexample
     job.close()
 
 

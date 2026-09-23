@@ -309,8 +309,13 @@ def build_offline_worker(stamp: str, runtime: str, zip_name: str) -> None:
         payload = (DIST / url.split("?")[0]).read_bytes()
         assets.append({"url": url, "bytes": len(payload),
                        "sha256": hashlib.sha256(payload).hexdigest()})
+    manifest = json.dumps(assets, separators=(",", ":"))
+    # The offline cache is named by the manifest itself: a change the stamp does
+    # not cover (the page's CSP meta, title, web manifest or icons) must still
+    # install as a new version rather than be taken for the installed one.
     _stamp_file(WEBAPP / "service-worker.js", DIST / "service-worker.js", {
-        "__BUILD__": stamp, "__ASSETS__": json.dumps(assets, separators=(",", ":")),
+        "__BUILD__": stamp, "__VERSION__": hashlib.sha256(manifest.encode()).hexdigest()[:16],
+        "__ASSETS__": manifest,
     })
 
 

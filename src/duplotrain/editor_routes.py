@@ -50,8 +50,10 @@ class RouteJob:
                          for start in self.starts)
         self.runs = self.steps = self.limited_runs = 0
         self.outcomes = Counter()
-        self.best = self.counterexample = None
-        self.best_score = None
+        self.best = self.best_score = None
+        # The first run breaking each universal property, as drive.classify
+        # records them: the counterexample breaks the weakest one that failed.
+        self.failures = {}
         self.locally = False
         self.looping = self.completely = self.perfectly = True
         self.status = "running"
@@ -94,13 +96,13 @@ class RouteJob:
                 self.locally = True
                 if not report.visited >= self.universe:
                     self.completely = self.perfectly = False
-                    self.counterexample = self.counterexample or witness
-                elif not _cycle_both_directions(report, self.layout):
+                    self.failures.setdefault("completely", witness)
+                elif self.perfectly and not _cycle_both_directions(report, self.layout):
                     self.perfectly = False
-                    self.counterexample = self.counterexample or witness
+                    self.failures.setdefault("perfectly", witness)
             else:
                 self.looping = self.completely = self.perfectly = False
-                self.counterexample = self.counterexample or witness
+                self.failures.setdefault("looping", witness)
             if time.perf_counter() >= deadline:
                 break
 
@@ -117,7 +119,9 @@ class RouteJob:
                 "required_runs": str(self.required), "max_runs": self.max_runs,
                 "max_steps": self.max_steps, "step_limited_runs": self.limited_runs,
                 "steps": self.steps, "total_drivable": len(self.universe),
-                "best": self.best, "counterexample": self.counterexample,
+                "best": self.best, "counterexample": (
+                    self.failures.get("looping") or self.failures.get("completely")
+                    or self.failures.get("perfectly")),
                 "outcomes": dict(self.outcomes), "classification": classification,
                 "complete": self.complete, "optimal": self.complete,
                 "model_only": True}

@@ -2,6 +2,7 @@
 import gc
 import json
 import weakref
+from collections import Counter
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -61,6 +62,14 @@ def call(session, action, **body):
     return dispatch_session(session, "/api/search/" + action,
                             {"revision": session.revision,
                              "preview_format": PREVIEW_FORMAT, **body})
+
+
+def physical(layout, start):
+    """Added pieces as built, each with its connector positions, whatever their order."""
+    return frozenset(Counter((p.piece.id, frozenset(
+        (round(float(q.x), 3), round(float(q.y), 3), round(float(q.z), 3), q.heading)
+        for q in map(p.port_pose, range(len(p.piece.ports)))))
+        for p in layout.placements[start:]).items())
 
 
 def assert_plan(base, solution, stock):
@@ -156,8 +165,8 @@ def test_publication_pause_resume_and_apply_are_revision_bound_and_undoable(cata
     before = session.snapshot()
     call(session, "start")
     job = session._interactive_job
-    call(session, "tick")
     call(session, "pause")
+    assert job.status == "paused"
     paused_nodes, paused_solutions = job.nodes, len(job.solutions)
     call(session, "tick")
     assert (job.nodes, len(job.solutions)) == (paused_nodes, paused_solutions)
@@ -323,8 +332,131 @@ def test_multi_gap_short_stock_does_not_publish_partial_plan(catalog):
     before = session.snapshot()
     job = SearchJob(session, {"all_gaps": True, "max_pieces": 2, "max_results": 1})
     settle(job)
-    assert not job.solutions and not job.complete
+    assert not job.solutions and job.status == "bounded_complete"
     assert session.snapshot() == before
+    job.close()
+
+
+def test_close_all_gaps_searches_each_pair_with_the_stock_left_by_the_last(catalog,
+                                                                          monkeypatch):
+    import duplotrain.editor_search as module
+
+    seen = []
+
+    class Spy(module.PairSearch):
+        def __init__(self, base, pieces, stock, *args):
+            seen.append(stock.get("curve"))
+            super().__init__(base, pieces, stock, *args)
+
+    monkeypatch.setattr(module, "PairSearch", Spy)
+    ring = build_chain([(catalog["curve"], 0, 1)] * 12).join((0, 0), (11, 1))
+    session = Session(history=[ring], inventory={"curve": 12})
+    session.remove_piece(7)
+    session.remove_piece(2)
+    job = SearchJob(session, {"all_gaps": True, "max_pieces": 2, "max_results": 1})
+    settle(job)
+    assert job.solutions
+    # The second gap is searched with one curve: the first gap's closure took one.
+    assert seen[:2] == [2, 1]
+    job.close()
+
+
+def test_close_all_gaps_gives_each_pair_the_jobs_search_effort(catalog, monkeypatch):
+    import duplotrain.editor_search as module
+
+    efforts = []
+
+    class Spy(module.PairSearch):
+        def __init__(self, base, pieces, stock, grow, close, depth, effort, *args):
+            efforts.append(effort)
+            super().__init__(base, pieces, stock, grow, close, depth, effort, *args)
+
+    monkeypatch.setattr(module, "PairSearch", Spy)
+    ring = build_chain([(catalog["curve"], 0, 1)] * 12).join((0, 0), (11, 1))
+    session = Session(history=[ring], inventory={"curve": 12})
+    session.remove_piece(7)
+    session.remove_piece(2)
+    job = SearchJob(session, {"all_gaps": True, "max_pieces": 2, "search_effort": 2})
+    settle(job)
+    job.more(harder=True)
+    settle(job)
+    assert efforts[0] == 2 and efforts[-1] == 4 and job.effort == 4
+    job.close()
+
+
+def test_close_all_gaps_offers_each_plan_once(catalog):
+    # An oval missing two pairs of straights. The same closing pieces found from
+    # the other end of a gap have other frames, and took three of eight places.
+    curve, straight = (catalog["curve"], 0, 1), (catalog["straight"], 0, 1)
+    session = Session(history=[build_chain(([curve] * 6 + [straight] * 3) * 2)])
+    for index in (17, 16, 8, 7):
+        session.remove_piece(index)
+    base = session.layout
+    job = SearchJob(session, {"all_gaps": True, "max_pieces": 14})
+    settle(job)
+    assert len(job.solutions) == 8
+    assert len({physical(s.layout, len(base)) for s in job.solutions}) == 8
+    for solution in job.solutions:
+        assert_plan(base, solution, session.remaining())
+    job.close()
+
+
+def test_the_same_track_found_from_either_end_is_offered_once(catalog):
+    # Both ends of a gap search. Frame identity alone let the second direction
+    # repeat the first: 50 alternatives of which only 31 differed.
+    right, straight = (catalog["curve"], 1, 0), (catalog["straight"], 0, 1)
+    base = build_chain([right, straight, right, straight, straight])
+    session = Session(history=[base])
+    response = call(session, "start", max_pieces=20)
+    while True:
+        while response["status"] == "running":
+            response = call(session, "tick")
+        if response["status"] != "results_ready" or response["found"] >= 50:
+            break
+        response = call(session, "continue")
+    solutions = session._interactive_job.solutions
+    assert len(solutions) == 50
+    assert len({physical(s.layout, len(base)) for s in solutions}) == 50
+
+
+def test_a_new_search_withdraws_the_suggestions_the_last_one_published(catalog):
+    session = Session(history=[half(catalog)], unlimited=True)
+    call(session, "start", max_results=2)
+    settle(session._interactive_job)
+    call(session, "publish")
+    revision = session.revision
+    # The next job's previews carry the same revision as that published list.
+    call(session, "start", max_results=2, options={"sort": "footprint"})
+    job = session._interactive_job
+    settle(job)
+    assert job.response(session, {})["candidates"][0]["revision"] == revision
+    with pytest.raises(ValueError, match="stale"):
+        session.apply_candidate(0, revision=revision)
+    assert not session.state()["candidates"]
+    call(session, "publish")
+    chosen = job.solutions[0].layout
+    session.apply_candidate(0, revision=session.revision)
+    assert session.layout == chosen
+
+
+def test_candidates_check_only_their_added_track_against_the_room(catalog, monkeypatch):
+    import duplotrain.editor_search as module
+
+    checked, real = [], module.fits_space
+
+    def spy(placements, options):
+        checked.append(len(placements))
+        return real(placements, options)
+
+    monkeypatch.setattr(module, "fits_space", spy)
+    arc = build_chain([(catalog["curve"], 0, 1)] * 11)  # one curve short of a circle
+    session = Session(history=[arc], unlimited=True)
+    job = SearchJob(session, {"max_pieces": 2,
+                              "options": {"keep_out": [[5000, 5000, 6000, 6000]]}})
+    settle(job)
+    assert job.solutions
+    # The existing track is checked once, when the search starts.
+    assert checked[0] == 11 and checked[1:] and max(checked[1:]) <= 2
     job.close()
 
 
@@ -413,11 +545,13 @@ def test_harder_retains_existing_exact_dfs_objects_and_lifts_depth(catalog):
     pool.harder()
     assert objects == [c.iterator for c in pool.cursors]
     assert pool.nodes == before and pool.depth == 8
+    assert all(c.limits.max_pieces == max(1, 8 - c.overhead) for c in pool.cursors)
+    # The resumed searches themselves, not only regenerated templates, reach deeper.
     for _ in range(10000):
         event = pool.step()
-        if event["kind"] == "solution":
+        if event["kind"] == "solution" and event["stage"] != "templates":
             break
-    assert event["kind"] == "solution"
+    assert event["kind"] == "solution" and event["stage"] != "templates"
     pool.close()
 
 

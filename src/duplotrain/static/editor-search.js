@@ -17,10 +17,7 @@ function clearInteractiveState() {
 }
 function discardInteractiveJob() {
   if ((interactiveJob && interactiveJob.revision !== S?.revision) ||
-      (routeAnalysis && routeAnalysis.revision !== S?.revision)) {
-    jobSequence++; interactiveJob = routeAnalysis = null; jobPauseRequested = true;
-    solving = false; jobLoop = false; refreshBusy(); renderJobControls();
-  }
+      (routeAnalysis && routeAnalysis.revision !== S?.revision)) clearInteractiveState();
 }
 function rectangleInput(text) {
   const values = text.split(",").map(s => s.trim()).map(s => s === "" ? NaN : Number(s) * 10);
@@ -83,7 +80,7 @@ function renderJobControls() {
       `${job.status.replaceAll("_", " ")}. Sorted best among found only; no global optimum guaranteed. ` +
       "Constraints shown belong to this search; changed controls apply to a new search.";
   } else {
-    for (const id of ["candidate-prev", "candidate-next"]) show(id, false);
+    for (const id of ["candidate-prev", "candidate-next", "expand-search"]) show(id, false);
     if (el("candidate-page")) el("candidate-page").textContent = "";
     if (el("search-report")) el("search-report").textContent = "";
   }
@@ -100,12 +97,14 @@ function renderJobControls() {
 function jobCurrent(sequence, response) {
   return sequence === jobSequence && response?.revision === S?.revision;
 }
+// The ranking is presentation: every request of a search carries the chosen one.
+const jobView = () => ({page: searchPage, sort: el("candidate-sort")?.value || "discovery"});
 async function publishSearch(sequence) {
   if (!interactiveJob || sequence !== jobSequence) return;
   const chosenIndex = (interactiveJob.candidates || []).find(c =>
     `${c.revision}:${c.index}` === selectedCandidate)?.index;
   const next = await api("/api/search/publish", {job_id: interactiveJob.job_id,
-    revision: interactiveJob.revision, page: searchPage});
+    revision: interactiveJob.revision, ...jobView()}, true);
   if (sequence !== jobSequence) return;
   S = next; interactiveJob = next.search_job;
   // Publication changes candidate indices' revision, not the immutable problem.
@@ -120,12 +119,12 @@ async function driveSearchTicks(sequence) {
     while (sequence === jobSequence && interactiveJob?.status === "running") {
       if (jobPauseRequested) {
         const paused = await api("/api/search/pause", {job_id: interactiveJob.job_id,
-          revision: interactiveJob.revision, page: searchPage});
+          revision: interactiveJob.revision, ...jobView()}, true);
         if (!jobCurrent(sequence, paused)) return;
         interactiveJob = paused; break;
       }
       const next = await api("/api/search/tick", {job_id: interactiveJob.job_id,
-        revision: interactiveJob.revision, page: searchPage});
+        revision: interactiveJob.revision, ...jobView()}, true);
       if (!jobCurrent(sequence, next)) return;
       interactiveJob = next;
       renderCandidates(); renderJobControls(); draw();
@@ -146,6 +145,9 @@ async function driveSearchTicks(sequence) {
     if (sequence === jobSequence) {
       interactiveJob = null; selectedCandidate = null; preview = null;
       finalMessage = error.message; failed = true;
+    } else if (error.code === "stale_revision") {
+      // Another tab changed the layout: adopting it discarded this job already.
+      status(error.message, "err");
     }
   } finally {
     if (sequence === jobSequence) {
@@ -158,14 +160,18 @@ async function startInteractiveSearch(grow, close, effort = 1, allGaps = false) 
   if (!S || solving || apiBusy) return;
   const sequence = ++jobSequence; jobPauseRequested = false;
   try {
+    // Close all gaps plans exact, non-reversing joins only: slop and reversing
+    // are settings of Close the loop.
     const body = {grow, close, max_results: 8, max_pieces: Number(el("max-pieces").value),
-      slop: Number(el("slop").value), search_effort: effort, reversing: el("reversing").checked,
-      all_gaps: allGaps, options: readSearchOptions()};
+      slop: allGaps ? 0 : Number(el("slop").value), search_effort: effort,
+      reversing: !allGaps && el("reversing").checked, all_gaps: allGaps, options: readSearchOptions()};
     selectTool();
     const response = await api("/api/search/start", body);
     if (!jobCurrent(sequence, response)) return;
     interactiveJob = response; routeAnalysis = null; searchPage = 0;
     selectedCandidate = null; preview = null;
+    // The engine withdrew the previous suggestions; only this job's can follow.
+    S.candidates = [];
     await driveSearchTicks(sequence);
   } catch (error) { if (sequence === jobSequence) status(error.message, "err"); }
 }
@@ -174,7 +180,7 @@ async function continueSearch(harder = false, resume = false) {
   const sequence = ++jobSequence;
   try {
     const response = await api(resume ? "/api/search/resume" : "/api/search/continue",
-      {job_id: interactiveJob.job_id, revision: interactiveJob.revision, harder, page: searchPage});
+      {job_id: interactiveJob.job_id, revision: interactiveJob.revision, harder, ...jobView()});
     if (!jobCurrent(sequence, response)) return;
     interactiveJob = response;
     el("max-pieces").value = response.max_pieces;
@@ -218,13 +224,18 @@ async function driveRouteTicks(sequence) {
   try {
     while (sequence === jobSequence && routeAnalysis?.status === "running") {
       const response = await api(jobPauseRequested ? "/api/routes/pause" : "/api/routes/tick",
-        {job_id: routeAnalysis.job_id, revision: routeAnalysis.revision});
+        {job_id: routeAnalysis.job_id, revision: routeAnalysis.revision}, true);
       if (!jobCurrent(sequence, response)) return;
       routeAnalysis = response; showRouteAnalysis();
       if (response.status === "running") await nextJobTurn();
     }
-  } catch (error) { failure = error.message; }
-  finally { if (sequence === jobSequence) {
+  } catch (error) {
+    if (sequence === jobSequence) {
+      // A failed tick ends the analysis, as it ends a search.
+      failure = error.message; routeAnalysis = null;
+      if (el("route-report")) el("route-report").textContent = "";
+    } else if (error.code === "stale_revision") status(error.message, "err");
+  } finally { if (sequence === jobSequence) {
     solving = false; jobLoop = false; refreshBusy(); renderJobControls(); refreshStatus();
     if (failure) status(failure, "err");
   } }
@@ -260,7 +271,11 @@ function bindSearchEvents() {
   on("stop-results", requestJobPause);
   on("candidate-prev", () => searchPageTo(Math.max(0, searchPage - 1)));
   on("candidate-next", () => searchPageTo(searchPage + 1));
-  el("candidate-sort")?.addEventListener("change", () => { updateProjectStatus(); searchPageTo(0); });
+  el("candidate-sort")?.addEventListener("change", () => {
+    updateProjectStatus();
+    // A running search re-ranks at its next checkpoint, from the first page.
+    if (jobLoop) searchPage = 0; else searchPageTo(0);
+  });
   for (const id of ["room-bounds", "keep-out"]) el(id)?.addEventListener("input", updateProjectStatus);
   const excludeKinds = kind => {
     for (const p of S?.palette || []) {

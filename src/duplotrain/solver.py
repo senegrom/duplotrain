@@ -738,8 +738,6 @@ _SLIP_NORMS = tuple(math.isqrt((a * a + b * b) * _MM_SCALE**2) + 1
                     for a, b in _SLIP_AXES)
 
 
-
-
 def _alg_interval(value: Alg) -> tuple[int, int]:
     # The same enclosure as summing Fraction coefficients times the radical
     # bounds, over one common denominator in integers: floor and ceiling of the

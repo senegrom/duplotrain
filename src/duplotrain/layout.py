@@ -685,8 +685,6 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
     return Layout(tuple(placements), links, accessories)
 
 
-
-
 def build_chain(
     pieces: Iterable[tuple[PieceType, int, int]], start: Pose | None = None
 ) -> Layout:

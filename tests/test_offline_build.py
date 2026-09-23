@@ -18,6 +18,15 @@ def manifest(dist):
     return stamp, entries
 
 
+def version(dist):
+    """The offline version's name, which must be the digest of its manifest."""
+    source = (dist / "service-worker.js").read_text()
+    name = re.search(r'const VERSION = "([0-9a-f]{16})";', source).group(1)
+    assert name == hashlib.sha256(
+        re.search(r"const ASSETS = (.*);", source).group(1).encode()).hexdigest()[:16]
+    return name
+
+
 def test_offline_manifest_covers_actual_byte_hashes_and_versioned_editor(synthetic_runtime_build):
     _source, dist = synthetic_runtime_build
     build.main()
@@ -40,9 +49,27 @@ def test_offline_manifest_covers_actual_byte_hashes_and_versioned_editor(synthet
     assert not any("api/" in u or "project" == u for u in urls)
     assert "__BUILD__" not in (dist / "boot.js").read_text()
     assert "__ASSETS__" not in (dist / "service-worker.js").read_text()
+    assert version(dist)
 
 
-def test_offline_code_changes_stamp_and_manifest_without_changing_project_formats(
+def test_a_change_the_stamp_does_not_cover_still_names_a_new_offline_version(
+    synthetic_runtime_build, monkeypatch,
+):
+    source, dist = synthetic_runtime_build
+    build.main()
+    before = manifest(dist)[0], version(dist)
+    webmanifest = source / "src/duplotrain/static/manifest.webmanifest"
+    webmanifest.write_text(webmanifest.read_text().replace("duplotrain", "duplotrain!", 1))
+    build.main()
+    assert manifest(dist)[0] == before[0] and version(dist) != before[1]
+    # So does the Pages build's CSP meta tag.
+    monkeypatch.setattr(build.sys, "argv", ["build.py"])
+    changed = version(dist)
+    build.main()
+    assert manifest(dist)[0] == before[0] and version(dist) != changed
+
+
+def test_a_service_worker_change_changes_the_stamp_and_manifest(
     synthetic_runtime_build, monkeypatch, tmp_path,
 ):
     _source, dist = synthetic_runtime_build
@@ -62,13 +89,7 @@ def test_offline_code_changes_stamp_and_manifest_without_changing_project_format
     assert len(list(dist.glob("duplotrain-src-*.zip"))) == 1
 
 
-def test_runtime_verification_and_production_csp_are_not_weakened():
+def test_the_reviewed_pyodide_digest_is_pinned():
+    # The service worker's behaviour is tested in tests/web/offline-worker.test.cjs.
     assert build.PYODIDE_SHA256["0.27.7"] == (
         "9bc8f127db6c590b191b9aee754022cb41b1a36c7bac233776c11c5ecb541be8")
-    source = (Path(__file__).parents[1] / "webapp/service-worker.js").read_text()
-    assert "skipWaiting" in source  # only the explicit ACTIVATE message path
-    install = source.split('self.addEventListener("install"', 1)[1].split(
-        'self.addEventListener("message"', 1)[0]
-    assert "await self.skipWaiting" not in install
-    assert '"/api/"' in source and 'request.method !== "GET"' in source
-    assert "crypto.subtle.digest" in source

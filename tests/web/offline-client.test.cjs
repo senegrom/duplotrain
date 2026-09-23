@@ -2,7 +2,7 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {harness} = require("./reliability-harness.cjs");
-function client({confirm = true, ready = true, waiting = false, fail = false} = {}) {
+function client({confirm = true, ready = true, waiting = false, fail = false, existing = false} = {}) {
   let reloads = 0, registrations = 0, confirmations = 0;
   const messages = [];
   const worker = {state: "activated"};
@@ -12,7 +12,7 @@ function client({confirm = true, ready = true, waiting = false, fail = false} = 
     location: {href: "https://example.test/train/index.html", pathname: "/train/index.html"},
     window: {duplotrainBuild: "test-build", addEventListener() {},
       confirm() { confirmations++; return confirm; }, location: {reload() { reloads++; }}},
-    navigator: {serviceWorker: {async getRegistration() { return null; },
+    navigator: {serviceWorker: {async getRegistration() { return existing ? registration : null; },
       async register() { registrations++; return registration; }}},
     offlineMessage: async (_worker, type) => {
       messages.push(type);
@@ -23,11 +23,20 @@ function client({confirm = true, ready = true, waiting = false, fail = false} = 
   return {...h, messages, counts: () => ({reloads, registrations, confirmations})};
 }
 
-test("offline startup reads an existing registration without installing or reloading", async () => {
+test("offline startup without a registration installs nothing", async () => {
   const h = client(); h.run("bindOfflineEvents()");
   await new Promise(resolve => setImmediate(resolve));
   assert.deepEqual(h.counts(), {reloads: 0, registrations: 0, confirmations: 0});
   assert.match(h.el("offline-status").textContent, /opt-in/);
+});
+
+test("offline startup adopts an existing registration without installing or reloading", async () => {
+  const h = client({existing: true}); h.run("bindOfflineEvents()");
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(h.counts(), {reloads: 0, registrations: 0, confirmations: 0});
+  assert.equal(h.run("offlineRegistration"), h.context.registration);
+  assert.deepEqual(h.messages, ["STATUS"]);
+  assert.match(h.el("offline-status").textContent, /Offline ready/);
 });
 
 test("declining an offline update never activates or reloads", async () => {

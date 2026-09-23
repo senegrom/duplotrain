@@ -215,5 +215,4 @@ geometry differs from the previous one paints directly, so panning and zooming
 never pay for rastering; once a frame repeats, one reused offscreen surface
 holds the stable base track while only overlays change. The raster key
 includes geometry identity, view, canvas sizes and pixel ratio; its eight-million-
-pixel ceiling has a direct-render fallback. These changes reduce unnecessary work
-but do not by themselves establish a browser or phone timing improvement.
+pixel ceiling has a direct-render fallback.

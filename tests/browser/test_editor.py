@@ -441,7 +441,6 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         from tests.browser.test_path_web import (
             exercise_cached_canvas,
             exercise_interactive_features,
-            exercise_offline_reload,
         )
 
         exercise_interactive_features(page)
@@ -464,7 +463,6 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         ).tap()
         expect(page.locator("#status")).to_contain_text("Engine restarted", timeout=90000)
         assert page.evaluate("S.snapshot") == confirmed
-        exercise_offline_reload(page)
         assert not errors
     finally:
         context.close()

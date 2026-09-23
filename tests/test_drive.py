@@ -292,7 +292,6 @@ def test_a_start_must_be_a_port_of_the_layout(catalog, start):
         drive(oval.join((15, 1), (0, 0)), start=start)
 
 
-
 def test_the_counterexample_breaks_the_first_failed_property(catalog):
     # One direction round the oval stops at the stone, the other runs forever but
     # never covers the stone's face both ways: the report must show the stop.
