@@ -6,9 +6,9 @@ dispatcher shared by every host. `duplotrain.gui` is only the local HTTP host,
 its static asset routes and the desktop launcher; the browser build runs the
 same editor module in a Pyodide worker and talks to it through the same
 dispatcher. HTML, CSS and JavaScript are packaged source files served by both
-hosts: `editor.js` owns the API snapshot and the interaction state, and three
+hosts: `editor.js` owns the API snapshot and the interaction state, and five
 companion deferred scripts hold derived canvas and picking geometry, project
-and backup presentation, and train presentation; their load order and the
+and backup presentation, train presentation, interactive jobs and offline controls; their load order and the
 single DOMContentLoaded initialiser are part of the tested contract, and the
 local host serves them from an explicit allowlist. The static build injects
 the worker bootstrap, stamps the bundle with the content of every engine and
@@ -56,6 +56,13 @@ only when the hovered piece changes; clicks pick immediately. A right click
 removes the stone or piece under the pointer, through the same chooser when
 pieces overlap. This is a sampled 2D view, not a solid renderer or a collision
 model.
+
+Conservative viewport bounds skip off-screen track batches and markers without
+changing global paint order or picking. A single offscreen base raster reuses
+unchanged track painting while hover, selection, train and constraint overlays
+change. Geometry, view, viewport or device-pixel-ratio changes invalidate it.
+The raster is limited to eight million pixels (about 32 MB of RGBA data);
+larger canvases or hosts without a secondary canvas use direct painting.
 
 ## Compact previews
 
@@ -110,7 +117,8 @@ portable copy. Undo history is not persisted across engine restarts.
 Export JSON keeps the `duplotrain-layout/1` format. A project
 (`duplotrain-project/1`) adds a name, the complete `duplotrain-session/1`
 snapshot and validated preferences: the viewport and the search settings
-(added-piece limit, slop, reversing). Opening validates everything before any
+(added-piece limit, slop, reversing, and optional ranking, piece exclusions and
+room/keep-out constraints). Opening validates everything before any
 mutation, a slow file cannot replace a newer selection or adopt an intervening
 revision, and the opener also accepts an emergency session download.
 
@@ -133,13 +141,25 @@ layout and session from this tab's own state, and a restart that creates a new
 worker and restores a copy of that snapshot; responses from an old worker
 generation are ignored, and a restart resets undo history and suggestions and
 says so. Startup times out after 60 seconds; outstanding calls time out after
-two minutes without a response or progress report. In the browser, Cancel
-restarts the worker from the confirmed snapshot. On the local host a search
+two minutes without a response or progress report. Interactive jobs pause cooperatively without restarting the worker or losing
+undo history; accepted suggestions can be published and applied after pausing.
+The legacy browser Cancel fallback restarts the worker from the confirmed snapshot. On the local host a search
 carries a random `operation_id`; `/api/cancel` sets its event without waiting
 for the session lock, the search raises at its next progress or publication
 checkpoint with HTTP 409 and `code: "cancelled"`, the layout stays unchanged,
 and a cancellation for a request not yet registered or already finished reports
 that it was not active.
+
+## Interactive completion
+
+Find more increases the distinct-alternative quota independently of Search harder.
+Single-pair searches retain their exact DFS checkpoint, publish validated previews
+in bounded chunks, and support pause/resume with eight-card pages and candidate
+ranking. Close all gaps uses bounded backtracking with shared stock and offers
+only fully audited complete plans. Opt-in room and keep-out constraints include
+track width and do not edit the user's inventory. Limits, scope and the difference
+between ranking a sample and proving an optimum are described in
+[search-jobs.md](search-jobs.md).
 
 ## Test train
 
@@ -155,6 +175,37 @@ piece; toggles highlight unvisited track and the repeating cycle. Changing the
 start, a switch or the layout invalidates the trace. This is a piece-level
 model of one start, not a physical simulation or a claim about every start.
 
+Route analysis can additionally search all initial switch assignments for the
+selected start or all starts, optimise lifetime or cycle coverage, and load a
+witness into these trace controls. It reports universal properties only after
+all requested runs complete within the bounds; see [search-jobs.md](search-jobs.md).
+
+## Offline installation and updates
+
+The browser-engine app offers **Make available offline** on HTTPS or localhost.
+It is opt-in; simply opening the app does not install a service worker. The build
+emits a manifest of the exact editor, engine, runtime, icon and manifest assets,
+including byte lengths and SHA-256 digests. An offline version is marked ready
+only after all resources verify and the completion marker is written. Cached
+responses preserve the build's CSP and MIME headers. Project/autosave data is
+not stored in these application-code caches.
+
+The status shows the loaded build and whether the complete corresponding version
+is available. Update checks install a verified waiting version without forcing
+activation or reloading an unsaved design. Applying it requires confirmation,
+rechecks readiness and waits for activation before reloading. Download a project
+first: an explicit reload still resets in-memory undo and search progress.
+
+A failed installation, failed digest or storage quota error does not replace an
+older verified version or delete unrelated application caches. Versioned asset
+URLs keep old live tabs on coherent resources; prior version caches are retained
+rather than pruned automatically. Many versions can therefore consume storage.
+Browser eviction or missing entries can remove offline availability, so readiness
+is checked and installation can be repaired online. This is not a permanent
+storage guarantee or a substitute for portable project backups. The desktop local
+HTTP host remains a separate offline-capable Python program and does not install
+this browser service worker.
+
 ## Checks and deployment
 
 The application workflow lints, runs the node suite once, runs the Python
@@ -162,6 +213,19 @@ suite on two interpreters, smoke-tests the CLI on a minimal install, builds the
 Pages bundle once as an immutable artifact, and runs the Chromium and WebKit
 browser suites against that artifact after verifying its digest. The deploy job
 of the same run publishes that artifact only after every gate passes on a push
-to `main` or a manual run there;
-it has no checkout and no build step, and nothing is selected across
-workflows.
+to `main` or a manual run there; it has no checkout and no build step, and
+nothing is selected across workflows.
+
+The offline browser test boots the built app in a fresh profile under the
+production CSP, installs the offline version, stops the resource server (a
+direct connection must then be refused while a cached index still loads),
+reloads the real engine from the cache and recovers the confirmed session; any
+page error fails it. Chromium serves it over HTTP loopback and also applies
+Playwright's offline emulation. WebKit upgrades loopback subresources to HTTPS
+under that policy, and its release builds have no CA-file override, so the
+WebKit job serves HTTPS with a short-lived test CA that it installs, by explicit
+opt-in (`DUPLOTRAIN_TEST_SYSTEM_CA=1`), in the disposable GitHub-hosted runner's
+trust store and removes afterwards, even on failure; the helper refuses any
+other machine, so that check runs only in CI. WebKit's offline emulation aborts
+service-worker navigations, so there the stopped server alone proves the
+origin is gone.

@@ -22,7 +22,7 @@ function projectContentKey(data) {
   if (snapshot === undefined) { snapshot = JSON.stringify(data.session); snapshotKeyCache.set(data.session, snapshot); }
   const p = data.preferences;
   return {snapshot, settings: JSON.stringify([data.name, p.view.x, p.view.y, p.view.scale,
-    p.search.max_pieces, p.search.slop, p.search.reversing])};
+    p.search.max_pieces, p.search.slop, p.search.reversing, p.search.options || null])};
 }
 function markProjectSaved(data, slot = null) {
   projectBaseline = projectContentKey(data); projectBaselineSlot = slot;
@@ -44,14 +44,20 @@ function updateProjectStatus() {
   } catch (_) { message = "Unsaved project settings are invalid; correct them before saving."; }
   if (notice.textContent !== message) notice.textContent = message;
 }
-function projectData() {
+function projectData(strict = false) {
+  // Unsaved constraint text may be invalid: a baseline records it as null, a save refuses it.
+  let options;
+  if (S?.capabilities?.interactive_search) {
+    try { options = readSearchOptions(); } catch (error) { if (strict) throw error; options = null; }
+  }
   return {format: PROJECT_FORMAT, name: el("project-name").value.trim() || "Untitled track",
     session: S.snapshot, preferences: {view: {...view}, search: {max_pieces: Number(el("max-pieces").value),
-      slop: Number(el("slop").value), reversing: el("reversing").checked}}};
+      slop: Number(el("slop").value), reversing: el("reversing").checked,
+      ...(options === undefined ? {} : {options})}}};
 }
 function projectSnapshot() {
   if (!S?.snapshot) throw new Error("Wait for the editor to finish loading");
-  const data = projectData(), {max_pieces, slop} = data.preferences.search;
+  const data = projectData(true), {max_pieces, slop} = data.preferences.search;
   if (data.name.length > 80 || !Number.isInteger(max_pieces) || max_pieces < 1 || max_pieces > 128 || !Number.isFinite(slop) || slop < 0 || slop > 1e9)
     throw new Error("Use a name up to 80 characters and valid search settings before saving");
   return data;
@@ -67,6 +73,7 @@ async function openProject(data, revision = S && S.revision) {
     el("max-pieces").value = prefs.search.max_pieces; el("slop").value = prefs.search.slop;
     el("reversing").checked = prefs.search.reversing; el("reversing").dataset.touched = "1";
   }
+  restoreSearchOptions(prefs.search?.options);
   if (prefs.view) { view = {...prefs.view}; fitted = true; } else fitted = false;
   // The project is open even when this tab's own search fields are invalid;
   // the status then asks for them to be corrected before the next save.

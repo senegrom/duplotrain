@@ -314,7 +314,8 @@ function paint() {
       ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(canvas.clientWidth, sy); ctx.stroke();
     }
   }
-  drawLayout(S.layout, false);
+  drawFloorConstraints();
+  drawBaseTrack(S.layout);
   const ghost = previewPlacements(preview);
   if (ghost) drawLayout({placements: ghost}, true);
 
@@ -331,6 +332,7 @@ function paint() {
       const [sx, sy] = worldToScreen(wx, wy);
       const r = Math.max(6, 14 * view.scale);
       const oy = (k - ((pl.stone_marks.length - 1) / 2)) * r * 2.2;
+      if (!screenBoundsVisible(sx, sy + oy, sx, sy + oy, r + 3)) return;
       ctx.beginPath();
       ctx.arc(sx, sy + oy, r, 0, 7);
       ctx.fillStyle = info.color || "#888";
@@ -352,6 +354,7 @@ function paint() {
   S.layout.placements.forEach((pl, i) => {
     for (const p of pl.ports) {
       const [sx, sy] = worldToScreen(p.x, p.y);
+      if (!screenBoundsVisible(sx, sy, sx, sy, Math.max(45, 40 * view.scale))) continue;
       if (p.sealed) {
         const rad = -p.deg * Math.PI / 180;
         const bx = Math.cos(rad + Math.PI / 2), by = Math.sin(rad + Math.PI / 2);
@@ -590,7 +593,7 @@ function renderStones() {
 }
 
 function renderCandidates() {
-  const candidates = S.candidates || [];
+  const candidates = visibleCandidates();
   const key = (c) => `${c.revision}:${c.index}`;
   const selected = candidates.find(c => key(c) === selectedCandidate);
   if (!selected) selectedCandidate = null;
@@ -626,6 +629,7 @@ function renderCandidates() {
       apply.addEventListener("click", async () => {
         try {
           const current = row.candidate;
+          if (solving) return;
           S = await api("/api/apply", {index: current.index, revision: current.revision});
           selectedCandidate = null;
           fitted = false;
@@ -638,7 +642,7 @@ function renderCandidates() {
         if (event.pointerType !== "touch") { preview = row.candidate.preview; draw(); }
       });
       div.addEventListener("pointerleave", () => {
-        const chosen = (S.candidates || []).find(candidate => key(candidate) === selectedCandidate);
+        const chosen = visibleCandidates().find(candidate => key(candidate) === selectedCandidate);
         preview = chosen ? chosen.preview : null;
         draw();
       });
@@ -653,7 +657,7 @@ function renderCandidates() {
     const label = active ? "Previewing" : "Preview";
     if (row.show.textContent !== label) row.show.textContent = label;
     row.show.setAttribute("aria-pressed", String(active));
-    row.apply.disabled = !active;
+    row.apply.disabled = !active || solving;
   });
 }
 
@@ -666,7 +670,7 @@ function redraw() {
     rev.checked = (S.stones.owned.stone_direction || 0) > 0;
   }
   if (lastSolve && lastSolve.revision !== S.revision) el("expand-search").hidden = true;
-  renderNavigation();
+  renderNavigation(); renderSearchOptions(); renderJobControls();
   refreshStatus(); updateProjectStatus(); draw(); saveSession();
 }
 
@@ -682,6 +686,7 @@ async function refresh() {
 let importSequence = 0;
 
 async function runSolve(grow, close, effort = 1) {
+  if (S?.capabilities?.interactive_search) return startInteractiveSearch(grow, close, effort);
   if (solving || apiBusy || !S) return;
   selectTool();
   const maxPieces = Number(el("max-pieces").value);
@@ -897,6 +902,7 @@ function bindEditorEvents() {
   });
   el("expand-search").addEventListener("click", async () => {
     if (solving || apiBusy || !S) return;
+    if (interactiveJob?.revision === S.revision) return continueSearch(true);
     el("max-pieces").value = Math.min(128, Math.max(1, Number(el("max-pieces").value)) * 2);
     if (!lastSolve || lastSolve.revision !== S.revision) { el("solve").click(); return; }
     await runSolve(lastSolve.grow, lastSolve.close, Math.min(16, lastSolve.effort * 2));
@@ -1006,6 +1012,7 @@ function initializeEditor() {
   ctx = canvas.getContext("2d");
   bindEditorEvents();
   renderProjects();
+  bindOfflineEvents();
   resize();
   if (window.duplotrainBoot) {
     window.duplotrainBoot({ refresh, status,
@@ -1068,6 +1075,7 @@ function closeOverlapPicker() {
   if (box) box.hidden = true;
 }
 function clearTransient() {
+  clearInteractiveState();
   pickMode = null; selectedCandidate = null; preview = null; lastSolve = null;
   selectedPiece = null; clearHover(); highlightedPieces = []; closeOverlapPicker();
   invalidateTrain(); initialSwitches = {};
@@ -1078,6 +1086,7 @@ function clearTransient() {
 }
 function discardStaleInteraction() {
   if (!S) return;
+  discardInteractiveJob();
   if (interactionRevision !== null && interactionRevision !== S.revision) {
     // Keep deliberately armed pieces/stones, but never reassign old index picks.
     const last = lastSolve;
@@ -1237,6 +1246,7 @@ async function checkLayout() {
 
 async function cancelSearch() {
   if (!solving) return;
+  if (jobLoop) { requestJobPause(); return; }
   try {
     if (window.duplotrainCancel) await window.duplotrainCancel();
     else if (solveOperation) {
@@ -1248,6 +1258,7 @@ async function cancelSearch() {
   } catch (error) { status(error.message, "err"); }
 }
 function bindExtraEvents() {
+  bindSearchEvents();
   const on = (id, action) => el(id)?.addEventListener("click", action);
   on("redo", async () => { try { S = await api("/api/redo", {}); redraw(); } catch (error) { status(error.message, "err"); } });
   on("cancel-search", cancelSearch);

@@ -30,6 +30,7 @@ __all__ = ["Session", "make_server", "run"]
 _EDITOR_ASSETS = {
     **{f"/{name}": "text/javascript; charset=utf-8" for name in (
         "editor.js", "editor-geometry.js", "editor-projects.js", "editor-train.js",
+        "editor-search.js", "editor-offline.js",
     )},
     "/editor.css": "text/css; charset=utf-8",
     "/manifest.webmanifest": "application/manifest+json",

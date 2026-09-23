@@ -229,6 +229,7 @@ class Session:
     instance: str = field(default_factory=lambda: secrets.token_hex(8), init=False)
     _candidate_revision: int | None = None
     _history_state: list[_EditState] = field(default_factory=list, init=False, repr=False)
+    _interactive_job: object = field(default=None, init=False, repr=False)
     _future: list[tuple[Layout, _EditState]] = field(default_factory=list, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -279,6 +280,9 @@ class Session:
         }
 
     def _invalidate(self) -> None:
+        job, self._interactive_job = self._interactive_job, None
+        if job is not None:
+            job.close()
         self.revision += 1
         self.candidates = []
         self._candidate_revision = None
@@ -471,6 +475,7 @@ class Session:
                     "id": pid,
                     "name": piece.name,
                     "category": piece.category,
+                    "junction": piece.is_junction,
                     "provisional": piece.provisional,
                     "variants": variants,
                 }
@@ -478,6 +483,7 @@ class Session:
         mates = [[list(a), list(b)] for a, b in layout.matable_pairs(port_poses)]
         return {
             "layout": self._layout_json(layout, port_poses),
+            "capabilities": {"interactive_search": True, "route_analysis": True},
             "open_ends": [list(end) for end in layout.connectable_ends()],
             "matable": mates,
             "train_switches": switch_choices(layout),
@@ -651,9 +657,15 @@ class Session:
             raise ValueError(f"no {stone_id!r} left (edit the inventory)")
         self._push(self.layout.with_accessory(placement, stone_id, at_port=at_port), "place stone")
 
-    def _arc_closures(
+    def _arc_closures(self, grow: End, close: End, max_results: int,
+                      max_pieces: int = 26) -> list[Solution]:
+        """Synchronous compatibility wrapper around the cooperative arc oracle."""
+        return [item for item in self._arc_events(grow, close, max_results, max_pieces)
+                if item is not None]
+
+    def _arc_events(
         self, grow: End, close: End, max_results: int, max_pieces: int = 26
-    ) -> list[Solution]:
+    ):
         """Instant oracle for ring-shaped closures the DFS chronically misses.
 
         Tries every ``leveler + j straights + k same-sign curves + m straights +
@@ -761,6 +773,7 @@ class Session:
         # with at most two without changing placements or template order.
         seen_layouts = set()
         for pre, post in pairs:
+            yield None  # cooperative boundary between bounded template groups
             if post not in suffixes:
                 # Walk the suffix BACK from the target once. Matching a prefix
                 # is then an exact pose lookup, not up to nine repeated chains
@@ -823,6 +836,7 @@ class Session:
                                     signature=("arc", pre, j, k, entry, m, post),
                                 )
                             )
+                            yield found[-1]
                             if len(found) >= max_results:
                                 return found
         return found
@@ -892,40 +906,17 @@ class Session:
             return {**outcome, "search_effort": search_effort}
 
         remaining = self.remaining()
-
-        # Inventory alone bounds height only when no open preplaced junction
-        # route can change elevation for free. Use the same eligible stub ends
-        # as the core solver; defer to its conservative bounds otherwise.
-        dz = abs(float(self.layout.pose_of(grow).z) - float(self.layout.pose_of(close).z))
-        if dz > 1e-9 and not reversing:
-            stub_ends = set(opens) - {grow, close}
-            climbing_transit = any(
-                placement.piece.ports[entry].pose.z != placement.piece.ports[exit_].pose.z
-                for index, placement in enumerate(self.layout.placements)
-                if placement.piece.is_junction
-                for entry in range(len(placement.piece.ports))
-                if (index, entry) in stub_ends
-                for exit_, _route in placement.piece.transit(entry)
-                if (index, exit_) in stub_ends
-            )
-            lift = sum(
-                max((abs(float(m.dz)) for m in _moves_for(self.catalog[pid])), default=0.0) * n
-                for pid, n in remaining.items()
-            )
-            if not climbing_transit and dz > lift + 1e-6:
-                return publish([], {
-                    "found": 0,
-                    "aborted": False,
-                    "searched": 0,
-                    "complete": True,
-                    "stop_reason": "height_impossible",
-                    "max_pieces_searched": 0,
-                    "reason": (
-                        f"impossible: those ends differ by {dz:.0f} mm in height "
-                        f"and the remaining pieces can climb at most {lift:.0f} mm "
-                        "— the track up there can never come back down"
-                    ),
-                })
+        reason = None if reversing else self._height_gap_reason(grow, close, remaining)
+        if reason is not None:
+            return publish([], {
+                "found": 0,
+                "aborted": False,
+                "searched": 0,
+                "complete": True,
+                "stop_reason": "height_impossible",
+                "max_pieces_searched": 0,
+                "reason": reason,
+            })
 
         if not reversing:
             arcs = self._arc_closures(grow, close, max_results, max_pieces)
@@ -1006,6 +997,38 @@ class Session:
             "max_pieces_searched": result.stats.max_pieces_searched,
         })
 
+    def _height_gap_reason(self, grow: End, close: End,
+                           remaining: Mapping[str, int]) -> str | None:
+        """Why no ordinary completion can join two ends at different heights, if so.
+
+        Inventory alone bounds height only when no open preplaced junction route
+        can change elevation for free. Use the same eligible stub ends as the core
+        solver; defer to its conservative bounds otherwise.
+        """
+        dz = abs(float(self.layout.pose_of(grow).z) - float(self.layout.pose_of(close).z))
+        if dz <= 1e-9:
+            return None
+        stub_ends = set(self.layout.connectable_ends()) - {grow, close}
+        if any(
+            placement.piece.ports[entry].pose.z != placement.piece.ports[exit_].pose.z
+            for index, placement in enumerate(self.layout.placements)
+            if placement.piece.is_junction
+            for entry in range(len(placement.piece.ports))
+            if (index, entry) in stub_ends
+            for exit_, _route in placement.piece.transit(entry)
+            if (index, exit_) in stub_ends
+        ):
+            return None
+        lift = sum(
+            max((abs(float(m.dz)) for m in _moves_for(self.catalog[pid])), default=0.0) * n
+            for pid, n in remaining.items()
+        )
+        if dz <= lift + 1e-6:
+            return None
+        return (f"impossible: those ends differ by {dz:.0f} mm in height and the "
+                f"remaining pieces can climb at most {lift:.0f} mm — the track up "
+                "there can never come back down")
+
     def apply_candidate(self, index: int, revision: int | None = None) -> None:
         if self._candidate_revision != self.revision or (
             revision is not None and revision != self.revision
@@ -1044,6 +1067,9 @@ MUTATING_ROUTES = frozenset({
     "/api/inventory", "/api/unlimited", "/api/add_set", "/api/stone",
     "/api/solve", "/api/apply", "/api/import", "/api/restore", "/api/redo",
     "/api/project/open",
+    *("/api/search/" + action for action in (
+        "start", "tick", "page", "continue", "pause", "resume", "publish", "discard")),
+    *("/api/routes/" + action for action in ("start", "tick", "pause", "resume", "discard")),
 })
 
 
@@ -1071,6 +1097,14 @@ def dispatch_session(
             "The session changed in another tab, or this page is out of date. "
             "Your action was not applied. Review the refreshed layout and try again."
         )
+    if path.startswith("/api/search/"):
+        from .editor_search import dispatch_search
+
+        return dispatch_search(session, path, body)
+    if path.startswith("/api/routes/"):
+        from .editor_routes import dispatch_routes
+
+        return dispatch_routes(session, path, body)
     if path == "/api/attach":
         session.attach(body["piece"], body["entry"], body.get("at"))
     elif path == "/api/join":
@@ -1114,7 +1148,7 @@ def dispatch_session(
     elif path == "/api/project/open":
         from .editor_tools import validate_project
 
-        project = validate_project(body.get("data"))
+        project = validate_project(body.get("data"), session.catalog)
         session.restore(project["session"])
         return {**session.state(preview_format=preview_format),
                 "project": {"name": project["name"], "preferences": project["preferences"]}}

@@ -170,6 +170,8 @@ def test_inventory_change_removes_suggestions(editor):
     page.locator("#reversing").uncheck()
     page.locator("#solve").tap()
     page.wait_for_selector(".cand")
+    # Suggestions stream in while the search runs; edit once it has published.
+    page.wait_for_function("!solving && !apiBusy")
     count = page.locator('[data-piece-id="curve"] input')
     count.fill("6")
     count.press("Tab")
@@ -344,7 +346,10 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
             expect(page.locator(f'[data-piece-id="{pid}"] .count')).to_have_text(remaining)
         page.locator("#reversing").check()
         page.locator("#solve").tap()
-        expect(page.locator(".cand")).to_have_count(3, timeout=30000)
+        # Interactive search fills its quota beyond the first successful stage.
+        # Wait for publication, not merely the first streamed preview.
+        expect(page.locator("#status")).to_contain_text("8 alternative(s) found", timeout=30000)
+        expect(page.locator(".cand")).to_have_count(8)
         assert page.evaluate("S.candidates.every(c => c.preview.format === 'duplotrain-preview/1')")
         candidate = page.locator(".cand").first
         candidate.get_by_role("button", name="Preview", exact=True).tap()
@@ -413,7 +418,10 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
             expect(page.locator(f'[data-piece-id="{pid}"] .count')).to_have_text(remaining)
         page.locator("#slop").fill("5")
         page.locator("#solve").tap()
-        expect(page.locator(".cand")).to_have_count(3, timeout=30000)
+        # Interactive search fills its quota beyond the first successful stage.
+        # Wait for publication, not merely the first streamed preview.
+        expect(page.locator("#status")).to_contain_text("8 alternative(s) found", timeout=30000)
+        expect(page.locator(".cand")).to_have_count(8)
         assert page.evaluate("S.candidates.every(c => c.preview.format === 'duplotrain-preview/1')")
         candidate = page.locator(".cand").first
         expect(candidate).to_contain_text("forced 5")
@@ -430,6 +438,14 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         assert sum(joint["gap_mm"] for joint in issues) == pytest.approx(10)
         exercise_project_history_and_tools(page)
         exercise_geometry_optimisations(page)
+        from tests.browser.test_path_web import (
+            exercise_cached_canvas,
+            exercise_interactive_features,
+            exercise_offline_reload,
+        )
+
+        exercise_interactive_features(page)
+        exercise_cached_canvas(page)
         # Force a genuine worker failure after confirmed work. Emergency downloads
         # must use the displayed snapshot, then a new worker must restore it.
         confirmed = page.evaluate("S.snapshot")
@@ -448,6 +464,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         ).tap()
         expect(page.locator("#status")).to_contain_text("Engine restarted", timeout=90000)
         assert page.evaluate("S.snapshot") == confirmed
+        exercise_offline_reload(page)
         assert not errors
     finally:
         context.close()
@@ -692,12 +709,15 @@ def test_reported_bridge_search_preview_apply_and_undo(editor):
     page.wait_for_function("S.inventory.unlimited && !apiBusy")
     page.locator("#reversing").uncheck()
     page.locator("#solve").tap()
-    page.wait_for_selector(".cand", timeout=30000)
-    assert page.locator(".cand").count() == 8
+    from playwright.sync_api import expect
+
+    expect(page.locator("#status")).to_contain_text("8 alternative(s) found", timeout=30000)
+    expect(page.locator(".cand")).to_have_count(8)
     assert page.evaluate("S.candidates.every(c => c.preview.format === 'duplotrain-preview/1' "
                          "&& c.preview.base_count === 59 && c.preview.placements.length === 24)")
     assert page.locator("#expand-search").is_visible()
-    assert page.evaluate("S.searched") < 50000
+    assert page.evaluate("S.search_job.searched") == 1878
+    assert page.evaluate("interactiveJob.searched") == 1878
     candidate = page.locator(".cand").first
     candidate.get_by_role("button", name="Preview", exact=True).tap()
     candidate.get_by_role("button", name="Apply").tap()

@@ -35,7 +35,7 @@ import math
 import time
 from bisect import bisect_left, bisect_right
 from collections import OrderedDict
-from collections.abc import Mapping, Sequence
+from collections.abc import Generator, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import lru_cache
@@ -49,7 +49,8 @@ from .pieces import PieceType
 from .symmetry import placement_key, pose_key
 from .validation import check_inventory
 
-__all__ = ["Move", "SolverConfig", "Solution", "SolveStats", "SolveResult", "solve"]
+__all__ = ["Move", "SolverConfig", "Solution", "SolveStats", "SolveResult",
+           "SearchLimits", "solve", "solve_steps"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -1738,6 +1739,26 @@ class SolveResult:
 # --------------------------------------------------------------------------------------
 
 
+@dataclass
+class SearchLimits:
+    """Mutable budgets for one explicitly owned, resumable completion iterator.
+
+    Increasing these limits does not restart DFS. ``close()`` the iterator when
+    abandoning it; retained geometry belongs to this problem, never to a global
+    session cache. Checkpoints bound nodes between yields, not wall-clock latency.
+    """
+
+    max_nodes: int = 250_000
+    max_results: int = 50
+    max_pieces: int = 26
+    quantum: int = 32
+
+    def validate(self) -> None:
+        for name in ("max_nodes", "max_results", "max_pieces", "quantum"):
+            if type(getattr(self, name)) is not int or getattr(self, name) < 1:
+                raise ValueError(f"{name} must be a positive integer")
+
+
 def solve(
     inventory: Mapping[str, int],
     pieces: Mapping[str, PieceType],
@@ -1748,6 +1769,33 @@ def solve(
     close_onto: tuple[int, int] | None = None,
     tables: dict | None = None,
 ) -> SolveResult:
+    """Run the exact solver to its configured limits (see :func:`solve_steps`).
+
+    The traditional synchronous API and its traversal/counter semantics are kept.
+    Interactive callers use ``solve_steps(..., limits=SearchLimits(...))`` instead.
+    """
+    iterator = solve_steps(inventory, pieces, config, base=base,
+                           grow_from=grow_from, close_onto=close_onto, tables=tables)
+    try:
+        while True:
+            next(iterator)
+    except StopIteration as done:
+        return done.value
+    finally:
+        iterator.close()
+
+
+def solve_steps(
+    inventory: Mapping[str, int],
+    pieces: Mapping[str, PieceType],
+    config: SolverConfig | None = None,
+    *,
+    base: Layout | None = None,
+    grow_from: tuple[int, int] | None = None,
+    close_onto: tuple[int, int] | None = None,
+    tables: dict | None = None,
+    limits: SearchLimits | None = None,
+) -> Generator[dict, None, SolveResult]:
     """Find closed loops buildable from *inventory*.
 
     Loop mode (default): search fresh loops from scratch.
@@ -1773,12 +1821,18 @@ def solve(
             budgets): the reverse reachability tables one search builds serve the
             next search of the same ends and stock, and keep growing with it.
 
-    Returns:
-        Distinct solutions (loop mode: deduplicated up to rotation, reflection and
-        starting point), each with a rebuilt :class:`~duplotrain.layout.Layout`, plus
-        counters describing how the search went.
+    Yields:
+        With mutable limits, progress/solution/limit checkpoints. Increase a
+        budget and advance to continue, or close to release retained state.
+        Piece-depth continuation applies to completion mode; fresh-loop mode
+        retains its configured full-depth traversal. The return value is a
+        SolveResult containing distinct solutions (loop mode: deduplicated up
+        to rotation, reflection and starting point), each with a rebuilt
+        :class:`~duplotrain.layout.Layout`, plus counters describing how the search went.
     """
     cfg = config or SolverConfig()
+    if limits is not None:
+        limits.validate()
     check_inventory(inventory, pieces)
 
     if base is None:
@@ -1967,7 +2021,8 @@ def solve(
             completion.eng = eng
         spent = completion.nodes_spent
         completion._budget = lambda: _completion_budget(
-            spent + stats.nodes, cfg.max_nodes, cfg.completion_base_work)
+            spent + stats.nodes, limits.max_nodes if limits else cfg.max_nodes,
+            cfg.completion_base_work)
     before = (
         (completion.work_used, completion.checks, completion.probes, completion.cache_hits)
         if completion is not None else (0, 0, 0, 0)
@@ -2235,6 +2290,7 @@ def solve(
         links[target] = cursor
         return Layout(placed, links, base.accessories if base is not None else ())
 
+    ready: list[Solution] = []
     audit: list = []  # one _OverlapAudit over the base, built on the first closure
 
     def emit(gap: float, reversing_target: tuple[int, int] | None = None) -> None:
@@ -2269,9 +2325,11 @@ def solve(
             stats.dropped_filter += 1
             return
         solutions[signature] = candidate
+        if limits is not None:
+            ready.append(candidate)
 
     def dfs(cursor, used: int, slack_used: float, prev_index: int | None,
-            handed: bool) -> bool:
+            handed: bool) -> Generator[dict, None, bool]:
         """Depth-first over moves; returns False when global limits say stop.
 
         *prev_index* is the placement owning the connector the walk currently stands
@@ -2280,10 +2338,19 @@ def solve(
         one-handed loop search has not yet placed a turning move.
         """
         nonlocal remaining_span, remaining_turn
-        if len(solutions) >= cfg.max_results:
+        if limits is not None:
+            # Suspended generator frames own the exact DFS/backtracking state.
+            # A caller may raise a limit and resume without revisiting any node.
+            while len(solutions) >= limits.max_results or stats.nodes >= limits.max_nodes:
+                reason = ("result_limit" if len(solutions) >= limits.max_results
+                          else "node_limit")
+                yield {"kind": reason, "nodes": stats.nodes, "depth": f_limit}
+            if stats.nodes % limits.quantum == 0:
+                yield {"kind": "progress", "nodes": stats.nodes, "depth": f_limit}
+        elif len(solutions) >= cfg.max_results:
             return False
         stats.nodes += 1
-        if stats.nodes > cfg.max_nodes:
+        if limits is None and stats.nodes > cfg.max_nodes:
             stats.aborted = True
             return False
         if cfg.progress is not None and stats.nodes % 4096 == 0:
@@ -2305,11 +2372,15 @@ def solve(
             # nothing can continue through it.
             if eligible(used) and closing_link_legal():
                 emit(slack_used)
+                while ready:
+                    yield {"kind": "solution", "solution": ready.pop(), "nodes": stats.nodes}
             return True
         if cfg.slop > 0.0 and eligible(used) and closing_link_legal():
             gap = eng.near_anchor(cursor, cfg.slop - slack_used)
             if gap is not None and gap > 0.0:
                 emit(slack_used + gap)
+                while ready:
+                    yield {"kind": "solution", "solution": ready.pop(), "nodes": stats.nodes}
                 # A forced fit does not occupy the anchor; deeper search may still
                 # find an exact closure, so carry on.
 
@@ -2400,6 +2471,8 @@ def solve(
                     # reversing loop: the walk's end mates this branch, and the train
                     # thereafter shuttles out through the junction's other route.
                     emit(slack_used + joint_gap, reversing_target=(pidx, port))
+                    while ready:
+                        yield {"kind": "solution", "solution": ready.pop(), "nodes": stats.nodes}
                 stub_pid = placements[pidx][0]
                 piece = piece_obj[stub_pid]  # base-only types are absent from *pieces*
                 frame = placements[pidx][1]
@@ -2420,7 +2493,8 @@ def solve(
                         out_pose = eng.port_world(stub_pid, exit_port, frame)
                     stubs[:] = [s for k, s in enumerate(snapshot) if k not in (i, j)]
                     steps.append(_Transit(pidx, port, exit_port))
-                    keep_going = dfs(out_pose, used, slack_used + joint_gap, pidx, handed)
+                    keep_going = yield from dfs(
+                        out_pose, used, slack_used + joint_gap, pidx, handed)
                     steps.pop()
                     stubs[:] = snapshot
                     if not keep_going:
@@ -2546,7 +2620,7 @@ def solve(
                     new_stubs += 1
             steps.append(_Place(pid, entry, exit_port))
 
-            keep_going = dfs(next_cursor, used + 1, slack_used, index,
+            keep_going = yield from dfs(next_cursor, used + 1, slack_used, index,
                              handed or chirality[(pid, entry, exit_port)] != 0)
 
             steps.pop()
@@ -2571,7 +2645,7 @@ def solve(
             # Loop mode enumerates everything reachable; one full-depth pass.
             f_limit = depth_limit
             stats.max_pieces_searched = f_limit
-            dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed)
+            yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed)
         else:
             # Completion mode runs IDA*: grow the pieces-needed contour until closures
             # appear.  Uninformed depth-first dies here whenever the inventory is broad
@@ -2582,17 +2656,30 @@ def solve(
             # A completion may only join/transit preplaced junctions. It still has
             # a nonempty step trace, but uses no inventory and needs contour zero.
             first_limit = 0 if cfg.min_pieces == 0 else 1
-            for f_limit in range(first_limit, depth_limit + 1):
+            f_limit = first_limit
+            while True:
+                if limits is not None:
+                    # A raised piece bound still stays within the recursion cap.
+                    depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH, limits.max_pieces)
+                    while f_limit > depth_limit and depth_limit < total_pieces:
+                        yield {"kind": "piece_limit", "nodes": stats.nodes,
+                               "depth": depth_limit}
+                        depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH, limits.max_pieces)
+                if f_limit > depth_limit:
+                    break
                 stats.max_pieces_searched = f_limit
-                if not dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed):
+                if not (yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed)):
                     break
-                if len(solutions) >= cfg.max_results or stats.aborted:
+                if limits is None and (len(solutions) >= cfg.max_results or stats.aborted):
                     break
+                f_limit += 1
     finally:
         # The recursive function owns a cell pointing to itself. Break that
         # cycle once the stack has unwound, so collision fields, geometry and
         # callbacks do not linger until cyclic GC between editor search stages.
         dfs = None
+        ready.clear()
+        audit.clear()
         if completion is not None:
             completion.nodes_spent += stats.nodes
             if tables is None:
@@ -2602,7 +2689,7 @@ def solve(
                 completion.near_indices.clear()
     if stats.aborted:
         stats.stop_reason = "node_limit"
-    elif len(solutions) >= cfg.max_results:
+    elif limits is None and len(solutions) >= cfg.max_results:
         stats.stop_reason = "result_limit"
     elif depth_limit < total_pieces:
         stats.stop_reason = "piece_limit"

@@ -148,6 +148,8 @@ jobs:
         env:
           DUPLOTRAIN_REQUIRE_BROWSER: '1'
           DUPLOTRAIN_BROWSER: ${{ matrix.browser }}
+          # Opt in only on this disposable hosted browser-test runner.
+          DUPLOTRAIN_TEST_SYSTEM_CA: ${{ matrix.browser == 'webkit' && '1' || '0' }}
           DUPLOTRAIN_STATIC_DIST: ${{ github.workspace }}/webapp/dist
   deploy:
     # Same-run immutable artifact only, after every gate. No source checkout,

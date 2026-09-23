@@ -23,6 +23,11 @@
   <h1>duplotrain <small>track editor</small></h1>
   <div id="status" role="status" aria-live="polite">loading…</div>
   <div id="save-status" role="status"></div>
+  <details><summary>Version and offline access</summary>
+    <div id="offline-status" role="status">Offline installation is available in the browser-engine app.</div>
+    <div class="buttons"><button id="offline-install">Make available offline</button><button id="offline-check">Check for update</button><button id="offline-update" hidden>Apply update and reload</button></div>
+    <p>No automatic reload. Download a project before updating. Browser storage may be evicted; keep portable backups.</p>
+  </details>
   <div id="actions">
     <button id="undo">↩ undo</button>
     <button id="redo">↪ redo</button>
@@ -54,7 +59,26 @@
   <label class="solverow">Search up to
     <input id="max-pieces" type="number" min="1" max="128" step="1" value="26"> added pieces
   </label>
-  <button id="expand-search" hidden>Search deeper</button>
+  <details><summary>Search goals and floor constraints</summary>
+    <label>Rank alternatives <select id="candidate-sort">
+      <option value="discovery">Discovery order</option><option value="pieces">Fewest added pieces</option>
+      <option value="footprint">Smallest footprint</option><option value="scarce">Preserve scarce pieces</option>
+      <option value="junctions">Fewest new junctions</option><option value="bridges">Fewest bridge parts</option>
+    </select></label>
+    <p>Ranking chooses among found alternatives, not a guaranteed global optimum. Exclusions and constraints apply to new searches.</p>
+    <label>Room rectangle (cm: xmin, ymin, xmax, ymax) <input id="room-bounds" placeholder="−200, −200, 200, 200"></label>
+    <label>Keep-out rectangles (cm, one per line) <textarea id="keep-out" rows="3" placeholder="50, 50, 100, 100"></textarea></label>
+    <p>Floor-to-ceiling limits include track width and a conservative sampling margin. Existing track must also fit. Origin is the layout's original coordinates.</p>
+    <div class="buttons"><button id="avoid-junctions">Exclude new junctions</button><button id="avoid-bridges">Exclude bridges</button><button id="reset-exclusions">Allow all pieces</button></div>
+    <details><summary>Exclude individual pieces (owned stock unchanged)</summary><div id="search-exclusions"></div></details>
+  </details>
+  <button id="close-all">Close all gaps</button>
+  <button id="find-more" hidden>Find more alternatives</button>
+  <button id="expand-search" hidden>Search harder</button>
+  <button id="resume-search" hidden>Resume search</button>
+  <button id="stop-results" hidden>Stop with results found</button>
+  <div id="search-report" role="status"></div>
+  <div class="buttons"><button id="candidate-prev" hidden>Previous</button><span id="candidate-page"></span><button id="candidate-next" hidden>Next</button></div>
   <button id="cancel-search" hidden>Cancel search</button>
   <div id="cands"></div>
   <details open>
@@ -69,6 +93,14 @@
       <p>Choices apply to this test only; trailing passes may change switches. Editing the layout resets them.</p>
     </details>
     <button id="test-train">Test train</button>
+    <details><summary>Find and analyse train routes</summary>
+      <label>Optimise <select id="route-goal"><option value="visited">Track visited at least once</option><option value="cycle">Track visited repeatedly</option></select></label>
+      <label>Maximum runs <input id="route-max-runs" type="number" min="1" max="100000" value="20000"></label>
+      <div class="buttons"><button id="route-best">Best settings for this start</button><button id="route-all">Best route / check all starts and settings</button></div>
+      <div class="buttons"><button id="route-pause" hidden>Pause analysis</button><button id="route-resume" hidden>Resume analysis</button></div>
+      <div id="route-report" role="status"></div>
+      <div class="buttons"><button id="route-witness" hidden>Load and trace best route</button><button id="route-counterexample" hidden>Load counterexample</button></div>
+    </details>
     <div class="buttons"><button id="train-play" disabled>Play trace</button><button id="train-pause">Pause</button><button id="train-step" disabled>Step</button></div>
     <div id="train-report" role="status"></div>
     <label><input id="train-unvisited" type="checkbox" disabled> Highlight unvisited drivable track (orange)</label>
@@ -110,6 +142,8 @@
 <script src="./editor-geometry.js" defer></script>
 <script src="./editor-projects.js" defer></script>
 <script src="./editor-train.js" defer></script>
+<script src="./editor-search.js" defer></script>
+<script src="./editor-offline.js" defer></script>
 
 </body>
 </html>

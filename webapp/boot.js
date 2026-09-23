@@ -1,5 +1,6 @@
 /* Bridge the editor to the worker. __BUILD__ is replaced by webapp/build.py. */
 "use strict";
+window.duplotrainBuild = "__BUILD__";
 
 (function () {
   let worker = null, ready = false, seq = 0;
