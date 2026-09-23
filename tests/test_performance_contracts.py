@@ -3,7 +3,6 @@
 import copy
 import math
 import pickle
-import random
 from dataclasses import FrozenInstanceError, replace
 from fractions import Fraction
 
@@ -47,18 +46,9 @@ def full_product(x, y):
             a * h + d * e + b * g + c * f)
 
 
-def test_fast_arithmetic_matches_full_field_product():
-    rng = random.Random(20260906)
-    values = [Alg(), Alg(1), Alg(-1), Alg(0, 1), Alg(0, 0, 1), Alg(0, 0, 0, 1)]
-    values += [Alg(*(Fraction(rng.randint(-100, 100), rng.randint(1, 17))
-                     for _ in range(4))) for _ in range(80)]
-    values += [Alg(Fraction(rng.randint(-100, 100), rng.randint(1, 17))) for _ in range(30)]
-    for x in values:
-        for y in values:
-            assert (x * y).coeffs() == full_product(x, y)
-            expected = tuple(a - b for a, b in zip(x.coeffs(), y.coeffs(), strict=True))
-            assert (x - y).coeffs() == expected
-    # Scalar entry points, including reflected subtraction, keep exact coercion.
+def test_scalar_arithmetic_entry_points_keep_exact_coercion():
+    # Alg-by-Alg products are compared in test_exact_fastpaths; here the scalar
+    # entry points, including reflected subtraction.
     x = Alg(1, 2, 3, 4)
     for scalar in (0, 1, -3, Fraction(7, 13), 152.4):
         y = Alg(scalar)

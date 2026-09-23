@@ -77,17 +77,18 @@ def test_absent_browser_fails_in_ci(local_env, monkeypatch, tmp_path, flag):
 
 
 def test_explicit_bad_browser_path_is_not_skipped(local_env, monkeypatch, tmp_path):
-    monkeypatch.setenv("DUPLOTRAIN_BROWSER_PATH", str(tmp_path / "explicit-missing"))
-    browser = browser_type(tmp_path / "missing", RuntimeError("bad custom path"))
-    with pytest.raises(RuntimeError, match="bad custom path"):
+    explicit = tmp_path / "explicit-missing"
+    monkeypatch.setenv("DUPLOTRAIN_BROWSER_PATH", str(explicit))
+    browser = browser_type(tmp_path / "missing", missing_executable(explicit))
+    with pytest.raises(FakePlaywrightError, match="Executable doesn't exist"):
         policy.launch_browser(browser)
 
 
 def test_unexpected_startup_failure_is_not_skipped(local_env, tmp_path):
     path = tmp_path / "installed"
     path.touch()
-    browser = browser_type(path, RuntimeError("browser crashed"))
-    with pytest.raises(RuntimeError, match="browser crashed"):
+    browser = browser_type(path, FakePlaywrightError("browser crashed"))
+    with pytest.raises(FakePlaywrightError, match="browser crashed"):
         policy.launch_browser(browser)
 
 

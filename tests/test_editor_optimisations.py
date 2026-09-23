@@ -187,7 +187,7 @@ def test_restore_checks_final_snapshot_once_and_rejection_is_atomic(monkeypatch)
 
 @pytest.mark.parametrize("path,body", [
     ("/api/state", {}), ("/api/missing", {}), ("/api/clear", {"revision": -1}),
-    ("/api/attach", {"piece": "not a piece – 🚂", "entry": 0}),
+    ("/api/attach", {"piece": "not a piece – 🚂", "entry": 0, "revision": 0}),
 ])
 def test_worker_json_is_compact_but_keeps_strings_and_ascii_escaping(path, body):
     adapter = load_adapter()

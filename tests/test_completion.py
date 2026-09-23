@@ -3,8 +3,9 @@
 import pytest
 
 from duplotrain.catalog import default_catalog
+from duplotrain.collision import DEFAULT_CLEARANCE
 from duplotrain.layout import build_chain
-from duplotrain.solver import SolverConfig, solve
+from duplotrain.solver import SolverConfig, _solution_overlaps, solve
 
 LEFT = (0, 1)
 
@@ -51,20 +52,16 @@ def test_completions_enumerate_straight_variants(catalog, half_circle):
 
 
 def test_completion_respects_base_collisions(catalog):
-    """Growing must not plough through the base track: an S that dead-ends into the
-    base's own body cannot be part of any reported completion."""
+    """Growing must not plough through the base track: with enough curves a walk
+    can loop back across the base's own body, and no such completion is reported."""
     base = build_chain([(catalog["curve"], *LEFT)] * 6)
-    result = solve(
-        {"curve": 6, "straight": 8},
-        catalog,
-        SolverConfig(min_pieces=1, max_results=200),
-        base=base,
-    )
-    # Every solution must replay into a collision-legal closed layout; is_closed and
-    # exactness are already asserted by construction, so just require solutions exist
-    # and none uses fewer pieces than the geometric minimum.
-    assert result.solutions
-    assert min(len(s.layout) for s in result.solutions) == 12
+    result = solve({"curve": 18}, catalog, SolverConfig(min_pieces=1, max_results=200),
+                   base=base)
+    # A search blind to collisions finds 87 closures here, six of them crossing
+    # the base; the independent audit agrees with the search's own field.
+    assert result.stats.complete and len(result.solutions) == 81
+    assert not any(_solution_overlaps(s.layout, len(base), DEFAULT_CLEARANCE, 8.0)
+                   for s in result.solutions)
 
 
 def test_completion_around_a_switch_leaves_its_branch_open(catalog):

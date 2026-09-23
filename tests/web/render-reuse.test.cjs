@@ -20,9 +20,6 @@ function editor() {
     armedStone: null, selectedCandidate: null, refreshStatus() {}, redraw() {},
     api: async (route, body) => { calls.push({route, body}); return h.context.S; },
   }});
-  h.context.selectTool = (tool = {}) => {
-    h.context.armed = tool.piece || null; h.context.armedStone = tool.stone || null;
-  };
   return {context: h.context, el: h.el, calls, created: h.created, run: h.run};
 }
 

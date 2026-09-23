@@ -941,6 +941,7 @@ def test_clear_empty_keeps_redo_in_the_editor(editor):
     expect(page.locator("#redo")).to_be_enabled()
     revision = session.revision
     page.locator("#clear").tap()
+    page.wait_for_function("!apiBusy")  # a tap while Clear is in flight is dropped
     expect(page.locator("#redo")).to_be_enabled()
     page.locator("#redo").tap()
     wait_count(page, 1)

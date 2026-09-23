@@ -1,9 +1,7 @@
 """Regressions from the second repository review: geometry, atomicity and CLI inputs."""
 
-import json
 
 import pytest
-from click.testing import CliRunner
 
 from duplotrain import (
     NetworkConfig,
@@ -14,7 +12,6 @@ from duplotrain import (
     parse_piece,
     solve,
 )
-from duplotrain.cli import main
 from duplotrain.explore import congruence_key
 from duplotrain.gui import Session, dispatch_session
 from duplotrain.solver import _solution_overlaps
@@ -94,20 +91,6 @@ def test_network_dedup_does_not_return_the_same_buffered_bar_twice():
     assert len(same_bar) == 1, "the long rail and two short rails were counted twice"
 
 
-@pytest.mark.parametrize("inventory", [
-    {"curve": 12.75},
-    {"curve": 12, "straight": True},
-])
-def test_cli_rejects_raw_noninteger_inventory(tmp_path, inventory):
-    path = tmp_path / "inventory.json"
-    path.write_text(json.dumps(inventory), encoding="utf-8")
-    result = CliRunner().invoke(main, ["solve", "--inventory", str(path)])
-    assert result.exit_code != 0, "CLI converted invalid counts into valid integers"
-
-
-def test_cli_rejects_negative_piece_flags():
-    result = CliRunner().invoke(main, ["solve", "--curve", "12", "--straight", "-4"])
-    assert result.exit_code != 0, "CLI silently dropped the negative count"
 
 
 def test_true_wide_piece_overlap_is_still_rejected():

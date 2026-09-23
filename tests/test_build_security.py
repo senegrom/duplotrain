@@ -111,13 +111,17 @@ def test_archive_must_contain_one_regular_copy_of_each_runtime_file(dependency, 
         data = runtime_archive(build.PYODIDE_FILES[:-1])
     else:
         member = tarfile.TarInfo("other/pyodide.js")
+        names = None
         if kind in ("symlink", "hardlink"):
             member.type = tarfile.SYMTYPE if kind == "symlink" else tarfile.LNKTYPE
             member.linkname = "../../outside"
-        data = runtime_archive(extra=member)
+            # The link is the only copy, so only the link check can reject it.
+            names = [name for name in build.PYODIDE_FILES if name != "pyodide.js"]
+        data = runtime_archive(names, extra=member)
     monkeypatch.setattr(build, "PYODIDE_SHA256", {"0.27.7": hashlib.sha256(data).hexdigest()})
     opener.side_effect = lambda *a, **kw: io.BytesIO(data)
-    with pytest.raises(SystemExit, match="lacked expected|invalid or duplicate"):
+    with pytest.raises(SystemExit, match="lacked expected" if kind == "missing"
+                       else "invalid or duplicate Pyodide file: pyodide.js"):
         build.fetch_pyodide("0.27.7")
     assert not vendor.exists()
 

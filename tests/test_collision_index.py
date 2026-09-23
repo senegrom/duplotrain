@@ -210,11 +210,18 @@ def test_complete_search_results_and_counters_match_without_index(
 
 
 def test_reported_bridge_search_is_unchanged(monkeypatch):
+    from duplotrain import collision
     from duplotrain.gui import Session
 
     catalog = default_catalog()
     base = layout_from_dict(json.loads((Path(__file__).parent
                                        / "fixtures/bridge-gap.json").read_text()), catalog)
+    # The 59-piece gap stays below the usual threshold: index every field.
+    monkeypatch.setattr(collision, "_BOUNDS_INDEX_MIN", 1)
+    queries = []
+    cells = collision._bound_cells
+    monkeypatch.setattr(collision, "_bound_cells",
+                        lambda *args, **kwargs: queries.append(1) or cells(*args, **kwargs))
     sessions = []
     outcomes = []
     for indexed in (True, False):
@@ -223,6 +230,7 @@ def test_reported_bridge_search_is_unchanged(monkeypatch):
         session = Session(history=[base], unlimited=True)
         outcomes.append(session.solve_gap(None, None, 0, 8))
         sessions.append(session)
+        assert queries or not indexed
     assert outcomes[0] == outcomes[1]
     assert sessions[0].candidates == sessions[1].candidates
     assert len(sessions[0].candidates) == 8

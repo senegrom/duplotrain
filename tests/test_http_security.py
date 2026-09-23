@@ -269,7 +269,13 @@ def test_the_graceful_close_is_bounded_when_the_client_never_closes(local_editor
         response.begin()
         assert response.status == 200 and response.read()
         started = time.monotonic()
-        # Keep our side open: the server must give up on its own and close.
+        # The server's FIN arrives at once; keep our side open and keep talking.
+        # It discards that input while it lingers, then must close on its own,
+        # after which a send is refused.
         sock.settimeout(3)
         assert sock.recv(1) == b""
+        with pytest.raises(OSError):
+            while time.monotonic() - started < 3:
+                sock.sendall(b"x")
+                time.sleep(0.05)
         assert time.monotonic() - started < 2.0

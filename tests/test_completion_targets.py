@@ -35,18 +35,18 @@ def assert_budget(result, config):
             <= result.stats.completion_work + 2)
 
 
-def test_six_step_lookahead_reduces_long_gap_work_again():
+def test_default_lookahead_does_less_long_gap_work_than_a_shorter_one():
     catalog = default_catalog()
     base = build_chain([(catalog["straight"], 0, 1)] * 4 + [(catalog["curve"], 0, 1)] * 2)
     inventory = {"curve": 14, "straight": 8}
     cfg = SolverConfig(min_pieces=0, max_pieces=20, max_results=8, max_nodes=25_000)
-    previous = solve(inventory, catalog, replace(cfg, completion_lookahead=4), base=base)
+    shorter = solve(inventory, catalog, replace(cfg, completion_lookahead=4), base=base)
     improved = solve(inventory, catalog, cfg, base=base)
     assert len(improved.solutions) == 8
-    assert signatures(improved) == signatures(previous)
-    # Longer linear bounds now help both settings; the six-step exact table
+    assert signatures(improved) == signatures(shorter)
+    # The longer linear bounds help both settings; the deeper exact table
     # still saves work on top of them.
-    assert improved.stats.nodes < previous.stats.nodes
+    assert improved.stats.nodes < shorter.stats.nodes
     assert_budget(improved, cfg)
 
 

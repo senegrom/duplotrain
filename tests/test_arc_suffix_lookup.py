@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import duplotrain.editor as editor
 from duplotrain import Layout, Pose, build_chain, default_catalog
 from duplotrain.gui import Session
 from duplotrain.layout import layout_from_dict
@@ -47,6 +48,8 @@ def test_reported_gap_does_not_rebuild_every_suffix_for_every_prefix(monkeypatch
     data = json.loads((Path(__file__).parent / "fixtures/bridge-gap.json").read_text())
     layout = layout_from_dict(data, default_catalog())
     session = Session(history=[layout], unlimited=True)
+    # The lattice path uses integer tuples; count the exact path's transforms.
+    monkeypatch.setattr(editor._LatticeArcGeometry, "compile", staticmethod(lambda *args: None))
     calls = 0
     original = Pose.then
 
@@ -57,9 +60,9 @@ def test_reported_gap_does_not_rebuild_every_suffix_for_every_prefix(monkeypatch
 
     monkeypatch.setattr(Pose, "then", counted)
     assert not session._arc_closures((25, 0), (23, 1), 8, 26)
-    # The earlier suffix lookup still made over 4,000 transforms. Composed runs
-    # reduce this to about 1,440; use an operation ceiling, not wall-clock timing.
-    assert calls < 2_000
+    # One walk back per suffix and composed runs take about 1,440 transforms;
+    # rebuilding suffixes per prefix takes several times that. Count, never time.
+    assert 0 < calls < 2_000
 
 
 @pytest.mark.parametrize("straights", [0, 1, 2, 4])

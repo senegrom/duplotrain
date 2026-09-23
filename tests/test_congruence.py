@@ -154,7 +154,7 @@ def test_invalid_congruence_spacing_is_rejected(spacing):
         congruence_key(track([line(128)]), spacing)
 
 
-def test_key_and_primitive_caches_are_bounded_and_transparent():
+def test_key_and_primitive_caches_are_bounded_and_transparent(monkeypatch):
     catalog = default_catalog()
     from duplotrain import _congruence
 
@@ -171,14 +171,13 @@ def test_key_and_primitive_caches_are_bounded_and_transparent():
     assert congruence_key(turned) == fresh[-1]
     _congruence._KEY_CACHE.clear()
     assert congruence_key(turned) == fresh[-1]
-    for cache, limit in ((_congruence._KEY_CACHE, _congruence._KEY_CACHE_LIMIT),
-                         (_congruence._PRIMITIVE_CACHE, _congruence._PRIMITIVE_CACHE_LIMIT)):
-        cache.clear()
-        for i in range(limit + 5):
-            if len(cache) >= limit:
-                cache.clear()
-            cache[("filler", i)] = ()
-        assert len(cache) <= limit
+    # Tiny limits make the module's own eviction run; the keys stay the same.
+    monkeypatch.setattr(_congruence, "_KEY_CACHE_LIMIT", 3)
+    monkeypatch.setattr(_congruence, "_PRIMITIVE_CACHE_LIMIT", 3)
+    _congruence._KEY_CACHE.clear()
+    _congruence._PRIMITIVE_CACHE.clear()
+    assert [congruence_key(layout) for layout in layouts] == fresh
+    assert len(_congruence._KEY_CACHE) <= 3 and len(_congruence._PRIMITIVE_CACHE) <= 3
     _congruence._KEY_CACHE.clear()
     _congruence._PRIMITIVE_CACHE.clear()
 

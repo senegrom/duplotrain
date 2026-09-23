@@ -25,8 +25,9 @@ def launch_browser(browser_type):
     try:
         return browser_type.launch(**kwargs)
     except Error as exc:
-        # Unexpected startup errors (crashes, missing OS libraries) still fail.
-        if required_browser() or "Executable doesn't exist" not in str(exc):
+        # Unexpected startup errors (crashes, missing OS libraries) still fail,
+        # and so does an explicitly named browser that is not there.
+        if required_browser() or executable or "Executable doesn't exist" not in str(exc):
             raise
         pytest.skip(f"{browser_type.name} not installed; run python -m playwright install")
 

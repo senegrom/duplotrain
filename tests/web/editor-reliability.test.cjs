@@ -3,17 +3,15 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {harness, scene, track} = require("./reliability-harness.cjs");
 
-for (const mutation of ["import", "undo", "inventory", "restore"]) {
-  test(`${mutation} revision invalidates index selections, not persistent armed tools`, () => {
-    const h = harness();
-    h.run('discardStaleInteraction(); selectTool({pick: {stage:"close",grow:[0,1]}}); armed = {piece:"straight"};');
-    assert.equal(h.context.pickMode.revision, 1);
-    h.context.S = scene([], 2); h.run("redraw()");
-    assert.equal(h.context.pickMode, null);
-    assert.equal(h.context.armed.piece, "straight");
-    assert.equal(h.run("trainTrace"), null);
-  });
-}
+test("a new revision invalidates index selections, not persistent armed tools", () => {
+  const h = harness();
+  h.run('discardStaleInteraction(); selectTool({pick: {stage:"close",grow:[0,1]}}); armed = {piece:"straight"};');
+  assert.equal(h.context.pickMode.revision, 1);
+  h.context.S = scene([], 2); h.run("redraw()");
+  assert.equal(h.context.pickMode, null);
+  assert.equal(h.context.armed.piece, "straight");
+  assert.equal(h.run("trainTrace"), null);
+});
 
 test("stale endpoint is rejected even before the next redraw", async () => {
   const s = scene(); s.open_ends = [[0, 0], [0, 1]];

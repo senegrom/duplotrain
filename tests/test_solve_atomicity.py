@@ -40,7 +40,9 @@ def test_search_failures_preserve_existing_usable_candidates(monkeypatch, failur
         if failure == "second_stage" and len(calls) == 1:
             return SolveResult([], SolveStats(complete=True, stop_reason="exhausted"))
         if failure == "progress":
+            # Succeed if the callback's error were swallowed: only it can fail this.
             config.progress(4096)
+            return SolveResult([], SolveStats(complete=True, stop_reason="exhausted"))
         return fail()
 
     monkeypatch.setattr(editor, "solve", search)

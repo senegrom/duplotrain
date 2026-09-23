@@ -84,8 +84,9 @@ def test_history_is_bounded_and_inventory_records_share_layout():
     assert not s._future
 
 
-@pytest.mark.parametrize("route", ["/api/redo", "/api/project/open", "/api/check", "/api/drive"])
-def test_new_api_calls_reject_stale_revision_without_changes(route):
+# Mutating routes are covered in test_editor_integrity; these two only read.
+@pytest.mark.parametrize("route", ["/api/check", "/api/drive"])
+def test_revision_checked_reports_reject_stale_revision_without_changes(route):
     s = Session()
     before = state_key(s)
     with pytest.raises(RevisionConflictError):

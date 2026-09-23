@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 import math
 import os
@@ -17,14 +16,12 @@ from click.testing import CliRunner
 from duplotrain import (
     ORIGIN,
     Alg,
-    ClassificationLimitError,
     Layout,
     NetworkConfig,
     Placement,
     Pose,
     SolverConfig,
     build_chain,
-    classify,
     default_catalog,
     enumerate_networks,
     layout_to_dict,
@@ -219,24 +216,11 @@ def test_unknown_segment_uses_declared_length_not_its_endpoint_distance():
     assert build_chain([(custom, 0, 1)]).track_length() == 177.0
 
 
-def _switch_chain():
-    switch = default_catalog()["switch"]
-    return build_chain([(switch, 0, 1 if i % 2 == 0 else 2) for i in range(25)])
-
-
-def test_existing_classifier_budget_rejects_connected_large_layout_without_simulation(monkeypatch):
-    module = importlib.import_module("duplotrain.drive")
-    calls = []
-    monkeypatch.setattr(module, "drive", lambda *args, **kwargs: calls.append(args))
-    with pytest.raises(ClassificationLimitError, match="max_runs"):
-        classify(_switch_chain())
-    assert calls == []
-
-
 @pytest.mark.skipif(sys.platform != "linux", reason="isolated Linux memory-budget probe")
 def test_unbounded_classifier_reaches_first_simulation_with_bounded_memory():
     # Stop on the first call to drive: exercise lazy allocation without running an
-    # exponential search. The default-budget case above must fail informatively.
+    # exponential search. (test_review_boundaries checks the default budget fails
+    # before any simulation.)
     source = '''
 import importlib
 import resource

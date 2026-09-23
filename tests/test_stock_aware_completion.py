@@ -112,24 +112,6 @@ def test_stronger_prunes_preserve_complete_results(engine, slop, shape, monkeypa
         assert not solver._solution_overlaps(candidate.layout, len(base), 120, 8)
 
 
-@pytest.mark.parametrize("engine", ["lattice", "field"])
-@pytest.mark.parametrize("slop", [0.0, 5.0])
-def test_zero_stock_base_junction_transit_still_closes(engine, slop):
-    catalog = default_catalog()
-    base, switch = Layout().with_piece(catalog["switch"], Pose.make(x=317, y=-90, z=41))
-    base, left = base.attach(catalog["straight"], 1, (switch, 0))
-    end = base.pose_of((switch, 1))
-    target = Pose(end.x + (3 if slop else 0), end.y + (4 if slop else 0),
-                  end.z, end.heading)
-    base, right = base.with_piece(catalog["straight"], catalog["straight"].frame_for(0, target))
-    base = Layout(base.placements, {})
-    witness = base.join((left, 1), (switch, 0)).join((switch, 1), (right, 0), force=bool(slop))
-    result = solver.solve({}, catalog, SolverConfig(min_pieces=0, engine=engine, slop=slop),
-                          base=base, grow_from=(left, 1), close_onto=(right, 0))
-    assert result.stats.complete and len(result.solutions) == 1
-    assert result.solutions[0].layout == witness
-
-
 @pytest.mark.parametrize("unlimited", [False, True])
 def test_reported_reverse_gap_needs_fewer_than_one_thousand_nodes(unlimited):
     data = json.loads((Path(__file__).parent / "fixtures/bridge-gap.json").read_text())

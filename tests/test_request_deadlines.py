@@ -126,7 +126,8 @@ def test_real_socket_refuses_slow_body_without_waiting_for_all_bytes():
         stop.set()
         assert response.status == 403
         assert b"forbidden" in response.read()
-        assert elapsed < 1.0  # Generous CI margin; the old idle timeout exceeds 2s.
+        # The trickle lasts 2 s; a timeout restarted per chunk would wait it out.
+        assert elapsed < 1.5
         assert (session.snapshot(), session.revision) == before
     finally:
         stop.set()
