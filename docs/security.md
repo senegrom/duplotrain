@@ -3,7 +3,7 @@
 ## Local editor
 
 `duplotrain gui` is a single-user local tool, not an authenticated network service.
-It continues to bind only to `127.0.0.1`. Use the printed URL, or `localhost` with
+It binds only to `127.0.0.1`. Use the printed URL, or `localhost` with
 that same port. Do not expose it through a reverse proxy or public interface.
 
 The HTTP layer requires a single, exact loopback Host header on the listening
@@ -11,8 +11,8 @@ port, rejects foreign/null/duplicate Origins and cross-site Fetch Metadata, and
 requires `application/json` for every POST (even an empty body). It never grants
 CORS/preflight access. The JSON-only requirement is intentional CSRF protection
 for browsers without Origin or Fetch Metadata: forms and no-cors requests cannot
-send this non-simple media type. Local programmatic clients can continue using
-JSON without browser-only headers. These protections do not authenticate other
+send this non-simple media type. Local programmatic clients can use JSON
+without browser-only headers. These protections do not authenticate other
 processes already running on the local machine.
 
 Ambiguous/chunked framing, oversized or truncated bodies, and malformed JSON are
@@ -24,19 +24,20 @@ Every connection is closed gracefully. A close with unread input, or input that
 arrives after the close, resets the connection, and on Windows the reset discards
 a response the client has not read yet. Draining a rejected body first only works
 when one valid length says how much to expect; it cannot cover a chunked request,
-repeated or malformed lengths, or a body sent with a successful GET, and those
-lost their answer whenever the body arrived after the server had replied. The
-handler therefore flushes its response, sends FIN, and discards input until the
+repeated or malformed lengths, or a body sent with a successful GET, whose
+answer a body arriving after the reply would otherwise reset. The handler
+therefore flushes its response, sends FIN, and discards input until the
 client closes, for at most 64 KiB and half a second. Regressions send each such
 body late and still read the status, and check that the wait is bounded.
 
 The static Pyodide application uses the shared in-process dispatcher instead of
-this HTTP listener; its transport and engine rules have not changed.
+this HTTP listener, with the same engine rules.
 
 ## Reproducible dependency downloads
 
-Both workflows use read-only repository tokens, disable checkout credential
-persistence, and pin actions to upstream commit SHAs. Version comments allow
+All three workflows use read-only repository tokens (only the Pages deploy job
+also holds Pages-write and OIDC tokens), disable checkout credential persistence,
+and pin actions to upstream commit SHAs. Version comments allow
 Dependabot to maintain those pins, and it checks Python and GitHub Actions
 dependencies weekly. The Lean workflow downloads the versioned
 elan Linux release archive, checks its reviewed SHA-256 before extracting or
@@ -67,11 +68,20 @@ stale revisions receive HTTP 409 with `code: "stale_revision"` and the current
 `state`, without changing the session. Read-only state/export requests do not
 require a revision. Non-browser JSON clients must follow this contract too.
 
+Revisions restart at 0 in every engine process or worker, so the state also
+carries a random engine `instance`. The editor sends it with the revision, and
+a request naming another instance is stale even at an equal revision; clients
+that omit it get the revision check alone. The local server binds its port
+without address reuse on Windows, so a second server cannot share it.
+
 The editor refreshes from a conflict response and clears old tools/previews,
 but never automatically retries the rejected action against newly indexed
-pieces. The shared Pyodide dispatcher uses the same revision check. Each new
-search also advances the revision because candidate indices can change even
-when the layout does not. Revisions prevent stale edits; they are not credentials.
+pieces. A conflict from a fresh engine at revision 0, such as a restarted local
+server, restores the tab's last confirmed session there instead of adopting,
+and autosaving, the empty one. The shared Pyodide dispatcher uses the same
+revision check. Each new search also advances the revision because candidate
+indices can change even when the layout does not. Revisions prevent stale
+edits; they are not credentials.
 
 Before committing an edit, the session validates its proposed snapshot with the
 same layout limits as import/recovery (1,500 pieces and 200 action stones), plus

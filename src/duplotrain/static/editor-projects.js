@@ -44,14 +44,17 @@ function updateProjectStatus() {
   } catch (_) { message = "Unsaved project settings are invalid; correct them before saving."; }
   if (notice.textContent !== message) notice.textContent = message;
 }
+function projectData() {
+  return {format: PROJECT_FORMAT, name: el("project-name").value.trim() || "Untitled track",
+    session: S.snapshot, preferences: {view: {...view}, search: {max_pieces: Number(el("max-pieces").value),
+      slop: Number(el("slop").value), reversing: el("reversing").checked}}};
+}
 function projectSnapshot() {
   if (!S?.snapshot) throw new Error("Wait for the editor to finish loading");
-  const name = el("project-name").value.trim() || "Untitled track";
-  const max_pieces = Number(el("max-pieces").value), slop = Number(el("slop").value);
-  if (name.length > 80 || !Number.isInteger(max_pieces) || max_pieces < 1 || max_pieces > 128 || !Number.isFinite(slop) || slop < 0 || slop > 1e9)
+  const data = projectData(), {max_pieces, slop} = data.preferences.search;
+  if (data.name.length > 80 || !Number.isInteger(max_pieces) || max_pieces < 1 || max_pieces > 128 || !Number.isFinite(slop) || slop < 0 || slop > 1e9)
     throw new Error("Use a name up to 80 characters and valid search settings before saving");
-  return {format: PROJECT_FORMAT, name, session: S.snapshot,
-    preferences: {view: {...view}, search: {max_pieces, slop, reversing: el("reversing").checked}}};
+  return data;
 }
 async function openProject(data, revision = S && S.revision) {
   // Emergency session downloads use the already supported session format.
@@ -65,7 +68,9 @@ async function openProject(data, revision = S && S.revision) {
     el("reversing").checked = prefs.search.reversing; el("reversing").dataset.touched = "1";
   }
   if (prefs.view) { view = {...prefs.view}; fitted = true; } else fitted = false;
-  redraw(); markProjectSaved(projectSnapshot()); status(`Opened project: ${next.project.name}`);
+  // The project is open even when this tab's own search fields are invalid;
+  // the status then asks for them to be corrected before the next save.
+  redraw(); markProjectSaved(projectData()); status(`Opened project: ${next.project.name}`);
 }
 function readLocalProject(key, raw) {
   if (typeof key !== "string" || !key.startsWith(PROJECT_PREFIX) ||

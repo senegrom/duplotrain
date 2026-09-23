@@ -62,6 +62,26 @@ def test_two_tabs_cannot_delete_a_reindexed_piece(local_session):
     assert [p.piece.id for p in session.layout] == ["switch"]
 
 
+def test_restarted_engine_rejects_a_stale_tab_at_the_same_revision():
+    # A restarted local server counts revisions from 0 again. A tab that saw
+    # revision 2 of the previous engine must not edit revision 2 of the new one.
+    old, new = Session(), Session()
+    assert old.instance != new.instance
+    new.attach("straight", 0, None)
+    new.attach("curve", 0, (0, 1))
+    stale = {"placement": 0, "revision": new.revision, "instance": old.instance}
+    before = unchanged(new)
+    with running_server(new) as server:
+        status, result = post(server, "/api/remove", stale)
+        assert status == 409 and result["code"] == "stale_revision"
+        assert result["state"]["instance"] == new.instance
+        assert unchanged(new) == before
+        # Clients naming this engine, and older clients naming none, still edit.
+        assert post(server, "/api/remove", {**stale, "instance": new.instance})[0] == 200
+        assert post(server, "/api/remove", {"placement": 0, "revision": new.revision})[0] == 200
+    assert not new.layout
+
+
 def test_old_clients_without_revision_fail_closed(local_session):
     session, server = local_session
     before = unchanged(session)

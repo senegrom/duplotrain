@@ -11,7 +11,8 @@ companion deferred scripts hold derived canvas and picking geometry, project
 and backup presentation, and train presentation; their load order and the
 single DOMContentLoaded initialiser are part of the tested contract, and the
 local host serves them from an explicit allowlist. The static build injects
-the worker bootstrap, stamps the bundle with the content of every file, and
+the worker bootstrap, stamps the bundle with the content of every engine and
+editor source (icons and the manifest carry versioned names instead), and
 leaves the CLI, the HTTP host, rendering, exhaustive enumeration and scoring
 out of the worker archive. Local hosting
 security and the revision protocol are described in [security.md](security.md).
@@ -32,7 +33,8 @@ history, and history is not persisted across engine restarts.
 
 Endpoint picks, index-based dialogs, diagnostic highlights and train traces
 are bound to the revision they were made at; a changed revision discards them,
-while an armed piece or stone tool persists. Old placement indices are never
+while an armed piece or stone tool persists unless an edit was refused as stale,
+which disarms it. Old placement indices are never
 reused for a newly imported piece, and the keyboard selectors act on the
 selected indices directly. When several pieces overlap under the pointer, a
 click or the Remove tool opens a chooser that owns its allowed targets and its
@@ -50,8 +52,10 @@ segments, per-piece groups, paint batches and bounds, flat segments of one
 piece share a fill and stroke, and repaints are coalesced into animation
 frames. Hover hit-testing runs at most once per frame at the latest pointer
 position, visits only the pieces whose bounds contain the pointer, and repaints
-only when the hovered piece changes; clicks pick immediately. This is a sampled
-2D view, not a solid renderer or a collision model.
+only when the hovered piece changes; clicks pick immediately. A right click
+removes the stone or piece under the pointer, through the same chooser when
+pieces overlap. This is a sampled 2D view, not a solid renderer or a collision
+model.
 
 ## Compact previews
 
@@ -90,10 +94,11 @@ and manual layouts stay editable whatever it says.
 The editor saves the exact layout, the owned track and stone counts and the
 sandbox flag in the browser's local storage after every change. A fresh engine
 restores that session; a local server that is already running keeps its newer
-session. Checkpoints carry unique revisions and Web Locks serialise writes
-across tabs: a tab that sees another writer pauses its autosave and asks you to
-export before reloading, and redrawing or closing a stale tab never rewrites a
-newer checkpoint. Saves from older editor versions migrate read-only into a new
+session, and a tab left open across a server restart restores its own last
+confirmed session into the new server at its next action. Checkpoints carry
+unique revisions and Web Locks serialise writes across tabs: a tab that sees
+another writer pauses its autosave and asks you to export before reloading, and
+redrawing or closing a stale tab never rewrites a newer checkpoint. Saves from older editor versions migrate read-only into a new
 storage key, isolated from tabs still running the old editor. Without safe
 locking or storage the editor warns you to export instead, and a storage or
 recovery error is shown without overwriting an unreadable checkpoint. Autosave
@@ -153,9 +158,10 @@ model of one start, not a physical simulation or a claim about every start.
 ## Checks and deployment
 
 The application workflow lints, runs the node suite once, runs the Python
-suite on two interpreters and on a minimal install, builds the Pages bundle
-once as an immutable artifact, and runs the Chromium and WebKit browser suites
-against that artifact after verifying its digest. The deploy job of the same
-run publishes that artifact only after every gate passes on a push to `main`;
+suite on two interpreters, smoke-tests the CLI on a minimal install, builds the
+Pages bundle once as an immutable artifact, and runs the Chromium and WebKit
+browser suites against that artifact after verifying its digest. The deploy job
+of the same run publishes that artifact only after every gate passes on a push
+to `main` or a manual run there;
 it has no checkout and no build step, and nothing is selected across
 workflows.

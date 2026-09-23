@@ -3,6 +3,20 @@
 // build (see webapp/) installs window.duplotrainApi to run the same Python engine
 // in-browser via Pyodide. Checked at call time so either host works unmodified.
 let apiBusy = false;
+async function send(path, body) {
+  if (window.duplotrainApi) return window.duplotrainApi(path, body);
+  const res = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const error = new Error(data.error || res.statusText);
+    error.code = data.code;
+    error.state = data.state;
+    throw error;
+  }
+  return data;
+}
 async function api(path, body) {
   if (apiBusy) throw new Error("An action is still running; try again when it finishes.");
   apiBusy = true;
@@ -12,37 +26,46 @@ async function api(path, body) {
     // versioned drawing-only contract; state reads use the existing read-only POST.
     if (path !== "/api/export") body = {...body, preview_format: "duplotrain-preview/1"};
     if (body !== undefined && path !== "/api/state" && path !== "/api/export") {
-      // Capture the state the user acted on; never fill in a newer revision
-      // after an await. Preserve an explicit candidate revision as well.
-      body = {revision: S && S.revision, ...body};
+      // Capture the state and engine the user acted on; never fill in a newer
+      // revision after an await. Preserve an explicit candidate revision as well.
+      body = {revision: S && S.revision, ...(S?.instance ? {instance: S.instance} : {}), ...body};
     }
-    if (window.duplotrainApi) return await window.duplotrainApi(path, body);
-    const res = await fetch(path, body === undefined ? {} : {
-      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      const error = new Error(data.error || res.statusText);
-      error.code = data.code;
-      error.state = data.state;
-      throw error;
-    }
-    return data;
+    return await send(path, body);
   } catch (error) {
-    if (error.code === "stale_revision" && error.state) {
-      S = error.state;
-      selectTool();
-      selectedCandidate = null;
-      preview = null;
-      lastSolve = null;
-      el("expand-search").hidden = true;
-      redraw();
-    }
+    if (error.code === "stale_revision" && error.state) await adoptConflictState(error);
     throw error; // Refresh only: never replay a stale deletion/attachment.
   } finally {
     apiBusy = false;
     document.body.classList.remove("busy");
   }
+}
+async function adoptConflictState(error) {
+  const current = error.state;
+  if (S?.snapshot && S.instance && current.instance !== S.instance && current.revision === 0) {
+    // A restarted engine, such as a new local server on the same port, starts
+    // empty. Restore this tab's confirmed session there rather than adopting,
+    // and autosaving over, the empty one. If another tab restored first, adopt it.
+    try {
+      S = await send("/api/restore", {data: S.snapshot, revision: 0, instance: current.instance,
+                                      preview_format: "duplotrain-preview/1"});
+      error.message = "The editor engine restarted; this tab's last confirmed session was " +
+        "restored and undo history reset. Your last action was not applied.";
+    } catch (restoreError) {
+      if (restoreError.code !== "stale_revision" || !restoreError.state) {
+        error.message = "The editor engine restarted and restoring this tab's session failed " +
+          `(${restoreError.message}). Export JSON or reload before editing.`;
+        return;
+      }
+      S = restoreError.state;
+    }
+    clearTransient();
+  } else S = error.state;
+  selectTool();
+  selectedCandidate = null;
+  preview = null;
+  lastSolve = null;
+  el("expand-search").hidden = true;
+  redraw();
 }
 
 // One API snapshot owner. The companion geometry, projects and train scripts
@@ -707,6 +730,7 @@ async function runSolve(grow, close, effort = 1) {
     el("cancel-search").hidden = true;
     el("solve").disabled = !S || S.open_ends.length < 2;
     el("undo").disabled = !S || !S.can_undo;
+    el("redo").disabled = !S || !S.can_redo;
   }
 }
 
@@ -943,6 +967,7 @@ function bindEditorEvents() {
   });
   canvas.addEventListener("wheel", (e) => {
     e.preventDefault();
+    if (!e.deltaY) return; // a sideways swipe is not a zoom
     const p = canvasPoint(e);
     zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, p.x, p.y);
   }, {passive: false});

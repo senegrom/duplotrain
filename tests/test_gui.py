@@ -134,13 +134,15 @@ def test_export_round_trips(server):
 
 
 def test_add_set_bumps_inventory(server):
+    from duplotrain.sets import SETS
+
     status, before = server("/api/state")
-    owned_before = before["inventory"]["owned"]["curve"]
     status, state = server("/api/add_set", {"code": "10882"})
     assert status == 200
-    assert state["inventory"]["owned"]["curve"] == owned_before + 10
-    assert state["inventory"]["owned"]["buffer"] >= 2
-    assert state["stones"]["owned"]["stone_stop"] >= 1
+    box = SETS["10882"]
+    for kind, counts in (("inventory", box.pieces), ("stones", box.stones)):
+        for pid, n in counts.items():
+            assert state[kind]["owned"][pid] == before[kind]["owned"].get(pid, 0) + n
     status, err = server("/api/add_set", {"code": "1234"})
     assert status == 409
     assert "unknown set" in err["error"]
@@ -329,3 +331,13 @@ def test_non_object_body_and_invalid_port_return_json(server):
     status, error = server("/api/attach", {"piece": "straight", "entry": -1, "at": None})
     assert status == 409
     assert "port" in error["error"]
+
+
+def test_a_second_editor_cannot_take_over_a_listening_port():
+    # On Windows SO_REUSEADDR would let the second server bind and split requests.
+    first = make_server(Session(), port=0)
+    try:
+        with pytest.raises(OSError):
+            make_server(Session(), port=first.server_port)
+    finally:
+        first.server_close()

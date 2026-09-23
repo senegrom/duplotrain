@@ -101,6 +101,9 @@
         });
         await options.restored(state);
       } else await options.refresh();
+      // The editor tolerates a failed startup restore; a worker that died during
+      // it has already put up the recovery overlay, which must stay.
+      if (!ready) return;
       overlay.remove();
       (options.readyStatus || options.status)(snapshot ?
         "Engine restarted; last confirmed session restored. Previous undo history and suggestions were reset." :

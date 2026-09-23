@@ -146,3 +146,38 @@ test("sandbox checkbox returns to the viewed value after a network failure", asy
   assert.equal(e.run("S.inventory.unlimited"), false);
   assert.equal(e.messages.at(-1), "offline");
 });
+
+test("a solve re-enables redo when the server kept the redo stack", async () => {
+  const {scene, track} = require("./reliability-harness.cjs");
+  const before = {...scene([track([[0, 0, 0], [100, 0, 0]])], 5), can_undo: true, can_redo: true,
+    open_ends: [[0, 0], [0, 1]]};
+  const after = {...before, revision: 6, complete: true, candidates: []};
+  const h = harness({state: before, overrides: {api: async () => after}});
+  h.context.__c = h.el("canvas"); h.run("canvas = __c");
+  await h.run("runSolve(null, null)");
+  assert.equal(h.el("redo").disabled, false);
+  assert.equal(h.el("undo").disabled, false);
+});
+
+test("opening a project records it as opened even with invalid local search fields", async () => {
+  const {scene, track} = require("./reliability-harness.cjs");
+  const opened = {...scene([track([[0, 0, 0], [100, 0, 0]])], 4),
+    project: {name: "Recovered session", preferences: {}}};
+  const h = harness({state: scene([], 3), overrides: {api: async () => opened}});
+  h.context.__c = h.el("canvas"); h.run("canvas = __c");
+  h.el("max-pieces").value = "";
+  const session = {format: "duplotrain-session/1", layout: {placements: []}, inventory: {}, stones: {}, unlimited: false};
+  await h.run("openProject")(session);
+  assert.equal(h.notices.at(-1).text, "Opened project: Recovered session");
+  assert.notEqual(h.run("projectBaseline"), null);
+  assert.match(h.el("project-status").textContent, /settings are invalid/);
+});
+
+test("a sideways wheel swipe does not zoom", () => {
+  const e = editor();
+  const before = e.run("view.scale");
+  e.el("canvas").fire("wheel", {deltaX: 40, deltaY: 0, clientX: 10, clientY: 10, preventDefault() {}});
+  assert.equal(e.run("view.scale"), before);
+  e.el("canvas").fire("wheel", {deltaX: 0, deltaY: 40, clientX: 10, clientY: 10, preventDefault() {}});
+  assert.ok(e.run("view.scale") < before);
+});

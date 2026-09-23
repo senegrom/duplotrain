@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import socket
+import sys
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,7 +22,6 @@ from .editor import RevisionConflictError, SearchCancelledError, UnknownRouteErr
 from .editor import Session as Session
 from .editor import dispatch_session as dispatch_session
 from .validation import MAX_JSON_BYTES
-from .validation import check_layout_json as check_layout_json
 
 __all__ = ["Session", "make_server", "run"]
 
@@ -320,9 +320,15 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
+class _EditorServer(ThreadingHTTPServer):
+    # On Windows SO_REUSEADDR lets a second editor bind a port that is still
+    # listening and silently split its requests; a restart rebinds without it.
+    allow_reuse_address = sys.platform != "win32"
+
+
 def make_server(session: Session, port: int = 8137) -> ThreadingHTTPServer:
     """Build (but do not start) the editor server; port 0 picks a free port."""
-    return ThreadingHTTPServer(("127.0.0.1", port), _handler_for(session))
+    return _EditorServer(("127.0.0.1", port), _handler_for(session))
 
 
 def run(port: int = 8137, open_browser: bool = True) -> None:

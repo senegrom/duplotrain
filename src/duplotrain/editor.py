@@ -9,6 +9,7 @@ from __future__ import annotations
 import itertools
 import json
 import math
+import secrets
 import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -223,6 +224,9 @@ class Session:
     candidates: list[Solution] = field(default_factory=list)
     lock: threading.Lock = field(default_factory=threading.Lock)
     revision: int = 0
+    #: Revisions restart at 0 in every engine process or worker; this random id
+    #: tells a restarted engine's revision 3 from the one a stale tab saw.
+    instance: str = field(default_factory=lambda: secrets.token_hex(8), init=False)
     _candidate_revision: int | None = None
     _history_state: list[_EditState] = field(default_factory=list, init=False, repr=False)
     _future: list[tuple[Layout, _EditState]] = field(default_factory=list, init=False, repr=False)
@@ -503,6 +507,7 @@ class Session:
             "undo_label": self._history_state[-1].label if len(self.history) > 1 else None,
             "redo_label": self._future[-1][1].label if self._future else None,
             "revision": self.revision,
+            "instance": self.instance,
             "snapshot": self.snapshot(),
             "candidates": [
                 self._candidate_json(i, s, preview_format=preview_format)
@@ -566,8 +571,6 @@ class Session:
                 raise ValueError("pick an open end to attach to")
             layout, _ = self.layout.attach(piece, entry, at)
         else:
-            from .geometry import ORIGIN
-
             layout, _ = self.layout.with_piece(piece, piece.frame_for(entry, ORIGIN))
         self._push(layout, "attach piece")
 
@@ -1061,7 +1064,9 @@ def dispatch_session(
     if path not in MUTATING_ROUTES and path not in ("/api/check", "/api/drive"):
         raise UnknownRouteError(f"no route {path}")
     revision = body.get("revision")
-    if type(revision) is not int or revision != session.revision:
+    # The editor also names the engine instance it saw; older API clients may omit it.
+    if (type(revision) is not int or revision != session.revision
+            or body.get("instance", session.instance) != session.instance):
         raise RevisionConflictError(
             "The session changed in another tab, or this page is out of date. "
             "Your action was not applied. Review the refreshed layout and try again."

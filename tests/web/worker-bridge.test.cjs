@@ -43,11 +43,15 @@ test("API rejects before boot and correlates request IDs afterwards", async () =
   const h = harness();
   await assert.rejects(h.window.duplotrainApi("/api/state"), /not ready/);
   await boot(h);
-  const result = h.window.duplotrainApi("/api/clear", {});
-  const message = h.workers[0].sent[0];
-  assert.equal(message.body, "{}");
-  h.workers[0].emit({id: message.id, res: '{"ok":true}'});
-  assert.equal((await result).ok, true);
+  const first = h.window.duplotrainApi("/api/clear", {});
+  const second = h.window.duplotrainApi("/api/state");
+  const [a, b] = h.workers[0].sent;
+  assert.equal(a.body, "{}");
+  // Answers arriving out of order still reach their own callers.
+  h.workers[0].emit({id: b.id, res: '{"which":"second"}'});
+  h.workers[0].emit({id: a.id, res: '{"which":"first"}'});
+  assert.equal((await first).which, "first");
+  assert.equal((await second).which, "second");
   assert.equal(h.timers.size, 0);
 });
 
@@ -194,4 +198,25 @@ test("repeated cancellation during restart creates only one replacement worker",
   const restore = h.workers[1].sent[0]; h.workers[1].emit({id: restore.id, res: '{"revision":1}'});
   await Promise.all([first, second]);
   assert.equal(h.workers.length, 2);
+});
+
+test("a worker dying during the startup restore keeps the recovery overlay", async () => {
+  const h = harness();
+  const statuses = [];
+  const promise = h.window.duplotrainBoot({
+    status: text => statuses.push(text),
+    // Like editor.js, refresh swallows a failed restore of the autosave.
+    refresh: async () => {
+      const restore = h.window.duplotrainApi("/api/restore", {data: {}});
+      h.workers[0].onerror({message: "out of memory", preventDefault() {}});
+      await restore.catch(() => {});
+    },
+  });
+  h.workers[0].emit({ready: true});
+  await promise;
+  assert.equal(h.workers[0].terminated, true);
+  assert.equal(h.body.children[0].isConnected, true);
+  assert.ok(h.body.children[0].children[0].textContent.includes("out of memory"));
+  assert.ok(!statuses.some(text => text.includes("Engine ready")));
+  await assert.rejects(h.window.duplotrainApi("/api/state"), /not ready/);
 });
