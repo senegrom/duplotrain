@@ -1,8 +1,12 @@
 """Bounded interactive completion jobs, independent of the saved editor content.
 
 A job owns suspended exact solver generators; ticks only advance those generators.
-Candidates are independently checked before they leave the job. No candidate event
-is an edit: publication/application remains revision checked and atomic.
+Candidates are checked against the job's base, stock, size, joints and room before
+they leave the job. Each candidate's final placements are audited for overlaps
+exactly once, by whatever produced them: the core search's replay audit, the arc
+oracle, or, for an expanded bridge macro, before it counts as a result. No
+candidate event is an edit: publication/application remains revision checked and
+atomic.
 """
 from __future__ import annotations
 
@@ -18,7 +22,14 @@ from .bridge_completion import _BRIDGE_ID, _bridge, _expand
 from .collision import DEFAULT_CLEARANCE
 from .exact import ZERO
 from .layout import layout_to_dict
-from .solver import SearchLimits, Solution, SolverConfig, _solution_overlaps, solve_steps
+from .solver import (
+    SearchLimits,
+    Solution,
+    SolverConfig,
+    _OverlapAudit,
+    _solution_overlaps,
+    solve_steps,
+)
 
 MAX_RESULTS = 50
 MAX_JOB_SECONDS = 1200
@@ -127,7 +138,14 @@ def layout_key(layout):
                           .encode()).hexdigest()
 
 
-def valid_extension(base, candidate, stock, max_pieces, options, *, all_gaps=False):
+def valid_extension(base, candidate, stock, max_pieces, options, *, all_gaps=False,
+                    audit=None):
+    """Acceptance checks of one candidate over *base*.
+
+    *audit*, the problem's shared overlap auditor, is for geometry nobody audited
+    yet: an expanded bridge macro. Every other producer already audited exactly
+    these placements with the same clearance and spacing.
+    """
     layout = candidate.layout
     if (layout.placements[:len(base)] != base.placements
             or any(layout.links.get(a) != b for a, b in base.links.items())
@@ -144,9 +162,7 @@ def valid_extension(base, candidate, stock, max_pieces, options, *, all_gaps=Fal
             or (new_issues and candidate.exact)
             or sum(issue["gap_mm"] for issue in new_issues) > candidate.gap + 1e-6):
         return False
-    # Preserve the standalone acceptance audit, including actual final link sets.
-    return not _solution_overlaps(layout, 0 if all_gaps else len(base),
-                                  DEFAULT_CLEARANCE, 8.0)
+    return audit is None or not audit.overlaps(layout)
 
 
 @dataclass
@@ -209,6 +225,8 @@ class PairSearch:
                     self.arc_session._arc_events(grow, close, MAX_RESULTS, depth))
         self.arc_done = False
         self.slop, self.reversing, self.options = slop, reversing, options
+        # Expanded bridge macros are new geometry: audit them before they count.
+        self.audit = _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
         self._build()
 
     @property
@@ -251,7 +269,8 @@ class PairSearch:
                         if p.piece.id in ("curve", "straight", "ramp")
                     ):
                         return False
-                    return valid_extension(base, sol, stock, self.depth, self.options)
+                    return valid_extension(base, sol, stock, self.depth, self.options,
+                                           audit=self.audit if parts is not None else None)
 
                 iterator = solve_steps(inventory, pieces,
                     SolverConfig(min_pieces=0, max_pieces=limits.max_pieces,
@@ -391,6 +410,10 @@ class SearchJob:
         if (any(issue["problems"] != ["planar gap"] for issue in issues)
                 or (self.all_gaps and issues)):
             raise ValueError("Fix incompatible existing joints before starting this search")
+        # A plan must be overlap-free as a whole, which no addition can make it.
+        if self.all_gaps and _solution_overlaps(self.base, 0, DEFAULT_CLEARANCE, 8.0):
+            raise ValueError("The existing track overlaps itself; Check layout lists the "
+                             "pieces. Fix it before closing all gaps")
         if not fits_space(self.base, self.options):
             raise ValueError(
                 "Existing track crosses the room/keep-out limits; no pieces were moved")

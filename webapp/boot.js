@@ -123,7 +123,6 @@ window.duplotrainBuild = "__BUILD__";
       await start(saved);
     } finally { restarting = false; }
   }
-  window.duplotrainCancel = restart;
   window.duplotrainBoot = async supplied => {
     options = supplied;
     overlay = document.createElement("div");

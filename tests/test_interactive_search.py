@@ -24,6 +24,7 @@ from duplotrain.solver import (
     SearchLimits,
     Solution,
     SolverConfig,
+    _OverlapAudit,
     _solution_overlaps,
     solve,
     solve_steps,
@@ -382,10 +383,19 @@ def test_exact_dedup_is_independent_of_new_placement_order(catalog):
     assert layout_key(moved) != layout_key(original)
 
 
-def test_full_plan_audit_does_not_ignore_colliding_original_track(catalog):
-    bad = build_chain([(catalog["curve"], 0, 1)] * 24).join((0, 0), (23, 1))
-    candidate = Solution(bad, (), 0, True, 0, ("overlap",))
-    assert not valid_extension(bad, candidate, {}, 1, search_options({}, catalog), all_gaps=True)
+def test_close_all_gaps_refuses_track_that_already_overlaps_itself(catalog):
+    # Two full turns of curves lie on top of each other: no plan can be overlap-free.
+    spiral = build_chain([(catalog["curve"], 0, 1)] * 24)
+    session = Session(history=[spiral], inventory={"curve": 30})
+    with pytest.raises(ValueError, match="overlaps itself"):
+        call(session, "start", all_gaps=True)
+    # The explicit whole-layout auditor rejects it as well.
+    closed = spiral.join((0, 0), (23, 1))
+    candidate = Solution(closed, (), 0, True, 0, ("overlap",))
+    options = search_options({}, catalog)
+    assert valid_extension(closed, candidate, {}, 1, options, all_gaps=True)
+    assert not valid_extension(closed, candidate, {}, 1, options, all_gaps=True,
+                               audit=_OverlapAudit(None, 120.0, 8.0))
 
 
 def test_harder_retains_existing_exact_dfs_objects_and_lifts_depth(catalog):

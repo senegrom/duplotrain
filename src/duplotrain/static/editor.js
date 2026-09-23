@@ -20,7 +20,7 @@ async function send(path, body) {
 async function api(path, body) {
   if (apiBusy) throw new Error("An action is still running; try again when it finishes.");
   apiBusy = true;
-  document.body.classList.add("busy");
+  refreshBusy();
   try {
     // Legacy API clients still receive full previews. This editor opts into the
     // versioned drawing-only contract; state reads use the existing read-only POST.
@@ -36,9 +36,12 @@ async function api(path, body) {
     throw error; // Refresh only: never replay a stale deletion/attachment.
   } finally {
     apiBusy = false;
-    document.body.classList.remove("busy");
+    refreshBusy();
   }
 }
+// One busy state for a single request or a whole engine job: a job's ticks must
+// not flicker the controls (or let clicks through) between their requests.
+function refreshBusy() { document.body.classList.toggle("busy", apiBusy || jobLoop); }
 async function adoptConflictState(error) {
   const current = error.state;
   if (S?.snapshot && S.instance && current.instance !== S.instance && current.revision === 0) {
@@ -63,7 +66,6 @@ async function adoptConflictState(error) {
   selectTool();
   selectedCandidate = null;
   preview = null;
-  lastSolve = null;
   el("expand-search").hidden = true;
   redraw();
 }
@@ -80,7 +82,6 @@ let fitted = false;
 let deleting = false;
 let selectedCandidate = null;
 let solving = false;
-let lastSolve = null;
 let recoveryAttempted = false;
 let autosaveReady = false;
 
@@ -669,7 +670,6 @@ function redraw() {
   if (!rev.dataset.touched) {
     rev.checked = (S.stones.owned.stone_direction || 0) > 0;
   }
-  if (lastSolve && lastSolve.revision !== S.revision) el("expand-search").hidden = true;
   renderNavigation(); renderSearchOptions(); renderJobControls();
   refreshStatus(); updateProjectStatus(); draw(); saveSession();
 }
@@ -684,60 +684,6 @@ async function refresh() {
 }
 
 let importSequence = 0;
-
-async function runSolve(grow, close, effort = 1) {
-  if (S?.capabilities?.interactive_search) return startInteractiveSearch(grow, close, effort);
-  if (solving || apiBusy || !S) return;
-  selectTool();
-  const maxPieces = Number(el("max-pieces").value);
-  const slop = Number(el("slop").value);
-  if (!Number.isInteger(maxPieces) || maxPieces < 1 || maxPieces > 128 || !Number.isFinite(slop) || slop < 0) {
-    status("Use 1–128 added pieces and a finite, non-negative slop.", "err");
-    return;
-  }
-  lastSolve = {grow, close, effort, revision: S.revision};
-  el("expand-search").hidden = true;
-  selectedCandidate = null;
-  solving = true;
-  el("solve").disabled = true;
-  solveOperation = globalThis.crypto?.randomUUID?.() || null;
-  el("cancel-search").hidden = false;
-  status(effort > 1 ? `searching… ${effort}× search budget` : "searching…");
-  try {
-    S = await api("/api/solve", {
-      grow, close,
-      ...(solveOperation ? {operation_id: solveOperation} : {}),
-      slop, max_pieces: maxPieces, search_effort: effort,
-      max_results: 8,
-      reversing: el("reversing").checked,
-    });
-    pickMode = null;
-    lastSolve = {grow, close, effort, revision: S.revision};
-    redraw();
-    if (!S.candidates.length) {
-      if (S.reason)
-        status(S.reason, "err");
-      else if (!S.complete)
-        status(`No completion found within the search limits (${S.stop_reason}, ` +
-               `${(S.searched || 0).toLocaleString()} states). A closure may still exist.`, "err");
-      else
-        status("No completion fits the remaining inventory under these settings.", "err");
-    } else {
-      status(`${S.candidates.length} suggestion(s)${S.complete ? "" : " (search limited)"} — Preview, then Apply.`);
-    }
-    el("expand-search").hidden = !!S.complete || (maxPieces >= 128 && effort >= 16);
-  } catch (e) {
-    pickMode = null;
-    status(e.message, "err");
-  } finally {
-    solving = false;
-    solveOperation = null;
-    el("cancel-search").hidden = true;
-    el("solve").disabled = !S || S.open_ends.length < 2;
-    el("undo").disabled = !S || !S.can_undo;
-    el("redo").disabled = !S || !S.can_redo;
-  }
-}
 
 // Pointer events support mouse, pen and touch; capture keeps drags well-defined
 // outside the canvas. Any multi-touch gesture suppresses placement until all lift.
@@ -898,14 +844,11 @@ function bindEditorEvents() {
       renderPalette(); renderStones(); refreshStatus(); draw();
       return;
     }
-    await runSolve(null, null);
+    await startInteractiveSearch(null, null);
   });
   el("expand-search").addEventListener("click", async () => {
-    if (solving || apiBusy || !S) return;
-    if (interactiveJob?.revision === S.revision) return continueSearch(true);
-    el("max-pieces").value = Math.min(128, Math.max(1, Number(el("max-pieces").value)) * 2);
-    if (!lastSolve || lastSolve.revision !== S.revision) { el("solve").click(); return; }
-    await runSolve(lastSolve.grow, lastSolve.close, Math.min(16, lastSolve.effort * 2));
+    if (solving || apiBusy || !S || interactiveJob?.revision !== S.revision) return;
+    await continueSearch(true);
   });
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !S) return;
@@ -1036,7 +979,6 @@ document.addEventListener("DOMContentLoaded", initializeEditor, {once: true});
 // are loaded before the single DOMContentLoaded initializer above runs.
 let interactionRevision = null, navigationRevision = null;
 let selectedPiece = null, hoveredPiece = null, highlightedPieces = [];
-let solveOperation = null;
 let framePending = false, pendingHover = null, activeOverlap = null;
 let repaintPending = false;
 function draw() { scheduleFrame(true); }
@@ -1076,7 +1018,7 @@ function closeOverlapPicker() {
 }
 function clearTransient() {
   clearInteractiveState();
-  pickMode = null; selectedCandidate = null; preview = null; lastSolve = null;
+  pickMode = null; selectedCandidate = null; preview = null;
   selectedPiece = null; clearHover(); highlightedPieces = []; closeOverlapPicker();
   invalidateTrain(); initialSwitches = {};
   navigationRevision = null;
@@ -1089,9 +1031,7 @@ function discardStaleInteraction() {
   discardInteractiveJob();
   if (interactionRevision !== null && interactionRevision !== S.revision) {
     // Keep deliberately armed pieces/stones, but never reassign old index picks.
-    const last = lastSolve;
     clearTransient();
-    if (last?.revision === S.revision) lastSolve = last;
   }
   if (pickMode && pickMode.revision !== S.revision) pickMode = null;
   interactionRevision = S.revision;
@@ -1194,7 +1134,7 @@ async function activateEnd(end) {
     if (pickMode.grow[0] === end[0] && pickMode.grow[1] === end[1]) {
       status("Choose a different open end to close onto.", "err"); return;
     }
-    await runSolve(pickMode.grow, end);
+    await startInteractiveSearch(pickMode.grow, end);
   } else if (armed) {
     S = await api("/api/attach", {piece: armed.piece, entry: armed.entry, at: end}); redraw();
   } else {
@@ -1244,24 +1184,11 @@ async function checkLayout() {
   } catch (error) { status(error.message, "err"); }
 }
 
-async function cancelSearch() {
-  if (!solving) return;
-  if (jobLoop) { requestJobPause(); return; }
-  try {
-    if (window.duplotrainCancel) await window.duplotrainCancel();
-    else if (solveOperation) {
-      const result = await fetch("/api/cancel", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({operation_id: solveOperation})});
-      if (!result.ok) throw new Error("Cancellation request was rejected");
-      const response = await result.json();
-      status(response.cancelled ? "Cancelling search at its next checkpoint…" : "Search already finished or is not yet active; retry cancellation.");
-    } else status("Cancellation is unavailable for this request; the current layout can still be exported.");
-  } catch (error) { status(error.message, "err"); }
-}
 function bindExtraEvents() {
   bindSearchEvents();
   const on = (id, action) => el(id)?.addEventListener("click", action);
   on("redo", async () => { try { S = await api("/api/redo", {}); redraw(); } catch (error) { status(error.message, "err"); } });
-  on("cancel-search", cancelSearch);
+  on("cancel-search", () => { if (jobLoop) requestJobPause(); });
   on("check-layout", checkLayout);
   on("fit-preview", () => { const pl = previewPlacements(preview); if (pl) { fitView(pl); fitted = true; draw(); } });
   on("use-end", async () => { try { await activateEnd(JSON.parse(el("end-select").value)); } catch (e) { status(e.message, "err"); } });

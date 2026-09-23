@@ -46,7 +46,9 @@ async function installVersion() {
         headers.delete("Content-Encoding"); headers.set("Content-Length", String(data.byteLength));
         await cache.put(url, new Response(data, {status: 200, headers}));
       }
-      await cache.put(MARKER, new Response(BUILD, {headers: {"Content-Type": "text/plain"}}));
+      // The marker also records when this version completed, for pruning.
+      await cache.put(MARKER, new Response(BUILD, {headers: {"Content-Type": "text/plain",
+        "X-Installed": String(Date.now())}}));
       return offlineStatus();
     } catch (error) {
       // Delete ONLY this incomplete version. Previously verified versions and
@@ -57,8 +59,22 @@ async function installVersion() {
   })();
   try { return await installing; } finally { installing = null; }
 }
+// Keep this version and the newest older complete one, which tabs opened before
+// the update still run; older versions only take space. A cache without its
+// marker may be a newer version still installing, so it is left alone.
+async function pruneOlderVersions() {
+  const complete = [];
+  for (const name of await caches.keys()) {
+    if (!name.startsWith(PREFIX) || name === CACHE) continue;
+    const marker = await (await caches.open(name)).match(absolute(".offline-complete-" + name.slice(PREFIX.length)));
+    if (marker) complete.push({name, installed: Number(marker.headers.get("X-Installed")) || 0});
+  }
+  complete.sort((a, b) => b.installed - a.installed);
+  for (const {name} of complete.slice(1)) await caches.delete(name);
+}
 self.addEventListener("install", event => event.waitUntil(installVersion()));
-self.addEventListener("activate", event => event.waitUntil(self.clients.claim()));
+self.addEventListener("activate", event => event.waitUntil(
+  pruneOlderVersions().then(() => self.clients.claim())));
 // Do not skipWaiting automatically: changing versions must not reload or
 // replace an unsaved editor. Already-open clients keep their exact asset URLs.
 self.addEventListener("message", event => {

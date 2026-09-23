@@ -46,14 +46,11 @@ function updateProjectStatus() {
 }
 function projectData(strict = false) {
   // Unsaved constraint text may be invalid: a baseline records it as null, a save refuses it.
-  let options;
-  if (S?.capabilities?.interactive_search) {
-    try { options = readSearchOptions(); } catch (error) { if (strict) throw error; options = null; }
-  }
+  let options = null;
+  try { options = readSearchOptions(); } catch (error) { if (strict) throw error; }
   return {format: PROJECT_FORMAT, name: el("project-name").value.trim() || "Untitled track",
     session: S.snapshot, preferences: {view: {...view}, search: {max_pieces: Number(el("max-pieces").value),
-      slop: Number(el("slop").value), reversing: el("reversing").checked,
-      ...(options === undefined ? {} : {options})}}};
+      slop: Number(el("slop").value), reversing: el("reversing").checked, options}}};
 }
 function projectSnapshot() {
   if (!S?.snapshot) throw new Error("Wait for the editor to finish loading");

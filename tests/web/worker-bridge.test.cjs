@@ -143,23 +143,32 @@ test("failure overlay exports the last confirmed layout and session without the 
   assert.equal(h.workers[0].sent.length, 0);
 });
 
-test("cancel restarts with an isolated copy of this tab's snapshot and ignores late responses", async () => {
+// The failure overlay's restart button is the only way the page restarts the engine.
+function crash(h) {
+  h.workers.at(-1).onerror({message: "engine crashed", preventDefault() {}});
+  return () => h.body.children[0].children.find(
+    c => c.textContent === "Restart engine and restore last confirmed session");
+}
+const turns = async (n = 3) => { for (let i = 0; i < n; i++) await new Promise(r => setImmediate(r)); };
+
+test("restart restores an isolated copy of this tab's snapshot and ignores late responses", async () => {
   const h = harness(), r = await recoverableBoot(h);
   const original = structuredClone(r.snapshot);
-  const pending = assert.rejects(h.window.duplotrainApi("/api/solve", {}), e => e.code === "cancelled");
-  const first = h.workers[0], solving = first.sent[0];
-  const recovery = h.window.duplotrainCancel();
+  const pending = assert.rejects(h.window.duplotrainApi("/api/search/tick", {}), /engine crashed/);
+  const first = h.workers[0], ticking = first.sent[0];
+  const restart = crash(h); await pending;
+  restart().click();
   assert.equal(first.terminated, true);
   r.snapshot.inventory.curve = 999; // no alias into the captured recovery payload
-  first.emit({id: solving.id, res: '{"revision":999}'});
+  first.emit({id: ticking.id, res: '{"revision":999}'});
   const second = h.workers[1]; second.emit({ready: true});
-  await new Promise(resolve => setImmediate(resolve));
+  await turns(1);
   const restore = second.sent[0];
   assert.equal(restore.path, "/api/restore");
   assert.deepEqual(JSON.parse(restore.body).data, original);
   assert.equal(JSON.parse(restore.body).revision, 0);
   second.emit({id: restore.id, res: '{"revision":1,"restored":true}'});
-  await recovery; await pending;
+  await turns();
   assert.equal(r.restored.length, 1); assert.equal(r.restored[0].revision, 1);
   assert.match(r.notices.at(-1), /history and suggestions were reset/);
   assert.equal(h.timers.size, 0);
@@ -178,11 +187,11 @@ test("progress renews the inactivity watchdog, silence rejects pending operation
 
 test("failed recovery keeps emergency downloads available and never publishes restored state", async () => {
   const h = harness(), r = await recoverableBoot(h);
-  const recovery = h.window.duplotrainCancel();
-  h.workers[1].emit({ready: true}); await new Promise(resolve => setImmediate(resolve));
+  crash(h)().click();
+  h.workers[1].emit({ready: true}); await turns(1);
   const restore = h.workers[1].sent[0];
   h.workers[1].emit({id: restore.id, res: '{"__error":"restore failed"}'});
-  await recovery;
+  await turns();
   assert.equal(r.restored.length, 0);
   const overlay = h.body.children[0];
   assert.match(overlay.children[0].textContent, /restore failed/);
@@ -190,13 +199,14 @@ test("failed recovery keeps emergency downloads available and never publishes re
   assert.deepEqual(r.downloads, [r.snapshot]);
 });
 
-test("repeated cancellation during restart creates only one replacement worker", async () => {
+test("repeated restart clicks create only one replacement worker", async () => {
   const h = harness(); await recoverableBoot(h);
-  const first = h.window.duplotrainCancel(); const second = h.window.duplotrainCancel();
+  const restart = crash(h);
+  restart().click(); restart().click();
   assert.equal(h.workers.length, 2);
-  h.workers[1].emit({ready: true}); await new Promise(resolve => setImmediate(resolve));
+  h.workers[1].emit({ready: true}); await turns(1);
   const restore = h.workers[1].sent[0]; h.workers[1].emit({id: restore.id, res: '{"revision":1}'});
-  await Promise.all([first, second]);
+  await turns();
   assert.equal(h.workers.length, 2);
 });
 

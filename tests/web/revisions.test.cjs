@@ -62,13 +62,13 @@ for (const transport of ["http", "worker"]) {
       e.calls.push({url, body});
       throw Object.assign(new Error(data.error), {code: data.code, state: data.state});
     };
-    e.run('deleting = true; armed = {piece:"straight"}; selectedCandidate = "old"; preview = {}; lastSolve = {};');
+    e.run('deleting = true; armed = {piece:"straight"}; selectedCandidate = "old"; preview = {};');
     await assert.rejects(e.run('api("/api/remove", {placement: 1})'), /not applied/);
     assert.equal(e.calls.length, 1);
     assert.equal(e.run("S.revision"), 9);
     assert.equal(e.run("S.layout.placements[1].piece"), "switch");
     assert.equal(e.run("deleting"), false);
-    for (const name of ["armed", "armedStone", "pickMode", "selectedCandidate", "preview", "lastSolve"])
+    for (const name of ["armed", "armedStone", "pickMode", "selectedCandidate", "preview"])
       assert.equal(e.run(name), null);
     assert.equal(e.el("expand-search").hidden, true);
     assert.equal(e.redraws(), 1);

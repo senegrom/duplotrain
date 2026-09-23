@@ -16,7 +16,7 @@ function cacheStorage(){
         async delete(k){return store.delete(name(k));}};
     }};
 }
-function worker({build="aaa",caches=cacheStorage(),bad=null}={}){
+function worker({build="aaa",caches=cacheStorage(),bad=null,now=()=>Date.now()}={}){
   const assets=[{url:"index.html",body:`<html>build ${build}</html>`},
     {url:`editor.js?v=${build}`,body:`const build='${build}'`},
     {url:`worker.js?v=${build}`,body:`const engine='${build}'`}];
@@ -32,13 +32,14 @@ function worker({build="aaa",caches=cacheStorage(),bad=null}={}){
       "Content-Security-Policy":"default-src 'self'","Content-Encoding":"gzip"}});
   };
   const ctx=vm.createContext({URL,Response,Request,Headers,Uint8Array,ArrayBuffer,AbortController,
-    crypto:webcrypto,caches,fetch,setTimeout,clearTimeout,
+    crypto:webcrypto,caches,fetch,setTimeout,clearTimeout,Date:{now},
     self:{registration:{scope},clients:{claim:async()=>{}},skipWaiting:async()=>{activated++;},
       addEventListener:(name,fn)=>{handlers[name]=fn;}}});
   vm.runInContext(template.replaceAll("__BUILD__",build).replace("__ASSETS__",JSON.stringify(manifest)),ctx);
   const run=code=>vm.runInContext(code,ctx);
   return {ctx,run,caches,assets,manifest,handlers,calls,setOffline:v=>{offline=v;},activated:()=>activated,
     async install(){let promise;handlers.install({waitUntil:p=>{promise=p;}});return promise;},
+    async activate(){let promise;handlers.activate({waitUntil:p=>{promise=p;}});return promise;},
     async message(type){let promise,result;handlers.message({data:{type},ports:[{postMessage:r=>{result=r;}}],waitUntil:p=>{promise=p;}});
       await promise;return clean(result);},
     async request(url,mode="cors",method="GET"){
@@ -109,3 +110,21 @@ for(const [url,method]of[["api/state","GET"],["api/search/tick","POST"],["servic
 test("unknown navigation is not silently replaced with the editor",async()=>{
   const w=worker();await w.install();assert.equal(await (await w.request("unknown.html","navigate")).text(),"network fallback");
 });
+
+test("activation keeps this and the newest older version, never unrelated or unfinished caches",async()=>{
+  const caches=cacheStorage();let clock=1000;const now=()=>clock++;
+  const other=await caches.open("other-app");await other.put("https://example.test/other",new Response("keep"));
+  const versions=[];
+  for(const build of ["aaa","bbb","ccc"]){const w=worker({build,caches,now});await w.install();versions.push(w);}
+  const partial=worker({build:"ddd",caches,now});await (await caches.open(partial.run("CACHE"))).put(
+    new URL("index.html",scope).href,new Response("still installing"));
+  await versions[2].activate();
+  const kept=[...caches.map.keys()];
+  assert.ok(kept.includes("other-app")&&kept.includes(partial.run("CACHE")));
+  assert.ok(kept.includes(versions[2].run("CACHE"))&&kept.includes(versions[1].run("CACHE")));
+  assert.ok(!kept.includes(versions[0].run("CACHE")));
+  // Tabs still running the previous version keep its exact assets offline.
+  versions[2].setOffline(true);
+  assert.match(await (await versions[2].request("editor.js?v=bbb")).text(),/bbb/);
+});
+

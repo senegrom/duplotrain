@@ -190,7 +190,7 @@ def test_search_limit_message_and_deeper_search(editor):
     load(page, url)
     page.locator("#reversing").uncheck()
     # Same entry point as two selected arrows, with exact endpoint IDs.
-    page.evaluate("runSolve([0, 1], [1, 0])")
+    page.evaluate("startInteractiveSearch([0, 1], [1, 0])")
     assert "may still exist" in page.locator("#status").inner_text()
     assert page.locator("#expand-search").is_visible()
     page.locator("#expand-search").tap()

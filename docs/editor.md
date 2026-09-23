@@ -58,11 +58,13 @@ pieces overlap. This is a sampled 2D view, not a solid renderer or a collision
 model.
 
 Conservative viewport bounds skip off-screen track batches and markers without
-changing global paint order or picking. A single offscreen base raster reuses
-unchanged track painting while hover, selection, train and constraint overlays
-change. Geometry, view, viewport or device-pixel-ratio changes invalidate it.
-The raster is limited to eight million pixels (about 32 MB of RGBA data);
-larger canvases or hosts without a secondary canvas use direct painting.
+changing global paint order or picking. While the view or geometry keeps
+changing (a pan, a zoom, new track) every frame paints the track directly. Once
+a frame repeats, one reused offscreen surface holds the stable track while hover,
+selection, train and constraint overlays change; geometry, view, viewport or
+device-pixel-ratio changes invalidate it. The raster is limited to eight million
+pixels (about 32 MB of RGBA data); larger canvases or hosts without a secondary
+canvas use direct painting.
 
 ## Compact previews
 
@@ -141,14 +143,16 @@ layout and session from this tab's own state, and a restart that creates a new
 worker and restores a copy of that snapshot; responses from an old worker
 generation are ignored, and a restart resets undo history and suggestions and
 says so. Startup times out after 60 seconds; outstanding calls time out after
-two minutes without a response or progress report. Interactive jobs pause cooperatively without restarting the worker or losing
-undo history; accepted suggestions can be published and applied after pausing.
-The legacy browser Cancel fallback restarts the worker from the confirmed snapshot. On the local host a search
-carries a random `operation_id`; `/api/cancel` sets its event without waiting
-for the session lock, the search raises at its next progress or publication
-checkpoint with HTTP 409 and `code: "cancelled"`, the layout stays unchanged,
-and a cancellation for a request not yet registered or already finished reports
-that it was not active.
+two minutes without a response or progress report. The editor's searches and
+route analyses are interactive jobs: they pause at their next checkpoint without
+restarting the worker or losing undo history, and accepted suggestions can be
+published and applied after pausing. The synchronous `/api/solve` route remains
+for API clients. On the local host such a search may carry a random
+`operation_id`; `/api/cancel` sets its event without waiting for the session
+lock, the search raises at its next progress or publication checkpoint with
+HTTP 409 and `code: "cancelled"`, the layout stays unchanged, and a cancellation
+for a request not yet registered or already finished reports that it was not
+active.
 
 ## Interactive completion
 
@@ -198,8 +202,9 @@ first: an explicit reload still resets in-memory undo and search progress.
 
 A failed installation, failed digest or storage quota error does not replace an
 older verified version or delete unrelated application caches. Versioned asset
-URLs keep old live tabs on coherent resources; prior version caches are retained
-rather than pruned automatically. Many versions can therefore consume storage.
+URLs keep old live tabs on coherent resources: activating a version keeps the
+newest older complete version, which tabs opened before the update still run,
+and deletes older ones; a version that is still installing is left alone.
 Browser eviction or missing entries can remove offline availability, so readiness
 is checked and installation can be repaired online. This is not a permanent
 storage guarantee or a substitute for portable project backups. The desktop local

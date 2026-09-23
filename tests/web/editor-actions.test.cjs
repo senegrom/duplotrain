@@ -147,14 +147,17 @@ test("sandbox checkbox returns to the viewed value after a network failure", asy
   assert.equal(e.messages.at(-1), "offline");
 });
 
-test("a solve re-enables redo when the server kept the redo stack", async () => {
+test("a search re-enables redo when the server kept the redo stack", async () => {
   const {scene, track} = require("./reliability-harness.cjs");
   const before = {...scene([track([[0, 0, 0], [100, 0, 0]])], 5), can_undo: true, can_redo: true,
     open_ends: [[0, 0], [0, 1]]};
-  const after = {...before, revision: 6, complete: true, candidates: []};
-  const h = harness({state: before, overrides: {api: async () => after}});
+  const done = {job_id: "job", revision: 5, status: "exhausted", stage: "full inventory", searched: 12,
+    found: 0, target: 8, page: 0, candidates: [], complete: true, resumable: false, can_harden: false};
+  const api = async path => path.endsWith("/start") ? done :
+    {...before, revision: 6, search_job: {...done, revision: 6}};
+  const h = harness({state: before, overrides: {api}});
   h.context.__c = h.el("canvas"); h.run("canvas = __c");
-  await h.run("runSolve(null, null)");
+  await h.run("startInteractiveSearch(null, null)");
   assert.equal(h.el("redo").disabled, false);
   assert.equal(h.el("undo").disabled, false);
 });

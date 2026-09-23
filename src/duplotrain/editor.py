@@ -483,7 +483,6 @@ class Session:
         mates = [[list(a), list(b)] for a, b in layout.matable_pairs(port_poses)]
         return {
             "layout": self._layout_json(layout, port_poses),
-            "capabilities": {"interactive_search": True, "route_analysis": True},
             "open_ends": [list(end) for end in layout.connectable_ends()],
             "matable": mates,
             "train_switches": switch_choices(layout),

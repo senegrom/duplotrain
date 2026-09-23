@@ -63,9 +63,12 @@ preferences still open.
 mode. It chooses a constrained end, tries possible mates and alternative
 completions, debits the shared remaining stock, and backtracks when a choice
 prevents a later gap from closing. Already matching, compatible ends can be
-joined without adding pieces. Only a complete plan reducing the open-end count
-to zero is offered, after the final whole-layout collision, exact-joint,
-unchanged-base, inventory and size checks.
+joined without adding pieces. Track that already overlaps itself is refused
+before the search starts, since no plan could then be overlap-free as a whole.
+Each added piece is audited for overlaps against all the track before it when
+its pair is solved, and only a complete plan reducing the open-end count to zero
+is offered, after the final exact-joint, unchanged-base, inventory and size
+checks.
 
 The plan search tries at most eight alternatives per pair, permits at most 128
 added pieces across the whole plan, and has a shared node allowance. This is a
@@ -92,10 +95,17 @@ search stages and alternating endpoints. Stage node budgets are shared across
 directions, not multiplied for each direction. Template generation is separate
 from DFS and its bounded list is regenerated when a higher depth is requested.
 Room restrictions and publication guards run before a solution is streamed.
+Each candidate's final placements are audited for overlaps exactly once, by
+whatever produced them: the core search's replay audit, the arc oracle, or, for
+an expanded bridge macro, a shared incremental auditor before the candidate
+counts as a result. Acceptance then repeats the base, stock, size, joint and
+room checks.
 
 One tick processes at most 32 checkpoint events and aims to return after about
 20 ms between checkpoints. This is not a hard execution deadline: preprocessing,
-a bridge expansion, validation or one train run can take longer. Request IDs,
+a bridge expansion, validation or one train run can take longer. The editor
+keeps its controls busy for the whole job rather than per request, so they
+neither flicker nor accept clicks between ticks. Request IDs,
 job IDs, revisions and client generations prevent results from an old problem
 from being applied to new content. Jobs expire after 20 minutes without a
 request, checked on the next access, and are released on content changes or
@@ -133,5 +143,6 @@ Both the local HTTP host and the browser worker use the existing revision-checke
 dispatcher. Interactive completion uses `/api/search/start`, then `tick`, `page`,
 `pause`, `resume`, `continue`, `publish` and `discard`; subsequent requests carry
 the job ID and current revision. Train analysis uses `/api/routes/start`, `tick`,
-`pause`, `resume` and `discard`. The legacy synchronous `/api/solve` remains
-available. Errors validate before replacing an active job or publishing changes.
+`pause`, `resume` and `discard`. The synchronous `/api/solve` remains for API
+clients; the editor itself uses only the job routes. Errors validate before
+replacing an active job or publishing changes.

@@ -11,7 +11,7 @@ function visibleCandidates() {
 }
 function clearInteractiveState() {
   jobSequence++; interactiveJob = routeAnalysis = null;
-  jobPauseRequested = true; jobLoop = false; solving = false;
+  jobPauseRequested = true; jobLoop = false; solving = false; refreshBusy();
   if (el("route-report")) el("route-report").textContent = "";
   renderJobControls();
 }
@@ -19,7 +19,7 @@ function discardInteractiveJob() {
   if ((interactiveJob && interactiveJob.revision !== S?.revision) ||
       (routeAnalysis && routeAnalysis.revision !== S?.revision)) {
     jobSequence++; interactiveJob = routeAnalysis = null; jobPauseRequested = true;
-    solving = false; jobLoop = false; renderJobControls();
+    solving = false; jobLoop = false; refreshBusy(); renderJobControls();
   }
 }
 function rectangleInput(text) {
@@ -87,12 +87,10 @@ function renderJobControls() {
     if (el("candidate-page")) el("candidate-page").textContent = "";
     if (el("search-report")) el("search-report").textContent = "";
   }
-  if (S?.capabilities?.interactive_search) {
-    show("close-all", true, solving || S.open_ends.length < 2);
-    if (el("cancel-search")) {
-      el("cancel-search").hidden = !solving;
-      el("cancel-search").textContent = "Pause at next checkpoint";
-    }
+  if (S) show("close-all", true, solving || (S.open_ends?.length ?? 0) < 2);
+  if (el("cancel-search")) {
+    el("cancel-search").hidden = !solving;
+    el("cancel-search").textContent = "Pause at next checkpoint";
   }
   show("route-pause", !!routeAnalysis && routeAnalysis.status === "running");
   show("route-resume", !!routeAnalysis && routeAnalysis.status === "paused", solving);
@@ -117,7 +115,7 @@ async function publishSearch(sequence) {
 }
 async function driveSearchTicks(sequence) {
   let finalMessage = null, failed = false;
-  jobLoop = true; solving = true; jobPauseRequested = false; renderJobControls(); refreshStatus();
+  jobLoop = true; solving = true; jobPauseRequested = false; refreshBusy(); renderJobControls(); refreshStatus();
   try {
     while (sequence === jobSequence && interactiveJob?.status === "running") {
       if (jobPauseRequested) {
@@ -151,7 +149,7 @@ async function driveSearchTicks(sequence) {
     }
   } finally {
     if (sequence === jobSequence) {
-      solving = false; jobLoop = false; renderJobControls(); refreshStatus(); renderCandidates();
+      solving = false; jobLoop = false; refreshBusy(); renderJobControls(); refreshStatus(); renderCandidates();
       if (finalMessage) status(finalMessage, failed ? "err" : "");
     }
   }
@@ -216,7 +214,7 @@ function showRouteAnalysis() {
 }
 async function driveRouteTicks(sequence) {
   let failure = null;
-  solving = true; jobLoop = true; jobPauseRequested = false; refreshStatus(); renderJobControls();
+  solving = true; jobLoop = true; jobPauseRequested = false; refreshBusy(); refreshStatus(); renderJobControls();
   try {
     while (sequence === jobSequence && routeAnalysis?.status === "running") {
       const response = await api(jobPauseRequested ? "/api/routes/pause" : "/api/routes/tick",
@@ -227,7 +225,7 @@ async function driveRouteTicks(sequence) {
     }
   } catch (error) { failure = error.message; }
   finally { if (sequence === jobSequence) {
-    solving = false; jobLoop = false; renderJobControls(); refreshStatus();
+    solving = false; jobLoop = false; refreshBusy(); renderJobControls(); refreshStatus();
     if (failure) status(failure, "err");
   } }
 }

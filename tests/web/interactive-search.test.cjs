@@ -11,7 +11,7 @@ const job = (extra = {}) => ({job_id: "job-A", revision: 7, status: "running", s
   searched: 32, found: 0, target: 8, page: 0, candidates: [], complete: false, optimal: false,
   max_pieces: 26, search_effort: 1, resumable: true, can_harden: true, ...extra});
 function app(overrides = {}) {
-  const state = scene([], 7); state.capabilities = {interactive_search: true, route_analysis: true};
+  const state = scene([], 7);
   state.open_ends = [[0, 0], [5, 1]];
   return harness({state, events: true, overrides: {setTimeout: fn => { fn(); return 1; },
     redraw() {}, ...overrides}});
@@ -181,30 +181,40 @@ test("viewport culling submits only visible track and includes edge padding", ()
   assert.equal(h.context.screenBoundsVisible(NaN,0,1,1),true);
 });
 
-test("base raster paints once, invalidates view/geometry/DPR, and caps its pixel count", () => {
-  const h=harness({events:true}); let paints=0,blits=0,created=0;
+test("base raster builds once a frame repeats, on one reused surface, within its pixel cap", () => {
+  const h=harness({events:true}); let direct=0,offscreen=0,blits=0,created=0;
   const originalCreate=h.context.document.createElement;
-  h.context.document.createElement=tag=>tag==="canvas" ? {width:0,height:0,
-    getContext:()=>({setTransform(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},
-      fill(){paints++;},stroke(){}}),...(created++,{})} : originalCreate(tag);
-  const target={drawImage(){blits++;},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){paints++;},stroke(){}};
+  h.context.document.createElement=tag=>tag==="canvas" ? (created++,{width:0,height:0,
+    getContext:()=>({setTransform(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},
+      fill(){offscreen++;},stroke(){}})}) : originalCreate(tag);
+  const target={drawImage(){blits++;},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){direct++;},stroke(){}};
   h.context.target=target; h.context.layout={placements:[track([[0,0,0],[100,0,0]])]};
-  h.run("ctx=target; canvas.width=500; canvas.height=500; drawBaseTrack(layout); drawBaseTrack(layout)");
-  assert.equal(paints,1);assert.equal(blits,2);assert.equal(created,1);
-  h.run("view.x++;drawBaseTrack(layout); layout={placements:[...layout.placements]};drawBaseTrack(layout)");
-  assert.equal(created,3);
-  h.context.devicePixelRatio=2;h.run("drawBaseTrack(layout)"); assert.equal(created,4);
-  h.run("canvas.width=4000;canvas.height=3000;drawBaseTrack(layout)");
-  assert.equal(h.run("baseRaster"),null);assert.equal(created,4);
+  // A new view paints directly; its repeat builds the raster; later repeats only blit.
+  h.run("ctx=target; canvas.width=500; canvas.height=500; drawBaseTrack(layout); drawBaseTrack(layout); drawBaseTrack(layout)");
+  assert.deepEqual([direct,offscreen,blits,created],[1,1,2,1]);
+  // Pan and zoom frames and new geometry paint directly and allocate nothing.
+  h.run("for (let i=0;i<5;i++) { view.x++; drawBaseTrack(layout); }");
+  h.run("layout={placements:[...layout.placements]}; drawBaseTrack(layout)");
+  assert.deepEqual([direct,offscreen,blits,created],[7,1,2,1]);
+  assert.equal(h.run("baseRaster"),null);
+  // Once the view rests again, the same surface is re-rendered.
+  h.context.devicePixelRatio=2; h.run("drawBaseTrack(layout); drawBaseTrack(layout)");
+  assert.deepEqual([direct,offscreen,blits,created],[8,2,3,1]);
+  h.run("canvas.width=4000;canvas.height=3000;drawBaseTrack(layout);drawBaseTrack(layout)");
+  assert.equal(h.run("baseRaster"),null); assert.equal(h.run("rasterSurface"),null);
+  assert.deepEqual([direct,created],[10,1]);
   assert.equal(h.run("ctx"),target);
 });
 
 test("base raster always restores the real canvas context if drawing throws", () => {
-  const h=harness({events:true});const target={drawImage(){}};h.context.target=target;
+  const h=harness({events:true});
+  const target={drawImage(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){}};
+  h.context.target=target;
   h.context.document.createElement=()=>({getContext:()=>({setTransform(){},beginPath(){throw new Error("paint error");}})});
   h.context.layout={placements:[track([[0,0,0],[100,0,0]])]};
-  assert.throws(()=>h.run("ctx=target;canvas.width=500;canvas.height=500;drawBaseTrack(layout)"),/paint error/);
-  assert.equal(h.run("ctx"),target);
+  h.run("ctx=target;canvas.width=500;canvas.height=500;drawBaseTrack(layout)");
+  assert.throws(()=>h.run("drawBaseTrack(layout)"),/paint error/);
+  assert.equal(h.run("ctx"),target); assert.equal(h.run("baseRaster"),null);
 });
 
 test("paused preview uses its captured constraints rather than newer draft controls", () => {
@@ -236,3 +246,33 @@ for (const [finished, message] of [
     assert.equal(h.notices.at(-1).kind, "err");
   });
 }
+
+test("Close the loop and Search harder ignore clicks before state loads and during work", async () => {
+  const calls = [];
+  const h = app({api: async (path, body) => { calls.push(path); return job(); }});
+  for (const setup of ["S = null", "S = {open_ends: []}; apiBusy = true", "apiBusy = false; solving = true"]) {
+    h.run(setup);
+    await h.el("solve").click();
+    await h.el("expand-search").click();
+  }
+  assert.deepEqual(calls, []);
+});
+
+test("the busy state holds through a whole search instead of flickering per tick", async () => {
+  const state = scene([], 7); state.open_ends = [[0, 0], [5, 1]];
+  let body = null, ticks = 0; const gaps = [];
+  const h = harness({state, events: true, omit: ["api"], overrides: {redraw() {},
+    // nextJobTurn yields here between ticks: the controls must stay busy.
+    setTimeout: fn => { if (body) gaps.push(body.classes.has("busy")); fn(); return 1; }}});
+  body = h.context.document.body;
+  h.context.window.duplotrainApi = async path => {
+    if (path.endsWith("/start")) return job();
+    if (path.endsWith("/tick")) return ++ticks < 3 ? job({searched: 32 * ticks}) :
+      job({status: "results_ready", found: 1, candidates: [candidate(0)]});
+    return {...h.context.S, revision: 8, search_job: job({status: "results_ready", revision: 8, found: 1})};
+  };
+  await h.run("startInteractiveSearch(null, null)");
+  assert.equal(ticks, 3);
+  assert.deepEqual(gaps, [true, true]);
+  assert.equal(body.classes.has("busy"), false);
+});

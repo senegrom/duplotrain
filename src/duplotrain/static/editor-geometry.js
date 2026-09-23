@@ -55,7 +55,7 @@ function drawLayout(layout, ghost) {
 // Bounds cover painted edge/rail vertices. This is presentation only, never a
 // collision or picking decision. Non-finite bounds conservatively remain visible.
 const batchBounds = new WeakMap();
-let baseRaster = null;
+let baseRaster = null, rasterSurface = null, lastBaseFrame = null;
 function screenBoundsVisible(x0, y0, x1, y1, pad = 3) {
   if (![x0, y0, x1, y1, pad, canvas.clientWidth, canvas.clientHeight].every(Number.isFinite)) return true;
   const guard = 1e-7 + 1e-9 * Math.max(1, Math.abs(x0), Math.abs(x1), Math.abs(y0), Math.abs(y1));
@@ -79,22 +79,32 @@ function drawBaseTrack(layout) {
   const ratio = globalThis.devicePixelRatio || 1;
   const key = [view.x, view.y, view.scale, canvas.width, canvas.height,
     canvas.clientWidth, canvas.clientHeight, ratio].join(":");
+  const repeated = lastBaseFrame?.key === key && lastBaseFrame.placements === layout.placements;
+  lastBaseFrame = {key, placements: layout.placements};
   const canCache = typeof ctx.drawImage === "function" && canvas.width > 0 && canvas.height > 0 &&
     canvas.width * canvas.height <= 8_000_000;
-  if (!canCache) { baseRaster = null; drawLayout(layout, false); return; }
-  if (!baseRaster || baseRaster.placements !== layout.placements || baseRaster.key !== key) {
-    const surface = document.createElement("canvas");
-    surface.width = canvas.width; surface.height = canvas.height;
-    const target = surface.getContext?.("2d");
-    if (!target) { baseRaster = null; drawLayout(layout, false); return; }
+  if (!canCache) { baseRaster = rasterSurface = null; drawLayout(layout, false); return; }
+  if (baseRaster?.placements !== layout.placements || baseRaster.key !== key) {
+    // While the view or geometry keeps changing (a pan, a zoom, new track), paint
+    // directly: rastering pays off only once a frame repeats under changing overlays.
+    baseRaster = null;
+    if (!repeated) { drawLayout(layout, false); return; }
+    // One reused surface, resized only with the canvas; never one per frame.
+    rasterSurface ??= document.createElement("canvas");
+    if (rasterSurface.width !== canvas.width) rasterSurface.width = canvas.width;
+    if (rasterSurface.height !== canvas.height) rasterSurface.height = canvas.height;
+    const target = rasterSurface.getContext?.("2d");
+    if (!target) { rasterSurface = null; drawLayout(layout, false); return; }
     const original = ctx;
     try {
-      ctx = target; ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx = target; ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect?.(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       drawLayout(layout, false);
     } finally { ctx = original; }
-    baseRaster = {surface, key, placements: layout.placements};
+    baseRaster = {key, placements: layout.placements};
   }
-  ctx.drawImage(baseRaster.surface, 0, 0, canvas.clientWidth, canvas.clientHeight);
+  ctx.drawImage(rasterSurface, 0, 0, canvas.clientWidth, canvas.clientHeight);
 }
 function drawFloorConstraints() {
   let options;
