@@ -31,6 +31,7 @@ function drawLayout(layout, ghost) {
   // Same-height segments of one piece share a fill/stroke, while ramps keep
   // their local elevation order. This avoids thousands of separate flat strokes.
   for (const batch of drawingBatches(layout.placements)) {
+    if (!batchVisible(batch)) continue;
     ctx.beginPath();
     for (const segment of batch) {
       segment.edge.forEach(([x, y], i) => {
@@ -51,6 +52,68 @@ function drawLayout(layout, ghost) {
   }
 }
 
+// Bounds cover painted edge/rail vertices. This is presentation only, never a
+// collision or picking decision. Non-finite bounds conservatively remain visible.
+const batchBounds = new WeakMap();
+let baseRaster = null;
+function screenBoundsVisible(x0, y0, x1, y1, pad = 3) {
+  if (![x0, y0, x1, y1, pad, canvas.clientWidth, canvas.clientHeight].every(Number.isFinite)) return true;
+  const guard = 1e-7 + 1e-9 * Math.max(1, Math.abs(x0), Math.abs(x1), Math.abs(y0), Math.abs(y1));
+  return Math.max(x0, x1) + pad + guard >= 0 && Math.min(x0, x1) - pad - guard <= canvas.clientWidth &&
+    Math.max(y0, y1) + pad + guard >= 0 && Math.min(y0, y1) - pad - guard <= canvas.clientHeight;
+}
+function batchVisible(batch) {
+  let bounds = batchBounds.get(batch);
+  if (!bounds) {
+    bounds = [Infinity, Infinity, -Infinity, -Infinity];
+    for (const segment of batch) for (const [x, y] of [...segment.edge, ...segment.rails.flat()]) {
+      bounds[0] = Math.min(bounds[0], x); bounds[1] = Math.min(bounds[1], y);
+      bounds[2] = Math.max(bounds[2], x); bounds[3] = Math.max(bounds[3], y);
+    }
+    batchBounds.set(batch, bounds);
+  }
+  const [x0, y0] = worldToScreen(bounds[0], bounds[1]), [x1, y1] = worldToScreen(bounds[2], bounds[3]);
+  return screenBoundsVisible(x0, y0, x1, y1, Math.max(3, view.scale));
+}
+function drawBaseTrack(layout) {
+  const ratio = globalThis.devicePixelRatio || 1;
+  const key = [view.x, view.y, view.scale, canvas.width, canvas.height,
+    canvas.clientWidth, canvas.clientHeight, ratio].join(":");
+  const canCache = typeof ctx.drawImage === "function" && canvas.width > 0 && canvas.height > 0 &&
+    canvas.width * canvas.height <= 8_000_000;
+  if (!canCache) { baseRaster = null; drawLayout(layout, false); return; }
+  if (!baseRaster || baseRaster.placements !== layout.placements || baseRaster.key !== key) {
+    const surface = document.createElement("canvas");
+    surface.width = canvas.width; surface.height = canvas.height;
+    const target = surface.getContext?.("2d");
+    if (!target) { baseRaster = null; drawLayout(layout, false); return; }
+    const original = ctx;
+    try {
+      ctx = target; ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      drawLayout(layout, false);
+    } finally { ctx = original; }
+    baseRaster = {surface, key, placements: layout.placements};
+  }
+  ctx.drawImage(baseRaster.surface, 0, 0, canvas.clientWidth, canvas.clientHeight);
+}
+function drawFloorConstraints() {
+  let options;
+  try { options = interactiveJob?.revision === S?.revision && interactiveJob.options ?
+    interactiveJob.options : readSearchOptions(); } catch (_) { return; }
+  const boxes = [...(options.room ? [[options.room, false]] : []), ...options.keep_out.map(r => [r, true])];
+  if (!boxes.length || !ctx.strokeRect) return;
+  ctx.save();
+  for (const [r, blocked] of boxes) {
+    const [x, y] = worldToScreen(r[0], r[3]);
+    const width = (r[2] - r[0]) * view.scale, height = (r[3] - r[1]) * view.scale;
+    if (!screenBoundsVisible(x, y, x + width, y + height)) continue;
+    ctx.strokeStyle = blocked ? "#ab4c3b" : "#4b7380"; ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]); ctx.strokeRect(x, y, width, height);
+    if (blocked) { ctx.fillStyle = "rgba(171,76,59,.10)"; ctx.fillRect(x, y, width, height); }
+  }
+  ctx.restore();
+}
+
 function offsetLine(line, d) {
   const out = [];
   for (let i = 0; i < line.length; i++) {
@@ -64,6 +127,7 @@ function offsetLine(line, d) {
 
 function strokeSegment(a, b, width, color, cap = "round") {
   const [ax, ay] = worldToScreen(a[0], a[1]), [bx, by] = worldToScreen(b[0], b[1]);
+  if (!screenBoundsVisible(ax, ay, bx, by, width / 2 + 2)) return;
   ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
   ctx.lineWidth = width; ctx.lineCap = cap; ctx.lineJoin = "round";
   ctx.strokeStyle = color; ctx.stroke();

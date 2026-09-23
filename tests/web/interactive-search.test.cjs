@@ -1,0 +1,238 @@
+"use strict";
+const {test} = require("node:test");
+const assert = require("node:assert/strict");
+const {harness, scene, track} = require("./reliability-harness.cjs");
+const clean = x => JSON.parse(JSON.stringify(x));
+const turn = () => new Promise(resolve => setImmediate(resolve));
+const candidate = (index, revision = 7) => ({index, revision, candidate_id: `candidate-${index}`,
+  exact: true, gap: 0, kind: "loop", added: {curve: 6}, size_cm: [50, 50], open_stubs: 0,
+  preview: {format: "duplotrain-preview/1", base_count: 0, base_revision: revision, placements: []}});
+const job = (extra = {}) => ({job_id: "job-A", revision: 7, status: "running", stage: "plain track",
+  searched: 32, found: 0, target: 8, page: 0, candidates: [], complete: false, optimal: false,
+  max_pieces: 26, search_effort: 1, resumable: true, can_harden: true, ...extra});
+function app(overrides = {}) {
+  const state = scene([], 7); state.capabilities = {interactive_search: true, route_analysis: true};
+  state.open_ends = [[0, 0], [5, 1]];
+  return harness({state, events: true, overrides: {setTimeout: fn => { fn(); return 1; },
+    redraw() {}, ...overrides}});
+}
+
+for (const value of ["0,0,1", "0,0,0,1", "0,0,Infinity,1", "0,0,,1", "0,0,1000001,1"]) {
+  test(`room input rejects ${value} before any API call`, async () => {
+    const h = app(); h.el("room-bounds").value = value;
+    await h.run("startInteractiveSearch(null,null)");
+    assert.equal(h.calls.length, 0);
+    assert.match(h.notices.at(-1).text, /Rectangles/);
+  });
+}
+
+test("preferences use centimetres in controls and millimetres in the validated API", () => {
+  const h = app(); h.el("room-bounds").value = "-10,-20,200,300";
+  h.el("keep-out").value = "1,2,3,4\n\n5,6,7,8";
+  const options = clean(h.run("readSearchOptions()"));
+  assert.deepEqual(options.room, [-100,-200,2000,3000]);
+  assert.deepEqual(options.keep_out, [[10,20,30,40],[50,60,70,80]]);
+  h.context.options = options; h.run("restoreSearchOptions(options)");
+  assert.deepEqual(clean(h.run("readSearchOptions()")), options);
+  h.el("keep-out").value = Array(33).fill("1,2,3,4").join("\n");
+  assert.throws(() => h.run("readSearchOptions()"), /32/);
+});
+
+test("excluded categories change next-search options, never inventory", async () => {
+  const h = app(); h.context.S.palette = [
+    {id: "custom-junction", name: "Junction", junction: true, category: "track"},
+    {id: "custom-bridge", name: "Bridge", category: "bridge"},
+    {id: "straight", name: "Straight", junction: false, category: "track"},
+  ];
+  const before = clean(h.context.S.inventory);
+  await h.el("avoid-junctions").click(); await h.el("avoid-bridges").click();
+  assert.deepEqual(clean(h.run("readSearchOptions().exclude")), ["custom-bridge", "custom-junction"]);
+  assert.deepEqual(clean(h.context.S.inventory), before); assert.equal(h.calls.length, 0);
+  await h.el("reset-exclusions").click(); assert.deepEqual(clean(h.run("readSearchOptions().exclude")), []);
+});
+
+test("project saved-change indicator includes optional search restrictions and reversion", () => {
+  const h = app(); h.run("markProjectSaved(projectSnapshot())");
+  h.el("room-bounds").value = "-100,-100,100,100"; h.run("updateProjectStatus()");
+  assert.match(h.el("project-status").textContent, /^Changed/);
+  assert.deepEqual(clean(h.run("projectSnapshot().preferences.search.options.room")), [-1000,-1000,1000,1000]);
+  h.el("room-bounds").value = ""; h.run("updateProjectStatus()");
+  assert.match(h.el("project-status").textContent, /^Unchanged/);
+});
+
+test("streamed suggestions cannot apply before pause publishes their exact revision", async () => {
+  const calls = []; let finishTick, ticks = 0, h;
+  const pending = new Promise(resolve => { finishTick = resolve; });
+  const preview = job({found: 1, candidates: [candidate(0)]});
+  h = app({api: async (path, body) => {
+    calls.push({path, body: clean(body)});
+    if (path.endsWith("/start")) return job();
+    if (path.endsWith("/tick")) return ++ticks === 1 ? preview : pending;
+    if (path.endsWith("/pause")) return {...preview, status: "paused"};
+    if (path.endsWith("/publish")) return {...h.context.S, revision: 8, candidates: [candidate(0, 8)],
+      search_job: {...preview, status: "paused", revision: 8, candidates: [candidate(0, 8)]}};
+    throw new Error("Unexpected API: " + path);
+  }});
+  const before = clean(h.context.S.snapshot);
+  const search = h.run("startInteractiveSearch(null,null)");
+  await turn();
+  assert.equal(ticks, 2);
+  h.run('selectedCandidate="7:0"; renderCandidates()');
+  const row = h.run("candidateRows[0]"); assert.equal(row.apply.disabled, true);
+  await row.apply.listeners.click();
+  assert.ok(!calls.some(c => c.path === "/api/apply"));
+  h.run("requestJobPause()"); finishTick(preview); await search;
+  h.run("renderCandidates()");
+  assert.equal(h.run("interactiveJob.status"), "paused");
+  assert.equal(h.context.S.revision, 8);
+  assert.equal(h.run("selectedCandidate"), "8:0");
+  assert.equal(h.run("candidateRows[0].apply.disabled"), false);
+  assert.deepEqual(clean(h.context.S.snapshot), before);
+  assert.ok(calls.some(c => c.path === "/api/search/pause"));
+  assert.ok(calls.some(c => c.path === "/api/search/publish"));
+  assert.ok(!calls.some(c => /restore|undo|restart/.test(c.path)));
+});
+
+test("Find more continues the same job with a stable candidate index, separate from harder", async () => {
+  const calls = []; let h;
+  h = app({api: async (path, body) => {
+    calls.push({path, body: clean(body)});
+    if (path.endsWith("/continue")) return job({target: 16, found: 16, status: "results_ready", candidates: [candidate(0)]});
+    if (path.endsWith("/publish")) return {...h.context.S, revision: 8,
+      search_job: job({revision: 8, found: 16, target: 16, status: "results_ready", candidates: [candidate(0,8)]})};
+    throw new Error(path);
+  }});
+  h.context.initial = job({status: "results_ready", found: 8, candidates: [candidate(0)]});
+  h.run("interactiveJob=initial; renderJobControls(); selectedCandidate='7:0'");
+  await h.el("find-more").click();
+  assert.equal(calls[0].path, "/api/search/continue");
+  assert.equal(calls[0].body.job_id, "job-A"); assert.equal(calls[0].body.harder, false);
+  assert.equal(h.run("interactiveJob.found"),16);
+  assert.equal(h.el("max-pieces").value,"26");
+  assert.equal(h.run("selectedCandidate"), "8:0");
+});
+
+test("paging and sorting use stable engine indices, never the page-local row", async () => {
+  const calls = [];
+  const h = app({api: async (path, body) => {
+    calls.push({path, body: clean(body)});
+    return job({status: "results_ready", found: 16, page: body.page, candidates: [candidate(13)]});
+  }});
+  h.context.initial = job({status: "results_ready", found: 16, candidates: [candidate(0)]});
+  h.run("interactiveJob=initial"); h.el("candidate-sort").value="footprint";
+  await h.run("searchPageTo(1)");
+  assert.equal(calls[0].body.page,1); assert.equal(calls[0].body.sort,"footprint");
+  const row=h.run("candidateRows[0]"); await row.show.click(); await row.apply.click();
+  assert.equal(calls[1].path,"/api/apply"); assert.equal(calls[1].body.index,13);
+});
+
+test("failed tick drops unpublished preview indices instead of enabling stale Apply", async () => {
+  let ticks=0;
+  const h=app({api:async path=> {
+    if (path.endsWith("/start")) return job();
+    if (path.endsWith("/tick") && ++ticks===1) return job({found:1,candidates:[candidate(42)]});
+    throw new Error("Worker failed");
+  }});
+  h.context.S.candidates=[candidate(0)];
+  await h.run("startInteractiveSearch(null,null)");
+  assert.equal(h.run("interactiveJob"),null);
+  assert.equal(h.run("selectedCandidate"),null);
+  assert.deepEqual(clean(h.run("visibleCandidates().map(c=>c.index)")),[0]);
+  assert.equal(h.run("candidateRows[0].apply.disabled"),true);
+  assert.match(h.notices.at(-1).text,/Worker failed/);
+});
+
+test("an old tick cannot replace imported/restarted content even with reused revision", async () => {
+  let finish;
+  const h=app({api: async path => path.endsWith("/start") ? job() :
+    new Promise(resolve=>{finish=resolve;})});
+  const pending=h.run("startInteractiveSearch(null,null)"); await turn();
+  h.run("clearInteractiveState(); S={...S,snapshot:{replacement:true}}");
+  finish(job({status:"results_ready",found:1,candidates:[candidate(0)]})); await pending;
+  assert.equal(h.run("interactiveJob"),null); assert.equal(h.context.S.snapshot.replacement,true);
+});
+
+test("route analysis labels incomplete bounds and loads the selected witness only", async () => {
+  let traceBody;
+  const h=app({testTrain:async ()=>{traceBody={start:h.el("train-start").value,
+    switches:clean(h.run("initialSwitches"))};}});
+  h.context.report={job_id:"route-A",revision:7,status:"limited",scope:"selected",runs:3,
+    required_runs:"64",max_runs:3,max_steps:10000,step_limited_runs:0,total_drivable:83,
+    best:{start:[0,0],switch_states:{5:2,6:2},visited:57,cycle_visited:26},counterexample:null,
+    complete:false,optimal:false,classification:null};
+  h.run("routeAnalysis=report; showRouteAnalysis()");
+  const text=h.el("route-report").children.map(c=>c.textContent).join(" ");
+  assert.match(text,/among completed runs so far/); assert.match(text,/No universal verdict/);
+  assert.match(text,/57 \/ 83/); assert.match(text,/26 visited in the repeating cycle/);
+  await h.el("route-witness").click();
+  assert.equal(traceBody.start,"[0,0]"); assert.deepEqual(traceBody.switches,{5:2,6:2});
+});
+
+test("viewport culling submits only visible track and includes edge padding", () => {
+  let fills=0,strokes=0;
+  const h=harness({events:true,overrides:{worldToScreen:(x,y)=>[x,y]}});
+  const placements=Array.from({length:1000},(_,i)=>track([[100+i*1000,100,0],[200+i*1000,100,0]]));
+  h.context.painted=placements;
+  h.context.record={beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){fills++;},stroke(){strokes++;}};
+  h.run("ctx=record; drawLayout({placements:painted},false)");
+  assert.equal(fills,1); assert.equal(strokes,1);
+  assert.equal(h.context.screenBoundsVisible(-100,-100,-1,-1,3),true);
+  assert.equal(h.context.screenBoundsVisible(-100,-100,-10,-10,3),false);
+  assert.equal(h.context.screenBoundsVisible(NaN,0,1,1),true);
+});
+
+test("base raster paints once, invalidates view/geometry/DPR, and caps its pixel count", () => {
+  const h=harness({events:true}); let paints=0,blits=0,created=0;
+  const originalCreate=h.context.document.createElement;
+  h.context.document.createElement=tag=>tag==="canvas" ? {width:0,height:0,
+    getContext:()=>({setTransform(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},
+      fill(){paints++;},stroke(){}}),...(created++,{})} : originalCreate(tag);
+  const target={drawImage(){blits++;},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){paints++;},stroke(){}};
+  h.context.target=target; h.context.layout={placements:[track([[0,0,0],[100,0,0]])]};
+  h.run("ctx=target; canvas.width=500; canvas.height=500; drawBaseTrack(layout); drawBaseTrack(layout)");
+  assert.equal(paints,1);assert.equal(blits,2);assert.equal(created,1);
+  h.run("view.x++;drawBaseTrack(layout); layout={placements:[...layout.placements]};drawBaseTrack(layout)");
+  assert.equal(created,3);
+  h.context.devicePixelRatio=2;h.run("drawBaseTrack(layout)"); assert.equal(created,4);
+  h.run("canvas.width=4000;canvas.height=3000;drawBaseTrack(layout)");
+  assert.equal(h.run("baseRaster"),null);assert.equal(created,4);
+  assert.equal(h.run("ctx"),target);
+});
+
+test("base raster always restores the real canvas context if drawing throws", () => {
+  const h=harness({events:true});const target={drawImage(){}};h.context.target=target;
+  h.context.document.createElement=()=>({getContext:()=>({setTransform(){},beginPath(){throw new Error("paint error");}})});
+  h.context.layout={placements:[track([[0,0,0],[100,0,0]])]};
+  assert.throws(()=>h.run("ctx=target;canvas.width=500;canvas.height=500;drawBaseTrack(layout)"),/paint error/);
+  assert.equal(h.run("ctx"),target);
+});
+
+test("paused preview uses its captured constraints rather than newer draft controls", () => {
+  const drawn = [];
+  const h = app({worldToScreen: (x, y) => [x, y], screenBoundsVisible: () => true,
+    readSearchOptions() { throw new Error("draft controls must not determine a saved search overlay"); }});
+  h.context.paint = {save() {}, restore() {}, setLineDash() {}, strokeRect(...box) { drawn.push(box); }};
+  h.context.snapshot = job({options: {room: [0, 0, 100, 200], keep_out: [], exclude: []}, status: "paused"});
+  h.run("interactiveJob = snapshot; ctx = paint; drawFloorConstraints(); renderJobControls()");
+  assert.deepEqual(drawn, [[0, 200, 100, 200]]);
+  assert.match(h.el("search-report").textContent, /changed controls apply to a new search/);
+});
+
+for (const [finished, message] of [
+  [{complete: false}, /within these limits\. A closure may still exist/],
+  [{complete: true}, /No completion fits the remaining inventory/],
+  [{complete: true, reason: "impossible: those ends differ by 58 mm in height"}, /differ by 58 mm/],
+]) {
+  test(`a search without results says why: ${message.source.slice(0, 30)}`, async () => {
+    let h;
+    const done = job({status: "exhausted", found: 0, resumable: false, ...finished});
+    h = app({api: async path => {
+      if (path.endsWith("/start")) return done;
+      if (path.endsWith("/publish")) return {...h.context.S, revision: 8, search_job: {...done, revision: 8}};
+      throw new Error("Unexpected API: " + path);
+    }});
+    await h.run("startInteractiveSearch(null,null)");
+    assert.match(h.notices.at(-1).text, message);
+    assert.equal(h.notices.at(-1).kind, "err");
+  });
+}

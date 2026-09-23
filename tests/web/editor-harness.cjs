@@ -3,7 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const scripts = ["editor.js", "editor-geometry.js", "editor-projects.js", "editor-train.js"];
+const scripts = ["editor.js", "editor-geometry.js", "editor-projects.js", "editor-train.js", "editor-search.js", "editor-offline.js"];
 const sources = scripts.map(name => [name,
   fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static", name), "utf8")]);
 const stateNames = new Set(["S", "armed", "armedStone", "preview", "pickMode", "view", "fitted",

@@ -3,6 +3,7 @@
 // API state store: revision checks use the editor.js snapshot before adoption.
 let trainTrace = null, trainStep = -1, trainTimer = null;
 let trainConfigSequence = 0, initialSwitches = {};
+const switchControls = new Map();
 
 function invalidateTrain() {
   closeOverlapPicker();
@@ -15,7 +16,7 @@ function invalidateTrain() {
 function renderSwitches() {
   const box = el("train-switches");
   if (!box?.replaceChildren) return;
-  box.replaceChildren(); initialSwitches = {};
+  box.replaceChildren(); initialSwitches = {}; switchControls.clear();
   for (const item of S.train_switches || []) {
     initialSwitches[item.placement] = item.default;
     const label = document.createElement("label"), select = document.createElement("select");
@@ -25,7 +26,7 @@ function renderSwitches() {
       const option = document.createElement("option"); option.value = choice.port;
       option.textContent = choice.name; select.append(option);
     }
-    select.value = item.default;
+    select.value = item.default; switchControls.set(item.placement, select);
     const revision = S.revision;
     select.addEventListener("change", () => {
       if (S?.revision !== revision) return;

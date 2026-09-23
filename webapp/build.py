@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import io
+import json
 import shutil
 import sys
 import tarfile
@@ -41,7 +42,10 @@ WEBAPP = ROOT / "webapp"
 DIST = WEBAPP / "dist"
 VENDOR = WEBAPP / "vendor"
 
-EDITOR_SCRIPTS = ("editor.js", "editor-geometry.js", "editor-projects.js", "editor-train.js")
+EDITOR_SCRIPTS = (
+    "editor.js", "editor-geometry.js", "editor-projects.js", "editor-train.js",
+    "editor-search.js", "editor-offline.js",
+)
 
 WORKER_EXCLUDES = {
     "cli.py",
@@ -292,6 +296,24 @@ def _stamp_file(source: Path, dest: Path, replacements: dict[str, str]) -> None:
     dest.write_text(text, encoding="utf-8", newline="\n")
 
 
+def build_offline_worker(stamp: str, runtime: str, zip_name: str) -> None:
+    """Embed a complete exact-byte manifest, not an open-ended runtime cache."""
+    paths = ["index.html", "manifest.webmanifest", zip_name]
+    paths += [f"{name}?v={stamp}" for name in (*EDITOR_SCRIPTS, "editor.css",
+                                               "boot.js", "worker.js", "adapter.py")]
+    paths += [f"{runtime}/{name}" for name in PYODIDE_FILES]
+    paths += [p.relative_to(DIST).as_posix() for p in sorted((DIST / "icons").rglob("*"))
+              if p.is_file()]
+    assets = []
+    for url in paths:
+        payload = (DIST / url.split("?")[0]).read_bytes()
+        assets.append({"url": url, "bytes": len(payload),
+                       "sha256": hashlib.sha256(payload).hexdigest()})
+    _stamp_file(WEBAPP / "service-worker.js", DIST / "service-worker.js", {
+        "__BUILD__": stamp, "__ASSETS__": json.dumps(assets, separators=(",", ":")),
+    })
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pyodide-version", default="0.27.7", choices=sorted(PYODIDE_SHA256))
@@ -328,7 +350,7 @@ def main() -> None:
     stamp_part("pyodide", args.pyodide_version.encode("ascii"))
     for name in (*EDITOR_SCRIPTS, "editor.css", "editor.html"):
         stamp_part(name, text_bytes(ROOT / "src/duplotrain/static" / name))
-    for name in ("boot.js", "worker.js"):
+    for name in ("boot.js", "worker.js", "service-worker.js"):
         stamp_part(name, text_bytes(WEBAPP / name))
     stamp = digest.hexdigest()[:8]
 
@@ -364,6 +386,7 @@ def main() -> None:
     # The pre-stamp flat layout, if present from an older build.
     shutil.rmtree(DIST / "pyodide", ignore_errors=True)
 
+    build_offline_worker(stamp, pyodide_dirname, zip_name)
     total = sum(f.stat().st_size for f in DIST.rglob("*") if f.is_file())
     print(f"dist ready: build {stamp}, {total / 1e6:.1f} MB total")
 

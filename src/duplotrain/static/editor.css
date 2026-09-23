@@ -89,3 +89,12 @@
 #project-status { font-size:12px; margin:6px 0; }
 #project-slots { max-width:100%; }
 #train-switches label { display:block; margin:5px 0; }
+
+/* Bounded advanced tools remain usable in the narrow phone sidebar. */
+#side textarea, #room-bounds { box-sizing: border-box; width: 100%; }
+#side textarea { min-height: 64px; resize: vertical; }
+#search-exclusions label { display: block; }
+#route-report p, #search-report, #offline-status { font-size: 12px; overflow-wrap: anywhere; }
+#candidate-page { align-self: center; font-size: 12px; }
+
+body.busy #stop-results, body.busy #route-pause { pointer-events: auto; opacity: 1; }

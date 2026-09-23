@@ -198,3 +198,20 @@ counter against the reference search with tables disabled, on both engines,
 with slippage and with reversing closures, and the browser suite closes,
 previews and applies gaps through the real Pyodide worker under the production
 content security policy.
+
+
+## Interactive work and drawing layers
+
+The interactive solver yields at deterministic checkpoints and retains DFS state
+between requests; Find more increases its result allowance without replaying
+already visited nodes. The legacy synchronous entry point drains the same engine.
+Stage budgets, exact validation and the final acceptance audits remain separate
+from the UI's progress clock. Tick time is a cooperative target, not a hard
+latency bound. See [search-jobs.md](search-jobs.md) for continuation and multi-gap
+limits rather than interpreting a bounded search as a proof of impossibility.
+
+Viewport culling removes off-screen paint commands, and one bounded offscreen
+raster reuses the stable base track when only overlays change. The raster key
+includes geometry identity, view, canvas sizes and pixel ratio; its eight-million-
+pixel ceiling has a direct-render fallback. These changes reduce unnecessary work
+but do not by themselves establish a browser or phone timing improvement.
