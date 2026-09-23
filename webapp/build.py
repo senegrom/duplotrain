@@ -315,14 +315,21 @@ def main() -> None:
     zip_bytes = build_source_zip(entries)
     adapter = text_bytes(WEBAPP / "adapter.py")
     # Content-only stamp: the same commit yields the same name on every platform.
+    # Each part is framed by its name and length, so bytes moving from one file
+    # to the next still change it.
     digest = hashlib.sha256()
+
+    def stamp_part(name: str, payload: bytes) -> None:
+        digest.update(f"{name}\n{len(payload)}\n".encode() + payload)
+
     for arcname, payload in entries:
-        digest.update(arcname.encode("utf-8") + b"\n" + payload + b"\n")
-    digest.update(adapter + args.pyodide_version.encode("ascii"))
+        stamp_part(arcname, payload)
+    stamp_part("adapter.py", adapter)
+    stamp_part("pyodide", args.pyodide_version.encode("ascii"))
     for name in (*EDITOR_SCRIPTS, "editor.css", "editor.html"):
-        digest.update(text_bytes(ROOT / "src/duplotrain/static" / name))
+        stamp_part(name, text_bytes(ROOT / "src/duplotrain/static" / name))
     for name in ("boot.js", "worker.js"):
-        digest.update(text_bytes(WEBAPP / name))
+        stamp_part(name, text_bytes(WEBAPP / name))
     stamp = digest.hexdigest()[:8]
 
     for stale in DIST.glob("duplotrain-src*.zip"):

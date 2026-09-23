@@ -131,3 +131,16 @@ def test_deferred_scripts_match_the_build_allowlist_and_single_snapshot_owner():
     assert sum(source.count("let S = null;") for source in sources) == 1
     assert sum(source.count('document.addEventListener("DOMContentLoaded"')
                for source in sources) == 1
+
+
+def test_moving_bytes_between_frontend_files_changes_the_stamp(synthetic_runtime_build):
+    source, dist = synthetic_runtime_build
+    build.main()
+    old = next(dist.glob("duplotrain-src-*.zip")).name
+    static = source / "src/duplotrain/static"
+    first, second = (static / name for name in build.EDITOR_SCRIPTS[:2])
+    text = first.read_text()
+    first.write_text(text[:-1])
+    second.write_text(text[-1] + second.read_text())
+    build.main()
+    assert next(dist.glob("duplotrain-src-*.zip")).name != old
