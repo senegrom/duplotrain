@@ -266,3 +266,40 @@ def test_find_perfect_loops_dedupes_isomorphs(catalog):
         assert any(sid == "stone_direction" for _i, sid in layout.accessories)
     keys = {congruence_key(layout) for layout, _v in found}
     assert len(keys) == 4
+
+
+def test_a_crossing_on_the_tail_is_not_taken_for_the_switch(catalog):
+    from duplotrain.explore import is_stem_tailed
+
+    result = solve({"switch": 1, "curve": 12, "crossing": 1}, catalog,
+                   SolverConfig(reversing_loops=True, max_results=2000))
+    tailed = []
+    for solution in result.solutions:
+        ids = [getattr(step, "piece_id", None) for step in solution.steps]
+        if (solution.kind == "reversing" and "crossing" in ids
+                and ids.index("crossing") < ids.index("switch")):
+            tailed.append((solution.steps[ids.index("switch")].entry == 0, solution))
+    assert tailed
+    for via_stem, solution in tailed:
+        assert is_stem_tailed(solution, catalog) is via_stem
+
+
+@pytest.mark.parametrize("start", [(-1, 0), (0, 5), (16, 0), [0, 0], (0, True)])
+def test_a_start_must_be_a_port_of_the_layout(catalog, start):
+    oval = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["straight"], 0, 1)] * 2
+                       + [(catalog["curve"], 0, 1)] * 6 + [(catalog["straight"], 0, 1)] * 2)
+    with pytest.raises(ValueError, match="not a port"):
+        drive(oval.join((15, 1), (0, 0)), start=start)
+
+
+
+def test_the_counterexample_breaks_the_first_failed_property(catalog):
+    # One direction round the oval stops at the stone, the other runs forever but
+    # never covers the stone's face both ways: the report must show the stop.
+    oval = solve({"curve": 12, "straight": 4}, catalog,
+                 SolverConfig(use_all_pieces=True, max_results=5)).solutions[0].layout
+    straight = next(i for i, p in enumerate(oval.placements) if p.piece.id == "straight")
+    entered = next(e for p, e, _x in drive(oval, start=(0, 0)).steps if p == straight)
+    verdict = classify(oval.with_accessory(straight, "stone_stop", at_port=entered))
+    assert verdict.locally_looping and not verdict.looping
+    assert verdict.counterexample[2] == "stopped"

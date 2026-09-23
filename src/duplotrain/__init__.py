@@ -28,7 +28,9 @@ from .explore import (
     congruence_key,
     find_perfect_loops,
     find_perfect_networks,
+    is_stem_tailed,
     make_dogbone,
+    pick_stem_tailed,
 )
 from .geometry import ORIGIN, Pose
 from .layout import Layout, Placement, build_chain, layout_from_dict, layout_to_dict
@@ -77,6 +79,8 @@ __all__ = [
     "enumerate_networks",
     "NetworkConfig",
     "make_dogbone",
+    "is_stem_tailed",
+    "pick_stem_tailed",
     "render_layout",
     "__version__",
 ]

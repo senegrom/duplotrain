@@ -27,11 +27,28 @@ from .validation import MAX_JSON_BYTES, check_inventory
 console = Console()
 
 
+#: What reading an untrusted JSON file can raise short of a bug: bad values and
+#: shapes (JSONDecodeError is a ValueError), unreadable files, absurd nesting.
+_BAD_FILE = (ValueError, TypeError, KeyError, OSError, RecursionError)
+
+
 def _catalog(paths: tuple[str, ...]):
     try:
         return load_catalog(*paths) if paths else default_catalog()
-    except (ValueError, OSError) as exc:  # JSONDecodeError is a ValueError
+    except _BAD_FILE as exc:
         raise click.ClickException(f"bad catalogue file: {exc}") from exc
+
+
+def _image_target(out: str) -> str:
+    """matplotlib saves an extension-less name as PNG; name the file it writes."""
+    return out if Path(out).suffix else f"{out}.png"
+
+
+def _write_image(render_layout, layout: object, target: str, **options: object) -> None:
+    try:
+        render_layout(layout, path=target, **options)
+    except (ValueError, OSError) as exc:  # unknown format, missing directory
+        raise click.ClickException(f"cannot write {target}: {exc}") from exc
 
 
 @click.group()
@@ -163,7 +180,8 @@ def sets_cmd() -> None:
     default=None,
     help="Directory for rendered images and layout JSON; omit for a text listing only.",
 )
-@click.option("--top", type=int, default=10, show_default=True, help="How many to save.")
+@click.option("--top", type=click.IntRange(min=0), default=10, show_default=True,
+              help="How many to save.")
 def solve_cmd(
     inventory_path: str | None,
     set_codes: tuple[str, ...],
@@ -201,7 +219,7 @@ def solve_cmd(
             check_inventory(raw_counts, catalog)
             for k, v in raw_counts.items():
                 inventory[k] = inventory.get(k, 0) + v
-        except (ValueError, TypeError, OSError) as exc:
+        except _BAD_FILE as exc:
             raise click.ClickException(f"bad inventory file: {exc}") from exc
     if not inventory:
         raise click.UsageError(
@@ -217,15 +235,15 @@ def solve_cmd(
                 "enabled (--no-reversing to disable).[/dim]"
             )
 
-    config = SolverConfig(
-        slop=slop,
-        min_pieces=min_pieces,
-        max_results=max_results,
-        max_nodes=max_nodes,
-        use_all_pieces=use_all,
-        reversing_loops=reversing,
-    )
     try:
+        config = SolverConfig(
+            slop=slop,
+            min_pieces=min_pieces,
+            max_results=max_results,
+            max_nodes=max_nodes,
+            use_all_pieces=use_all,
+            reversing_loops=reversing,
+        )
         with console.status("searching for loops..."):
             result = solve(inventory, catalog, config)
     except ValueError as exc:
@@ -329,7 +347,7 @@ def _load_layout(layout_file: str, catalog):
         if len(raw) > MAX_JSON_BYTES:
             raise ValueError("layout file larger than 2 MB")
         return layout_from_dict(json.loads(raw.decode("utf-8")), catalog)
-    except (ValueError, KeyError, TypeError, OSError) as exc:
+    except _BAD_FILE as exc:
         raise click.ClickException(f"bad layout file: {exc}") from exc
 
 
@@ -348,8 +366,8 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
 
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
-    target = out or str(Path(layout_file).with_suffix(".png"))
-    render_layout(layout, path=target)
+    target = _image_target(out) if out else str(Path(layout_file).with_suffix(".png"))
+    _write_image(render_layout, layout, target)
     console.print(f"Wrote [bold]{target}[/bold]")
 
 
@@ -436,7 +454,7 @@ def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...], max_runs: int
     Simulates a train from every placement, in both directions, under every initial
     switch-tongue setting, with the layout's action stones in effect.
     """
-    from .drive import ClassificationLimitError, classify
+    from .drive import ClassificationLimitError, DriveLimitError, classify
 
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
@@ -444,6 +462,8 @@ def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...], max_runs: int
         verdict = classify(layout, max_runs=max_runs)
     except ClassificationLimitError as exc:
         raise click.ClickException(str(exc).replace("max_runs", "--max-runs")) from exc
+    except (ValueError, DriveLimitError) as exc:  # an empty layout; an endless-run guard
+        raise click.ClickException(str(exc)) from exc
     ladder = [
         ("locally looping", verdict.locally_looping, "some placement runs forever"),
         ("looping", verdict.looping, "every placement runs forever"),
@@ -464,7 +484,7 @@ def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...], max_runs: int
 
 
 @main.command()
-@click.option("--port", type=int, default=8137, show_default=True)
+@click.option("--port", type=click.IntRange(0, 65535), default=8137, show_default=True)
 @click.option("--no-browser", is_flag=True, help="Don't open a browser tab.")
 def gui(port: int, no_browser: bool) -> None:
     """Open the interactive track designer in your browser.
@@ -490,9 +510,10 @@ def demo(out: str) -> None:
         SolverConfig(use_all_pieces=True, max_results=5),
     )
     best = result.solutions[0]
-    render_layout(best.layout, path=out, title="The classic DUPLO oval")
+    target = _image_target(out)
+    _write_image(render_layout, best.layout, target, title="The classic DUPLO oval")
     console.print(
-        f"The starter oval closes exactly; picture in [bold]{out}[/bold]. "
+        f"The starter oval closes exactly; picture in [bold]{target}[/bold]. "
         "Now try:  duplotrain solve --curve 12 --straight 4 --switch 2 -o out"
     )
 

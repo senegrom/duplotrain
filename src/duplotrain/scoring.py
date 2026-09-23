@@ -90,7 +90,9 @@ def score_solution(
 
     width, height = layout.size()
     perimeter = 2.0 * (width + height)
-    # A 12-curve circle has track/perimeter ~0.79; treat that as full marks.
+    # Track length over footprint perimeter, normalised by a circle's centreline
+    # figure (pi/4). The footprint includes the track width, so a 12-curve circle
+    # measures about 0.70 and gets about 0.89 of the full compactness weight.
     density = min(1.0, (layout.track_length() / perimeter) / 0.785) if perimeter else 0.0
     compactness = w.compactness * density
 

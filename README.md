@@ -246,13 +246,15 @@ can explicitly request unbounded enumeration with `max_runs=None`.
 
 Findings the simulator proves about real DUPLO:
 
-- Any reachable open end or buffer admits a doomed start (bounce off the tip, or park
-  against the bumper), so everything from *looping* up requires a fully mated layout.
+- Any reachable open end, or buffer without a direction stone at its face, admits a
+  doomed start (bounce off the tip, or park against the bumper), so everything from
+  *looping* up requires every end mated or guarded by such a reversing terminator.
   Teardrops are therefore *locally* looping only — wonderful, but keep the toddler
   from placing the loco at the very tip.
 - A plain loop is *completely* but never *perfectly* looping: runs are one-way.
-  Clip one green direction stone anywhere on it and it becomes **perfect** — every
-  run ping-pongs, sweeping everything both ways.
+  Clip one green direction stone mid-piece on a straight and it becomes **perfect** —
+  every run ping-pongs, sweeping everything both ways. (A stone at a piece's end face
+  only turns trains running into that face, which leaves the loop one-way there.)
 - Teardrops come in two flavours: **stem-tailed** (the classic — every pass trails
   the points, the tongue alternates, the train alternates lobes) and **branch-tailed**
   (a one-way trap that absorbs the train into its circuit). `is_stem_tailed()` tells

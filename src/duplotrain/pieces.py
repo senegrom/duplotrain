@@ -23,6 +23,7 @@ closure test.  Writing it as an exact field element keeps the test honest.
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
@@ -47,6 +48,35 @@ __all__ = [
 ]
 
 
+#: Catalogue numbers: an integer ratio, or a decimal whose exponent stays small.
+_INTEGER = re.compile(r"[+-]?\d+")
+_DECIMAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE]([+-]?\d+))?")
+#: Longest single segment a catalogue piece may have, mm: sampling cost grows with it.
+MAX_SEGMENT_LENGTH = 10_000.0
+
+
+def _number(value: Any) -> Fraction:
+    """An exact catalogue number, refusing text Fraction would take ages to build.
+
+    ``"1e16000000"`` is short, but it is a sixteen-million-digit integer.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float, str, Fraction)):
+        raise ValueError(f"cannot read a number from {value!r}")
+    if not isinstance(value, (int, Fraction)):
+        text = str(value).strip()
+        numerator, slash, denominator = text.partition("/")
+        match = None if slash else _DECIMAL.fullmatch(text)
+        if len(text) > 64 or not (
+            (slash and _INTEGER.fullmatch(numerator) and _INTEGER.fullmatch(denominator))
+            or (match and abs(int(match.group(1) or 0)) <= 64)
+        ):
+            raise ValueError(f"cannot read a catalogue number from {value!r}")
+        if slash and int(denominator) == 0:
+            raise ValueError(f"catalogue number {value!r} divides by zero")
+        value = text
+    return Fraction(value)
+
+
 def parse_length(value: Any) -> Alg:
     """Parse a catalogue length into an exact field element.
 
@@ -61,20 +91,16 @@ def parse_length(value: Any) -> Alg:
     """
     if isinstance(value, Alg):
         return value
-    if isinstance(value, (int, Fraction)):
-        return alg(Fraction(value))
-    if isinstance(value, float):
-        return alg(Fraction(str(value)))
-    if isinstance(value, str):
-        return alg(Fraction(value))
+    if isinstance(value, (int, float, str, Fraction)) and not isinstance(value, bool):
+        return alg(_number(value))
     if isinstance(value, dict):
         if "alg" in value:
-            a, b, c, d = (Fraction(str(x)) for x in value["alg"])
+            a, b, c, d = (_number(x) for x in value["alg"])
             return Alg(a, b, c, d)
         if "chord" in value:
             spec = value["chord"]
             radius = parse_length(spec["radius"])
-            half = degrees_to_steps(Fraction(str(spec["degrees"])) / 2)
+            half = degrees_to_steps(_number(spec["degrees"]) / 2)
             _, sin_half = cos_sin(half)
             return radius * sin_half * 2
         raise ValueError(f"unrecognised length expression {value!r}")
@@ -385,12 +411,20 @@ def _sample_paths(
 def _parse_segment(spec: dict[str, Any]) -> Segment:
     kind = spec.get("type")
     if kind == "straight":
-        return Straight(run=parse_length(spec["run"]))
-    if kind == "arc":
-        return Arc(radius=parse_length(spec["radius"]), degrees=spec["degrees"])
-    if kind == "ramp":
-        return Ramp(run=parse_length(spec["run"]), rise=parse_length(spec["rise"]))
-    raise ValueError(f"unknown segment type {kind!r}")
+        segment: Segment = Straight(run=parse_length(spec["run"]))
+    elif kind == "arc":
+        try:
+            degrees = _number(spec["degrees"])
+        except ValueError as exc:
+            raise ValueError("arc degrees must be a whole multiple of 15") from exc
+        segment = Arc(radius=parse_length(spec["radius"]), degrees=degrees)
+    elif kind == "ramp":
+        segment = Ramp(run=parse_length(spec["run"]), rise=parse_length(spec["rise"]))
+    else:
+        raise ValueError(f"unknown segment type {kind!r}")
+    if not segment.length() <= MAX_SEGMENT_LENGTH:
+        raise ValueError(f"a {kind} segment may be at most {MAX_SEGMENT_LENGTH:g} mm long")
+    return segment
 
 
 def _parse_path(spec: dict[str, Any]) -> Path:
@@ -399,7 +433,7 @@ def _parse_path(spec: dict[str, Any]) -> Path:
         parse_length(start_spec.get("x", 0)),
         parse_length(start_spec.get("y", 0)),
         parse_length(start_spec.get("z", 0)),
-        degrees_to_steps(start_spec.get("heading_deg", 0)),
+        degrees_to_steps(_number(start_spec.get("heading_deg", 0))),
     )
     segments = tuple(_parse_segment(s) for s in spec["segments"])
     if not segments:
@@ -469,6 +503,14 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
             f"piece {piece_id!r} seals nonexistent port(s) {bad_sealed}; "
             f"it has ports 0..{len(ports) - 1}"
         )
+    if len(sealed) >= len(ports):
+        raise ValueError(f"piece {piece_id!r} seals every port; nothing could attach to it")
+    width, overhang = float(spec.get("width", 40.0)), float(spec.get("end_overhang", 0.0))
+    if not (math.isfinite(width) and width > 0 and math.isfinite(overhang) and overhang >= 0):
+        raise ValueError(
+            f"piece {piece_id!r} needs a finite positive width and a finite, "
+            "non-negative end overhang"
+        )
 
     return PieceType(
         id=spec["id"],
@@ -477,8 +519,8 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         paths=paths,
         ports=ports,
         routes=routes,
-        width=float(spec.get("width", 40.0)),
-        end_overhang=float(spec.get("end_overhang", 0.0)),
+        width=width,
+        end_overhang=overhang,
         sealed=sealed,
         underpass=bool(spec.get("underpass", False)),
         part_numbers=tuple(spec.get("part_numbers", ())),

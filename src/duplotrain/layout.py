@@ -102,8 +102,6 @@ def _centreline_points(
     )
 
 
-
-
 @lru_cache(maxsize=2048)
 def _local_footprint_bounds(
     paths: tuple[TrackPath, ...], width: float, end_overhang: float, heading: int
@@ -594,10 +592,11 @@ class Layout:
         different kind of answer from one that is 400 mm away.
         """
         open_ends = self.open_ends()
+        poses = [self.pose_of(end) for end in open_ends]  # once per end, not per pair
         out = []
         for i, a in enumerate(open_ends):
-            for b in open_ends[i + 1 :]:
-                out.append((a, b, self.pose_of(a).distance_to(self.pose_of(b))))
+            for j in range(i + 1, len(open_ends)):
+                out.append((a, open_ends[j], poses[i].distance_to(poses[j])))
         out.sort(key=lambda t: t[2])
         return out
 

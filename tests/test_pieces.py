@@ -118,3 +118,20 @@ def test_unknown_segment_type_rejected():
         parse_piece(
             {"id": "bad", "paths": [{"segments": [{"type": "teleport", "run": 1}]}]}
         )
+
+
+@pytest.mark.parametrize("change,message", [
+    ({"sealed_ports": [0, 1]}, "seals every port"),
+    ({"width": float("nan")}, "finite positive width"),
+    ({"end_overhang": float("-inf")}, "non-negative end overhang"),
+    ({"paths": [{"segments": [{"type": "straight", "run": "1e16000000"}]}]}, "catalogue number"),
+    ({"paths": [{"segments": [{"type": "straight", "run": "1/0"}]}]}, "divides by zero"),
+    ({"paths": [{"segments": [{"type": "straight", "run": 20_000}]}]}, "at most 10000 mm"),
+    ({"paths": [{"segments": [{"type": "arc", "radius": 256, "degrees": "1e9999"}]}]},
+     "whole multiple of 15"),
+])
+def test_catalogue_values_are_bounded_and_meaningful(change, message):
+    spec = {"id": "odd", "paths": [{"segments": [{"type": "straight", "run": 64}]}], **change}
+    with pytest.raises(ValueError, match=message):
+        parse_piece(spec)
+

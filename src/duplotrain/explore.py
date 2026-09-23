@@ -143,12 +143,12 @@ def _lobe_recipe(teardrop: Solution, pieces: Mapping[str, PieceType]) -> list:
     steps = [s for s in teardrop.steps if type(s).__name__ == "_Place"]
     if len(steps) != len(teardrop.steps):
         raise ValueError("teardrop recipe with transits is not replayable here")
-    switch_pos = next(
-        (i for i, s in enumerate(steps) if pieces[s.piece_id].is_junction), None
-    )
-    if switch_pos is None:
+    # The walk's last piece closes into a stub of the switch that starts the lobe.
+    # (The first junction in the trace may be a crossing on the tail.)
+    target = teardrop.layout.links.get((len(steps) - 1, steps[-1].exit)) if steps else None
+    if target is None or not pieces[steps[target[0]].piece_id].is_junction:
         raise ValueError("no junction in the teardrop recipe")
-    return steps[switch_pos:]
+    return steps[target[0]:]
 
 
 def is_stem_tailed(teardrop: Solution, pieces: Mapping[str, PieceType]) -> bool:

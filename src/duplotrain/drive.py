@@ -160,6 +160,12 @@ def drive(
         raise ValueError("nothing to drive on")
     if start is None:
         start = (0, layout.placements[0].piece.routes[0].port_a)
+    if (not isinstance(start, tuple) or len(start) != 2
+            or any(type(value) is not int for value in start)
+            or not 0 <= start[0] < len(layout.placements)
+            or not 0 <= start[1] < len(layout.placements[start[0]].piece.ports)):
+        # A negative alias would index the right piece and then miss every link.
+        raise ValueError(f"start {start!r} is not a port of the layout")
     if layout.is_sealed(start):
         raise ValueError("a train cannot enter through a sealed buffer face")
 
@@ -295,8 +301,9 @@ class LoopClassification:
       goes over every tile in both directions (hence each infinitely often).
 
     Each level implies the ones above it.  ``witness`` is an endless start for the
-    local property; ``counterexample`` is the (start, tongue setting, outcome) that
-    broke the strongest failed universal property.
+    local property; ``counterexample`` is the first (start, tongue setting, outcome)
+    that breaks the weakest failed universal property -- the first "no" down the
+    ladder, so a layout that is not looping gets a run that actually ends.
     """
 
     locally_looping: bool
@@ -398,7 +405,8 @@ def classify(
     completely = True
     perfectly = True
     witness: tuple[End, dict[int, int]] | None = None
-    counterexample: tuple[End, dict[int, int], str] | None = None
+    # The first run breaking each universal property, weakest property first.
+    failures: dict[str, tuple[End, dict[int, int], str]] = {}
     runs = 0
 
     for assignment in assignments:
@@ -412,27 +420,22 @@ def classify(
                 if not report.visited >= everything and completely:
                     completely = False
                     perfectly = False
-                    counterexample = counterexample or (
-                        start,
-                        dict(assignment),
-                        "endless but does not cover the whole track",
-                    )
+                    failures.setdefault("completely", (
+                        start, dict(assignment), "endless but does not cover the whole track",
+                    ))
                 elif perfectly and not _cycle_both_directions(report, layout):
                     perfectly = False
-                    counterexample = counterexample or (
-                        start,
-                        dict(assignment),
+                    failures.setdefault("perfectly", (
+                        start, dict(assignment),
                         "endless but some tile is never traversed both ways",
-                    )
+                    ))
             else:
                 looping = False
                 completely = False
                 perfectly = False
-                counterexample = counterexample or (
-                    start,
-                    dict(assignment),
-                    report.outcome,
-                )
+                failures.setdefault("looping", (start, dict(assignment), report.outcome))
+    counterexample = (failures.get("looping") or failures.get("completely")
+                      or failures.get("perfectly"))
 
     return LoopClassification(
         locally_looping=locally,

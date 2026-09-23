@@ -25,7 +25,6 @@ __all__ = ["render_layout"]
 
 BALLAST = "#b9bec4"
 BALLAST_EDGE = "#8d949c"
-BRIDGE = "#c9b79b"
 RAIL = "#6d7278"
 SLEEPER = "#9aa0a7"
 JOINT = "#4d5359"
