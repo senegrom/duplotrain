@@ -9,7 +9,7 @@ machine, never a test assertion.
 ## Measuring
 
 `PYTHONPATH=src python benchmarks/completion.py --repeats 3` runs the 30
-completion cases (nine exact, 21 with slippage) and reports nodes, results,
+completion cases (ten exact, 20 with slippage) and reports nodes, results,
 stop reasons, preprocessing work and median times; `--suite`, `--case`,
 `--lookahead 0` (the reference search without tables), `--engine field` and
 `--max-nodes` select variants. `benchmarks/editor_completion.py` times whole
@@ -61,7 +61,9 @@ stock piece, every usable route of a base-only junction and the exact
 retargeting of reversing loops. Tables are built progressively: a search gets
 `min(4096, max_nodes // 8)` expansions at once, earns 24 more per DFS node up to
 262,144, and a depth not yet affordable stays permissive and is asked again
-later. Only decided answers enter the per-search LRU cache of 4,096 entries.
+later. Only decided answers enter an LRU cache of 4,096 entries that lives with
+the tables: one search's own, or the tables an editor closing shares across its
+direction turns and stages.
 
 Beyond the built layers a query up to three moves deeper is decided exactly by
 a forward probe: the cursor is expanded forward over the same moves and each
@@ -180,16 +182,11 @@ identical to the reference searches without tables.
 | Ordinary plain-track gap (oracle, then a short search) | 138 | 16 ms |
 | All loops of 12 curves and 6 straights | 1,915 | 0.07 s |
 | Reversing loops of 12 curves, 4 straights and 2 switches, 100 results | 793 | 57 ms |
-| Loops of 16 curves, 8 straights, 2 switches and a crossing, 100 results | 350 | 27 ms |
+| Loops of at most 14 pieces from 16 curves, 8 straights, 2 switches and a crossing, 100 results | 350 | 27 ms |
 | 17-piece loop search with one switch, every piece required | 11,488 | 0.22 s |
 | Networks of 2 buffers, 3 straights and 3 curves up to 8 pieces, 109 classes | 770 | 0.61 s |
-| Keying the 671-layout corpus | | 2.0 s |
-| The arc oracle over 584 corpus closings | | 2.3 s |
 | Check layout on a synthetic 1,499-piece layout | | 60 ms |
 | Warm state with eight compact suggestions, reported gap | | 8.7 ms |
-
-Before this work the loop search with a switch spent 1.85 million nodes and
-31 s, the bridge gap 190,000 nodes and 8.5 s, and the suite 13.7 s.
 
 ## Regression contracts
 

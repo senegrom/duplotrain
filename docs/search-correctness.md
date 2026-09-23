@@ -50,8 +50,7 @@ arbitrary custom shapes cannot be unioned without a primitive description.
 
 The returned value is a floating-point geometric length in millimetres, not the
 length of a particular train itinerary. CLI length reports and the compactness
-score now include secondary junction routes. Existing saved-layout JSON is
-unchanged; cached curve keys and derived scores should be regenerated.
+score include secondary junction routes.
 
 The regressions in `tests/test_review_round4.py` exercise decimal ties across all
 lattice symmetries, an exact independent oval oracle, shared-route length, and
@@ -124,7 +123,7 @@ queries cover every geometrically distinct placement and spare port, ignoring
 what precedes the placement. Distance and heading to the original endpoints
 cannot prune a branch while a future junction could supply another target. A
 regression pins a valid teardrop even when the selected original target is 100 m
-away; the previous endpoint-only bound incorrectly rejected it.
+away, which a bound on the original endpoints alone would reject.
 
 Both projections share the same preprocessing budget, and a layer is published
 only when both are complete. Slop queries use the physical enclosures below.
@@ -159,13 +158,13 @@ conservative rules as the short tables. Both share the progressive
 preprocessing allowance (`min(4096, max_nodes // 8)` expansions at once, 24
 more per DFS node, at most 262,144), and neither publishes an unfinished layer. Stable zero-motion envelopes are reused at every greater depth,
 so an empty move pool and a huge inventory cannot allocate endless identical
-layers. The future-target query cache is limited to 4096 entries per search.
+layers. The future-target query cache is limited to 4096 entries.
 
 `completion_bound_depth` and `completion_bound_states` expose the largest complete
 depth and total retained heading envelopes. Regressions in
 `tests/test_completion_bounds.py` retain independently constructed exact tails,
 compare exhaustive results on both engines, exercise custom 15-degree curves and
-preprocessing exhaustion, and pin the two previously capped broad-inventory cases.
+preprocessing exhaustion, and pin two broad-inventory cases.
 
 ## Traversal count and turning capacity are separate bounds
 
@@ -246,7 +245,8 @@ for the entire tail, including the final joint. Rigid retargeting preserves that
 budget for existing and future reversing targets. Both geometry and future-target
 cache keys include the remaining budget, preventing an answer for one allowance
 from being reused for another. The indexes are cleared together with the query
-cache when a search finishes or its progress callback raises.
+cache when a search that built its own tables finishes or its progress callback
+raises.
 
 `tests/test_completion_slippage.py` compares complete ordered solutions against
 lookahead-disabled searches on both engines, including 3-4-5 mm offset endpoints,
@@ -259,20 +259,23 @@ a forced closure through the real Pyodide worker under the production CSP.
 ## Reused geometric proofs are independent of search state
 
 The completion cache keys contain the full exact cursor pose, including height
-and heading, the remaining traversal bound, and any remaining slop. The anchor and move pool are
-fixed within one solve. Published reachability layers never change, so both
-positive and negative answers from complete layers can be reused. A permissive
-answer from an unfinished layer also remains valid: the next layer already
-exceeds the remaining preprocessing budget, which can only decrease.
+and heading, the remaining traversal bound, and any remaining slop. The anchor
+and move pool are fixed for the tables' lifetime. Published reachability layers
+never change, so both positive and negative answers from complete layers can be
+reused. An answer that needs a layer not yet built is permissive and is never
+cached: the progressive budget may build that layer later, and the query is
+asked again.
 
 Geometric cache entries contain no stock, free ports, collision decisions or candidate layouts.
 Each DFS node computes its current transit allowances and reversing targets once;
 its child visits compute their own values after consuming stock and ports. The
 parent's values remain valid when backtracking restores its state.
 
-The 4096-entry LRU belongs to one solve and is explicitly emptied on normal return
-or a traversal exception. This avoids retaining its poses through the recursive
-DFS closure cycle. Tests compare complete results and all search counters against
+The 4096-entry LRU belongs to the tables. A search that built its own empties
+it on normal return or a traversal exception, which avoids retaining its poses
+through the recursive DFS closure cycle; tables an editor closing passes from
+one search to the next keep their decided answers for the same ends and stock.
+Tests compare complete results and all search counters against
 an uncached evaluator, retain permissive fallback after eviction, separate
 catalogues, and check callback-error cleanup.
 
@@ -364,9 +367,9 @@ identity, and the index belongs to one field.
 
 ## Free transits need a reachable entry
 
-A free transit passes through a junction without spending a placement, so the
-completion tables were asked with one extra traversal per possible transit. Two
-exact conditions now gate that allowance.
+A free transit passes through a junction without spending a placement, so each
+possible transit adds one traversal to what the completion tables are asked.
+Two exact conditions gate that allowance.
 
 A junction still in stock can only be transited by a tail that first places it
 and then loops back to one of its spare ports that still has a route partner.
@@ -409,9 +412,8 @@ mirror twin, because a single-handed piece would make the twin loop
 unconstructible and its signature distinct, and never in completion mode, where
 the base fixes the handedness. Reversing closures and transits are unaffected:
 both are mirror-symmetric. A result-limited search may therefore return the
-left-handed representative of a class where it used to return the right-handed
-one; complete searches return the same signature set, as the corpus loop
-enumerations confirm.
+left-handed representative of a class where a two-handed search would return the
+right-handed one; complete searches return the same signature set either way.
 
 ## The canonical frame is chosen on reduced integer identities
 
@@ -425,10 +427,8 @@ reduced form, so equal geometries get equal identities whatever denominators
 they arrived with, and the smallest identity names the same frame for every
 member of the orbit. Ties can only occur between frames with identical
 geometry, which sample to the same points. The chosen frame is materialised
-with the unchanged exact transform, so the sampled key is exactly the one that
-frame produced before; only which frame wins can differ from the previous
-implementation, so cached keys should be regenerated as before. Opaque custom
-segments keep the sampled-orbit fallback.
+with its exact transform, so the sampled key is exactly the one that frame
+produces. Opaque custom segments keep the sampled-orbit fallback.
 
 ## Forward probes are exact
 
@@ -462,7 +462,7 @@ result-limited loop search returns the same solutions in the same order, and a
 node-limited one can only return more. The one-handed rule and the signature
 deduplication are unaffected. Regressions compare ordered results with and
 without the tables on both engines, with slop, with reversing closures, and on
-a search that used to exhaust its node budget.
+a search that exhausts its node budget without them.
 
 ## Group extremes only pre-test the near scan
 
@@ -473,7 +473,7 @@ can be within reach, so rejecting it early is a necessary condition applied
 before the unchanged sorted scan; nothing is accepted that the scan would not
 accept. The cached box of a queried pose is the same integer enclosure the
 layer poses use. The integer form of the field engine's interval enclosure
-computes the same floor and ceiling as the Fraction sums it replaces.
+computes the same floor and ceiling as exact Fraction sums.
 
 ## Screened frames and cached keys choose and name the same frame
 
@@ -551,9 +551,9 @@ removes only subtrees whose closed networks were all duplicates, and the
 remaining subtrees are visited in the same order, so the found layouts and their
 order are unchanged. One theoretical difference remains: the sampled overlap
 audit works in floating point, so a network exactly on its threshold could in
-principle be rejected in one embedding and pass in another; the previous
-enumerator would then have audited it again from another root. No layout in the
-differential corpus is near the threshold. With `use_all_pieces` no later pass
+principle be rejected in one embedding and pass in another, where an
+enumeration keeping every type in every pass would audit it again from another
+root. With `use_all_pieces` no later pass
 can use the whole inventory, so those passes are skipped.
 
 ## Lattice oracle poses and shared audits

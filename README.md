@@ -154,7 +154,8 @@ finished, not dangling.
 engine under Pyodide. `webapp/build.py` produces the static bundle; nothing leaves
 the browser. The bundle is published at <https://senegrom.github.io/duplotrain/>
 by the final job of the *Application checks* workflow, after every check has
-passed on a push to `main`, at exactly that commit; that build passes `--pages`,
+passed on a push to `main` (or a manual run on `main`), at exactly that commit;
+that build passes `--pages`,
 which also embeds the content security policy as a `<meta>` tag because GitHub
 Pages cannot send response headers.
 
@@ -302,9 +303,9 @@ likewise compare complete exact primitive paths and route incidence, not only po
 
 **Check whether the search finished.** `solve()` and `enumerate_networks()` expose
 `stats.complete`, `stats.stop_reason`, and `stats.max_pieces_searched`. Both
-`find_perfect_*()` helpers return a `PerfectResult`: it still supports the previous
-list operations (indexing, iteration, `len`, comparison with `[]`), and also exposes
-`.layouts` and `.stats`. A successful classification proves the returned candidate's
+`find_perfect_*()` helpers return a `PerfectResult`: it supports list operations
+(indexing, iteration, `len`, comparison with `[]`), and also exposes `.layouts` and
+`.stats`. A successful classification proves the returned candidate's
 behaviour; it does not mean the search found every candidate.
 
 ```python
@@ -340,7 +341,8 @@ straight. It does not enumerate every combination of multiple optional stones.
 Exhaustion refers to that policy, the catalogue, and the sampled collision/congruence
 model — closure itself remains exact. For larger inventories, compose layouts
 constructively and verify their dynamics with `classify`. The slow end-to-end network
-test runs weekly and can also be started with the Extended search checks workflow.
+and loop tests run weekly and can also be started with the Extended search checks
+workflow.
 
 The switch dynamics yields a little theorem the machine confirms by exhaustion: a
 dead-end cap **reflects** a train back through the branch it came from, so a trailing
@@ -348,7 +350,7 @@ pass re-aims the tongue at that same branch and a facing return retraces it — 
 keep the tongue *sticky*. Only a lobe (branch-to-branch loop) *alternates* the
 tongue. Hence a 3-armed star of capped arms ping-pongs between two arms forever
 (looping, never completely), and **no perfect one-switch network exists without
-curves** — checked over all 27 closed candidates. Perfection needs rotation
+curves** — checked over every closed candidate. Perfection needs rotation
 somewhere: a lobe, or a stone in a ring.
 
 ## How the solver works
@@ -389,14 +391,14 @@ indexed nearby short tails allow the **remaining total** gap budget; heading and
 height still have to match. `stats.pruned_completion` and
 `stats.completion_work` report the saved branches and total preprocessing work;
 `stats.completion_bound_depth` reports how far the longer bounds reached.
-Repeated geometry queries use a per-search cache capped at 4096 entries;
-`stats.completion_checks` and `stats.completion_cache_hits` report evaluated and
-reused queries. The full geometry and height must agree on an actual route, and
+Repeated geometry queries use a cache of at most 4096 decided answers that lives
+with the tables; `stats.completion_checks` and `stats.completion_cache_hits`
+report evaluated and reused queries. The full geometry and height must agree on an actual route, and
 the independent collision audit still checks every returned candidate. Reproduce
 the measurements with `PYTHONPATH=src python benchmarks/completion.py --repeats 3`.
 The benchmark has 30 cases; use `--suite slippage` for 20 covering offset ends,
 bridges, reversing targets, intermediate joint gaps and custom 15° pieces.
-Broad mixed inventory now finds eight closures within 25,000 nodes at both 1 and
+Broad mixed inventory finds eight closures within 25,000 nodes at both 1 and
 5 mm slop. `--case NAME` selects individual
 cases; `--lookahead 0` runs the unpruned reference. Each JSON row includes the
 gap budget, engine, result fingerprint, forced-fit gaps, stop reason and median time.
@@ -409,8 +411,8 @@ engines apply the same rule (see `duplotrain.collision` and the catalogue notes)
 **Arithmetic engines.** Exactness doesn't require Fractions: every real piece turns in
 30° steps and measures in twentieths of a millimetre, so positions live in the scaled
 cyclotomic ring (1/20)·ℤ[e^{iπ/6}], where rotation is an *integer* 4×4 map. The solver
-compiles the problem for this integer lattice engine automatically (~6× faster:
-1.8k → 10k nodes/s natively; it's what makes the browser build usable) and falls back
+compiles the problem for this integer lattice engine automatically (several times
+faster than the field; it's what makes the browser build usable) and falls back
 to the general ℚ(√2,√3) field for anything off-grid — a user piece on the 45° lattice,
 say. Conformance tests run every solver mode on both engines and require identical
 solutions. If far bigger searches ever matter (v2 multi-cycle at scale), the same seam
@@ -418,10 +420,10 @@ is where a Rust core would slot in.
 
 **Current limits worth knowing:**
 
-- The solver finds *driving loops* — one closed train circuit. A passing loop (both
-  switch branch-pairs connected) is not a single circuit and needs the planned
-  multi-cycle search; today the second track shows up as two dangling stubs. (The
-  completion solver will happily close a hand-built passing loop's siding, though.)
+- `solve()` finds *driving loops* — one closed train circuit. A passing loop (both
+  switch branch-pairs connected) is not a single circuit: `solve()` shows its second
+  track as two dangling stubs, while `enumerate_networks()` finds such networks. (The
+  completion solver will happily close a hand-built passing loop's siding, too.)
 - With the measured crossing geometry, no figure-eight closes within 6 mm from 12–16
   curves (± straights): the solver instead uses the crossing straight-through with its
   other route dangling. Blame the lattice, not the box.
@@ -436,26 +438,28 @@ python -m pytest -m "not slow"              # skip the ~2 min full-enumeration p
 python -m pytest -m "not slow and not browser"  # what application CI runs first
 ```
 
-The full local sequence, which is what application CI runs on every push and pull
-request (plus a clean base installation without matplotlib; the Lean workflow checks
-proof changes independently):
+The full local sequence mirrors application CI, which runs on pull requests and
+pushes to `main` (plus a clean base installation without matplotlib; the Lean
+workflow checks proof changes independently):
 
 ```sh
 python -m pip install -e '.[dev]'
-ruff check src webapp
+ruff check src webapp tests benchmarks
 python -m pytest -m 'not slow and not browser'
 node --test tests/web/*.test.cjs
 # Browser integration, including the real Pyodide worker:
 python -m pip install playwright
 python -m playwright install chromium webkit
-python webapp/build.py
+python webapp/build.py --pages
 DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m pytest tests/browser -m browser
 DUPLOTRAIN_BROWSER=webkit DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m pytest tests/browser -m browser
 ```
 
-Tests marked `browser` need playwright plus a downloaded browser. Locally, only an
-absent default browser may skip them; CI sets `DUPLOTRAIN_REQUIRE_BROWSER=1`, and
-explicit browser paths and every browser startup failure are errors.
+Tests marked `browser` need playwright plus a downloaded browser. Locally they skip
+when playwright or the chosen browser is missing, and the Pyodide app test skips
+without `DUPLOTRAIN_STATIC_DIST`; CI sets `DUPLOTRAIN_REQUIRE_BROWSER=1`, and
+explicit browser paths and every browser startup failure are errors. The two-finger
+pinch test runs on Chromium only.
 
 The suite covers the number field, the pose lattice, piece derivation, the documented
 geometric identities (the `L,R,R,L` snake equals four straights exactly; `R,R,L,L`
@@ -469,9 +473,10 @@ forced fit reporting exactly its 2 mm gap).
 
 Rendered output of the exhaustive searches, in [`docs/`](docs/):
 `perfect-gallery.png`, `perfect-gallery-2.png`, `perfect-gallery-switches.png` and
-`perfect-gallery-wild.png` (every perfect layout the classification admits),
+`perfect-gallery-wild.png` (perfect layouts from those searches),
 `topology-gallery.png` and `crossing-gallery.png` (crossing topologies),
-`figure-eight.png` (the minimal exact eight through crossing 6376) and
+`figure-eight.png` (an eight through crossing 6376: 24 curves and 2 straights closing
+as a 9.2 mm forced fit) and
 `flyover-eight.png` (the bridge flyover eight, closed exactly from one owned set).
 
 ---
