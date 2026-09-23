@@ -2,8 +2,10 @@
 
 import pytest
 
+import duplotrain.solver as solver_module
 from duplotrain.catalog import default_catalog
 from duplotrain.geometry import ORIGIN
+from duplotrain.layout import build_chain
 from duplotrain.scoring import score_solution
 from duplotrain.solver import SolverConfig, solve
 
@@ -27,7 +29,8 @@ def assert_loop_is_sound(solution, catalog):
 
 
 def test_twelve_curves_make_exactly_one_circle(catalog):
-    result = solve({"curve": 12}, catalog)
+    # The all-left and all-right circles are one physical layout.
+    result = solve({"curve": 12}, catalog, SolverConfig(max_results=10))
     assert len(result.solutions) == 1
     sol = result.solutions[0]
     assert sol.exact
@@ -82,9 +85,10 @@ def test_switch_joins_the_circle_with_a_dangling_branch(catalog):
     assert_loop_is_sound(best, catalog)
 
 
-def test_slop_never_relabels_forced_fits_as_exact(catalog):
+def test_slop_never_closes_a_loop_that_cannot_turn_full_circle(catalog):
     # A simple closed loop must turn a net 360 degrees; ten curves cannot, so with or
-    # without slop this inventory yields nothing -- and never a fake "exact" closure.
+    # without slop this inventory yields nothing. (test_slop_reports_engineered_gap
+    # checks that genuine forced fits are never labelled exact.)
     for slop in (0.0, 6.0):
         result = solve(
             {"curve": 10, "straight": 2},
@@ -92,12 +96,6 @@ def test_slop_never_relabels_forced_fits_as_exact(catalog):
             SolverConfig(slop=slop, use_all_pieces=True),
         )
         assert result.solutions == []
-
-
-def test_dedup_no_mirror_twins(catalog):
-    # The all-left circle and the all-right circle are the same physical layout.
-    result = solve({"curve": 12}, catalog, SolverConfig(max_results=10))
-    assert len(result.solutions) == 1
 
 
 def test_chiral_loops_dedup_mirror_twins(catalog):
@@ -208,14 +206,45 @@ def test_inventory_validation(catalog):
         solve({"warp_gate": 1}, catalog)
 
 
+@pytest.mark.parametrize("ends", [((5, 1), (-6, 0)), ((-1, 1), (0, 0)), ((5, -1), (0, 0)),
+                                  ((9, 0), (0, 0)), ((5, 7), (0, 0)), ([5, 1], (0, 0)),
+                                  ((5, True), (0, 0))])
+def test_completion_ends_must_name_real_ports(catalog, ends):
+    # A negative alias of a real port passed every lookup, then matched nothing.
+    base = build_chain([(catalog["curve"], 0, 1)] * 6)
+    with pytest.raises(ValueError, match="not a port"):
+        solve({"curve": 6}, catalog, SolverConfig(min_pieces=1), base=base,
+              grow_from=ends[0], close_onto=ends[1])
+
+
+def test_base_junction_types_need_not_be_in_the_catalogue(catalog):
+    base = build_chain([(catalog["switch"], 0, 1)])
+    subset = {pid: catalog[pid] for pid in ("curve", "straight")}
+    cfg = SolverConfig(min_pieces=1, max_results=1000, reversing_loops=True)
+    options = dict(base=base, grow_from=(0, 1), close_onto=(0, 0))
+    full = solve({"curve": 12, "straight": 4}, catalog, cfg, **options)
+    assert full.solutions and full.stats.complete
+    assert solve({"curve": 12, "straight": 4}, subset, cfg, **options).solutions == full.solutions
+
+
+def test_the_search_depth_cap_is_reported_not_a_crash(catalog, monkeypatch):
+    # Thousands of straights once recursed past Python's limit.
+    result = solve({"curve": 12, "straight": 2000}, catalog, SolverConfig(max_nodes=20_000))
+    assert result.solutions and result.stats.stop_reason == "node_limit"
+    monkeypatch.setattr(solver_module, "_MAX_SEARCH_DEPTH", 12)
+    capped = solve({"curve": 12, "straight": 2}, catalog)
+    assert [s.piece_count for s in capped.solutions] == [12]
+    assert capped.stats.stop_reason == "piece_limit" and not capped.stats.complete
+
+
 def test_scoring_prefers_exact_and_fuller_layouts(catalog):
     inventory = {"curve": 12, "straight": 4}
     result = solve(inventory, catalog, SolverConfig(max_results=50))
     scored = [(score_solution(s, inventory).total, s) for s in result.solutions]
     assert all(t >= 0 for t, _ in scored)
     top_total, top = max(scored, key=lambda p: p[0])
-    # The best layout should use most of the box.
-    assert top.piece_count >= 12
+    # The best layout uses the most of the box any loop uses.
+    assert top.exact and top.piece_count == max(s.piece_count for s in result.solutions)
 
 
 def test_anchor_pose_is_origin(catalog):

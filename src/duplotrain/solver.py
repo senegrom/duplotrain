@@ -257,6 +257,26 @@ def _turn_capacity(piece: PieceType) -> int:
 
 
 @lru_cache(maxsize=128)
+def _spare_passes(piece: PieceType) -> int:
+    """Further traversals a junction still offers once the walk has passed through it.
+
+    Each such pass turns the walk again, at most by :func:`_turn_capacity`, without
+    spending a piece. (Its displacement needs no extra budget: entering at one port
+    and finally leaving at another nets at most the piece's own span.)
+    """
+    if not piece.is_junction:
+        return 0
+    best = 0
+    for route in piece.routes:
+        free = set(range(len(piece.ports))) - piece.sealed - {route.port_a, route.port_b}
+        usable = {port for other in piece.routes
+                  if other.port_a in free and other.port_b in free
+                  for port in (other.port_a, other.port_b)}
+        best = max(best, len(usable) // 2)
+    return best
+
+
+@lru_cache(maxsize=128)
 def _max_span(piece: PieceType) -> float:
     best = 0.0
     for i, a in enumerate(piece.ports):
@@ -327,9 +347,6 @@ class _FieldEngine:
             return cursor.then(dx, dy, dz, dheading)
 
         return apply
-
-    def convert(self, pose: Pose) -> Pose:
-        return pose
 
     @staticmethod
     def to_pose(frame: Pose) -> Pose:
@@ -1584,6 +1601,10 @@ class _OverlapAudit:
 # Configuration and results
 # --------------------------------------------------------------------------------------
 
+#: Placements a search stacks at most: far beyond any real box, and well inside
+#: Python's default recursion limit with transits and callers on the stack too.
+_MAX_SEARCH_DEPTH = 400
+
 
 @dataclass(frozen=True, slots=True)
 class SolverConfig:
@@ -1595,7 +1616,8 @@ class SolverConfig:
     min_pieces: int = 4
     #: Upper bound on pieces placed (loop length / grown completion length).  With a
     #: huge inventory an unbounded depth-first dive is the enemy: a 300 mm gap needs
-    #: a dozen pieces, not two hundred.  None = no bound.
+    #: a dozen pieces, not two hundred.  None = no bound beyond the recursive search's
+    #: own ``_MAX_SEARCH_DEPTH``; either limit reports ``stop_reason="piece_limit"``.
     max_pieces: int | None = None
     max_results: int = 100
     max_nodes: int = 2_000_000
@@ -1769,6 +1791,14 @@ def solve(
             grow_from, close_onto = opens[-1], opens[0]
         if grow_from is None or close_onto is None or grow_from == close_onto:
             raise ValueError("completion needs two distinct open ends of the base layout")
+        for end in (grow_from, close_onto):
+            # Later code compares indices literally: a negative alias of a real
+            # port would pass the lookups below and then never match itself.
+            if (not isinstance(end, tuple) or len(end) != 2
+                    or any(type(value) is not int for value in end)
+                    or not 0 <= end[0] < len(base.placements)
+                    or not 0 <= end[1] < len(base.placements[end[0]].piece.ports)):
+                raise ValueError(f"end {end!r} is not a port of the base layout")
         for end in (grow_from, close_onto):
             if end in base.links:
                 raise ValueError(f"end {end} of the base layout is already connected")
@@ -2021,6 +2051,11 @@ def solve(
 
     remaining_span = sum(span_of[pid] * n for pid, n in counts.items())
     remaining_turn = sum(turn_of[pid] * n for pid, n in counts.items())
+    # A junction from stock may be re-entered once placed and turn the walk again
+    # without spending a piece. The quick turn prunes below add that whole
+    # potential up front; the tail tables budget these passes exactly.
+    pass_turns = sum(turn_of[pid] * n * _spare_passes(piece_obj[pid])
+                     for pid, n in counts.items())
 
     # Admissible per-piece bounds for the completion-mode IDA* contour: one piece
     # advances at most max_span_any millimetres and swings at most max_turn_any
@@ -2118,8 +2153,7 @@ def solve(
 
     def tail_possible(cursor, budget, context, slack: float | None,
                       extra_pid: str | None = None) -> bool:
-        if completion is None:
-            return True
+        # Callers only ask with reverse tables built (completion is not None).
         if extra_pid and cfg.reversing_loops and stub_capacity[extra_pid]:
             # Its new targets need the placement frame. The recursive visit checks
             # them after placement, with its own updated context.
@@ -2301,7 +2335,7 @@ def solve(
         if home > remaining_span + stub_reach + (cfg.slop - slack_used) + 1e-6:
             stats.pruned_reach += 1
             return True
-        stub_turns = sum(turn_of[placements[s[0]][0]] for s in stubs)
+        stub_turns = sum(turn_of[placements[s[0]][0]] for s in stubs) + pass_turns
         if need > remaining_turn + stub_turns:
             stats.pruned_turn += 1
             return True
@@ -2367,7 +2401,7 @@ def solve(
                     # thereafter shuttles out through the junction's other route.
                     emit(slack_used + joint_gap, reversing_target=(pidx, port))
                 stub_pid = placements[pidx][0]
-                piece = pieces[stub_pid]
+                piece = piece_obj[stub_pid]  # base-only types are absent from *pieces*
                 frame = placements[pidx][1]
                 for exit_port, _route in piece.transit(port):
                     j = next(
@@ -2527,7 +2561,9 @@ def solve(
                 return False
         return True
 
-    depth_limit = total_pieces
+    # One Python frame per placement or transit: stay well inside the default
+    # recursion limit, and report the cut like any other piece limit.
+    depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH)
     if cfg.max_pieces is not None:
         depth_limit = min(depth_limit, cfg.max_pieces)
     try:

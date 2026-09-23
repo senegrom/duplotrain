@@ -49,7 +49,8 @@ def test_existing_switch_can_supply_all_turning_without_new_stock(engine, branch
 
 @pytest.mark.parametrize("engine", ["lattice", "field"])
 @pytest.mark.parametrize("slop", [0.0, 5.0])
-def test_new_junction_retains_its_later_turning_transit(engine, slop):
+@pytest.mark.parametrize("reversing", [True, False])
+def test_new_junction_retains_its_later_turning_transit(engine, slop, reversing):
     catalog = default_catalog()
     start = catalog["curve"].paths[0].end().then(128, 0, 0, 0)
     # Two independent curved routes on one custom junction. A spare straight
@@ -68,8 +69,10 @@ def test_new_junction_retains_its_later_turning_transit(engine, slop):
     witness = witness.join((bridge, 1), (junction, 2)).join((junction, 3), (right, 0),
                                                           force=bool(slop))
     assert not _solution_overlaps(witness, len(base), 120, 8)
+    # Without reversing targets the quick turn prunes stay active: they must
+    # count the second pass's turn, which needs no further piece.
     cfg = SolverConfig(min_pieces=2, max_results=1000, engine=engine,
-                       reversing_loops=True, slop=slop)
+                       reversing_loops=reversing, slop=slop)
     result = compare_searches(catalog, {"double_curve": 1, "straight": 1}, cfg,
                               base, (left, 1), (right, 0))
     assert any(s.layout == witness for s in result.solutions)
@@ -122,3 +125,9 @@ def test_return_loop_floor_grants_the_transit_exactly_when_the_loop_fits(engine,
     result = compare_searches(catalog, {"double_curve": 1, "straight": bridge + 1}, cfg,
                               base, (left, 1), (right, 0))
     assert any(s.layout == witness for s in result.solutions)
+    tables = {}
+    solve({"double_curve": 1, "straight": bridge + 1}, catalog, cfg, base=base,
+          grow_from=(left, 1), close_onto=(right, 0), tables=tables)
+    (completion,) = tables.values()
+    # The loop back takes `bridge` traversals, so exactly the shorter ones are too few.
+    assert completion.transit_floor("double_curve") == bridge - 1

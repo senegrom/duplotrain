@@ -19,6 +19,7 @@ from functools import lru_cache
 from types import MappingProxyType
 from typing import Any, Literal
 
+from .catalog import ACCESSORIES, STONE_MOUNTS
 from .exact import Alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose, cos_sin
 from .pieces import Path as TrackPath
@@ -675,6 +676,13 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
     )
     for entry in accessories:
         check_end(entry[0], entry[2] if len(entry) > 2 else 0)
+        # The same rules as the editor's stone tool: a file from elsewhere must
+        # not smuggle in a stone that no later check or removal understands.
+        if entry[1] not in ACCESSORIES:
+            raise ValueError(f"layout uses unknown action stone {entry[1]!r}")
+        if placements[entry[0]].piece.id not in STONE_MOUNTS:
+            raise ValueError(
+                f"action stones clip onto straights, not {placements[entry[0]].piece.id!r}")
     return Layout(tuple(placements), links, accessories)
 
 

@@ -7,6 +7,7 @@ import pytest
 
 from duplotrain import ORIGIN, Layout, Placement, Pose, default_catalog
 from duplotrain.gui import Session, dispatch_session
+from duplotrain.layout import layout_from_dict, layout_to_dict
 from duplotrain.solver import Solution
 from tests.editor_support import load_adapter, post, running_server, unchanged
 
@@ -124,3 +125,24 @@ def test_correctly_typed_requests_still_succeed(path, body):
     before = session.revision
     result = dispatch_session(session, path, {"revision": before, **body})
     assert result["revision"] == session.revision == before + 1
+
+
+@pytest.mark.parametrize("stones,message", [
+    ([[0, "stone_accessory7"]], "unknown action stone"),
+    ([[2, "stone_stop"]], "clip onto straights"),
+    ([[2, "stone_direction", 1]], "clip onto straights"),
+])
+def test_imported_stones_follow_the_stone_tool_rules(endpoint, stones, message):
+    # A stone no later check or removal understands must not enter the session.
+    _session, reject = endpoint
+    catalog = default_catalog()
+    layout = Layout((Placement(catalog["straight"], ORIGIN),
+                     Placement(catalog["straight"], Pose.make(x=128)),
+                     Placement(catalog["curve"], Pose.make(x=512))))
+    data = {**layout_to_dict(layout), "accessories": stones}
+    with pytest.raises(ValueError, match=message):
+        layout_from_dict(data, catalog)
+    reject("/api/import", {"data": data})
+    data["accessories"] = [[0, "stone_stop"], [1, "stone_direction", 0]]
+    assert layout_from_dict(data, catalog).accessories == ((0, "stone_stop"),
+                                                          (1, "stone_direction", 0))

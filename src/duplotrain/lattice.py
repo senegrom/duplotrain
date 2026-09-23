@@ -75,11 +75,6 @@ class LatticePoint:
             self.a + other.a, self.b + other.b, self.c + other.c, self.d + other.d
         )
 
-    def __sub__(self, other: LatticePoint) -> LatticePoint:
-        return LatticePoint(
-            self.a - other.a, self.b - other.b, self.c - other.c, self.d - other.d
-        )
-
     def key(self) -> tuple[int, int, int, int]:
         return (self.a, self.b, self.c, self.d)
 
@@ -133,29 +128,9 @@ class LatticePose:
     def __hash__(self) -> int:
         return hash(self.key())
 
-    def distance_to(self, other: LatticePose) -> float:
-        ax, ay = self.p.xy()
-        bx, by = other.p.xy()
-        return math.hypot(ax - bx, ay - by)
-
-    def connects_to(self, other: LatticePose) -> bool:
-        """Same point and height, opposite headings -- the exact mating test."""
-        return (
-            self.p.key() == other.p.key()
-            and self.z == other.z
-            and (self.heading - other.heading) % 12 == 6
-        )
-
-    def xyz(self) -> tuple[float, float, float]:
-        x, y = self.p.xy()
-        return (x, y, self.z / SCALE)
-
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         x, y = self.p.xy()
         return f"LatticePose({x:.3f}, {y:.3f}, z={self.z / SCALE:.3f}, {self.heading * 30}deg)"
-
-
-ORIGIN_POSE = LatticePose(LatticePoint(0, 0, 0, 0), 0, 0)
 
 
 def _scaled_int(value: Fraction) -> int | None:
