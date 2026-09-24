@@ -27,7 +27,7 @@ provably periodic.
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from itertools import product
 
@@ -35,7 +35,7 @@ from .layout import End, Layout
 
 __all__ = [
     "ClassificationLimitError", "DriveLimitError", "DriveReport", "DriveTerminal", "drive",
-    "endless_run", "classify", "drivable_universe",
+    "classify", "drivable_universe",
 ]
 
 #: Stones that affect motion.
@@ -273,23 +273,6 @@ def drive(
         if link is None:
             return finish("derailed", placement, "open_end", exit_port)
         placement, entered = link
-
-
-def endless_run(
-    layout: Layout,
-    starts: Iterable[End] | None = None,
-) -> DriveReport | None:
-    """The first start that yields an endless run, or None.
-
-    Tries both directions of every piece by default.
-    """
-    if starts is None:
-        starts = _all_starts(layout)
-    for start in starts:
-        report = drive(layout, start=start)
-        if report.outcome == "endless":
-            return report
-    return None
 
 
 # --------------------------------------------------------------------------------------

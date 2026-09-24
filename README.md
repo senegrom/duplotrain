@@ -123,7 +123,8 @@ set twice. Sets also contribute their **action stones** (below).
 
 `duplotrain check` audits the geometry of every recorded joint, not just whether the
 connectors have link records: it exits 1 for empty or open layouts, non-exact joints
-and incompatible headings, elevations or connector plates. `--slop 5` accepts up to
+and incompatible headings, elevations or connector plates, and lists the five
+closest pairs of open ends. `--slop 5` accepts up to
 5 mm of **total** planar joint gap in a fully linked layout with a forced-fit warning;
 it never excuses elevation or heading errors and checks no collisions away from the
 joints. The editor recomputes joint warnings after import and reload, so an exported

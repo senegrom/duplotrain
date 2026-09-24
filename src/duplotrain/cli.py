@@ -431,10 +431,7 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
         console.print(f"[yellow]{len(layout.connectable_ends())} open end(s).[/yellow]")
         if not len(layout):
             console.print("Empty layout; no closed track.")
-        # A buffer's sealed face is no open end: drop those before the first five.
-        gaps = [(a, b, gap) for a, b, gap in layout.gaps()
-                if not layout.is_sealed(a) and not layout.is_sealed(b)]
-        for a, b, gap in gaps[:5]:
+        for a, b, gap in layout.gaps(limit=5):
             console.print(f"  Open ends {a} <-> {b}: gap {gap:.6g} mm")
     for joint in issues:
         a, b = tuple(joint["a"]), tuple(joint["b"])

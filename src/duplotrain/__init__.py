@@ -19,7 +19,6 @@ from .drive import (
     LoopClassification,
     classify,
     drive,
-    endless_run,
 )
 from .exact import Alg
 from .explore import (
@@ -66,7 +65,6 @@ __all__ = [
     "ScoreWeights",
     "score_solution",
     "drive",
-    "endless_run",
     "classify",
     "DriveReport",
     "LoopClassification",

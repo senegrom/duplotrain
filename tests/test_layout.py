@@ -216,3 +216,38 @@ def test_joint_audit_since_is_the_full_audit_restricted_to_later_placements(cata
         assert layout.joint_issues(port_poses, since=since) == expected
     assert layout.joint_issues(since=3) == [full[0], full[2]]
     assert layout.joint_issues(since=5) == []
+
+
+def test_track_length_needs_no_congruence_origin(monkeypatch, catalog):
+    # The exact average of points with unrelated denominators can run to tens of
+    # thousands of digits, and a length never needs that origin.
+    import math
+
+    import duplotrain._congruence as congruence
+
+    monkeypatch.setattr(congruence, "_normalise", lambda layout: pytest.fail("origin computed"))
+    circle = build_chain([(catalog["curve"], 0, 1)] * 12)
+    assert circle.track_length() == pytest.approx(2 * math.pi * 256)
+
+
+@pytest.mark.parametrize("columns", [20, 1])
+def test_the_closest_gaps_come_first_without_measuring_every_pair(monkeypatch, catalog, columns):
+    # A grid of loose crossings, or a single column of them, plus buffers whose
+    # sealed faces must never be paired. Equal gaps keep end order.
+    from duplotrain.geometry import Pose
+    from duplotrain.layout import Placement
+
+    placements = [Placement(catalog["crossing"], Pose.make(400 * (i % columns), 400 * (i // columns)))
+                  for i in range(100)]
+    placements += [Placement(catalog["buffer"], Pose.make(-1000, 300 * i)) for i in range(4)]
+    layout = Layout(tuple(placements))
+    full = layout.gaps()
+    assert not any(layout.is_sealed(end) for a, b, _gap in full for end in (a, b))
+    measured = []
+    original = Pose.distance_to
+    monkeypatch.setattr(Pose, "distance_to",
+                        lambda self, other: measured.append(1) or original(self, other))
+    for limit in (1, 5, 12):
+        assert layout.gaps(limit=limit) == full[:limit]
+    assert len(measured) < len(full) // 20
+    assert layout.gaps(limit=0) == [] and len(layout.gaps(limit=len(full) + 7)) == len(full)

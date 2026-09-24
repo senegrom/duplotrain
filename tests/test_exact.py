@@ -67,5 +67,4 @@ def test_ordering_matches_floats():
 
 def test_rationality():
     assert Alg(Fraction(7, 3)).is_rational()
-    assert Alg(Fraction(7, 3)).as_fraction() == Fraction(7, 3)
     assert not SQRT3.is_rational()

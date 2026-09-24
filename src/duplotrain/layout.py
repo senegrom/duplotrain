@@ -12,6 +12,7 @@ for speed and only builds a ``Layout`` once a candidate is worth keeping.
 
 from __future__ import annotations
 
+import heapq
 import math
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
@@ -585,20 +586,56 @@ class Layout:
                 return
             cursor = nxt
 
-    def gaps(self) -> list[tuple[End, End, float]]:
-        """Pairs of open ends that nearly meet, with the gap in mm.
+    def gaps(self, limit: int | None = None) -> list[tuple[End, End, float]]:
+        """Pairs of connectable ends, closest first, with the planar gap in mm.
 
         Useful for reporting near-misses: a layout that is 4 mm from closing is a
-        different kind of answer from one that is 400 mm away.
+        different kind of answer from one that is 400 mm away. A buffer's sealed
+        face mates with nothing and is never paired. Equal gaps keep end order.
+
+        Without *limit* every pair is listed. With it, only that many of the
+        closest, found by a sweep along the wider axis that measures only pairs
+        still able to beat the worst one kept.
         """
-        open_ends = self.open_ends()
-        poses = [self.pose_of(end) for end in open_ends]  # once per end, not per pair
-        out = []
-        for i, a in enumerate(open_ends):
-            for j in range(i + 1, len(open_ends)):
-                out.append((a, open_ends[j], poses[i].distance_to(poses[j])))
-        out.sort(key=lambda t: t[2])
-        return out
+        ends = self.connectable_ends()
+        poses = [self.pose_of(end) for end in ends]  # once per end, not per pair
+        if limit is None:
+            out = [(ends[i], ends[j], poses[i].distance_to(poses[j]))
+                   for i in range(len(ends)) for j in range(i + 1, len(ends))]
+            out.sort(key=lambda t: t[2])
+            return out
+        if limit < 1 or len(ends) < 2:
+            return []
+        # A gap is at least the pair's distance along either axis, less the error of
+        # converting each end's exact coordinates to float, which `slack` bounds.
+        points = [(float(pose.x), float(pose.y)) for pose in poses]
+        slack = [2 * (_float_error(pose.x) + _float_error(pose.y)) for pose in poses]
+        spans = [max(p[k] for p in points) - min(p[k] for p in points) for k in (0, 1)]
+        along = 0 if spans[0] >= spans[1] else 1
+        order = sorted(range(len(ends)), key=lambda k: points[k][along])
+        shrink = 1 - 2.0 ** -50  # a float difference's own rounding
+        kept: list[tuple[float, int, int]] = []  # the worst kept (gap, i, j), negated, on top
+        for position, first in enumerate(order):
+            for second in order[position + 1:]:
+                if len(kept) == limit:
+                    bound = -kept[0][0] + slack[first] + slack[second]
+                    if (points[second][along] - points[first][along]) * shrink > bound:
+                        break  # every later end lies farther along the sweep
+                    if abs(points[second][1 - along] - points[first][1 - along]) * shrink > bound:
+                        continue
+                i, j = sorted((first, second))
+                candidate = (-poses[i].distance_to(poses[j]), -i, -j)
+                if len(kept) < limit:
+                    heapq.heappush(kept, candidate)
+                elif candidate > kept[0]:
+                    heapq.heapreplace(kept, candidate)
+        return [(ends[-i], ends[-j], -gap) for gap, i, j in sorted(kept, reverse=True)]
+
+
+def _float_error(value: Alg) -> float:
+    """A bound on ``|float(value) - value|``: float() rounds four terms and three sums."""
+    a, b, c, d = (abs(float(coefficient)) for coefficient in value.coeffs())
+    return 2.0 ** -48 * (a + 1.5 * b + 1.8 * c + 2.5 * d)
 
 
 # --------------------------------------------------------------------------------------

@@ -165,8 +165,12 @@ def _placement_primitives(placement) -> tuple:
     return cached
 
 
-def _normalise(layout: Layout) -> _Curve:
-    """Union exact primitives and choose an equivariant translation origin."""
+def _union(layout: Layout) -> tuple[list, dict, set, list, set]:
+    """Union exact primitives: lines, circle sectors, isolated points, opaque segments.
+
+    Also returns the feature points (segment ends and sector boundaries) whose
+    average is the congruence origin.
+    """
     line_groups = defaultdict(list)
     circles = defaultdict(set)
     endpoints: dict[tuple, dict] = defaultdict(dict)  # line -> axis value -> point
@@ -232,6 +236,12 @@ def _normalise(layout: Layout) -> _Curve:
     features.update(isolated)
     for start, end, _segment in opaque:
         features.update((_xyz(start), _xyz(end)))
+    return lines, circles, isolated, opaque, features
+
+
+def _normalise(layout: Layout) -> _Curve:
+    """Union exact primitives and choose an equivariant translation origin."""
+    lines, circles, isolated, opaque, features = _union(layout)
     # Unique normalized endpoints/sector boundaries transform as a set. Averaging
     # them exactly makes translation independent of segmentation and duplication.
     # The exact average is summed in integers over one common denominator, with
@@ -569,12 +579,13 @@ def curve_length(layout: Layout) -> float:
     Known collinear intervals and circular sectors are counted once even when
     routes share them or duplicate them with different segment boundaries. For an
     unknown Segment, its declared length is used; arbitrary-shape intersections
-    cannot be unioned without a primitive description.
+    cannot be unioned without a primitive description. A length needs no origin:
+    the exact centroid of points with unrelated denominators can be enormous.
     """
-    curve = _normalise(layout)
+    lines, circles, _isolated, opaque, _features = _union(layout)
     lengths = [math.sqrt(float(sum(((y - x) * (y - x) for x, y in zip(a, b, strict=True)),
-                                  Alg(0)))) for a, b in curve.lines]
+                                  Alg(0)))) for a, b in lines]
     lengths.extend(float(radius) * math.radians(DEGREES_PER_STEP * len(sectors))
-                   for _centre, radius, sectors in curve.circles)
-    lengths.extend(segment.length() for _start, _end, segment in curve.opaque)
+                   for (_centre, radius), sectors in circles.items())
+    lengths.extend(segment.length() for _start, _end, segment in opaque)
     return math.fsum(lengths)

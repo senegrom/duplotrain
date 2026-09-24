@@ -28,7 +28,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
 from functools import lru_cache
-from typing import Any, Literal
+from typing import Any
 
 from .exact import Alg, alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose, cos_sin, degrees_to_steps
@@ -298,7 +298,6 @@ class Route:
     port_a: int
     port_b: int
     path_index: int
-    kind: Literal["main", "branch"] = "main"
 
 
 @dataclass(frozen=True, slots=True)
@@ -381,18 +380,10 @@ class PieceType:
             (exit_.heading + rotation) % HEADING_STEPS,
         )
 
-    def centreline(self, route: Route, spacing: float = 8.0) -> list[tuple[float, float, float]]:
-        """Sampled centreline of one route, in the piece's local frame."""
-        return self.paths[route.path_index].sample(spacing)
-
     def all_centrelines(self, spacing: float = 8.0) -> list[list[tuple[float, float, float]]]:
         # Cache immutable samples, never the caller's mutable outer/inner lists.
         # Geometry (not a catalogue id) is the key, so custom pieces cannot alias.
         return [list(line) for line in _sample_paths(self.paths, spacing)]
-
-    def span(self) -> float:
-        """Longest path length through the piece, in mm."""
-        return max((p.length() for p in self.paths), default=0.0)
 
 
 @lru_cache(maxsize=128)
@@ -474,7 +465,7 @@ def _derive_ports_and_routes(
         if a == b:
             raise ValueError("a path must start and end at different ports")
         routes.append(
-            Route(port_a=a, port_b=b, path_index=i, kind="main" if i == 0 else "branch")
+            Route(port_a=a, port_b=b, path_index=i)
         )
 
     if names:

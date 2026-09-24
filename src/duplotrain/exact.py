@@ -250,12 +250,6 @@ class Alg:
     def is_rational(self) -> bool:
         return not (self.b or self.c or self.d)
 
-    def as_fraction(self) -> Fraction:
-        """Return the value as a :class:`Fraction`, if it is rational."""
-        if not self.is_rational():
-            raise ValueError(f"{self!r} is not rational")
-        return self.a
-
     def coeffs(self) -> tuple[Fraction, Fraction, Fraction, Fraction]:
         return (self.a, self.b, self.c, self.d)
 
