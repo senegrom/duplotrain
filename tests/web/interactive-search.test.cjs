@@ -172,6 +172,51 @@ test("route analysis labels incomplete bounds and loads the selected witness onl
   assert.equal(traceBody.start,"[0,0]"); assert.deepEqual(traceBody.switches,{5:2,6:2});
 });
 
+test("Load counterexample loads the counterexample's start and switches, not the best route", async () => {
+  let traceBody;
+  const h = app({testTrain: async () => { traceBody = {start: h.el("train-start").value,
+    switches: clean(h.run("initialSwitches"))}; }});
+  h.context.report = route({status: "complete", complete: true,
+    best: {start: [0, 0], switch_states: {5: 1}, visited: 3, cycle_visited: 3},
+    counterexample: {start: [2, 1], switch_states: {5: 2}, visited: 1, cycle_visited: 0},
+    classification: {looping: false, completely_looping: false, perfectly_looping: false}});
+  h.run("routeAnalysis = report; showRouteAnalysis()");
+  assert.equal(h.el("route-counterexample").hidden, false);
+  await h.el("route-counterexample").click();
+  assert.deepEqual(traceBody, {start: "[2,1]", switches: {5: 2}});
+});
+
+test("Pause stops a route analysis at its next checkpoint and offers Resume", async () => {
+  const paths = []; let h, ticks = 0;
+  h = app({api: async path => {
+    paths.push(path);
+    if (path === "/api/routes/start") return route();
+    if (path === "/api/routes/pause") return route({runs: 2, status: "paused"});
+    if (path !== "/api/routes/tick") throw new Error("Unexpected API: " + path);
+    if (++ticks === 1) h.el("route-pause").click();  // pressed while the first tick runs
+    return ticks < 4 ? route({runs: 1 + ticks}) : route({status: "complete", complete: true});
+  }});
+  await h.run('startRouteAnalysis("all")');
+  assert.deepEqual(paths, ["/api/routes/start", "/api/routes/tick", "/api/routes/pause"]);
+  assert.equal(h.run("routeAnalysis.status"), "paused");
+  assert.equal(h.el("route-pause").hidden, true);
+  assert.equal(h.el("route-resume").hidden, false);
+});
+
+test("Stop with results is offered only while a running search has found some", async () => {
+  const h = app();
+  const offered = extra => {
+    h.context.current = job(extra); h.run("interactiveJob = current; renderJobControls()");
+    return !h.el("stop-results").hidden;
+  };
+  assert.equal(offered({found: 0}), false);
+  assert.equal(offered({found: 3, status: "paused"}), false);
+  assert.equal(offered({found: 3, revision: 6}), false);  // a search of an older layout
+  assert.equal(offered({found: 3}), true);
+  await h.el("stop-results").click();
+  assert.equal(h.run("jobPauseRequested"), true);
+});
+
 test("viewport culling submits only visible track and includes edge padding", () => {
   let fills=0,strokes=0;
   const h=harness({events:true,overrides:{worldToScreen:(x,y)=>[x,y]}});
@@ -253,13 +298,19 @@ for (const [finished, message] of [
 
 test("Close the loop and Search harder ignore clicks before state loads and during work", async () => {
   const calls = [];
-  const h = app({api: async (path, body) => { calls.push(path); return job(); }});
-  for (const setup of ["S = null", "S = {open_ends: []}; apiBusy = true", "apiBusy = false; solving = true"]) {
+  const h = app({api: async (path, body) => { calls.push([path, body.harder]); throw new Error("refused"); }});
+  // A paused search of the shown revision, which Search harder, Find more and
+  // Resume would continue: only the loading and busy guards can refuse them.
+  h.context.paused = job({status: "paused", found: 8});
+  h.run("interactiveJob = paused");
+  for (const setup of ["S = null", "S = {revision: 7, open_ends: []}; apiBusy = true", "apiBusy = false; solving = true"]) {
     h.run(setup);
-    await h.el("solve").click();
-    await h.el("expand-search").click();
+    for (const id of ["solve", "expand-search", "find-more", "resume-search"]) await h.el(id).click();
   }
   assert.deepEqual(calls, []);
+  h.run("solving = false");
+  await h.el("expand-search").click();
+  assert.deepEqual(calls, [["/api/search/continue", true]]);
 });
 
 test("the busy state holds through a whole search instead of flickering per tick", async () => {
@@ -380,4 +431,42 @@ test("Search harder leaves with the paused search a route analysis replaces", as
   assert.equal(h.el("expand-search").hidden, false);
   await h.run('startRouteAnalysis("all")');
   assert.equal(h.el("expand-search").hidden, true);
+});
+
+test("publishing a search keeps the train start, switches and trace made on its layout", async () => {
+  const piece = (name, x, ports) => ({name, width: 40, lines: [[[x, 0, 0], [x + 128, 0, 0]]],
+    mid: [x + 64, 0], stone_marks: [], ports: ports.map((p, i) => ({port: i, name: p, x: x + 128 * i,
+      y: 0, deg: 0, open: true, sealed: false}))});
+  const state = revision => ({...scene([piece("straight", 0, ["a", "b"]),
+    piece("switch", 200, ["stem", "left", "right"])], revision), open_ends: [[0, 0], [1, 2]],
+    train_switches: [{placement: 1, default: 1, options: [{port: 1, name: "left"}, {port: 2, name: "right"}]}]});
+  let h;
+  h = harness({state: state(7), events: true, overrides: {setTimeout: fn => { fn(); return 1; },
+    api: async path => {
+      if (path === "/api/drive") return {revision: h.context.S.revision, steps: [[1, 0, 2], [0, 1, 0]],
+        terminal: null, cycle_start: 0, period: 2, outcome: "endless", reversals: 0,
+        visited_drivable: [0, 1], drivable_count: 2, complete: true, unvisited: [], cycle_pieces: [0, 1]};
+      if (path === "/api/search/start") return job();
+      if (path === "/api/search/tick") return job({status: "results_ready", found: 1});
+      if (path === "/api/search/publish") return {...state(8), search_job: job({revision: 8,
+        status: "results_ready", found: 1})};
+      throw new Error("Unexpected API: " + path);
+    }}});
+  h.run("redraw()");
+  h.el("train-start").value = "[1,1]"; h.el("train-start").fire("change");
+  const control = h.el("train-switches").children[0].children[0];
+  control.value = "2"; control.fire("change");
+  h.el("piece-select").value = "1";
+  await h.run("testTrain()");
+  await h.run("startInteractiveSearch(null, null)");
+  assert.equal(h.context.S.revision, 8);
+  assert.equal(h.el("train-start").value, "[1,1]");
+  assert.deepEqual(clean(h.run("initialSwitches")), {1: 2});
+  assert.equal(h.el("piece-select").value, "1");
+  assert.equal(h.run("trainTrace.revision"), 8);
+  h.el("train-step").click();
+  assert.equal(h.run("trainStep"), 0);
+  // The same switch control still accepts a change on the new revision.
+  control.value = "1"; control.fire("change");
+  assert.deepEqual(clean(h.run("initialSwitches")), {1: 1});
 });

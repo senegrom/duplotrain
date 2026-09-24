@@ -200,6 +200,7 @@ class Cursor:
     blocked: bool = False
     exhausted: bool = False
     expand: Any = None
+    direction: int = 0  # 0 grows from the chosen end, 1 from the other one
 
     def advance(self):
         try:
@@ -244,6 +245,8 @@ class PairSearch:
         self.arc_session = Session(catalog=dict(catalog), history=[base], inventory={
             pid: n + base.piece_counts.get(pid, 0) for pid, n in stock.items()
         })
+        # As /api/solve does, a search allowing reversing loops skips the arc
+        # templates: its ordinary stages then find the same closures first.
         self.arc = (iter(()) if reversing else
                     self.arc_session._arc_events(grow, close, MAX_RESULTS, depth))
         self.arc_done = False
@@ -260,22 +263,27 @@ class PairSearch:
         base, catalog, stock = self.base, self.catalog, self.stock
         plain = {pid: n for pid, n in stock.items() if pid in ("curve", "straight") and n}
         full = {pid: n for pid, n in stock.items() if n}
-        directions = [(self.grow, self.close_end)]
-        if not self.slop and not self.reversing:
-            directions.append((self.close_end, self.grow))
         stages = []
         if plain and plain != full:
             stages.append(("plain track", plain, catalog, 25_000, 0, None))
         bridge = _bridge(catalog)
         if (bridge is not None and stock.get("ramp", 0) >= 2
-                and stock.get("span", 0) >= 2 and not self.reversing
+                and stock.get("span", 0) >= 2
                 and base.pose_of(self.grow).z == ZERO and base.pose_of(self.close_end).z == ZERO):
             macro, parts = bridge
             stages.append(("standard bridge", {**plain, _BRIDGE_ID: 1},
                            {**catalog, _BRIDGE_ID: macro}, 250_000, 3, parts))
         stages.append(("full inventory", full, catalog, 60_000, 0, None))
         for name, inventory, pieces, budget, overhead, parts in stages:
-            for grow, close in directions:
+            # Plain and bridge stages look for ordinary closures; only the full
+            # inventory also searches reversing ones, as /api/solve does. Forced
+            # fits and reversing closures are not direction-equivalent: those
+            # stages grow from the chosen end only.
+            reversing = self.reversing and name == "full inventory"
+            directions = [(self.grow, self.close_end)]
+            if not self.slop and not reversing:
+                directions.append((self.close_end, self.grow))
+            for direction, (grow, close) in enumerate(directions):
                 cap = budget * self.effort
                 limits = SearchLimits(min(1024, cap), MAX_RESULTS, max(1, self.depth - overhead))
 
@@ -298,13 +306,13 @@ class PairSearch:
                 iterator = solve_steps(inventory, pieces,
                     SolverConfig(min_pieces=0, max_pieces=limits.max_pieces,
                                  max_results=MAX_RESULTS, max_nodes=cap, slop=self.slop,
-                                 reversing_loops=self.reversing,
+                                 reversing_loops=reversing,
                                  completion_base_work=min(4096, cap // 8),
                                  solution_filter=accept),
                     base=base, grow_from=grow, close_onto=close, limits=limits)
                 self.cursors.append(Cursor(iterator, limits, name, cap, overhead,
                                            blocked=bool(overhead and self.depth < 4),
-                                           expand=expand))
+                                           expand=expand, direction=direction))
 
     def step(self):
         if not self.arc_done:
@@ -348,14 +356,16 @@ class PairSearch:
             left = [i for i, c in enumerate(self.cursors) if not c.blocked and not c.exhausted]
             if left:
                 first_stage = self.cursors[left[0]].stage
-                same_end = self.active % (2 if not self.slop and not self.reversing else 1)
                 self.active = next((i for i in left if self.cursors[i].stage == first_stage
-                                    and i % 2 == same_end), left[0])
+                                    and self.cursors[i].direction == cursor.direction), left[0])
         elif event["kind"] in ("node_limit", "result_limit"):
             left = [i for i, c in enumerate(self.cursors) if not c.blocked and not c.exhausted]
-            other = self.active ^ 1
-            if other in left and self.cursors[other].stage == cursor.stage:
+            other = next((i for i in left if i != self.active
+                          and self.cursors[i].stage == cursor.stage), None)
+            if other is not None:
                 self.active = other
+            elif len(stage) == 1 and self.active in left:
+                pass  # a one-direction stage runs until its own limits stop it
             elif left:
                 self.active = next((i for i in left if i != self.active), left[0])
         # A single cursor stopping is not a whole-problem exhaustion verdict.

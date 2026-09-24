@@ -11,9 +11,11 @@ from duplotrain.gui import Session, make_server
 
 
 def unchanged(session):
-    """Include candidate identity state and undo history, not only visible geometry."""
-    return (session.snapshot(), list(session.history), session.revision,
-            list(session.candidates), session._candidate_revision)
+    """Include candidate identity state and the undo AND redo history, not only
+    visible geometry: a rejected edit must keep redo (docs/editor.md, History)."""
+    return (session.snapshot(), list(session.history), list(session._history_state),
+            list(session._future), session.revision, list(session.candidates),
+            session._candidate_revision)
 
 
 @contextmanager

@@ -1,7 +1,8 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {harness} = require("./reliability-harness.cjs");
+const {randomUUID} = require("node:crypto");
+const {harness, scene} = require("./reliability-harness.cjs");
 
 function editor() {
   const calls = [];
@@ -137,4 +138,110 @@ test("another tab's restore into the new engine is adopted like any conflict", a
   assert.equal(e.h.run("S.revision"), 1);
   assert.equal(e.h.run("S.instance"), "new");
   assert.equal(e.redraws(), 1);
+});
+
+// Tabs of one origin on one local server whose session is a list of piece ids;
+// the server can restart empty, counting revisions from 0 in a new instance.
+function localServerTabs() {
+  const values = new Map();
+  const storage = {get length() { return values.size; }, key: i => [...values.keys()][i],
+    getItem: k => values.get(k) ?? null, setItem: (k, v) => values.set(k, String(v)),
+    removeItem: k => values.delete(k)};
+  let queue = Promise.resolve();
+  const locks = {request(_name, callback) { const p = queue.then(callback); queue = p.catch(() => {}); return p; }};
+  const server = {instance: "A", revision: 0, pieces: []};
+  const snapshotOf = pieces => ({format: "duplotrain-session/1", inventory: {straight: 20}, stones: {},
+    unlimited: false, layout: {format: "duplotrain-layout/1", placements: pieces.map(piece => ({piece}))}});
+  const stateOf = () => {
+    const state = scene(server.pieces.map((name, i) => ({name, width: 40, ports: [], stone_marks: [],
+      lines: [[[i * 200, 0, 0], [i * 200 + 128, 0, 0]]], mid: [i * 200 + 64, 0]})), server.revision);
+    return JSON.parse(JSON.stringify({...state, instance: server.instance,
+      snapshot: snapshotOf(server.pieces), train_switches: []}));
+  };
+  const api = async (path, body) => {
+    await new Promise(resolve => setImmediate(resolve));
+    if (path === "/api/state") return stateOf();
+    if (body.revision !== server.revision || (body.instance ?? server.instance) !== server.instance) {
+      const error = new Error("The session changed in another tab. Your action was not applied.");
+      error.code = "stale_revision"; error.state = stateOf(); throw error;
+    }
+    if (path === "/api/restore") server.pieces = body.data.layout.placements.map(p => p.piece);
+    else if (path === "/api/attach") server.pieces = [...server.pieces, body.piece];
+    server.revision++;
+    return stateOf();
+  };
+  const settle = async () => { for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve)); };
+  const open = async () => {
+    const h = harness({state: null, events: true, omit: ["api", "saveSession"], overrides: {
+      localStorage: storage, navigator: {locks}, crypto: {randomUUID},
+      setTimeout: fn => { fn(); return 1; }, location: {pathname: "/"}}});
+    h.context.window.duplotrainApi = api;
+    await h.run("refresh()"); await settle();
+    return {h, shown: () => h.context.S.layout.placements.map(p => p.name).join(","),
+      async attach(piece) {
+        h.context.piece = piece;
+        try { await h.run("(async () => { S = await api('/api/attach', {piece, entry: 0, at: null}); redraw(); })()"); }
+        catch (error) { await settle(); return error.message; }
+        await settle(); return "ok";
+      }};
+  };
+  const saved = () => JSON.parse(storage.getItem("duplotrain-session/2:/")).snapshot.layout.placements
+    .map(p => p.piece).join(",");
+  return {server, open, saved};
+}
+
+test("after a server restart a stale tab restores the newest autosave, not its older view", async () => {
+  const {server, open, saved} = localServerTabs();
+  const newer = await open();
+  await newer.attach("curve");
+  const stale = await open();                       // sees only the curve, then stays idle
+  await newer.attach("straight"); await newer.attach("bridge");
+  assert.equal(stale.shown(), "curve"); assert.equal(saved(), "curve,straight,bridge");
+  // A trace the stale tab made on its revision 1 of the old engine.
+  stale.h.run("trainTrace = {revision: S.revision, steps: [[0, 0, 1]], start: [0, 0], terminal: null, cycle_start: 0}");
+  Object.assign(server, {instance: "B", revision: 0, pieces: []});   // the server restarts
+  assert.match(await stale.attach("switch"), /another tab saved last was restored/);
+  assert.equal(server.pieces.join(","), "curve,straight,bridge");
+  // The restore is revision 1 of the new engine, the very number the stale tab
+  // showed: only the restart itself says its selectors and trace belong elsewhere.
+  assert.equal(stale.h.context.S.revision, 1);
+  assert.deepEqual(stale.h.el("piece-select").children.map(o => o.textContent),
+    ["#1 curve", "#2 straight", "#3 bridge"]);
+  assert.equal(stale.h.run("trainTrace"), null);
+  assert.match(await newer.attach("switch"), /not applied/);
+  assert.equal(newer.shown(), "curve,straight,bridge");
+  assert.equal(saved(), "curve,straight,bridge");
+  const fresh = await open();
+  assert.equal(fresh.shown(), "curve,straight,bridge"); assert.equal(saved(), "curve,straight,bridge");
+});
+
+test("after a server restart the tab that saved last restores its own session", async () => {
+  const {server, open, saved} = localServerTabs();
+  const tab = await open();
+  await tab.attach("curve"); await tab.attach("straight");
+  Object.assign(server, {instance: "B", revision: 0, pieces: []});
+  assert.match(await tab.attach("bridge"), /this tab's last confirmed session was restored/);
+  assert.equal(server.pieces.join(","), "curve,straight"); assert.equal(saved(), "curve,straight");
+});
+
+test("a state from another engine at the same revision number rebuilds revision-bound selectors", async () => {
+  const piece = (name, x) => ({name, width: 40, lines: [[[x, 0, 0], [x + 128, 0, 0]]], mid: [x + 64, 0],
+    stone_marks: [], ports: [{port: 0, name: "a", x, y: 0, deg: 180, open: true, sealed: false},
+      {port: 1, name: "b", x: x + 128, y: 0, deg: 0, open: true, sealed: false}]});
+  const state = (instance, names) => ({...scene(names.map((n, i) => piece(n, i * 300)), 3), instance,
+    open_ends: [], train_switches: []});
+  const other = state("B", ["bridge ramp", "curve", "straight"]);
+  const h = harness({state: state("A", ["curve", "straight", "bridge ramp"]), events: true, omit: ["api"],
+    overrides: {setTimeout: fn => { fn(); return 1; }}});
+  h.context.window.duplotrainApi = async () => {
+    const error = new Error("The session changed in another tab."); error.code = "stale_revision";
+    error.state = other; throw error;
+  };
+  h.run("redraw()"); h.el("piece-select").value = "1";
+  h.run("trainTrace = {revision: 3, steps: [[2, 0, 1]], start: [2, 0], terminal: null, cycle_start: 0}");
+  await h.run("checkLayout()");
+  assert.equal(h.context.S.instance, "B");
+  assert.deepEqual(h.el("piece-select").children.map(o => o.textContent),
+    ["#1 bridge ramp", "#2 curve", "#3 straight"]);
+  assert.equal(h.run("trainTrace"), null);
 });

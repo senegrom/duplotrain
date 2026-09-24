@@ -40,7 +40,9 @@ async function showOfflineStatus() {
   offlineNotice(result.ready ? (same ? "Offline ready (verified complete app)." :
     `Offline build ${result.build} is ready. Save your project before reloading it.`) :
     "Offline files are missing or incomplete. Reinstall while online.");
-  if (el("offline-update")) el("offline-update").hidden = !r.waiting && same;
+  // Only a waiting version is an update: reloading otherwise opens the active
+  // offline build, which may be older than this page.
+  if (el("offline-update")) el("offline-update").hidden = !r.waiting;
 }
 function watchOfflineUpdates(r) {
   r.addEventListener("updatefound", () => {
@@ -69,7 +71,7 @@ async function installOffline() {
     const result = await offlineMessage(worker, "INSTALL");
     offlineNotice(result.ready && result.build === window.duplotrainBuild ? "Offline ready (complete version verified)." :
       `Build ${result.build} is ready offline. Save your project before switching versions.`);
-    el("offline-update").hidden = !r.waiting && result.build === window.duplotrainBuild;
+    el("offline-update").hidden = !r.waiting;
   } catch (error) { offlineNotice(`${error.message} Portable project downloads remain available.`); }
   finally { offlineWorking = false; }
 }

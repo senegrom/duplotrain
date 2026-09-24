@@ -27,9 +27,8 @@ function renderSwitches() {
       option.textContent = choice.name; select.append(option);
     }
     select.value = item.default; switchControls.set(item.placement, select);
-    const revision = S.revision;
     select.addEventListener("change", () => {
-      if (S?.revision !== revision) return;
+      if (navigationRevision !== S?.revision) return; // built for another layout
       const value = Number(select.value);
       if (!item.options.some(o => o.port === value)) return;
       initialSwitches[item.placement] = value; invalidateTrain(); draw();

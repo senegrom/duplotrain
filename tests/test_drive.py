@@ -3,9 +3,9 @@
 import pytest
 
 from duplotrain.catalog import default_catalog
-from duplotrain.drive import classify, drive
+from duplotrain.drive import DriveLimitError, classify, drive
 from duplotrain.explore import congruence_key, find_perfect_loops, make_dogbone
-from duplotrain.layout import build_chain
+from duplotrain.layout import Layout, build_chain
 from duplotrain.solver import SolverConfig, solve
 
 LEFT = (0, 1)
@@ -255,17 +255,23 @@ def test_congruence_identifies_same_curve_different_pieces(catalog):
 
 def test_find_perfect_loops_dedupes_isomorphs(catalog):
     """12 curves + 4 straights: four non-isomorphic perfectly looping tracks."""
-    found = find_perfect_loops(
-        {"curve": 12, "straight": 4},
-        catalog,
-        SolverConfig(use_all_pieces=True, max_results=100),
-    )
+    cfg = SolverConfig(use_all_pieces=True, max_results=100)
+    found = find_perfect_loops({"curve": 12, "straight": 4}, catalog, cfg)
+    assert found.stats.complete
     assert len(found) == 4  # oval, two parallelograms, rounded square -- stone added
     for layout, verdict in found:
         assert verdict.perfectly_looping
         assert any(sid == "stone_direction" for _i, sid in layout.accessories)
     keys = {congruence_key(layout) for layout, _v in found}
     assert len(keys) == 4
+    # Level crossings draw the same line as straights: the solver's nine piece
+    # arrangements trace those same four curves, and each counts once.
+    box = {"curve": 12, "straight": 2, "level_crossing": 2}
+    assert len(solve(box, catalog, cfg).solutions) == 9
+    crossed = find_perfect_loops(box, catalog, cfg)
+    assert crossed.stats.complete and len(crossed) == 4
+    assert {congruence_key(layout) for layout, _v in crossed} == keys
+    assert all(verdict.perfectly_looping for _layout, verdict in crossed)
 
 
 def test_a_crossing_on_the_tail_is_not_taken_for_the_switch(catalog):
@@ -292,6 +298,15 @@ def test_a_start_must_be_a_port_of_the_layout(catalog, start):
         drive(oval.join((15, 1), (0, 0)), start=start)
 
 
+def test_a_train_never_starts_through_a_sealed_face_or_on_no_track(catalog):
+    bar = build_chain([(catalog["straight"], 0, 1), (catalog["buffer"], 0, 1)])
+    with pytest.raises(ValueError, match="sealed buffer face"):
+        drive(bar, start=(1, 1))
+    assert drive(bar, start=(0, 0)).outcome == "buffered"
+    with pytest.raises(ValueError, match="nothing to drive on"):
+        drive(Layout())
+
+
 def test_the_counterexample_breaks_the_first_failed_property(catalog):
     # One direction round the oval stops at the stone, the other runs forever but
     # never covers the stone's face both ways: the report must show the stop.
@@ -302,3 +317,50 @@ def test_the_counterexample_breaks_the_first_failed_property(catalog):
     verdict = classify(oval.with_accessory(straight, "stone_stop", at_port=entered))
     assert verdict.locally_looping and not verdict.looping
     assert verdict.counterexample[2] == "stopped"
+
+
+def _switch_ring(n):
+    """Exact ring of 4n + 12 switches, each with one dangling branch, and a stone."""
+    sw, st = default_catalog()["switch"], default_catalog()["straight"]
+    side = [(sw, 0, 1), (sw, 1, 0)] * n + [(st, 0, 1)]
+    chain = build_chain(([(sw, 0, 1)] * 6 + side) * 2)
+    ring = chain.join((len(chain.placements) - 1, 1), (0, 0))
+    straight = next(i for i, p in enumerate(ring.placements) if p.piece.id == "straight")
+    return ring.with_accessory(straight, "stone_direction")
+
+
+def test_a_half_never_driven_is_not_swept_both_ways(catalog):
+    # A mid-piece stone on M and a stone on B's face toward M: every cycle bounces
+    # between M's midpoint and that face, so M's other half is never driven.
+    oval = build_chain(([(catalog["straight"], 0, 1)] * 2 + [(catalog["curve"], 0, 1)] * 6) * 2)
+    oval = oval.join((15, 1), (0, 0))
+    layout = oval.with_accessory(0, "stone_direction")
+    layout = layout.with_accessory(1, "stone_direction", at_port=0)
+    verdict = classify(layout)
+    assert verdict.completely_looping and not verdict.perfectly_looping
+    # One stone mid-piece sweeps both halves of its straight both ways: perfect.
+    assert classify(oval.with_accessory(0, "stone_direction")).perfectly_looping
+
+
+def test_an_endless_run_found_exactly_at_the_step_budget_is_a_verdict(catalog):
+    circle = build_chain([(catalog["curve"], 0, 1)] * 12).join((0, 0), (11, 1))
+    report = drive(circle, max_steps=12)
+    assert report.outcome == "endless" and len(report.steps) == 12
+    with pytest.raises(DriveLimitError, match="11-step budget"):
+        drive(circle, max_steps=11)
+
+
+def test_drive_memory_does_not_grow_with_steps_times_switches():
+    import tracemalloc
+
+    ring = _switch_ring(100)
+    assert sum(p.piece.id == "switch" for p in ring.placements) == 412
+    tracemalloc.start()
+    try:
+        report = drive(ring, start=(0, 0), max_steps=10_000)
+        _current, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert report.outcome == "endless" and len(report.steps) > 400
+    # One tongue tuple per change, not one per step (a copy per step took 6 MiB).
+    assert peak < 2 * 2**20

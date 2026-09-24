@@ -26,7 +26,8 @@ function harness({state = scene(), events = false, schedule = false, overrides =
   class Element {
     constructor(tag = "div") {
       created++;
-      this.tag = tag; this.tagName = tag; this.children = []; this.listeners = {}; this.dataset = {}; this.style = {};
+      this.tag = tag; this.tagName = tag; this.children = []; this.listeners = {}; this.registered = {};
+      this.dataset = {}; this.style = {};
       this.attributes = {}; this._value = ""; this.textContent = ""; this.disabled = false; this.hidden = false;
       this.checked = false;
       const classes = this.classes = new Set();
@@ -42,7 +43,10 @@ function harness({state = scene(), events = false, schedule = false, overrides =
     append(...children) { this.children.push(...children); }
     replaceChildren(...children) { this.children = children; this._value = ""; }
     setAttribute(k, v) { this.attributes[k] = String(v); }
-    addEventListener(event, action) { this.listeners[event] = action; }
+    // fire() and click() call the latest listener; `registered` keeps every one, so
+    // a control bound twice (one click, two actions) stays visible to a test.
+    addEventListener(event, action) { (this.registered[event] ??= []).push(action); this.listeners[event] = action; }
+    listenerCount(event) { return this.registered[event]?.length ?? 0; }
     fire(event, data = {target: this}) { return this.listeners[event]?.(data); }
     click() { if (!this.disabled) return this.fire("click"); }
     focus() { context.document.activeElement = this; }

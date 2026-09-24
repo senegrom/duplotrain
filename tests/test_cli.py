@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+import duplotrain.cli as cli
+from duplotrain import build_chain, classify, default_catalog
 from duplotrain.cli import main
+from duplotrain.layout import layout_to_dict
+from duplotrain.scoring import score_solution
+from duplotrain.solver import SolverConfig, SolveResult, SolveStats, solve
 
 
 @pytest.fixture()
@@ -20,13 +25,88 @@ def test_pieces_lists_catalog(runner):
     assert "curve" in result.output
 
 
-def test_unknown_piece_in_inventory_fails_politely(runner, tmp_path):
-    bad = tmp_path / "box.json"
-    bad.write_text(json.dumps({"curve": 12, "kurve": 4}))
-    result = runner.invoke(main, ["solve", "--inventory", str(bad)])
-    assert result.exit_code != 0
-    assert "unknown piece" in result.output
-    assert "Traceback" not in result.output
+def test_pieces_json_lists_every_piece_with_its_port_count(runner, tmp_path):
+    catalog = default_catalog()
+    result = runner.invoke(main, ["pieces", "--json"])
+    assert result.exit_code == 0
+    listed = {piece["id"]: piece for piece in json.loads(result.output)}
+    assert list(listed) == list(catalog)
+    assert {pid: piece["ports"] for pid, piece in listed.items()} == {
+        pid: len(piece.ports) for pid, piece in catalog.items()}
+    assert (listed["straight"]["ports"], listed["switch"]["ports"],
+            listed["crossing"]["ports"]) == (2, 3, 4)
+    # A --catalog file overrides a built-in piece by its id (the README example).
+    mine = tmp_path / "my-measurements.json"
+    mine.write_text(json.dumps({"pieces": [{
+        "id": "ramp", "name": "Bridge ramp (my callipers)", "category": "bridge", "width": 64,
+        "paths": [{"segments": [{"type": "ramp", "run": 320, "rise": 60}]}],
+        "port_names": ["low", "high"]}]}))
+    result = runner.invoke(main, ["pieces", "--json", "--catalog", str(mine)])
+    overridden = {piece["id"]: piece for piece in json.loads(result.output)}
+    assert list(overridden) == list(catalog)
+    assert overridden["ramp"]["name"] == "Bridge ramp (my callipers)"
+    assert overridden["ramp"]["ports"] == 2 and not overridden["ramp"]["provisional"]
+
+
+def captured_configs(monkeypatch):
+    configs = []
+
+    def search(inventory, catalog, config):
+        configs.append(config)
+        return SolveResult([], SolveStats(complete=True, stop_reason="exhausted"))
+
+    monkeypatch.setattr(cli, "solve", search)
+    return configs
+
+
+@pytest.mark.parametrize("args, reversing, announced", [
+    (["--set", "10874"], True, True),   # the Steam Train box has a direction stone
+    (["--set", "10874", "--no-reversing"], False, False),
+    (["--set", "10882"], False, False),  # Train Tracks: a stop stone only
+    (["--curve", "12"], False, False),
+    (["--curve", "12", "--reversing"], True, False),
+])
+def test_reversing_follows_a_sets_direction_stone_unless_chosen(runner, monkeypatch, args,
+                                                                reversing, announced):
+    configs = captured_configs(monkeypatch)
+    result = runner.invoke(main, ["solve", *args])
+    assert result.exit_code == 0, result.output
+    assert [config.reversing_loops for config in configs] == [reversing]
+    assert ("reversing loops enabled" in " ".join(result.output.split())) is announced
+
+
+@pytest.mark.parametrize("use_all", [False, True])
+def test_use_all_keeps_only_loops_that_use_every_owned_piece(runner, monkeypatch, tmp_path,
+                                                             use_all):
+    monkeypatch.setattr(cli, "_get_renderer", lambda required=True: None)  # JSON only
+    out = tmp_path / "out"
+    result = runner.invoke(main, ["solve", "--curve", "12", "--straight", "2", "-o", str(out),
+                                  *(["--use-all"] if use_all else [])])
+    assert result.exit_code == 0, result.output
+    sizes = sorted(len(json.loads(path.read_text())["placements"])
+                   for path in out.glob("loop_*.json"))
+    # The circle leaves both straights in the box; only the oval uses them all.
+    assert sizes == ([14] if use_all else [12, 14])
+
+
+def test_solve_saves_and_lists_loops_best_first(runner, monkeypatch, tmp_path):
+    monkeypatch.setattr(cli, "_get_renderer", lambda required=True: None)  # JSON only
+    inventory = {"curve": 12, "straight": 4}
+    out = tmp_path / "out"
+    result = runner.invoke(main, ["solve", "--curve", "12", "--straight", "4",
+                                  "-o", str(out), "--top", "25"])
+    assert result.exit_code == 0, result.output
+    found = solve(inventory, default_catalog(), SolverConfig(min_pieces=4, max_results=25))
+    score = {json.dumps(layout_to_dict(sol.layout)): score_solution(sol, inventory).total
+             for sol in found.solutions}
+    saved = sorted(out.glob("loop_*.json"))
+    assert len(saved) == len(found.solutions) >= 3
+    totals = [score[json.dumps(json.loads(path.read_text()))] for path in saved]
+    assert totals == sorted(totals, reverse=True) and totals[0] > totals[-1]
+    # The table lists them in the same order, numbered from the best.
+    shown = [round(float(row.split("│")[2])) for row in result.output.splitlines()
+             if row.count("│") > 3 and row.split("│")[1].strip().isdigit()]
+    assert shown == [round(total) for total in totals]
 
 
 def test_malformed_catalog_fails_politely(runner, tmp_path):
@@ -75,6 +155,29 @@ def test_solve_with_set_shortcut(runner):
     result = runner.invoke(main, ["solve", "--set", "9999"])
     assert result.exit_code != 0
     assert "unknown set" in result.output
+
+
+def test_check_reports_each_pair_of_open_ends_and_their_gap(runner, tmp_path):
+    half = build_chain([(default_catalog()["curve"], 0, 1)] * 6)
+    path = tmp_path / "half.json"
+    path.write_text(json.dumps(layout_to_dict(half)))
+    result = runner.invoke(main, ["check", str(path)])
+    assert result.exit_code == 1
+    assert "2 open end(s)" in result.output
+    # The half circle's two ends face each other across its 512 mm diameter.
+    assert "Open ends (0, 0) <-> (5, 1): gap 512 mm" in result.output
+
+
+def test_classify_prints_the_first_failing_run(runner, tmp_path):
+    bar = build_chain([(default_catalog()["straight"], 0, 1)] * 2)
+    path = tmp_path / "bar.json"
+    path.write_text(json.dumps(layout_to_dict(bar)))
+    result = runner.invoke(main, ["classify", str(path)])
+    assert result.exit_code == 0
+    (start, tongues, outcome) = classify(bar).counterexample
+    assert (start, tongues, outcome) == ((0, 0), {}, "derailed")
+    assert ("first failure: a train entering piece 0 via port 0 -> derailed"
+            in " ".join(result.output.split()))
 
 
 def test_check_rejects_garbage_layout(runner, tmp_path):

@@ -8,8 +8,8 @@ mates exactly (position, height and opposite heading). During growth, the collis
 checker therefore exempts the attached neighbour and those possible future
 neighbours. The final audit exempts only actual links.
 
-This uses the same whole-neighbour exemption as the final collision model; it does
-not assume a 70 mm joint radius or a particular piece width. Regression tests
+This uses the same whole-neighbour exemption as the final collision model, whatever
+the joint radius or piece width. Regression tests
 compare loop and network enumeration on wide circles, including a catalogue that
 requires the general field engine. Collision checks remain sampled and inherit
 the catalogue's geometry and underpass assumptions.
@@ -54,11 +54,12 @@ score include secondary junction routes.
 
 The regressions in `tests/test_review_round4.py` exercise decimal ties across all
 lattice symmetries, an exact independent oval oracle, shared-route length, and
-CLI output. They also verify the existing classifier safeguards on a connected
-25-switch layout: default budgets reject before simulation, while explicitly
-unbounded enumeration reaches the first simulation within an isolated process
-with only 64 MiB of additional address space. The latter test stops immediately;
-lazy allocation does not remove the exponential cost of complete classification.
+CLI output. On Linux, explicitly unbounded classification of a connected
+25-switch chain reaches its first simulation within an isolated process with only
+64 MiB of additional address space; the test stops there, since lazy allocation
+does not remove the exponential cost of complete classification.
+`tests/test_review_boundaries.py` checks that the default budget refuses 24
+switches before any simulation.
 
 ## Failed searches leave the editor unchanged
 
@@ -299,8 +300,7 @@ or `None` in the library API, permits exhaustive enumeration. This avoids both
 materializing an exponential assignment list and silently treating an unfinished
 universal check as a proof. The CLI exposes the same budget as `--max-runs`.
 
-These boundaries are covered by `tests/test_review_boundaries.py` and
-`tests/test_completion_lookahead.py`.
+These boundaries are covered by `tests/test_review_boundaries.py`.
 
 ## Reversals start another ordered pass
 
@@ -330,8 +330,8 @@ so a missing marker is an error rather than a request to add a new stone. Invali
 positions/removal modes leave the session and revision untouched.
 
 Library callers can use `Layout.without_accessory(..., at_port=None)` or an
-integer for exact-position removal. Omitting the keyword retains the older
-last-of-colour behaviour. Removing one marker preserves other positions, counts,
+integer for exact-position removal. Omitting the keyword removes the last stone
+of that colour. Removing one marker preserves other positions, counts,
 serialization round trips and undo.
 
 These contracts are exercised by `tests/test_review_round3.py`,
@@ -512,14 +512,29 @@ reversed pose of another end of `O` or at a spare port of a junction it placed.
 The first case is a reachability query of the loop solver's tables after the
 rigid motion that moves the target onto the anchor, over at most the remaining
 placements; the second is the solver's future-junction query, which depends
-only on the junction type and the remaining budget less one. Pieces with a
-sealed or route-less port can end a walk without mating anything, one end per
-such port, so a node is rejected only when more ends have no reachable target
-than the stock's caps can absorb. Collisions and stock counts are ignored,
-which only enlarges the allowed set; direct joins are the zero-traversal case.
-Regressions compare the enumerated layouts, in order, with and without the
-prune on rings, buffered bars, capped stars and networks with a switch or a
-crossing, and check that a teardrop closing into its own switch survives.
+only on the junction type and the remaining budget less one. A piece with a
+sealed or route-less port can end a walk without mating anything, and two walks
+can trail into one new junction whose third port a single such cap then
+closes, so while any cap remains in stock no end is provably stranded; with
+none left, a node is rejected when some end has no reachable target.
+Collisions and stock counts are ignored, which only enlarges the allowed set;
+direct joins are the zero-traversal case. Regressions compare the enumerated
+layouts, in order, with and without the prune on rings, buffered bars and capped
+networks with a switch or a crossing, check that a teardrop closing into its own
+switch survives, and that a passing loop whose two branch ends share one buffer
+through a second switch is found.
+
+## A reversing lobe driven either way round
+
+A reversing closure ends at a junction the walk placed or passed: the walk
+enters it, leaves by one branch, goes round the lobe and closes into the other
+branch, the stub. Entering the same way, the walk can leave by the stub instead
+and drive the lobe backwards to close into the first branch. When the closure
+is exact both walks build the same layout, so the signature is the minimum over
+both walks (and their mirror images in loop mode); a forced fit keeps its
+misfit at the closing joint, so its two walks are different layouts and keep
+separate signatures. A regression checks that no reversing result, in loop or
+completion mode, repeats a layout.
 
 ## Lazy signature minima and assembled layouts
 
@@ -601,7 +616,9 @@ off and checks that the candidate's only joint issues are the base's own.
 ## Packed lattice keys
 
 A key is injective on planar poses whose coordinates stay below 2^31 lattice
-units, 107 km, which no accepted layout approaches, and it ignores the height,
+units, 107 km. A problem whose anchor, start or base junction ports lie beyond
+2^30 lattice units (53 km) runs on the field engine instead; the search reaches
+only metres from them, so its keys stay in range. The key ignores the height,
 exactly as the levelled tuple did: the height layers remain separate. A move's
 packed delta is the difference of the keys of its endpoint and its origin at
 each heading, and adding it to any key of that heading yields the key of the

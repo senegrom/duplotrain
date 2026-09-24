@@ -62,6 +62,9 @@ def test_completion_respects_base_collisions(catalog):
     assert result.stats.complete and len(result.solutions) == 81
     assert not any(_solution_overlaps(s.layout, len(base), DEFAULT_CLEARANCE, 8.0)
                    for s in result.solutions)
+    # The search refuses those six itself, as it places their pieces; the
+    # final audit of each closure finds nothing left to drop.
+    assert result.stats.pruned_collision and not result.stats.dropped_overlap
 
 
 def test_completion_around_a_switch_leaves_its_branch_open(catalog):

@@ -199,18 +199,29 @@ for(const action of ["leave","revision","replace","drag"]) test(`queued hover is
   h.frames.shift()();assert.equal(calls,0);
 });
 
-test("bounds prefilter preserves ordered elevation hits at zoom, negative and boundary coordinates",()=>{
-  const placements=tracks();placements.push(track([[-1e7,0,10],[-1e7+150,0,110]],"Ramp"));
-  const h=harness({state:scene(placements),events:true});
-  const filter=h.context.hitCandidates;
-  for(const scale of [0.000001,0.08,1,4]){
-    h.context.view={x:-21,y:45,scale};
-    for(const [x,y] of [[0,0],[-50,13.999999],[50,20],[1050,0],[-1e7+50,0],[-1e7,40]]){
-      const [sx,sy]=h.context.worldToScreen(x,y);
-      const filtered=h.context.placementsAt(sx,sy);
-      h.context.hitCandidates=()=>new Set(placements.map((_,i)=>i));
-      const all=h.context.placementsAt(sx,sy);h.context.hitCandidates=filter;
-      assert.deepEqual(json(filtered),json(all));
+test("a click near a joint picks the piece painted there, without a chooser", async () => {
+  // Pieces are painted with flat ends: the neighbour's hit padding past its own
+  // end neither wins the tie nor makes the click ambiguous.
+  const pieces = [track([[0, 0, 0], [128, 0, 0]], "A"), track([[128, 0, 0], [256, 0, 0]], "B")];
+  for (const piece of pieces) piece.width = 64;
+  for (const scale of [0.9, 4]) {
+    const h = harness({state: scene(pieces, 5), events: true});
+    h.run(`view = {x: 128, y: 0, scale: ${scale}}; canvas.clientWidth = 1000; canvas.clientHeight = 500`);
+    const [jx, jy] = h.run("worldToScreen(128, 0)");
+    for (const mm of [3, 8, 30]) {
+      assert.equal(h.run(`placementAt(${jx - mm * scale}, ${jy})`), 0, `${mm} mm inside A at ${scale}`);
+      assert.equal(h.run(`placementAt(${jx + mm * scale}, ${jy})`), 1, `${mm} mm inside B at ${scale}`);
     }
+    h.run("selectTool({remove: true})");
+    await h.run(`removeAt(${jx - 8 * scale}, ${jy})`);
+    assert.equal(h.el("overlap-picker").hidden, true);
+    assert.deepEqual(json(h.calls.at(-1)), {path: "/api/remove", body: {placement: 0}});
   }
+});
+
+test("pieces painted over one another under the pointer still offer the chooser", () => {
+  const h = harness({state: scene(tracks(), 5), events: true});
+  h.run("view = {x: 0, y: 0, scale: 1}; canvas.clientWidth = 1000; canvas.clientHeight = 500");
+  const [x, y] = h.run("worldToScreen(0, 0)");
+  assert.deepEqual(json(h.run(`placementsAt(${x}, ${y}).map(hit => hit.placement)`)), [0, 1]);
 });

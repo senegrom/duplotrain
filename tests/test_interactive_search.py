@@ -12,6 +12,7 @@ from duplotrain import build_chain, default_catalog
 from duplotrain.editor import PREVIEW_FORMAT, RevisionConflictError, Session, dispatch_session
 from duplotrain.editor_search import (
     MAX_JOB_SECONDS,
+    MAX_RESULTS,
     PairSearch,
     SearchJob,
     fits_space,
@@ -467,6 +468,32 @@ def test_room_input_rejects_invalid_rectangles(catalog, value):
         search_options({"room": value}, catalog)
 
 
+def test_a_search_takes_at_most_32_keep_out_rectangles(catalog):
+    square = [0, 0, 10, 10]
+    assert len(search_options({"keep_out": [square] * 32}, catalog)["keep_out"]) == 32
+    with pytest.raises(ValueError, match="at most 32 keep-out rectangles"):
+        search_options({"keep_out": [square] * 33}, catalog)
+    session = Session(history=[half(catalog)])
+    with pytest.raises(ValueError, match="at most 32"):
+        call(session, "start", options={"keep_out": [square] * 33})
+    assert session._interactive_job is None
+
+
+def test_finding_more_stops_at_the_fifty_result_cap(catalog):
+    session = Session(history=[half(catalog)])
+    job = SearchJob(session, {})
+    try:
+        job.solutions = [Solution(half(catalog), (), 0.0, True, 2, ())] * MAX_RESULTS
+        job.status = "results_ready"
+        for harder in (False, True):
+            job.more(harder=harder)
+            assert job.status == "result_cap"
+            assert not job.response(session, {})["resumable"]
+        assert job.depth == 26 and job.effort == 1  # no deeper search was started
+    finally:
+        job.close()
+
+
 def test_room_and_keepout_include_width_overhang_and_all_heights(catalog):
     straight = Layout((Placement(catalog["straight"], Pose.make()),))
     pad = catalog["straight"].width / 2
@@ -500,6 +527,48 @@ def test_exclusions_do_not_change_owned_inventory_and_ranked_pages_keep_identity
     ranked = [len(sol.layout) for _, sol in job.ordered()]
     assert ranked == sorted(ranked)
     job.close()
+
+
+RANKINGS = [
+    ("discovery", [1, 2, 3, 4, 0]),
+    ("pieces", [2, 3, 4, 1, 0]),     # 1, 1, 2 and 3 added pieces
+    ("footprint", [3, 1, 2, 4, 0]),  # 448x64, 512x64, 272x125 and 377x176 mm
+    ("scarce", [4, 1, 3, 2, 0]),     # 2/20, 3/19, 1/2 and 1/1 of the stock left
+    ("junctions", [1, 3, 4, 2, 0]),  # only candidate 2 adds a switch
+    ("bridges", [1, 2, 4, 3, 0]),    # only candidate 3 adds a bridge piece
+]
+
+
+@pytest.mark.parametrize("goal, order", RANKINGS, ids=[goal for goal, _ in RANKINGS])
+def test_each_sort_ranks_exact_candidates_by_its_own_cost_then_discovery(catalog, goal, order):
+    # SearchJob.ordered: exact candidates first, then the goal's cost, then the
+    # order found. The forced fit (0) is cheapest by every cost, yet stays last.
+    straight = (catalog["straight"], 0, 1)
+    session = Session(history=[build_chain([straight])],
+                      inventory={"straight": 20, "curve": 20, "switch": 1, "ramp": 2})
+    job = SearchJob(session, {})
+
+    def candidate(*added, exact=True):
+        layout = build_chain([straight, *added])
+        return Solution(layout, (), 0.0 if exact else 2.0, exact,
+                        len(layout.connectable_ends()), ())
+
+    curve = (catalog["curve"], 0, 1)
+    try:
+        job.solutions = [
+            candidate(curve, exact=False),
+            candidate(straight, straight, straight),
+            candidate((catalog["switch"], 0, 1)),
+            candidate((catalog["ramp"], 0, 1)),
+            candidate(curve, curve),
+        ]
+        assert [index for index, _ in job.ordered()] == [1, 2, 3, 4, 0]  # discovery
+        response = job.response(session, {"sort": goal})
+        assert response["options"]["sort"] == goal
+        assert [item["index"] for item in response["candidates"]] == order
+        assert [index for index, _ in job.ordered()] == order
+    finally:
+        job.close()
 
 
 def test_exact_dedup_is_independent_of_new_placement_order(catalog):

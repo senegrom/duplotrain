@@ -38,8 +38,9 @@ test("geometry fallback displays only the complete candidate drawing", () => {
   assert.deepEqual(plain(editor().previewPlacements(fallback, state)), [extra]);
 });
 
+// A stale base revision is covered with the composition cache in editor-reliability.
 for (const [name, changes] of [
-  ["stale revision", {base_revision: 8}], ["unknown version", {format: "future"}],
+  ["unknown version", {format: "future"}],
   ["too many base pieces", {base_count: 3}], ["negative count", {base_count: -1}],
   ["fractional count", {base_count: 1.5}], ["boolean count", {base_count: true}],
   ["missing drawing", {placements: null}],

@@ -47,7 +47,9 @@ def test_interactive_quota_preserves_first_stage_and_publishes_job_counters(slop
         published = dispatch_session(session, "/api/search/publish", {
             "revision": session.revision, "job_id": job.id, "preview_format": PREVIEW_FORMAT,
         })
-        assert published["search_job"]["searched"] == job.nodes == 95
+        # Plain track (75 nodes), then the ordinary bridge stage, which reversing
+        # does not skip (102), then the full inventory (20).
+        assert published["search_job"]["searched"] == job.nodes == 197
         assert published["search_job"]["found"] == len(published["candidates"]) == 8
         assert published["snapshot"] == before
         assert len(session.history) == 1

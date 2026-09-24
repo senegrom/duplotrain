@@ -409,6 +409,8 @@ def _sample_paths(
 
 
 def _parse_segment(spec: dict[str, Any]) -> Segment:
+    if not isinstance(spec, dict):
+        raise ValueError("a segment must be an object")
     kind = spec.get("type")
     if kind == "straight":
         segment: Segment = Straight(run=parse_length(spec["run"]))
@@ -428,7 +430,11 @@ def _parse_segment(spec: dict[str, Any]) -> Segment:
 
 
 def _parse_path(spec: dict[str, Any]) -> Path:
+    if not isinstance(spec, dict):
+        raise ValueError("a path must be an object")
     start_spec = spec.get("start", {})
+    if not isinstance(start_spec, dict) or not isinstance(spec.get("segments", []), list):
+        raise ValueError("a path's start must be an object and its segments a list")
     start = Pose(
         parse_length(start_spec.get("x", 0)),
         parse_length(start_spec.get("y", 0)),
@@ -482,7 +488,11 @@ def _derive_ports_and_routes(
 
 def parse_piece(spec: dict[str, Any]) -> PieceType:
     """Build a :class:`PieceType` from its JSON/dict description."""
+    if not isinstance(spec, dict):
+        raise ValueError("a piece must be an object")
     piece_id = spec.get("id", "?")
+    if not isinstance(spec.get("paths", []), list):
+        raise ValueError(f"piece {piece_id!r} paths must be a list")
     try:
         paths = tuple(_parse_path(p) for p in spec["paths"])
     except KeyError as exc:

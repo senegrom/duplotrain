@@ -60,14 +60,31 @@ def test_indexed_diagnostics_match_original_sampled_pairs(seed):
     assert (report["overlaps"], report["overlap_check_complete"]) == reference_overlaps(layout)
 
 
-@pytest.mark.parametrize("count", [0, 1, 24, 127, 128, 129, 180])
-def test_diagnostics_small_and_indexed_paths_keep_report_and_truncation(count):
+SPREAD = [300 * i for i in range(128)]  # 128 straights in a row, 172 mm apart
+
+
+@pytest.mark.parametrize("positions, found, complete", [
+    ([], 0, True),
+    ([0], 0, True),
+    ([0] * 24, 200, False),  # 276 overlapping pairs: a report is at most 200
+    (SPREAD[:127], 0, True),
+    # From the 129th piece on, pairs come from the bounds index.
+    (SPREAD + [0], 1, True),
+    (SPREAD + SPREAD[::3], 43, True),
+    (SPREAD + [0] * 60, 200, False),
+], ids=["empty", "one", "stacked", "spread", "indexed-one", "indexed", "indexed-truncated"])
+def test_diagnostics_small_and_indexed_paths_keep_report_and_truncation(positions, found,
+                                                                        complete):
     piece = default_catalog()["straight"]
-    layout = Layout(tuple(Placement(piece, Pose.make()) for _ in range(count)))
+    layout = Layout(tuple(Placement(piece, Pose.make(x)) for x in positions))
     session = Session(history=[layout])
     before = unchanged(session)
     report = check_session(session)
     assert (report["overlaps"], report["overlap_check_complete"]) == reference_overlaps(layout)
+    # A report cut at the limit is explicitly incomplete, never a clean bill.
+    assert (len(report["overlaps"]), report["overlap_check_complete"]) == (found, complete)
+    if len(positions) > 128:
+        assert all(i >= 128 for _j, i in report["overlaps"])
     assert unchanged(session) == before
 
 

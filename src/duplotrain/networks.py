@@ -206,18 +206,18 @@ def enumerate_networks(
             for pid, queries in closing_queries.items() for query in queries
         ):
             return True
-        capacity = sum(counts[pid] * ports for pid, ports in caps.items())
+        # Any cap in stock could end a walk anywhere, and two walks can trail
+        # into one new junction whose third port a single cap then closes: with
+        # a cap left, no end is provably stranded.
+        if any(counts[pid] for pid in caps):
+            return True
         reverse, retarget = eng.reverse, eng.retarget
         ends = list(open_ends.values())
         mates = [reverse(pose) for pose in ends]
-        stranded = 0
-        for i, pose in enumerate(ends):
-            if not any(allows(retarget(pose, mate), budget)
-                       for j, mate in enumerate(mates) if j != i):
-                stranded += 1
-                if stranded > capacity:
-                    return False
-        return True
+        return all(
+            any(allows(retarget(pose, mate), budget) for j, mate in enumerate(mates) if j != i)
+            for i, pose in enumerate(ends)
+        )
 
     # Per-placement sample clouds: rotated local samples and their bounds are
     # cached per (piece, entry, heading); a candidate only adds its offset, and

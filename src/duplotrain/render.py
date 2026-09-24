@@ -106,14 +106,20 @@ def render_layout(
     ax: Axes | None = None,
     dpi: int = 150,
 ) -> Figure:
-    """Draw *layout*; save to *path* if given, and return the figure."""
-    import matplotlib
+    """Draw *layout*; save to *path* if given, and return the figure.
 
-    if path is not None and ax is None:
-        matplotlib.use("Agg", force=False)
-    import matplotlib.pyplot as plt
+    A figure made only to be saved is a standalone :class:`~matplotlib.figure.Figure`:
+    pyplot's backend and open figures stay as they were. A caller's *ax* keeps its
+    figure open.
+    """
+    if ax is None and path is not None:
+        from matplotlib.figure import Figure
 
-    if ax is None:
+        fig = Figure(figsize=(9, 9))
+        ax = fig.subplots()
+    elif ax is None:
+        import matplotlib.pyplot as plt
+
         fig, ax = plt.subplots(figsize=(9, 9))
     else:
         fig = ax.figure
@@ -306,5 +312,4 @@ def render_layout(
 
     if path is not None:
         fig.savefig(path, dpi=dpi, bbox_inches="tight")
-        plt.close(fig)
     return fig

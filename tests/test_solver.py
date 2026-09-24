@@ -31,6 +31,7 @@ def assert_loop_is_sound(solution, catalog):
 def test_twelve_curves_make_exactly_one_circle(catalog):
     # The all-left and all-right circles are one physical layout.
     result = solve({"curve": 12}, catalog, SolverConfig(max_results=10))
+    assert result.stats.complete and result.stats.stop_reason == "exhausted"
     assert len(result.solutions) == 1
     sol = result.solutions[0]
     assert sol.exact
@@ -41,7 +42,7 @@ def test_twelve_curves_make_exactly_one_circle(catalog):
 
 def test_eleven_curves_make_nothing(catalog):
     result = solve({"curve": 11}, catalog)
-    assert result.solutions == []
+    assert result.solutions == [] and result.stats.complete
     # The turn and reach prunes should keep this cheap.
     assert result.stats.nodes < 100_000
 
@@ -72,7 +73,7 @@ def test_no_false_closures_with_odd_straight(catalog):
         catalog,
         SolverConfig(use_all_pieces=True),
     )
-    assert result.solutions == []
+    assert result.solutions == [] and result.stats.complete
 
 
 def test_switch_joins_the_circle_with_a_dangling_branch(catalog):
@@ -95,7 +96,7 @@ def test_slop_never_closes_a_loop_that_cannot_turn_full_circle(catalog):
             catalog,
             SolverConfig(slop=slop, use_all_pieces=True),
         )
-        assert result.solutions == []
+        assert result.solutions == [] and result.stats.complete
 
 
 def test_chiral_loops_dedup_mirror_twins(catalog):
@@ -106,20 +107,20 @@ def test_chiral_loops_dedup_mirror_twins(catalog):
     signature gained an explicit mirror normalisation.
     """
     result = solve({"curve": 11, "switch": 1}, catalog, SolverConfig(use_all_pieces=True))
+    assert result.stats.complete and result.stats.stop_reason == "exhausted"
     assert len(result.solutions) == 1
 
 
-@pytest.mark.slow
 def test_chiral_enumeration_counts(catalog):
     """12 curves + 6 straights: 18 distinct loops, 9 of them using every piece."""
     result = solve({"curve": 12, "straight": 6}, catalog, SolverConfig(max_results=100))
-    assert len(result.solutions) == 18
+    assert result.stats.complete and len(result.solutions) == 18
     result = solve(
         {"curve": 12, "straight": 6},
         catalog,
         SolverConfig(use_all_pieces=True, max_results=100),
     )
-    assert len(result.solutions) == 9
+    assert result.stats.complete and len(result.solutions) == 9
 
 
 def test_level_crossings_never_link_in_series(catalog):
@@ -184,6 +185,8 @@ def test_starter_box_has_exactly_four_shapes(catalog):
         catalog,
         SolverConfig(use_all_pieces=True, max_results=1000),
     )
+    # Exactly four: the enumeration ran to exhaustion, not into a limit.
+    assert result.stats.complete and result.stats.stop_reason == "exhausted"
     assert len(result.solutions) == 4
     sizes = sorted(
         tuple(sorted((round(w), round(h))))
@@ -245,6 +248,49 @@ def test_scoring_prefers_exact_and_fuller_layouts(catalog):
     top_total, top = max(scored, key=lambda p: p[0])
     # The best layout uses the most of the box any loop uses.
     assert top.exact and top.piece_count == max(s.piece_count for s in result.solutions)
+
+
+def stretched_catalog():
+    """The default pieces plus a 130 mm straight that closes 2 mm short."""
+    from duplotrain.catalog import DEFAULT_CATALOG_SPECS
+    from duplotrain.pieces import parse_pieces
+
+    return parse_pieces(list(DEFAULT_CATALOG_SPECS) + [{
+        "id": "stretched", "name": "Stretched straight (test)", "category": "track",
+        "width": 64, "paths": [{"segments": [{"type": "straight", "run": 130}]}],
+    }])
+
+
+def test_scoring_ranks_a_forced_fit_below_the_same_loop_closed_exactly(catalog):
+    # The same oval, once with a stretched straight forcing a 2 mm gap and once
+    # exact: equal usage and variety, so the gap decides.
+    forced_box = {"curve": 12, "straight": 1, "stretched": 1}
+    exact_box = {"curve": 12, "straight": 2}
+    forced = solve(forced_box, stretched_catalog(),
+                   SolverConfig(use_all_pieces=True, slop=3.0)).solutions[0]
+    exact = solve(exact_box, catalog, SolverConfig(use_all_pieces=True)).solutions[0]
+    assert not forced.exact and forced.gap == pytest.approx(2.0) and exact.exact
+    f, e = score_solution(forced, forced_box), score_solution(exact, exact_box)
+    assert e.exactness == 40.0
+    assert f.exactness == pytest.approx(40.0 - 8.0 * 2.0)  # 8 points per mm of gap
+    assert (f.usage, f.variety) == (e.usage, e.variety)
+    assert e.total - f.total == pytest.approx(16.0, abs=0.5)
+
+
+def test_scoring_subtracts_a_penalty_for_each_open_stub(catalog):
+    # Eleven curves and a switch close with the switch's other branch dangling.
+    from dataclasses import fields, replace
+
+    inventory = {"curve": 11, "switch": 1}
+    stubbed = solve(inventory, catalog, SolverConfig(use_all_pieces=True)).solutions[0]
+    assert stubbed.open_stubs == 1
+    with_stub = score_solution(stubbed, inventory)
+    tidy = score_solution(replace(stubbed, open_stubs=0), inventory)
+    assert with_stub.stub_penalty == 3.0 and tidy.stub_penalty == 0.0
+    assert with_stub.total == pytest.approx(tidy.total - 3.0)
+    parts = {f.name: getattr(with_stub, f.name) for f in fields(with_stub)}
+    assert with_stub.total == pytest.approx(
+        sum(parts.values()) - 2 * parts["stub_penalty"])
 
 
 def test_anchor_pose_is_origin(catalog):
@@ -380,3 +426,60 @@ def test_solution_layouts_equal_their_replayed_constructions(catalog):
             checked += 1
             transits += any(isinstance(step, _Transit) for step in solution.steps)
     assert checked >= 30 and transits >= 1
+
+
+def test_a_reversing_lobe_driven_either_way_round_is_one_result():
+    # The same teardrop, entered at the stem, can go round its lobe either way.
+    from duplotrain.explore import congruence_key
+
+    catalog = default_catalog()
+    result = solve({"curve": 12, "switch": 1, "straight": 2}, catalog,
+                   SolverConfig(reversing_loops=True, max_results=100))
+    keys = [congruence_key(s.layout) for s in result.solutions if s.kind == "reversing"]
+    assert len(keys) == len(set(keys)) == 40
+    base = build_chain([(catalog["straight"], 0, 1)])
+    completed = solve({"curve": 12, "switch": 1, "straight": 1}, catalog,
+                      SolverConfig(reversing_loops=True, max_results=100),
+                      base=base, grow_from=(0, 1), close_onto=(0, 0))
+    placed = [frozenset((p.piece.id, frozenset(map(p.port_pose, range(len(p.piece.ports)))))
+                        for p in s.layout.placements[1:]) for s in completed.solutions]
+    assert len(placed) == len(set(placed)) == 68
+
+
+def test_a_slop_search_far_from_the_origin_runs_on_the_field_engine():
+    from duplotrain.geometry import Pose
+
+    catalog = default_catalog()
+    half = [(catalog["straight"], 0, 1)] * 2 + [(catalog["curve"], 0, 1)] * 6
+    oval = half + half
+    rest = [oval[(6 + i) % len(oval)] for i in range(len(oval) - 3)]  # three curves short
+    base = build_chain(rest, start=Pose.make(y=150_000_000))  # 150 km: past the packed keys
+    ends = base.connectable_ends()
+    for slop in (0.0, 5.0):
+        result = solve({"curve": 4, "straight": 2}, catalog,
+                       SolverConfig(slop=slop, min_pieces=1, max_pieces=5),
+                       base=base, grow_from=ends[-1], close_onto=ends[0])
+        assert result.stats.engine == "field" and len(result.solutions) == 1
+    with pytest.raises(ValueError, match="does not fit the integer lattice"):
+        solve({"curve": 4, "straight": 2}, catalog, SolverConfig(engine="lattice", max_pieces=5),
+              base=base, grow_from=ends[-1], close_onto=ends[0])
+
+
+@pytest.mark.parametrize("spec", [
+    {"id": "x", "paths": "abc"},
+    {"id": "x", "paths": [{"segments": [5]}]},
+    {"id": "x", "paths": [{"start": "s", "segments": [{"type": "straight", "run": 1}]}]},
+    {"id": "x", "paths": [{"segments": "abc"}]},
+    "not a piece",
+])
+def test_malformed_catalogue_entries_are_bad_input(spec):
+    from duplotrain.pieces import parse_piece
+
+    with pytest.raises(ValueError):
+        parse_piece(spec)
+
+
+def test_a_catalogue_keyed_apart_from_its_piece_ids_is_refused():
+    catalog = default_catalog()
+    with pytest.raises(ValueError, match="must agree"):
+        solve({"my_curve": 12}, {"my_curve": catalog["curve"]})

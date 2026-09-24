@@ -12,7 +12,8 @@ and backup presentation, train presentation, interactive jobs and offline contro
 single DOMContentLoaded initialiser are part of the tested contract, and the
 local host serves them from an explicit allowlist. The static build injects
 the worker bootstrap, stamps the bundle with the content of every engine and
-editor source (icons and the manifest carry versioned names instead), and
+editor source (icons carry versioned names instead; the web manifest and the
+Pages CSP tag are covered by the offline version's digest), and
 leaves the CLI, the HTTP host, rendering, exhaustive enumeration and scoring
 out of the worker archive. Local hosting
 security and the revision protocol are described in [security.md](security.md).
@@ -22,10 +23,14 @@ security and the revision protocol are described in [security.md](security.md).
 Every edit commits the exact layout together with the owned track and stone
 counts and the sandbox flag, so undo and redo restore all of them; layouts are
 immutable and shared between history entries. The history holds at most 200
-entries, each with a label the Undo and Redo buttons show. A new edit clears
-redo; a no-op or rejected edit, such as clearing an empty layout, submitting an
-unchanged count or a count the session refuses, keeps it. Opening a project is
-one undoable change. Ctrl or Cmd+Z undoes, Shift+Ctrl or Cmd+Z and Ctrl+Y redo,
+entries, each with a label the Undo and Redo buttons show; beyond that the
+oldest entry becomes the start, so every remaining step undoes exactly the edit
+its label names. A new edit clears redo; a no-op or rejected edit, such as
+clearing an empty layout, submitting an unchanged count or a count the session
+refuses, keeps it. Opening a project is one undoable change. A session recovered
+into an engine (autosave on a fresh engine, a worker or server restart) starts a
+new history instead: undoing it could only empty the engine, and autosave would
+then replace the recovered checkpoint. Ctrl or Cmd+Z undoes, Shift+Ctrl or Cmd+Z and Ctrl+Y redo,
 never inside a text input. Viewport and search settings are presentation, not
 history, and history is not persisted across engine restarts.
 
@@ -103,8 +108,9 @@ and manual layouts stay editable whatever it says.
 The editor saves the exact layout, the owned track and stone counts and the
 sandbox flag in the browser's local storage after every change. A fresh engine
 restores that session; a local server that is already running keeps its newer
-session, and a tab left open across a server restart restores its own last
-confirmed session into the new server at its next action. Checkpoints carry
+session. After a server restart the first tab to act restores the newest
+confirmed session into the new server: its own, unless another tab autosaved
+since this tab last did, in which case that checkpoint. Checkpoints carry
 unique revisions and Web Locks serialise writes across tabs: a tab that sees
 another writer pauses its autosave and asks you to export before reloading, and
 redrawing or closing a stale tab never rewrites a newer checkpoint. Saves from older editor versions migrate read-only into a new
@@ -138,7 +144,8 @@ service.
 
 ## Recovery and cancellation
 
-When the engine fails, the overlay offers downloads of the last confirmed
+When the engine fails, including a fatal error the Python runtime reports
+while answering a request, the overlay offers downloads of the last confirmed
 layout and session from this tab's own state, and a restart that creates a new
 worker and restores a copy of that snapshot; responses from an old worker
 generation are ignored, and a restart resets undo history and suggestions and
@@ -151,8 +158,8 @@ for API clients. On the local host such a search may carry a random
 `operation_id`; `/api/cancel` sets its event without waiting for the session
 lock, the search raises at its next progress or publication checkpoint with
 HTTP 409 and `code: "cancelled"`, the layout stays unchanged, and a cancellation
-for a request not yet registered or already finished reports that it was not
-active.
+for a request not yet registered, past its last checkpoint or already finished
+reports that it was not active.
 
 ## Interactive completion
 
@@ -171,8 +178,7 @@ between ranking a sample and proving an optimum are described in
 `/api/drive` runs the drive model from one selected inward start with the
 chosen initial switch positions (`train_switches` in the state lists the
 choices, `switch_states` in the request selects them) for at most 10,000
-steps; a run that reaches the limit makes no verdict, coverage or terminal
-claim. The report gives the outcome, the traversals, the repeating cycle, the
+steps; a run that needs more makes no verdict, coverage or terminal claim. The report gives the outcome, the traversals, the repeating cycle, the
 reversals, the visited and unvisited drivable pieces, and a separate terminal
 event (stop stone, buffer, open end or dead route) with the piece and port it
 happened at. Play, Pause and Step walk the trace and highlight the current
@@ -226,7 +232,10 @@ Pages bundle once as an immutable artifact, and runs the Chromium and WebKit
 browser suites against that artifact after verifying its digest. The deploy job
 of the same run publishes that artifact only after every gate passes on a push
 to `main` or a manual run there; it has no checkout and no build step, and
-nothing is selected across workflows.
+nothing is selected across workflows. Because the Pages action selects the
+artifact by name, the deploy job first downloads it by the build job's artifact
+ID and checks the same digest: a same-name upload from any other job would carry
+a new ID, and the deploy would fail rather than publish it.
 
 The offline browser test boots the built app in a fresh profile under the
 production CSP, installs the offline version, stops the resource server (a

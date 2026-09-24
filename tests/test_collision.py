@@ -50,15 +50,49 @@ def test_plain_track_thresholds_unchanged():
     assert field.clashes(straight_line(60.0), 32.0, ignore=set())
 
 
+class CountingGrid(dict):
+    """A sample grid that counts the cells a query looks up."""
+
+    gets = 0
+
+    def get(self, key, default=None):
+        self.gets += 1
+        return super().get(key, default)
+
+
 def test_pop_restores_reach_bookkeeping():
     field = CollisionField()
     field.add(0, straight_line(0.0), 32.0)
     field.add(1, straight_line(400.0), 80.0)  # widens the max stored half-width
+    assert field._max_half_width == 80.0
     field.pop()
+    assert field._max_half_width == 32.0
     # With the wide cloud gone, a probe near where it was must be clean again,
     # and the narrow cloud still collides as before.
     assert not field.clashes(straight_line(400.0), 80.0, ignore=set())
     assert field.clashes(straight_line(30.0), 32.0, ignore=set())
+    # And a narrow query is back to scanning 3 x 3 cells around each of its two
+    # cells, not the 5 x 5 the wide piece's 110 mm reach needed.
+    field._grid = CountingGrid(field._grid)
+    assert not field.clashes(straight_line(300.0), 32.0, ignore=set())
+    assert field._grid.gets == 2 * 9
+
+
+def test_pop_removes_the_popped_samples_wherever_they_sit_in_a_bucket():
+    # A deferred placement is binned only once a query reaches it, which puts
+    # its samples AFTER a newer placement's in the cell buckets they share.
+    from duplotrain.collision import bounds_of
+
+    field = CollisionField()
+    ground = straight_line(0.0)
+    field.add_deferred(0, ground, (0.0, 0.0, 0.0), 32.0, bounds_of(ground))
+    field.add(1, straight_line(10.0, z=200.0), 32.0)  # high above: clear of 0
+    assert field.near(bounds_of(straight_line(20.0)), 32.0, set())  # bins 0 now
+    assert [c.placement for c in field._grid[(0, 0)]] == [1, 0]
+    field.pop()  # placement 1
+    assert [c.placement for c in field._grid[(0, 0)]] == [0]
+    assert field.clashes(straight_line(20.0), 32.0, ignore=set())
+    assert not field.clashes(straight_line(10.0, z=200.0), 32.0, ignore={0})
 
 
 def test_z_clearance_lets_high_track_over_low():

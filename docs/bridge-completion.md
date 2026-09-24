@@ -1,12 +1,12 @@
 # Bridge-aware editor completion
 
-The editor searches in this order: the existing arc templates, ordinary curves and
+The editor searches in this order: the arc templates, ordinary curves and
 straights, one complete standard bridge plus ordinary track, and finally the full
 remaining inventory. The bridge stage is a heuristic, not a proof of completeness.
 Other elevations, custom bridge geometry, and multiple bridges still use the general
 solver. Plain and bridge stages prefer ordinary closures even when reversing loops
 are allowed; the full-inventory fallback also searches reversing closures. Collision
-and underpass thresholds are unchanged.
+and underpass thresholds are the general solver's.
 
 The bridge macro uses the exact four ramp/span/span/ramp segments and their sampled
 height profile. It is enabled only for the standard bridge geometry, sufficient
@@ -29,8 +29,8 @@ suspended searches and the selected endpoints (see [search-jobs.md](search-jobs.
 
 ## Regression case
 
-`tests/fixtures/bridge-gap.json` and `bridge-completed.json` preserve the two JSON
-layouts reported on 16 September 2026. The former has 59 placements and two open
+`tests/fixtures/bridge-gap.json` and `bridge-completed.json` are two JSON layouts
+from a user report. The former has 59 placements and two open
 ends; the latter retains them and adds 16 curves, four straights, two ramps and two
 spans. Tests separately verify that witness and discover a completion without its
 coordinates, in both finite-stock and infinite-pieces modes. Every returned candidate

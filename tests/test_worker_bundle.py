@@ -77,7 +77,31 @@ assert s["snapshot"] == snapshot
 r = json.loads(adapter.dispatch("/api/clear", json.dumps({"revision": 0})))
 assert r["code"] == "stale_revision"
 assert api("/api/state", {})["snapshot"] == snapshot
+# The resumable search and the route analysis are imported only when first used.
+s = api("/api/clear", {"revision": s["revision"]})
+for at in (None, [0, 1]):
+    s = api("/api/attach", {"piece": "curve", "entry": 0, "at": at, "revision": s["revision"]})
+job = api("/api/search/start", {"revision": s["revision"], "max_results": 1})
+body = {"revision": s["revision"], "job_id": job["job_id"]}
+for _ in range(500):
+    if job["status"] != "running":
+        break
+    job = api("/api/search/tick", body)
+assert job["found"] == 1, job
+s = api("/api/search/publish", body)
+s = api("/api/apply", {"index": 0, "revision": s["revision"]})
+assert s["layout"]["exactly_closed"]
+routes = api("/api/routes/start", {"revision": s["revision"]})
+body = {"revision": s["revision"], "job_id": routes["job_id"]}
+for _ in range(500):
+    if routes["status"] != "running":
+        break
+    routes = api("/api/routes/tick", body)
+assert routes["complete"] and routes["classification"] is not None, routes
+assert api("/api/check", {"revision": s["revision"]})["connector_closed"]
+assert api("/api/drive", {"revision": s["revision"], "start": [0, 0]})["complete"]
 '''
-    subprocess.run([sys.executable, "-I", "-c", code, str(archive), str(tmp_path),
-                    "compact" if compact else "legacy"],
-                   cwd=tmp_path, check=True, capture_output=True, text=True, timeout=30)
+    run = subprocess.run([sys.executable, "-I", "-c", code, str(archive), str(tmp_path),
+                          "compact" if compact else "legacy"],
+                         cwd=tmp_path, capture_output=True, text=True, timeout=30)
+    assert run.returncode == 0, run.stderr

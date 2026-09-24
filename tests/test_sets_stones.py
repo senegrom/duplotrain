@@ -71,6 +71,7 @@ def test_buffers_never_join_a_loop(catalog):
         SolverConfig(use_all_pieces=True),
     )
     assert result.solutions == []  # a loop cannot pass through a dead face
+    assert result.stats.complete
     result = solve({"curve": 12, "buffer": 2}, catalog)
     assert result.solutions  # without use-all the circle simply leaves them in the box
     assert all("buffer" not in s.layout.piece_counts for s in result.solutions)
@@ -98,7 +99,7 @@ def test_stones_serialise_with_the_layout(catalog):
 def test_teardrop_needs_reversing_mode(catalog):
     inventory = {"switch": 1, "curve": 12}
     plain = solve(inventory, catalog, SolverConfig(use_all_pieces=True))
-    assert plain.solutions == []
+    assert plain.solutions == [] and plain.stats.complete
 
 
 def test_teardrop_found_with_reversing(catalog):
@@ -108,6 +109,7 @@ def test_teardrop_found_with_reversing(catalog):
         catalog,
         SolverConfig(use_all_pieces=True, reversing_loops=True, max_results=100),
     )
+    assert result.stats.complete and result.stats.stop_reason == "exhausted"
     assert len(result.solutions) == 3  # three distinct teardrop shapes, mirrors folded
     for sol in result.solutions:
         assert sol.kind == "reversing"

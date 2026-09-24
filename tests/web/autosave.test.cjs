@@ -128,7 +128,11 @@ test("clearing storage is a conflict, not permission to recreate a stale save", 
   const store = shared(), a = tab(store);
   await a.init(); await a.save();
   store.storage.removeItem(KEY);
+  // Another tab's localStorage.clear() is reported with a null key: pause at once,
+  // not only when this tab next tries to save.
   a.events.storage({key: null});
+  assert.equal(a.context.autosaveReady, false);
+  assert.match(a.notice.textContent, /Another tab changed the saved session/);
   a.edit(1); await a.save();
   assert.equal(store.storage.getItem(KEY), null);
 });

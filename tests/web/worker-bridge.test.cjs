@@ -22,16 +22,16 @@ function harness() {
     emit(data) { this.message({data}); }
     terminate() { this.terminated = true; }
   }
-  const timers = new Map();
+  const timers = new Map(), delays = new Map();  // pending timers and their delays
   const body = new Element("body");
   const context = vm.createContext({
     window: {}, document: {body, createElement: tag => new Element(tag)}, Worker,
     location: {reload() {}}, console,
-    setTimeout(fn) { const id = Symbol(); timers.set(id, fn); return id; },
-    clearTimeout(id) { timers.delete(id); },
+    setTimeout(fn, ms) { const id = Symbol(); timers.set(id, fn); delays.set(id, ms); return id; },
+    clearTimeout(id) { timers.delete(id); delays.delete(id); },
   });
   vm.runInContext(fs.readFileSync(path.join(root, "webapp/boot.js"), "utf8"), context);
-  return {window: context.window, workers, timers, body};
+  return {window: context.window, workers, timers, delays, body};
 }
 async function boot(h) {
   const promise = h.window.duplotrainBoot({refresh: async () => {}, status() {}});
@@ -79,6 +79,18 @@ test("boot errors and timeout both settle startup and offer recovery", async () 
     assert.equal(h.timers.size, 0);
     assert.ok(h.body.children[0].querySelector("button"));
   }
+});
+
+test("the engine gets a minute to load and a pending call two minutes of silence", async () => {
+  const h = harness();
+  const promise = h.window.duplotrainBoot({refresh: async () => {}, status() {}});
+  assert.deepEqual([...h.delays.values()], [60000]);
+  h.workers[0].emit({ready: true}); await promise;
+  assert.equal(h.delays.size, 0);
+  const call = h.window.duplotrainApi("/api/state");
+  assert.deepEqual([...h.delays.values()], [120000]);
+  h.workers[0].emit({id: h.workers[0].sent[0].id, res: "{}"}); await call;
+  assert.equal(h.delays.size, 0);
 });
 
 test("adapter errors and worker message errors reject callers", async () => {
@@ -232,4 +244,32 @@ test("a worker dying during the startup restore keeps the recovery overlay", asy
   assert.ok(h.body.children[0].children[0].textContent.includes("out of memory"));
   assert.ok(!statuses.some(text => text.includes("Engine ready")));
   await assert.rejects(h.window.duplotrainApi("/api/state"), /not ready/);
+});
+
+test("a fatal engine error makes the page restart the engine rather than reuse it", async () => {
+  const h = harness();
+  await boot(h);
+  const pending = h.window.duplotrainApi("/api/import", {});
+  h.workers[0].emit({id: h.workers[0].sent[0].id, fatal: "RangeError: Maximum call stack size exceeded"});
+  await assert.rejects(pending, /must restart/);
+  assert.equal(h.workers[0].terminated, true);
+  assert.ok(h.body.children[0].querySelector("button"));
+  await assert.rejects(h.window.duplotrainApi("/api/state"), /not ready/);
+});
+
+test("the worker reports Pyodide's fatal errors apart from ordinary request errors", async () => {
+  const messages = [];
+  const failures = {"/fatal": () => { const error = new RangeError("Maximum call stack size exceeded");
+    error.pyodide_fatal_error = true; throw error; }, "/ordinary": () => { throw new Error("bad input"); }};
+  const pyodide = {FS: {mkdirTree() {}, writeFile() {}}, unpackArchive() {}, runPython() {},
+    pyimport: () => ({dispatch: path => failures[path]()})};
+  const context = vm.createContext({
+    importScripts() {}, loadPyodide: async () => pyodide, console,
+    fetch: async () => ({ok: true, arrayBuffer: async () => new ArrayBuffer(0), text: async () => ""}),
+    postMessage: message => messages.push(message), onmessage: null,
+  });
+  vm.runInContext(fs.readFileSync(path.join(root, "webapp/worker.js"), "utf8"), context);
+  await context.onmessage({data: {id: 1, path: "/fatal", body: "{}"}});
+  await context.onmessage({data: {id: 2, path: "/ordinary", body: "{}"}});
+  assert.deepEqual(messages.slice(1).map(m => [m.id, Boolean(m.fatal), Boolean(m.err)]), [[1, true, false], [2, false, true]]);
 });

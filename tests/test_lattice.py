@@ -96,6 +96,11 @@ def _run_both(catalog, inventory, config_kwargs, **solve_kwargs):
     field, lattice = results["field"], results["lattice"]
     assert field.stats.engine == "field"
     assert lattice.stats.engine == "lattice"
+    # Agreement is only evidence when both engines searched everything and found
+    # something: two empty or truncated result lists agree about nothing.
+    for result in (field, lattice):
+        assert result.solutions
+        assert result.stats.complete and result.stats.stop_reason == "exhausted"
     assert len(field.solutions) == len(lattice.solutions)
     assert sorted(s.signature for s in field.solutions) == sorted(
         s.signature for s in lattice.solutions

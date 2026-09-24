@@ -43,7 +43,6 @@ duplotrain = [
 testpaths = ["tests"]
 addopts = "-q"
 markers = [
-    "slow: long-running full enumerations (deselect with -m 'not slow')",
     "browser: real browser integration tests (requires playwright and browser binaries)",
 ]
 

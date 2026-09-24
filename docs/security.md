@@ -15,9 +15,12 @@ send this non-simple media type. Local programmatic clients can use JSON
 without browser-only headers. These protections do not authenticate other
 processes already running on the local machine.
 
-Ambiguous/chunked framing, oversized or truncated bodies, and malformed JSON are
-rejected before dispatch. Body reads have a timeout. Responses prohibit framing
-and MIME sniffing. A rejected request must leave the entire session unchanged;
+Ambiguous/chunked framing, oversized or truncated bodies, malformed JSON and
+JSON nested more than 64 levels deep are rejected before dispatch; the browser
+engine applies the same depth limit before parsing, since its WebAssembly stack
+overflows long before Python's recursion limit. Body reads have a timeout.
+Every response, the server's own error pages included, prohibits framing and
+MIME sniffing. A rejected request must leave the entire session unchanged;
 `tests/test_http_security.py` verifies this using real local sockets.
 
 Every connection is closed gracefully. A close with unread input, or input that
@@ -41,7 +44,7 @@ and pin actions to upstream commit SHAs. Version comments allow
 Dependabot to maintain those pins, and it checks Python and GitHub Actions
 dependencies weekly. The Lean workflow downloads the versioned
 elan Linux release archive, checks its reviewed SHA-256 before extracting or
-executing it, and keeps the existing `lean-toolchain` version and axiom audit.
+executing it, and uses the `lean-toolchain` version and the axiom audit.
 
 The static builder verifies the Pyodide release archive against the reviewed
 `PYODIDE_SHA256` map in `webapp/build.py` before touching the deployment output.

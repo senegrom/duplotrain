@@ -43,6 +43,15 @@ for (const flag of ["apiBusy", "solving"]) {
   });
 }
 
+test("the stone tool clips a stone at the connector face clicked, otherwise mid-piece", async () => {
+  const e = editor([]);
+  e.run(`Object.assign(S.layout.placements[0], {stone_ok: true, ports: [{port: 0, x: 0, y: 0}, {port: 1, x: 128, y: 0}]});
+    armedStone = "stone_stop"`);
+  for (const [x, y] of [[3, 2], [125, -4], [64, 10]]) await e.run(`activateAt(${x}, ${y})`);
+  assert.deepEqual(e.calls.map(c => [c.path, c.body.placement, c.body.id, c.body.at_port]), [
+    ["/api/stone", 0, "stone_stop", 0], ["/api/stone", 0, "stone_stop", 1], ["/api/stone", 0, "stone_stop", null]]);
+});
+
 test("Remove away from markers still removes the selected piece", async () => {
   const e = editor([]);
   await e.run("removeAt(64, 0)");

@@ -155,14 +155,14 @@ def sets_cmd() -> None:
 )
 @click.option(
     "--slop",
-    type=float,
+    type=click.FloatRange(min=0),
     default=0.0,
     show_default=True,
     help="Total closing gap (mm) the joints may absorb; 0 = exact loops only.",
 )
-@click.option("--min-pieces", type=int, default=4, show_default=True)
-@click.option("--max-results", type=int, default=25, show_default=True)
-@click.option("--max-nodes", type=int, default=2_000_000, show_default=True)
+@click.option("--min-pieces", type=click.IntRange(min=0), default=4, show_default=True)
+@click.option("--max-results", type=click.IntRange(min=1), default=25, show_default=True)
+@click.option("--max-nodes", type=click.IntRange(min=1), default=2_000_000, show_default=True)
 @click.option("--use-all", is_flag=True, help="Only layouts using every owned piece.")
 @click.option(
     "--reversing/--no-reversing",
@@ -301,18 +301,23 @@ def solve_cmd(
 
     if out:
         out_dir = Path(out)
-        out_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            out_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise click.ClickException(f"cannot create {out_dir}: {exc}") from exc
         render_layout = _get_renderer(required=False)
         for rank, (score, sol) in enumerate(scored[:top], start=1):
             stem = out_dir / f"loop_{rank:02d}"
-            with open(f"{stem}.json", "w", encoding="utf-8") as fh:
-                json.dump(layout_to_dict(sol.layout), fh, indent=2)
+            try:
+                with open(f"{stem}.json", "w", encoding="utf-8") as fh:
+                    json.dump(layout_to_dict(sol.layout), fh, indent=2)
+            except OSError as exc:
+                raise click.ClickException(f"cannot write {stem}.json: {exc}") from exc
             if render_layout is not None:
                 closure = "exact" if sol.exact else f"forced {sol.gap:.1f} mm"
                 width, height = sol.layout.size()
-                render_layout(
-                    sol.layout,
-                    path=f"{stem}.png",
+                _write_image(
+                    render_layout, sol.layout, f"{stem}.png",
                     title=(
                         f"#{rank}  score {score:.0f}  |  {closure}  |  "
                         f"{width / 10:.0f} x {height / 10:.0f} cm"
@@ -409,9 +414,11 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
         console.print(f"[yellow]{len(layout.connectable_ends())} open end(s).[/yellow]")
         if not len(layout):
             console.print("Empty layout; no closed track.")
-        for a, b, gap in layout.gaps()[:5]:
-            if not layout.is_sealed(a) and not layout.is_sealed(b):
-                console.print(f"  Open ends {a} <-> {b}: gap {gap:.6g} mm")
+        # A buffer's sealed face is no open end: drop those before the first five.
+        gaps = [(a, b, gap) for a, b, gap in layout.gaps()
+                if not layout.is_sealed(a) and not layout.is_sealed(b)]
+        for a, b, gap in gaps[:5]:
+            console.print(f"  Open ends {a} <-> {b}: gap {gap:.6g} mm")
     for joint in issues:
         a, b = tuple(joint["a"]), tuple(joint["b"])
         console.print(
@@ -494,7 +501,10 @@ def gui(port: int, no_browser: bool) -> None:
     """
     from .gui import run
 
-    run(port=port, open_browser=not no_browser)
+    try:
+        run(port=port, open_browser=not no_browser)
+    except OSError as exc:  # the port is taken, or the address is unavailable
+        raise click.ClickException(f"cannot serve on port {port}: {exc}") from exc
 
 
 @main.command()

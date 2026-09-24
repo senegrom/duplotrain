@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from duplotrain.catalog import default_catalog
-from duplotrain.drive import drive
+from duplotrain.drive import DriveLimitError, drive
 from duplotrain.editor import Session, dispatch_session
 from duplotrain.editor_tools import trace_train
 from duplotrain.layout import build_chain, layout_from_dict
@@ -94,15 +94,21 @@ def test_endless_and_limited_runs_never_invent_a_terminal_event():
     c = default_catalog()
     layout = build_chain([(c["curve"], 0, 1)] * 12).join((0, 0), (11, 1))
     session = Session(history=[layout])
+    before = content_state(session)
     complete = trace_train(session, [0, 0])
+    assert complete["outcome"] == "endless" and complete["covers"]
     assert complete["terminal"] is None
     assert complete["cycle_start"] == 0 and complete["period"] == 12
     assert complete["cycle_pieces"] == list(range(12))
+    # One start and a step budget: past it there is no verdict and no claim.
     limited = trace_train(session, [0, 0], 3)
+    assert limited["outcome"] == "limit" and not limited["complete"]
     assert limited["terminal"] is None
     assert limited["unvisited"] is None
-    assert not limited["complete"]
     assert limited["cycle_pieces"] == []
+    assert content_state(session) == before
+    with pytest.raises(DriveLimitError):
+        drive(layout, max_steps=3)
 
 
 @pytest.mark.parametrize("fixture,total", [("bridge-gap.json", 59), ("bridge-completed.json", 83)])

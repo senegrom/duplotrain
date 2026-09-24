@@ -1,6 +1,7 @@
 """Real Chromium/WebKit tests for the local editor and shared application API."""
 
 import os
+import shutil
 import threading
 
 import pytest
@@ -231,6 +232,8 @@ def test_corrupt_recovery_is_not_overwritten(editor):
     assert not errors
 
 
+@pytest.mark.skipif(shutil.which("openssl") is None,
+                    reason="issuing the test certificate needs openssl on PATH")
 def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
     """Exercise WASM over HTTPS under production CSP, using only visible controls.
 

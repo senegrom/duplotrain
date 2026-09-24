@@ -318,8 +318,10 @@ class Session:
         self.inventory, self.stones, self.unlimited = inventory, stones, unlimited
         self._history_state.append(self._edit_state(label))
         if len(self.history) > 200:
-            del self.history[1:2]
-            del self._history_state[1:2]
+            # The oldest kept state becomes the base: every undo step left
+            # reverts exactly the one edit its label names.
+            del self.history[0]
+            del self._history_state[0]
         self._future.clear()
         self._invalidate()
 
@@ -401,8 +403,14 @@ class Session:
             "unlimited": self.unlimited,
         }
 
-    def restore(self, data: object) -> None:
-        """Restore a validated checkpoint atomically. Never partially mutate on error."""
+    def restore(self, data: object, *, new_history: bool = False) -> None:
+        """Restore a validated checkpoint atomically. Never partially mutate on error.
+
+        Opening a project is one undoable change. Recovering a session into an
+        engine (autosave on a fresh engine, a worker or server restart) starts a
+        *new_history* instead: undoing it could only empty the engine again, and
+        autosave would then replace the recovered checkpoint with that.
+        """
         if not isinstance(data, dict) or data.get("format") != "duplotrain-session/1":
             raise ValueError("unrecognised session format")
         inventory = self._validated_counts(data.get("inventory"), self.catalog)
@@ -414,6 +422,9 @@ class Session:
         # _commit validates the complete proposed snapshot before any mutation.
         self._commit(layout, inventory=inventory, stones=stones, unlimited=unlimited,
                      label="project restore")
+        if new_history:
+            del self.history[:-1]
+            del self._history_state[:-1]
 
     @staticmethod
     def _validated_counts(counts: object, known: Mapping) -> dict[str, int]:
@@ -895,7 +906,7 @@ class Session:
 
         def publish(candidates: list[Solution], outcome: dict) -> dict:
             if cancel_check is not None:
-                cancel_check()
+                cancel_check(final=True)  # the last point at which it may stop
             # Candidate indices change even on unchanged geometry. Publish only
             # after all validation/search work succeeds: failed oracle, solver or
             # progress callbacks must leave revision and previous candidates alone.
@@ -937,7 +948,8 @@ class Session:
         aborted = False
         candidates = []
         # One closing problem: every stage tries first the direction that
-        # settled the previous one, and reuses the reverse tables it built.
+        # settled the previous one; reverse tables carry over between turns of a
+        # stage, and between stages only where they share the stock.
         memo: dict = {}
 
         def stage_progress(nodes: int) -> None:
@@ -1143,7 +1155,7 @@ def dispatch_session(
     elif path == "/api/import":
         session._push(layout_from_dict(body.get("data"), session.catalog), "import layout")
     elif path == "/api/restore":
-        session.restore(body.get("data"))
+        session.restore(body.get("data"), new_history=True)
     elif path == "/api/project/open":
         from .editor_tools import validate_project
 

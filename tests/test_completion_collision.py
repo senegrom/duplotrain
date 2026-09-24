@@ -81,12 +81,25 @@ def test_blocked_gap_is_not_closed_through_existing_track(catalog, engine):
         grow_from=opens[1],
         close_onto=opens[0],
     )
-    assert result.solutions == []
+    assert result.solutions == [] and result.stats.complete
+    # Refused by the search as pieces reach the blocker, not by the audit of
+    # closures already found through it.
+    assert result.stats.pruned_collision and not result.stats.dropped_overlap
 
 
-def test_gui_completions_never_overlap_the_base():
+def test_gui_completions_never_overlap_the_base(monkeypatch):
     """A ring containing a switch with a dangling spur, closed via solve_gap:
     every candidate must pass an independent overlap audit against the base."""
+    import duplotrain.editor as editor
+
+    searches, search = [], editor.solve
+
+    def recorded(*args, **kwargs):
+        result = search(*args, **kwargs)
+        searches.append(result.stats)
+        return result
+
+    monkeypatch.setattr(editor, "solve", recorded)
     session = Session()
     session.attach("switch", 1, None)
     session.attach("straight", 0, (0, 2))  # spur on the spare branch
@@ -109,6 +122,9 @@ def test_gui_completions_never_overlap_the_base():
             if (hit[0], hit[1]) not in pre
         ]
         assert fresh == [], f"candidate overlaps the base: {fresh}"
+    # The solver found them, refusing overlapping pieces as it placed them: its
+    # final audit of each closure had nothing left to drop.
+    assert searches and all(s.pruned_collision and not s.dropped_overlap for s in searches)
 
 
 def bridge_with_ground_track(catalog, cross_x):

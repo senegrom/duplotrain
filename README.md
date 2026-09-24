@@ -69,12 +69,11 @@ Connectors are genderless (a jigsaw tab **and** socket at every end), so any end
 with any end and one physical curve serves as both the left and the right turn — the
 model gets that for free by letting pieces be entered from either port.
 
-These numbers were settled by parsing the LDraw part files and BlueBrick's measured
-connection library, cross-checked against part weights, photographs and
-duplo-schienen.de's combination rules (BrickLink's stud dimensions for track parts are
-demonstrably wrong and were rejected). The one soft spot left is the bridge's vertical
-split — derived from brick-integer constraints and part heights rather than a published
-figure. Override any piece — or add entirely new ones — with a JSON catalogue, no code
+These numbers come from the LDraw part files and BlueBrick's measured connection
+library, cross-checked against part weights, photographs and duplo-schienen.de's
+combination rules; BrickLink's stud dimensions for track parts are wrong and are not
+used. The one soft spot is the bridge's vertical split — derived from brick-integer
+constraints and part heights rather than a published figure. Override any piece — or add entirely new ones — with a JSON catalogue, no code
 changes:
 
 ```json
@@ -97,7 +96,7 @@ Lengths may be plain numbers, exact fractions (`"384/5"`), field elements
 Python ≥ 3.12. From a checkout:
 
 ```
-pip install -e .[dev]        # click + rich + matplotlib + pytest
+pip install -e '.[dev]'      # click + rich + matplotlib + pytest + ruff
 ```
 
 CLI:
@@ -176,7 +175,9 @@ Completion cards require Preview before Apply, and inventory changes invalidate 
 suggestions. A search is a resumable job: it reports whether it exhausted the
 inventory or stopped at its limits, Find more asks it for more alternatives, and
 Search harder raises its node budgets and added-piece limit (up to 128); a search
-stopped at a limit never proves that no layout exists.
+stopped at a limit never proves that no layout exists. The search stages, including
+one for a complete standard bridge, are described in
+[docs/bridge-completion.md](docs/bridge-completion.md).
 
 Beyond closing loops, the editor keeps a bounded undo/redo history of track, owned
 pieces and sandbox mode, checks a layout for open connectors, sampled overlaps and
@@ -275,7 +276,7 @@ centreline union and chooses a canonical frame over the 24 lattice rotations ×
 reflection **before** sampling and rounding. Piece boundaries and decimal rounding
 ties therefore do not change the identity of an exactly congruent primitive curve.
 The resulting key is still approximate, controlled by `spacing` and `decimals`;
-regenerate previously cached keys after updating. Non-isomorphic hunting is a
+cached keys compare only with keys from the same version of the library. Non-isomorphic hunting is a
 set of keys:
 
 ```python
@@ -343,9 +344,9 @@ direction stone, then tries zero or one additional mid-piece stone on each eligi
 straight. It does not enumerate every combination of multiple optional stones.
 Exhaustion refers to that policy, the catalogue, and the sampled collision/congruence
 model — closure itself remains exact. For larger inventories, compose layouts
-constructively and verify their dynamics with `classify`. The slow end-to-end network
-and loop tests run weekly and can also be started with the Extended search checks
-workflow.
+constructively and verify their dynamics with `classify`. The end-to-end network and
+loop tests run in every application check, and again weekly in the Extended search
+checks workflow.
 
 The switch dynamics yields a little theorem the machine confirms by exhaustion: a
 dead-end cap **reflects** a train back through the branch it came from, so a trailing
@@ -437,8 +438,7 @@ is where a Rust core would slot in.
 
 ```
 python -m pytest                            # everything installed browsers allow
-python -m pytest -m "not slow"              # skip the ~2 min full-enumeration proofs
-python -m pytest -m "not slow and not browser"  # what application CI runs first
+python -m pytest -m "not browser"           # what application CI runs first
 ```
 
 The full local sequence mirrors application CI, which runs on pull requests and
@@ -448,7 +448,7 @@ workflow checks proof changes independently):
 ```sh
 python -m pip install -e '.[dev]'
 ruff check src webapp tests benchmarks
-python -m pytest -m 'not slow and not browser'
+python -m pytest -m 'not browser'
 node --test tests/web/*.test.cjs
 # Browser integration, including the real Pyodide worker:
 python -m pip install playwright
@@ -459,8 +459,9 @@ DUPLOTRAIN_BROWSER=webkit DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m py
 ```
 
 Tests marked `browser` need playwright plus a downloaded browser. Locally they skip
-when playwright or the chosen browser is missing, and the Pyodide app test skips
-without `DUPLOTRAIN_STATIC_DIST`; CI sets `DUPLOTRAIN_REQUIRE_BROWSER=1`, and
+when playwright or the chosen browser is missing, the two tests of the built app
+skip without `DUPLOTRAIN_STATIC_DIST`, and the offline reload test skips without
+`openssl` on the PATH; CI sets `DUPLOTRAIN_REQUIRE_BROWSER=1`, and
 explicit browser paths and every browser startup failure are errors. The two-finger
 pinch test runs on Chromium only.
 

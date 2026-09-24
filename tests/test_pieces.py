@@ -105,6 +105,36 @@ def test_span_keeps_rising_to_the_crest(catalog):
     assert (float(dx), float(dz)) == (192.0, pytest.approx(19.2))
 
 
+def test_a_user_catalogue_overrides_a_built_in_piece_by_id(tmp_path, catalog):
+    """The README's own "custom catalogue" example: re-measured bridge ramps."""
+    import json
+
+    from duplotrain.catalog import load_catalog
+
+    readme_example = {"pieces": [{
+        "id": "ramp",
+        "name": "Bridge ramp (my callipers)", "category": "bridge", "width": 64,
+        "paths": [{"segments": [{"type": "ramp", "run": 320, "rise": 60}]}],
+        "port_names": ["low", "high"],
+    }]}
+    path = tmp_path / "my-measurements.json"
+    path.write_text(json.dumps(readme_example))
+    loaded = load_catalog(path)
+    ramp = loaded["ramp"]
+    assert ramp.name == "Bridge ramp (my callipers)"
+    assert [port.name for port in ramp.ports] == ["low", "high"]
+    dx, _dy, dz, _heading = ramp.exit_delta(0, 1)
+    assert (dx, dz) == (Alg(320), Alg(60))  # not the built-in 57.6 mm rise
+    assert catalog["ramp"].exit_delta(0, 1)[2] == Alg(Fraction(288, 5))
+    # Every other piece is still the built-in one, in the built-in order.
+    assert list(loaded) == list(catalog)
+    assert all(loaded[pid] == catalog[pid] for pid in catalog if pid != "ramp")
+    # A later file overrides an earlier one, too.
+    later = tmp_path / "later.json"
+    later.write_text(json.dumps([{**readme_example["pieces"][0], "name": "Later ramp"}]))
+    assert load_catalog(path, later)["ramp"].name == "Later ramp"
+
+
 def test_duplicate_piece_ids_rejected():
     from duplotrain.pieces import parse_pieces
 

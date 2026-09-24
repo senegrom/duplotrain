@@ -91,9 +91,11 @@ test("shortlisted picking does not iterate the global segment array", () => {
   assert.equal(h.context.placementAt(10010, 0), 1);
 });
 
-for (const scale of [0.08, 0.9, 4]) test(`grouped shortlist picking matches an unfiltered scan at scale ${scale}`, () => {
+// At the extreme zoom every piece, even a ramp ten kilometres away, lies within the scan.
+for (const scale of [0.000001, 0.08, 0.9, 4]) test(`grouped shortlist picking matches an unfiltered scan at scale ${scale}`, () => {
   const placements = [track([[-100, 0, 0], [100, 0, 0]]),
-    track([[0, -150, 0], [0, 150, 120]]), track([[-100, 0, 120], [100, 0, 120]])];
+    track([[0, -150, 0], [0, 150, 120]]), track([[-100, 0, 120], [100, 0, 120]]),
+    track([[-1e7, 0, 10], [-1e7 + 150, 0, 110]])];
   const fast = harness({state: scene(placements), events: true});
   const slow = harness({state: scene(placements), events: true, overrides: {
     hitCandidates: () => new Set(placements.map((_, i) => i)),

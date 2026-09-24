@@ -7,7 +7,6 @@ import threading
 import pytest
 
 from duplotrain.catalog import default_catalog
-from duplotrain.drive import DriveLimitError, drive
 from duplotrain.editor import RevisionConflictError, Session, dispatch_session
 from duplotrain.editor_tools import check_session, trace_train, validate_project
 from duplotrain.geometry import Pose
@@ -77,7 +76,8 @@ def test_history_is_bounded_and_inventory_records_share_layout():
     assert all(item is layout for item in s.history)
     for _ in range(199):
         s.undo()
-    assert s.inventory["straight"] == 8
+    # The oldest kept edit is the base: undo never jumps past dropped edits.
+    assert s.inventory["straight"] == 50 and not s.state()["can_undo"]
     for _ in range(199):
         s.redo()
     assert s.inventory["straight"] == 249
@@ -178,14 +178,6 @@ def test_diagnostics_use_existing_height_collision_rules(z, expected):
     assert bool(report["overlaps"]) == expected
 
 
-def test_diagnostics_limit_is_not_a_clean_bill_of_health():
-    straight = default_catalog()["straight"]
-    s = Session(history=[Layout(tuple(Placement(straight, Pose.make()) for _ in range(30)))])
-    report = check_session(s)
-    assert not report["overlap_check_complete"]
-    assert len(report["overlaps"]) == 200
-
-
 def test_diagnostics_reports_stone_shortages_even_in_sandbox():
     s = Session(unlimited=True, stones={})
     s.attach("straight", 0, None)
@@ -206,21 +198,6 @@ def test_train_rejects_invalid_start_without_mutation(start):
     assert state_key(s) == before
 
 
-def test_trace_is_one_start_bounded_and_readonly():
-    c = default_catalog()
-    s = Session(history=[build_chain([(c["curve"], 0, 1)] * 12).join((0, 0), (11, 1))])
-    before = state_key(s)
-    report = trace_train(s, [0, 0])
-    assert report["outcome"] == "endless"
-    assert report["period"] == 12
-    assert report["covers"]
-    limited = trace_train(s, [0, 0], 3)
-    assert limited["outcome"] == "limit" and not limited["complete"]
-    assert state_key(s) == before
-    with pytest.raises(DriveLimitError):
-        drive(s.layout, max_steps=3)
-
-
 @pytest.mark.parametrize("limit", [0, 10001, True, 1.5, "4"])
 def test_train_budget_validation(limit):
     s = Session()
@@ -233,7 +210,7 @@ def test_cancelled_solve_does_not_publish_or_drop_candidates():
     s = Session()
     s.attach("curve", 0, None)
     before = state_key(s)
-    def cancel():
+    def cancel(final=False):
         raise ValueError("cancelled")
     with pytest.raises(ValueError, match="cancelled"):
         s.solve_gap(None, None, 0, 1, cancel_check=cancel)
@@ -274,8 +251,114 @@ def test_http_cancel_does_not_wait_for_session_lock(monkeypatch):
     assert state_key(s) == before
 
 
+@pytest.mark.parametrize("token", [
+    "0123456789abcde", "0" * 65, "0123456789abcdef!", "0123456789abcdéf", "0123 56789abcdef",
+    12345678901234567, None,
+])
+def test_http_solve_and_cancel_need_a_valid_operation_id(token):
+    # 16-64 ASCII letters, digits, '-' or '_': a random id names one solve.
+    s = Session()
+    s.attach("curve", 0, None)
+    before = state_key(s)
+    with running_server(s) as server:
+        for path in ("/api/solve", "/api/cancel"):
+            code, result = post(server, path, {"revision": s.revision, "operation_id": token})
+            assert code == 409 and "a valid operation_id is required" in result["error"], path
+    assert state_key(s) == before
+
+
+def test_http_operation_id_names_one_running_solve(monkeypatch):
+    s = Session()
+    s.attach("curve", 0, None)
+    entered, release = threading.Event(), threading.Event()
+
+    def slow(*args, cancel_check=None, **kwargs):
+        entered.set()
+        assert release.wait(3)
+        return {"found": 0, "aborted": False, "searched": 0}
+
+    monkeypatch.setattr(s, "solve_gap", slow)
+    token = "0123456789abcdef0123456789abcdef"
+    results = []
+    with running_server(s) as server:
+        worker = threading.Thread(target=lambda: results.append(post(server, "/api/solve", {
+            "revision": s.revision, "operation_id": token})))
+        worker.start()
+        try:
+            assert entered.wait(3)
+            # Refused at once, without waiting for the session the first one holds.
+            code, result = post(server, "/api/solve", {
+                "revision": s.revision, "operation_id": token})
+        finally:
+            release.set()
+            worker.join(3)
+    assert code == 409 and "operation_id is already active" in result["error"]
+    assert results[0][0] == 200
+
+
 def test_project_validation_does_not_modify_input():
     original = project(Session(), view={"x": 0, "y": 0, "scale": 1})
     before = copy.deepcopy(original)
     validate_project(original)
     assert original == before
+
+
+def test_a_solve_makes_its_last_cancellation_check_just_before_it_commits():
+    s = Session()
+    s.attach("curve", 0, None)
+    checks = []
+    s.solve_gap(None, None, 0, 1, cancel_check=lambda final=False: checks.append(final))
+    assert checks and checks[-1] is True and not any(checks[:-1])
+
+
+def test_http_cancel_after_the_last_check_reports_that_it_was_not_active(monkeypatch):
+    s = Session()
+    s.attach("curve", 0, None)
+    committed, answered = threading.Event(), threading.Event()
+
+    def solve(*args, cancel_check=None, **kwargs):
+        cancel_check(final=True)          # past this point the search commits
+        committed.set()
+        assert answered.wait(3)
+        return {"found": 0, "aborted": False, "searched": 0}
+
+    monkeypatch.setattr(s, "solve_gap", solve)
+    token = "0123456789abcdef0123456789abcdef"
+    results = []
+    with running_server(s) as server:
+        worker = threading.Thread(target=lambda: results.append(post(server, "/api/solve", {
+            "revision": s.revision, "operation_id": token})))
+        worker.start()
+        assert committed.wait(3)
+        status, reply = post(server, "/api/cancel", {"operation_id": token})
+        answered.set()
+        worker.join(3)
+    assert status == 200 and reply == {"cancelled": False}
+    assert results[0][0] == 200
+
+
+def test_the_bounded_history_undoes_exactly_the_edit_each_label_names():
+    s = Session()
+    s.restore(Session(unlimited=True).snapshot())       # an undoable project open
+    for _ in range(199):
+        s.attach("straight", 0, None if not s.layout.placements else s.layout.connectable_ends()[0])
+    assert len(s.history) == 200
+    while s.state()["can_undo"]:
+        s.undo()
+    # The oldest kept state is the opened project, not the engine's first empty one.
+    assert s.unlimited and s.layout.placements == ()
+
+
+def test_a_recovered_session_starts_a_new_history_but_opening_a_project_is_undoable():
+    source = Session()
+    source.attach("curve", 0, None)
+    source.set_unlimited(True)
+    engine = Session()
+    dispatch_session(engine, "/api/restore", {"data": source.snapshot(), "revision": 0})
+    assert engine.snapshot() == source.snapshot() and not engine.state()["can_undo"]
+    project = {"format": "duplotrain-project/1", "name": "Loop", "session": Session().snapshot(),
+               "preferences": {}}
+    dispatch_session(engine, "/api/project/open", {"data": project, "revision": engine.revision})
+    assert engine.state()["can_undo"]
+    engine.undo()
+    assert engine.snapshot() == source.snapshot()

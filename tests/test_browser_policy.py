@@ -82,6 +82,15 @@ def test_explicit_bad_browser_path_is_not_skipped(local_env, monkeypatch, tmp_pa
     browser = browser_type(tmp_path / "missing", missing_executable(explicit))
     with pytest.raises(FakePlaywrightError, match="Executable doesn't exist"):
         policy.launch_browser(browser)
+    browser.launch.assert_called_once_with(headless=True, executable_path=str(explicit))
+
+
+def test_explicit_browser_path_is_the_one_launched(local_env, monkeypatch, tmp_path):
+    explicit = tmp_path / "my-browser"
+    monkeypatch.setenv("DUPLOTRAIN_BROWSER_PATH", str(explicit))
+    browser = browser_type(tmp_path / "bundled")
+    assert policy.launch_browser(browser) is browser.launch.return_value
+    browser.launch.assert_called_once_with(headless=True, executable_path=str(explicit))
 
 
 def test_unexpected_startup_failure_is_not_skipped(local_env, tmp_path):

@@ -228,3 +228,20 @@ def test_network_and_solver_agree_on_bridge_crossing(underpass):
     )
     assert result.stats.complete
     assert (congruence_key(layout) in {congruence_key(lay) for lay in result.layouts}) is underpass
+    solved = solve(dict.fromkeys(catalog, 1), catalog,
+                   SolverConfig(min_pieces=4, use_all_pieces=True, max_results=100))
+    assert solved.stats.complete
+    assert ([congruence_key(s.layout) for s in solved.solutions]
+            == ([congruence_key(layout)] if underpass else []))
+    # The search's own collision rule decides, not the final audit afterwards.
+    assert solved.stats.pruned_collision and not solved.stats.dropped_overlap
+    # With the ground already laid, the deck is placed over it: completing the
+    # eight from either end applies the new deck's own underpass flag.
+    base = build_chain([(catalog[pid], 0, 1) for pid in ("ground", "climb")])
+    for grow, close in (((1, 1), (0, 0)), ((0, 0), (1, 1))):
+        completed = solve({"deck": 1, "descent": 1}, catalog,
+                          SolverConfig(min_pieces=1, max_results=100),
+                          base=base, grow_from=grow, close_onto=close)
+        assert completed.stats.complete and not completed.stats.dropped_overlap
+        assert ([congruence_key(s.layout) for s in completed.solutions]
+                == ([congruence_key(layout)] if underpass else []))

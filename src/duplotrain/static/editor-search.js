@@ -106,9 +106,13 @@ async function publishSearch(sequence) {
   const next = await api("/api/search/publish", {job_id: interactiveJob.job_id,
     revision: interactiveJob.revision, ...jobView()}, true);
   if (sequence !== jobSequence) return;
+  const before = S.revision;
   S = next; interactiveJob = next.search_job;
-  // Publication changes candidate indices' revision, not the immutable problem.
+  // Publication changes candidate indices' revision, not the immutable problem
+  // or its layout: picks, selectors and a train trace made on it stay valid.
   interactionRevision = S.revision;
+  if (navigationRevision === before) navigationRevision = S.revision;
+  if (trainTrace?.revision === before) trainTrace.revision = S.revision;
   selectedCandidate = chosenIndex === undefined ? null : `${S.revision}:${chosenIndex}`;
   redraw(); renderJobControls();
 }

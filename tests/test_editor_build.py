@@ -104,7 +104,14 @@ def test_ci_builds_once_tests_same_artifact_and_never_rebuilds_with_deploy_permi
     deploy = jobs["deploy"]
     assert "needs: [quality, python, base-install, build, browser]" in deploy
     assert "github.event_name != 'pull_request' && github.ref == 'refs/heads/main'" in deploy
-    assert "actions/checkout@" not in deploy and "run:" not in deploy
+    assert "actions/checkout@" not in deploy
+    # Its one command checks the artifact: nothing from the repository runs there.
+    assert deploy.count("run:") == 1
+    assert ('run: echo "$EXPECTED_SHA256  verified-bundle/artifact.tar" | '
+            'sha256sum --check --strict') in deploy
+    assert "artifact-ids: ${{ needs.build.outputs.artifact_id }}" in deploy
+    assert "EXPECTED_SHA256: ${{ needs.build.outputs.sha256 }}" in deploy
+    assert deploy.index("sha256sum") < deploy.index("actions/deploy-pages@")
     assert "actions/deploy-pages@" in deploy
     assert "workflow_run:" not in text and "pull_request_target:" not in text
 
@@ -114,7 +121,7 @@ def test_ci_keeps_both_versions_both_browsers_and_minimal_install():
     assert "python: ['3.12', '3.13']" in jobs["python"]
     assert "browser: [chromium, webkit]" in jobs["browser"]
     assert "DUPLOTRAIN_REQUIRE_BROWSER: '1'" in jobs["browser"]
-    assert 'not slow and not browser' in jobs["python"]
+    assert "-m 'not browser'" in jobs["python"]
     assert 'find_spec(\'matplotlib\') is None' in jobs["base-install"]
     assert 'duplotrain solve' in jobs["base-install"]
 

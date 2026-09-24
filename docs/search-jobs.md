@@ -101,9 +101,13 @@ reverse tables. Closing an iterator releases its workspace. The synchronous
 depth in one pass; raising a piece bound on a continuation applies to
 completion mode.
 
-Interactive single-pair jobs search in ordinary, bridge and full-inventory
-stages, alternating endpoints. Stage node budgets are shared across
-directions, not multiplied for each direction. Template generation is separate
+Interactive single-pair jobs search the arc templates, then ordinary, bridge
+and full-inventory stages in that order, as `/api/solve` does: only the full
+inventory also searches reversing closures, even when reversing loops are
+allowed. An exact ordinary stage alternates endpoints; forced fits and reversing
+closures are not direction-equivalent, so those stages grow from the chosen end
+only and run until their own limits stop them. Stage node budgets are shared
+across directions, not multiplied for each direction. Template generation is separate
 from DFS and its bounded list is regenerated when a higher depth is requested.
 Room restrictions and publication guards run before a solution is streamed.
 Each candidate's final placements are audited for overlaps exactly once, by

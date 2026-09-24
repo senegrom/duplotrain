@@ -31,6 +31,8 @@ function worker({build="aaa",caches=cacheStorage(),bad=null,now=()=>Date.now(),p
     const asset=assets.find(a=>new URL(a.url,scope).href===url);
     if(stream&&asset)return new Response(stream(asset,init.signal),{headers:{"Content-Type":"text/html"}});
     const body=bad===asset?.url?"corrupt":bad==="long"&&asset?asset.body+" and more":
+      // One byte changed, length kept: only the SHA-256 comparison can catch it.
+      bad==="same-length"&&asset?.url.startsWith("editor.js")?asset.body.slice(0,-1)+"x":
       asset?.body||"network fallback";
     return new Response(body,{headers:{"Content-Type":asset?.url==="index.html"?"text/html":"application/javascript",
       "Content-Security-Policy":"default-src 'self'","Content-Encoding":"gzip"}});
@@ -72,6 +74,17 @@ for(const bad of ["index.html","editor.js?v=bbb","network","long"])test(`failed 
   assert.equal((await old.ctx.offlineStatus()).ready,true);
   assert.ok(caches.map.has("other-app"));assert.equal(next.activated(),0);
   assert.ok(!caches.map.has(next.run("CACHE")));
+});
+
+test("a corrupt asset of exactly the promised size fails its SHA-256 check",async()=>{
+  const caches=cacheStorage(),old=worker({caches});await old.install();
+  const next=worker({build:"bbb",caches,bad:"same-length"});
+  // The served bytes match the manifest's length, so the length check alone would accept them.
+  const served=await (await next.ctx.fetch(new URL(next.assets[1].url,scope).href,{})).text();
+  assert.equal(Buffer.byteLength(served),next.manifest[1].bytes);assert.notEqual(served,next.assets[1].body);
+  await assert.rejects(next.install(),/verification failed: editor\.js\?v=bbb/);
+  assert.equal((await next.ctx.offlineStatus()).ready,false);assert.ok(!caches.map.has(next.run("CACHE")));
+  assert.equal((await old.ctx.offlineStatus()).ready,true);
 });
 
 test("quota failure cannot mark a partial installation ready",async()=>{
@@ -164,6 +177,15 @@ function clock(){
     advance(ms){now+=ms;for(const [id,t] of [...timers])if(t.at<=now){timers.delete(id);t.fn();}}};
 }
 const settle=async()=>{for(let i=0;i<10;i++)await new Promise(resolve=>setImmediate(resolve));};
+// The next body is requested only after the previous asset's SHA-256 digest, which
+// runs on another thread: on a loaded machine that took over 12,000 turns. So wait
+// for the request itself, bounded in time so a download that never asks still fails.
+async function requested(bodies,ms=10000){
+  for(const end=Date.now()+ms;!bodies.waiting.length&&Date.now()<end;)
+    await new Promise(resolve=>setImmediate(resolve));
+  assert.ok(bodies.waiting.length,`no download requested its body within ${ms} ms`);
+  return bodies.waiting.shift();
+}
 function feeds(){
   const waiting=[];
   return {waiting,stream(asset,signal){
@@ -175,9 +197,9 @@ function feeds(){
 
 test("a slow but steady download completes; a quiet minute aborts it",async()=>{
   const time=clock(),bodies=feeds(),w=worker({timers:time,stream:bodies.stream});
-  const installing=w.install();
+  const installing=w.install();installing.catch(()=>{});
   for(let i=0;i<w.assets.length;i++){
-    await settle();const {asset,control}=bodies.waiting.shift();
+    const {asset,control}=await requested(bodies);
     const bytes=new TextEncoder().encode(asset.body),half=bytes.length>>1;
     // Each asset takes 100 s, but bytes never stop for a minute.
     control.enqueue(bytes.slice(0,half));await settle();time.advance(50000);
@@ -186,11 +208,12 @@ test("a slow but steady download completes; a quiet minute aborts it",async()=>{
   }
   assert.equal((await installing).ready,true);
   const stalledTime=clock(),stalled=feeds(),v=worker({timers:stalledTime,stream:stalled.stream});
-  const failing=v.install();
-  await settle();stalled.waiting[0].control.enqueue(new Uint8Array(1));await settle();
+  let outcome=null;v.install().then(()=>{outcome="installed";},error=>{outcome=error.message;});
+  (await requested(stalled)).control.enqueue(new Uint8Array(1));await settle();
+  // One millisecond short of a quiet minute the download still runs; at the minute it aborts.
   stalledTime.advance(59999);await settle();
-  assert.equal(stalled.waiting.length,1);
-  stalledTime.advance(1);
-  await assert.rejects(failing,/aborted/);
+  assert.equal(outcome,null);assert.equal(stalled.waiting.length,0);
+  stalledTime.advance(1);await settle();
+  assert.match(String(outcome),/aborted/);
   assert.ok(!v.caches.map.has(v.run("CACHE")));
 });

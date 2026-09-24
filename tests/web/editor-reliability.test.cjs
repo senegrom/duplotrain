@@ -34,6 +34,35 @@ for (const [key, ctrl, meta, shift, path] of [
   assert.deepEqual(h.calls.map(c => c.path), [path]);
 });
 
+test("Escape disarms whichever tool is armed and drops the selection, hover and chooser", () => {
+  const h = harness({state: scene([track([[0, 0, 0], [100, 0, 0]]), track([[0, 0, 0], [100, 0, 0]])]), events: true});
+  for (const tool of ['{piece: {piece: "straight", entry: 0}}', '{stone: "stone_stop"}', "{remove: true}",
+    '{pick: {stage: "grow", grow: null}}']) {
+    h.run(`selectTool(${tool})`);
+    h.context.showOverlapPicker([{placement: 0, z: 0}, {placement: 1, z: 0}]);
+    h.run("hoveredPiece = 1");
+    assert.ok(h.run("armed || armedStone || pickMode || deleting"), tool);
+    assert.notEqual(h.run("selectedPiece"), null);
+    h.windowEvents.keydown({key: "Escape", target: {closest: () => false}, preventDefault() {}});
+    for (const name of ["armed", "armedStone", "pickMode", "selectedPiece", "hoveredPiece"])
+      assert.equal(h.run(name), null, `${name} after ${tool}`);
+    assert.equal(h.run("deleting"), false);
+    assert.equal(h.el("overlap-picker").hidden, true);
+  }
+});
+
+test("right-click removes the piece under the pointer; a touch long-press does not", async () => {
+  const h = harness({state: scene([track([[-100, 0, 0], [100, 0, 0]])]), events: true, overrides: {redraw() {}}});
+  let prevented = 0;
+  const menu = pointerType => h.el("canvas").fire("contextmenu",
+    {pointerType, clientX: 250, clientY: 250, preventDefault() { prevented++; }});
+  await menu("touch");
+  assert.equal(h.calls.length, 0);
+  await menu("mouse");
+  assert.deepEqual(JSON.parse(JSON.stringify(h.calls)), [{path: "/api/remove", body: {placement: 0}}]);
+  assert.equal(prevented, 2);  // the browser's own menu never opens over the track
+});
+
 test("editing a text input never invokes global history shortcuts", () => {
   const h = harness({events: true});
   h.windowEvents.keydown({key: "z", ctrlKey: true, shiftKey: true, target: {closest: () => true}});
@@ -157,6 +186,21 @@ test("slow project selection cannot replace a newer selected project", async () 
   await h.context.readProjectFile({target: {files: [{size: 2, text: async () => '{"name":"new"}'}]}});
   finish('{"name":"old"}'); await slow;
   assert.deepEqual(opened.map(p => p.name), ["new"]);
+});
+
+test("a project file opens against the revision shown when it was chosen", async () => {
+  // An edit that lands while the file is read must make the engine refuse the open.
+  const opens = [];
+  const h = harness({overrides: {redraw() {}, api: async (path, body) => {
+    opens.push({path, revision: body.revision}); throw new Error("Your action was not applied");
+  }}});
+  let finish;
+  const reading = h.context.readProjectFile({target: {files: [{size: 2,
+    text: () => new Promise(resolve => { finish = resolve; })}]}});
+  h.run("S = {...S, revision: 2}");
+  finish('{"format": "duplotrain-project/1"}'); await reading;
+  assert.deepEqual(opens, [{path: "/api/project/open", revision: 1}]);
+  assert.match(h.notices.at(-1).text, /Project not opened: Your action was not applied/);
 });
 
 test("named local saves append copies, preserve autosave, and handle quota failures", async () => {

@@ -89,6 +89,7 @@ window.duplotrainBuild = "__BUILD__";
             if (pending.size) { heartbeat(); options.status(`searching… ${data.toLocaleString()} states explored`); }
             return;
           }
+          if (data?.fatal) { fail(new Error(`The engine failed and must restart (${data.fatal})`)); return; }
           const {id, res, err} = data || {}, call = pending.get(id);
           if (!call) return;
           pending.delete(id); heartbeat();

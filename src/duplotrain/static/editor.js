@@ -49,12 +49,15 @@ async function adoptConflictState(error) {
   const current = error.state;
   if (S?.snapshot && S.instance && current.instance !== S.instance && current.revision === 0) {
     // A restarted engine, such as a new local server on the same port, starts
-    // empty. Restore this tab's confirmed session there rather than adopting,
-    // and autosaving over, the empty one. If another tab restored first, adopt it.
+    // empty. Restore the newest confirmed session there rather than adopting,
+    // and autosaving over, the empty one: this tab's own, unless another tab
+    // autosaved since this tab last did. If another tab restored first, adopt it.
+    const newer = newerCheckpoint();
     try {
-      S = await send("/api/restore", {data: S.snapshot, revision: 0, instance: current.instance,
+      S = await send("/api/restore", {data: newer || S.snapshot, revision: 0, instance: current.instance,
                                       preview_format: "duplotrain-preview/1"});
-      error.message = "The editor engine restarted; this tab's last confirmed session was " +
+      error.message = (newer ? "The editor engine restarted; the session another tab saved last was " :
+        "The editor engine restarted; this tab's last confirmed session was ") +
         "restored and undo history reset. Your last action was not applied.";
     } catch (restoreError) {
       if (restoreError.code !== "stale_revision" || !restoreError.state) {
@@ -65,7 +68,12 @@ async function adoptConflictState(error) {
       S = restoreError.state;
     }
     clearTransient();
-  } else S = error.state;
+  } else {
+    // Another engine counts revisions afresh: nothing bound to this tab's
+    // revision numbers (picks, selectors, traces) may carry over to its state.
+    if (S?.instance && current.instance !== S.instance) clearTransient();
+    S = error.state;
+  }
   selectTool();
   selectedCandidate = null;
   preview = null;
@@ -134,6 +142,14 @@ function decodeCheckpoint(raw, legacy = false) {
     throw new Error("unrecognised session format");
   }
   return snapshot;
+}
+
+// The session another tab autosaved after this tab's last save or read, if any.
+function newerCheckpoint() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored !== null && stored !== savedCheckpoint ? decodeCheckpoint(stored) : null;
+  } catch (_error) { return null; } // unreadable: this tab's own session is all there is
 }
 
 async function initializeRecovery() {

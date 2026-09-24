@@ -28,12 +28,14 @@ def test_invalid_json_counts_are_rejected_before_merging(tmp_path, monkeypatch, 
     assert "Traceback" not in result.output
 
 
-@pytest.mark.parametrize("data", [[], None, 12, "box", {"missing": 0}])
+@pytest.mark.parametrize("data", [[], None, 12, "box", {"missing": 0}, {"curve": 12, "kurve": 4}])
 def test_inventory_document_must_be_a_known_id_mapping(tmp_path, data):
     path = tmp_path / "box.json"
     path.write_text(json.dumps(data))
     result = CliRunner().invoke(cli.main, ["solve", "--inventory", str(path)])
     assert result.exit_code != 0 and "bad inventory file" in result.output
+    if isinstance(data, dict):
+        assert "unknown piece" in result.output
     assert "Traceback" not in result.output
 
 

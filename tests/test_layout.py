@@ -160,6 +160,32 @@ def test_serialisation_round_trip_is_exact(catalog):
     assert rebuilt.pose_of(rebuilt.open_ends()[-1]) == layout.pose_of(layout.open_ends()[-1])
 
 
+@pytest.mark.parametrize("links", [
+    [[0, 1, 1, 0], [0, 1, 2, 0]],  # one end linked to two others: asymmetric
+    [[0, 1, 1, 0], [2, 0, 1, 0]],  # the same, named from the other side
+    [[0, 1, 1, 0], [1, 0, 0, 1]],  # the same joint listed twice
+    [[1, 1, 1, 1]],                # an end linked to itself
+])
+def test_import_rejects_ends_linked_more_than_once(catalog, links):
+    data = layout_to_dict(build_chain([(catalog["straight"], 0, 1)] * 3))
+    data["links"] = links
+    with pytest.raises(ValueError, match="linked twice"):
+        layout_from_dict(data, catalog)
+
+
+@pytest.mark.parametrize("links", [[[1, 1, 0, 0]], [[0, 0, 1, 1]]])
+def test_import_rejects_a_link_onto_a_sealed_buffer_face(catalog, links):
+    # The buffer's port 1 is its bumper: it never mates, whichever side names it.
+    layout = build_chain([(catalog["straight"], 0, 1), (catalog["buffer"], 0, 1)])
+    assert layout.is_sealed((1, 1))
+    data = layout_to_dict(layout)
+    data["links"] = [[0, 1, 1, 0], *links]
+    with pytest.raises(ValueError, match="sealed faces cannot be linked"):
+        layout_from_dict(data, catalog)
+    data["links"] = [[0, 1, 1, 0]]
+    assert layout_from_dict(data, catalog) == layout
+
+
 def test_walk_traverses_the_loop(catalog):
     curve = catalog["curve"]
     layout = build_chain([(curve, *LEFT)] * 12)

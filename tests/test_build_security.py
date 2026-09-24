@@ -156,16 +156,83 @@ def test_failed_dependency_verification_preserves_existing_dist(dependency, monk
     assert list(dist.iterdir()) == [dist / "index.html"]
 
 
+WORKFLOWS = ROOT / ".github" / "workflows"
+#: The one job allowed a write scope: it publishes the tested Pages artifact.
+DEPLOY_SCOPES = {("app-check.yml", "deploy"): {
+    "contents": "read", "pages": "write", "id-token": "write"}}
+
+
+def workflow_files():
+    files = sorted(path for path in WORKFLOWS.iterdir() if path.is_file())
+    # GitHub runs every .yml and .yaml file here; nothing else may hide in it.
+    assert files and all(path.suffix in (".yml", ".yaml") for path in files), files
+    return files
+
+
+def permission_blocks(text):
+    """``{owner: scopes}`` for every ``permissions:`` key, owner None for the workflow.
+
+    A block mapping becomes a dict; an inline value (``write-all``, ``{...}``) its
+    text. A structural scan rather than a YAML runtime dependency: a key found
+    anywhere but at workflow or job level is reported under its line.
+    """
+    found, section, job = {}, None, None
+    lines = text.splitlines()
+    for number, line in enumerate(lines):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        key, _, value = line.strip().partition(":")
+        if indent == 0:
+            section = key
+        elif indent == 2 and section == "jobs":
+            job = key
+        if key.strip("'\"") != "permissions":
+            continue
+        owner = (None if indent == 0 else job if indent == 4 and section == "jobs"
+                 else f"line {number + 1}")
+        assert owner not in found, f"permissions repeated for {owner}"
+        value = value.split(" #", 1)[0].strip()
+        if value:
+            found[owner] = value
+            continue
+        scopes = {}
+        for inner in lines[number + 1:]:
+            if inner.strip() and len(inner) - len(inner.lstrip(" ")) <= indent:
+                break
+            if inner.strip() and not inner.lstrip().startswith("#"):
+                scope, _, level = inner.strip().partition(":")
+                scopes[scope.strip()] = level.split(" #", 1)[0].strip().strip("'\"")
+        found[owner] = scopes
+    return found
+
+
 def test_workflows_use_read_only_tokens_and_immutable_actions():
-    for path in (ROOT / ".github" / "workflows").glob("*.yml"):
+    for path in workflow_files():
         workflow = path.read_text()
-        assert "permissions:\n  contents: read\n" in workflow, path
+        blocks = permission_blocks(workflow)
+        # The token is read-only by default, at the workflow level...
+        assert blocks.get(None) == {"contents": "read"}, path
+        # ...and no job widens it, save the one deploy job, exactly as reviewed.
+        for owner, scopes in blocks.items():
+            if owner is None:
+                continue
+            expected = DEPLOY_SCOPES.get((path.name, owner))
+            if expected is not None:
+                assert scopes == expected, (path, owner)
+            else:
+                assert isinstance(scopes, dict) and set(scopes.values()) <= {"read", "none"}, (
+                    path, owner, scopes)
+        assert "pull_request_target" not in workflow and "workflow_run" not in workflow, path
         actions = re.findall(r"uses:\s*([^\s]+)", workflow)
         assert actions, path
-        assert all(re.fullmatch(r"[\w./-]+@[0-9a-f]{40}", action) for action in actions), path
+        assert all(re.fullmatch(r"[\w.-]+/[\w./-]+@[0-9a-f]{40}", action)
+                   for action in actions), path
         assert workflow.count("persist-credentials: false") == sum(
             action.startswith("actions/checkout@") for action in actions
         ), path
+    assert DEPLOY_SCOPES.keys() <= {(path.name, owner) for path in workflow_files()
+                                    for owner in permission_blocks(path.read_text())}
 
 
 def test_lean_installer_is_versioned_verified_and_not_piped_to_shell():

@@ -90,10 +90,23 @@ def test_old_clients_without_revision_fail_closed(local_session):
     assert unchanged(session) == before
 
 
-def test_concurrent_same_revision_edits_have_only_one_winner(local_session):
+def test_concurrent_same_revision_edits_have_only_one_winner(local_session, monkeypatch):
     session, server = local_session
     revision = session.revision
     barrier = threading.Barrier(2)
+    arrivals, both_arrived = [], threading.Event()
+    remove_piece = Session.remove_piece
+
+    def held_open(self, placement):
+        # Keep the first edit open for a while. Were requests not serialised,
+        # the second would pass the same revision check and arrive here too.
+        arrivals.append(placement)
+        if len(arrivals) == 2:
+            both_arrived.set()
+        both_arrived.wait(1.0)
+        return remove_piece(self, placement)
+
+    monkeypatch.setattr(Session, "remove_piece", held_open)
 
     def remove():
         barrier.wait(timeout=3)
@@ -102,6 +115,7 @@ def test_concurrent_same_revision_edits_have_only_one_winner(local_session):
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [pool.submit(remove) for _ in range(2)]
         assert sorted(f.result(timeout=5) for f in futures) == [200, 409]
+    assert arrivals == [0]  # the loser was refused before it reached the edit
     assert [p.piece.id for p in session.layout] == ["curve", "switch"]
     assert session.revision == revision + 1
 
@@ -210,6 +224,59 @@ def test_save_size_budget_is_checked_before_any_session_change(monkeypatch, acti
             snapshot["inventory"]["straight"] = 10000
             session.restore(snapshot)
     assert unchanged(session) == before
+
+
+def stone_limit(session, _monkeypatch):
+    """200 stones already on 201 straights: the 201st stone must be refused."""
+    layout = straights(MAX_ACCESSORIES + 1)
+    session._push(Layout(layout.placements, accessories=tuple(
+        (i, "stone_stop") for i in range(MAX_ACCESSORIES))))
+    return lambda: session.toggle_stone(MAX_ACCESSORIES, "stone_stop")
+
+
+def placement_limit(session, _monkeypatch):
+    session._push(straights(MAX_PLACEMENTS))
+    return lambda: session.attach("straight", 0, (MAX_PLACEMENTS - 1, 1))
+
+
+def save_budget(session, monkeypatch):
+    session.attach("straight", 0, None)
+
+    def rejected():
+        size = len(json.dumps(session.snapshot()).encode())
+        monkeypatch.setattr(editor, "MAX_SNAPSHOT_BYTES", size)
+        session.set_inventory({"straight": 10000})
+    return rejected
+
+
+def unknown_piece(session, _monkeypatch):
+    session.attach("straight", 0, None)
+    return lambda: dispatch_session(session, "/api/attach", {
+        "revision": session.revision, "piece": "warp", "entry": 0, "at": [0, 1]})
+
+
+def bad_restore(session, _monkeypatch):
+    snapshot = session.snapshot()
+    snapshot["layout"]["links"] = [[0, 0, 0, 0]]
+    return lambda: session.restore(snapshot)
+
+
+@pytest.mark.parametrize("prepare", [stone_limit, placement_limit, save_budget, unknown_piece,
+                                     bad_restore])
+def test_a_rejected_edit_keeps_redo(monkeypatch, prepare):
+    # docs/editor.md: "a no-op or rejected edit ... keeps [redo]". Limits are
+    # checked on the complete proposed snapshot, before anything changes.
+    session = Session(unlimited=True)
+    rejected = prepare(session, monkeypatch)
+    session.set_unlimited(False)
+    session.undo()
+    assert session.state()["can_redo"] and session.state()["redo_label"] == "sandbox change"
+    before = unchanged(session)
+    with pytest.raises(ValueError):
+        rejected()
+    assert unchanged(session) == before
+    session.redo()
+    assert not session.unlimited
 
 
 def test_exact_pose_index_agrees_with_pairwise_reference():

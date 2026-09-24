@@ -28,12 +28,21 @@ def version(dist):
 
 
 def test_offline_manifest_covers_actual_byte_hashes_and_versioned_editor(synthetic_runtime_build):
-    _source, dist = synthetic_runtime_build
+    source, dist = synthetic_runtime_build
     build.main()
     stamp, entries = manifest(dist)
     urls = [a["url"] for a in entries]
     assert len(urls) == len(set(urls))
     assert "index.html" in urls and "manifest.webmanifest" in urls
+    # An installed app offline still shows its icons: every icon the build ships,
+    # and every one the page and the web manifest name, is in the manifest.
+    icons = {"icons/" + p.name for p in (source / "src/duplotrain/static/icons").iterdir()}
+    assert len(icons) >= 9 and icons <= set(urls)
+    named = {icon["src"] for icon in json.loads(
+        (dist / "manifest.webmanifest").read_text())["icons"]}
+    named |= set(re.findall(r'<link rel="(?:icon|apple-touch-icon)" href="([^"]+)"',
+                            (dist / "index.html").read_text()))
+    assert len(named) >= 9 and {name.removeprefix("./") for name in named} <= set(urls)
     for name in (*build.EDITOR_SCRIPTS, "boot.js", "worker.js", "adapter.py", "editor.css"):
         assert f"{name}?v={stamp}" in urls
     for name in build.PYODIDE_FILES:

@@ -173,16 +173,20 @@ def drive(
     if switch_states:
         states.update({int(k): int(v) for k, v in switch_states.items()})
 
+    # One pass over the stones, in their order: this runs once per drive() call,
+    # and classify or a route analysis drive the same layout thousands of times.
     stones_by_placement: dict[int, list[tuple[str, int | None]]] = {}
-    for index in range(len(layout.placements)):
-        entries = layout.stone_entries_on(index)
-        if entries:
-            stones_by_placement[index] = entries
+    for entry in layout.accessories:
+        stones_by_placement.setdefault(entry[0], []).append(
+            (entry[1], entry[2] if len(entry) > 2 else None))
 
     placement, entered = start
     steps: list[tuple[int, int, int]] = []
     seen: dict[tuple, int] = {}
     reversals = 0
+    # Every step's state holds all tongues, but they change only on trailing
+    # moves: share one tuple between changes rather than build one per step.
+    tongues = tuple(states[index] for index in sorted(states))
 
     def finish(
         outcome: str, here: int, reason: str, at_port: int | None = None,
@@ -197,8 +201,8 @@ def drive(
             terminal=DriveTerminal(here, entered, at_port, reason),
         )
 
-    for _ in range(max_steps):
-        key = (placement, entered, tuple(sorted(states.items())))
+    while True:
+        key = (placement, entered, tongues)
         if key in seen:
             return DriveReport(
                 outcome="endless",
@@ -208,6 +212,10 @@ def drive(
                 visited=frozenset(p for p, _e, _x in steps),
                 final_switch_states=dict(states),
             )
+        if len(steps) >= max_steps:
+            # A cycle closing exactly at the budget is still recognised above.
+            raise DriveLimitError(f"drive() exceeded its {max_steps:,}-step budget; "
+                                  "no verdict was made")
         seen[key] = len(steps)
 
         piece = layout.placements[placement].piece
@@ -240,7 +248,9 @@ def drive(
                 ) > 1:
                     # Trailing move: we are pushing through toward a facing port, so
                     # the tongue is forced to the branch we came from.
-                    states[placement] = entered
+                    if states.get(placement) != entered:
+                        states[placement] = entered
+                        tongues = tuple(states[index] for index in sorted(states))
         # A mid-piece reversal also approaches a connector face, including the
         # one we originally entered through. Only the *initial departure* from
         # that face is silent; a return toward it must encounter its stones.
@@ -263,8 +273,6 @@ def drive(
         if link is None:
             return finish("derailed", placement, "open_end", exit_port)
         placement, entered = link
-
-    raise DriveLimitError("drive() exceeded its MAX_STEPS budget; no verdict was made")
 
 
 def endless_run(
@@ -298,7 +306,8 @@ class LoopClassification:
     * ``looping`` -- EVERY placement runs forever, whatever the tongues say.
     * ``completely_looping`` -- looping, and every run covers the whole track.
     * ``perfectly_looping`` -- completely looping, and every run's eventual cycle
-      goes over every tile in both directions (hence each infinitely often).
+      sweeps every tile, each of its routes end to end, in both directions (hence
+      each infinitely often).
 
     Each level implies the ones above it.  ``witness`` is an endless start for the
     local property; ``counterexample`` is the first (start, tongue setting, outcome)
@@ -355,20 +364,35 @@ def _tongue_assignments(layout: Layout) -> Iterator[dict[int, int]]:
 
 
 def _cycle_both_directions(report: DriveReport, layout: Layout) -> bool:
-    """Does the eventual cycle traverse every drivable tile in both directions?"""
+    """Does the eventual cycle sweep every drivable tile, all of it, both ways?
+
+    Each route of a piece has a half at either port. A move ``e -> x`` drives the
+    half at ``e`` inward and the half at ``x`` outward; a mid-piece reversal at
+    ``e`` drives the half at ``e`` both ways and never reaches the other half.
+    Every half of every route through two real connectors must be driven both
+    ways: a junction route the cycle never takes, or a half behind a reversal,
+    is track the cycle does not sweep.
+    """
     assert report.cycle_start is not None
-    cycle = report.steps[report.cycle_start :]
-    per_placement: dict[int, set[tuple[int, int]]] = {}
-    for placement, entered, exited in cycle:
-        per_placement.setdefault(placement, set()).add((entered, exited))
-    universe = drivable_universe(layout)
-    if not universe <= set(per_placement):
-        return False
-    return all(
-        any((x, e) in moves for (e, x) in moves)
-        for index, moves in per_placement.items()
-        if index in universe
-    )
+    driven: dict[int, set[tuple[int, int, bool]]] = {}
+    for placement, entered, exited in report.steps[report.cycle_start :]:
+        halves = driven.setdefault(placement, set())
+        if entered == exited:
+            for other, _route in layout.placements[placement].piece.transit(entered):
+                halves.update(((entered, other, True), (entered, other, False)))
+        else:
+            halves.update(((entered, exited, True), (exited, entered, False)))
+    for index in drivable_universe(layout):
+        piece = layout.placements[index].piece
+        halves = driven.get(index, set())
+        for route in piece.routes:
+            a, b = route.port_a, route.port_b
+            if a in piece.sealed or b in piece.sealed:
+                continue
+            if not all((port, other, inward) in halves for port, other in ((a, b), (b, a))
+                       for inward in (True, False)):
+                return False
+    return True
 
 
 def classify(

@@ -13,14 +13,6 @@ def catalog():
     return default_catalog()
 
 
-def test_circle_is_the_only_12_curve_network(catalog):
-    result = enumerate_networks(
-        {"curve": 12}, catalog, NetworkConfig(use_all_pieces=True, max_pieces=12)
-    )
-    assert len(result.layouts) == 1
-    assert result.layouts[0].is_closed
-
-
 def test_shuttle_is_the_only_buffered_bar(catalog):
     result = enumerate_networks(
         {"straight": 3, "buffer": 2},
@@ -33,18 +25,31 @@ def test_shuttle_is_the_only_buffered_bar(catalog):
     assert layout.piece_counts == {"straight": 3, "buffer": 2}
 
 
-def test_perfect_networks_shuttle(catalog):
+@pytest.mark.parametrize("inventory, owned, expected", [
+    # The shuttle needs a guard stone at each buffer face: two stones.
+    ({"straight": 3, "buffer": 2}, 1, 0),
+    ({"straight": 3, "buffer": 2}, 2, 1),
+    # The ring needs one mid-piece stone, which is optional only when owned.
+    ({"curve": 12, "straight": 2}, 0, 0),
+    ({"curve": 12, "straight": 2}, 1, 1),
+])
+def test_perfect_networks_use_only_the_stones_owned(catalog, inventory, owned, expected):
     perfect = find_perfect_networks(
-        {"straight": 3, "buffer": 2},
-        catalog,
-        {"stone_direction": 2},
-        NetworkConfig(use_all_pieces=True, max_pieces=5),
+        inventory, catalog, {"stone_direction": owned} if owned else {},
+        NetworkConfig(use_all_pieces=True, max_pieces=sum(inventory.values())),
     )
-    assert len(perfect) == 1
-    layout, verdict = perfect[0]
-    assert verdict.perfectly_looping
-    # Both buffer faces got their mandatory guard stones.
-    assert len(layout.accessories) == 2
+    assert perfect.stats.complete and len(perfect) == expected
+    for layout, verdict in perfect:
+        assert verdict.perfectly_looping
+        stones = [entry for entry in layout.accessories if entry[1] == "stone_direction"]
+        assert len(stones) == len(layout.accessories) == owned
+        if "buffer" in inventory:
+            # Both buffer faces got their mandatory guard stones.
+            guarded = {(entry[0], entry[2]) for entry in stones}
+            assert guarded == {layout.links[(i, 0)] for i, p in enumerate(layout.placements)
+                               if p.piece.id == "buffer"}
+        else:
+            assert [len(entry) for entry in stones] == [2]  # mid-piece, on a straight
 
 
 def test_star_of_three_arms_is_never_perfect(catalog):
@@ -94,7 +99,6 @@ def test_star_of_three_arms_is_never_perfect(catalog):
     assert not verdict.completely_looping  # ...but the third arm is never visited
 
 
-@pytest.mark.slow
 def test_perfect_networks_finds_the_stoned_loop(catalog):
     """{12 curves + 2 straights}: network enumeration + stone placement rediscovers
     the perfect loop family (a closed ring with one direction stone on a straight)."""
@@ -163,7 +167,6 @@ def _found(result):
 
 
 @pytest.mark.parametrize("inventory, config", [
-    ({"curve": 12}, dict(use_all_pieces=True, max_pieces=12)),
     ({"straight": 3, "buffer": 2}, dict(use_all_pieces=True, max_pieces=5)),
     ({"buffer": 2, "straight": 2, "curve": 2}, dict(max_pieces=6, max_results=100)),
     ({"switch": 1, "curve": 4, "straight": 1, "buffer": 2}, dict(max_pieces=8, max_results=100)),
@@ -183,13 +186,43 @@ def test_reachability_prune_keeps_every_network_in_order(catalog, inventory, con
 
 
 def test_reachability_prune_cuts_the_ring_enumeration(catalog):
+    # Twelve curves close one network, the circle, with or without the prune.
     plain = enumerate_networks({"curve": 12}, catalog,
                                NetworkConfig(use_all_pieces=True, max_pieces=12, lookahead=0))
     fast = enumerate_networks({"curve": 12}, catalog,
                               NetworkConfig(use_all_pieces=True, max_pieces=12))
+    assert plain.stats.complete and fast.stats.complete
+    assert plain.stats.stop_reason == fast.stats.stop_reason == "exhausted"
     assert _found(fast) == _found(plain) and len(fast.layouts) == 1
+    assert fast.layouts[0].is_closed and fast.layouts[0].piece_counts == {"curve": 12}
     assert fast.stats.pruned_reachability > 0
     assert fast.stats.nodes * 50 < plain.stats.nodes
+
+
+@pytest.mark.parametrize("inventory, max_pieces, expected", [
+    ({"level_crossing": 2, "buffer": 2}, 4, 0),  # only plate against plate would close
+    # One of these ovals would close its last joint plate to plate.
+    ({"curve": 12, "level_crossing": 4, "straight": 2}, 18, 6),
+])
+def test_overhanging_plates_never_mate_in_a_network(catalog, inventory, max_pieces, expected):
+    # Two level-crossing road plates overhang their joint: neither an attached
+    # piece nor a closing join may put one against the other.
+    result = enumerate_networks(inventory, catalog, NetworkConfig(
+        use_all_pieces=True, max_pieces=max_pieces, max_results=100))
+    assert result.stats.complete and len(result.layouts) == expected
+    for layout in result.layouts:
+        assert not layout.joint_issues()
+        assert not any(layout.placements[a[0]].piece.end_overhang > 0
+                       and layout.placements[b[0]].piece.end_overhang > 0
+                       for a, b in layout.links.items())
+
+
+def test_network_progress_is_reported_every_4096_nodes(catalog):
+    calls = []
+    result = enumerate_networks({"curve": 8, "straight": 2}, catalog, NetworkConfig(
+        max_pieces=10, lookahead=0, progress=calls.append))
+    assert result.stats.complete and result.stats.nodes > 2 * 4096
+    assert calls == [4096 * k for k in range(1, result.stats.nodes // 4096 + 1)]
 
 
 def test_reachability_prune_respects_caps_and_junction_closures(catalog):
@@ -255,3 +288,16 @@ def test_network_field_bins_only_placements_a_query_reached(catalog, monkeypatch
     assert calls["add_deferred"] > 0 and calls["_clashes_prepared"] > 0
     search = calls["_prepare"] - 2 * sum(len(layout) for layout in result.layouts)
     assert search <= calls["_clashes_prepared"] + calls["_bin_deferred"] + 3
+
+
+def test_two_stranded_ends_can_share_one_cap_through_a_new_switch():
+    # buffer-switch-two lobes-switch-buffer: after [buffer, switch] both branch
+    # ends are stranded with one buffer left, yet a second switch merges them.
+    catalog = default_catalog()
+    inventory = {"switch": 2, "curve": 4, "buffer": 2}
+    pruned = enumerate_networks(inventory, catalog, NetworkConfig(max_pieces=8))
+    unpruned = enumerate_networks(inventory, catalog, NetworkConfig(max_pieces=8, lookahead=0))
+    assert pruned.stats.complete and len(pruned.layouts) == len(unpruned.layouts) == 14
+    assert any(sorted(p.piece.id for p in layout.placements).count("buffer") == 2
+               and sorted(p.piece.id for p in layout.placements).count("switch") == 2
+               for layout in pruned.layouts)

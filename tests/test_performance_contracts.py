@@ -30,6 +30,7 @@ from duplotrain.solver import (
     _cached_mirror_ports,
     _cached_mirror_traversals,
     _cached_moves,
+    _lattice_pose,
     _max_span,
     _moves_for,
     _turn_capacity,
@@ -88,17 +89,6 @@ def test_cached_piece_data_is_exact_and_callers_own_containers(pid):
         assert piece.all_centrelines(spacing) == expected_lines
 
 
-@pytest.mark.parametrize("heading", range(24))
-def test_port_cache_agrees_with_uncached_transform(heading):
-    piece = default_catalog()["switch"]
-    frame = Pose(Alg(2, -1, 3, 4), Alg(-8, 2), Alg(9), heading)
-    placement = Placement(piece, frame)
-    for port, local in enumerate(piece.ports):
-        expected = frame.then(local.pose.x, local.pose.y, local.pose.z, local.pose.heading)
-        assert placement.port_pose(port) == expected
-        assert placement.port_pose(port) == expected
-
-
 def test_caches_key_geometry_not_piece_id_or_current_layout():
     piece = default_catalog()["straight"]
     original = _moves_for(piece)
@@ -128,6 +118,7 @@ def test_all_shared_caches_are_bounded():
     assert _cached_mirror_traversals.cache_parameters()["maxsize"] == 128
     assert _turn_capacity.cache_parameters()["maxsize"] == 128
     assert _max_span.cache_parameters()["maxsize"] == 128
+    assert _lattice_pose.cache_parameters()["maxsize"] == 4096
     assert _default_catalog_items.cache_parameters()["maxsize"] == 1
     _port_pose.cache_clear()
     for i in range(4100):
@@ -159,12 +150,14 @@ def test_rotated_transform_caches_match_direct_geometry():
     piece = default_catalog()["switch"]
     _rotated_local_pose.cache_clear()
     _heading_trig.cache_clear()
+    _port_pose.cache_clear()
     for heading in range(24):
-        frame = Pose.make(x=Alg(5, 1), y=Alg(-7, 0, 1), z=3, heading=heading)
+        frame = Pose(Alg(2, -1, 3, 4), Alg(-8, 2), Alg(9), heading)
         placement = Placement(piece, frame)
         for port, local in enumerate(piece.ports):
             expected = frame.then(local.pose.x, local.pose.y, local.pose.z, local.pose.heading)
-            assert placement.port_pose(port) == expected
+            assert placement.port_pose(port) == expected  # computed
+            assert placement.port_pose(port) == expected  # cached
         for spacing in (8.0, 10.0, 17.0):
             theta = math.radians(frame.degrees)
             c, s = math.cos(theta), math.sin(theta)
@@ -375,8 +368,13 @@ def test_cached_local_footprint_matches_direct_layout_bounds():
 
 def test_alg_hash_memo_is_not_a_constructor_field():
     x = Alg(1, 2, 3, 4)
-    assert hash(x) == hash(x)
-    assert replace(x, a=5) == Alg(5, 2, 3, 4)
+    assert hash(x) == hash(Alg(1, 2, 3, 4))  # memoises x's hash
+    # A copy with other coefficients must not inherit that memo: equal values
+    # hash equal, so the copy is found in sets and dicts of fresh values.
+    y = replace(x, a=5)
+    assert y == Alg(5, 2, 3, 4)
+    assert hash(y) == hash(Alg(5, 2, 3, 4)) and hash(y) != hash(x)
+    assert y in {Alg(5, 2, 3, 4)} and {y: 1}[Alg(5, 2, 3, 4)] == 1
     assert pickle.loads(pickle.dumps(x)) == x
     assert hash(pickle.loads(pickle.dumps(x))) == hash(x)
     assert hash(copy.deepcopy(x)) == hash(x)

@@ -5,8 +5,9 @@ trace congruent subsets of space -- the "track as a curve in R^2" view (with z k
 so parallel layers and bridges distinguish naturally).  This is deliberately coarser
 than the solver's piece-level signatures: a straight and a level crossing draw the
 same line, and which straight carries the action stone doesn't change the curve at
-all.  Congruence is decided by canonicalising the sampled centreline point cloud over
-the 24 lattice rotations and reflection.
+all.  Congruence is decided by choosing a canonical frame for the exact centreline
+union over the 24 lattice rotations and reflection, then sampling and rounding in
+that frame.
 
 **Perfection.** By exhaustive simulation (:func:`duplotrain.drive.classify`),
 classify each candidate's train dynamics. Known constructions include a ring with a

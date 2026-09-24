@@ -21,7 +21,7 @@ from .editor import MUTATING_ROUTES as MUTATING_ROUTES
 from .editor import RevisionConflictError, SearchCancelledError, UnknownRouteError
 from .editor import Session as Session
 from .editor import dispatch_session as dispatch_session
-from .validation import MAX_JSON_BYTES
+from .validation import MAX_JSON_BYTES, check_json_depth
 
 __all__ = ["Session", "make_server", "run"]
 
@@ -71,15 +71,19 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
         def log_message(self, fmt: str, *args: Any) -> None:  # quiet
             pass
 
-        def _send(self, status: int, payload: bytes, content_type: str) -> None:
-            self.send_response(status)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(payload)))
+        def end_headers(self) -> None:
+            # Every response, http.server's own error pages included.
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
             self.send_header("Content-Security-Policy", "frame-ancestors 'none'")
             self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+            super().end_headers()
+
+        def _send(self, status: int, payload: bytes, content_type: str) -> None:
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)
 
@@ -240,7 +244,9 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 raise
             finally:
                 self.connection.settimeout(previous)
-            return json.loads(payload.decode("utf-8"))
+            text = payload.decode("utf-8")
+            check_json_depth(text)
+            return json.loads(text)
 
         def do_GET(self) -> None:  # noqa: N802 (http.server API)
             if not self._trusted_request():
@@ -253,8 +259,10 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 asset = resources.files("duplotrain").joinpath("static" + path)
                 self._send(200, asset.read_bytes(), content_type)
             elif self.path in ("/api/state", "/api/export"):
+                # A client slow to read must not hold the session lock.
                 with session.lock:
-                    self._json(200, dispatch_session(session, self.path, {}))
+                    result = dispatch_session(session, self.path, {})
+                self._json(200, result)
             else:
                 # A GET carrying a body (a mutation attempt) must be drained like
                 # any other rejected request, or the close resets the connection
@@ -285,9 +293,14 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                             raise ValueError("operation_id is already active")
                         active[token] = event
 
-                def check_cancel() -> None:
-                    if event.is_set():
-                        raise SearchCancelledError("Search cancelled; layout unchanged")
+                def check_cancel(final: bool = False) -> None:
+                    # Under the lock /api/cancel takes: past its final check the
+                    # search commits, so from then on it is no longer cancellable.
+                    with operation_lock:
+                        if event.is_set():
+                            raise SearchCancelledError("Search cancelled; layout unchanged")
+                        if final and token is not None:
+                            active.pop(token, None)
 
                 try:
                     with session.lock:

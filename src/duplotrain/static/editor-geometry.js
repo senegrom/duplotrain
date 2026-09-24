@@ -160,8 +160,10 @@ function drawingSegments(placements) {
         for (let j = 0; j < divisions; j++) {
           const from = j / divisions, to = (j + 1) / divisions;
           const start = interpolate(a, b, from), end = interpolate(a, b, to);
+          // A piece's own ends are painted flat: picking must not round them.
           segments.push({placement, a: start, b: end, width: pl.width,
-            z: (start[2] + end[2]) / 2,
+            z: (start[2] + end[2]) / 2, first: i === 0 && j === 0,
+            last: i + 2 === line.length && j + 1 === divisions,
             edge: [interpolate(edges[0][i], edges[0][i + 1], from),
               interpolate(edges[0][i], edges[0][i + 1], to),
               interpolate(edges[1][i], edges[1][i + 1], to),
@@ -227,15 +229,20 @@ function placementsAt(sx, sy) {
   for (const placement of candidates) for (const seg of grouped[placement]) {
     const [ax, ay] = worldToScreen(seg.a[0], seg.a[1]), [bx, by] = worldToScreen(seg.b[0], seg.b[1]);
     const dx = bx - ax, dy = by - ay;
-    const t = Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / (dx * dx + dy * dy || 1)));
+    const along = ((sx - ax) * dx + (sy - ay) * dy) / (dx * dx + dy * dy || 1);
+    const t = Math.max(0, Math.min(1, along));
     const d = Math.hypot(sx - ax - t * dx, sy - ay - t * dy);
     const half = seg.width * view.scale / 2;
     if (d >= Math.max(14, half)) continue;
-    const hit = {placement: seg.placement, d, z: seg.z, painted: d < half};
+    const beyond = (seg.first && along < 0) || (seg.last && along > 1);
+    const hit = {placement: seg.placement, d, z: seg.z, painted: d < half && !beyond};
     const prev = hits.get(hit.placement);
     if (!prev || compareHits(hit, prev) < 0) hits.set(hit.placement, hit);
   }
-  return [...hits.values()].sort(compareHits);
+  const sorted = [...hits.values()].sort(compareHits);
+  // Track painted under the pointer outranks the padding of thin or nearby
+  // pieces: only painted pieces that overlap there make a choice.
+  return sorted[0]?.painted ? sorted.filter(hit => hit.painted) : sorted;
 }
 function compareHits(a, b) {
   // Painted area wins over hit-padding; within it the last painted surface wins.

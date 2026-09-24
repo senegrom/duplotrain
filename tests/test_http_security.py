@@ -2,6 +2,7 @@
 
 import http.client
 import json
+import select
 import socket
 import time
 
@@ -9,7 +10,7 @@ import pytest
 
 from duplotrain.gui import Session
 from duplotrain.validation import MAX_JSON_BYTES
-from tests.editor_support import running_server
+from tests.editor_support import load_adapter, running_server
 
 
 @pytest.fixture()
@@ -225,6 +226,48 @@ def test_get_with_a_late_body_still_reads_the_refusal(local_editor):
     assert session.state() == before
 
 
+def test_a_refused_body_is_drained_before_the_refusal_is_sent(monkeypatch):
+    """A refused request's declared body is read before the refusal goes out.
+
+    The refusal is decided on the headers alone, but answering then would
+    leave the promised body to arrive on a connection being closed. So the
+    server first waits, boundedly, for that body; it answers once the body is
+    read (or its drain window has passed). The window is widened here so that
+    the observation below cannot race it.
+    """
+    import duplotrain.gui as gui
+
+    handler_for = gui._handler_for
+
+    def patient(session):
+        handler = handler_for(session)
+        handler.DRAIN_SECONDS = 2.0
+        return handler
+
+    monkeypatch.setattr(gui, "_handler_for", patient)
+    session = Session()
+    session.attach("straight", 0, None)
+    before = session.state()
+    body = b" " * 1000
+    with running_server(session) as server:
+        port = server.server_port
+        head = (f"POST /api/clear HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n"
+                "Content-Type: application/json\r\nOrigin: https://attacker.invalid\r\n"
+                f"Content-Length: {len(body)}\r\n\r\n").encode()
+        with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
+            sent = time.monotonic()
+            sock.sendall(head)
+            # Inside the drain window no answer has come: the body is still due.
+            wait = max(0.0, sent + 1.0 - time.monotonic())
+            assert select.select([sock], [], [], wait)[0] == []
+            sock.sendall(body)
+            response = http.client.HTTPResponse(sock, method="POST")
+            response.begin()
+            payload = json.loads(response.read())
+    assert response.status == 403 and "error" in payload
+    assert session.state() == before
+
+
 @pytest.mark.parametrize("head, body, expected", [
     pytest.param("GET / HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 200, id="page"),
     pytest.param("GET /api/state HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 200, id="state"),
@@ -279,3 +322,37 @@ def test_the_graceful_close_is_bounded_when_the_client_never_closes(local_editor
                 sock.sendall(b"x")
                 time.sleep(0.05)
         assert time.monotonic() - started < 2.0
+
+
+def test_both_hosts_refuse_deep_nesting_before_parsing_it(local_editor):
+    # The browser engine's stack overflowed at a few thousand levels and left the
+    # runtime unusable; no legitimate request nests more than about ten.
+    _, port = local_editor
+    deep = {"data": {"format": "duplotrain-layout/1", "placements": [], "x": 0}, "revision": 0}
+    text = json.dumps(deep).replace('"x": 0', '"x": ' + "[" * 6000 + "]" * 6000)
+    status, _, payload = request(port, path="/api/import", body=text.encode())
+    assert status == 409 and "nested more than 64 levels" in payload["error"]
+    adapter = load_adapter()
+    reply = json.loads(adapter.dispatch("/api/import", text))
+    assert "nested more than 64 levels" in reply["__error"]
+    # Brackets inside strings are not nesting.
+    name = json.dumps({"name": "[" * 500, "revision": 0})
+    assert "nested" not in json.loads(adapter.dispatch("/api/clear", name)).get("__error", "")
+
+
+@pytest.mark.parametrize("raw", [
+    b"HEAD / HTTP/1.1\r\nHost: x\r\n\r\n",
+    b"GET / HTTP/1.1\r\n" + b"".join(b"X-%d: y\r\n" % i for i in range(101)) + b"\r\n",
+], ids=["unsupported method", "too many headers"])
+def test_the_servers_own_error_pages_carry_the_security_headers(local_editor, raw):
+    _, port = local_editor
+    with socket.create_connection(("127.0.0.1", port), timeout=3) as sock:
+        sock.sendall(raw)
+        response = b""
+        while chunk := sock.recv(65536):
+            response += chunk
+    head = response.split(b"\r\n\r\n", 1)[0].decode("latin-1").lower()
+    assert head.startswith("http/1.") and " 200 " not in head.splitlines()[0]
+    for header in ("x-content-type-options: nosniff", "x-frame-options: deny",
+                   "content-security-policy: frame-ancestors 'none'", "cache-control: no-store"):
+        assert header in head

@@ -645,7 +645,8 @@ def _compile_lattice(
 ) -> _LatticeEngine | None:
     anchor_l = _pose_to_lattice(anchor)
     start_l = _pose_to_lattice(start_cursor)
-    if anchor_l is None or start_l is None:
+    if (anchor_l is None or start_l is None
+            or not _packable(_flat(anchor_l)) or not _packable(_flat(start_l))):
         return None
 
     moves: dict[str, list[tuple]] = {}
@@ -917,6 +918,14 @@ class _CompletionBounds:
 # near, and the search's own poses stay within its horizon of the base.
 _PACK_BIAS = 1 << 31
 _PACK_MASK = (1 << 32) - 1
+#: A problem whose anchor, start or base junction lies beyond this many lattice
+#: units (53 km) runs on the field engine: the search reaches only metres from
+#: them, so its packed poses keep clear of the 2^31 field limit.
+_PACK_LIMIT = 1 << 30
+
+
+def _packable(pose: tuple) -> bool:
+    return all(-_PACK_LIMIT < value < _PACK_LIMIT for value in pose[:4])
 
 
 def _pack_lattice(pose: tuple) -> int:
@@ -1331,6 +1340,7 @@ def _canonical_signature(
     mirror_for: Mapping[str, Mapping[tuple[int, int], tuple[int, int] | None]] | None = None,
     closing_stub: tuple[int, int] | None = None,
     port_mirror_for: Mapping[str, Mapping[int, int | None]] | None = None,
+    exact: bool = False,
 ) -> tuple:
     """Loop signature invariant to starting piece, direction, and reflection.
 
@@ -1412,13 +1422,27 @@ def _canonical_signature(
             ordinal = fresh.setdefault(stub_inst, len(fresh))
             return tuple(out) + (("J", ordinal, port),)
 
-        candidates = [with_join(visits, stub_port)]
-        mirrored = mirror_of(visits) if cyclic else None
-        if mirrored is not None and port_mirror_for is not None:
-            stub_pid = pid_of(stub_inst)
-            mirrored_port = port_mirror_for.get(stub_pid, {}).get(stub_port)
-            if mirrored_port is not None:
-                candidates.append(with_join(mirrored, mirrored_port))
+        walks = [(visits, stub_port)]
+        # The lobe after the closing junction can be driven either way round:
+        # entering the junction the same way, the walk leaves by the stub port
+        # instead and closes into the old exit. An exact closure builds the same
+        # layout both ways; a forced fit has its misfit at the closing joint, so
+        # its two walks are different layouts.
+        first = next((k for k, visit in enumerate(visits) if visit[0] == stub_inst), None)
+        if exact and first is not None:
+            inst, pid, entry, exit_ = visits[first]
+            if (entry, stub_port) in canon_for.get(pid, {}):
+                lobe = [(i, p, x, e) for (i, p, e, x) in reversed(visits[first + 1:])]
+                walks.append((visits[:first] + [(inst, pid, entry, stub_port)] + lobe, exit_))
+        candidates = []
+        for walk, port in walks:
+            candidates.append(with_join(walk, port))
+            mirrored = mirror_of(walk) if cyclic else None
+            if mirrored is not None and port_mirror_for is not None:
+                stub_pid = pid_of(stub_inst)
+                mirrored_port = port_mirror_for.get(stub_pid, {}).get(port)
+                if mirrored_port is not None:
+                    candidates.append(with_join(mirrored, mirrored_port))
         return min(candidates)
 
     if not cyclic:
@@ -1974,7 +1998,7 @@ def solve_steps(
                     continue
                 for port in range(len(placement.piece.ports)):
                     converted = _pose_to_lattice(placement.port_pose(port))
-                    if converted is None:
+                    if converted is None or not _packable(_flat(converted)):
                         eng = None
                         break
                     base_stub_poses[(index, port)] = _flat(converted)
@@ -2301,6 +2325,7 @@ def solve_steps(
             mirror_for=mirror_for,
             closing_stub=reversing_target,
             port_mirror_for=port_mirror_for,
+            exact=gap == 0.0,
         )
         if signature in solutions and solutions[signature].gap <= gap:
             return

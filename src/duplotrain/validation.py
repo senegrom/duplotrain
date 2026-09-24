@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from fractions import Fraction
+from itertools import accumulate
 
 MAX_JSON_BYTES = 2 * 1024 * 1024
 MAX_PLACEMENTS = 1500
@@ -12,6 +14,24 @@ MAX_LINKS = 6000
 # Leave room for the request/checkpoint envelope around a saved session.
 MAX_SNAPSHOT_BYTES = MAX_JSON_BYTES - 1024
 MAX_COEFFICIENT_LENGTH = 48
+# No request of the editor API nests more than about ten levels.
+MAX_JSON_DEPTH = 64
+
+_JSON_STRING = re.compile(r'"(?:[^"\\]|\\.)*"')
+_NOT_BRACKET = re.compile(r"[^\[\]{}]+")
+_NESTING = {"[": 1, "{": 1, "]": -1, "}": -1}
+
+
+def check_json_depth(text: str, limit: int = MAX_JSON_DEPTH) -> None:
+    """Refuse JSON nested deeper than *limit* before a recursive parser sees it.
+
+    The browser engine's WebAssembly stack overflows long before Python's
+    recursion limit and leaves the runtime unusable, so both hosts check this
+    first. Brackets inside strings do not count.
+    """
+    brackets = _NOT_BRACKET.sub("", _JSON_STRING.sub("", text))
+    if max(accumulate(map(_NESTING.__getitem__, brackets)), default=0) > limit:
+        raise ValueError(f"JSON nested more than {limit} levels deep")
 
 
 def _signed_decimal(text: str) -> bool:
@@ -97,6 +117,10 @@ def check_inventory(inventory: Mapping[str, int], pieces: Mapping) -> None:
     """Both enumerators accept only known IDs and non-negative integer counts."""
     if not isinstance(inventory, Mapping):
         raise ValueError("inventory must be a mapping of piece ids to counts")
+    # The solver keys its traversal tables by piece id and looks them up by key.
+    for key, piece in pieces.items():
+        if getattr(piece, "id", key) != key:
+            raise ValueError(f"catalogue key {key!r} holds piece {piece.id!r}; they must agree")
     for piece_id, count in inventory.items():
         if piece_id not in pieces:
             raise ValueError(f"inventory names unknown piece {piece_id!r}")

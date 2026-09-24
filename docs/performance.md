@@ -3,8 +3,9 @@
 Every speed-up keeps results identical: the same solutions in the same order,
 the same node counts and pruning counters, byte-identical congruence keys and
 bit-identical sampled floats. A change is verified by differentials against
-the previous tree before it lands, and timing is process CPU time on one
-machine, never a test assertion.
+the previous tree before it lands. Speed is measured as process CPU time on one
+machine and is never a test assertion; tests assert operation counts, and only
+the deadline tests bound elapsed time.
 
 ## Measuring
 
@@ -62,14 +63,16 @@ retargeting of reversing loops. Tables are built progressively: a search gets
 `min(4096, max_nodes // 8)` expansions at once, earns 24 more per DFS node up to
 262,144, and a depth not yet affordable stays permissive and is asked again
 later. Only decided answers enter an LRU cache of 4,096 entries that lives with
-the tables: one search's own, or the tables an editor closing shares across its
-direction turns and stages.
+the tables: one search's own, or the tables an editor closing shares between the
+direction turns of a stage.
 
 Beyond the built layers a query up to three moves deeper is decided exactly by
 a forward probe: the cursor is expanded forward over the same moves and each
 frontier is tested against the deepest layer, with at most 1,024 poses per
-probe. Deeper still, heading-conditioned linear envelopes bound each
-coordinate, the height and eight cardinal and diagonal projections per heading.
+probe. Deeper still, heading-conditioned linear envelopes bound each coordinate,
+the height and projections per heading: x, y and the two diagonals for exact
+closures, and eight directions, including the (2, ±1) and (1, ±2) axes, for
+slippage.
 
 Free transits through junctions lend traversals only when they are possible: a
 junction still in stock must be placed and reached again by a return loop,
@@ -95,7 +98,7 @@ an impossible child is rejected before any table query or collision sample.
 ## Collision checks
 
 Centreline samples 8 mm apart are binned into 96 mm grid cells, grouped per
-placement and cell, and removed in O(1) on backtracking. A placement is stored
+placement and cell, and removed cell by cell on backtracking. A placement is stored
 with its sample bounds and binned only when a later candidate's box comes
 within the interaction limit in x, y and height, so a piece two joints back
 costs nothing. A prepared query resolves each neighbouring cell once for all
@@ -122,8 +125,8 @@ instead of being replayed through the checked constructors.
 
 The network enumerator prunes with the same tables (`NetworkConfig.lookahead`,
 default 10): every open end of a closed network must reach another open end or
-a spare port of a junction the walk placed, so a node is cut when more ends are
-stranded than the stock's buffers can cap. Each piece type roots the
+a spare port of a junction the walk placed, so once no buffer or other cap is
+left in stock a node is cut when an end is stranded. Each piece type roots the
 enumeration once and a later pass withdraws the types rooted before it, whose
 networks were all found already; collision samples are binned lazily as in the
 loop solver.
@@ -141,10 +144,10 @@ The editor first asks an arc oracle, which composes its prefix and suffix
 poses on the lattice and matches them exactly; then it searches plain track,
 one standard bridge as a four-piece macro, and finally the whole inventory,
 with budgets of 25,000, 250,000 and 60,000 nodes scaled by `search_effort`.
-Which end is the hard one is unknown in advance, so each stage alternates
-directions in turns of doubling budget from 1,024 nodes, keeps each direction's
-tables between turns and across stages, and tries first the direction that
-settled the previous stage. Bridge candidates are expanded and audited before
+Which end is the hard one is unknown in advance, so each exact ordinary stage
+alternates directions in turns of doubling budget from 1,024 nodes, keeps each
+direction's tables between its turns, and tries first the direction that settled
+the previous stage; forced fits and reversing closures grow from one end. Bridge candidates are expanded and audited before
 they count toward the result limit, and only the joints among their new
 placements are audited, since the base and its links are carried over
 unchanged. Candidate previews use a compact drawing-only contract, and state
@@ -162,7 +165,7 @@ JSON, which leaves every parsed value unchanged and trims an eight-suggestion
 response by an eighth. Check layout keeps its all-pairs scan below 128 pieces;
 larger layouts shortlist candidate pairs through the collision field's bounds
 index, a conservative superset, and run the unchanged pair tests on them, which
-turns the quadratic scan of a 1,499-piece layout into a few thousand pair tests.
+turns the quadratic scan of a 1,499-piece layout into about ten thousand pair tests.
 In the browser, flat chords are drawn whole and only climbing edges are
 subdivided for paint order, one lazily built record per layout holds segments,
 per-piece groups, batches and bounds, picking visits only the pieces whose
@@ -190,12 +193,12 @@ identical to the reference searches without tables.
 
 ## Regression contracts
 
-Timing is never asserted. `tests/test_performance_contracts.py` pins operation
+Speed is never asserted. `tests/test_performance_contracts.py` pins operation
 counts (samples prepared once per point test and once per deferred placement a
 query reaches), cache bounds, bit-identical sample clouds and cache isolation.
-Differential tests compare complete ordered solutions and every non-timing
-counter against the reference search with tables disabled, on both engines,
-with slippage and with reversing closures, and the browser suite closes,
+Differential tests compare complete ordered solutions against the reference
+search with tables disabled, and check that the tables never add nodes, on both
+engines, with slippage and with reversing closures, and the browser suite closes,
 previews and applies gaps through the real Pyodide worker under the production
 content security policy.
 

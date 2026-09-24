@@ -24,5 +24,9 @@ onmessage = async ({data: {id, path, body}}) => {
   try {
     await booted;
     postMessage({id, res: dispatch(path, body)});
-  } catch (error) { postMessage({id, err: String(error)}); }
+  } catch (error) {
+    // After a fatal error Pyodide "can no longer be used": the page must restart
+    // the engine rather than keep sending requests to this runtime.
+    postMessage(error?.pyodide_fatal_error ? {id, fatal: String(error)} : {id, err: String(error)});
+  }
 };

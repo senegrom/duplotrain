@@ -3,7 +3,7 @@
 import json
 
 from duplotrain.editor import RevisionConflictError, Session, dispatch_session
-from duplotrain.validation import MAX_JSON_BYTES
+from duplotrain.validation import MAX_JSON_BYTES, check_json_depth
 
 session = Session()
 
@@ -22,6 +22,8 @@ def dispatch(path: str, body_json: str | None) -> str:
     try:
         if body_json and len(body_json.encode("utf-8")) > MAX_JSON_BYTES:
             raise ValueError("request body larger than 2 MB")
+        if body_json:
+            check_json_depth(body_json)
         body = json.loads(body_json) if body_json else {}
         result = dispatch_session(session, path, body, progress=_progress)
         return json.dumps(result, separators=(",", ":"))

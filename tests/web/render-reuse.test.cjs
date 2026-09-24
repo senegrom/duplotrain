@@ -23,6 +23,18 @@ function editor() {
   return {context: h.context, el: h.el, calls, created: h.created, run: h.run};
 }
 
+// A retained control keeps one listener per event however often it is redrawn.
+// fire() calls only the latest, so a duplicate binding must be counted instead.
+function assertBoundOnce(...roots) {
+  for (const stack = [...roots]; stack.length;) {
+    const node = stack.pop();
+    if (!node || typeof node !== "object") continue;
+    for (const event of Object.keys(node.registered))
+      assert.equal(node.listenerCount(event), 1, `${node.tag} has ${node.listenerCount(event)} ${event} listeners`);
+    stack.push(...node.children);
+  }
+}
+
 function candidate(index = 0, revision = 4) {
   return {index, revision, exact: true, gap: 0, kind: "loop", added: {curve: 10},
     size_cm: [50, 50], open_stubs: 0, preview: {placements: [index]}};
@@ -70,6 +82,8 @@ test("retained listeners fire once and mutually exclusive tools update styling",
   assert.equal(row.buttons[0].button.classList.contains("armed"), false);
   assert.equal(stone.classList.contains("armed"), true);
   e.run("renderPalette(); renderStones(); renderSets()");
+  assertBoundOnce(e.el("palette"), e.el("stones"), e.el("sets"));
+  assert.equal(row.input.listenerCount("change"), 1);
   row.input.value = "17";
   await row.input.fire("change");
   assert.equal(e.calls.length, 1);
@@ -112,10 +126,28 @@ test("candidate selection keeps card identity and uses the latest preview object
   e.run("renderCandidates()");
   assert.equal(e.context.preview, preview);
   assert.equal(e.created(), count);
+  assertBoundOnce(e.el("cands"));
   await rows[1].apply.fire("click");
   assert.equal(e.calls[0].route, "/api/apply");
   assert.equal(e.calls[0].body.index, 1);
   assert.equal(e.calls[0].body.revision, 4);
+});
+
+test("hovering a suggestion previews it and leaving restores the chosen one; touch never hovers", () => {
+  const e = editor(); e.context.S.candidates = [candidate(), candidate(1)];
+  e.run("renderCandidates()");
+  const card = e.el("cands").children[1], [first, second] = e.context.S.candidates;
+  card.fire("pointerenter", {pointerType: "mouse"});
+  assert.equal(e.context.preview, second.preview);
+  card.fire("pointerleave", {pointerType: "mouse"});
+  assert.equal(e.context.preview, null);
+  e.run("selectedCandidate = '4:0'; renderCandidates()");
+  card.fire("pointerenter", {pointerType: "pen"});
+  assert.equal(e.context.preview, second.preview);
+  card.fire("pointerleave", {pointerType: "pen"});
+  assert.equal(e.context.preview, first.preview);
+  card.fire("pointerenter", {pointerType: "touch"});
+  assert.equal(e.context.preview, first.preview);
 });
 
 test("new candidate revision clears selection; changed metadata rebuilds descriptions", () => {

@@ -85,6 +85,26 @@ def test_step_limited_runs_produce_no_terminal_or_coverage_claim(completed):
     job.close()
 
 
+def test_runs_share_one_ten_million_step_allowance(completed, monkeypatch):
+    # A run that reaches its step limit spends that whole limit. Once the job has
+    # spent 10,000,000 steps it stops, limited, however many runs remain.
+    import duplotrain.editor_routes as routes
+    from duplotrain.drive import DriveLimitError
+
+    def limited(layout, **kwargs):
+        raise DriveLimitError(f"{kwargs['max_steps']} steps without a verdict")
+
+    monkeypatch.setattr(routes, "drive", limited)
+    job = RouteJob(Session(history=[completed]), {"max_runs": 100000, "max_steps": 10000})
+    result = finished(job)
+    assert result["required_runs"] == "11008" and result["max_runs"] == 100000
+    assert result["runs"] == result["step_limited_runs"] == 1000
+    assert result["steps"] == 10_000_000
+    assert result["status"] == "limited" and not result["complete"]
+    assert result["classification"] is None and result["best"] is None
+    job.close()
+
+
 def test_an_open_end_produces_a_loadable_counterexample():
     c = default_catalog()
     layout = build_chain([(c["straight"], 0, 1)] * 2)

@@ -78,3 +78,38 @@ def test_internal_cycle_does_not_claim_to_cover_other_pieces():
 def test_passive_stones_do_not_change_return_stops(stone):
     layout = straight_with([("direction", 1), ("stop", 0), (stone, None)])
     assert drive(layout, start=(0, 0)).outcome == "stopped"
+
+
+PASSIVE = ("stone_horn", "stone_lights", "stone_refuel")
+
+
+def with_every_passive_stone(layout):
+    """Each passive stone mid-piece and on both faces of every straight."""
+    for index, placement in enumerate(layout.placements):
+        if placement.piece.id == "straight":
+            for sid in PASSIVE:
+                for position in (None, 0, 1):
+                    layout = layout.with_accessory(index, sid, at_port=position)
+    return layout
+
+
+def test_passive_stones_never_stop_reverse_or_park_a_train():
+    # With no stop or direction stone on the track, horn, lights and refuel
+    # stones must leave every run exactly as it is without them.
+    c = default_catalog()
+    half = [(c["straight"], 0, 1)] + [(c["curve"], 0, 1)] * 6
+    oval = build_chain(half * 2)
+    oval = oval.join(*oval.connectable_ends())
+    bar = build_chain([(c["buffer"], 1, 0)] + [(c["straight"], 0, 1)] * 2 + [(c["buffer"], 0, 1)])
+    for plain in (oval, bar):
+        stoned = with_every_passive_stone(plain)
+        assert len(stoned.accessories) == 9 * sum(p.piece.id == "straight" for p in plain)
+        starts = [(i, port) for i, p in enumerate(plain.placements) if p.piece.id != "buffer"
+                  for port in range(len(p.piece.ports))]
+        for start in starts:
+            expected, report = drive(plain, start=start), drive(stoned, start=start)
+            assert report.outcome == expected.outcome, start
+            assert report.outcome == ("endless" if plain is oval else "buffered")
+            assert report.reversals == 0
+            assert report.steps == expected.steps and report.terminal == expected.terminal
+        assert classify(stoned) == classify(plain)
