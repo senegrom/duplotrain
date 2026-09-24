@@ -113,6 +113,9 @@ duplotrain gui                                        # interactive designer
 duplotrain demo                                       # the classic oval
 ```
 
+`solve -o DIR` saves the top loops as `loop_01.json`, `loop_01.png` and so on,
+replacing the `loop_NN` files an earlier run left in `DIR`.
+
 `--set` knows the 2018 wave (10874 Steam Train, 10875 Cargo Train, 10872 Bridge &
 Tracks, 10882 Track pack) and the 2024 sets (10425 Tunnel, 10426 Bridge expansion)
 with per-set piece counts from the published inventories — repeat a flag to own a

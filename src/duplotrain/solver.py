@@ -184,29 +184,45 @@ def _stock_span_budget(
     return reach
 
 
-def _mirror_ports(piece: PieceType) -> dict[int, int | None]:
-    """Map each port to the port its mirror image lands on, if any.
+def _port_landings(
+    piece: PieceType,
+) -> dict[tuple[int, int], tuple[tuple[int, ...], tuple[int, ...] | None]]:
+    """Where each port of a traversal's placement lands in two equivalent placements.
 
-    Local reflection across the piece's x axis; for the switch this pairs left/right
-    and fixes the stem.  ``None`` when the piece has no mirror-symmetric counterpart
-    for that port (the crossing's diagonal ports), in which case callers skip the
-    mirror candidate rather than mis-pair.
+    For every (entry, exit) traversal: first the port at the same place when the same
+    geometry is placed by the canonical traversal (a symmetric piece relabels its
+    ports), then the port at each port's mirror image when the reflected geometry is
+    placed by the mirror traversal, or ``None`` without a mirror twin. A joint closing
+    into a junction names one of its ports, so the name must follow the traversal the
+    junction is written with: the crossing's mirror traversal takes its other route,
+    and its diagonal ports land on the straight ones.
     """
-    return dict(_cached_mirror_ports(piece))
+    return dict(_cached_port_landings(piece))
 
 
 @lru_cache(maxsize=128)
-def _cached_mirror_ports(piece: PieceType) -> tuple[tuple[int, int | None], ...]:
-    by_pose = {
-        (p.pose.x, p.pose.y, p.pose.z, p.pose.heading): i
-        for i, p in enumerate(piece.ports)
-    }
-    return tuple({
-        i: by_pose.get(
-            (p.pose.x, -p.pose.y, p.pose.z, (-p.pose.heading) % HEADING_STEPS)
-        )
-        for i, p in enumerate(piece.ports)
-    }.items())
+def _cached_port_landings(
+    piece: PieceType,
+) -> tuple[tuple[tuple[int, int], tuple[tuple[int, ...], tuple[int, ...] | None]], ...]:
+    def world(entry: int, mirror: bool = False) -> list[tuple]:
+        frame = piece.frame_for(entry, ORIGIN)
+        return [pose_key(frame.then(p.pose.x, p.pose.y, p.pose.z, p.pose.heading), mirror)
+                for p in piece.ports]
+
+    def landing(keys: list[tuple], traversal: tuple[int, int]) -> tuple[int, ...]:
+        port_at = {key: port for port, key in enumerate(world(traversal[0]))}
+        return tuple(port_at[key] for key in keys)
+
+    canon = _canonical_traversals(piece)
+    mirror = _mirror_traversals(piece)
+    return tuple(
+        (traversal, (
+            landing(world(traversal[0]), canon[traversal]),
+            None if mirror[traversal] is None
+            else landing(world(traversal[0], mirror=True), mirror[traversal]),
+        ))
+        for traversal in canon
+    )
 
 
 def _mirror_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, int] | None]:
@@ -1339,7 +1355,7 @@ def _canonical_signature(
     cyclic: bool = True,
     mirror_for: Mapping[str, Mapping[tuple[int, int], tuple[int, int] | None]] | None = None,
     closing_stub: tuple[int, int] | None = None,
-    port_mirror_for: Mapping[str, Mapping[int, int | None]] | None = None,
+    landings_for: Mapping[str, Mapping[tuple[int, int], tuple]] | None = None,
     exact: bool = False,
 ) -> tuple:
     """Loop signature invariant to starting piece, direction, and reflection.
@@ -1409,7 +1425,18 @@ def _canonical_signature(
         # closing joint is part of the identity, appended as a final token.
         stub_inst, stub_port = closing_stub
 
+        def landings(seq) -> tuple | None:
+            # A base junction's ports are fixed by the base; a grown one's are
+            # numbered by the traversal that places it in *seq*.
+            if stub_inst < n_base or landings_for is None:
+                return None
+            visit = next((v for v in seq if v[0] == stub_inst), None)
+            return None if visit is None else landings_for.get(visit[1], {}).get(visit[2:])
+
         def with_join(seq, port: int) -> tuple:
+            placed = landings(seq)
+            if placed is not None:
+                port = placed[0][port]  # the port as the canonical traversal numbers it
             fresh: dict[int, int] = {} if cyclic else {i: i for i in range(n_base)}
             out = []
             for inst, pid, entry, exit_ in seq:
@@ -1438,11 +1465,9 @@ def _canonical_signature(
         for walk, port in walks:
             candidates.append(with_join(walk, port))
             mirrored = mirror_of(walk) if cyclic else None
-            if mirrored is not None and port_mirror_for is not None:
-                stub_pid = pid_of(stub_inst)
-                mirrored_port = port_mirror_for.get(stub_pid, {}).get(port)
-                if mirrored_port is not None:
-                    candidates.append(with_join(mirrored, mirrored_port))
+            placed = landings(walk)
+            if mirrored is not None and placed is not None and placed[1] is not None:
+                candidates.append(with_join(mirrored, placed[1][port]))
         return min(candidates)
 
     if not cyclic:
@@ -1936,7 +1961,7 @@ def solve_steps(
     one_handed = base is None and all(
         twin is not None for pid in piece_ids for twin in mirror_for[pid].values()
     )
-    port_mirror_for = {pid: _mirror_ports(p) for pid, p in piece_obj.items()}
+    landings_for = {pid: _port_landings(p) for pid, p in piece_obj.items()}
     span_of = {pid: _max_span(p) for pid, p in piece_obj.items()}
     turn_of = {pid: _turn_capacity(p) for pid, p in piece_obj.items()}
     overhang_of = {pid: p.end_overhang for pid, p in piece_obj.items()}
@@ -2324,7 +2349,7 @@ def solve_steps(
             cyclic=base is None,
             mirror_for=mirror_for,
             closing_stub=reversing_target,
-            port_mirror_for=port_mirror_for,
+            landings_for=landings_for,
             exact=gap == 0.0,
         )
         if signature in solutions and solutions[signature].gap <= gap:

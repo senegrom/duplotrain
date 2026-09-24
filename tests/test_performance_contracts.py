@@ -27,9 +27,9 @@ from duplotrain.solver import (
     Solution,
     SolverConfig,
     _cached_canonical_traversals,
-    _cached_mirror_ports,
     _cached_mirror_traversals,
     _cached_moves,
+    _cached_port_landings,
     _lattice_pose,
     _max_span,
     _moves_for,
@@ -114,7 +114,7 @@ def test_all_shared_caches_are_bounded():
     assert _local_footprint_bounds.cache_parameters()["maxsize"] == 2048
     assert _centreline_points.cache_parameters()["maxsize"] == 2048
     assert _cached_canonical_traversals.cache_parameters()["maxsize"] == 128
-    assert _cached_mirror_ports.cache_parameters()["maxsize"] == 128
+    assert _cached_port_landings.cache_parameters()["maxsize"] == 128
     assert _cached_mirror_traversals.cache_parameters()["maxsize"] == 128
     assert _turn_capacity.cache_parameters()["maxsize"] == 128
     assert _max_span.cache_parameters()["maxsize"] == 128

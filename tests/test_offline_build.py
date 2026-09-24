@@ -1,7 +1,10 @@
 """The offline manifest binds every executable/runtime asset to one content build."""
 import hashlib
+import io
 import json
 import re
+import shutil
+import zipfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -18,12 +21,29 @@ def manifest(dist):
     return stamp, entries
 
 
-def version(dist):
-    """The offline version's name, which must be the digest of its manifest."""
+def version_name(dist):
     source = (dist / "service-worker.js").read_text()
-    name = re.search(r'const VERSION = "([0-9a-f]{16})";', source).group(1)
+    return re.search(r'const VERSION = "([0-9a-f]{16})";', source).group(1)
+
+
+def version(dist):
+    """The offline version's name: the digest of what the manifest serves.
+
+    The engine zip counts by its entries, read back here, not by its bytes.
+    """
+    source = (dist / "service-worker.js").read_text()
+    name = version_name(dist)
+    served = []
+    for entry in json.loads(re.search(r"const ASSETS = (.*);", source).group(1)):
+        if entry["url"].startswith("duplotrain-src-"):
+            with zipfile.ZipFile(dist / entry["url"]) as archive:
+                content = hashlib.sha256(b"".join(
+                    f"{info.filename}\n{info.file_size}\n".encode() + archive.read(info)
+                    for info in archive.infolist())).hexdigest()
+            entry = {"url": entry["url"], "content": content}
+        served.append(entry)
     assert name == hashlib.sha256(
-        re.search(r"const ASSETS = (.*);", source).group(1).encode()).hexdigest()[:16]
+        json.dumps(served, separators=(",", ":")).encode()).hexdigest()[:16]
     return name
 
 
@@ -76,6 +96,41 @@ def test_a_change_the_stamp_does_not_cover_still_names_a_new_offline_version(
     changed = version(dist)
     build.main()
     assert manifest(dist)[0] == before[0] and version(dist) != changed
+
+
+def test_one_commit_names_one_offline_version_on_every_build_host(
+    synthetic_runtime_build, monkeypatch, tmp_path,
+):
+    # zlib and zlib-ng compress the same entries to different bytes, and a Windows
+    # checkout may have CRLF text files. Neither may make a deploy from another
+    # host look like a new version that every installed copy downloads again.
+    source, dist = synthetic_runtime_build
+    build.main()
+    before = manifest(dist)[0], version_name(dist)
+    engine = next(dist.glob("duplotrain-src-*.zip")).read_bytes()
+
+    def recompressed(entries):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            for arcname, payload in entries:
+                archive.writestr(zipfile.ZipInfo(arcname, date_time=(2020, 1, 1, 0, 0, 0)),
+                                 payload, zipfile.ZIP_DEFLATED, compresslevel=1)
+        return buffer.getvalue()
+
+    monkeypatch.setattr(build, "build_source_zip", recompressed)
+    webapp = tmp_path / "crlf-webapp"
+    shutil.copytree(build.WEBAPP, webapp,
+                    ignore=shutil.ignore_patterns("dist", "vendor", "__pycache__"))
+    monkeypatch.setattr(build, "WEBAPP", webapp)
+    for root in (source / "src/duplotrain", webapp):
+        for path in root.rglob("*"):
+            if path.suffix in (".py", ".js", ".css", ".html", ".webmanifest", ".svg"):
+                text = path.read_bytes().replace(b"\r\n", b"\n")
+                path.write_bytes(text.replace(b"\n", b"\r\n"))
+    build.main()
+    assert next(dist.glob("duplotrain-src-*.zip")).read_bytes() != engine
+    assert (manifest(dist)[0], version_name(dist)) == before
+    assert version(dist)
 
 
 def test_a_service_worker_change_changes_the_stamp_and_manifest(

@@ -148,17 +148,17 @@ def from_alg_xy(x: Alg, y: Alg) -> LatticePoint | None:
 
         b = 2*xc,  c = 2*yc,  a = xa - yc,  d = ya - xc
 
-    Any sqrt2/sqrt6 component, or a coefficient not landing on 1/SCALE, disqualifies.
+    The point is on the lattice exactly when all four are integers; the scaled
+    coefficients themselves may be halves (``zeta/SCALE`` has ``xc = ya = 1/2``).
+    Any sqrt2/sqrt6 component disqualifies.
     """
     if x.b or x.d or y.b or y.d:  # sqrt2 / sqrt6 terms: 45-degree territory
         return None
-    xa = _scaled_int(x.a)
-    xc = _scaled_int(x.c)
-    ya = _scaled_int(y.a)
-    yc = _scaled_int(y.c)
-    if None in (xa, xc, ya, yc):
+    xa, xc, ya, yc = (value * SCALE for value in (x.a, x.c, y.a, y.c))
+    coords = (xa - yc, 2 * xc, 2 * yc, ya - xc)
+    if any(value.denominator != 1 for value in coords):
         return None
-    return LatticePoint(xa - yc, 2 * xc, 2 * yc, ya - xc)
+    return LatticePoint(*map(int, coords))
 
 
 def z_from_alg(z: Alg) -> int | None:

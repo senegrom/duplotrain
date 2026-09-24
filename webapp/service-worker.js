@@ -1,8 +1,9 @@
 /* Opt-in, complete-version offline installation. Stamped by build.py. */
 "use strict";
 const BUILD = "__BUILD__";
-// A version is named by the digest of its exact manifest, so any changed byte
-// installs as a new version, even one the build stamp does not cover.
+// A version is named by a digest of what its manifest serves (the engine zip by
+// its entries, whose compression differs between build hosts), so any changed
+// content installs as a new version, even one the build stamp does not cover.
 const VERSION = "__VERSION__";
 const ASSETS = __ASSETS__;
 const SCOPE = self.registration.scope;

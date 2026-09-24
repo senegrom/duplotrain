@@ -59,6 +59,7 @@ window.duplotrainBuild = "__BUILD__";
     const data = JSON.parse(res);
     if (data.__error) {
       const error = new Error(data.__error); error.code = data.code; error.state = data.state;
+      error.refused = true;  // the engine answered and turned the request down
       throw error;
     }
     return data;

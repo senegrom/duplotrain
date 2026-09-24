@@ -33,6 +33,25 @@ def test_solve_output_that_is_a_directory_is_refused_without_a_traceback(runner,
     assert result.exception is None or isinstance(result.exception, SystemExit)
 
 
+def test_solve_output_replaces_an_earlier_runs_loops(runner, monkeypatch, tmp_path):
+    # A second, smaller run must leave neither the first run's extra loops nor its
+    # pictures of other loops beside the JSON it saves; other files stay.
+    from duplotrain import cli
+
+    monkeypatch.setattr(cli, "_get_renderer", lambda required=True: None)  # JSON only
+    for rank in range(1, 6):
+        (tmp_path / f"loop_{rank:02d}.json").write_text("{}")
+        (tmp_path / f"loop_{rank:02d}.png").write_bytes(b"old picture")
+    (tmp_path / "loop_07.png").mkdir()
+    for name in ("notes.txt", "loop_01.json.bak", "loop_1.json"):
+        (tmp_path / name).write_text("mine")
+    result = runner.invoke(main, ["solve", "--curve", "12", "--top", "3", "-o", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert sorted(path.name for path in tmp_path.iterdir()) == [
+        "loop_01.json", "loop_01.json.bak", "loop_07.png", "loop_1.json", "notes.txt"]
+    assert len(json.loads((tmp_path / "loop_01.json").read_text())["placements"]) == 12
+
+
 def test_gui_on_a_port_in_use_fails_politely(runner):
     with socket.socket() as taken:
         taken.bind(("127.0.0.1", 0))

@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib
 import json
 import math
+import re
 from pathlib import Path
 
 import click
@@ -30,6 +31,9 @@ console = Console()
 #: What reading an untrusted JSON file can raise short of a bug: bad values and
 #: shapes (JSONDecodeError is a ValueError), unreadable files, absurd nesting.
 _BAD_FILE = (ValueError, TypeError, KeyError, OSError, RecursionError)
+
+#: The files ``solve -o`` writes, one pair per saved loop.
+_SAVED_NAME = re.compile(r"loop_\d{2,}\.(?:json|png)")
 
 
 def _catalog(paths: tuple[str, ...]):
@@ -178,7 +182,10 @@ def sets_cmd() -> None:
     "--out",
     type=click.Path(file_okay=False),
     default=None,
-    help="Directory for rendered images and layout JSON; omit for a text listing only.",
+    help=(
+        "Directory for rendered images and layout JSON, replacing an earlier run's "
+        "loop_NN files there; omit for a text listing only."
+    ),
 )
 @click.option("--top", type=click.IntRange(min=0), default=10, show_default=True,
               help="How many to save.")
@@ -305,6 +312,16 @@ def solve_cmd(
             out_dir.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
             raise click.ClickException(f"cannot create {out_dir}: {exc}") from exc
+        # The directory holds one run's results: an earlier run's files would
+        # outnumber a smaller result set, or picture other loops than the JSON
+        # beside them when this run saves no images.
+        try:
+            for stale in [path for path in out_dir.iterdir()
+                          if _SAVED_NAME.fullmatch(path.name) and not path.is_dir()]:
+                stale.unlink()
+        except OSError as exc:
+            raise click.ClickException(
+                f"cannot replace the earlier results in {out_dir}: {exc}") from exc
         render_layout = _get_renderer(required=False)
         for rank, (score, sol) in enumerate(scored[:top], start=1):
             stem = out_dir / f"loop_{rank:02d}"

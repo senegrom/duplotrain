@@ -17,6 +17,7 @@ is a plain additive term.
 from __future__ import annotations
 
 import math
+import numbers
 from dataclasses import dataclass
 from fractions import Fraction
 
@@ -73,20 +74,28 @@ def steps_to_degrees(steps: int) -> int:
     return (steps % HEADING_STEPS) * DEGREES_PER_STEP
 
 
-def degrees_to_steps(degrees: float) -> int:
+def degrees_to_steps(degrees: int | float | Fraction) -> int:
     """Convert an angle in degrees to a heading index, rejecting off-lattice angles.
 
+    The test is exact: an angle a hair off the lattice, such as ``30.0000000001``,
+    is refused rather than snapped onto it.
+
     Raises:
+        TypeError: if *degrees* is not a real number.
         ValueError: if *degrees* is not a whole multiple of :data:`DEGREES_PER_STEP`.
     """
-    steps = degrees / DEGREES_PER_STEP
-    nearest = round(steps)
-    if abs(steps - nearest) > 1e-9:
+    if not isinstance(degrees, numbers.Real):
+        raise TypeError(f"cannot read an angle from {degrees!r}")
+    try:
+        steps = Fraction(degrees) / DEGREES_PER_STEP
+    except (ValueError, OverflowError) as exc:  # NaN or infinity
+        raise ValueError(f"{degrees} deg is not an angle") from exc
+    if steps.denominator != 1:
         raise ValueError(
             f"{degrees} deg is not a multiple of {DEGREES_PER_STEP} deg, so it does not "
             f"lie on the {HEADING_STEPS}-step heading lattice"
         )
-    return nearest % HEADING_STEPS
+    return int(steps) % HEADING_STEPS
 
 
 def cos_sin(steps: int) -> tuple[Alg, Alg]:

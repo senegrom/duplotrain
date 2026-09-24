@@ -23,6 +23,19 @@ def test_cos_sin_table_matches_floats():
         assert float(s) == pytest.approx(math.sin(angle), abs=1e-12)
 
 
+def test_angles_near_the_lattice_are_refused_not_snapped():
+    from fractions import Fraction
+
+    for degrees in (30.0000000001, Fraction(300000000001, 10**10), 29.999999999999996):
+        with pytest.raises(ValueError, match="not a multiple"):
+            degrees_to_steps(degrees)
+    assert degrees_to_steps(Fraction(45)) == 3 and degrees_to_steps(-30.0) == 22
+    with pytest.raises(ValueError):
+        degrees_to_steps(float("nan"))
+    with pytest.raises(TypeError):
+        degrees_to_steps("30")
+
+
 def test_degrees_to_steps_round_trip():
     for k in range(HEADING_STEPS):
         assert degrees_to_steps(steps_to_degrees(k)) == k

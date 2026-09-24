@@ -3,18 +3,22 @@
 // owned by editor.js; project baselines and dialogs have a separate lifetime from
 // autosave, whose cross-tab safeguards remain in the main editor source.
 const PROJECT_FORMAT = "duplotrain-project/1";
-const PROJECT_PREFIX = PROJECT_FORMAT + ":" + location.pathname + ":";
+const PROJECT_PREFIX = PROJECT_FORMAT + ":" + APP_PATH + ":";
+// Copies saved while keys named the exact path stay listed under either spelling.
+const PROJECT_PREFIXES = [PROJECT_PREFIX, PROJECT_FORMAT + ":" + APP_PATH + "index.html:"];
+const projectPrefix = key => typeof key === "string" ? PROJECT_PREFIXES.find(prefix => key.startsWith(prefix)) : undefined;
 let projectBaseline = null, projectBaselineSlot = null, projectManagement = null;
 const snapshotKeyCache = new WeakMap();
 let projectRows = new Map();
 
 
-function downloadJSON(data, filename) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+function downloadText(text, filename, type = "text/plain") {
+  const blob = new Blob([text], {type});
   const url = URL.createObjectURL(blob), anchor = document.createElement("a");
   anchor.href = url; anchor.download = filename; anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+function downloadJSON(data, filename) { downloadText(JSON.stringify(data, null, 2), filename, "application/json"); }
 function projectContentKey(data) {
   // Snapshots are immutable API responses. Cache their large serialization;
   // panning/hover frames only serialize the small presentation fields.
@@ -77,8 +81,8 @@ async function openProject(data, revision = S && S.revision) {
   redraw(); markProjectSaved(projectData()); status(`Opened project: ${next.project.name}`);
 }
 function readLocalProject(key, raw) {
-  if (typeof key !== "string" || !key.startsWith(PROJECT_PREFIX) ||
-      typeof raw !== "string" || raw.length > 2 * 1024 * 1024) throw new Error("No readable project selected");
+  if (!projectPrefix(key) || typeof raw !== "string" || raw.length > 2 * 1024 * 1024)
+    throw new Error("No readable project selected");
   const data = JSON.parse(raw);
   if (!data || data.format !== PROJECT_FORMAT || typeof data.name !== "string" ||
       !data.name.trim() || data.name.length > 80 || data.session?.format !== "duplotrain-session/1" ||
@@ -94,8 +98,8 @@ function renderProjects() {
   const rows = [];
   try {
     for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (typeof key !== "string" || !key.startsWith(PROJECT_PREFIX)) continue;
+      const key = localStorage.key(i), prefix = projectPrefix(key);
+      if (!prefix) continue;
       const raw = localStorage.getItem(key);
       if (raw === null) continue; // another tab removed it during enumeration
       let data = null, time = 0;
@@ -104,7 +108,7 @@ function renderProjects() {
         const parsed = typeof data.saved_at === "string" ? Date.parse(data.saved_at) : NaN;
         if (Number.isFinite(parsed)) time = parsed;
       } catch (_) { /* Kept visible; never silently discard an unreadable copy. */ }
-      const suffix = key.slice(PROJECT_PREFIX.length);
+      const suffix = key.slice(prefix.length);
       const version = suffix.length > 12 ? suffix.slice(0, 8) + "…" + suffix.slice(-4) : suffix;
       const label = data ? `${data.name} · ${time ? new Date(time).toLocaleString() : "date unknown"} · ` +
         `${data.session.layout.placements.length} pieces · ${version}` : `Unreadable saved project (kept) · ${version}`;

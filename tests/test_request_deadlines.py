@@ -1,6 +1,8 @@
 """Total request-read deadlines, not resettable per-read idle timeouts."""
 
 import http.client
+import io
+import json
 import socket
 import threading
 import time
@@ -88,6 +90,37 @@ def test_drain_byte_budget_is_still_enforced(monkeypatch):
     handler._drain_body()
     assert sum(sizes) == handler.DRAIN_BYTES
     assert clock.timeout == 10.0
+
+
+def test_an_answer_the_client_stops_reading_is_not_followed_by_a_408():
+    # Writing a response times out when the client stops reading. The session has
+    # applied the request by then: the connection just ends, with no second answer.
+    session = Session()
+    handler = object.__new__(_handler_for(session))
+    body = json.dumps({"piece": "straight", "entry": 0, "at": None, "revision": 0}).encode()
+    handler.headers = Message()
+    for name, value in (("Host", "127.0.0.1:8137"), ("Content-Type", "application/json"),
+                        ("Content-Length", str(len(body)))):
+        handler.headers[name] = value
+    handler.command, handler.path, handler.request_version = "POST", "/api/attach", "HTTP/1.1"
+    handler.requestline = "POST /api/attach HTTP/1.1"
+    handler.client_address = ("127.0.0.1", 50000)
+    handler.server = SimpleNamespace(server_port=8137)
+    handler.close_connection = False
+    handler.connection = SimpleNamespace(gettimeout=lambda: 10.0, settimeout=lambda _v: None)
+    handler.rfile = io.BytesIO(body)
+    written = []
+
+    class Stalled:
+        def write(self, data):
+            written.append(bytes(data))
+            raise TimeoutError("timed out")
+
+    handler.wfile = Stalled()
+    handler.do_POST()
+    assert session.revision == 1 and len(session.layout.placements) == 1
+    assert len(written) == 1 and written[0].split(b"\r\n", 1)[0].endswith(b" 200 OK")
+    assert handler.close_connection
 
 
 def test_real_socket_refuses_slow_body_without_waiting_for_all_bytes():

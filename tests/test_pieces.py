@@ -135,6 +135,17 @@ def test_a_user_catalogue_overrides_a_built_in_piece_by_id(tmp_path, catalog):
     assert load_catalog(path, later)["ramp"].name == "Later ramp"
 
 
+@pytest.mark.parametrize("spec", [
+    {"start": {"heading_deg": "30.0000000001"}, "segments": [{"type": "straight", "run": 128}]},
+    {"segments": [{"type": "straight", "run": {"chord": {"radius": 256,
+                                                         "degrees": "60.0000000001"}}}]},
+])
+def test_catalogue_angles_a_hair_off_the_lattice_are_refused(spec):
+    # As arc degrees are: a start heading or chord angle is never snapped.
+    with pytest.raises(ValueError, match="not a multiple"):
+        parse_piece({"id": "p", "paths": [spec]})
+
+
 def test_duplicate_piece_ids_rejected():
     from duplotrain.pieces import parse_pieces
 

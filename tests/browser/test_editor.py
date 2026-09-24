@@ -219,7 +219,7 @@ def test_pinch_zooms_without_placing_a_piece(editor):
     assert not errors
 
 
-def test_corrupt_recovery_is_not_overwritten(editor):
+def test_corrupt_recovery_is_kept_until_discarded_on_purpose(editor):
     page, session, url, errors = editor
     load(page, url)
     page.evaluate("autosaveReady = false; localStorage.setItem(STORAGE_KEY, 'not json')")
@@ -229,6 +229,27 @@ def test_corrupt_recovery_is_not_overwritten(editor):
     assert page.evaluate("localStorage.getItem(STORAGE_KEY)") == "not json"
     place_straight(page)
     assert page.evaluate("localStorage.getItem(STORAGE_KEY)") == "not json"
+    with page.expect_download() as kept:
+        page.locator("#save-download").tap()
+    assert kept.value.suggested_filename == "session-kept.txt"
+    with open(kept.value.path(), encoding="utf-8") as saved:
+        assert saved.read() == "not json"
+    assert page.locator("#save-discard-confirm").is_hidden()
+    page.locator("#save-discard").tap()
+    page.locator("#save-discard-confirm").tap()
+    page.wait_for_function("autosaveReady")
+    assert page.locator("#save-recovery").is_hidden()
+    placements = page.evaluate(
+        "JSON.parse(localStorage.getItem(STORAGE_KEY)).snapshot.layout.placements.length")
+    assert placements == 1
+    assert not errors
+
+
+def test_the_editor_at_index_html_keeps_the_directory_s_storage(editor):
+    page, session, url, errors = editor
+    load(page, url + "index.html")
+    assert page.evaluate("[STORAGE_KEY, PROJECT_PREFIX]") == [
+        "duplotrain-session/2:/", "duplotrain-project/1:/:"]
     assert not errors
 
 

@@ -69,6 +69,18 @@ def text_bytes(path: Path) -> bytes:
     """
     return path.read_bytes().replace(b"\r\n", b"\n")
 
+
+#: Static assets shipped as text, so with LF newlines (see ``text_bytes``).
+TEXT_SUFFIXES = (".js", ".css", ".webmanifest", ".svg")
+
+
+def framed(name: str, payload: bytes) -> bytes:
+    """One part of a content digest, framed by its name and length.
+
+    Bytes moving from one part to the next still change the digest.
+    """
+    return f"{name}\n{len(payload)}\n".encode() + payload
+
 #: Everything Pyodide needs for `loadPyodide` + pure-Python imports.
 PYODIDE_FILES = [
     "pyodide.mjs",
@@ -280,7 +292,7 @@ def build_index(meta_csp: bool = False) -> None:
             continue
         dest = DIST / source.relative_to(static)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if source.suffix in (".js", ".css"):
+        if source.suffix in TEXT_SUFFIXES:
             dest.write_bytes(text_bytes(source))
         else:
             shutil.copy2(source, dest)
@@ -296,8 +308,11 @@ def _stamp_file(source: Path, dest: Path, replacements: dict[str, str]) -> None:
     dest.write_text(text, encoding="utf-8", newline="\n")
 
 
-def build_offline_worker(stamp: str, runtime: str, zip_name: str) -> None:
-    """Embed a complete exact-byte manifest, not an open-ended runtime cache."""
+def build_offline_worker(stamp: str, runtime: str, zip_name: str, zip_content: str) -> None:
+    """Embed a complete exact-byte manifest, not an open-ended runtime cache.
+
+    *zip_content* is the SHA-256 of the engine zip's framed entries.
+    """
     paths = ["index.html", "manifest.webmanifest", zip_name]
     paths += [f"{name}?v={stamp}" for name in (*EDITOR_SCRIPTS, "editor.css",
                                                "boot.js", "worker.js", "adapter.py")]
@@ -310,12 +325,17 @@ def build_offline_worker(stamp: str, runtime: str, zip_name: str) -> None:
         assets.append({"url": url, "bytes": len(payload),
                        "sha256": hashlib.sha256(payload).hexdigest()})
     manifest = json.dumps(assets, separators=(",", ":"))
-    # The offline cache is named by the manifest itself: a change the stamp does
-    # not cover (the page's CSP meta, title, web manifest or icons) must still
-    # install as a new version rather than be taken for the installed one.
+    # The offline cache is named by what the manifest serves: a change the stamp
+    # does not cover (the page's CSP meta, title, web manifest or icons) must still
+    # install as a new version rather than be taken for the installed one. The
+    # engine zip counts by its entries, not its bytes: zlib and zlib-ng compress
+    # the same entries differently, and one commit must name one version on every
+    # build host, or a deploy from another host would be downloaded all over again.
+    served = [{"url": asset["url"], "content": zip_content} if asset["url"] == zip_name
+              else asset for asset in assets]
+    version = hashlib.sha256(json.dumps(served, separators=(",", ":")).encode()).hexdigest()
     _stamp_file(WEBAPP / "service-worker.js", DIST / "service-worker.js", {
-        "__BUILD__": stamp, "__VERSION__": hashlib.sha256(manifest.encode()).hexdigest()[:16],
-        "__ASSETS__": manifest,
+        "__BUILD__": stamp, "__VERSION__": version[:16], "__ASSETS__": manifest,
     })
 
 
@@ -342,15 +362,14 @@ def main() -> None:
     zip_bytes = build_source_zip(entries)
     adapter = text_bytes(WEBAPP / "adapter.py")
     # Content-only stamp: the same commit yields the same name on every platform.
-    # Each part is framed by its name and length, so bytes moving from one file
-    # to the next still change it.
     digest = hashlib.sha256()
 
     def stamp_part(name: str, payload: bytes) -> None:
-        digest.update(f"{name}\n{len(payload)}\n".encode() + payload)
+        digest.update(framed(name, payload))
 
     for arcname, payload in entries:
         stamp_part(arcname, payload)
+    zip_content = hashlib.sha256(b"".join(framed(*entry) for entry in entries)).hexdigest()
     stamp_part("adapter.py", adapter)
     stamp_part("pyodide", args.pyodide_version.encode("ascii"))
     for name in (*EDITOR_SCRIPTS, "editor.css", "editor.html"):
@@ -391,7 +410,7 @@ def main() -> None:
     # The pre-stamp flat layout, if present from an older build.
     shutil.rmtree(DIST / "pyodide", ignore_errors=True)
 
-    build_offline_worker(stamp, pyodide_dirname, zip_name)
+    build_offline_worker(stamp, pyodide_dirname, zip_name, zip_content)
     total = sum(f.stat().st_size for f in DIST.rglob("*") if f.is_file())
     print(f"dist ready: build {stamp}, {total / 1e6:.1f} MB total")
 

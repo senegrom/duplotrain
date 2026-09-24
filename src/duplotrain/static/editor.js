@@ -13,6 +13,7 @@ async function send(path, body) {
     const error = new Error(data.error || res.statusText);
     error.code = data.code;
     error.state = data.state;
+    error.refused = true;  // the engine answered and turned the request down
     throw error;
   }
   return data;
@@ -109,13 +110,19 @@ function selectTool({piece = null, stone = null, pick = null, remove = false} = 
 }
 
 // ---------- Checkpoint persistence ----------
+// One editor answers at ".../" and at ".../index.html": storage is keyed by the
+// directory, so both spellings share one autosave and one list of local copies.
+const APP_PATH = location.pathname.replace(/\/index\.html$/, "/");
 // Use a new key so a still-open tab running the old, unconditional writer cannot
-// overwrite new checkpoints. The previous key is read once for migration only.
-const STORAGE_KEY = "duplotrain-session/2:" + location.pathname;
-const LEGACY_STORAGE_KEY = "duplotrain-session/1:" + location.pathname;
+// overwrite new checkpoints. The previous format's keys are read for migration only.
+const STORAGE_KEY = "duplotrain-session/2:" + APP_PATH;
+// Keys once named the exact path, so the index.html spelling kept its own autosave.
+const INDEX_STORAGE_KEY = STORAGE_KEY + "index.html";
+const LEGACY_STORAGE_KEYS = [APP_PATH, APP_PATH + "index.html"].map(path => "duplotrain-session/1:" + path);
 const CHECKPOINT_FORMAT = "duplotrain-checkpoint/1";
 let savedCheckpoint = null;       // exact revision this tab read or last committed
 let lastSavedSnapshot = null;     // ignore redraws and other non-mutating actions
+let keptCheckpoint = null;        // {key, raw, legacy}: a stored session this tab could not restore
 
 function saveNotice(message, error = false) {
   const notice = document.getElementById("save-status");
@@ -152,22 +159,118 @@ function newerCheckpoint() {
   } catch (_error) { return null; } // unreadable: this tab's own session is all there is
 }
 
+// Fold the index.html spelling's autosave into this key: moved here when this key
+// is empty, otherwise kept as a local project copy. An unreadable one stays put.
+async function adoptIndexSpelling() {
+  if (!navigator.locks || localStorage.getItem(INDEX_STORAGE_KEY) === null) return;
+  // Old tabs at that spelling write it under its own lock; newer tabs under this one.
+  await navigator.locks.request(INDEX_STORAGE_KEY, () => navigator.locks.request(STORAGE_KEY, () => {
+    const raw = localStorage.getItem(INDEX_STORAGE_KEY);
+    if (raw === null) return;
+    if (localStorage.getItem(STORAGE_KEY) === null) localStorage.setItem(STORAGE_KEY, raw);
+    else {
+      let session;
+      try { session = decodeCheckpoint(raw); } catch (_error) { return; }
+      localStorage.setItem(PROJECT_PREFIX + crypto.randomUUID(), JSON.stringify({
+        format: PROJECT_FORMAT, name: "Autosave from index.html", session, preferences: {}}));
+    }
+    localStorage.removeItem(INDEX_STORAGE_KEY);
+  }));
+  renderProjects();  // the list was drawn before recovery began
+}
+
+// Where to recover from when this key holds nothing: an index.html autosave that
+// could not be moved, else the previous format's.
+function migrationSource() {
+  const raw = localStorage.getItem(INDEX_STORAGE_KEY);
+  if (raw !== null) return {key: INDEX_STORAGE_KEY, raw, legacy: false};
+  for (const key of LEGACY_STORAGE_KEYS) {
+    const legacy = localStorage.getItem(key);
+    if (legacy !== null) return {key, raw: legacy, legacy: true};
+  }
+  return null;
+}
+
 async function initializeRecovery() {
+  let source = null, unreadable = false;
+  const instance = S.instance;
   try {
+    try { await adoptIndexSpelling(); } catch (_error) { /* left in place; read below */ }
     savedCheckpoint = localStorage.getItem(STORAGE_KEY);
-    const legacy = savedCheckpoint === null;
-    const raw = legacy ? localStorage.getItem(LEGACY_STORAGE_KEY) : savedCheckpoint;
-    if (raw !== null) {
-      const snapshot = decodeCheckpoint(raw, legacy);
+    source = savedCheckpoint !== null ? {key: STORAGE_KEY, raw: savedCheckpoint, legacy: false} : migrationSource();
+    if (source !== null) {
+      let snapshot;
+      try { snapshot = decodeCheckpoint(source.raw, source.legacy); }
+      catch (error) { unreadable = true; throw error; }
       lastSavedSnapshot = JSON.stringify(snapshot);
       // A running local server is authoritative; restore only a fresh engine.
       if (S.revision === 0) S = await api("/api/restore", {data: snapshot});
     }
     autosaveReady = true;
   } catch (error) {
+    // Another tab restored this same fresh engine first, and this tab now shows
+    // what it restored; its own baseline still guards the checkpoint. A restarted
+    // engine is no such case: what this tab adopted there proves nothing.
+    if (error.code === "stale_revision" && error.state?.instance === instance) {
+      autosaveReady = true;
+      return;
+    }
     // Never overwrite unreadable data, or fall back past a corrupt new save.
     autosaveReady = false;
-    saveNotice(`Recovery unavailable: ${error.message}. Existing save kept; export new work.`, true);
+    // Offer the choices only for a save this editor or its engine turned down;
+    // after a transport or worker failure the save itself may well be fine.
+    const refused = source !== null && (unreadable || (error.refused && error.code === undefined));
+    saveNotice(`Recovery unavailable: ${error.message}. Existing save kept` + (refused ?
+      " and autosave off. A newer editor may read it: download it before you discard it." :
+      "; export new work."), true);
+    if (refused) {
+      keptCheckpoint = source;
+      showDiscard(false);
+      el("save-recovery").hidden = false;
+    }
+  }
+}
+
+// The kept session, decoded where possible: "Open project" reads that format.
+function downloadKeptCheckpoint() {
+  if (!keptCheckpoint) return;
+  let session = null;
+  try { session = decodeCheckpoint(keptCheckpoint.raw, keptCheckpoint.legacy); } catch (_error) { /* raw */ }
+  if (session) downloadJSON(session, "session-kept.json");
+  else downloadText(keptCheckpoint.raw, "session-kept.txt");
+}
+
+function showDiscard(confirming) {
+  el("save-discard").hidden = confirming;
+  el("save-discard-confirm").hidden = el("save-discard-cancel").hidden = !confirming;
+}
+
+async function discardKeptCheckpoint() {
+  const kept = keptCheckpoint;
+  if (!kept) return;
+  keptCheckpoint = null;
+  el("save-recovery").hidden = true;
+  if (!navigator.locks) {
+    saveNotice("Safe autosave unavailable in this browser or connection; export JSON before closing.", true);
+    return;
+  }
+  try {
+    const discarded = await navigator.locks.request(STORAGE_KEY, () => {
+      if (localStorage.getItem(kept.key) !== kept.raw) return false;
+      localStorage.removeItem(kept.key);
+      savedCheckpoint = localStorage.getItem(STORAGE_KEY);
+      lastSavedSnapshot = null;
+      autosaveReady = true;
+      return true;
+    });
+    if (!discarded) {
+      saveNotice("Another tab changed the saved session; reload to review it before editing here.", true);
+      return;
+    }
+    await saveSession();
+  } catch (_error) {
+    autosaveReady = false;
+    saveNotice("Autosave unavailable — export JSON before closing this page.", true);
   }
 }
 
@@ -786,7 +889,7 @@ async function removeAt(sx, sy) {
 function bindEditorEvents() {
   bindExtraEvents();
   window.addEventListener("storage", (event) => {
-    if (event.key === null || (typeof event.key === "string" && event.key.startsWith(PROJECT_PREFIX))) renderProjects();
+    if (event.key === null || projectPrefix(event.key)) renderProjects();
     if (!autosaveReady || (event.key !== null && event.key !== STORAGE_KEY)) return;
     try {
       // Read current storage: an event describing an older revision may be delayed.
@@ -1240,6 +1343,10 @@ function bindExtraEvents() {
     } catch (e) { status(e.message, "err"); }
   });
   on("refresh-projects", renderProjects);
+  on("save-download", downloadKeptCheckpoint);
+  on("save-discard", () => showDiscard(true));
+  on("save-discard-cancel", () => showDiscard(false));
+  on("save-discard-confirm", discardKeptCheckpoint);
   on("rename-local", () => manageLocalProject("rename"));
   on("delete-local", () => manageLocalProject("delete"));
   el("project-slots")?.addEventListener("change", closeProjectManagement);

@@ -98,6 +98,9 @@ Request bodies use an absolute 10-second read deadline. Rejected-body cleanup
 has a separate absolute 0.25-second deadline and 64 KiB cap, and skips bytes
 already consumed. Single-read buffering lets the deadline be rechecked even
 when a client continually trickles bytes; timeouts do not restart per chunk.
+A response that cannot be written, because the client stopped reading or went
+away, ends the connection: nothing follows a partly written answer, least of
+all an error for a request the session has already applied.
 
 Open-end mate discovery indexes exact positions and opposite headings once per
 endpoint, instead of comparing every pair. Elevation and the exact algebraic

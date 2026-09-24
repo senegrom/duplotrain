@@ -19,7 +19,7 @@ from duplotrain.lattice import (
     z_from_alg,
 )
 from duplotrain.layout import build_chain
-from duplotrain.solver import SolverConfig, _pose_to_lattice, solve
+from duplotrain.solver import SolverConfig, _lattice_pose, _pose_to_lattice, solve
 
 
 @pytest.fixture(scope="module")
@@ -66,6 +66,12 @@ def test_off_lattice_values_are_rejected():
     assert from_alg_xy(Alg(1) / 3, Alg(0)) is None  # not a twentieth
     assert z_from_alg(Alg(0, 0, 1, 0)) is None  # irrational elevation
     assert _pose_to_lattice(Pose.make(0, 0, 0, degrees_to_steps(15))) is None
+
+
+def test_points_with_odd_zeta_coefficients_are_on_the_lattice():
+    # zeta/SCALE is (sqrt3/40, 1/40): scaled by SCALE, its field coefficients are halves.
+    for key in [(0, 1, 0, 0), (0, 0, 1, 0), (3, -5, 7, 1), (1, 1, 1, 1)]:
+        assert _pose_to_lattice(_lattice_pose((*key, 0, 0))).key() == (*key, 0, 0)
 
 
 def test_lattice_pose_composition_matches_field(catalog):
@@ -175,6 +181,23 @@ def test_conformance_forced_fits(catalog):
         {"curve": 12, "straight": 1, "stretched": 1},
         {"use_all_pieces": True, "slop": 3.0, "max_results": 20},
     )
+
+
+def test_conformance_odd_lattice_points():
+    # A 2561/20 mm straight turned 30 degrees moves by an odd multiple of zeta/SCALE.
+    from duplotrain.catalog import DEFAULT_CATALOG_SPECS
+    from duplotrain.pieces import parse_pieces
+
+    pieces = parse_pieces(list(DEFAULT_CATALOG_SPECS) + [{
+        "id": "long", "name": "2561/20 mm straight (test)", "category": "track", "width": 64,
+        "paths": [{"segments": [{"type": "straight", "run": "2561/20"}]}],
+    }])
+    curve, long = (pieces["curve"], 0, 1), (pieces["long"], 0, 1)
+    base = build_chain([curve, long] + [curve] * 6)
+    inventory = {"long": 1, "curve": 5, "straight": 2}
+    _run_both(pieces, inventory, {"min_pieces": 1, "max_results": 100}, base=base)
+    auto = solve(inventory, pieces, SolverConfig(min_pieces=1, max_results=100), base=base)
+    assert auto.stats.engine == "lattice"
 
 
 def test_auto_engine_picks_lattice_for_builtins(catalog):

@@ -84,8 +84,14 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(payload)))
-            self.end_headers()
-            self.wfile.write(payload)
+            try:
+                self.end_headers()
+                self.wfile.write(payload)
+            except OSError:
+                # The client stopped reading (the write timed out) or went away.
+                # Part of this response may be on the wire, so nothing may follow
+                # it, least of all an error for a request the session applied.
+                self.close_connection = True
 
         def _json(self, status: int, data: Any) -> None:
             payload = json.dumps(data, separators=(",", ":")).encode("utf-8")

@@ -98,10 +98,11 @@ test("adapter errors and worker message errors reject callers", async () => {
   await boot(h);
   let promise = h.window.duplotrainApi("/api/import", {});
   h.workers[0].emit({id: h.workers[0].sent[0].id, res: '{"__error":"bad layout"}'});
-  await assert.rejects(promise, /bad layout/);
+  // Only the engine's own answer marks a request as refused.
+  await assert.rejects(promise, error => /bad layout/.test(error.message) && error.refused === true);
   promise = h.window.duplotrainApi("/api/state");
   h.workers[0].onmessageerror();
-  await assert.rejects(promise, /invalid worker message/);
+  await assert.rejects(promise, error => /invalid worker message/.test(error.message) && !error.refused);
 });
 
 test("worker boot reports failed runtime requests instead of unpacking HTTP error pages", async () => {

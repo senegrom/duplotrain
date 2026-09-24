@@ -446,6 +446,29 @@ def test_a_reversing_lobe_driven_either_way_round_is_one_result():
     assert len(placed) == len(set(placed)) == 68
 
 
+def test_mirror_twins_closing_into_a_crossing_are_one_result():
+    # The mirror twin of a loop closing into a crossing's diagonal port enters by
+    # the crossing's other route, where that port lands on a straight one. An unused
+    # single-handed piece turns the one-handed search off, so both twins are built.
+    from duplotrain.catalog import DEFAULT_CATALOG_SPECS
+    from duplotrain.explore import congruence_key
+    from duplotrain.pieces import parse_pieces
+
+    catalog = parse_pieces(list(DEFAULT_CATALOG_SPECS) + [
+        {"id": "arc300", "width": 64, "paths": [{"segments": [
+            {"type": "arc", "radius": {"alg": [0, 0, 64, 0]}, "degrees": -300}]}]},
+        {"id": "hook", "width": 64, "paths": [{"segments": [
+            {"type": "arc", "radius": 256, "degrees": 30}, {"type": "straight", "run": 64}]}]},
+    ])
+    for stock in ({"straight": 1, "crossing": 1, "arc300": 1},
+                  {"straight": 1, "crossing": 1, "arc300": 1, "hook": 1}):
+        result = solve(stock, catalog, SolverConfig(reversing_loops=True, min_pieces=2))
+        assert result.stats.complete
+        keys = [congruence_key(s.layout) for s in result.solutions
+                if s.kind == "reversing" and "hook" not in s.layout.piece_counts]
+        assert len(keys) == len(set(keys)) == 2
+
+
 def test_a_slop_search_far_from_the_origin_runs_on_the_field_engine():
     from duplotrain.geometry import Pose
 

@@ -282,8 +282,9 @@ catalogues, and check callback-error cleanup.
 
 ## Input and snapshot boundaries preserve exactness
 
-Arc angles are checked as exact multiples of 15 before any integer conversion.
-For example, 30.9 degrees is rejected rather than changed into a 30-degree curve.
+Arc angles, start headings and chord angles are checked as exact multiples of
+15 before any integer conversion. For example, 30.9 degrees is rejected rather
+than changed into a 30-degree curve, and 30.0000000001 rather than snapped to 30.
 Integral float/string inputs are normalized to integers while retaining signed
 and multi-turn sweeps. Layout construction copies and freezes the link graph,
 placements and accessory collections; copying and pickling retain that boundary.
@@ -535,6 +536,15 @@ both walks (and their mirror images in loop mode); a forced fit keeps its
 misfit at the closing joint, so its two walks are different layouts and keep
 separate signatures. A regression checks that no reversing result, in loop or
 completion mode, repeats a layout.
+
+The closing joint names a port of the junction closed into, and each candidate
+names it as its own walk numbers that junction: a symmetric piece written with
+its canonical traversal relabels its ports, and the mirror image places the
+junction by its mirror traversal, which for the crossing is the other route, so
+a diagonal port lands on a straight one. Both port maps come from the placed
+geometry. A regression checks that the mirror twins of a loop closing into a
+crossing are one result when a single-handed piece in stock makes the search
+build both.
 
 ## Lazy signature minima and assembled layouts
 

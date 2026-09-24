@@ -101,9 +101,9 @@ def test_reversing_signature_reflection_only_applies_to_fresh_layouts(cyclic):
     from duplotrain.solver import (
         _canonical_signature,
         _canonical_traversals,
-        _mirror_ports,
         _mirror_traversals,
         _Place,
+        _port_landings,
     )
 
     catalog = default_catalog()
@@ -113,7 +113,7 @@ def test_reversing_signature_reflection_only_applies_to_fresh_layouts(cyclic):
         "cyclic": cyclic,
         "canon_for": {pid: _canonical_traversals(p) for pid, p in catalog.items()},
         "mirror_for": {pid: _mirror_traversals(p) for pid, p in catalog.items()},
-        "port_mirror_for": {pid: _mirror_ports(p) for pid, p in catalog.items()},
+        "landings_for": {pid: _port_landings(p) for pid, p in catalog.items()},
     }
     left_key = _canonical_signature(left, closing_stub=(0, 2), **options)
     right_key = _canonical_signature(right, closing_stub=(0, 1), **options)
