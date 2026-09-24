@@ -300,8 +300,8 @@ def default_catalog() -> dict[str, PieceType]:
     """The built-in modern-generation piece set, keyed by id.
 
     The returned mapping is always caller-owned; only the immutable piece objects
-    behind it are shared.  Re-parsing the same built-in JSON on every Session/solve
-    start was measurable startup work, especially in the Pyodide worker.
+    behind it are shared, so a Session or solve does not re-parse the built-in
+    JSON, which costs noticeable startup time in the Pyodide worker.
     """
     return dict(_default_catalog_items())
 

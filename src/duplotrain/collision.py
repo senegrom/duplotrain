@@ -10,7 +10,7 @@ Height is respected two ways.  Points whose elevations differ by at least
 reach. Separately, pieces flagged ``underpass`` let track run beneath wherever their
 deck stands at least ``UNDERPASS_MIN`` higher. The current catalogue flags both spans and ramps:
 the spans and the highest portions of the ramps can clear track, while the lower
-ramp sections stay solid. These provisional thresholds are not new measurements.
+ramp sections stay solid. These thresholds are provisional.
 
 Directly-linked placements are exempt from mutual checking: neighbouring pieces meet at
 their shared joint by construction, and that contact is not an overlap.  The one thing
@@ -368,6 +368,30 @@ class CollisionField:
             grid.setdefault(key, []).append(
                 _cell_cloud(cloud.placement, cloud.half_width, cell_points, cloud.underpass)
             )
+
+    def place(
+        self,
+        placement: int,
+        points: list[_Point],
+        offset: _Point,
+        half_width: float,
+        bounds: _Bounds,
+        ignore: set[int],
+        underpass: bool = False,
+    ) -> bool:
+        """Add a placement unless it clashes with one not in *ignore*.
+
+        The samples are binned and tested only when some placement's bounds come
+        within reach; a piece laid clear of everything is deferred as-is.
+        """
+        if not self.near(bounds, half_width, ignore):
+            self.add_deferred(placement, points, offset, half_width, bounds, underpass=underpass)
+            return True
+        grouped = self._prepare(points, offset=offset)
+        if self._clashes_prepared(grouped, half_width, ignore, underpass=underpass):
+            return False
+        self._add_prepared(placement, grouped, half_width, underpass=underpass, bounds=bounds)
+        return True
 
     def near(self, bounds: _Bounds, half_width: float, ignore: set[int]) -> bool:
         """Could samples inside *bounds* overlap any placement not in *ignore*?

@@ -58,12 +58,7 @@ score include secondary junction routes.
 Regressions in `tests/test_congruence.py`, `tests/test_networks.py`,
 `tests/test_layout.py` and `tests/test_cli.py` exercise decimal ties across all
 lattice symmetries, an exact independent oval oracle, shared-route length, and
-CLI output. In `tests/test_drive.py`, explicitly unbounded classification of a
-connected 25-switch chain reaches its first simulation on Linux within an isolated
-process with only 64 MiB of additional address space; the test stops there, since
-lazy allocation does not remove the exponential cost of complete classification.
-Another test there checks that the default budget refuses 24 switches before any
-simulation.
+CLI output.
 
 ## Failed searches leave the editor unchanged
 
@@ -72,8 +67,7 @@ candidates and a new revision only after a successful result. An already-mating
 pair should be joined instead. Oracle, solver and progress-callback exceptions
 leave the previous candidate list and revision untouched. A successful search,
 including a zero-result search, publishes one new revision so old candidate
-indices cannot be reused. The shared dispatcher gives HTTP and Pyodide the same
-contract.
+indices cannot be reused.
 
 ## Validate inventory before merging
 
@@ -100,8 +94,7 @@ In completion mode, `SolverConfig(min_pieces=0)` permits a path consisting only
 of connections and transits through existing junctions. The search visits the
 zero-new-piece depth contour even with an empty inventory, but never emits an
 empty fresh loop. Minimum/use-all constraints and node/result caps still apply.
-The editor also permits these no-new-inventory completions. Already-mating
-selected endpoints should still be joined directly instead of searched.
+The editor also permits these no-new-inventory completions.
 
 ## Exact reverse reachability is an overapproximation
 
@@ -159,11 +152,12 @@ The general field engine similarly uses rational forms on its exact coefficients
 including all four height coefficients. No floating tolerance enters these bounds.
 
 All routes, free-transit allowances and present/future targets use the same
-conservative rules as the short tables. Both share the progressive
-preprocessing allowance (`min(4096, max_nodes // 8)` expansions at once, 24
-more per DFS node, at most 262,144), and neither publishes an unfinished layer. Stable zero-motion envelopes are reused at every greater depth,
-so an empty move pool and a huge inventory cannot allocate endless identical
-layers. The future-target query cache is limited to 4096 entries.
+conservative rules as the short tables. Both share the progressive preprocessing
+allowance ([performance.md](performance.md#reverse-reachability-tables)), and
+neither publishes an unfinished layer. Stable zero-motion envelopes are reused at
+every greater depth, so an empty move pool and a huge inventory cannot allocate
+endless identical layers. The future-target query cache is limited to 4096
+entries.
 
 `completion_bound_depth` and `completion_bound_states` expose the largest complete
 depth and total retained heading envelopes. Regressions in
@@ -297,13 +291,14 @@ change the catalogue or other sessions.
 
 ## Classification never reports a budget-limited verdict
 
-Switch settings are generated lazily. Before simulation, `classify()` computes
-the number of starts times the product of switch choices and compares it with
-`max_runs` (100,000 by default). Exceeding the limit raises
-`ClassificationLimitError` without a classification. A larger explicit budget,
-or `None` in the library API, permits exhaustive enumeration. This avoids both
-materializing an exponential assignment list and silently treating an unfinished
-universal check as a proof. The CLI exposes the same budget as `--max-runs`.
+Before any simulation, `classify()` compares the number of starts times the
+product of switch choices with its run budget (see the
+[README](../README.md#driving-and-the-looping-ladder)), and it generates switch
+settings lazily, so it neither materializes an exponential assignment list nor
+treats an unfinished universal check as a proof. Regressions refuse 24 switches
+under the default budget before any simulation and, on Linux, run an unbounded
+25-switch classification to its first simulation within 64 MiB of additional
+address space (`tests/test_drive.py`).
 
 These boundaries are covered in `tests/test_pieces.py`, `tests/test_layout.py`,
 `tests/test_editor_snapshots.py`, `tests/test_drive.py` and `tests/test_cli.py`.
@@ -318,14 +313,11 @@ precedence over direction stones at the same position. The ordinary repeated-sta
 check also detects oscillations entirely inside one piece, including two guarded
 faces, without falsely claiming coverage of other track.
 
-`DriveReport.steps` records each pass as `(placement, departure, reached)`.
-A face turnaround and its return are separate passes; a mid-piece bounce reaches
-its own departure port, so face-reversing runs have correspondingly larger
-`steps` and `period` values. These are discrete pass counts, not travel times.
-`DriveReport.terminal` records the stopping event (stop stone, buffer, open end
-or dead route) with its piece, inward entry and reached face without adding a
-pass; endless runs have none. Saved layout JSON and the formal lazy-switch
-theorem are untouched.
+`DriveReport.steps` records each pass as `(placement, departure, reached)`: a
+face turnaround and its return are separate passes, and a mid-piece bounce
+reaches its own departure port. `steps` and `period` count passes, not travel
+time. `DriveReport.terminal` records the stopping event (stop stone, buffer, open
+end or dead route) without adding a pass; endless runs have none.
 
 ## Remove the selected stone, not the last stone of that colour
 
@@ -353,12 +345,11 @@ when their planar distance is below `half_width + half_width - TOUCH_MARGIN`
 and their height difference is below the clearance, and a candidate whose box is
 that far from a placement's box in `x`, in `y`, or in height has no such pair.
 Underpass rules only exempt further pairs. Whenever the boxes do come within
-reach, every deferred placement in reach is binned before the unchanged point
+reach, every deferred placement in reach is binned before the point
 test runs, so the grid the test sees contains every placement that could matter.
 Backtracking removes a placement's cell entries by placement rather than by
 stack position, because a late-binned placement may sit below a newer one in a
-shared cell. The final overlap audit of every returned layout is unchanged and
-still bins eagerly.
+shared cell. The final overlap audit of every returned layout bins eagerly.
 
 ## The bounds index only screens
 
@@ -398,13 +389,11 @@ placement whose entries are all unreachable lends no traversal and no turn. A
 candidate one move on can reach no more than its parent, so the node's answer
 covers its candidates as well.
 
-Table preprocessing grows with the search effort. Every answer is either final
-(a rejection, or a membership found in a published layer, which no later layer
-can undo) or permissive because a depth was not yet affordable; only final
-answers are cached, and a permissive one is asked again when the allowance has
-grown. Comparing a cached search with an uncached one therefore gives the same
-decisions at every node; only the moment some layer was built can differ, which
-the regression in `tests/test_completion_reuse.py` allows for.
+As for every table query, only final answers are cached
+([above](#reused-geometric-proofs-are-independent-of-search-state)), so a cached
+search decides every node as an uncached one does; only the moment some layer
+was built can differ, which the regression in `tests/test_completion_reuse.py`
+allows for.
 
 ## Loop mode explores one handedness
 
@@ -447,8 +436,8 @@ anchor, which every layer contains, after fewer than `g` moves. Conversely a
 pose in `L_d` reached after `i <= g` moves gives a route of at most `i + d`
 moves. The probe therefore expands the cursor forward level by level, over the
 same pooled moves the layers use, and tests each level against `L_d`; heights
-are checked separately against their own exact layer at the queried depth, as
-before. Slippage translates the remainder of a route at its forced joints, never
+are checked separately against their own exact layer at the queried depth.
+Slippage translates the remainder of a route at its forced joints, never
 the cursor's own first moves, so the same argument holds with the near test at
 depth `d`. A probe that exceeds its expansion cap leaves the query permissive
 and undecided, exactly like an unaffordable layer.
@@ -476,7 +465,7 @@ A near test asks whether some box of the queried heading's group lies within
 the slack of the query's box. If the query's box grown by the slack does not
 overlap the smallest axis-aligned box containing the whole group, no member
 can be within reach, so rejecting it early is a necessary condition applied
-before the unchanged sorted scan; nothing is accepted that the scan would not
+before the sorted scan; nothing is accepted that the scan would not
 accept. The cached box of a queried pose is the same integer enclosure the
 layer poses use. The integer form of the field engine's interval enclosure
 computes the same floor and ceiling as exact Fraction sums.
@@ -593,8 +582,8 @@ motions. The lattice engine's flat tuples represent exactly the poses whose
 coordinates lie on the 30-degree lattice, and two such poses are equal as
 tuples exactly when they are equal as field poses, so composing a candidate's
 prefix and suffix on the lattice and comparing there decides the same matches
-as the field arithmetic did. Rigid motions associate, so stepping through a
-unit piece by piece yields the pose its composed transform yielded. When an
+as field arithmetic. Rigid motions associate, so stepping through a unit piece
+by piece yields the same pose as its composed transform. When an
 end or a traversal does not fit the lattice the oracle keeps the exact
 geometry; a regression compares the two geometries candidate for candidate on
 a dozen closings and step for step on every traversal.
@@ -633,8 +622,8 @@ off and checks that the candidate's only joint issues are the base's own.
 A key is injective on planar poses whose coordinates stay below 2^31 lattice
 units, 107 km. A problem whose anchor, start or base junction ports lie beyond
 2^30 lattice units (53 km) runs on the field engine instead; the search reaches
-only metres from them, so its keys stay in range. The key ignores the height,
-exactly as the levelled tuple did: the height layers remain separate. A move's
+only metres from them, so its keys stay in range. The key ignores the height;
+the height layers are separate. A move's
 packed delta is the difference of the keys of its endpoint and its origin at
 each heading, and adding it to any key of that heading yields the key of the
 moved pose, because no coordinate field can borrow or carry within the bound.

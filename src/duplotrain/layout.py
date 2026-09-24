@@ -75,9 +75,9 @@ def _rotated_local_pose(local: Pose, heading: int) -> tuple[Alg, Alg, Alg, int]:
 def _heading_trig(heading: int) -> tuple[float, float]:
     """Floating render/collision rotation for one lattice heading.
 
-    Cache only the trig, not the transformed points: keeping the original
-    multiply/add evaluation order makes every sampled float bit-for-bit identical
-    to the uncached implementation, including borderline collision comparisons.
+    Cache only the trig, not the transformed points: every sample keeps its
+    multiply/add evaluation order, so the floats are bit-for-bit those of computing
+    each point directly, including borderline collision comparisons.
     """
     theta = math.radians((heading % HEADING_STEPS) * DEGREES_PER_STEP)
     return math.cos(theta), math.sin(theta)
@@ -91,8 +91,8 @@ def _centreline_points(
 
     The same multiply/add order as :meth:`Placement.centrelines`, so every float
     is bit-identical; only the result is kept. An editor closing audits dozens of
-    candidates over the same base and starts several searches over it, each of
-    which used to re-sample every base placement.
+    candidates over the same base and starts several searches over it, so the base
+    is sampled once.
     """
     cos_t, sin_t = _heading_trig(frame.heading)
     ox, oy, oz = frame.xyz()
@@ -524,7 +524,8 @@ class Layout:
     ) -> Layout:
         """Remove one matching stone, preserving other stones of the same colour.
 
-        Omit ``at_port`` for legacy last-of-colour removal. Explicit ``None``
+        Omit ``at_port`` to remove the last stone of that colour, wherever it
+        sits. Explicit ``None``
         selects the midpoint; an integer selects that connector face only.
         """
         if at_port != "any":

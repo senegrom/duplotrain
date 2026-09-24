@@ -140,10 +140,9 @@ primitives are cached, and the sampled key is cached per exact identity.
 
 ## Editor closings
 
-The editor first asks an arc oracle, which composes its prefix and suffix
-poses on the lattice and matches them exactly; then it searches plain track,
-one standard bridge as a four-piece macro, and finally the whole inventory,
-with budgets of 25,000, 250,000 and 60,000 nodes scaled by `search_effort`.
+Unless reversing loops are allowed, the editor first asks an arc oracle, which
+composes its prefix and suffix poses on the lattice and matches them exactly; the
+search stages and their node budgets are in [bridge-completion.md](bridge-completion.md).
 Which end is the hard one is unknown in advance, so each exact ordinary stage
 alternates directions in turns of doubling budget from 1,024 nodes, keeps each
 direction's tables between its turns, and tries first the direction that settled
@@ -161,16 +160,10 @@ cached in a 2,048-entry LRU and copied into fresh lists for every response, and
 a 32-entry LRU keeps the footprint of a placement tuple, so a state or candidate
 response does not resample or remeasure geometry it has already served; neither
 cache holds a session, revision, link or ownership. Both hosts send compact
-JSON, which leaves every parsed value unchanged and trims an eight-suggestion
-response by an eighth. Check layout keeps its all-pairs scan below 128 pieces;
-larger layouts shortlist candidate pairs through the collision field's bounds
-index, a conservative superset, and run the unchanged pair tests on them, which
-turns the quadratic scan of a 1,499-piece layout into about ten thousand pair tests.
-In the browser, flat chords are drawn whole and only climbing edges are
-subdivided for paint order, one lazily built record per layout holds segments,
-per-piece groups, batches and bounds, picking visits only the pieces whose
-bounds contain the pointer, and the project indicator compares a cached session
-string with a small settings key on explicit redraws only.
+JSON. From 128 pieces Check layout shortlists pairs through the collision field's
+bounds index ([editor.md](editor.md#check-layout)); on the synthetic 1,499-piece
+layout that leaves about ten thousand pair tests. Browser drawing and picking are
+described in [editor.md](editor.md#drawing-and-picking).
 
 ## Representative times
 
@@ -193,7 +186,7 @@ identical to the reference searches without tables.
 
 ## Regression contracts
 
-Speed is never asserted. `tests/test_performance_contracts.py` pins operation
+`tests/test_performance_contracts.py` pins operation
 counts (samples prepared once per point test and once per deferred placement a
 query reaches), cache bounds, bit-identical sample clouds and cache isolation.
 Differential tests compare complete ordered solutions against the reference
@@ -201,21 +194,3 @@ search with tables disabled, and check that the tables never add nodes, on both
 engines, with slippage and with reversing closures, and the browser suite closes,
 previews and applies gaps through the real Pyodide worker under the production
 content security policy.
-
-
-## Interactive work and drawing layers
-
-The interactive solver yields at deterministic checkpoints and retains DFS state
-between requests; Find more increases its result allowance without replaying
-already visited nodes. The synchronous `solve` drains the same engine.
-Stage budgets, exact validation and the acceptance checks remain separate
-from the UI's progress clock. Tick time is a cooperative target, not a hard
-latency bound. See [search-jobs.md](search-jobs.md) for continuation and multi-gap
-limits rather than interpreting a bounded search as a proof of impossibility.
-
-Viewport culling removes off-screen paint commands. A frame whose view or
-geometry differs from the previous one paints directly, so panning and zooming
-never pay for rastering; once a frame repeats, one reused offscreen surface
-holds the stable base track while only overlays change. The raster key
-includes geometry identity, view, canvas sizes and pixel ratio; its eight-million-
-pixel ceiling has a direct-render fallback.

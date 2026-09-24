@@ -1,8 +1,8 @@
 """Local HTTP host for the shared track editor.
 
 ``duplotrain gui`` serves the packaged HTML, JavaScript and icons on loopback.
-The public ``Session`` and ``dispatch_session`` imports remain available here for
-existing desktop callers; the browser worker imports :mod:`duplotrain.editor`.
+It re-exports ``Session`` and ``dispatch_session`` for desktop callers; the
+browser worker imports :mod:`duplotrain.editor`.
 """
 
 from __future__ import annotations

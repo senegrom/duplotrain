@@ -1,12 +1,11 @@
 """Bounded direction portfolios for editor completions, not fresh-loop enumeration.
 
 A difficult obstacle can be near either end, and which end is the hard one is not
-known in advance: on the reported bridge gap one direction proves the plain
+known in advance: on tests/fixtures/bridge-gap.json one direction proves the plain
 stage impossible in about a hundred nodes while the other wanders for tens of
 thousands. So the two directions take turns, each turn with twice the previous
 budget, starting small. Whichever direction settles a stage is tried first in
 the next one, and each direction keeps its reverse tables between its attempts.
-The core solver and its exact collision/reachability checks are unchanged.
 """
 
 from __future__ import annotations
@@ -44,8 +43,8 @@ def solve_completion(
     """Try either end without multiplying the caller's total search-node budget.
 
     Exact ordinary connections are reversible. Reversing-loop targets and forced
-    fits are not assumed to be direction-equivalent, so those retain the original
-    one-direction search. A returned batch comes from ONE search: signatures and
+    fits are not assumed to be direction-equivalent, so those search from the
+    chosen end only. A returned batch comes from ONE search: signatures and
     step traces never mix opposite directions. The existing base remains untouched.
 
     The directions alternate, each turn with twice the previous budget, starting

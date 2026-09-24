@@ -12,10 +12,8 @@ and backup presentation, train presentation, interactive jobs and offline contro
 single DOMContentLoaded initialiser are part of the tested contract, and the
 local host serves them from an explicit allowlist. The static build injects
 the worker bootstrap, stamps the bundle with the content of every engine and
-editor source (icons carry versioned names instead; the web manifest and the
-Pages CSP tag are covered by the offline version's digest), and
-leaves the CLI, the HTTP host, rendering, exhaustive enumeration and scoring
-out of the worker archive. Local hosting
+editor source, and leaves the CLI, the HTTP host, rendering, exhaustive
+enumeration and scoring out of the worker archive. Local hosting
 security and the revision protocol are described in [security.md](security.md).
 
 ## History
@@ -73,14 +71,14 @@ canvas use direct painting.
 
 ## Compact previews
 
-The editor requests `preview_format: "duplotrain-preview/1"` on every call,
-including the read-only `/api/state` POST; callers that omit it receive the
-original full previews. A compact candidate carries `format`, `base_revision`,
+The editor requests `preview_format: "duplotrain-preview/1"` on every call except
+`/api/export`, including the read-only `/api/state` POST; callers that omit it
+receive full previews. A compact candidate carries `format`, `base_revision`,
 `base_count` and `placements` with drawing-only widths and sampled lines. It
-reuses the first `base_count` current placements only while their exact
-geometry is unchanged; otherwise `base_count` is zero and all geometry is
-included. Exact candidate layouts stay in the session; drawing payloads are
-never inputs to candidate application.
+reuses the first `base_count` current placements only while their exact geometry
+is unchanged; otherwise `base_count` is zero and all geometry is included. Exact
+candidate layouts stay in the session; drawing payloads are never inputs to
+candidate application.
 
 ## Inventory
 
@@ -98,7 +96,7 @@ solver's width, height and underpass rules, shortages of track and action
 stones against the owned counts, and pieces the catalogue marks provisional.
 Each finding focuses and highlights its pieces. Layouts of 128 pieces or more
 shortlist candidate pairs through the collision field's bounds index and run
-the unchanged pair tests on that superset. At most 200 overlapping pairs are
+the same pair tests on that superset. At most 200 overlapping pairs are
 reported, and reaching that bound marks the check incomplete. A clean
 report is a model result at 8 mm sampling, not a physical-clearance guarantee,
 and manual layouts stay editable whatever it says.
@@ -130,8 +128,7 @@ read) and a discard, which asks for confirmation, deletes it only if no other
 tab has replaced it since, and turns autosave back on for this tab's session. A
 restore that fails for another reason, such as a lost connection, keeps the
 session without offering to discard it. Autosave is device- and browser-local,
-not a backup: export JSON or save a project for a portable copy. Undo history is
-not persisted across engine restarts.
+not a backup: export JSON or save a project for a portable copy.
 
 ## Projects and local copies
 
@@ -164,10 +161,9 @@ worker and restores a copy of that snapshot; responses from an old worker
 generation are ignored, and a restart resets undo history and suggestions and
 says so. Startup times out after 60 seconds; outstanding calls time out after
 two minutes without a response or progress report. The editor's searches and
-route analyses are interactive jobs: they pause at their next checkpoint without
-restarting the worker or losing undo history, and accepted suggestions can be
-published and applied after pausing. The synchronous `/api/solve` route remains
-for API clients. On the local host such a search may carry a random
+route analyses are interactive jobs that pause without restarting the worker
+([search-jobs.md](search-jobs.md)); the synchronous `/api/solve` route serves API
+clients. On the local host such a search may carry a random
 `operation_id`; `/api/cancel` sets its event without waiting for the session
 lock, the search raises at its next progress or publication checkpoint with
 HTTP 409 and `code: "cancelled"`, the layout stays unchanged, and a cancellation
@@ -176,15 +172,9 @@ reports that it was not active.
 
 ## Interactive completion
 
-Find more increases the quota of distinct alternatives (the same track found
-from either end counts once) independently of Search harder.
-Single-pair searches retain their exact DFS checkpoint, publish validated previews
-in bounded chunks, and support pause/resume with eight-card pages and candidate
-ranking. Close all gaps uses bounded backtracking with shared stock and offers
-only fully audited complete plans. Opt-in room and keep-out constraints include
-track width and do not edit the user's inventory. Limits, scope and the difference
-between ranking a sample and proving an optimum are described in
-[search-jobs.md](search-jobs.md).
+Find more, Search harder, pause and resume, ranking, room and keep-out
+rectangles and Close all gaps are described in [search-jobs.md](search-jobs.md),
+with their limits and what a ranking or a bounded search does not prove.
 
 ## Test train
 
@@ -254,16 +244,10 @@ ID and checks the same digest: a same-name upload from any other job would carry
 a new ID, and the deploy would fail rather than publish it.
 
 The offline browser test boots the built app in a fresh profile under the
-production CSP, installs the offline version, stops the resource server (a
-direct connection must then be refused while a cached index still loads),
-reloads the real engine from the cache and recovers the confirmed session; any
-page error fails it. Chromium serves it over HTTP loopback and also applies
-Playwright's offline emulation. WebKit upgrades loopback subresources to HTTPS
-under that policy, and its release builds have no CA-file override, so the
-WebKit job serves HTTPS with a short-lived test CA that it installs, by explicit
-opt-in (`DUPLOTRAIN_TEST_SYSTEM_CA=1`), in the disposable GitHub-hosted runner's
-trust store and removes afterwards, even on failure. The helper refuses any
-other machine, so elsewhere the WebKit variant of this test is skipped with that
-reason. WebKit's offline emulation aborts
-service-worker navigations, so there the stopped server alone proves the
-origin is gone.
+production CSP, installs the offline version, stops the resource server, reloads
+the real engine from the cache and recovers the confirmed session; any page error
+fails it. Chromium serves it over HTTP loopback. WebKit needs HTTPS under that
+policy, so its variant runs only on the disposable GitHub-hosted runner, which
+installs a short-lived test CA by explicit opt-in (`DUPLOTRAIN_TEST_SYSTEM_CA=1`)
+and removes it afterwards; elsewhere it is skipped. `tests/browser/tls.py` and
+`tests/browser/test_path_web.py` give the details.

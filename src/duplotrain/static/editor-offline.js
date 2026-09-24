@@ -108,7 +108,6 @@ async function applyOfflineUpdate() {
   finally { offlineWorking = false; }
 }
 function bindOfflineEvents() {
-  const on = (id, fn) => el(id)?.addEventListener("click", fn);
   on("offline-install", installOffline); on("offline-check", checkOfflineUpdate); on("offline-update", applyOfflineUpdate);
   offlineNotice(window.duplotrainBuild ? "Offline access is opt-in." : "Offline installation is available in the browser-engine app.");
   if (!window.duplotrainBuild || !navigator.serviceWorker || !globalThis.isSecureContext) {

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from .catalog import ACCESSORIES
 from .collision import DEFAULT_CLEARANCE, CollisionField, bounds_of
-from .drive import DriveLimitError, drivable_universe, drive
+from .drive import DriveLimitError, _tongue_choices, drivable_universe, drive
 
 if TYPE_CHECKING:
     from .editor import Session
@@ -87,9 +87,9 @@ def check_session(session: Session) -> dict[str, Any]:
         neighbours.setdefault(a, set()).add(b)
     overlaps = []
     clouds = []
-    # Small layouts keep the original linear path. On larger layouts the shared
-    # deferred field indexes bounds, while the original one-piece fields retain
-    # exactly the same narrow-phase predicates and pair ordering.
+    # Small layouts test every pair. On larger layouts the shared deferred field
+    # indexes bounds to shortlist pairs, and the one-piece fields apply the same
+    # narrow-phase predicates in the same pair order.
     spatial = CollisionField(clearance=DEFAULT_CLEARANCE) if len(layout) >= 128 else None
     complete = True
     for i, placement in enumerate(layout):
@@ -143,19 +143,10 @@ def check_session(session: Session) -> dict[str, Any]:
 
 def switch_choices(layout: Layout) -> list[dict[str, Any]]:
     """The drive model's facing-port choices, not external connector links."""
-    choices = []
-    for index, placement in enumerate(layout):
-        piece = placement.piece
-        if not piece.is_junction:
-            continue
-        for port in range(len(piece.ports)):
-            options = sorted(exit_port for exit_port, _ in piece.transit(port))
-            if len(options) > 1:
-                choices.append({"placement": index, "default": min(options),
-                                "options": [{"port": p, "name": piece.ports[p].name}
-                                            for p in options]})
-                break
-    return choices
+    return [{"placement": index, "default": min(options),
+             "options": [{"port": p, "name": layout.placements[index].piece.ports[p].name}
+                         for p in sorted(options)]}
+            for index, options in _tongue_choices(layout)]
 
 
 def _initial_switches(layout: Layout, settings: object) -> dict[int, int]:

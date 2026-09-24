@@ -13,8 +13,8 @@ Output layout (everything self-hosted, no third-party requests at runtime):
 Caching contract: mutable names (html/js/py) are served ``no-cache`` so every
 visit revalidates them (cheap 304s), while the content-stamped zip and the
 versioned Pyodide directory are immutable-cached forever.  The engine zip MUST
-carry the stamp in its filename: it was once served under a flat name with an
-immutable header, which pinned stale engines in returning visitors' browsers.
+carry the stamp in its filename: under a flat name, an immutable header would pin
+a stale engine in returning visitors' browsers.
 
 Usage:  python webapp/build.py [--pyodide-version 0.27.7] [--pages]
 
@@ -228,8 +228,8 @@ HTACCESS = """\
 
   # Mutable names (the page, scripts, adapter) revalidate on every visit so
   # engine fixes actually reach returning visitors; 304s make this cheap.
-  # NEVER serve a flat-named artifact as immutable -- a stale engine pinned
-  # in browser caches is exactly the bug this policy replaced.
+  # NEVER serve a flat-named artifact as immutable: it would pin a stale
+  # engine in browser caches.
   Header set Cache-Control "no-cache"
 
   # Content-stamped artifacts may cache forever: a new build gets a new name.
@@ -286,7 +286,6 @@ def build_index(meta_csp: bool = False) -> None:
     (DIST / ".htaccess").write_text(HTACCESS, encoding="utf-8", newline="\n")
     # Commit raster exports so the static build and installed Python editor use
     # identical icons without needing image-rendering dependencies at build time.
-    static = ROOT / "src" / "duplotrain" / "static"
     for source in sorted(static.rglob("*")):
         if not source.is_file() or source.name == "editor.html":
             continue

@@ -1,7 +1,7 @@
 """Integer fast path for the 30-degree track lattice.
 
-Profiling puts ~85% of solve time inside :class:`~fractions.Fraction` churn under the
-general ``Q(sqrt2, sqrt3)`` field.  But every piece in the real catalogue turns in
+Exact ``Q(sqrt2, sqrt3)`` arithmetic spends most of its time in
+:class:`~fractions.Fraction` churn.  But every piece in the real catalogue turns in
 multiples of 30 degrees and measures in exact twentieths of a millimetre, so all
 reachable positions live in the scaled cyclotomic ring
 
@@ -70,21 +70,8 @@ class LatticePoint:
             a, b, c, d = -d, a, b + d, c
         return LatticePoint(a, b, c, d)
 
-    def __add__(self, other: LatticePoint) -> LatticePoint:
-        return LatticePoint(
-            self.a + other.a, self.b + other.b, self.c + other.c, self.d + other.d
-        )
-
     def key(self) -> tuple[int, int, int, int]:
         return (self.a, self.b, self.c, self.d)
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, LatticePoint):
-            return NotImplemented
-        return self.key() == other.key()
-
-    def __hash__(self) -> int:
-        return hash(self.key())
 
     def xy(self) -> tuple[float, float]:
         """Floating-point millimetres."""
@@ -102,7 +89,7 @@ class LatticePose:
 
     ``heading`` uses 12 steps per revolution (unlike :class:`~duplotrain.geometry.Pose`
     which uses 24 steps of 15 degrees); the solver converts between the two at the
-    boundary.  ``then(delta, dz, turn)`` mirrors ``Pose.then`` exactly.
+    boundary and moves flat tuples of these values.
     """
 
     __slots__ = ("p", "z", "heading")
@@ -111,22 +98,6 @@ class LatticePose:
         self.p = p
         self.z = z
         self.heading = heading % 12
-
-    def then(self, delta: LatticePoint, dz: int, turn: int) -> LatticePose:
-        return LatticePose(
-            self.p + delta.rotated(self.heading), self.z + dz, self.heading + turn
-        )
-
-    def key(self) -> tuple:
-        return (*self.p.key(), self.z, self.heading)
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, LatticePose):
-            return NotImplemented
-        return self.key() == other.key()
-
-    def __hash__(self) -> int:
-        return hash(self.key())
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         x, y = self.p.xy()

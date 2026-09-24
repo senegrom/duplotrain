@@ -373,7 +373,7 @@ function openEndScreenPos() {
 }
 
 function stoneMarkPositions() {
-  // Screen positions of every drawn stone, mirroring the draw loop's layout.
+  // Screen positions of every stone mark: the draw loop and hit tests share them.
   const out = [];
   if (!S) return out;
   S.layout.placements.forEach((pl, i) => {
@@ -443,35 +443,23 @@ function paint() {
   if (ghost) drawLayout({placements: ghost}, true);
 
   // action stones (mid-piece, or pulled toward the port face they guard)
-  S.layout.placements.forEach((pl) => {
-    (pl.stone_marks || []).forEach((mark, k) => {
-      const info = S.stones.catalog[mark.id] || {};
-      let wx = pl.mid[0], wy = pl.mid[1];
-      if (mark.at !== null && mark.at !== undefined && pl.ports[mark.at]) {
-        const port = pl.ports[mark.at];
-        wx = port.x * 0.82 + pl.mid[0] * 0.18;
-        wy = port.y * 0.82 + pl.mid[1] * 0.18;
-      }
-      const [sx, sy] = worldToScreen(wx, wy);
-      const r = Math.max(6, 14 * view.scale);
-      const oy = (k - ((pl.stone_marks.length - 1) / 2)) * r * 2.2;
-      if (!screenBoundsVisible(sx, sy + oy, sx, sy + oy, r + 3)) return;
-      ctx.beginPath();
-      ctx.arc(sx, sy + oy, r, 0, 7);
-      ctx.fillStyle = info.color || "#888";
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "#ffffff";
-      ctx.stroke();
-      if (mark.id === "stone_direction" && r > 7) {
-        ctx.fillStyle = "#fff";
-        ctx.font = `${r}px system-ui`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("↔", sx, sy + oy + 1);
-      }
-    });
-  });
+  for (const {id, x, y, r} of stoneMarkPositions()) {
+    if (!screenBoundsVisible(x, y, x, y, r + 3)) continue;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, 7);
+    ctx.fillStyle = (S.stones.catalog[id] || {}).color || "#888";
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+    if (id === "stone_direction" && r > 7) {
+      ctx.fillStyle = "#fff";
+      ctx.font = `${r}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("↔", x, y + 1);
+    }
+  }
 
   // joints + open-end arrows (+ sealed buffer faces)
   S.layout.placements.forEach((pl, i) => {
@@ -537,6 +525,7 @@ function fitView(placements = S && S.layout.placements) {
 
 // ---------- UI wiring ----------
 function el(id) { return document.getElementById(id); }
+const on = (id, action) => el(id)?.addEventListener("click", action);
 
 function status(msg, cls) {
   const s = el("status");
@@ -1112,7 +1101,7 @@ function scheduleFrame(repaint) {
     const changed = flushHover(), render = repaintPending || changed;
     if (repaintPending) updateProjectStatus();
     repaintPending = false;
-    // Preserve the upstream optimization: unchanged hover never repaints track.
+    // Hover that changes nothing never repaints the track.
     if (render) paint();
   };
   if (typeof requestAnimationFrame !== "function") { finish(); return; }
@@ -1308,7 +1297,6 @@ async function checkLayout() {
 
 function bindExtraEvents() {
   bindSearchEvents();
-  const on = (id, action) => el(id)?.addEventListener("click", action);
   on("redo", async () => { try { S = await api("/api/redo", {}); redraw(); } catch (error) { status(error.message, "err"); } });
   on("cancel-search", () => { if (jobLoop) requestJobPause(); });
   on("check-layout", checkLayout);

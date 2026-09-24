@@ -325,7 +325,7 @@ def _pose_to_lattice(pose: Pose) -> LatticePose | None:
 
 
 class _FieldEngine:
-    """Pose operations over exact field arithmetic (the original implementation)."""
+    """Pose operations over exact field arithmetic."""
 
     name = "field"
 
@@ -653,6 +653,45 @@ class _LatticeEngine:
         return score
 
 
+def _lattice_rotations(point: LatticePoint) -> tuple:
+    """The point's coordinates under each of the twelve lattice rotations."""
+    return tuple(point.rotated(h).key() for h in range(12))
+
+
+def _lattice_step(rot12: tuple, dz: int, turn: int):
+    """One move on flat lattice poses: add the delta rotated to the pose's heading."""
+    def apply(cursor: tuple) -> tuple:
+        a, b, c, d, z, h = cursor
+        da, db, dc, dd = rot12[h]
+        return (a + da, b + db, c + dc, d + dd, z + dz, (h + turn) % 12)
+
+    return apply
+
+
+def _placement_samples(eng, pieces: Mapping[str, PieceType], spacing: float):
+    """Collision samples of placements, rotated once per piece, entry and heading.
+
+    Frames of one piece and heading differ only by a translation, so the trig runs
+    once per key and a placement adds its frame's offset to the cached bounds.
+    Returns ``samples(pid, entry, frame) -> (local points, offset, world bounds)``.
+    """
+    cache: dict[tuple[str, int, int], tuple[list, tuple]] = {}
+
+    def samples(pid: str, entry: int, frame) -> tuple[list, tuple, tuple]:
+        hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
+        key = (pid, entry, hkey)
+        cached = cache.get(key)
+        if cached is None:
+            points = [(cos_t * lx - sin_t * ly, sin_t * lx + cos_t * ly, lz)
+                      for line in pieces[pid].all_centrelines(spacing) for lx, ly, lz in line]
+            cached = cache[key] = (points, bounds_of(points))
+        points, local = cached
+        return points, (fx, fy, fz), (local[0] + fx, local[1] + fx, local[2] + fy,
+                                      local[3] + fy, local[4] + fz, local[5] + fz)
+
+    return samples
+
+
 def _compile_lattice(
     anchor: Pose,
     start_cursor: Pose,
@@ -669,19 +708,8 @@ def _compile_lattice(
     frames0: dict[tuple[str, int], tuple] = {}
     port_locals: dict[tuple[str, int], tuple] = {}
 
-    def rotations_of(point: LatticePoint) -> tuple:
-        return tuple(point.rotated(h).key() for h in range(12))
-
     def as_delta(pose: LatticePose) -> tuple:
-        return (rotations_of(pose.p), pose.z, pose.heading)
-
-    def make_apply(rot12: tuple, dz: int, turn: int):
-        def apply(cursor: tuple) -> tuple:
-            a, b, c, d, z, h = cursor
-            da, db, dc, dd = rot12[h]
-            return (a + da, b + db, c + dc, d + dd, z + dz, (h + turn) % 12)
-
-        return apply
+        return (_lattice_rotations(pose.p), pose.z, pose.heading)
 
     for pid, piece in pieces.items():
         for port_index, port in enumerate(piece.ports):
@@ -709,7 +737,7 @@ def _compile_lattice(
             if delta is None or dz is None:
                 return None
             compiled.append(
-                (m.entry, m.exit, make_apply(rotations_of(delta), dz, m.dheading // 2))
+                (m.entry, m.exit, _lattice_step(_lattice_rotations(delta), dz, m.dheading // 2))
             )
         moves[pid] = compiled
 
@@ -822,7 +850,7 @@ class _CompletionBounds:
 
     @staticmethod
     def _lattice_envelope(pose) -> tuple[tuple, tuple]:
-        # The same arithmetic as _outward and _physical_envelope over the lattice
+        # The same arithmetic as _alg_interval and _physical_envelope over the lattice
         # coordinates x = (2a + c + b*sqrt3) / 40 and y = (2d + b + c*sqrt3) / 40,
         # written out flat: this runs once for every pose of every slippage layer.
         a, b, c, d, z, _heading = pose
@@ -1397,8 +1425,9 @@ def _canonical_signature(
         else:
             visits.append((s.placement, pid_of(s.placement), s.entry, s.exit))
 
-    def normalise(seq: list[tuple[int, str, int, int]]) -> tuple:
-        fresh: dict[int, int] = {} if cyclic else {i: i for i in range(n_base)}
+    def normalise(seq: list[tuple[int, str, int, int]], fresh: dict | None = None) -> tuple:
+        if fresh is None:
+            fresh = {} if cyclic else {i: i for i in range(n_base)}
         out = []
         for inst, pid, entry, exit_ in seq:
             if inst not in fresh:
@@ -1438,16 +1467,9 @@ def _canonical_signature(
             if placed is not None:
                 port = placed[0][port]  # the port as the canonical traversal numbers it
             fresh: dict[int, int] = {} if cyclic else {i: i for i in range(n_base)}
-            out = []
-            for inst, pid, entry, exit_ in seq:
-                if inst not in fresh:
-                    fresh[inst] = len(fresh)
-                table = canon_for.get(pid)
-                if table is not None:
-                    entry, exit_ = table.get((entry, exit_), (entry, exit_))
-                out.append((fresh[inst], pid, entry, exit_))
+            out = normalise(seq, fresh)
             ordinal = fresh.setdefault(stub_inst, len(fresh))
-            return tuple(out) + (("J", ordinal, port),)
+            return out + (("J", ordinal, port),)
 
         walks = [(visits, stub_port)]
         # The lobe after the closing junction can be driven either way round:
@@ -1818,7 +1840,6 @@ def solve(
 ) -> SolveResult:
     """Run the exact solver to its configured limits (see :func:`solve_steps`).
 
-    The traditional synchronous API and its traversal/counter semantics are kept.
     Interactive callers use ``solve_steps(..., limits=SearchLimits(...))`` instead.
     """
     iterator = solve_steps(inventory, pieces, config, base=base,
@@ -1967,27 +1988,6 @@ def solve_steps(
     overhang_of = {pid: p.end_overhang for pid, p in piece_obj.items()}
     total_pieces = sum(counts.values())
 
-    # Collision samples, precomputed per (piece, entry, frame rotation): the world
-    # frame of a placement only ever differs by one of finitely many rotations plus a
-    # translation, so the trig happens once here and the hot loop just adds offsets.
-    sample_cache: dict[tuple[str, int, int], tuple[list[tuple[float, float, float]], tuple]] = {}
-
-    def placement_samples(pid: str, entry: int, hkey: int, cos_t: float, sin_t: float):
-        """Rotated local samples and their bounds; the hot loop only adds offsets."""
-        key = (pid, entry, hkey)
-        cached = sample_cache.get(key)
-        if cached is None:
-            piece = pieces[pid]
-            base_pts = []
-            for line in piece.all_centrelines(cfg.collision_spacing):
-                for lx, ly, lz in line:
-                    base_pts.append(
-                        (cos_t * lx - sin_t * ly, sin_t * lx + cos_t * ly, lz)
-                    )
-            cached = (base_pts, bounds_of(base_pts))
-            sample_cache[key] = cached
-        return cached
-
     stats = SolveStats()
     field = CollisionField(clearance=cfg.clearance)
     solutions: dict[tuple, Solution] = {}
@@ -2041,6 +2041,7 @@ def solve_steps(
                 for port in range(len(placement.piece.ports))
             }
     stats.engine = eng.name
+    placement_samples = _placement_samples(eng, pieces, cfg.collision_spacing)
     # Free transits only ever traverse a junction's own routes: those of a base
     # junction with open ports, or of a junction still in stock. The allowance
     # cap bounds every transit count the search can ask for, one extra for the
@@ -2600,13 +2601,7 @@ def solve_steps(
                 continue
             piece = pieces[pid]
             frame = eng.frame(pid, entry, cursor)
-            hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
-            base_pts, local_bounds = placement_samples(pid, entry, hkey, cos_t, sin_t)
-            bounds = (
-                local_bounds[0] + fx, local_bounds[1] + fx,
-                local_bounds[2] + fy, local_bounds[3] + fy,
-                local_bounds[4] + fz, local_bounds[5] + fz,
-            )
+            base_pts, offset, bounds = placement_samples(pid, entry, frame)
             index = len(placements)
             ignore = {prev_index} if prev_index is not None else set()
             # Every free connector can become a later joint, not just the exit
@@ -2634,31 +2629,15 @@ def solve_steps(
                     cfg.slop > 0.0 and eng.near_pose(pose, stub_pose, slack_left) is not None
                 ) for pose in free_poses):
                     ignore.add(stub_index)
-            half_width = piece.width / 2.0
-            offset = (fx, fy, fz)
-            # Bin and test sample points only when some placement's bounds come
-            # within reach; a piece laid clear of everything is deferred as-is.
-            grouped_pts = None
-            if field.near(bounds, half_width, ignore):
-                grouped_pts = field._prepare(base_pts, offset=offset)
-                if field._clashes_prepared(
-                    grouped_pts, half_width, ignore, underpass=piece.underpass
-                ):
-                    stats.pruned_collision += 1
-                    continue
+            if not field.place(index, base_pts, offset, piece.width / 2.0, bounds, ignore,
+                               underpass=piece.underpass):
+                stats.pruned_collision += 1
+                continue
 
             counts[pid] -= 1
             remaining_span -= span_of[pid]
             remaining_turn -= turn_of[pid]
             placements.append((pid, frame))
-            if grouped_pts is None:
-                field.add_deferred(
-                    index, base_pts, offset, half_width, bounds, underpass=piece.underpass
-                )
-            else:
-                field._add_prepared(
-                    index, grouped_pts, half_width, underpass=piece.underpass, bounds=bounds
-                )
             new_stubs = 0
             if piece.is_junction:
                 for port_index in range(len(piece.ports)):
@@ -2699,8 +2678,8 @@ def solve_steps(
             # appear.  Uninformed depth-first dies here whenever the inventory is broad
             # (it exhausts gigantic fruitless subtrees before ever backtracking), while
             # each admissible contour stays small and finds the SHORTEST completions
-            # first.  Plain iterative deepening without the heuristic was tried and is
-            # equally hopeless -- the contour bound is what tames the tree.
+            # first.  Plain iterative deepening without the heuristic is equally
+            # hopeless -- the contour bound is what tames the tree.
             # A completion may only join/transit preplaced junctions. It still has
             # a nonempty step trace, but uses no inventory and needs contour zero.
             first_limit = 0 if cfg.min_pieces == 0 else 1

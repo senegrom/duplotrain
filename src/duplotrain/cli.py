@@ -133,7 +133,7 @@ def sets_cmd() -> None:
     console.print(table)
 
 
-@main.command()
+@main.command(name="solve")
 @_inventory_options
 @click.option(
     "--set",
@@ -341,9 +341,6 @@ def solve_cmd(
                     ),
                 )
         console.print(f"Saved the top {min(top, len(scored))} to [bold]{out_dir}[/bold]")
-
-
-main.add_command(solve_cmd, name="solve")
 
 
 def _get_renderer(required: bool = True):

@@ -18,20 +18,19 @@ processes already running on the local machine.
 Ambiguous/chunked framing, oversized or truncated bodies, malformed JSON and
 JSON nested more than 64 levels deep are rejected before dispatch; the browser
 engine applies the same depth limit before parsing, since its WebAssembly stack
-overflows long before Python's recursion limit. Body reads have a timeout.
+overflows long before Python's recursion limit.
 Every response, the server's own error pages included, prohibits framing and
 MIME sniffing. A rejected request must leave the entire session unchanged;
 `tests/test_http_security.py` verifies this using real local sockets.
 
-Every connection is closed gracefully. A close with unread input, or input that
-arrives after the close, resets the connection, and on Windows the reset discards
-a response the client has not read yet. Draining a rejected body first only works
-when one valid length says how much to expect; it cannot cover a chunked request,
-repeated or malformed lengths, or a body sent with a successful GET, whose
-answer a body arriving after the reply would otherwise reset. The handler
-therefore flushes its response, sends FIN, and discards input until the
-client closes, for at most 64 KiB and half a second. Regressions send each such
-body late and still read the status, and check that the wait is bounded.
+Request bodies have an absolute 10-second read deadline that a client trickling
+bytes cannot extend. A rejected body is drained for at most 0.25 s and 64 KiB;
+every connection then closes gracefully, flushing its response, sending FIN and
+discarding input for at most 0.5 s and 64 KiB, so a client reads the refusal even
+after chunked, malformed or late input (`finish()` in `duplotrain/gui.py` gives the
+reasons). A response that cannot be written ends the connection: nothing follows a
+partly written answer. Regressions send each such body late and still read the
+status, and check that the waits are bounded.
 
 The static Pyodide application uses the shared in-process dispatcher instead of
 this HTTP listener, with the same engine rules.
@@ -49,8 +48,8 @@ executing it, and uses the `lean-toolchain` version and the axiom audit.
 The static builder verifies the Pyodide release archive against the reviewed
 `PYODIDE_SHA256` map in `webapp/build.py` before touching the deployment output.
 It checks cached archives on every build and regenerates loose runtime files
-from verified bytes. Old loose-file-only caches are not trusted. Downloads and
-extraction are size-bounded, and downloads have a timeout.
+from verified bytes. Downloads and extraction are size-bounded, and downloads
+have a timeout.
 
 A checksum failure stops the build; it is never silently accepted. Remove the
 reported archive from `webapp/vendor/` and retry to recover from corruption.
@@ -80,11 +79,10 @@ without address reuse on Windows, so a second server cannot share it.
 The editor refreshes from a conflict response and clears old tools/previews,
 but never automatically retries the rejected action against newly indexed
 pieces. A conflict from a fresh engine at revision 0, such as a restarted local
-server, restores the tab's last confirmed session there instead of adopting,
-and autosaving, the empty one. The shared Pyodide dispatcher uses the same
-revision check. Each new search also advances the revision because candidate
-indices can change even when the layout does not. Revisions prevent stale
-edits; they are not credentials.
+server, restores the newest confirmed session there instead of adopting, and
+autosaving, the empty one ([editor.md](editor.md#autosave)). Each new search also
+advances the revision because candidate indices can change even when the layout
+does not. Revisions prevent stale edits; they are not credentials.
 
 Before committing an edit, the session validates its proposed snapshot with the
 same layout limits as import/recovery (1,500 pieces and 200 action stones), plus
@@ -93,15 +91,3 @@ placement, solver candidate application and restore, as well as inventory
 changes. An edit that crosses a limit is rejected without changing history,
 revision, inventory or saved state. Unlimited inventory does not bypass these
 recovery limits. Exporting, removing pieces/stones and undoing remain available.
-
-Request bodies use an absolute 10-second read deadline. Rejected-body cleanup
-has a separate absolute 0.25-second deadline and 64 KiB cap, and skips bytes
-already consumed. Single-read buffering lets the deadline be rechecked even
-when a client continually trickles bytes; timeouts do not restart per chunk.
-A response that cannot be written, because the client stopped reading or went
-away, ends the connection: nothing follows a partly written answer, least of
-all an error for a request the session has already applied.
-
-Open-end mate discovery indexes exact positions and opposite headings once per
-endpoint, instead of comparing every pair. Elevation and the exact algebraic
-coordinates remain part of the key; there is no approximate snapping tolerance.

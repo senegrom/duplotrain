@@ -101,10 +101,9 @@ reverse tables. Closing an iterator releases its workspace. The synchronous
 depth in one pass; raising a piece bound on a continuation applies to
 completion mode.
 
-Interactive single-pair jobs search the arc templates, then ordinary, bridge
-and full-inventory stages in that order, as `/api/solve` does: only the full
-inventory also searches reversing closures, even when reversing loops are
-allowed. An exact ordinary stage alternates endpoints; forced fits and reversing
+Interactive single-pair jobs run the stages of
+[bridge-completion.md](bridge-completion.md) in the same order as `/api/solve`.
+An exact ordinary stage alternates endpoints; forced fits and reversing
 closures are not direction-equivalent, so those stages grow from the chosen end
 only and run until their own limits stop them. Stage node budgets are shared
 across directions, not multiplied for each direction. Template generation is separate
@@ -143,7 +142,7 @@ best route** and **Load counterexample** fill the existing start/switch controls
 and run the normal trace without changing track geometry. A failed step ends the
 analysis.
 
-The analyser calls the existing `drive` model, not a second simulator. It
+The analyser calls the `drive` model, not a second simulator. It
 separately counts drivable pieces visited at least once and drivable pieces in
 the eventual repeating cycle. A transiently visited bridge is not necessarily
 part of the repeating circuit. Default run allowance is 20,000, adjustable from
@@ -160,10 +159,9 @@ witnesses remain per-run settings, not persistent layout geometry.
 
 ## Shared API
 
-Both the local HTTP host and the browser worker use the existing revision-checked
-dispatcher. Interactive completion uses `/api/search/start`, then `tick`, `page`,
+Interactive completion uses `/api/search/start`, then `tick`, `page`,
 `pause`, `resume`, `continue`, `publish` and `discard`; subsequent requests carry
 the job ID and current revision. Train analysis uses `/api/routes/start`, `tick`,
-`pause`, `resume` and `discard`. The synchronous `/api/solve` remains for API
+`pause`, `resume` and `discard`. The synchronous `/api/solve` serves API
 clients; the editor itself uses only the job routes. Errors validate before
 replacing an active job or publishing changes.

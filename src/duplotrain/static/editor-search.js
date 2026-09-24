@@ -268,7 +268,6 @@ async function useRouteWitness(counterexample = false) {
   await testTrain();
 }
 function bindSearchEvents() {
-  const on = (id, fn) => el(id)?.addEventListener("click", fn);
   on("find-more", () => continueSearch());
   on("resume-search", () => continueSearch(false, true));
   on("close-all", () => startInteractiveSearch(null, null, 1, true));

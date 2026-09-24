@@ -18,6 +18,7 @@ from typing import Any
 
 from .bridge_completion import bridge_completion
 from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
+from .collision import DEFAULT_CLEARANCE
 from .completion_search import solve_completion as solve
 from .editor_tools import switch_choices
 from .geometry import ORIGIN, Pose, steps_to_degrees
@@ -25,7 +26,16 @@ from .lattice import LatticePoint, from_alg_xy, z_from_alg
 from .layout import End, Layout, Placement, layout_from_dict, layout_to_dict
 from .pieces import PieceType
 from .sets import SETS, inventory_for_sets
-from .solver import Solution, SolverConfig, _flat, _moves_for, _OverlapAudit, _pose_to_lattice
+from .solver import (
+    Solution,
+    SolverConfig,
+    _flat,
+    _lattice_rotations,
+    _lattice_step,
+    _moves_for,
+    _OverlapAudit,
+    _pose_to_lattice,
+)
 from .validation import MAX_SNAPSHOT_BYTES
 from .validation import check_layout_json as check_layout_json
 
@@ -53,7 +63,7 @@ UNLIMITED_COUNT = 999
 
 MAX_INVENTORY_COUNT = 10_000
 
-# An opt-in presentation contract; saved layouts and the legacy state API are unchanged.
+# An opt-in presentation contract; saved layouts and full previews do not change.
 PREVIEW_FORMAT = "duplotrain-preview/1"
 
 
@@ -154,7 +164,7 @@ class _LatticeArcGeometry:
             delta, rise = from_alg_xy(dx, dy), z_from_alg(dz)
             if dheading % 2 or delta is None or rise is None:
                 return None
-            steps[pid, entry, exit_port] = (cls._rotations(delta), rise, dheading // 2)
+            steps[pid, entry, exit_port] = (_lattice_rotations(delta), rise, dheading // 2)
         geometry = cls()
         geometry.start, geometry.target = _flat(start_l), _flat(target_l)
         geometry._steps = steps
@@ -162,20 +172,8 @@ class _LatticeArcGeometry:
         geometry._run_steps: dict[tuple, tuple] = {}
         return geometry
 
-    @staticmethod
-    def _rotations(point: LatticePoint) -> tuple:
-        return tuple(point.rotated(heading).key() for heading in range(12))
-
-    @staticmethod
-    def _apply(rot12: tuple, dz: int, turn: int):
-        def apply(pose: tuple) -> tuple:
-            a, b, c, d, z, heading = pose
-            da, db, dc, dd = rot12[heading]
-            return (a + da, b + db, c + dc, d + dd, z + dz, (heading + turn) % 12)
-        return apply
-
     def step(self, pid: str, entry: int, exit_port: int):
-        return self._apply(*self._steps[pid, entry, exit_port])
+        return _lattice_step(*self._steps[pid, entry, exit_port])
 
     def run(self, pid: str, entry: int, exit_port: int, count: int):
         key = (pid, entry, exit_port)
@@ -186,8 +184,8 @@ class _LatticeArcGeometry:
             while len(runs) <= count:
                 runs.append(step(runs[-1]))
             a, b, c, d, z, heading = runs[count]
-            cached = self._run_steps[key, count] = self._apply(
-                self._rotations(LatticePoint(a, b, c, d)), z, heading)
+            cached = self._run_steps[key, count] = _lattice_step(
+                _lattice_rotations(LatticePoint(a, b, c, d)), z, heading)
         return cached
 
     @staticmethod
@@ -242,7 +240,8 @@ class Session:
                           self.unlimited, label)
 
     def _sync_history(self) -> None:
-        # Keep the historical public ``history=[Layout(...)]`` construction seam.
+        # ``Session(history=[...])`` and callers that assign ``history`` directly
+        # give layouts without edit states; give them some.
         if len(self._history_state) != len(self.history):
             self._history_state = [self._edit_state("layout change") for _ in self.history]
             self._future.clear()
@@ -386,7 +385,7 @@ class Session:
         joint_issues = layout.joint_issues(port_poses)
         return {
             "placements": placements,
-            "closed": layout.is_closed,  # topological, retained for API compatibility
+            "closed": layout.is_closed,  # topological; exactly_closed also audits joints
             "exactly_closed": layout.is_closed and not joint_issues,
             "joint_issues": joint_issues,
             "size_cm": [round(width / 10, 1), round(height / 10, 1)],
@@ -773,7 +772,7 @@ class Session:
 
         start, target = geometry.start, geometry.target
         want_heading = (geometry.heading(target) + 12) % 24
-        audit = _OverlapAudit(base, 120.0, 8.0)
+        audit = _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
         found: list[Solution] = []
         seen_pre = {}
         prefixes = {}

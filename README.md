@@ -55,7 +55,7 @@ and the LDraw part library:
 | id               | part    | geometry                                                  |
 | ---------------- | ------- | --------------------------------------------------------- |
 | `straight`       | 6377    | 128 mm (8 studs) connection pitch                          |
-| `curve`          | 6378    | 30°, R = 256 mm; 12 make a 576 mm circle                   |
+| `curve`          | 6378    | 30°, R = 256 mm; 12 make a circle of 576 mm outer diameter |
 | `switch`         | 51943c01| left + right 30°/R256 branches off one stem (LDraw-exact); no straight route |
 | `crossing`       | 6376    | two 128 mm straight runs crossing at their midpoints, 60°  |
 | `level_crossing` | 6391    | one straight under a 160 × 160 mm road plate (16 mm end overhang — two of them refuse to mate) |
@@ -156,11 +156,10 @@ finished, not dangling.
 **Browser build:** the editor can run fully client-side using the identical Python
 engine under Pyodide. `webapp/build.py` produces the static bundle; nothing leaves
 the browser. The bundle is published at <https://senegrom.github.io/duplotrain/>
-by the final job of the *Application checks* workflow, after every check has
-passed on a push to `main` (or a manual run on `main`), at exactly that commit;
-that build passes `--pages`,
-which also embeds the content security policy as a `<meta>` tag because GitHub
-Pages cannot send response headers.
+from each push or manual run on `main` that passes every check
+([docs/editor.md](docs/editor.md#checks-and-deployment)); that build passes
+`--pages`, which also embeds the content security policy as a `<meta>` tag because
+GitHub Pages cannot send response headers.
 
 The browser tab and Home Screen use the app's own toy-train icon. On iPhone or
 iPad, use Safari's **Share → Add to Home Screen**. The same icons are included in
@@ -176,12 +175,10 @@ hover, and apply with a click. Export/import round-trips the same exact-geometry
 the CLI uses. On phones the canvas sits above the scrolling controls: drag to pan,
 pinch or use +/− to zoom, and use the Remove tool to delete a stone or piece.
 Completion cards require Preview before Apply, and inventory changes invalidate old
-suggestions. A search is a resumable job: it reports whether it exhausted the
-inventory or stopped at its limits, Find more asks it for more alternatives, and
-Search harder raises its node budgets and added-piece limit (up to 128); a search
-stopped at a limit never proves that no layout exists. The search stages, including
-one for a complete standard bridge, are described in
-[docs/bridge-completion.md](docs/bridge-completion.md).
+suggestions. A search is a resumable job that reports whether it exhausted the
+inventory or stopped at its limits; one stopped at a limit never proves that no
+layout exists. [docs/search-jobs.md](docs/search-jobs.md) describes Find more and
+Search harder, and [docs/bridge-completion.md](docs/bridge-completion.md) the stages.
 
 Beyond closing loops, the editor keeps a bounded undo/redo history of track, owned
 pieces and sandbox mode, checks a layout for open connectors, sampled overlaps and
@@ -275,13 +272,12 @@ Findings the simulator proves about real DUPLO:
 Two layouts count as the same when their track centrelines are congruent curves in
 space (rotations, translations, reflections; `z` included, so bridges distinguish) —
 which straight carries the stone, or whether a level crossing stands in for a plain
-straight, doesn't change the curve. `congruence_key()` normalizes the exact
-centreline union and chooses a canonical frame over the 24 lattice rotations ×
-reflection **before** sampling and rounding. Piece boundaries and decimal rounding
-ties therefore do not change the identity of an exactly congruent primitive curve.
-The resulting key is still approximate, controlled by `spacing` and `decimals`;
-cached keys compare only with keys from the same version of the library. Non-isomorphic hunting is a
-set of keys:
+straight, doesn't change the curve. `congruence_key()` names that class with a
+sampled key, controlled by `spacing` and `decimals` and comparable only with keys
+from the same library version; for the built-in segment types, piece boundaries
+and decimal rounding ties cannot change it
+([why](docs/search-correctness.md#centreline-identity-is-independent-of-piece-boundaries)).
+Non-isomorphic hunting is a set of keys:
 
 ```python
 from duplotrain import default_catalog, find_perfect_loops, SolverConfig
@@ -306,8 +302,7 @@ and multi-cap topologies included — by extending the canonically smallest open
 It shares the loop solver's sampled collision model, including bridge underpasses.
 `find_perfect_networks()` checks stone placement and classification **before**
 deduplicating an accepted centreline: a level crossing must not hide an otherwise
-identical straight that can carry a required stone. Custom-piece move symmetries
-likewise compare complete exact primitive paths and route incidence, not only ports.
+identical straight that can carry a required stone.
 
 **Check whether the search finished.** `solve()` and `enumerate_networks()` expose
 `stats.complete`, `stats.stop_reason`, and `stats.max_pieces_searched`. Both
@@ -337,11 +332,11 @@ except IncompleteSearchError as exc:
 ```
 
 `complete=True` means exhaustion over the inventory for the searched family, with
-`stop_reason="exhausted"`. Node, result, or piece caps instead report `node_limit`,
-`result_limit`, or `piece_limit` and leave `complete=False`; an empty partial result
-is not proof that no qualifying layout exists. `aborted` retains its narrower
-meaning of hitting the node limit. A piece-limited search is conservatively reported
-as incomplete even when all branches within that piece bound were visited.
+`stop_reason="exhausted"`. Node, result, or piece caps instead report
+`node_limit`, `result_limit`, or `piece_limit` and leave `complete=False`; an
+empty partial result is not proof that no qualifying layout exists. `aborted` is
+true only for the node limit. A piece-limited search is conservatively reported as
+incomplete even when all branches within that piece bound were visited.
 
 The network helper's **stone policy** guards every buffer-facing connector with a
 direction stone, then tries zero or one additional mid-piece stone on each eligible
@@ -376,40 +371,19 @@ deduplicated by a canonical signature invariant under rotation, reversal **and
 reflection** — the mirror image is generated explicitly per piece from its geometry,
 since walking a chiral loop backwards is not its mirror image.
 
-Both search modes also work backward to check whether the remaining traversals
-can reach the closing target: a fresh loop must return to its origin face, a
-completion to the selected end, and every open end of a network another open
-end or a junction it places. Short tails use exact planar-pose and height tables.
-Longer tails use exact linear bounds on coordinates, diagonals and height for
-each arrival heading, avoiding enumeration of every possible position.
-Existing junction ports and targets created by future junctions are included;
-free transits require two compatible ports on the same piece. A separate turn
-bound limits what the remaining stock and free routes can contribute: a crossing
-can advance the path without granting it another curve's turn. Impossible tails
-are rejected before collision sampling. `SolverConfig.completion_lookahead`
-defaults to 10 for the exact table (0 disables both checks). A free transit
-through a junction the tail places itself is only allowed once the remaining
-placements can fit that junction and the loop back to it, which the same tables
-bound; a transit through a junction already placed needs one of its entries to
-be reachable. Both checks share a preprocessing allowance of `min(4096, max_nodes // 8)`
-expansions plus 24 per node the search has spent, capped at 262,144, so short
-searches never pay for deep tables. Partial tables fall back
-to ordinary search. With slippage enabled, outward-rounded physical bounds and
-indexed nearby short tails allow the **remaining total** gap budget; heading and
-height still have to match. `stats.pruned_completion` and
-`stats.completion_work` report the saved branches and total preprocessing work;
-`stats.completion_bound_depth` reports how far the longer bounds reached.
-Repeated geometry queries use a cache of at most 4096 decided answers that lives
-with the tables; `stats.completion_checks` and `stats.completion_cache_hits`
-report evaluated and reused queries. The full geometry and height must agree on an actual route, and
-the independent collision audit still checks every returned candidate. Reproduce
-the measurements with `PYTHONPATH=src python benchmarks/completion.py --repeats 3`.
-The benchmark has 30 cases; use `--suite slippage` for 20 covering offset ends,
-bridges, reversing targets, intermediate joint gaps and custom 15° pieces.
-Broad mixed inventory finds eight closures within 25,000 nodes at both 1 and
-5 mm slop. `--case NAME` selects individual
-cases; `--lookahead 0` runs the unpruned reference. Each JSON row includes the
-gap budget, engine, result fingerprint, forced-fit gaps, stop reason and median time.
+Both search modes also work backward: exact reverse-reachability tables and, for
+longer tails, exact linear bounds per arrival heading reject any branch whose
+remaining traversals cannot reach the closing target (a fresh loop's origin face,
+a completion's selected end; for a network, another open end or a junction the
+walk places), and a separate turn bound keeps a crossing from lending a curve's
+turn. The pruning removes only branches without closures: exhaustive and
+result-limited searches return the same solutions as without it, and the
+independent collision audit still checks every returned candidate.
+`SolverConfig.completion_lookahead` (`NetworkConfig.lookahead` for networks;
+default 10, 0 disables) sets the exact horizon, and `stats.pruned_completion` and
+the other `completion_*` counters report the effect.
+[docs/search-correctness.md](docs/search-correctness.md) gives the argument and
+[docs/performance.md](docs/performance.md#measuring) the budgets and benchmark.
 
 Elevation is modelled (ramps carry `z`; closure requires returning to the anchor's
 height). Blanket collision clearance defaults to 120 mm; underpass-enabled pieces
@@ -423,8 +397,7 @@ compiles the problem for this integer lattice engine automatically (several time
 faster than the field; it's what makes the browser build usable) and falls back
 to the general ℚ(√2,√3) field for anything off-grid — a user piece on the 45° lattice,
 say. Conformance tests run every solver mode on both engines and require identical
-solutions. If far bigger searches ever matter (v2 multi-cycle at scale), the same seam
-is where a Rust core would slot in.
+solutions.
 
 **Current limits worth knowing:**
 
@@ -442,7 +415,7 @@ is where a Rust core would slot in.
 
 ```
 python -m pytest                            # everything installed browsers allow
-python -m pytest -m "not browser"           # what application CI runs first
+python -m pytest -m "not browser"           # the non-browser suite CI runs
 ```
 
 The full local sequence mirrors application CI, which runs on pull requests and
@@ -464,10 +437,11 @@ DUPLOTRAIN_BROWSER=webkit DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m py
 
 Tests marked `browser` need playwright plus a downloaded browser. Locally they skip
 when playwright or the chosen browser is missing, the two tests of the built app
-skip without `DUPLOTRAIN_STATIC_DIST`, and the offline reload test skips without
-`openssl` on the PATH; CI sets `DUPLOTRAIN_REQUIRE_BROWSER=1`, and
-explicit browser paths and every browser startup failure are errors. The two-finger
-pinch test runs on Chromium only.
+skip without `DUPLOTRAIN_STATIC_DIST`, the built-app boot test also skips without
+`openssl` on the PATH, and the WebKit offline reload test runs only on the opted-in
+CI runner ([docs/editor.md](docs/editor.md#checks-and-deployment)); CI sets
+`DUPLOTRAIN_REQUIRE_BROWSER=1`, and explicit browser paths and every browser startup
+failure are errors. The two-finger pinch test runs on Chromium only.
 
 The suite covers the number field, the pose lattice, piece derivation, the documented
 geometric identities (the `L,R,R,L` snake equals four straights exactly; `R,R,L,L`

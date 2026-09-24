@@ -32,7 +32,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
-from .collision import DEFAULT_CLEARANCE, CollisionField, bounds_of
+from .collision import DEFAULT_CLEARANCE, CollisionField
 from .explore import congruence_key
 from .geometry import ORIGIN
 from .layout import End, Layout, Placement
@@ -46,6 +46,7 @@ from .solver import (
     _CompletionReachability,
     _FieldEngine,
     _moves_for,
+    _placement_samples,
     _solution_overlaps,
     _traversal_key,
 )
@@ -219,26 +220,8 @@ def enumerate_networks(
             for i, pose in enumerate(ends)
         )
 
-    # Per-placement sample clouds: rotated local samples and their bounds are
-    # cached per (piece, entry, heading); a candidate only adds its offset, and
-    # the field bins the samples once some placement's bounds come within reach.
-    sample_cache: dict[tuple[str, int, int], tuple[list, tuple]] = {}
-
-    def samples_for(pid: str, entry: int, frame) -> tuple[list, tuple, tuple]:
-        """Rotated local samples, the world offset, and the world bounds."""
-        hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
-        key = (pid, entry, hkey)
-        cached = sample_cache.get(key)
-        if cached is None:
-            base = []
-            for line in pieces[pid].all_centrelines(cfg.collision_spacing):
-                for lx, ly, lz in line:
-                    base.append((cos_t * lx - sin_t * ly, sin_t * lx + cos_t * ly, lz))
-            cached = sample_cache[key] = (base, bounds_of(base))
-        base, local = cached
-        bounds = (local[0] + fx, local[1] + fx, local[2] + fy, local[3] + fy,
-                  local[4] + fz, local[5] + fz)
-        return base, (fx, fy, fz), bounds
+    # The field bins a candidate's samples once some placement's bounds come within reach.
+    samples_for = _placement_samples(eng, pieces, cfg.collision_spacing)
 
     placements: list[tuple[str, object, int]] = []  # (pid, engine frame, entry used)
     field = CollisionField(clearance=cfg.clearance)
@@ -341,30 +324,12 @@ def enumerate_networks(
                         for port in range(len(piece.ports))
                         if port != entry and port not in piece.sealed
                     }
-                    half_width = piece.width / 2.0
                     exempt = potential_neighbours(port_poses, target)
-                    # Bin and test the samples only when some placement's bounds
-                    # come within reach; a piece laid clear of everything is
-                    # deferred as-is, exactly as in the loop solver.
-                    grouped = None
-                    if field.near(bounds, half_width, exempt):
-                        grouped = field._prepare(base_pts, offset=offset)
-                        if field._clashes_prepared(
-                            grouped, half_width, exempt, underpass=piece.underpass
-                        ):
-                            continue
                     index = len(placements)
+                    if not field.place(index, base_pts, offset, piece.width / 2.0, bounds,
+                                       exempt, underpass=piece.underpass):
+                        continue
                     placements.append((pid, frame, entry))
-                    if grouped is None:
-                        field.add_deferred(
-                            index, base_pts, offset, half_width, bounds,
-                            underpass=piece.underpass,
-                        )
-                    else:
-                        field._add_prepared(
-                            index, grouped, half_width, underpass=piece.underpass,
-                            bounds=bounds,
-                        )
                     counts[pid] -= 1
                     del open_ends[target]
                     links[target] = (index, entry)

@@ -31,8 +31,8 @@ The PNG/ICO files are committed as Python package data and copied into
 Image-export dependencies are only needed when changing the artwork, not to
 install, build or use the app.
 
-Icon URLs include `duplotrain` and a revision in their physical filenames, following
-TheoreticalRacing's cache-isolation approach. For future artwork changes, bump
+Icon URLs include `duplotrain` and a revision in their physical filenames. For
+future artwork changes, bump
 `v1` in the exporter, HTML, manifest and local server asset allowlist together.
 Conventional `favicon.ico` and `apple-touch-icon.png` aliases are also included.
 An existing iOS Home Screen shortcut may need to be removed and re-added to

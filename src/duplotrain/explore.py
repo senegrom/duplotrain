@@ -202,7 +202,7 @@ def _stone_variants(
     used = 0
     for index, placement in enumerate(layout.placements):
         if not placement.piece.sealed:
-            continue  # only buffers carry sealed faces today
+            continue  # sealed faces are buffers' bumpers
         connector = next(
             p for p in range(len(placement.piece.ports)) if p not in placement.piece.sealed
         )

@@ -230,7 +230,7 @@ class Cursor:
 
 
 class PairSearch:
-    """Resumable, alternating-end stages; the legacy portfolio stays available."""
+    """Resumable, alternating-end stages (``completion_search`` runs them in one call)."""
 
     def __init__(self, base, catalog, stock, grow, close, depth, effort, slop, reversing,
                  options):
@@ -241,7 +241,6 @@ class PairSearch:
         self.grow, self.close_end = grow, close
         self.cursors: list[Cursor] = []
         self.active = 0
-        self.last_stage = "templates"
         self.arc_session = Session(catalog=dict(catalog), history=[base], inventory={
             pid: n + base.piece_counts.get(pid, 0) for pid, n in stock.items()
         })
@@ -339,11 +338,10 @@ class PairSearch:
             return {"kind": "progress", "stage": cursor.stage}
         cursor.limits.max_nodes = min(cursor.limits.max_nodes, cursor.nodes + remaining_budget)
         event = cursor.advance()
-        self.last_stage = cursor.stage
         # One exact direction exhausting a contour proves the reversed problem
         # has no further candidates at that bound. Keep the opposite suspended
         # stack for a raised bound, and try this successful direction first in
-        # the next stage, as the legacy direction portfolio does.
+        # the next stage, as completion_search.solve_completion does.
         if event["kind"] in ("piece_limit", "exhausted"):
             for peer in stage:
                 if peer is cursor:
@@ -459,7 +457,6 @@ class SearchJob:
         self.complete = False
         self.multi_nodes = 0
         self.multi_cap = 335_000 * self.effort
-        self.multis: list[PairSearch] = []
         self.pool = None
         if self.all_gaps:
             self.multi = self._all_gaps(self.base, self.stock, self.depth)
@@ -524,7 +521,6 @@ class SearchJob:
                 continue
             pair = PairSearch(base, self.catalog, stock, grow, close, slots, self.effort, 0,
                               False, self.options)
-            self.multis.append(pair)
             seen = set()
             try:
                 while len(seen) < 8:
@@ -550,7 +546,6 @@ class SearchJob:
                                               slots - (len(candidate.layout) - len(base)))
             finally:
                 pair.close()
-                self.multis.remove(pair)
 
     def tick(self):
         self.last_touch = time.monotonic()
@@ -596,12 +591,11 @@ class SearchJob:
             else:
                 # New depth contours of multi-gap orchestration are a new bounded
                 # plan search; ordinary DFS resumes at its saved exact checkpoint.
-                if self.all_gaps:
-                    self.multi.close()
-                    self.depth = min(128, self.depth * 2)
-                    self.effort = min(16, self.effort * 2)
-                    self.multi_cap = self.multi_nodes + 335_000 * self.effort
-                    self.multi = self._all_gaps(self.base, self.stock, self.depth)
+                self.multi.close()
+                self.depth = min(128, self.depth * 2)
+                self.effort = min(16, self.effort * 2)
+                self.multi_cap = self.multi_nodes + 335_000 * self.effort
+                self.multi = self._all_gaps(self.base, self.stock, self.depth)
             self.complete = False
         self.target = min(MAX_RESULTS, max(self.target * 2, len(self.solutions) + 8))
         if self.status != "exhausted" or harder:

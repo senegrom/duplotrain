@@ -19,7 +19,15 @@ from duplotrain.lattice import (
     z_from_alg,
 )
 from duplotrain.layout import build_chain
-from duplotrain.solver import SolverConfig, _lattice_pose, _pose_to_lattice, solve
+from duplotrain.solver import (
+    SolverConfig,
+    _flat,
+    _lattice_pose,
+    _lattice_rotations,
+    _lattice_step,
+    _pose_to_lattice,
+    solve,
+)
 
 
 @pytest.fixture(scope="module")
@@ -71,24 +79,22 @@ def test_off_lattice_values_are_rejected():
 def test_points_with_odd_zeta_coefficients_are_on_the_lattice():
     # zeta/SCALE is (sqrt3/40, 1/40): scaled by SCALE, its field coefficients are halves.
     for key in [(0, 1, 0, 0), (0, 0, 1, 0), (3, -5, 7, 1), (1, 1, 1, 1)]:
-        assert _pose_to_lattice(_lattice_pose((*key, 0, 0))).key() == (*key, 0, 0)
+        assert _flat(_pose_to_lattice(_lattice_pose((*key, 0, 0)))) == (*key, 0, 0)
 
 
 def test_lattice_pose_composition_matches_field(catalog):
-    """Random-ish walks agree between Pose.then and LatticePose.then exactly."""
+    """Walks agree exactly between Pose.then and the lattice engine's move step."""
     curve = catalog["curve"]
     straight = catalog["straight"]
     field_pose = ORIGIN
-    lat_pose = _pose_to_lattice(ORIGIN)
+    cursor = _flat(_pose_to_lattice(ORIGIN))
     walk = [curve.exit_delta(0, 1), straight.exit_delta(0, 1), curve.exit_delta(1, 0)] * 4
     for dx, dy, dz, dh in walk:
         field_pose = field_pose.then(dx, dy, dz, dh)
-        delta = from_alg_xy(dx, dy)
-        lat_pose = lat_pose.then(delta, z_from_alg(dz), dh // 2)
-        assert _pose_to_lattice(field_pose).key() == lat_pose.key()
-    fx, fy = field_pose.xy()
-    lx, ly = lat_pose.p.xy()
-    assert (lx, ly) == (pytest.approx(fx, abs=1e-9), pytest.approx(fy, abs=1e-9))
+        step = _lattice_step(_lattice_rotations(from_alg_xy(dx, dy)), z_from_alg(dz), dh // 2)
+        cursor = step(cursor)
+        assert _flat(_pose_to_lattice(field_pose)) == cursor
+    assert _lattice_pose(cursor) == field_pose
 
 
 # -- engine conformance ------------------------------------------------------------

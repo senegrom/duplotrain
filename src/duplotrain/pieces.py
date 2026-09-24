@@ -320,9 +320,9 @@ class PieceType:
     #: buffer stop.  Nothing may ever mate with a sealed port, and the solver never
     #: routes through one, so a sealed piece can terminate track but not join it.
     sealed: frozenset[int] = frozenset()
-    #: True for open-arch pieces (the bridge span): other track may run beneath
-    #: this piece's deck where the deck stands high enough (user-verified: a train
-    #: passes under the 10872 mid-arch).  Solid pieces (ramps) stay impassable.
+    #: True where other track may run beneath this piece wherever its deck stands
+    #: at least ``collision.UNDERPASS_MIN`` higher: the bridge span (a train passes
+    #: under the 10872 mid-arch) and the high end of each ramp.
     underpass: bool = False
     part_numbers: tuple[str, ...] = ()
     notes: str = ""

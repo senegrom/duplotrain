@@ -121,21 +121,6 @@ def drivable_universe(layout: Layout) -> frozenset[int]:
     return frozenset(universe)
 
 
-def _default_switch_states(layout: Layout) -> dict[int, int]:
-    """Tongue positions as a builder would leave them: aimed at the first branch."""
-    states: dict[int, int] = {}
-    for index, placement in enumerate(layout.placements):
-        piece = placement.piece
-        if not piece.is_junction:
-            continue
-        for port in range(len(piece.ports)):
-            options = [exit_port for exit_port, _ in piece.transit(port)]
-            if len(options) > 1:
-                states[index] = min(options)
-                break
-    return states
-
-
 def drive(
     layout: Layout,
     start: End | None = None,
@@ -169,7 +154,8 @@ def drive(
     if layout.is_sealed(start):
         raise ValueError("a train cannot enter through a sealed buffer face")
 
-    states = dict(_default_switch_states(layout))
+    # As a builder leaves them: every tongue aimed at its lowest-numbered branch.
+    states = {index: min(options) for index, options in _tongue_choices(layout)}
     if switch_states:
         states.update({int(k): int(v) for k, v in switch_states.items()})
 

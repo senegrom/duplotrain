@@ -12,7 +12,7 @@ function drawingGeometry(placements) {
 
 function previewPlacements(candidate, state = S) {
   if (!candidate) return null;
-  if (!candidate.format) return candidate.placements; // legacy API response
+  if (!candidate.format) return candidate.placements; // a full preview
   if (candidate.format !== "duplotrain-preview/1" || !state ||
       !Array.isArray(candidate.placements) ||
       candidate.base_revision !== state.revision ||
