@@ -237,8 +237,10 @@ def test_the_closest_gaps_come_first_without_measuring_every_pair(monkeypatch, c
     from duplotrain.geometry import Pose
     from duplotrain.layout import Placement
 
-    placements = [Placement(catalog["crossing"], Pose.make(400 * (i % columns), 400 * (i // columns)))
-                  for i in range(100)]
+    placements = [
+        Placement(catalog["crossing"], Pose.make(400 * (i % columns), 400 * (i // columns)))
+        for i in range(100)
+    ]
     placements += [Placement(catalog["buffer"], Pose.make(-1000, 300 * i)) for i in range(4)]
     layout = Layout(tuple(placements))
     full = layout.gaps()
