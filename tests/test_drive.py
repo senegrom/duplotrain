@@ -1,12 +1,27 @@
 """Stateful driving, the looping taxonomy, and isomorphism of perfect tracks."""
 
+import importlib
+import os
+import subprocess
+import sys
+from itertools import islice
+from pathlib import Path
+
 import pytest
 
 from duplotrain.catalog import default_catalog
-from duplotrain.drive import DriveLimitError, classify, drive
+from duplotrain.drive import (
+    ClassificationLimitError,
+    DriveLimitError,
+    _tongue_assignments,
+    classify,
+    drive,
+)
 from duplotrain.explore import congruence_key, find_perfect_loops, make_dogbone
-from duplotrain.layout import Layout, build_chain
-from duplotrain.solver import SolverConfig, solve
+from duplotrain.geometry import ORIGIN
+from duplotrain.gui import Session, dispatch_session
+from duplotrain.layout import Layout, build_chain, layout_to_dict
+from duplotrain.solver import SolverConfig, _solution_overlaps, solve
 
 LEFT = (0, 1)
 
@@ -364,3 +379,125 @@ def test_drive_memory_does_not_grow_with_steps_times_switches():
     assert report.outcome == "endless" and len(report.steps) > 400
     # One tongue tuple per change, not one per step (a copy per step took 6 MiB).
     assert peak < 2 * 2**20
+
+
+# -- stones on the return pass -------------------------------------------------------
+
+
+def exact_oval():
+    catalog = default_catalog()
+    half = [(catalog["straight"], 0, 1)] + [(catalog["curve"], 0, 1)] * 6
+    layout = build_chain(half * 2)
+    return layout.join(*layout.connectable_ends())
+
+
+def oval_with_return_stop(face):
+    """Both stone placements are accepted by the shared editor API."""
+    session = Session()
+    dispatch_session(session, "/api/import", {
+        "revision": session.revision, "data": layout_to_dict(exact_oval()),
+    })
+    for sid, position in (("stone_direction", None), ("stone_stop", face)):
+        dispatch_session(session, "/api/stone", {
+            "revision": session.revision,
+            "placement": 0, "id": sid, "at_port": position,
+        })
+    layout = session.layout
+    assert layout.is_closed and not layout.joint_issues()
+    assert not _solution_overlaps(layout, 0, 120.0, 8.0)
+    return layout
+
+
+@pytest.mark.parametrize("face", [0, 1])
+def test_returning_from_mid_piece_reversal_hits_the_face_stop(face):
+    layout = oval_with_return_stop(face)
+    # Starting away from the face is silent; returning toward it after the green
+    # stone must fire the red stone before the train leaves that same connector.
+    assert drive(layout, start=(0, face)).outcome == "stopped"
+
+
+@pytest.mark.parametrize("face", [0, 1])
+def test_reachable_return_stop_prevents_a_perfect_verdict(face):
+    layout = oval_with_return_stop(face)
+    verdict = classify(layout)
+    assert not verdict.perfectly_looping
+    assert not verdict.looping
+
+
+# -- the classification budget -------------------------------------------------------
+
+
+def switches(count):
+    layout = Layout()
+    switch = default_catalog()["switch"]
+    for _ in range(count):
+        layout, _ = layout.with_piece(switch, ORIGIN)
+    return layout
+
+
+def test_tongue_assignments_can_yield_a_small_prefix_of_a_large_product():
+    assignments = list(islice(_tongue_assignments(switches(24)), 3))
+    assert len(assignments) == 3
+    assert all(len(a) == 24 for a in assignments)
+    assert len({tuple(a.items()) for a in assignments}) == 3
+    assignments[0].clear()
+    assert len(assignments[1]) == 24
+
+
+def test_large_classification_fails_before_any_simulation(monkeypatch):
+    def unexpected_drive(*args, **kwargs):
+        pytest.fail("classification must check its budget before simulation")
+
+    monkeypatch.setattr(importlib.import_module("duplotrain.drive"), "drive", unexpected_drive)
+    with pytest.raises(ClassificationLimitError, match="1,207,959,552 runs"):
+        classify(switches(24))
+
+
+def test_classification_budget_is_explicit_and_never_returns_a_partial_verdict():
+    layout = switches(1)
+    with pytest.raises(ClassificationLimitError, match="6 runs"):
+        classify(layout, max_runs=5)
+    bounded = classify(layout, max_runs=6)
+    assert bounded == classify(layout, max_runs=None)
+    assert bounded.runs == 6 and not bounded.locally_looping
+
+
+@pytest.mark.parametrize("budget", [0, -1, 1.5, True])
+def test_classification_rejects_invalid_budget(budget):
+    with pytest.raises(ValueError, match="max_runs"):
+        classify(switches(1), max_runs=budget)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="isolated Linux memory-budget probe")
+def test_unbounded_classifier_reaches_first_simulation_with_bounded_memory():
+    # Stop on the first call to drive: exercise lazy allocation without running an
+    # exponential search. (test_large_classification_fails_before_any_simulation
+    # checks the default budget fails before any simulation.)
+    source = '''
+import importlib
+import resource
+from duplotrain import build_chain, default_catalog
+module = importlib.import_module("duplotrain.drive")
+switch = default_catalog()["switch"]
+layout = build_chain([(switch, 0, 1 if i % 2 == 0 else 2) for i in range(25)])
+class FirstSimulation(Exception):
+    pass
+def stop(*args, **kwargs):
+    raise FirstSimulation
+module.drive = stop
+with open("/proc/self/status") as status:
+    size = next(int(line.split()[1]) * 1024 for line in status if line.startswith("VmSize:"))
+limit = size + 64 * 1024 * 1024
+resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
+try:
+    module.classify(layout, max_runs=None)
+except FirstSimulation:
+    print("first simulation started")
+else:
+    raise AssertionError("no simulation")
+'''
+    env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "src"))
+    process = subprocess.run([sys.executable, "-c", source], env=env, text=True,
+                             capture_output=True, timeout=15, check=False)
+    assert process.returncode == 0, process.stderr
+    assert process.stdout.strip() == "first simulation started"

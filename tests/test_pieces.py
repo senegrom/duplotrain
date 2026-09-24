@@ -7,7 +7,7 @@ import pytest
 from duplotrain.catalog import default_catalog
 from duplotrain.exact import Alg
 from duplotrain.geometry import ORIGIN, degrees_to_steps
-from duplotrain.pieces import parse_length, parse_piece
+from duplotrain.pieces import Arc, parse_length, parse_piece
 
 # The lateral kick of one 30-degree curve: R(1 - cos30) = 256 - 128*sqrt(3).
 CURVE_KICK = Alg(256, 0, -128, 0)
@@ -133,6 +133,25 @@ def test_a_user_catalogue_overrides_a_built_in_piece_by_id(tmp_path, catalog):
     later = tmp_path / "later.json"
     later.write_text(json.dumps([{**readme_example["pieces"][0], "name": "Later ramp"}]))
     assert load_catalog(path, later)["ramp"].name == "Later ramp"
+
+
+@pytest.mark.parametrize("degrees", [30.9, -30.9, 30.000000001, "30.9", float("inf"),
+                                     float("nan"), True, False, None])
+def test_arc_rejects_angle_without_rounding(degrees):
+    with pytest.raises(ValueError, match="whole multiple of 15"):
+        parse_piece({"id": "bad_arc", "paths": [{"segments": [
+            {"type": "arc", "radius": 256, "degrees": degrees},
+        ]}]})
+    with pytest.raises(ValueError, match="whole multiple of 15"):
+        Arc(Alg(256), degrees)
+
+
+@pytest.mark.parametrize("degrees", [30, 30.0, "30", -300, 390])
+def test_integral_arc_angles_retain_their_full_sweep(degrees):
+    arc = Arc(Alg(256), degrees)
+    assert type(arc.degrees) is int
+    assert arc.degrees == int(degrees)
+    assert arc.turn_steps == int(degrees) // 15 % 24
 
 
 @pytest.mark.parametrize("spec", [

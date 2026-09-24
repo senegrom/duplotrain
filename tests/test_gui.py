@@ -6,7 +6,9 @@ import urllib.request
 
 import pytest
 
+from duplotrain.catalog import default_catalog
 from duplotrain.gui import Session, make_server
+from duplotrain.layout import build_chain
 
 
 @pytest.fixture()
@@ -310,6 +312,28 @@ def test_arc_oracle_levels_through_ramps():
     counts = dict(session.candidates[0].layout.piece_counts)
     assert counts["ramp"] == 2  # the descending ramp was added
     assert counts["curve"] == 12
+
+
+def long_gap_session():
+    catalog = default_catalog()
+    layout = build_chain([(catalog["straight"], 0, 1)] * 34)
+    for index in range(32, 0, -1):
+        layout = layout.remove(index)
+    return Session(catalog=catalog, inventory={"straight": 34}, history=[layout])
+
+
+def test_piece_depth_limit_is_not_a_proof_of_impossibility():
+    session = long_gap_session()
+    outcome = session.solve_gap((0, 1), (1, 0), 0, 3)
+    assert outcome["found"] == 0
+    assert not outcome["aborted"]
+    assert not outcome["complete"]
+    assert outcome["stop_reason"] == "piece_limit"
+    assert outcome["max_pieces_searched"] == 26
+    deeper = session.solve_gap((0, 1), (1, 0), 0, 3, max_pieces=64)
+    assert deeper["found"] == 1
+    assert deeper["complete"]
+    assert session.candidates[0].piece_count == 34
 
 
 @pytest.mark.parametrize("coefficient", ["1e999999999", "1/0"])

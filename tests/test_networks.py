@@ -2,10 +2,15 @@
 
 import pytest
 
+from duplotrain import Pose, SolverConfig, build_chain, parse_piece, solve
 from duplotrain.catalog import default_catalog
 from duplotrain.drive import classify
+from duplotrain.exact import Alg
 from duplotrain.explore import congruence_key, find_perfect_networks
 from duplotrain.networks import NetworkConfig, enumerate_networks
+from duplotrain.solver import _solution_overlaps
+from duplotrain.symmetry import placement_key
+from tests.test_congruence import long_straight_catalog
 
 
 @pytest.fixture(scope="module")
@@ -97,24 +102,6 @@ def test_star_of_three_arms_is_never_perfect(catalog):
     verdict = classify(guarded)
     assert verdict.looping  # nobody derails or stalls...
     assert not verdict.completely_looping  # ...but the third arm is never visited
-
-
-def test_perfect_networks_finds_the_stoned_loop(catalog):
-    """{12 curves + 2 straights}: network enumeration + stone placement rediscovers
-    the perfect loop family (a closed ring with one direction stone on a straight)."""
-    perfect = find_perfect_networks(
-        {"curve": 12, "straight": 2},
-        catalog,
-        {"stone_direction": 1},
-        NetworkConfig(use_all_pieces=True, max_pieces=14, max_nodes=1_500_000),
-    )
-    assert perfect
-    keys = {congruence_key(layout) for layout, _v in perfect}
-    assert len(keys) == len(perfect)
-    for layout, verdict in perfect:
-        assert verdict.perfectly_looping
-        # Exactly the one direction stone, clipped mid-piece on a straight.
-        assert [entry[1] for entry in layout.accessories] == ["stone_direction"]
 
 
 def test_lattice_frames_convert_back_to_exact_layout_poses(catalog):
@@ -301,3 +288,99 @@ def test_two_stranded_ends_can_share_one_cap_through_a_new_switch():
     assert any(sorted(p.piece.id for p in layout.placements).count("buffer") == 2
                and sorted(p.piece.id for p in layout.placements).count("switch") == 2
                for layout in pruned.layouts)
+
+
+@pytest.mark.parametrize("radius,width", [(512, 96), (1024, 192), ("3585/7", 96)])
+def test_network_retains_a_valid_wide_circle(radius, width):
+    catalog = default_catalog()
+    catalog["curve"] = parse_piece({
+        "id": "curve", "width": width,
+        "paths": [{"segments": [
+            {"type": "arc", "radius": radius, "degrees": 30},
+        ]}],
+    })
+    circle = build_chain([(catalog["curve"], 0, 1)] * 12)
+    circle = circle.join((0, 0), (11, 1))
+    assert circle.is_closed and not circle.joint_issues()
+    assert not _solution_overlaps(circle, 0, 120.0, 8.0)
+
+    loops = solve(
+        {"curve": 12}, catalog,
+        SolverConfig(min_pieces=12, use_all_pieces=True, max_results=100),
+    )
+    assert len(loops.solutions) == 1 and loops.stats.complete
+    networks = enumerate_networks(
+        {"curve": 12}, catalog,
+        NetworkConfig(min_pieces=12, max_pieces=12,
+                      use_all_pieces=True, max_results=100),
+    )
+    assert networks.stats.complete and networks.stats.stop_reason == "exhausted"
+    assert len(networks.layouts) == 1, "a valid circle was pruned before emission"
+
+
+def test_true_wide_piece_overlap_is_still_rejected():
+    catalog = default_catalog()
+    catalog["curve"] = parse_piece({
+        "id": "curve", "width": 160,
+        "paths": [{"segments": [{"type": "arc", "radius": 256, "degrees": 30}]}],
+    })
+    circle = build_chain([(catalog["curve"], 0, 1)] * 12).join((0, 0), (11, 1))
+    assert _solution_overlaps(circle, 0, 120.0, 8.0)
+    result = enumerate_networks(
+        {"curve": 12}, catalog,
+        NetworkConfig(min_pieces=12, max_pieces=12, use_all_pieces=True),
+    )
+    assert result.stats.complete and result.layouts == []
+
+
+def test_network_dedup_does_not_return_the_same_buffered_bar_twice():
+    result = enumerate_networks(
+        {"straight": 2, "long": 1, "buffer": 2}, long_straight_catalog(),
+        NetworkConfig(min_pieces=3, max_pieces=4),
+    )
+    same_bar = [lay for lay in result.layouts if lay.track_length() == 384.0]
+    # Both are identical straight centrelines from x=-320 to x=64, with
+    # identical 64 mm widths and buffers; only the internal segmentation differs.
+    assert len(same_bar) == 1, "the long rail and two short rails were counted twice"
+
+
+def _oval_catalog():
+    return {
+        "long": parse_piece({"id": "long", "width": 64, "paths": [{"segments": [
+            {"type": "straight", "run": "2559/10"},
+        ]}]}),
+        "bend": parse_piece({"id": "bend", "width": 64, "paths": [{"segments": [
+            {"type": "arc", "radius": 256, "degrees": 60},
+        ]}]}),
+    }
+
+
+def _exact_piece_key(layout):
+    """Independent whole-piece orbit oracle; only for equal piece inventories."""
+    ports = [p.port_pose(i) for p in layout for i in range(len(p.piece.ports))]
+    centre = tuple(sum((getattr(p, axis) for p in ports), Alg(0)) / len(ports)
+                   for axis in ("x", "y", "z"))
+    candidates = []
+    for heading in range(24):
+        for mirror in (False, True):
+            items = []
+            for placement in layout:
+                f = placement.frame
+                centred = Pose(f.x - centre[0], f.y - centre[1], f.z - centre[2], f.heading)
+                items.append((placement.piece.id, placement_key(
+                    placement.piece, centred.rotated_about_origin(heading), mirror)))
+            candidates.append(tuple(sorted(items)))
+    return min(candidates)
+
+
+def test_networks_do_not_count_the_decimal_tie_oval_twice():
+    inventory, catalog = {"long": 2, "bend": 6}, _oval_catalog()
+    result = enumerate_networks(inventory, catalog, NetworkConfig(
+        use_all_pieces=True, max_pieces=8, max_results=100, max_nodes=100_000,
+    ))
+    reference = solve(inventory, catalog, SolverConfig(use_all_pieces=True, max_results=100))
+    assert result.stats.complete and reference.stats.complete
+    assert len(result.layouts) == len(reference.solutions) == 1
+    assert _exact_piece_key(result.layouts[0]) == _exact_piece_key(reference.solutions[0].layout)
+    assert result.layouts[0].is_closed and not result.layouts[0].joint_issues()
+    assert not _solution_overlaps(result.layouts[0], 0, 120, 8)

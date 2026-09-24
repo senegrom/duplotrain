@@ -24,7 +24,7 @@ def arc(degrees):
     return {"type": "arc", "radius": 128, "degrees": degrees}
 
 
-def transform(layout, heading, mirror):
+def transform(layout, heading, mirror, dx=431):
     placements = []
     for placement in layout:
         piece, frame = placement.piece, placement.frame
@@ -40,9 +40,18 @@ def transform(layout, heading, mirror):
             piece = replace(piece, paths=paths, ports=ports)
             frame = frame.mirrored()
         frame = frame.rotated_about_origin(heading)
-        frame = Pose.make(frame.x + 431, frame.y - 781, frame.z + 19, frame.heading)
+        frame = Pose.make(frame.x + dx, frame.y - 781, frame.z + 19, frame.heading)
         placements.append(Placement(piece, frame))
     return Layout(tuple(placements), dict(layout.links), layout.accessories)
+
+
+def long_straight_catalog():
+    catalog = default_catalog()
+    catalog["long"] = parse_piece({
+        "id": "long", "width": 64,
+        "paths": [{"segments": [{"type": "straight", "run": 256}]}],
+    })
+    return catalog
 
 
 @pytest.mark.parametrize("spacing", [7.0, 8.0, 11.3])
@@ -82,6 +91,54 @@ def test_mixed_curve_duplicates_and_reordered_placements_do_not_change_key():
     for heading in range(24):
         for mirror in (False, True):
             assert congruence_key(transform(duplicate, heading, mirror)) == expected
+
+
+def test_congruence_is_independent_of_straight_segmentation():
+    catalog = long_straight_catalog()
+    split = build_chain([(catalog["straight"], 0, 1)] * 2)
+    whole = build_chain([(catalog["long"], 0, 1)])
+    assert split.pose_of((0, 0)) == whole.pose_of((0, 0))
+    assert split.pose_of((1, 1)) == whole.pose_of((0, 1))
+    same_curve_key = congruence_key(split) == congruence_key(whole)
+    assert same_curve_key, (
+        "the same 256 mm centreline has a 34-point key versus a 33-point key"
+    )
+
+
+@pytest.mark.parametrize("run", ["2559/10", "256", "25599/100", "255999/1000"])
+@pytest.mark.parametrize("kind", ["straight", "ramp", "arc", "mixed"])
+def test_decimal_ties_keep_one_curve_key_under_all_rigid_motions(run, kind):
+    straight = {"type": "straight", "run": run}
+    arc = {"type": "arc", "radius": run, "degrees": -105}
+    if kind == "straight":
+        segments = [straight]
+    elif kind == "ramp":
+        segments = [{"type": "ramp", "run": run, "rise": "279/10"}]
+    elif kind == "arc":
+        segments = [arc]
+    else:
+        segments = [straight, arc, {"type": "ramp", "run": 96, "rise": 19}]
+    layout = track(segments)
+    expected = congruence_key(layout)
+    for heading in range(24):
+        for mirror in (False, True):
+            moved = transform(layout, heading, mirror, dx=Alg(431, 0, 2))
+            assert congruence_key(moved) == expected
+
+
+@pytest.mark.parametrize("spacing,decimals", [(7.0, 0), (8.0, 1), (11.3, 3), (6.7, -1)])
+def test_uneven_splits_reversals_and_duplicates_keep_decimal_tie_key(spacing, decimals):
+    whole = track([{"type": "straight", "run": "2559/10"}])
+    pieces = [parse_piece({"id": f"part{i}", "paths": [{"segments": [
+        {"type": "straight", "run": run},
+    ]}]}) for i, run in enumerate(["73/3", "6947/30"])]
+    split = build_chain([(pieces[0], 0, 1), (pieces[1], 1, 0)])
+    duplicate = Layout(tuple(reversed(split.placements)) + split.placements)
+    expected = congruence_key(whole, spacing, decimals)
+    for heading in range(24):
+        for mirror in (False, True):
+            moved = transform(duplicate, heading, mirror, dx=Alg(431, 0, 2))
+            assert congruence_key(moved, spacing, decimals) == expected
 
 
 def test_partial_overlap_on_a_line_does_not_insert_extra_boundaries():

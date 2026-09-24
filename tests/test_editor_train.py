@@ -1,4 +1,5 @@
-"""Regression tests for PR 18's finishing pass; no search semantics change."""
+"""The test train: one start's trace, its terminal event, coverage and initial switch
+choices, validated before it runs and never changing the session."""
 
 import json
 from pathlib import Path
@@ -10,7 +11,7 @@ from duplotrain.drive import DriveLimitError, drive
 from duplotrain.editor import Session, dispatch_session
 from duplotrain.editor_tools import trace_train
 from duplotrain.layout import build_chain, layout_from_dict
-from tests.editor_support import load_adapter, post, running_server
+from tests.editor_support import load_adapter, post, running_server, unchanged
 
 
 def content_state(session):
@@ -18,39 +19,22 @@ def content_state(session):
             list(session._history_state), list(session._future), list(session.candidates))
 
 
-@pytest.mark.parametrize("transport", ["direct", "adapter", "http"])
-def test_empty_clear_preserves_redo_revision_and_history(transport):
-    session = Session()
-    session.attach("straight", 0, None)
-    placed = session.snapshot()
-    session.undo()
-    before = content_state(session)
-    body = {"revision": session.revision}
-    if transport == "direct":
-        result = dispatch_session(session, "/api/clear", body)
-    elif transport == "adapter":
-        result = json.loads(load_adapter(session).dispatch("/api/clear", json.dumps(body)))
-    else:
-        with running_server(session) as server:
-            status, result = post(server, "/api/clear", body)
-            assert status == 200
-    assert result["can_redo"]
-    assert content_state(session) == before
-    session.redo()
-    assert session.snapshot() == placed
+@pytest.mark.parametrize("start", [[-1, 0], [999, 0], [0, 999], [False, 0], None])
+def test_train_rejects_invalid_start_without_mutation(start):
+    s = Session()
+    s.attach("straight", 0, None)
+    before = unchanged(s)
+    with pytest.raises((ValueError, TypeError)):
+        trace_train(s, start)
+    assert unchanged(s) == before
 
 
-def test_nonempty_clear_is_still_one_undoable_change():
-    session = Session()
-    session.attach("straight", 0, None)
-    before = session.snapshot()
-    session.clear()
-    assert not len(session.layout)
-    revision = session.revision
-    session.clear()
-    assert session.revision == revision
-    session.undo()
-    assert session.snapshot() == before
+@pytest.mark.parametrize("limit", [0, 10001, True, 1.5, "4"])
+def test_train_budget_validation(limit):
+    s = Session()
+    s.attach("straight", 0, None)
+    with pytest.raises(ValueError):
+        trace_train(s, [0, 0], limit)
 
 
 @pytest.mark.parametrize("piece,stone,at_port,expected_steps,reason,event_port", [

@@ -1,6 +1,7 @@
-"""Rejected or interrupted editor searches must not consume a revision."""
+"""Rejected, interrupted or cancelled editor searches must not consume a revision."""
 
 import json
+import threading
 
 import pytest
 
@@ -87,6 +88,20 @@ def unjoined_circle_session():
     ])
 
 
+def test_rejected_solve_preserves_session_revision():
+    catalog = default_catalog()
+    unjoined_circle = build_chain([(catalog["curve"], 0, 1)] * 12)
+    session = Session(catalog=catalog, inventory={"curve": 12}, history=[unjoined_circle])
+    before = session.snapshot(), session.revision, session._candidate_revision
+    with pytest.raises(ValueError, match="already mate"):
+        dispatch_session(session, "/api/solve", {
+            "revision": session.revision, "reversing": True,
+        })
+    after = session.snapshot(), session.revision, session._candidate_revision
+    preserved = after == before
+    assert preserved, "a rejected request changed revision/candidate state"
+
+
 def test_http_error_does_not_make_the_next_explicit_join_stale():
     session = unjoined_circle_session()
     with running_server(session) as server:
@@ -108,3 +123,127 @@ def test_pyodide_error_preserves_the_same_revision_contract():
         "revision": 0, "a": [0, 0], "b": [11, 1],
     })))
     assert "__error" not in joined and joined["layout"]["exactly_closed"]
+
+
+def test_cancelled_solve_does_not_publish_or_drop_candidates():
+    s = Session()
+    s.attach("curve", 0, None)
+    before = unchanged(s)
+    def cancel(final=False):
+        raise ValueError("cancelled")
+    with pytest.raises(ValueError, match="cancelled"):
+        s.solve_gap(None, None, 0, 1, cancel_check=cancel)
+    assert unchanged(s) == before
+
+
+def test_a_solve_makes_its_last_cancellation_check_just_before_it_commits():
+    s = Session()
+    s.attach("curve", 0, None)
+    checks = []
+    s.solve_gap(None, None, 0, 1, cancel_check=lambda final=False: checks.append(final))
+    assert checks and checks[-1] is True and not any(checks[:-1])
+
+
+def test_http_cancel_does_not_wait_for_session_lock(monkeypatch):
+    s = Session()
+    s.attach("curve", 0, None)
+    before = unchanged(s)
+    entered = threading.Event()
+    def slow(*args, cancel_check=None, **kwargs):
+        entered.set()
+        # The test's event lets cancellation happen while the session lock is held.
+        assert release.wait(3)
+        cancel_check()
+        raise AssertionError("cancellation was not delivered")
+    release = threading.Event()
+    monkeypatch.setattr(s, "solve_gap", slow)
+    token = "0123456789abcdef0123456789abcdef"
+    results = []
+    with running_server(s) as server:
+        worker = threading.Thread(target=lambda: results.append(post(server, "/api/solve", {
+            "revision": s.revision, "operation_id": token,
+        })))
+        worker.start()
+        try:
+            assert entered.wait(3)
+            code, result = post(server, "/api/cancel", {"operation_id": token})
+            assert code == 200 and result["cancelled"]
+        finally:
+            release.set()
+            worker.join(3)
+        assert not worker.is_alive()
+        assert results[0][0] == 409
+        assert results[0][1]["code"] == "cancelled"
+        assert post(server, "/api/cancel", {"operation_id": token})[1]["cancelled"] is False
+    assert unchanged(s) == before
+
+
+@pytest.mark.parametrize("token", [
+    "0123456789abcde", "0" * 65, "0123456789abcdef!", "0123456789abcdéf", "0123 56789abcdef",
+    12345678901234567, None,
+])
+def test_http_solve_and_cancel_need_a_valid_operation_id(token):
+    # 16-64 ASCII letters, digits, '-' or '_': a random id names one solve.
+    s = Session()
+    s.attach("curve", 0, None)
+    before = unchanged(s)
+    with running_server(s) as server:
+        for path in ("/api/solve", "/api/cancel"):
+            code, result = post(server, path, {"revision": s.revision, "operation_id": token})
+            assert code == 409 and "a valid operation_id is required" in result["error"], path
+    assert unchanged(s) == before
+
+
+def test_http_operation_id_names_one_running_solve(monkeypatch):
+    s = Session()
+    s.attach("curve", 0, None)
+    entered, release = threading.Event(), threading.Event()
+
+    def slow(*args, cancel_check=None, **kwargs):
+        entered.set()
+        assert release.wait(3)
+        return {"found": 0, "aborted": False, "searched": 0}
+
+    monkeypatch.setattr(s, "solve_gap", slow)
+    token = "0123456789abcdef0123456789abcdef"
+    results = []
+    with running_server(s) as server:
+        worker = threading.Thread(target=lambda: results.append(post(server, "/api/solve", {
+            "revision": s.revision, "operation_id": token})))
+        worker.start()
+        try:
+            assert entered.wait(3)
+            # Refused at once, without waiting for the session the first one holds.
+            code, result = post(server, "/api/solve", {
+                "revision": s.revision, "operation_id": token})
+        finally:
+            release.set()
+            worker.join(3)
+    assert code == 409 and "operation_id is already active" in result["error"]
+    assert results[0][0] == 200
+
+
+def test_http_cancel_after_the_last_check_reports_that_it_was_not_active(monkeypatch):
+    s = Session()
+    s.attach("curve", 0, None)
+    committed, answered = threading.Event(), threading.Event()
+
+    def solve(*args, cancel_check=None, **kwargs):
+        cancel_check(final=True)          # past this point the search commits
+        committed.set()
+        assert answered.wait(3)
+        return {"found": 0, "aborted": False, "searched": 0}
+
+    monkeypatch.setattr(s, "solve_gap", solve)
+    token = "0123456789abcdef0123456789abcdef"
+    results = []
+    with running_server(s) as server:
+        worker = threading.Thread(target=lambda: results.append(post(server, "/api/solve", {
+            "revision": s.revision, "operation_id": token})))
+        worker.start()
+        assert committed.wait(3)
+        status, reply = post(server, "/api/cancel", {"operation_id": token})
+        answered.set()
+        worker.join(3)
+    assert status == 200 and reply == {"cancelled": False}
+    assert results[0][0] == 200

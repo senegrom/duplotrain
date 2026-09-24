@@ -59,6 +59,26 @@ def test_toggling_another_position_does_not_remove_same_colour_elsewhere():
     assert len(session.layout.stone_entries_on(0)) == 3
 
 
+def test_removing_a_positioned_stone_preserves_the_other_same_colour_stone():
+    catalog = default_catalog()
+    layout = build_chain([(catalog["straight"], 0, 1)])
+    layout = layout.with_accessory(0, "stone_lights", at_port=0)
+    layout = layout.with_accessory(0, "stone_lights", at_port=1)
+    session = Session()
+    session.set_inventory({"stone_lights": 2})
+    state = dispatch_session(session, "/api/import", {
+        "revision": session.revision, "data": layout_to_dict(layout),
+    })
+    assert state["layout"]["placements"][0]["stone_marks"] == [
+        {"id": "stone_lights", "at": 0}, {"id": "stone_lights", "at": 1},
+    ]
+    dispatch_session(session, "/api/stone", {
+        "revision": session.revision, "placement": 0,
+        "id": "stone_lights", "at_port": 0,
+    })
+    assert session.layout.accessories == ((0, "stone_lights", 1),)
+
+
 @pytest.mark.parametrize("position", [True, False, 0.5, "0", -1, 2, {}, []])
 def test_invalid_position_does_not_mutate_or_remove_a_different_stone(position):
     session = positioned_session()

@@ -7,11 +7,12 @@ import pytest
 from click.testing import CliRunner
 
 import duplotrain.cli as cli
-from duplotrain import build_chain, classify, default_catalog
+from duplotrain import ORIGIN, Layout, build_chain, classify, default_catalog
 from duplotrain.cli import main
 from duplotrain.layout import layout_to_dict
 from duplotrain.scoring import score_solution
 from duplotrain.solver import SolverConfig, SolveResult, SolveStats, solve
+from tests.test_drive import switches
 
 
 @pytest.fixture()
@@ -139,6 +140,28 @@ def test_solve_check_render_round_trip(runner, tmp_path):
     assert target.exists()
 
 
+def test_cli_continues_json_export_without_matplotlib(monkeypatch, tmp_path):
+    import duplotrain.cli as cli
+
+    real_import = cli.importlib.import_module
+
+    def without_matplotlib(name, *args, **kwargs):
+        if name == "matplotlib":
+            raise ModuleNotFoundError("No module named matplotlib", name="matplotlib")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(cli.importlib, "import_module", without_matplotlib)
+    out = tmp_path / "layouts"
+    result = CliRunner().invoke(main, ["solve", "--curve", "12", "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    assert "writing layout JSON only" in " ".join(result.output.split())
+    assert list(out.glob("*.json"))
+    assert not list(out.glob("*.png"))
+    result = CliRunner().invoke(main, ["render", str(next(out.glob("*.json")))])
+    assert result.exit_code != 0
+    assert "duplotrain[render]" in result.output
+
+
 def test_sets_command_lists_known_sets(runner):
     result = runner.invoke(main, ["sets"])
     assert result.exit_code == 0
@@ -168,6 +191,15 @@ def test_check_reports_each_pair_of_open_ends_and_their_gap(runner, tmp_path):
     assert "Open ends (0, 0) <-> (5, 1): gap 512 mm" in result.output
 
 
+def test_cli_check_reports_the_complete_crossing_length(tmp_path):
+    layout, _ = Layout().with_piece(default_catalog()["crossing"], ORIGIN)
+    path = tmp_path / "crossing.json"
+    path.write_text(json.dumps(layout_to_dict(layout)))
+    result = CliRunner().invoke(main, ["check", str(path)])
+    assert "26 cm of track" in result.output
+    assert "13 cm of track" not in result.output
+
+
 def test_classify_prints_the_first_failing_run(runner, tmp_path):
     bar = build_chain([(default_catalog()["straight"], 0, 1)] * 2)
     path = tmp_path / "bar.json"
@@ -178,6 +210,18 @@ def test_classify_prints_the_first_failing_run(runner, tmp_path):
     assert (start, tongues, outcome) == ((0, 0), {}, "derailed")
     assert ("first failure: a train entering piece 0 via port 0 -> derailed"
             in " ".join(result.output.split()))
+
+
+def test_cli_classification_limit_has_no_verdict_or_traceback(tmp_path):
+    path = tmp_path / "switch.json"
+    path.write_text(json.dumps(layout_to_dict(switches(1))))
+    runner = CliRunner()
+    result = runner.invoke(main, ["classify", str(path), "--max-runs", "5"])
+    assert result.exit_code != 0
+    assert "increase --max-runs" in result.output
+    assert "Traceback" not in result.output and "locally looping" not in result.output
+    result = runner.invoke(main, ["classify", str(path), "--max-runs", "6"])
+    assert result.exit_code == 0 and "6 simulated runs" in result.output
 
 
 def test_check_rejects_garbage_layout(runner, tmp_path):
@@ -193,10 +237,8 @@ def test_check_rejects_garbage_layout(runner, tmp_path):
     assert "Traceback" not in result.output
 
 
-@pytest.mark.parametrize("args", [
-    ["--slop", "-1"], ["--slop", "nan"], ["--max-results", "0"], ["--min-pieces", "-1"],
-    ["--top", "-1", "-o", "out"],
-])
+# Out-of-range counts and slop are covered in test_cli_failures.py.
+@pytest.mark.parametrize("args", [["--slop", "nan"], ["--top", "-1", "-o", "out"]])
 def test_invalid_solve_options_fail_politely(runner, tmp_path, args):
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(main, ["solve", "--curve", "12", *args])

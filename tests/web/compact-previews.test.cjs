@@ -3,6 +3,7 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
 const {loadEditor} = require("./editor-harness.cjs");
+const {harness, scene, track} = require("./reliability-harness.cjs");
 
 function editor() {
   const context = vm.createContext({});
@@ -38,7 +39,7 @@ test("geometry fallback displays only the complete candidate drawing", () => {
   assert.deepEqual(plain(editor().previewPlacements(fallback, state)), [extra]);
 });
 
-// A stale base revision is covered with the composition cache in editor-reliability.
+// A stale base revision is covered with the composition cache at the end of this file.
 for (const [name, changes] of [
   ["unknown version", {format: "future"}],
   ["too many base pieces", {base_count: 3}], ["negative count", {base_count: -1}],
@@ -63,4 +64,23 @@ test("independent candidates share base geometry but not each other's additions"
   assert.equal(a.length, 3);
   assert.equal(b.length, 2);
   assert.equal(a[0], b[0]);
+});
+
+test("fit preview includes extension geometry rather than only the current base", async () => {
+  let fitted;
+  const h = harness({events: true, overrides: {fitView: p => { fitted = p; }}});
+  h.context.preview = {placements: [track([[1000, 0, 0], [1200, 0, 0]])]};
+  await h.el("fit-preview").click(); assert.equal(fitted[0].lines[0][0][0], 1000);
+});
+
+test("compact preview composition and paint batches are reused without crossing revisions", () => {
+  const h = harness({state: scene([track([[0, 0, 0], [100, 0, 0]])])});
+  const candidate = {format: "duplotrain-preview/1", base_revision: 1, base_count: 1,
+    placements: [track([[100, 0, 0], [200, 0, 0]])]};
+  const first = h.context.previewPlacements(candidate);
+  assert.equal(h.context.previewPlacements(candidate), first);
+  assert.equal(h.context.drawingBatches(first).length, 2);
+  assert.equal(h.context.drawingBatches(first), h.context.drawingBatches(first));
+  h.context.S.revision++;
+  assert.equal(h.context.previewPlacements(candidate), null);
 });

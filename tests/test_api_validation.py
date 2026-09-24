@@ -1,4 +1,4 @@
-"""Malformed indices must never become edits in HTTP, Pyodide or direct dispatch."""
+"""Malformed indices, counts and options must never become edits, on any transport."""
 
 import json
 from contextlib import ExitStack
@@ -109,6 +109,19 @@ def test_search_options_reject_wrong_types_without_losing_candidates(endpoint, f
 def test_search_integer_bounds_remain_enforced(endpoint, field, value):
     _, reject = endpoint
     reject("/api/solve", {"grow": [1, 1], "close": [0, 0], "max_pieces": 1, field: value})
+
+
+@pytest.mark.parametrize("counts", [
+    {"curve": 9, "invalid": 1}, {"curve": 9, "straight": "no"},
+    {"curve": 9, "straight": 1.5}, {"curve": 9, "straight": True},
+    {"curve": 9, "straight": -1}, {"curve": 9, "straight": 10001}, [],
+])
+def test_inventory_update_is_atomic(counts):
+    session = Session()
+    before = session.snapshot(), session.revision
+    with pytest.raises(ValueError):
+        session.set_inventory(counts)
+    assert (session.snapshot(), session.revision) == before
 
 
 @pytest.mark.parametrize("path,body", [

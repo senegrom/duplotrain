@@ -1,11 +1,21 @@
 """Layout assembly, the classic identities, and serialisation."""
 
+import copy
+import math
+import pickle
+from dataclasses import replace
+from fractions import Fraction
+
 import pytest
 
 from duplotrain.catalog import default_catalog
 from duplotrain.exact import Alg
-from duplotrain.geometry import ORIGIN
-from duplotrain.layout import Layout, build_chain, layout_from_dict, layout_to_dict
+from duplotrain.geometry import ORIGIN, Pose
+from duplotrain.gui import Session
+from duplotrain.layout import Layout, Placement, build_chain, layout_from_dict, layout_to_dict
+from duplotrain.pieces import Straight, parse_piece
+from duplotrain.validation import check_layout_json
+from tests.test_congruence import track, transform
 
 
 @pytest.fixture(scope="module")
@@ -150,6 +160,30 @@ def test_join_rejects_non_meeting_ends(catalog):
     assert forced.is_closed
 
 
+def test_layout_copies_and_freezes_constructor_collections():
+    chain = build_chain([(default_catalog()["straight"], 0, 1)] * 2)
+    placements, links, stones = list(chain.placements), dict(chain.links), [[0, "stone_horn"]]
+    layout = Layout(placements, links, stones)
+    placements.clear()
+    links.clear()
+    stones[0][1] = "stone_stop"
+    assert layout.placements == chain.placements
+    assert layout.links == chain.links
+    assert layout.accessories == ((0, "stone_horn"),)
+    with pytest.raises(TypeError):
+        layout.links[(0, 1)] = (1, 1)
+
+
+@pytest.mark.parametrize("restore", [copy.copy, copy.deepcopy,
+                                     lambda obj: pickle.loads(pickle.dumps(obj))])
+def test_immutable_layout_still_supports_copy_and_pickle(restore):
+    chain = build_chain([(default_catalog()["straight"], 0, 1)] * 2)
+    restored = restore(chain)
+    assert restored == chain
+    with pytest.raises(TypeError):
+        restored.links[(0, 1)] = (1, 1)
+
+
 def test_serialisation_round_trip_is_exact(catalog):
     curve, straight = catalog["curve"], catalog["straight"]
     layout = build_chain([(curve, *LEFT)] * 3 + [(straight, 0, 1)])
@@ -186,6 +220,38 @@ def test_import_rejects_a_link_onto_a_sealed_buffer_face(catalog, links):
     assert layout_from_dict(data, catalog) == layout
 
 
+@pytest.mark.parametrize("coefficient", [
+    "1e5000", "1e999999999", "1/0", "0/0", "nan", "inf", "9" * 49,
+    10**100, "1000000001", 0.5, True, None, {}, [],
+])
+def test_untrusted_coefficients_fail_before_layout_construction(coefficient):
+    catalog = default_catalog()
+    data = layout_to_dict(build_chain([(catalog["straight"], 0, 1)]))
+    data["placements"][0]["frame"]["x"][0] = coefficient
+    with pytest.raises(ValueError):
+        check_layout_json(data)
+    with pytest.raises(ValueError):
+        layout_from_dict(data, catalog)
+
+
+def test_exact_rationals_remain_supported():
+    catalog = default_catalog()
+    data = layout_to_dict(build_chain([(catalog["curve"], 0, 1)]))
+    data["placements"][0]["frame"]["x"] = ["1/3", "-2/7", "3/11", "0"]
+    assert layout_to_dict(layout_from_dict(data, catalog)) == data
+
+
+def test_coefficient_arity_and_format_version_are_checked():
+    data = layout_to_dict(Session().layout)
+    data["format"] = "duplotrain-layout/99"
+    with pytest.raises(ValueError, match="format"):
+        check_layout_json(data)
+    data = layout_to_dict(build_chain([(default_catalog()["straight"], 0, 1)]))
+    data["placements"][0]["frame"]["x"] = ["0"] * 3
+    with pytest.raises(ValueError, match="exactly 4"):
+        check_layout_json(data)
+
+
 def test_walk_traverses_the_loop(catalog):
     curve = catalog["curve"]
     layout = build_chain([(curve, *LEFT)] * 12)
@@ -218,6 +284,51 @@ def test_joint_audit_since_is_the_full_audit_restricted_to_later_placements(cata
     assert layout.joint_issues(since=5) == []
 
 
+def straights(count):
+    straight = default_catalog()["straight"]
+    return Layout(tuple(Placement(straight, Pose.make(x=128 * i)) for i in range(count)))
+
+
+def test_exact_pose_index_agrees_with_pairwise_reference():
+    catalog = default_catalog()
+    layout = Layout()
+    # Includes irrational coordinates, all headings, ramps, sealed buffer ends,
+    # duplicate positions, different heights and an almost-but-not-exact match.
+    for i in range(24):
+        piece = catalog[("straight", "curve", "ramp", "buffer")[i % 4]]
+        frame = Pose.make(x=(i % 3) * 128, y=(i % 2) * 128, z=i % 2, heading=i)
+        layout, _ = layout.with_piece(piece, frame)
+    for x, z in [(128, 0), (128, 0), (128, 1), (128 + Fraction(1, 10**20), 0)]:
+        layout, _ = layout.with_piece(catalog["straight"], Pose.make(x=x, z=z))
+    layout, _ = layout.with_piece(catalog["straight"], Pose.make())
+    ends = layout.connectable_ends()
+    expected = [(a, b) for i, a in enumerate(ends) for b in ends[i + 1:]
+                if layout.pose_of(a).connects_to(layout.pose_of(b))]
+    assert expected
+    assert layout.matable_pairs() == expected
+    a, b = expected[0]
+    linked = layout.join(a, b)
+    assert all(a not in pair and b not in pair for pair in linked.matable_pairs())
+
+
+def test_pose_index_computes_each_endpoint_once(monkeypatch):
+    layout = straights(128)
+    calls = []
+    original = Layout.pose_of
+
+    def counted(self, end):
+        calls.append(end)
+        return original(self, end)
+
+    monkeypatch.setattr(Layout, "pose_of", counted)
+    pairs = layout.matable_pairs()
+    assert len(pairs) == 127
+    assert calls == layout.connectable_ends()
+    assert Session(history=[layout]).state()["matable"] == [
+        [list(a), list(b)] for a, b in pairs
+    ]
+
+
 def test_track_length_needs_no_congruence_origin(monkeypatch, catalog):
     # The exact average of points with unrelated denominators can run to tens of
     # thousands of digits, and a length never needs that origin.
@@ -228,6 +339,77 @@ def test_track_length_needs_no_congruence_origin(monkeypatch, catalog):
     monkeypatch.setattr(congruence, "_normalise", lambda layout: pytest.fail("origin computed"))
     circle = build_chain([(catalog["curve"], 0, 1)] * 12)
     assert circle.track_length() == pytest.approx(2 * math.pi * 256)
+
+
+@pytest.mark.parametrize("pid", list(default_catalog()))
+def test_total_length_includes_every_stock_route(pid):
+    piece = default_catalog()[pid]
+    layout, _ = Layout().with_piece(piece, ORIGIN)
+    assert layout.track_length() == pytest.approx(sum(path.length() for path in piece.paths))
+
+
+@pytest.mark.parametrize("kind", ["straight", "ramp", "arc"])
+def test_length_unions_shared_paths_and_uneven_splits(kind):
+    if kind == "arc":
+        whole = [{"type": "arc", "radius": 128, "degrees": 90}]
+        split = [{"type": "arc", "radius": 128, "degrees": d} for d in (15, 30, 45)]
+        expected = 64 * math.pi
+    elif kind == "ramp":
+        whole = [{"type": "ramp", "run": 256, "rise": 28}]
+        split = [{"type": "ramp", "run": run, "rise": rise}
+                 for run, rise in ((67, "469/64"), (189, "1323/64"))]
+        expected = math.hypot(256, 28)
+    else:
+        whole = [{"type": "straight", "run": "2559/10"}]
+        split = [{"type": "straight", "run": run} for run in ("73/3", "6947/30")]
+        expected = 255.9
+    piece = parse_piece({"id": "duplicate", "paths": [
+        {"segments": whole}, {"segments": split},
+    ]})
+    layout, _ = Layout().with_piece(piece, ORIGIN)
+    for heading in range(24):
+        for mirror in (False, True):
+            moved = transform(layout, heading, mirror, dx=Alg(431, 0, 2))
+            assert moved.track_length() == pytest.approx(expected)
+
+
+def test_length_includes_both_arms_but_counts_a_shared_prefix_once():
+    piece = parse_piece({"id": "branch", "paths": [
+        {"segments": [{"type": "straight", "run": 64},
+                      {"type": "arc", "radius": 128, "degrees": d}]}
+        for d in (30, -30)
+    ]})
+    layout, _ = Layout().with_piece(piece, ORIGIN)
+    assert layout.track_length() == pytest.approx(64 + 128 * math.pi / 3)
+
+
+def test_length_unions_partial_overlaps_but_not_gaps_or_parallel_layers():
+    first = track([{"type": "straight", "run": 100}])
+    second = track([{"type": "straight", "run": 100}], start=Pose.make(60, 0, 0))
+    gap = track([{"type": "straight", "run": 100}], start=Pose.make(101, 0, 0))
+    raised = track([{"type": "straight", "run": 100}], start=Pose.make(0, 0, 1))
+    assert Layout(first.placements + second.placements).track_length() == 160
+    assert Layout(first.placements + gap.placements).track_length() == 200
+    assert Layout(first.placements + raised.placements).track_length() == 200
+    assert Layout(first.placements * 2).track_length() == 100
+    assert Layout().track_length() == 0
+
+
+@pytest.mark.parametrize("turn", [-720, -360, 360, 720])
+def test_multi_turn_arc_length_counts_its_curve_once(turn):
+    layout = track([{"type": "arc", "radius": 128, "degrees": turn}])
+    assert layout.track_length() == pytest.approx(256 * math.pi)
+
+
+def test_unknown_segment_uses_declared_length_not_its_endpoint_distance():
+    class Measured(Straight):
+        def length(self):
+            return 177.0
+
+    piece = default_catalog()["straight"]
+    path = replace(piece.paths[0], segments=(Measured(Alg(128)),))
+    custom = replace(piece, paths=(path,))
+    assert build_chain([(custom, 0, 1)]).track_length() == 177.0
 
 
 @pytest.mark.parametrize("columns", [20, 1])

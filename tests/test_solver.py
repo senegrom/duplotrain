@@ -240,6 +240,27 @@ def test_the_search_depth_cap_is_reported_not_a_crash(catalog, monkeypatch):
     assert capped.stats.stop_reason == "piece_limit" and not capped.stats.complete
 
 
+def test_node_and_result_caps_report_incomplete():
+    catalog = default_catalog()
+    stopped = solve({"curve": 12}, catalog, SolverConfig(max_nodes=1))
+    assert stopped.stats.aborted
+    assert not stopped.stats.complete
+    assert stopped.stats.stop_reason == "node_limit"
+    capped = solve({"curve": 12}, catalog, SolverConfig(max_results=1))
+    assert capped.solutions
+    assert not capped.stats.complete
+    assert capped.stats.stop_reason == "result_limit"
+    exhausted = solve({"straight": 1}, catalog)
+    assert exhausted.stats.complete
+    assert exhausted.stats.stop_reason == "exhausted"
+
+
+@pytest.mark.parametrize("engine", ["field", "lattice"])
+def test_contour_zero_does_not_emit_an_empty_fresh_loop(engine):
+    result = solve({}, default_catalog(), SolverConfig(min_pieces=0, engine=engine))
+    assert not result.solutions and result.stats.complete
+
+
 def test_scoring_prefers_exact_and_fuller_layouts(catalog):
     inventory = {"curve": 12, "straight": 4}
     result = solve(inventory, catalog, SolverConfig(max_results=50))

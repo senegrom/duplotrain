@@ -55,14 +55,15 @@ The returned value is a floating-point geometric length in millimetres, not the
 length of a particular train itinerary. CLI length reports and the compactness
 score include secondary junction routes.
 
-The regressions in `tests/test_review_round4.py` exercise decimal ties across all
+Regressions in `tests/test_congruence.py`, `tests/test_networks.py`,
+`tests/test_layout.py` and `tests/test_cli.py` exercise decimal ties across all
 lattice symmetries, an exact independent oval oracle, shared-route length, and
-CLI output. On Linux, explicitly unbounded classification of a connected
-25-switch chain reaches its first simulation within an isolated process with only
-64 MiB of additional address space; the test stops there, since lazy allocation
-does not remove the exponential cost of complete classification.
-`tests/test_review_boundaries.py` checks that the default budget refuses 24
-switches before any simulation.
+CLI output. In `tests/test_drive.py`, explicitly unbounded classification of a
+connected 25-switch chain reaches its first simulation on Linux within an isolated
+process with only 64 MiB of additional address space; the test stops there, since
+lazy allocation does not remove the exponential cost of complete classification.
+Another test there checks that the default budget refuses 24 switches before any
+simulation.
 
 ## Failed searches leave the editor unchanged
 
@@ -82,7 +83,7 @@ booleans, numeric strings, negatives, unknown IDs and non-object documents are
 rejected rather than truncated or silently discarded. Valid integer counts from
 all three sources remain additive. File-read errors are reported as CLI errors.
 
-The focused regressions are in `tests/test_review_round2.py`,
+The focused regressions are in `tests/test_networks.py`,
 `tests/test_congruence.py`, `tests/test_solve_atomicity.py`, and
 `tests/test_cli_inventory.py`.
 
@@ -304,7 +305,8 @@ or `None` in the library API, permits exhaustive enumeration. This avoids both
 materializing an exponential assignment list and silently treating an unfinished
 universal check as a proof. The CLI exposes the same budget as `--max-runs`.
 
-These boundaries are covered by `tests/test_review_boundaries.py`.
+These boundaries are covered in `tests/test_pieces.py`, `tests/test_layout.py`,
+`tests/test_editor_snapshots.py`, `tests/test_drive.py` and `tests/test_cli.py`.
 
 ## Reversals start another ordered pass
 
@@ -338,7 +340,7 @@ integer for exact-position removal. Omitting the keyword removes the last stone
 of that colour. Removing one marker preserves other positions, counts,
 serialization round trips and undo.
 
-These contracts are exercised by `tests/test_review_round3.py`,
+These contracts are exercised by `tests/test_drive.py`,
 `tests/test_stone_encounters.py`, `tests/test_stone_positions.py` and
 `tests/web/stone-selection.test.cjs`, including the HTTP and Pyodide dispatcher.
 

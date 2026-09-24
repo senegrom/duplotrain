@@ -2,6 +2,7 @@
 tiles, and a gap whose only closure is physically blocked must report NO way."""
 
 import math
+from dataclasses import replace
 
 import pytest
 
@@ -10,7 +11,8 @@ from duplotrain.collision import UNDERPASS_MIN
 from duplotrain.geometry import ORIGIN, Pose
 from duplotrain.gui import Session
 from duplotrain.layout import Layout
-from duplotrain.solver import SolverConfig, solve
+from duplotrain.solver import SolverConfig, _solution_overlaps, solve
+from tests.test_completion import crossing_completion
 
 
 @pytest.fixture(scope="module")
@@ -85,6 +87,59 @@ def test_blocked_gap_is_not_closed_through_existing_track(catalog, engine):
     # Refused by the search as pieces reach the blocker, not by the audit of
     # closures already found through it.
     assert result.stats.pruned_collision and not result.stats.dropped_overlap
+
+
+@pytest.mark.parametrize("engine", ["field", "lattice"])
+def test_future_joint_exemption_does_not_ignore_unrelated_obstacle(engine):
+    catalog, base, grow, close, witness = crossing_completion()
+    base, _ = base.with_piece(catalog["straight"], ORIGIN)
+    blocked, _ = witness.with_piece(catalog["straight"], ORIGIN)
+    assert _solution_overlaps(blocked, 0, 120, 8)
+    result = solve(
+        {"crossing": 1, "lower": 1}, catalog,
+        SolverConfig(min_pieces=1, engine=engine, max_nodes=100_000),
+        base=base, grow_from=grow, close_onto=close,
+    )
+    assert not result.solutions
+    assert result.stats.complete and result.stats.pruned_collision
+
+
+@pytest.mark.parametrize("engine", ["field", "lattice"])
+def test_sealed_crossing_branch_is_not_a_future_joint(engine, monkeypatch):
+    # Placed at the gap, the crossing touches the closing end's piece where one
+    # of its second route's ports would mate it. Open, that port is a future
+    # joint and the search exempts the closing piece from collision with the
+    # crossing; with both of those ports sealed nothing can ever mate there, so
+    # nothing is exempt and the touching crossing is refused.
+    from duplotrain.collision import CollisionField
+
+    exempted = []
+    near = CollisionField.near
+
+    def recorded(field, bounds, half_width, ignore):
+        exempted.append(set(ignore))
+        return near(field, bounds, half_width, ignore)
+
+    monkeypatch.setattr(CollisionField, "near", recorded)
+    results = {}
+    for sealed in (False, True):
+        catalog, base, grow, close, _ = crossing_completion()
+        if sealed:
+            catalog["crossing"] = replace(catalog["crossing"], sealed=frozenset({2, 3}))
+        exempted.clear()
+        # Without the reachability lookahead the search reaches the crossing:
+        # with it, a sealed crossing is pruned before any collision rule applies.
+        result = solve(
+            {"crossing": 1, "lower": 1}, catalog,
+            SolverConfig(min_pieces=1, engine=engine, max_nodes=100_000,
+                         completion_lookahead=0),
+            base=base, grow_from=grow, close_onto=close,
+        )
+        results[sealed] = result, any(close[0] in ignore for ignore in exempted)
+    (open_result, open_exempt), (sealed_result, sealed_exempt) = results[False], results[True]
+    assert open_result.solutions and open_exempt
+    assert not sealed_result.solutions and sealed_result.stats.complete
+    assert not sealed_exempt and sealed_result.stats.pruned_collision
 
 
 def test_gui_completions_never_overlap_the_base(monkeypatch):
