@@ -215,9 +215,13 @@ first: an explicit reload still resets in-memory undo and search progress.
 A failed installation, failed digest or storage quota error does not replace an
 older verified version or delete unrelated application caches. Versioned asset
 URLs keep old live tabs on coherent resources: activating a version keeps the
-version that was active before it, which tabs opened before the update still
-run, and deletes the other older versions, such as a waiting update that was
-superseded; a version that is still installing is left alone.
+version that was active before it and every version an open tab reports running,
+so a tab left open across several updates can still restart its engine offline;
+the other older versions, such as a waiting update that was superseded, are
+deleted. An open tab that does not answer within 1.5 seconds (a page older than
+this handshake, a suspended tab), a tab that opens meanwhile, or a reported build
+no complete version holds keeps every version for that activation; a version
+that is still installing is left alone.
 Browser eviction or missing entries can remove offline availability, so readiness
 is checked and installation can be repaired online. This is not a permanent
 storage guarantee or a substitute for portable project backups. The desktop local

@@ -79,11 +79,44 @@ async function installVersion() {
   })();
   try { return await installing; } finally { installing = null; }
 }
-// Tabs opened before an update run the version that was active until now. So
-// activation stamps its marker, then keeps, besides itself, the older complete
-// version activated most recently (by install time for versions never stamped)
-// and deletes the rest: a superseded waiting update served no tab. A cache
-// without its marker may be a newer version still installing: left alone.
+// A fresh handshake on each activation survives service-worker restarts. Older
+// pages without this protocol, suspended tabs and failed enumeration conservatively
+// pin ALL old versions. Cache space must not trump a live editor's recovery path.
+async function liveClientBuilds() {
+  const scopedClients = async () => (await self.clients.matchAll({
+    type: "window", includeUncontrolled: true
+  })).filter(client => client.url.startsWith(SCOPE));
+  const ask = client => new Promise(resolve => {
+    const channel = new MessageChannel();
+    let finished = false;
+    const finish = build => {
+      if (finished) return;
+      finished = true; clearTimeout(timer);
+      channel.port1.close(); channel.port2.close(); resolve(build);
+    };
+    const timer = setTimeout(() => finish(null), 1500);
+    channel.port1.onmessage = event => {
+      const build = event.data?.build;
+      finish(event.data?.type === "DUPLOTRAIN_CLIENT_BUILD" &&
+        typeof build === "string" && /^[a-f0-9]{1,64}$/.test(build) ? build : null);
+    };
+    channel.port1.onmessageerror = () => finish(null);
+    try { client.postMessage({type: "DUPLOTRAIN_CLIENT_BUILD"}, [channel.port2]); }
+    catch (_) { finish(null); }
+  });
+  try {
+    const before = await scopedClients();
+    const answers = new Map(await Promise.all(before.map(async client => [client.id, await ask(client)])));
+    // A tab which closed meanwhile no longer pins a version. A newly opened tab
+    // or an unanswered live client makes pruning unsafe for this activation.
+    const after = await scopedClients();
+    if (after.some(client => !answers.get(client.id))) return null;
+    return new Set(after.map(client => answers.get(client.id)));
+  } catch (_) { return null; }
+}
+// Keep this version, the newest previous active version, and every live tab's
+// build. Multiple content versions can share a build stamp: retain all matches.
+// Incomplete caches are left alone because another installation may own them.
 async function activateVersion() {
   const cache = await caches.open(CACHE), marker = await cache.match(MARKER);
   if (marker) {
@@ -95,11 +128,18 @@ async function activateVersion() {
   for (const name of await caches.keys()) {
     if (!name.startsWith(PREFIX) || name === CACHE) continue;
     const older = await (await caches.open(name)).match(absolute(".offline-complete-" + name.slice(PREFIX.length)));
-    if (older) complete.push({name, activated: Number(older.headers.get("X-Activated")) || 0,
+    if (older) complete.push({name, build: await older.text(), activated: Number(older.headers.get("X-Activated")) || 0,
       installed: Number(older.headers.get("X-Installed")) || 0});
   }
   complete.sort((a, b) => b.activated - a.activated || b.installed - a.installed);
-  for (const {name} of complete.slice(1)) await caches.delete(name);
+  const live = await liveClientBuilds();
+  if (live === null) return;
+  // A reported build without a complete cache is also ambiguous; retain backups.
+  const known = new Set([BUILD, ...complete.map(version => version.build)]);
+  if ([...live].some(build => !known.has(build))) return;
+  for (const {name, build} of complete.slice(1)) {
+    if (!live.has(build)) await caches.delete(name);
+  }
 }
 self.addEventListener("install", event => event.waitUntil(installVersion()));
 self.addEventListener("activate", event => event.waitUntil(

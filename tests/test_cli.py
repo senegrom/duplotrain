@@ -254,7 +254,12 @@ def test_invalid_solve_options_fail_politely(runner, tmp_path, args):
         {"type": "straight", "run": "1e16000000"}]}]}]}),     # an enormous number
     json.dumps({"pieces": [{"id": "x", "paths": [{"segments": [
         {"type": "straight", "run": "1/0"}]}]}]}),
-], ids=["nesting", "paths-shape", "piece-shape", "huge-number", "zero-division"])
+    json.dumps({"pieces": [{"id": "x", "paths": [{"segments": [
+        {"type": "straight", "run": 10**400}]}]}]}),       # a JSON integer, not text
+    json.dumps({"pieces": [{"id": "x", "width": 1e12, "paths": [{"segments": [
+        {"type": "straight", "run": 128}]}]}]}),
+], ids=["nesting", "paths-shape", "piece-shape", "huge-number", "zero-division",
+        "huge-integer", "huge-width"])
 def test_bad_catalogue_and_layout_files_fail_politely(runner, tmp_path, contents):
     bad = tmp_path / "bad.json"
     bad.write_text(contents)

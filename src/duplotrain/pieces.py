@@ -53,6 +53,12 @@ _INTEGER = re.compile(r"[+-]?\d+")
 _DECIMAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE]([+-]?\d+))?")
 #: Longest single segment a catalogue piece may have, mm: sampling cost grows with it.
 MAX_SEGMENT_LENGTH = 10_000.0
+#: A JSON integer escapes the text limits above: bound every numerator and
+#: denominator, which still admits each 64-character decimal they accept.
+MAX_CATALOGUE_NUMBER_BITS = 512
+#: Widest piece and longest end overhang, mm. A collision query scans the grid
+#: cells its own and the widest stored piece's half widths can reach.
+MAX_PIECE_WIDTH = 1_000.0
 
 
 def _number(value: Any) -> Fraction:
@@ -74,7 +80,13 @@ def _number(value: Any) -> Fraction:
         if slash and int(denominator) == 0:
             raise ValueError(f"catalogue number {value!r} divides by zero")
         value = text
-    return Fraction(value)
+    number = Fraction(value)
+    if (number.numerator.bit_length() > MAX_CATALOGUE_NUMBER_BITS
+            or number.denominator.bit_length() > MAX_CATALOGUE_NUMBER_BITS):
+        # Do not interpolate huge ints: formatting those can itself fail or be costly.
+        raise ValueError("catalogue number numerator and denominator may use at most "
+                         f"{MAX_CATALOGUE_NUMBER_BITS} bits")
+    return number
 
 
 def parse_length(value: Any) -> Alg:
@@ -506,12 +518,15 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         )
     if len(sealed) >= len(ports):
         raise ValueError(f"piece {piece_id!r} seals every port; nothing could attach to it")
-    width, overhang = float(spec.get("width", 40.0)), float(spec.get("end_overhang", 0.0))
-    if not (math.isfinite(width) and width > 0 and math.isfinite(overhang) and overhang >= 0):
-        raise ValueError(
-            f"piece {piece_id!r} needs a finite positive width and a finite, "
-            "non-negative end overhang"
-        )
+    unfit = (f"piece {piece_id!r} needs a finite positive width and a finite, non-negative "
+             f"end overhang, each at most {MAX_PIECE_WIDTH:g} mm")
+    try:  # the exact reader refuses booleans, text Fraction would crawl over, inf, nan
+        width = float(_number(spec.get("width", 40.0)))
+        overhang = float(_number(spec.get("end_overhang", 0.0)))
+    except ValueError as exc:
+        raise ValueError(unfit) from exc
+    if not (0 < width <= MAX_PIECE_WIDTH and 0 <= overhang <= MAX_PIECE_WIDTH):
+        raise ValueError(unfit)
 
     return PieceType(
         id=spec["id"],

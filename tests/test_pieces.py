@@ -189,9 +189,27 @@ def test_unknown_segment_type_rejected():
     ({"paths": [{"segments": [{"type": "straight", "run": 20_000}]}]}, "at most 10000 mm"),
     ({"paths": [{"segments": [{"type": "arc", "radius": 256, "degrees": "1e9999"}]}]},
      "whole multiple of 15"),
+    # A JSON integer is no text: its own bound applies, wherever a number goes.
+    ({"paths": [{"segments": [{"type": "straight", "run": 10**400}]}]}, "512 bits"),
+    ({"paths": [{"start": {"x": 10**400}, "segments": [{"type": "straight", "run": 64}]}]},
+     "512 bits"),
+    ({"paths": [{"segments": [{"type": "straight", "run": {"alg": [0, 10**400, 0, 0]}}]}]},
+     "512 bits"),
+    ({"width": 10**400}, "finite positive width"),
+    ({"width": True}, "finite positive width"),
+    ({"width": 1001}, "at most 1000 mm"),
+    ({"end_overhang": 1e12}, "at most 1000 mm"),
 ])
 def test_catalogue_values_are_bounded_and_meaningful(change, message):
     spec = {"id": "odd", "paths": [{"segments": [{"type": "straight", "run": 64}]}], **change}
     with pytest.raises(ValueError, match=message):
         parse_piece(spec)
+
+
+def test_the_bounds_admit_every_value_the_text_format_reads():
+    longest = "9" * 60 + "e64"
+    assert parse_length(longest) == Alg(Fraction(longest))
+    widest = parse_piece({"id": "wide", "width": 1000, "end_overhang": 1000,
+                          "paths": [{"segments": [{"type": "straight", "run": 128}]}]})
+    assert widest.width == widest.end_overhang == 1000
 

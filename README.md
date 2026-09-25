@@ -89,7 +89,10 @@ duplotrain solve --catalog my-measurements.json --curve 12 --ramp 2 --span 2 ...
 
 Lengths may be plain numbers, exact fractions (`"384/5"`), field elements
 (`{"alg": [a, b, c, d]}` = `a + b√2 + c√3 + d√6`), or arc chords
-(`{"chord": {"radius": 256, "degrees": 30}}`).
+(`{"chord": {"radius": 256, "degrees": 30}}`). A catalogue is read as untrusted
+input: a number takes at most 64 characters and 512-bit numerators and
+denominators, a segment at most 10,000 mm, and a piece's width and end overhang
+at most 1,000 mm each.
 
 ## Install & use
 

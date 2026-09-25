@@ -1,12 +1,14 @@
 """New job, viewport and offline workflows against real browser engines."""
+import hashlib
 import json
+import mimetypes
 import os
 import re
 import socket
 import tempfile
 import threading
-from contextlib import nullcontext
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from contextlib import contextmanager, nullcontext
+from http.server import BaseHTTPRequestHandler, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -130,20 +132,73 @@ def exercise_cached_canvas(page):
     assert result["reused"] and result["invalidated"]
 
 
-def exercise_offline_reload(browser_type, confirmed):
-    """Boot the unchanged offline build with genuine transport/certificate trust.
+def _built_app(browser_type):
+    """The built web app and its production CSP, or a skip where it cannot run."""
+    if not os.environ.get("DUPLOTRAIN_STATIC_DIST"):
+        pytest.skip("set DUPLOTRAIN_STATIC_DIST to a built webapp/dist directory")
+    if browser_type.name == "webkit" and os.environ.get("DUPLOTRAIN_TEST_SYSTEM_CA") != "1":
+        pytest.skip("WebKit offline tests need the opted-in disposable CI runner "
+                    "(DUPLOTRAIN_TEST_SYSTEM_CA=1, see tests/browser/tls.py)")
+    dist = Path(os.environ["DUPLOTRAIN_STATIC_DIST"])
+    policy = re.search(r'Content-Security-Policy "([^"\n]+)"',
+                       (dist / ".htaccess").read_text()).group(1)
+    return dist, policy
+
+
+@contextmanager
+def _offline_profile(browser_type, root, handler):
+    """Serve *handler* on localhost and open a fresh browser profile on it.
 
     WebKit upgrades localhost HTTP subresources under the production CSP. Use
     HTTPS and an ephemeral CA installed only in the explicitly opted-in disposable
     CI runner. Certificate errors and hostname validation remain enabled. The CA
     is removed after the fresh browser closes, including on failure. Chromium
-    retains its working potentially trustworthy HTTP-loopback profile.
+    retains its working potentially trustworthy HTTP-loopback profile. Yields the
+    context, the site's URL and a function that stops the server for good.
     """
+    options = {"headless": True, "viewport": {"width": 390, "height": 844},
+               "has_touch": True}
+    if os.environ.get("DUPLOTRAIN_BROWSER_PATH"):
+        options["executable_path"] = os.environ["DUPLOTRAIN_BROWSER_PATH"]
+    trust, scheme, tls = nullcontext(), "http", None
+    if browser_type.name == "webkit":
+        tls, ca = localhost_tls(root)
+        trust, scheme = runner_test_ca(ca), "https"
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    try:
+        if tls is not None:
+            server.socket = tls.wrap_socket(server.socket, server_side=True)
+    except BaseException:
+        server.server_close()
+        raise
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    stopped = False
+
+    def stop_server():
+        nonlocal stopped
+        if not stopped:
+            server.shutdown()
+            thread.join(timeout=3)
+            server.server_close()
+            stopped = True
+
+    try:
+        with trust:
+            context = browser_type.launch_persistent_context(str(root / "profile"), **options)
+            try:
+                yield context, f"{scheme}://localhost:{server.server_port}/", stop_server
+            finally:
+                context.close()
+    finally:
+        stop_server()
+
+
+def exercise_offline_reload(browser_type, confirmed):
+    """Boot the unchanged offline build with genuine transport/certificate trust."""
     from playwright.sync_api import expect
 
-    dist = Path(os.environ["DUPLOTRAIN_STATIC_DIST"])
-    policy = re.search(r'Content-Security-Policy "([^"\n]+)"',
-                       (dist / ".htaccess").read_text()).group(1)
+    dist, policy = _built_app(browser_type)
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -153,82 +208,40 @@ def exercise_offline_reload(browser_type, confirmed):
             self.send_header("Content-Security-Policy", policy)
             super().end_headers()
 
+    errors, failed_requests = [], []
     with tempfile.TemporaryDirectory(prefix="duplotrain-offline-test-") as directory:
-        root = Path(directory)
-        options = {"headless": True, "viewport": {"width": 390, "height": 844},
-                   "has_touch": True}
-        scheme = "http"
-        tls = None
-        trust = nullcontext()
-        if browser_type.name == "webkit":
-            tls, ca = localhost_tls(root)
-            trust = runner_test_ca(ca)
-            scheme = "https"
-        if os.environ.get("DUPLOTRAIN_BROWSER_PATH"):
-            options["executable_path"] = os.environ["DUPLOTRAIN_BROWSER_PATH"]
-        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         try:
-            if tls is not None:
-                server.socket = tls.wrap_socket(server.socket, server_side=True)
-        except BaseException:
-            server.server_close()
-            raise
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        stopped = False
-
-        def stop_server():
-            nonlocal stopped
-            if not stopped:
-                server.shutdown()
-                thread.join(timeout=3)
-                server.server_close()
-                stopped = True
-
-        context = None
-        errors, failed_requests = [], []
-        try:
-            with trust:
-                try:
-                    context = browser_type.launch_persistent_context(
-                        str(root / "profile"), **options,
-                    )
-                    offline_page = context.pages[0] if context.pages else context.new_page()
-                    offline_page.on("pageerror", lambda error: errors.append(str(error)))
-                    offline_page.on("requestfailed", lambda request: failed_requests.append(
-                        f"{request.url}: {request.failure}"))
-                    offline_page.goto(f"{scheme}://localhost:{server.server_port}/")
-                    assert offline_page.evaluate("window.isSecureContext")
-                    expect(offline_page.locator("#status")).to_contain_text(
-                        "Engine ready", timeout=90000,
-                    )
-                    offline_page.locator("#projectfile").set_input_files({
-                        "name": "confirmed-session.json", "mimeType": "application/json",
-                        "buffer": json.dumps(confirmed).encode(),
-                    })
-                    expect(offline_page.locator("#status")).to_contain_text("Opened project:")
-                    assert offline_page.evaluate("S.snapshot") == confirmed
-                    _exercise_offline_reload(offline_page, stop_server)
-                    assert offline_page.evaluate("S.snapshot") == confirmed
-                    assert not errors
-                finally:
-                    if context is not None:
-                        context.close()
+            with _offline_profile(browser_type, Path(directory), Handler) as (
+                    context, url, stop_server):
+                offline_page = context.pages[0] if context.pages else context.new_page()
+                offline_page.on("pageerror", lambda error: errors.append(str(error)))
+                offline_page.on("requestfailed", lambda request: failed_requests.append(
+                    f"{request.url}: {request.failure}"))
+                offline_page.goto(url)
+                assert offline_page.evaluate("window.isSecureContext")
+                expect(offline_page.locator("#status")).to_contain_text(
+                    "Engine ready", timeout=90000,
+                )
+                offline_page.locator("#projectfile").set_input_files({
+                    "name": "confirmed-session.json", "mimeType": "application/json",
+                    "buffer": json.dumps(confirmed).encode(),
+                })
+                expect(offline_page.locator("#status")).to_contain_text("Opened project:")
+                assert offline_page.evaluate("S.snapshot") == confirmed
+                _exercise_offline_reload(offline_page, stop_server)
+                assert offline_page.evaluate("S.snapshot") == confirmed
+                assert not errors
         except Exception:
             print("Offline page errors:", errors)
             print("Offline failed requests:", failed_requests)
             raise
-        finally:
-            stop_server()
 
 
 def _exercise_offline_reload(page, stop_server):
     """Reload the real worker after its resource server has physically stopped."""
     from playwright.sync_api import expect
 
-    summary = page.locator("summary", has_text="Version and offline access")
-    if summary.locator("..").get_attribute("open") is None:
-        summary.click()
+    _open_offline_panel(page)
     page.locator("#offline-install").click()
     # Fail promptly with the UI's actual reason rather than waiting three minutes
     # after a rejected registration or integrity check.
@@ -277,18 +290,140 @@ def _exercise_offline_reload(page, stop_server):
             page.context.set_offline(False)
 
 
+def _open_offline_panel(page):
+    summary = page.locator("summary", has_text="Version and offline access")
+    if summary.locator("..").get_attribute("open") is None:
+        summary.click()
+
+
 def test_built_app_reloads_offline(browser):
-    if not os.environ.get("DUPLOTRAIN_STATIC_DIST"):
-        pytest.skip("set DUPLOTRAIN_STATIC_DIST to a built webapp/dist directory")
-    if (browser.browser_type.name == "webkit"
-            and os.environ.get("DUPLOTRAIN_TEST_SYSTEM_CA") != "1"):
-        pytest.skip("the WebKit offline reload needs the opted-in disposable CI runner "
-                    "(DUPLOTRAIN_TEST_SYSTEM_CA=1, see tests/browser/tls.py)")
     from duplotrain.editor import Session
 
     session = Session()
     session.attach("straight", 0, None)
     exercise_offline_reload(browser.browser_type, session.snapshot())
+
+
+def _three_builds(dist):
+    """The built app under three build stamps: three real, content-stamped versions.
+
+    Per version, what the server answers for each path: the bytes and their type.
+    """
+    source = (dist / "service-worker.js").read_text()
+    original = re.search(r'const BUILD = "([a-f0-9]+)";', source).group(1)
+    assets = json.loads(re.search(r"const ASSETS = (\[.*\]);", source).group(1))
+    template = (Path(__file__).parents[2] / "webapp/service-worker.js").read_text()
+    versions = []
+    for build in ("ab000001", "ab000002", "ab000003"):
+        served, manifest = {}, []
+        for asset in assets:
+            path = asset["url"].split("?", 1)[0]
+            data = (dist / path).read_bytes()
+            # Only application text carries the stamp; runtime and archive bytes stay.
+            if "/" not in path and Path(path).suffix in {".js", ".html", ".css", ".py",
+                                                         ".webmanifest"}:
+                data = data.replace(original.encode(), build.encode())
+            url = asset["url"].replace(original, build)
+            served["/" + url] = (data, mimetypes.guess_type(path)[0] or "application/octet-stream")
+            manifest.append({"url": url, "bytes": len(data),
+                             "sha256": hashlib.sha256(data).hexdigest()})
+        version = hashlib.sha256(json.dumps(manifest).encode()).hexdigest()[:16]
+        worker = (template.replace("__BUILD__", build).replace("__VERSION__", version)
+                  .replace("__ASSETS__", json.dumps(manifest)))
+        served["/service-worker.js"] = (worker.encode(), "text/javascript")
+        served["/"] = served["/index.html"]
+        versions.append(served)
+    return versions
+
+
+def test_a_tab_left_open_across_two_updates_restarts_its_engine_offline(browser, tmp_path):
+    from playwright.sync_api import expect
+
+    dist, policy = _built_app(browser.browser_type)
+    versions, current = _three_builds(dist), [0]
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            entry = versions[current[0]].get(self.path)
+            if entry is None:
+                self.send_error(404)
+                return
+            data, kind = entry  # the headers come from this server's own table
+            self.send_response(200)
+            self.send_header("Content-Type", kind)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Security-Policy", policy)
+            # No HTTP cache may stand in for a deleted offline version.
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *args):
+            pass
+
+    errors = []
+    with _offline_profile(browser.browser_type, tmp_path, Handler) as (context, url, stop_server):
+        # Keep hold of each page's engine worker, to fail it on demand.
+        context.add_init_script("""
+          const NativeWorker = window.Worker;
+          window.Worker = class extends NativeWorker {
+            constructor(...args) { super(...args); window.__testWorker = this; }
+          };""")
+        old_tab = context.pages[0] if context.pages else context.new_page()
+        old_tab.on("pageerror", lambda error: errors.append(str(error)))
+        old_tab.goto(url)
+        expect(old_tab.locator("#status")).to_contain_text("Engine ready", timeout=90000)
+        old_tab.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
+        bounds = old_tab.locator("#canvas").bounding_box()
+        old_tab.touchscreen.tap(bounds["x"] + bounds["width"] / 2,
+                                bounds["y"] + bounds["height"] / 2)
+        expect(old_tab.locator("#undo")).to_be_enabled()
+        confirmed = old_tab.evaluate("S.snapshot")
+        _open_offline_panel(old_tab)
+        old_tab.locator("#offline-install").click()
+        expect(old_tab.locator("#offline-status")).to_contain_text("Offline ready",
+                                                                  timeout=180000)
+        old_tab.evaluate("""async () => {
+          await navigator.serviceWorker.ready;
+          if (!navigator.serviceWorker.controller) await new Promise(resolve =>
+            navigator.serviceWorker.addEventListener("controllerchange", resolve, {once: true}));
+        }""")
+        # Another tab installs and applies two updates, as a user would.
+        new_tab = context.new_page()
+        new_tab.on("pageerror", lambda error: errors.append(str(error)))
+        new_tab.on("dialog", lambda dialog: dialog.accept())
+        new_tab.goto(url)
+        for index, build in ((1, "ab000002"), (2, "ab000003")):
+            current[0] = index
+            expect(new_tab.locator("#status")).to_contain_text("Engine ready", timeout=90000)
+            _open_offline_panel(new_tab)
+            new_tab.locator("#offline-check").click()
+            expect(new_tab.locator("#offline-update")).to_be_visible(timeout=180000)
+            with new_tab.expect_navigation(timeout=90000):
+                new_tab.locator("#offline-update").click()
+            expect(new_tab.locator("#status")).to_contain_text("Engine ready", timeout=90000)
+            assert new_tab.evaluate("window.duplotrainBuild") == build
+            assert old_tab.evaluate("window.duplotrainBuild") == "ab000001"
+            assert old_tab.evaluate("S.snapshot") == confirmed
+        # With the network gone, the old tab still has its own version's files.
+        stop_server()
+        with pytest.raises(OSError):
+            socket.create_connection(("127.0.0.1", urlsplit(url).port), timeout=1)
+        if browser.browser_type.name == "chromium":
+            context.set_offline(True)
+        assert old_tab.evaluate("""async () => {
+          const r = await fetch("./worker.js?v=ab000001", {cache: "no-store"});
+          return r.ok && (await r.text()).includes("ab000001");
+        }""")
+        old_tab.evaluate("""() => window.__testWorker.dispatchEvent(new ErrorEvent("error", {
+          message: "test old engine failure", cancelable: true}))""")
+        old_tab.get_by_role(
+            "button", name="Restart engine and restore last confirmed session", exact=True,
+        ).tap()
+        expect(old_tab.locator("#status")).to_contain_text("Engine restarted", timeout=90000)
+        assert old_tab.evaluate("S.snapshot") == confirmed
+        assert old_tab.evaluate("window.duplotrainBuild") == "ab000001"
+        assert not errors
 
 
 def test_interactive_search_more_multi_gap_and_route_witness(editor):
