@@ -114,14 +114,15 @@ class RouteJob:
                               "looping": self.locally and self.looping,
                               "completely_looping": self.locally and self.completely,
                               "perfectly_looping": self.locally and self.perfectly}
+        counterexample_property = next((key for key in ("looping", "completely", "perfectly")
+                                        if key in self.failures), None)
         return {"job_id": self.id, "revision": self.revision, "status": self.status,
                 "scope": self.scope, "goal": self.goal, "runs": self.runs,
                 "required_runs": str(self.required), "max_runs": self.max_runs,
                 "max_steps": self.max_steps, "step_limited_runs": self.limited_runs,
                 "steps": self.steps, "total_drivable": len(self.universe),
-                "best": self.best, "counterexample": (
-                    self.failures.get("looping") or self.failures.get("completely")
-                    or self.failures.get("perfectly")),
+                "best": self.best, "counterexample": self.failures.get(counterexample_property),
+                "counterexample_property": counterexample_property,
                 "outcomes": dict(self.outcomes), "classification": classification,
                 "complete": self.complete, "optimal": self.complete,
                 "model_only": True}

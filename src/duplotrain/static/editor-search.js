@@ -219,6 +219,11 @@ function showRouteAnalysis() {
     line(`Every checked start/setting loops: ${c.looping ? "yes" : "no"}; every run covers all track: ${c.completely_looping ? "yes" : "no"}; ` +
       `every repeating cycle traverses all track both ways: ${c.perfectly_looping ? "yes" : "no"}.`);
   } else line(`Analysis incomplete. No universal verdict or optimality claim; ${r.step_limited_runs} run(s) reached the step limit.`);
+  const property = {looping: "every start/setting loops endlessly",
+    completely: "every run visits all drivable track",
+    perfectly: "every repeating cycle traverses all drivable track both ways"}[r.counterexample_property];
+  if (r.counterexample && property) line(`Counterexample disproves: ${property}. ` +
+    `This run is ${r.counterexample.outcome}; use Load counterexample to inspect it.`);
   line("Train-model result only, not a physical-track guarantee. Best route does not modify your layout.");
   renderJobControls();
 }

@@ -57,6 +57,8 @@ _Cell = tuple[int, int]
 _BOUNDS_CELL = 256.0
 _BOUNDS_MAX_CELLS = 64
 _BOUNDS_INDEX_MIN = 128
+# Above this radius, scan occupied cells rather than a quadratic empty square.
+_NARROW_MAX_RADIUS = 16
 
 
 def _bound_cells(bounds: tuple[float, ...], padding: float = 0.0) -> tuple[_Cell, ...] | None:
@@ -251,7 +253,8 @@ class CollisionField:
         clearance = self.clearance
         grid = self._grid
         reach = half_width + self._max_half_width - TOUCH_MARGIN
-        r = max(1, math.ceil(reach / cell))
+        radius = reach / cell
+        r = max(1, math.ceil(radius)) if math.isfinite(radius) else None
         for (cx, cy), cell_points in grouped:
             # The box of this cell's samples: a stored cloud whose box lies at
             # least the pair's limit away in x or in y cannot come within it.
@@ -266,34 +269,41 @@ class CollisionField:
                     qy0 = y
                 elif y > qy1:
                     qy1 = y
-            for gx in range(cx - r, cx + r + 1):
-                for gy in range(cy - r, cy + r + 1):
-                    bucket = grid.get((gx, gy))
-                    if not bucket:
+            if r is None:
+                buckets = grid.values()
+            elif r > _NARROW_MAX_RADIUS:
+                buckets = (bucket for (gx, gy), bucket in grid.items()
+                           if abs(gx - cx) <= r and abs(gy - cy) <= r)
+            else:
+                buckets = (grid.get((gx, gy))
+                           for gx in range(cx - r, cx + r + 1)
+                           for gy in range(cy - r, cy + r + 1))
+            for bucket in buckets:
+                if not bucket:
+                    continue
+                for cloud in bucket:
+                    if cloud.placement in ignore:
                         continue
-                    for cloud in bucket:
-                        if cloud.placement in ignore:
-                            continue
-                        limit = half_width + cloud.half_width - TOUCH_MARGIN
-                        bx0, bx1, by0, by1 = cloud.box
-                        if (bx0 - qx1 >= limit or qx0 - bx1 >= limit
-                                or by0 - qy1 >= limit or qy0 - by1 >= limit):
-                            continue
-                        limit2 = limit * limit
-                        stored_underpass = cloud.underpass
-                        for x, y, z in cell_points:
-                            for px, py, pz in cloud.points:
-                                dz = z - pz
-                                if dz >= clearance or dz <= -clearance:
-                                    continue
-                                if stored_underpass and dz <= -UNDERPASS_MIN:
-                                    continue
-                                if underpass and dz >= UNDERPASS_MIN:
-                                    continue
-                                dx = x - px
-                                dy = y - py
-                                if dx * dx + dy * dy < limit2:
-                                    return True
+                    limit = half_width + cloud.half_width - TOUCH_MARGIN
+                    bx0, bx1, by0, by1 = cloud.box
+                    if (bx0 - qx1 >= limit or qx0 - bx1 >= limit
+                            or by0 - qy1 >= limit or qy0 - by1 >= limit):
+                        continue
+                    limit2 = limit * limit
+                    stored_underpass = cloud.underpass
+                    for x, y, z in cell_points:
+                        for px, py, pz in cloud.points:
+                            dz = z - pz
+                            if dz >= clearance or dz <= -clearance:
+                                continue
+                            if stored_underpass and dz <= -UNDERPASS_MIN:
+                                continue
+                            if underpass and dz >= UNDERPASS_MIN:
+                                continue
+                            dx = x - px
+                            dy = y - py
+                            if dx * dx + dy * dy < limit2:
+                                return True
         return False
 
     def clashes(

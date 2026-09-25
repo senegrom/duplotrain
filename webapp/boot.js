@@ -2,6 +2,17 @@
 "use strict";
 window.duplotrainBuild = "__BUILD__";
 
+// Reply with this document's build, not the version activated in another tab.
+// Install early so offline cache pruning also protects an engine still starting.
+if (typeof navigator !== "undefined" && navigator.serviceWorker) {
+  const clientBuild = window.duplotrainBuild;
+  navigator.serviceWorker.addEventListener("message", event => {
+    if (event.data?.type === "DUPLOTRAIN_CLIENT_BUILD" && event.ports?.[0]) {
+      event.ports[0].postMessage({type: "DUPLOTRAIN_CLIENT_BUILD", build: clientBuild});
+    }
+  });
+}
+
 (function () {
   let worker = null, ready = false, seq = 0;
   let options, overlay, msg, rejectReady, bootTimer, idleTimer;

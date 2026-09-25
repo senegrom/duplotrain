@@ -2,6 +2,7 @@
 const {test}=require("node:test"), assert=require("node:assert/strict");
 const fs=require("node:fs"), path=require("node:path"), vm=require("node:vm");
 const {createHash,webcrypto}=require("node:crypto");
+const {MessageChannel}=require("node:worker_threads");
 const template=fs.readFileSync(path.join(__dirname,"../../webapp/service-worker.js"),"utf8");
 const scope="https://example.test/duplotrain/";
 const clean=x=>JSON.parse(JSON.stringify(x));
@@ -11,13 +12,16 @@ function cacheStorage(){
     async delete(key){return map.delete(key);},async open(key){
       if(!map.has(key))map.set(key,new Map());const store=map.get(key);
       const name=k=>typeof k==="string"?k:k.url;
-      return {async match(k){return store.get(name(k))?.clone();},async put(k,v){
-        if(failedPut)throw new Error("quota exceeded");store.set(name(k),v.clone());},
+      // Model stored bytes, not long-lived tee streams in Node's Response.clone.
+      return {async match(k){const value=store.get(name(k));return value?
+        new Response(value.body.slice(0),{status:value.status,headers:value.headers}):undefined;},async put(k,v){
+        if(failedPut)throw new Error("quota exceeded");store.set(name(k),{
+          body:await v.arrayBuffer(),status:v.status,headers:[...v.headers]});},
         async delete(k){return store.delete(name(k));}};
     }};
 }
 function worker({build="aaa",caches=cacheStorage(),bad=null,now=()=>Date.now(),page="",
-  timers={setTimeout,clearTimeout},stream=null}={}){
+  timers={setTimeout,clearTimeout},stream=null,clients=async()=>[]}={}){
   const assets=[{url:"index.html",body:`<html>build ${build}${page}</html>`},
     {url:`editor.js?v=${build}`,body:`const build='${build}'`},
     {url:`worker.js?v=${build}`,body:`const engine='${build}'`}];
@@ -38,8 +42,8 @@ function worker({build="aaa",caches=cacheStorage(),bad=null,now=()=>Date.now(),p
       "Content-Security-Policy":"default-src 'self'","Content-Encoding":"gzip"}});
   };
   const ctx=vm.createContext({URL,Response,Request,Headers,Uint8Array,ArrayBuffer,AbortController,
-    crypto:webcrypto,caches,fetch,...timers,Date:{now},
-    self:{registration:{scope},clients:{claim:async()=>{}},skipWaiting:async()=>{activated++;},
+    crypto:webcrypto,caches,fetch,MessageChannel,...timers,Date:{now},
+    self:{registration:{scope},clients:{claim:async()=>{},matchAll:clients},skipWaiting:async()=>{activated++;},
       addEventListener:(name,fn)=>{handlers[name]=fn;}}});
   vm.runInContext(template.replaceAll("__BUILD__",build).replace("__VERSION__",version)
     .replace("__ASSETS__",JSON.stringify(manifest)),ctx);
@@ -216,4 +220,110 @@ test("a slow but steady download completes; a quiet minute aborts it",async()=>{
   stalledTime.advance(1);await settle();
   assert.match(String(outcome),/aborted/);
   assert.ok(!v.caches.map.has(v.run("CACHE")));
+});
+
+function liveTab(id, build, url=scope) {
+  return {id, url, postMessage(message, ports) {
+    assert.equal(message.type, "DUPLOTRAIN_CLIENT_BUILD");
+    ports[0].postMessage({type: message.type, build});
+  }};
+}
+async function threeVersions(options={}) {
+  const caches=cacheStorage(); let time=1000;
+  const versions=[];
+  for (const build of ["aaa", "bbb", "ccc"]) {
+    const w=worker({build,caches,now:()=>time++,...options});
+    await w.install();versions.push(w);
+  }
+  return versions;
+}
+
+test("a live A tab survives activation of B and C, then unpins when closed",async()=>{
+  const live=[],clients=async()=>live;
+  const caches=cacheStorage();let time=1000;
+  const options={caches,clients,now:()=>time++};
+  const a=worker({...options,build:"aaa"});await a.install();await a.activate();
+  live.push(liveTab("old-tab","aaa"));
+  const b=worker({...options,build:"bbb"});await b.install();await b.activate();
+  const c=worker({...options,build:"ccc"});await c.install();await c.activate();
+  assert.equal((await a.ctx.offlineStatus()).ready,true);
+  assert.equal((await b.ctx.offlineStatus()).ready,true);
+  c.setOffline(true);
+  assert.match(await (await c.request("worker.js?v=aaa")).text(),/aaa/);
+  // A newly created worker global has no saved in-memory client information.
+  const fresh=worker({build:"ccc",caches:c.caches,clients});await fresh.activate();
+  assert.equal((await a.ctx.offlineStatus()).ready,true);
+  live.length=0;
+  const d=worker({build:"ddd",caches:c.caches,clients});await d.install();await d.activate();
+  assert.equal((await a.ctx.offlineStatus()).ready,false);
+  assert.equal((await b.ctx.offlineStatus()).ready,false);
+  assert.equal((await c.ctx.offlineStatus()).ready,true);
+});
+
+test("a legacy or suspended live tab pins all old caches without blocking activation",async()=>{
+  const time=clock(),silent={id:"legacy",url:scope,postMessage(){}};
+  const [a,b,c]=await threeVersions({timers:time,clients:async()=>[silent]});
+  const activation=c.activate();await settle();time.advance(1500);await activation;
+  assert.equal((await a.ctx.offlineStatus()).ready,true);
+  assert.equal((await b.ctx.offlineStatus()).ready,true);
+});
+
+test("a tab which closes during the handshake no longer pins caches",async()=>{
+  const time=clock();let checks=0;
+  const silent={id:"closing",url:scope,postMessage(){}};
+  const [a,,c]=await threeVersions({timers:time,clients:async()=>++checks===1?[silent]:[]});
+  const activation=c.activate();await settle();time.advance(1500);await activation;
+  assert.equal((await a.ctx.offlineStatus()).ready,false);
+});
+
+test("new clients during enumeration conservatively stop pruning",async()=>{
+  let checks=0;
+  const [a,b,c]=await threeVersions({clients:async()=>++checks===1?[]:[liveTab("new","aaa")]});
+  await c.activate();
+  assert.equal((await a.ctx.offlineStatus()).ready,true);
+  assert.equal((await b.ctx.offlineStatus()).ready,true);
+});
+
+test("failed client enumeration and unknown build identities retain backups",async()=>{
+  for (const clients of [async()=>{throw new Error("client enumeration failed");},
+    async()=>[liveTab("unknown","fff")]]) {
+    const [a,b,c]=await threeVersions({clients});await c.activate();
+    assert.equal((await a.ctx.offlineStatus()).ready,true);
+    assert.equal((await b.ctx.offlineStatus()).ready,true);
+  }
+});
+
+test("clients outside this scope do not pin this application's caches",async()=>{
+  const [a,,c]=await threeVersions({clients:async()=>[
+    {id:"other",url:"https://example.test/another/",postMessage(){throw new Error("not our client");}}
+  ]});
+  await c.activate();assert.equal((await a.ctx.offlineStatus()).ready,false);
+});
+
+test("all content versions sharing a live tab's build stamp are retained",async()=>{
+  const caches=cacheStorage(),clients=async()=>[liveTab("same-build","aaa")];let time=1000;
+  const options={caches,clients,now:()=>time++};
+  const a=worker({...options,build:"aaa"});await a.install();await a.activate();
+  const a2=worker({...options,build:"aaa",page:" second content version"});await a2.install();
+  const b=worker({...options,build:"bbb"});await b.install();await b.activate();
+  const c=worker({...options,build:"ccc"});await c.install();await c.activate();
+  assert.notEqual(a.run("CACHE"),a2.run("CACHE"));
+  assert.equal((await a.ctx.offlineStatus()).ready,true);
+  assert.equal((await a2.ctx.offlineStatus()).ready,true);
+});
+
+test("boot answers with its immutable document build without starting or installing anything",()=>{
+  let listener;
+  const context=vm.createContext({window:{},navigator:{serviceWorker:{
+    addEventListener(type,callback){assert.equal(type,"message");listener=callback;}
+  }}});
+  const source=fs.readFileSync(path.join(__dirname,"../../webapp/boot.js"),"utf8");
+  vm.runInContext(source.replaceAll("__BUILD__","abc12345"),context);
+  context.window.duplotrainBuild="newer-controller";
+  const replies=[],port={postMessage:reply=>replies.push(clean(reply))};
+  listener({data:{type:"DUPLOTRAIN_CLIENT_BUILD"},ports:[port]});
+  assert.deepEqual(replies,[{type:"DUPLOTRAIN_CLIENT_BUILD",build:"abc12345"}]);
+  listener({data:{type:"OTHER"},ports:[port]});
+  listener({data:{type:"DUPLOTRAIN_CLIENT_BUILD"},ports:[]});
+  assert.equal(replies.length,1);
 });
