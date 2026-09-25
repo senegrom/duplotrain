@@ -242,7 +242,16 @@ def test_key_and_primitive_caches_are_bounded_and_transparent(monkeypatch):
 def test_frame_screening_picks_the_exhaustive_minimum():
     catalog = default_catalog()
     from duplotrain import _congruence
-    from duplotrain._congruence import _canonical_frame, _identity, _in_frame, _normalise
+    from duplotrain._congruence import _canonical_frame, _in_frame, _normalise, _point_key
+
+    def _identity(curve):
+        """Exact union identity in one frame, independent of collection order."""
+        return (
+            tuple(sorted((_point_key(a), _point_key(b)) for a, b in curve.lines)),
+            tuple(sorted((_point_key(c), r.coeffs(), sectors)
+                         for c, r, sectors in curve.circles)),
+            tuple(sorted(_point_key(p) for p in curve.isolated)),
+        )
 
     for chain in (
         [(catalog["curve"], 0, 1)] * 3 + [(catalog["straight"], 0, 1)],

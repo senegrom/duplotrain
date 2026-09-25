@@ -211,7 +211,7 @@ def trace_train(
     return {**common, "outcome": report.outcome,
             "steps": [list(step) for step in report.steps], "cycle_start": report.cycle_start,
             "period": report.period, "reversals": report.reversals,
-            "visited": sorted(report.visited), "covers": report.covers(layout),
+            "visited": sorted(report.visited), "covers": report.visited >= universe,
             "visited_drivable": sorted(report.visited & universe),
             "unvisited": sorted(universe - report.visited),
             "cycle_pieces": sorted({step[0] for step in cycle}),

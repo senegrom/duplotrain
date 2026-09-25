@@ -289,7 +289,6 @@ class LoopClassification:
     completely_looping: bool
     perfectly_looping: bool
     runs: int
-    witness: tuple[End, dict[int, int]] | None
     counterexample: tuple[End, dict[int, int], str] | None
 
 
@@ -375,6 +374,8 @@ def classify(
     If the required number of runs exceeds ``max_runs``, raise
     :class:`ClassificationLimitError` before simulation, never return a partial
     verdict. Pass a larger budget (or ``None`` for unbounded enumeration) explicitly.
+    A single run longer than :func:`drive`'s step budget raises
+    :class:`DriveLimitError`, again instead of a verdict.
     """
     if not layout.placements:
         raise ValueError("nothing to classify")
@@ -397,7 +398,6 @@ def classify(
     looping = True
     completely = True
     perfectly = True
-    witness: tuple[End, dict[int, int]] | None = None
     # The first run breaking each universal property, weakest property first.
     failures: dict[str, tuple[End, dict[int, int], str]] = {}
     runs = 0
@@ -407,9 +407,7 @@ def classify(
             report = drive(layout, start=start, switch_states=assignment)
             runs += 1
             if report.outcome == "endless":
-                if not locally:
-                    locally = True
-                    witness = (start, dict(assignment))
+                locally = True
                 if not report.visited >= everything and completely:
                     completely = False
                     perfectly = False
@@ -436,6 +434,5 @@ def classify(
         completely_looping=locally and looping and completely,
         perfectly_looping=locally and looping and completely and perfectly,
         runs=runs,
-        witness=witness,
         counterexample=counterexample,
     )

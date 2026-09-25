@@ -284,3 +284,46 @@ def test_classify_and_gui_reject_impossible_requests(runner, tmp_path):
     result = runner.invoke(main, ["gui", "--port", "70000", "--no-browser"])
     assert result.exit_code == 2 and "70000" in result.output
 
+
+def test_classify_refuses_track_whose_joints_cannot_exist(runner, tmp_path):
+    # A bar of straights "linked" from its far end back to its start: the model
+    # would drive through a 512 mm joint as if it were track.
+    catalog = default_catalog()
+    bar = build_chain([(catalog["straight"], 0, 1)] * 4)
+    impossible = bar.join((3, 1), (0, 0), force=True).with_accessory(0, "stone_direction")
+    path = tmp_path / "impossible.json"
+    path.write_text(json.dumps(layout_to_dict(impossible)))
+    result = runner.invoke(main, ["classify", str(path)])
+    assert result.exit_code == 1 and "joints fit exactly" in result.output
+
+
+def test_a_solve_that_finds_nothing_still_replaces_earlier_results(runner, monkeypatch,
+                                                                   tmp_path):
+    monkeypatch.setattr(cli, "_get_renderer", lambda required=True: None)  # JSON only
+    out = tmp_path / "out"
+    assert runner.invoke(main, ["solve", "--curve", "12", "-o", str(out)]).exit_code == 0
+    assert list(out.glob("loop_*.json"))
+    result = runner.invoke(main, ["solve", "--set", "10872", "-o", str(out)])
+    assert result.exit_code == 0 and "No closed loop fits" in result.output
+    assert not list(out.glob("loop_*"))
+
+
+def test_json_files_may_start_with_a_byte_order_mark(runner, tmp_path):
+    catalog = default_catalog()
+    circle = build_chain([(catalog["curve"], 0, 1)] * 12).join((11, 1), (0, 0))
+    layout = tmp_path / "circle.json"
+    layout.write_bytes(json.dumps(layout_to_dict(circle)).encode("utf-8-sig"))
+    inventory = tmp_path / "box.json"
+    inventory.write_bytes(json.dumps({"curve": 12}).encode("utf-8-sig"))
+    extra = tmp_path / "extra.json"
+    extra.write_bytes(json.dumps({"pieces": []}).encode("utf-8-sig"))
+    assert runner.invoke(main, ["check", str(layout)]).exit_code == 0
+    result = runner.invoke(main, ["solve", "--inventory", str(inventory), "--catalog", str(extra)])
+    assert result.exit_code == 0 and "distinct loop(s) found" in result.output
+
+
+def test_an_inventory_of_zero_counts_asks_what_you_own(runner, tmp_path):
+    inventory = tmp_path / "empty-box.json"
+    inventory.write_text(json.dumps({"curve": 0, "straight": 0}))
+    result = runner.invoke(main, ["solve", "--inventory", str(inventory)])
+    assert result.exit_code == 2 and "Tell me what you own" in result.output

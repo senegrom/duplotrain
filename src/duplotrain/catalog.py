@@ -319,7 +319,7 @@ def load_catalog(*paths: str | Path, include_default: bool = True) -> dict[str, 
         for spec in DEFAULT_CATALOG_SPECS:
             specs[spec["id"]] = spec
     for path in paths:
-        with open(path, encoding="utf-8") as fh:
+        with open(path, encoding="utf-8-sig") as fh:  # a byte-order mark is harmless
             data = json.load(fh)
         if isinstance(data, dict):
             if "pieces" not in data:

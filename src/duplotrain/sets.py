@@ -1,6 +1,6 @@
 """LEGO set contents, so an inventory can be "the sets we own".
 
-Counts cover the modern (2018) DUPLO train wave and were taken from the Brickset /
+Counts cover the DUPLO train sets from 2018 on and were taken from the Brickset /
 BrickOwl inventories of each set.  Only track geometry and action stones are listed --
 locomotives, wagons, figures and scenery bricks don't affect layouts.
 

@@ -20,6 +20,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .catalog import default_catalog, load_catalog
+from .drive import DEFAULT_MAX_RUNS
 from .layout import layout_from_dict, layout_to_dict
 from .scoring import score_solution
 from .solver import SolverConfig, solve
@@ -55,6 +56,15 @@ def _write_image(render_layout, layout: object, target: str, **options: object) 
         raise click.ClickException(f"cannot write {target}: {exc}") from exc
 
 
+_catalog_option = click.option(
+    "--catalog",
+    "catalog_paths",
+    multiple=True,
+    type=click.Path(exists=True),
+    help="Extra piece-catalogue JSON, overriding built-ins by id.",
+)
+
+
 @click.group()
 @click.version_option(package_name="duplotrain")
 def main() -> None:
@@ -62,13 +72,7 @@ def main() -> None:
 
 
 @main.command()
-@click.option(
-    "--catalog",
-    "catalog_paths",
-    multiple=True,
-    type=click.Path(exists=True),
-    help="Extra piece-catalogue JSON, overriding built-ins by id.",
-)
+@_catalog_option
 @click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
 def pieces(catalog_paths: tuple[str, ...], as_json: bool) -> None:
     """List the known track pieces."""
@@ -150,13 +154,7 @@ def sets_cmd() -> None:
         "Pieces added via --catalog have no dedicated flag and are counted here."
     ),
 )
-@click.option(
-    "--catalog",
-    "catalog_paths",
-    multiple=True,
-    type=click.Path(exists=True),
-    help="Extra piece-catalogue JSON, overriding built-ins by id.",
-)
+@_catalog_option
 @click.option(
     "--slop",
     type=click.FloatRange(min=0),
@@ -219,7 +217,7 @@ def solve_cmd(
             inventory[k] = inventory.get(k, 0) + v
     if inventory_path:
         try:
-            with open(inventory_path, encoding="utf-8") as fh:
+            with open(inventory_path, encoding="utf-8-sig") as fh:
                 raw_counts = json.load(fh)
             # Validate the original values, before merging can mask a negative
             # count or int() can truncate a fraction/accept a boolean.
@@ -228,7 +226,7 @@ def solve_cmd(
                 inventory[k] = inventory.get(k, 0) + v
         except _BAD_FILE as exc:
             raise click.ClickException(f"bad inventory file: {exc}") from exc
-    if not inventory:
+    if not any(inventory.values()):
         raise click.UsageError(
             "Tell me what you own, e.g.:  duplotrain solve --curve 12 --straight 4 "
             "or --set 10874 --set 10882"
@@ -264,6 +262,8 @@ def solve_cmd(
         ),
         key=lambda pair: -pair[0],
     )
+    # Even a run that finds nothing replaces an earlier run's files.
+    out_dir = _fresh_output_dir(Path(out)) if out else None
 
     console.print(
         f"[bold]{len(scored)}[/bold] distinct loop(s) found "
@@ -306,22 +306,7 @@ def solve_cmd(
         )
     console.print(table)
 
-    if out:
-        out_dir = Path(out)
-        try:
-            out_dir.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            raise click.ClickException(f"cannot create {out_dir}: {exc}") from exc
-        # The directory holds one run's results: an earlier run's files would
-        # outnumber a smaller result set, or picture other loops than the JSON
-        # beside them when this run saves no images.
-        try:
-            for stale in [path for path in out_dir.iterdir()
-                          if _SAVED_NAME.fullmatch(path.name) and not path.is_dir()]:
-                stale.unlink()
-        except OSError as exc:
-            raise click.ClickException(
-                f"cannot replace the earlier results in {out_dir}: {exc}") from exc
+    if out_dir is not None:
         render_layout = _get_renderer(required=False)
         for rank, (score, sol) in enumerate(scored[:top], start=1):
             stem = out_dir / f"loop_{rank:02d}"
@@ -359,25 +344,40 @@ def _get_renderer(required: bool = True):
     return render_layout
 
 
+def _fresh_output_dir(out_dir: Path) -> Path:
+    """Create *out_dir* and delete an earlier run's loop_NN files from it."""
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise click.ClickException(f"cannot create {out_dir}: {exc}") from exc
+    # The directory holds one run's results: an earlier run's files would
+    # outnumber a smaller result set, or picture other loops than the JSON
+    # beside them when this run saves no images.
+    try:
+        for stale in [path for path in out_dir.iterdir()
+                      if _SAVED_NAME.fullmatch(path.name) and not path.is_dir()]:
+            stale.unlink()
+    except OSError as exc:
+        raise click.ClickException(
+            f"cannot replace the earlier results in {out_dir}: {exc}") from exc
+    return out_dir
+
+
 def _load_layout(layout_file: str, catalog):
     try:
         with open(layout_file, "rb") as fh:
             raw = fh.read(MAX_JSON_BYTES + 1)
         if len(raw) > MAX_JSON_BYTES:
             raise ValueError("layout file larger than 2 MB")
-        return layout_from_dict(json.loads(raw.decode("utf-8")), catalog)
+        # Editors on Windows often save a byte-order mark.
+        return layout_from_dict(json.loads(raw.decode("utf-8-sig")), catalog)
     except _BAD_FILE as exc:
         raise click.ClickException(f"bad layout file: {exc}") from exc
 
 
 @main.command()
 @click.argument("layout_file", type=click.Path(exists=True))
-@click.option(
-    "--catalog",
-    "catalog_paths",
-    multiple=True,
-    type=click.Path(exists=True),
-)
+@_catalog_option
 @click.option("-o", "--out", type=click.Path(dir_okay=False), default=None)
 def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) -> None:
     """Render a saved layout JSON to an image."""
@@ -392,12 +392,7 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
 
 @main.command()
 @click.argument("layout_file", type=click.Path(exists=True))
-@click.option(
-    "--catalog",
-    "catalog_paths",
-    multiple=True,
-    type=click.Path(exists=True),
-)
+@_catalog_option
 @click.option(
     "--slop", type=click.FloatRange(min=0), default=0.0, show_default=True,
     help="Accept this total planar joint gap in mm; never ignores height or heading errors.",
@@ -457,25 +452,26 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
 @main.command(name="classify")
 @click.argument("layout_file", type=click.Path(exists=True))
 @click.option(
-    "--max-runs", type=click.IntRange(min=1), default=100_000, show_default=True,
+    "--max-runs", type=click.IntRange(min=1), default=DEFAULT_MAX_RUNS, show_default=True,
     help="Maximum simulations; exceeding this budget produces no verdict.",
 )
-@click.option(
-    "--catalog",
-    "catalog_paths",
-    multiple=True,
-    type=click.Path(exists=True),
-)
+@_catalog_option
 def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...], max_runs: int) -> None:
     """Where does a saved layout sit on the looping ladder?
 
-    Simulates a train from every placement, in both directions, under every initial
-    switch-tongue setting, with the layout's action stones in effect.
+    Simulates a train entering every drivable piece through each of its connectors,
+    under every initial switch-tongue setting, with the layout's action stones in
+    effect. Joints must be exact: `check` lists any that are not.
     """
     from .drive import ClassificationLimitError, DriveLimitError, classify
 
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
+    if layout.joint_issues():
+        # The model follows recorded links: a joint that cannot exist would be
+        # driven through as if it did.
+        raise click.ClickException(
+            "classify needs track whose joints fit exactly; `duplotrain check` lists them")
     try:
         verdict = classify(layout, max_runs=max_runs)
     except ClassificationLimitError as exc:

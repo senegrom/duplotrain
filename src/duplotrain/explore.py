@@ -100,7 +100,6 @@ def find_perfect_loops(
     inventory: Mapping[str, int],
     pieces: Mapping[str, PieceType],
     config: SolverConfig | None = None,
-    stone_id: str = "stone_direction",
     *,
     require_complete: bool = False,
 ) -> PerfectResult:
@@ -131,7 +130,7 @@ def find_perfect_loops(
         key = congruence_key(sol.layout)
         if key in found:
             continue
-        candidate = sol.layout.with_accessory(mount, stone_id)
+        candidate = sol.layout.with_accessory(mount, "stone_direction")
         verdict = classify(candidate)
         if verdict.perfectly_looping:
             found[key] = (candidate, verdict)
@@ -181,7 +180,7 @@ def pick_stem_tailed(
 ) -> Solution | None:
     """The first stem-tailed teardrop among reversing solutions, if any."""
     for sol in solutions:
-        if sol.kind == "reversing" and is_stem_tailed(sol, pieces):
+        if is_stem_tailed(sol, pieces):
             return sol
     return None
 
@@ -261,12 +260,11 @@ def make_dogbone(
     teardrop: Solution,
     pieces: Mapping[str, PieceType],
     bar_straights: int = 2,
-    bar: list[tuple[str, int, int]] | None = None,
 ) -> Layout:
     """Grow a solver-found teardrop into a dogbone: the stone-free perfect layout.
 
-    The teardrop's open tail gets a straight bar, a second switch, and a mirror
-    lobe replayed from the teardrop's own step recipe; the final joint closes the
+    The teardrop's open tail gets a straight bar, a second switch, and a copy of
+    the lobe replayed from the teardrop's own step recipe; the final joint closes the
     walk into the new switch's other branch.  Every connector ends up mated, so the
     result has no ends to fall off and needs no direction stone: the lobes
     themselves turn the train around.
@@ -287,10 +285,9 @@ def make_dogbone(
         raise ValueError("the teardrop should have exactly its tail open")
 
     cursor = opens[0]
-    bar_sequence = bar if bar is not None else [("straight", 0, 1)] * bar_straights
-    for pid, entry, exit_port in bar_sequence:
-        layout, index = layout.attach(pieces[pid], entry, cursor)
-        cursor = (index, exit_port)
+    for _ in range(bar_straights):
+        layout, index = layout.attach(pieces["straight"], 0, cursor)
+        cursor = (index, 1)
 
     # The teardrop's step trace is tail pieces, then the switch, then the lobe that
     # closes into the switch's other branch.  The lobe recipe -- switch onward -- is

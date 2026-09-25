@@ -304,15 +304,6 @@ def _in_frame(curve: _Curve, heading: int, mirror: bool) -> _Curve:
                   opaque, (Alg(0), Alg(0), Alg(0)))
 
 
-def _identity(curve: _Curve) -> tuple:
-    """Exact union identity in one frame, independent of traversal/collection order."""
-    return (
-        tuple(sorted((_point_key(a), _point_key(b)) for a, b in curve.lines)),
-        tuple(sorted((_point_key(c), r.coeffs(), sectors) for c, r, sectors in curve.circles)),
-        tuple(sorted(_point_key(p) for p in curve.isolated)),
-    )
-
-
 def _rotation_ints() -> tuple[tuple[tuple[int, ...], tuple[int, ...]], ...]:
     """Four times the exact cosine and sine of every heading, as integer vectors."""
     table = []

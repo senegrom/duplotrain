@@ -1,9 +1,10 @@
 """Draw layouts, top-down, with matplotlib.
 
 The drawing is deliberately toy-like: a grey ballast band per piece, two rails, sleeper
-ticks, and dots at the joints.  Bridge pieces get a warmer tint and their elevation
-printed on them.  Output format follows the file extension (``.png``, ``.svg``,
-``.pdf``); pass no path to get the figure back for further fiddling.
+ticks, and dots at the joints.  Raised and climbing track is tinted by its height,
+and bridge pieces have their elevation printed on them.  Output format follows the
+file extension (``.png``, ``.svg``, ``.pdf``); pass no path to get the figure back
+for further fiddling.
 
 matplotlib is imported lazily so the geometry and solver work in environments without
 it (it is an optional dependency, installed via ``duplotrain[render]``).
@@ -123,12 +124,6 @@ def render_layout(
         fig, ax = plt.subplots(figsize=(9, 9))
     else:
         fig = ax.figure
-
-    max_z = 1e-9
-    for placement in layout:
-        for line in placement.centrelines():
-            for _x, _y, z in line:
-                max_z = max(max_z, z)
 
     # Ballast bands first, then rails and sleepers on top, so overlaps look right.
     features: list[tuple[float, list[list[tuple[float, float, float]]], float]] = []
@@ -278,14 +273,13 @@ def render_layout(
                     zorder=6,
                 )
 
-    # Elevation labels on bridge pieces.
-    if max_z > 1e-6:
-        for placement in layout:
-            if placement.piece.category != "bridge":
-                continue
-            line = placement.centrelines()[0]
-            mx, my, mz = line[len(line) // 2]
-            if mz > 1.0:
+    # Elevation labels on raised bridge pieces.
+    for placement in layout:
+        if placement.piece.category != "bridge":
+            continue
+        line = placement.centrelines()[0]
+        mx, my, mz = line[len(line) // 2]
+        if mz > 1.0:
                 ax.text(
                     mx,
                     my,
