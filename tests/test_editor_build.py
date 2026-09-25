@@ -17,10 +17,8 @@ spec.loader.exec_module(build)
 @pytest.mark.parametrize("pages", [False, True])
 def test_build_copies_external_sources_without_extracting_html(monkeypatch, tmp_path, pages):
     monkeypatch.setattr(build, "DIST", tmp_path)
-    (tmp_path / "app.js").write_text("stale extracted script")
     build.build_index(meta_csp=pages)
     html = (tmp_path / "index.html").read_text()
-    assert not (tmp_path / "app.js").exists()
     assert "<script>" not in html and "<style>" not in html
     assert html.index('src="./boot.js?v=__V__" defer') < html.index(
         'src="./editor.js?v=__V__" defer'

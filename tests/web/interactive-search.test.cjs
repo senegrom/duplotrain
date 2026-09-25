@@ -303,12 +303,12 @@ test("Close the loop and Search harder ignore clicks before state loads and duri
   // Resume would continue: only the loading and busy guards can refuse them.
   h.context.paused = job({status: "paused", found: 8});
   h.run("interactiveJob = paused");
-  for (const setup of ["S = null", "S = {revision: 7, open_ends: []}; apiBusy = true", "apiBusy = false; solving = true"]) {
+  for (const setup of ["S = null", "S = {revision: 7, open_ends: []}; apiBusy = true", "apiBusy = false; jobLoop = true"]) {
     h.run(setup);
     for (const id of ["solve", "expand-search", "find-more", "resume-search"]) await h.el(id).click();
   }
   assert.deepEqual(calls, []);
-  h.run("solving = false");
+  h.run("jobLoop = false");
   await h.el("expand-search").click();
   assert.deepEqual(calls, [["/api/search/continue", true]]);
 });
@@ -469,4 +469,124 @@ test("publishing a search keeps the train start, switches and trace made on its 
   // The same switch control still accepts a change on the new revision.
   control.value = "1"; control.fire("change");
   assert.deepEqual(clean(h.run("initialSwitches")), {1: 1});
+});
+
+test("a paused search reports the pause, never a failure to find", async () => {
+  let h, ticks = 0;
+  h = app({api: async path => {
+    if (path.endsWith("/start")) return job();
+    if (path.endsWith("/tick")) { if (++ticks === 1) h.el("pause-search").click(); return job({searched: 64}); }
+    if (path.endsWith("/pause")) return job({status: "paused"});
+    if (path.endsWith("/publish")) return {...h.context.S, revision: 8, search_job: job({status: "paused", revision: 8})};
+    throw new Error("Unexpected API: " + path);
+  }});
+  await h.run("startInteractiveSearch(null, null)");
+  assert.equal(h.notices.at(-1).text, "Search paused. Resume continues it.");
+  assert.notEqual(h.notices.at(-1).kind, "err");
+});
+
+for (const [status, extra, offered] of [
+  ["direct_join", {found: 1, resumable: false, can_harden: false}, []],
+  ["exhausted", {found: 3, resumable: false, complete: true}, []],
+  ["limited", {found: 3, resumable: false}, ["Search harder"]],
+  ["result_cap", {found: 50, resumable: false, can_harden: false}, []],
+  ["results_ready", {found: 8}, ["Find more", "Search harder"]],
+]) {
+  test(`a finished search names only the controls it offers: ${status}`, async () => {
+    let h;
+    const done = job({status, candidates: [candidate(0)], ...extra});
+    h = app({api: async path => {
+      if (path.endsWith("/start")) return done;
+      if (path.endsWith("/publish")) return {...h.context.S, revision: 8, search_job: {...done, revision: 8}};
+      throw new Error("Unexpected API: " + path);
+    }});
+    await h.run("startInteractiveSearch(null, null)");
+    const text = h.notices.at(-1).text;
+    assert.match(text, /alternative\(s\) found/);
+    for (const [name, id] of [["Find more", "find-more"], ["Search harder", "expand-search"]]) {
+      assert.equal(text.includes(name), offered.includes(name), text);
+      assert.equal(!h.el(id).hidden, offered.includes(name), id);
+    }
+  });
+}
+
+test("a search pauses with Pause and Stop, a route analysis with its own Pause", () => {
+  const h = app();
+  const pauses = () => ["stop-results", "pause-search", "route-pause"].filter(id => !h.el(id).hidden);
+  h.context.running = job({found: 3, candidates: [candidate(0)]});
+  h.run("interactiveJob = running; jobLoop = true; renderJobControls()");
+  assert.deepEqual(pauses(), ["stop-results", "pause-search"]);
+  h.context.analysis = route();
+  h.run("interactiveJob = null; routeAnalysis = analysis; renderJobControls()");
+  assert.deepEqual(pauses(), ["route-pause"]);
+});
+
+test("Check layout rows still focus their pieces after a search publishes", async () => {
+  let h, focused = 0;
+  const report = {revision: 7, connector_closed: false, open_ends: [[0, 0]], joint_issues: [],
+    overlaps: [[0, 1]], overlap_check_complete: true, missing: [], provisional: [], model_note: "m"};
+  h = app({focusPieces: () => { focused++; }, api: async path => {
+    if (path === "/api/check") return report;
+    if (path.endsWith("/start")) return job();
+    if (path.endsWith("/tick")) return job({status: "results_ready", found: 1, candidates: [candidate(0)]});
+    if (path.endsWith("/publish"))
+      return {...h.context.S, revision: 8, search_job: job({status: "results_ready", found: 1, revision: 8})};
+    throw new Error("Unexpected API: " + path);
+  }});
+  await h.run("checkLayout()");
+  await h.run("startInteractiveSearch(null, null)");
+  assert.equal(h.context.S.revision, 8);  // publication: a new revision of the same layout
+  h.el("diagnostics").children.find(c => c.tag === "button").fire("click");
+  assert.equal(focused, 1);
+});
+
+test("Best settings for this start waits for a layout to start from", () => {
+  const h = app();
+  h.run("S.layout.placements = []; S.open_ends = []; navigationRevision = null; renderNavigation()");
+  assert.equal(h.el("route-best").disabled, true);
+});
+
+test("a job the engine no longer holds withdraws its controls", async () => {
+  const h = app({api: async () => { throw new Error("Search expired after 20 minutes of inactivity; start again"); }});
+  h.context.paused = job({status: "paused", found: 8});
+  h.run("interactiveJob = paused; renderJobControls()");
+  await h.el("resume-search").click();
+  assert.match(h.notices.at(-1).text, /expired/);
+  assert.equal(h.run("interactiveJob"), null);
+  assert.deepEqual(["find-more", "resume-search", "expand-search"].filter(id => !h.el(id).hidden), []);
+});
+
+for (const [name, code] of [
+  ["Close the loop", "startInteractiveSearch(null, null)"],
+  ["Find more", "interactiveJob = paused; continueSearch()"],
+  ["a route analysis", 'startRouteAnalysis("all")'],
+  ["Test train", 'el("train-start").value = "[0,0]"; testTrain()'],
+]) {
+  test(`${name} refused by another tab's edit says why`, async () => {
+    const state = scene([], 7); state.open_ends = [[0, 0], [5, 1]];
+    const h = harness({state, events: true, omit: ["api"], overrides: {setTimeout: fn => { fn(); return 1; }}});
+    h.run("interactionRevision = 7");
+    h.context.window.duplotrainApi = async () => {
+      const error = new Error("The session changed in another tab. Your action was not applied.");
+      error.code = "stale_revision"; error.state = scene([], 9);
+      throw error;
+    };
+    h.context.paused = job({status: "paused", found: 8});
+    await h.run(code);
+    assert.equal(h.context.S.revision, 9);
+    assert.match(h.notices.at(-1).text, /changed in another tab/);
+    assert.equal(h.notices.at(-1).kind, "err");
+  });
+}
+
+test("hovering a card keeps its ghost while the search ticks on", () => {
+  const h = app();
+  const ghost = index => ({...candidate(index), preview: {...candidate(index).preview, placements: [{n: index}]}});
+  h.context.running = job({found: 2, candidates: [ghost(0), ghost(1)]});
+  h.run("interactiveJob = running; renderCandidates()");
+  h.el("cands").children[1].fire("pointerenter", {pointerType: "mouse"});
+  h.run("interactiveJob = {...running, searched: 64}; renderCandidates()");  // the next tick
+  assert.equal(h.run("preview.placements[0].n"), 1);
+  h.el("cands").children[1].fire("pointerleave");
+  assert.equal(h.run("preview"), null);
 });

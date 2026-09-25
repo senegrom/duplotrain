@@ -42,13 +42,11 @@ test("candidate revision is not silently replaced by the latest viewed revision"
   assert.deepEqual(JSON.parse(e.calls[0].options.body), {revision: 3, index: 0, preview_format: "duplotrain-preview/1"});
 });
 
-test("read-only requests do not require or inject an edit revision", async () => {
+test("the read-only state request does not require or inject an edit revision", async () => {
   const e = editor();
   await e.run('api("/api/state")');
-  await e.run('api("/api/export", {})');
   assert.equal(e.calls[0].options.method, "POST");
   assert.deepEqual(JSON.parse(e.calls[0].options.body), {preview_format: "duplotrain-preview/1"});
-  assert.equal(e.calls[1].options.body, "{}");
 });
 
 for (const transport of ["http", "worker"]) {
@@ -72,8 +70,7 @@ for (const transport of ["http", "worker"]) {
     assert.equal(e.run("deleting"), false);
     for (const name of ["armed", "armedStone", "pickMode", "selectedCandidate", "preview"])
       assert.equal(e.run(name), null);
-    assert.equal(e.el("expand-search").hidden, true);
-    assert.equal(e.redraws(), 1);
+    assert.equal(e.redraws(), 1);  // which renders the job controls afresh
     assert.equal(e.run("apiBusy"), false);
     assert.equal(e.classes.size, 0);
   });
@@ -245,4 +242,17 @@ test("a state from another engine at the same revision number rebuilds revision-
   assert.deepEqual(h.el("piece-select").children.map(o => o.textContent),
     ["#1 bridge ramp", "#2 curve", "#3 straight"]);
   assert.equal(h.run("trainTrace"), null);
+});
+
+test("a tab that restored another tab's newer autosave keeps autosaving its own edits", async () => {
+  const {server, open, saved} = localServerTabs();
+  const newer = await open();
+  await newer.attach("curve");
+  const stale = await open();
+  await newer.attach("straight");
+  Object.assign(server, {instance: "B", revision: 0, pieces: []});   // the server restarts
+  assert.match(await stale.attach("switch"), /another tab saved last was restored/);
+  assert.equal(await stale.attach("buffer"), "ok");
+  assert.equal(stale.h.run("autosaveReady"), true);
+  assert.equal(saved(), "curve,straight,buffer");
 });

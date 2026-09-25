@@ -172,7 +172,7 @@ def test_inventory_change_removes_suggestions(editor):
     page.locator("#solve").tap()
     page.wait_for_selector(".cand")
     # Suggestions stream in while the search runs; edit once it has published.
-    page.wait_for_function("!solving && !apiBusy")
+    page.wait_for_function("!jobLoop && !apiBusy")
     count = page.locator('[data-piece-id="curve"] input')
     count.fill("6")
     count.press("Tab")
@@ -197,8 +197,35 @@ def test_search_limit_message_and_deeper_search(editor):
     page.locator("#expand-search").tap()
     page.wait_for_selector(".cand")
     # Suggestions stream in while the search runs; read them once published.
-    page.wait_for_function("!solving && !apiBusy")
+    page.wait_for_function("!jobLoop && !apiBusy")
     assert len(session.candidates[0].layout) == 34
+    assert not errors
+
+
+def test_pause_and_save_controls_take_clicks_while_a_search_runs(editor):
+    page, session, url, errors = editor
+    session.inventory = {"curve": 12}
+    session.history = [build_chain([(session.catalog["curve"], 0, 1)] * 6)]
+    requests = []
+    page.on("request", lambda r: requests.append(r.url) if "/api/search/" in r.url else None)
+
+    def still_running(route):
+        # Report every tick as running, so the search waits for the user.
+        response = route.fetch()
+        route.fulfill(response=response, json={**response.json(), "status": "running"})
+
+    page.route("**/api/search/tick", still_running)
+    load(page, url)
+    page.locator("#reversing").uncheck()
+    page.evaluate("() => { startInteractiveSearch(null, null); }")  # runs until paused
+    page.wait_for_function("jobLoop && document.body.classList.contains('busy')")
+    events = "id => getComputedStyle(document.getElementById(id)).pointerEvents"
+    for control in ("pause-search", "export", "save-project"):
+        assert page.evaluate(events, control) != "none", control
+    assert page.evaluate(events, "check-layout") == "none"
+    page.locator("#pause-search").click()
+    page.wait_for_function("!jobLoop && !apiBusy")
+    assert any(url.endswith("/api/search/pause") for url in requests)
     assert not errors
 
 

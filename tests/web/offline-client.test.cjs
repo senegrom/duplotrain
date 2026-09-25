@@ -82,7 +82,7 @@ test("failed offline installation keeps the editor and portable download route",
 });
 
 test("busy search prevents update confirmation, activation and reload", async () => {
-  const h = client({waiting: true}); h.run("offlineRegistration = registration; solving = true");
+  const h = client({waiting: true}); h.run("offlineRegistration = registration; jobLoop = true");
   await h.run("applyOfflineUpdate()");
   assert.deepEqual(h.messages, []);
   assert.deepEqual(h.counts(), {reloads: 0, registrations: 0, confirmations: 0});
@@ -178,4 +178,20 @@ test("startup ignores an offline registration made for another scope", async () 
   await turn();
   assert.equal(h.run("offlineRegistration"), null);
   assert.deepEqual(h.messages, []);
+});
+
+test("one registration is watched for updates once, however often it is installed", async () => {
+  const listeners = [];
+  const active = {state: "activated", addEventListener() {}, removeEventListener() {}};
+  const registration = {scope: "https://example.test/train/", active, waiting: null, installing: null,
+    addEventListener(name, fn) { if (name === "updatefound") listeners.push(fn); }};
+  const h = harness({overrides: {isSecureContext: true, URL, clearTimeout() {},
+    location: {href: "https://example.test/train/", pathname: "/train/"},
+    window: {duplotrainBuild: "b1", addEventListener() {}},
+    navigator: {serviceWorker: {async getRegistration() { return registration; },
+      async register() { return registration; }}},
+    offlineMessage: async () => ({ready: true, build: "b1"})}});
+  h.run("bindOfflineEvents()"); await turn();
+  for (let i = 0; i < 3; i++) await h.run("installOffline()");
+  assert.equal(listeners.length, 1);
 });

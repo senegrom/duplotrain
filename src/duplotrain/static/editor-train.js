@@ -44,7 +44,9 @@ async function testTrain() {
     const trace = await api("/api/drive", {start, max_steps: 10000, switch_states: {...initialSwitches}});
     if (sequence !== trainConfigSequence || trace.revision !== S.revision) return;
     trainTrace = trace; trainStep = -1; showTrainStep(); draw();
-  } catch (error) { if (sequence === trainConfigSequence) status(error.message, "err"); }
+  } catch (error) {
+    if (sequence === trainConfigSequence || error.code === "stale_revision") status(error.message, "err");
+  }
 }
 function traceLength(trace = trainTrace) { return trace ? trace.steps.length + (trace.terminal ? 1 : 0) : 0; }
 function showTrainStep() {

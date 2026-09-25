@@ -44,7 +44,11 @@ async function showOfflineStatus() {
   // offline build, which may be older than this page.
   if (el("offline-update")) el("offline-update").hidden = !r.waiting;
 }
+// The browser hands back the same registration each time: listen to it once.
+const watchedRegistrations = new WeakSet();
 function watchOfflineUpdates(r) {
+  if (watchedRegistrations.has(r)) return;
+  watchedRegistrations.add(r);
   r.addEventListener("updatefound", () => {
     const installing = r.installing;
     installing?.addEventListener("statechange", () => {
@@ -85,7 +89,7 @@ async function checkOfflineUpdate() {
   } catch (error) { offlineNotice(`Update check failed: ${error.message}. Existing offline version kept.`); }
 }
 async function applyOfflineUpdate() {
-  if (offlineWorking || solving || apiBusy) { offlineNotice("Finish or pause the current operation before updating."); return; }
+  if (offlineWorking || jobLoop || apiBusy) { offlineNotice("Finish or pause the current operation before updating."); return; }
   if (!window.confirm("Reload the app with the verified offline version? Download a project first. In-memory undo and search progress will be reset.")) return;
   offlineWorking = true;
   try {

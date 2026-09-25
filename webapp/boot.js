@@ -113,10 +113,11 @@ window.duplotrainBuild = "__BUILD__";
     if (restarting) return;
     restarting = true;
     try {
+      // Only the failure overlay offers a restart: fail() has stopped the old
+      // engine already. Copy the snapshot; recovery never falls back to a
+      // different tab's save.
       const snapshot = options.checkpoint?.();
-      // Copy before terminating; recovery never falls back to a different tab's save.
       const saved = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
-      stop(new Error("The engine restarted; the last confirmed session is being restored"));
       await start(saved);
     } finally { restarting = false; }
   }

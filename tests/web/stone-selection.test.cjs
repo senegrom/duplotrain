@@ -34,7 +34,7 @@ test("Legacy midpoint markers without at send explicit null", async () => {
   assert.equal(e.calls[0].body.remove, true);
 });
 
-for (const flag of ["apiBusy", "solving"]) {
+for (const flag of ["apiBusy", "jobLoop"]) {
   test(`Remove ignores clicks while ${flag}`, async () => {
     const e = editor([{id: "stone_lights", at: 0}]);
     e.run(`${flag} = true`);

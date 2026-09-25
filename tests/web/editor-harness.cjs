@@ -7,7 +7,7 @@ const scripts = ["editor.js", "editor-geometry.js", "editor-projects.js", "edito
 const sources = scripts.map(name => [name,
   fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static", name), "utf8")]);
 const stateNames = new Set(["S", "armed", "armedStone", "preview", "pickMode", "view", "fitted",
-  "deleting", "selectedCandidate", "solving", "recoveryAttempted", "autosaveReady", "apiBusy"]);
+  "deleting", "selectedCandidate", "jobLoop", "recoveryAttempted", "autosaveReady", "apiBusy"]);
 
 function loadEditor(context, {events = false} = {}) {
   const overrides = {...context};

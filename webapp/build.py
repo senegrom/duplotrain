@@ -4,11 +4,14 @@ Output layout (everything self-hosted, no third-party requests at runtime):
 
     dist/
       index.html                    the editor, with boot.js injected
-      icons/ / manifest.webmanifest  favicon and installed-app identity
-      boot.js / editor.js / worker.js  bridge + editor + engine worker
+      editor*.js / editor.css       the editor's scripts and style
+      boot.js / worker.js           the worker bridge and the engine worker
       adapter.py                    the dispatch shim around duplotrain.editor.Session
       duplotrain-src-<stamp>.zip    the Python package, content-stamped
       pyodide-<version>/            Pyodide core (downloaded once into vendor/)
+      service-worker.js             the opt-in offline copy
+      icons/, manifest.webmanifest  favicon and installed-app identity
+      .htaccess                     the caching contract below, for Apache hosts
 
 Caching contract: mutable names (html/js/py) are served ``no-cache`` so every
 visit revalidates them (cheap 304s), while the content-stamped zip and the
@@ -83,7 +86,6 @@ def framed(name: str, payload: bytes) -> bytes:
 
 #: Everything Pyodide needs for `loadPyodide` + pure-Python imports.
 PYODIDE_FILES = [
-    "pyodide.mjs",
     "pyodide.js",
     "pyodide.asm.js",
     "pyodide.asm.wasm",
@@ -211,7 +213,7 @@ def build_source_zip(entries: list[tuple[str, bytes]] | None = None) -> bytes:
 _CSP = (
     "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; "
     "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
-    "connect-src 'self'; worker-src 'self' blob:; object-src 'none'; "
+    "connect-src 'self'; worker-src 'self'; object-src 'none'; "
     "base-uri 'self'; form-action 'self'; frame-ancestors 'none'; "
     "manifest-src 'self'; upgrade-insecure-requests"
 )
@@ -265,8 +267,6 @@ def build_index(meta_csp: bool = False) -> None:
     html = html.replace(boot_marker, '<script src="./boot.js?v=__V__" defer></script>')
     for asset in (*EDITOR_SCRIPTS, "editor.css"):
         html = html.replace(f'./{asset}"', f'./{asset}?v=__V__"')
-    # Old in-place builds must not retain a now-unused, extracted script.
-    (DIST / "app.js").unlink(missing_ok=True)
     html = html.replace(
         "<title>duplotrain editor</title>",
         "<title>duplotrain — DUPLO track designer</title>\n"
@@ -406,8 +406,6 @@ def main() -> None:
     for name in PYODIDE_FILES:
         shutil.copy2(pyodide_dir / name, dest / name)
     (dest / ".htaccess").write_text(HTACCESS_PYODIDE, encoding="utf-8", newline="\n")
-    # The pre-stamp flat layout, if present from an older build.
-    shutil.rmtree(DIST / "pyodide", ignore_errors=True)
 
     build_offline_worker(stamp, pyodide_dirname, zip_name, zip_content)
     total = sum(f.stat().st_size for f in DIST.rglob("*") if f.is_file())

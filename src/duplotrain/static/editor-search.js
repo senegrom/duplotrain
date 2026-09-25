@@ -11,7 +11,7 @@ function visibleCandidates() {
 }
 function clearInteractiveState() {
   jobSequence++; interactiveJob = routeAnalysis = null;
-  jobPauseRequested = true; jobLoop = false; solving = false; refreshBusy();
+  jobPauseRequested = true; jobLoop = false; refreshBusy();
   if (el("route-report")) el("route-report").textContent = "";
   renderJobControls();
 }
@@ -60,21 +60,35 @@ function renderSearchOptions() {
     label.append(input, ` ${piece.name}`); box.append(label);
   }
 }
+// What a search can still do; its controls and its final message both follow these.
+function canFindMore(job) { return job.found < 50 && job.resumable; }
+function canHarden(job) {
+  return job.can_harden && !job.complete && !(job.max_pieces >= 128 && job.search_effort >= 16);
+}
+function searchOutcome(job) {
+  if (job.status === "paused")
+    return `Search paused${job.found ? ` with ${job.found} alternative(s) — preview and apply` : ""}. Resume continues it.`;
+  const summary = job.found ? `${job.found} alternative(s) found — preview and apply.` :
+    job.reason || (job.complete ? "No completion fits the remaining inventory under these settings." :
+      "No completion found within these limits. A closure may still exist.");
+  const next = [canFindMore(job) && "Find more resumes this search",
+                canHarden(job) && "Search harder raises its limits"].filter(Boolean);
+  return next.length ? `${summary} ${next.join("; ")}.` : summary;
+}
 function renderJobControls() {
   const show = (id, visible, disabled = false) => {
     const target = el(id); if (target) { target.hidden = !visible; target.disabled = disabled; }
   };
   const job = interactiveJob, active = !!job && job.revision === S?.revision;
-  show("find-more", active && job.found < 50 && job.resumable, solving);
-  show("resume-search", active && job.status === "paused", solving);
+  show("find-more", active && canFindMore(job), jobLoop);
+  show("resume-search", active && job.status === "paused", jobLoop);
   show("stop-results", active && job.status === "running" && job.found > 0);
   if (active) {
-    show("expand-search", job.can_harden && !job.complete && !(job.max_pieces >= 128 && job.search_effort >= 16), solving);
-    el("expand-search").textContent = "Search harder";
+    show("expand-search", canHarden(job), jobLoop);
     const total = Math.max(1, Math.ceil(job.found / 8));
     if (el("candidate-page")) el("candidate-page").textContent = `Page ${job.page + 1} / ${total}`;
-    show("candidate-prev", total > 1, solving || job.page === 0);
-    show("candidate-next", total > 1, solving || job.page + 1 >= total);
+    show("candidate-prev", total > 1, jobLoop || job.page === 0);
+    show("candidate-next", total > 1, jobLoop || job.page + 1 >= total);
     if (el("search-report")) el("search-report").textContent =
       `${job.stage}: ${job.searched.toLocaleString()} search nodes; ${job.found} distinct alternative(s). ` +
       `${job.status.replaceAll("_", " ")}. Sorted best among found only; no global optimum guaranteed. ` +
@@ -84,18 +98,25 @@ function renderJobControls() {
     if (el("candidate-page")) el("candidate-page").textContent = "";
     if (el("search-report")) el("search-report").textContent = "";
   }
-  if (S) show("close-all", true, solving || (S.open_ends?.length ?? 0) < 2);
-  if (el("cancel-search")) {
-    el("cancel-search").hidden = !solving;
-    el("cancel-search").textContent = "Pause at next checkpoint";
-  }
+  if (S) show("close-all", true, jobLoop || (S.open_ends?.length ?? 0) < 2);
+  // A route analysis pauses with its own button.
+  show("pause-search", jobLoop && !routeAnalysis);
   show("route-pause", !!routeAnalysis && routeAnalysis.status === "running");
-  show("route-resume", !!routeAnalysis && routeAnalysis.status === "paused", solving);
-  show("route-witness", !!routeAnalysis?.best, solving);
-  show("route-counterexample", !!routeAnalysis?.counterexample, solving);
+  show("route-resume", !!routeAnalysis && routeAnalysis.status === "paused", jobLoop);
+  show("route-witness", !!routeAnalysis?.best, jobLoop);
+  show("route-counterexample", !!routeAnalysis?.counterexample, jobLoop);
 }
 function jobCurrent(sequence, response) {
   return sequence === jobSequence && response?.revision === S?.revision;
+}
+// A refused request to a running job. A stale revision was adopted, and the job
+// dropped, on the way; any other refusal means the engine no longer holds the job.
+function jobRequestFailed(error, sequence, drop) {
+  if (error.code !== "stale_revision") {
+    if (sequence !== jobSequence) return;
+    drop(); renderJobControls(); renderCandidates();
+  }
+  status(error.message, "err");
 }
 // The ranking is presentation: every request of a search carries the chosen one.
 const jobView = () => ({page: searchPage, sort: el("candidate-sort")?.value || "discovery"});
@@ -113,12 +134,13 @@ async function publishSearch(sequence) {
   interactionRevision = S.revision;
   if (navigationRevision === before) navigationRevision = S.revision;
   if (trainTrace?.revision === before) trainTrace.revision = S.revision;
+  if (diagnosticsRevision === before) diagnosticsRevision = S.revision;
   selectedCandidate = chosenIndex === undefined ? null : `${S.revision}:${chosenIndex}`;
   redraw(); renderJobControls();
 }
 async function driveSearchTicks(sequence) {
   let finalMessage = null, failed = false;
-  jobLoop = true; solving = true; jobPauseRequested = false; refreshBusy(); renderJobControls(); refreshStatus();
+  jobLoop = true; jobPauseRequested = false; refreshBusy(); renderJobControls(); refreshStatus();
   try {
     while (sequence === jobSequence && interactiveJob?.status === "running") {
       if (jobPauseRequested) {
@@ -139,11 +161,8 @@ async function driveSearchTicks(sequence) {
     if (sequence === jobSequence && interactiveJob) {
       await publishSearch(sequence);
       const job = interactiveJob;
-      failed = !job.found;
-      finalMessage = job.found ? `${job.found} alternative(s) found — preview and apply. ` +
-        "Find more resumes this search; Search harder raises its limits." :
-        job.reason || (job.complete ? "No completion fits the remaining inventory under these settings." :
-          "No completion found within these limits. A closure may still exist.");
+      failed = !job.found && job.status !== "paused";
+      finalMessage = searchOutcome(job);
     }
   } catch (error) {
     if (sequence === jobSequence) {
@@ -155,13 +174,13 @@ async function driveSearchTicks(sequence) {
     }
   } finally {
     if (sequence === jobSequence) {
-      solving = false; jobLoop = false; refreshBusy(); renderJobControls(); refreshStatus(); renderCandidates();
+      jobLoop = false; refreshBusy(); renderJobControls(); refreshStatus(); renderCandidates();
       if (finalMessage) status(finalMessage, failed ? "err" : "");
     }
   }
 }
 async function startInteractiveSearch(grow, close, effort = 1, allGaps = false) {
-  if (!S || solving || apiBusy) return;
+  if (!S || jobLoop || apiBusy) return;
   const sequence = ++jobSequence; jobPauseRequested = false;
   try {
     // Close all gaps plans exact, non-reversing joins only: slop and reversing
@@ -177,10 +196,13 @@ async function startInteractiveSearch(grow, close, effort = 1, allGaps = false) 
     // The engine withdrew the previous suggestions; only this job's can follow.
     S.candidates = [];
     await driveSearchTicks(sequence);
-  } catch (error) { if (sequence === jobSequence) status(error.message, "err"); }
+  } catch (error) {
+    // A refused start leaves the engine's previous job as it was.
+    if (sequence === jobSequence || error.code === "stale_revision") status(error.message, "err");
+  }
 }
 async function continueSearch(harder = false, resume = false) {
-  if (!interactiveJob || solving || apiBusy || interactiveJob.revision !== S?.revision) return;
+  if (!interactiveJob || jobLoop || apiBusy || interactiveJob.revision !== S?.revision) return;
   const sequence = ++jobSequence;
   try {
     const response = await api(resume ? "/api/search/resume" : "/api/search/continue",
@@ -189,10 +211,10 @@ async function continueSearch(harder = false, resume = false) {
     interactiveJob = response;
     el("max-pieces").value = response.max_pieces;
     await driveSearchTicks(sequence);
-  } catch (error) { if (sequence === jobSequence) status(error.message, "err"); }
+  } catch (error) { jobRequestFailed(error, sequence, () => { interactiveJob = null; }); }
 }
 async function searchPageTo(page) {
-  if (!interactiveJob || solving || apiBusy) return;
+  if (!interactiveJob || jobLoop || apiBusy) return;
   const sequence = jobSequence;
   try {
     const response = await api("/api/search/page", {job_id: interactiveJob.job_id,
@@ -200,7 +222,7 @@ async function searchPageTo(page) {
     if (!jobCurrent(sequence, response)) return;
     interactiveJob = response; searchPage = response.page;
     renderCandidates(); renderJobControls(); draw();
-  } catch (error) { status(error.message, "err"); }
+  } catch (error) { jobRequestFailed(error, sequence, () => { interactiveJob = null; }); }
 }
 function requestJobPause() {
   jobPauseRequested = true;
@@ -224,7 +246,7 @@ function showRouteAnalysis() {
 }
 async function driveRouteTicks(sequence) {
   let failure = null;
-  solving = true; jobLoop = true; jobPauseRequested = false; refreshBusy(); refreshStatus(); renderJobControls();
+  jobLoop = true; jobPauseRequested = false; refreshBusy(); refreshStatus(); renderJobControls();
   try {
     while (sequence === jobSequence && routeAnalysis?.status === "running") {
       const response = await api(jobPauseRequested ? "/api/routes/pause" : "/api/routes/tick",
@@ -240,12 +262,12 @@ async function driveRouteTicks(sequence) {
       if (el("route-report")) el("route-report").textContent = "";
     } else if (error.code === "stale_revision") status(error.message, "err");
   } finally { if (sequence === jobSequence) {
-    solving = false; jobLoop = false; refreshBusy(); renderJobControls(); refreshStatus();
+    jobLoop = false; refreshBusy(); renderJobControls(); refreshStatus();
     if (failure) status(failure, "err");
   } }
 }
 async function startRouteAnalysis(scope = "all") {
-  if (!S || solving || apiBusy) return;
+  if (!S || jobLoop || apiBusy) return;
   const sequence = ++jobSequence;
   try {
     const response = await api("/api/routes/start", {scope,
@@ -254,10 +276,12 @@ async function startRouteAnalysis(scope = "all") {
     if (!jobCurrent(sequence, response)) return;
     interactiveJob = null; routeAnalysis = response;
     await driveRouteTicks(sequence);
-  } catch (error) { if (sequence === jobSequence) status(error.message, "err"); }
+  } catch (error) {
+    if (sequence === jobSequence || error.code === "stale_revision") status(error.message, "err");
+  }
 }
 async function useRouteWitness(counterexample = false) {
-  if (solving || apiBusy || routeAnalysis?.revision !== S?.revision) return;
+  if (jobLoop || apiBusy || routeAnalysis?.revision !== S?.revision) return;
   const witness = counterexample ? routeAnalysis.counterexample : routeAnalysis.best;
   if (!witness) return;
   el("train-start").value = JSON.stringify(witness.start);
@@ -293,13 +317,18 @@ function bindSearchEvents() {
   on("route-all", () => startRouteAnalysis("all"));
   on("route-pause", requestJobPause);
   on("route-resume", async () => {
-    if (solving || apiBusy || !routeAnalysis) return;
+    if (jobLoop || apiBusy || !routeAnalysis) return;
     const sequence = ++jobSequence;
     try {
       const response = await api("/api/routes/resume", {job_id: routeAnalysis.job_id, revision: routeAnalysis.revision});
       if (!jobCurrent(sequence, response)) return;
       routeAnalysis = response; await driveRouteTicks(sequence);
-    } catch (error) { status(error.message, "err"); }
+    } catch (error) {
+      jobRequestFailed(error, sequence, () => {
+        routeAnalysis = null;
+        if (el("route-report")) el("route-report").textContent = "";
+      });
+    }
   });
   on("route-witness", () => useRouteWitness());
   on("route-counterexample", () => useRouteWitness(true));

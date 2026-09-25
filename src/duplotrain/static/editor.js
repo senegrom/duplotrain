@@ -28,8 +28,8 @@ async function api(path, body, fromJob = false) {
   try {
     // Legacy API clients still receive full previews. This editor opts into the
     // versioned drawing-only contract; state reads use the existing read-only POST.
-    if (path !== "/api/export") body = {...body, preview_format: "duplotrain-preview/1"};
-    if (body !== undefined && path !== "/api/state" && path !== "/api/export") {
+    body = {...body, preview_format: "duplotrain-preview/1"};
+    if (path !== "/api/state") {
       // Capture the state and engine the user acted on; never fill in a newer
       // revision after an await. Preserve an explicit candidate revision as well.
       body = {revision: S && S.revision, ...(S?.instance ? {instance: S.instance} : {}), ...body};
@@ -55,8 +55,11 @@ async function adoptConflictState(error) {
     // autosaved since this tab last did. If another tab restored first, adopt it.
     const newer = newerCheckpoint();
     try {
-      S = await send("/api/restore", {data: newer || S.snapshot, revision: 0, instance: current.instance,
-                                      preview_format: "duplotrain-preview/1"});
+      S = await send("/api/restore", {data: newer?.snapshot || S.snapshot, revision: 0,
+                                      instance: current.instance, preview_format: "duplotrain-preview/1"});
+      // This tab now continues the session another tab saved: its save is this
+      // tab's baseline, not a competing writer that should pause autosave.
+      if (newer) { savedCheckpoint = newer.raw; lastSavedSnapshot = JSON.stringify(newer.snapshot); }
       error.message = (newer ? "The editor engine restarted; the session another tab saved last was " :
         "The editor engine restarted; this tab's last confirmed session was ") +
         "restored and undo history reset. Your last action was not applied.";
@@ -78,7 +81,6 @@ async function adoptConflictState(error) {
   selectTool();
   selectedCandidate = null;
   preview = null;
-  el("expand-search").hidden = true;
   redraw();
 }
 
@@ -93,7 +95,7 @@ let view = { x: 0, y: 0, scale: 0.9 };
 let fitted = false;
 let deleting = false;
 let selectedCandidate = null;
-let solving = false;
+let hoveredCandidate = null;  // the card under the pointer keeps its ghost across ticks
 let recoveryAttempted = false;
 let autosaveReady = false;
 
@@ -151,11 +153,12 @@ function decodeCheckpoint(raw, legacy = false) {
   return snapshot;
 }
 
-// The session another tab autosaved after this tab's last save or read, if any.
+// The session another tab autosaved after this tab's last save or read, if any,
+// with the stored record it came from.
 function newerCheckpoint() {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored !== null && stored !== savedCheckpoint ? decodeCheckpoint(stored) : null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw !== null && raw !== savedCheckpoint ? {raw, snapshot: decodeCheckpoint(raw)} : null;
   } catch (_error) { return null; } // unreadable: this tab's own session is all there is
 }
 
@@ -567,9 +570,9 @@ function refreshStatus() {
     status(n ? `${n} pieces, ${opens} open end(s), ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`
              : "Empty floor. Arm a piece to begin.");
   }
-  el("solve").disabled = solving || opens < 2;
-  el("undo").disabled = solving || !S.can_undo;
-  el("redo").disabled = solving || !S.can_redo;
+  el("solve").disabled = jobLoop || opens < 2;
+  el("undo").disabled = jobLoop || !S.can_undo;
+  el("redo").disabled = jobLoop || !S.can_redo;
   el("undo").title = S.undo_label ? `Undo ${S.undo_label}` : "Nothing to undo";
   el("redo").title = S.redo_label ? `Redo ${S.redo_label}` : "Nothing to redo";
 }
@@ -709,7 +712,9 @@ function renderCandidates() {
   const key = (c) => `${c.revision}:${c.index}`;
   const selected = candidates.find(c => key(c) === selectedCandidate);
   if (!selected) selectedCandidate = null;
-  preview = selected ? selected.preview : null;
+  const hovered = candidates.find(c => key(c) === hoveredCandidate);
+  if (!hovered) hoveredCandidate = null;
+  preview = (hovered || selected)?.preview ?? null;
   // Previews can be large: compare only the card's metadata, not its geometry.
   const cards = JSON.stringify(candidates.map(({preview, ...card}) => card));
   if (cards !== candidateKey) {
@@ -741,7 +746,7 @@ function renderCandidates() {
       apply.addEventListener("click", async () => {
         try {
           const current = row.candidate;
-          if (solving) return;
+          if (jobLoop) return;
           S = await api("/api/apply", {index: current.index, revision: current.revision});
           selectedCandidate = null;
           fitted = false;
@@ -751,9 +756,12 @@ function renderCandidates() {
       buttons.append(show, apply);
       div.append(buttons);
       div.addEventListener("pointerenter", (event) => {
-        if (event.pointerType !== "touch") { preview = row.candidate.preview; draw(); }
+        if (event.pointerType !== "touch") {
+          hoveredCandidate = key(row.candidate); preview = row.candidate.preview; draw();
+        }
       });
       div.addEventListener("pointerleave", () => {
+        hoveredCandidate = null;
         const chosen = visibleCandidates().find(candidate => key(candidate) === selectedCandidate);
         preview = chosen ? chosen.preview : null;
         draw();
@@ -769,7 +777,7 @@ function renderCandidates() {
     const label = active ? "Previewing" : "Preview";
     if (row.show.textContent !== label) row.show.textContent = label;
     row.show.setAttribute("aria-pressed", String(active));
-    row.apply.disabled = !active || solving;
+    row.apply.disabled = !active || jobLoop;
   });
 }
 
@@ -817,7 +825,7 @@ function pairMetrics() {
 }
 
 async function activateAt(sx, sy) {
-  if (!S || apiBusy || solving) return;
+  if (!S || apiBusy || jobLoop) return;
   closeOverlapPicker(); clearHover();
   if (pickMode && pickMode.revision !== S.revision) {
     pickMode = null;
@@ -854,7 +862,7 @@ async function activateAt(sx, sy) {
   } catch (err) { status(err.message, "err"); }
 }
 async function removeAt(sx, sy) {
-  if (!S || apiBusy || solving) return;
+  if (!S || apiBusy || jobLoop) return;
   closeOverlapPicker(); clearHover();
   try {
     const mark = stoneMarkPositions().find(m => Math.hypot(m.x - sx, m.y - sy) < Math.max(16, m.r + 4));
@@ -865,7 +873,7 @@ async function removeAt(sx, sy) {
     } else {
       const hits = placementsAt(sx, sy);
       if (hits.length > 1) { showOverlapPicker(hits, true); return; }
-      const hit = placementAt(sx, sy);
+      const hit = hits[0]?.placement ?? null;
       if (hit === null) return;
       S = await api("/api/remove", {placement: hit});
     }
@@ -948,7 +956,7 @@ function bindEditorEvents() {
     }
   });
   el("solve").addEventListener("click", async () => {
-    if (!S || solving || apiBusy) return;
+    if (!S || jobLoop || apiBusy) return;
     const opens = S.open_ends.length;
     if (opens > 2) {
       selectTool({pick: {stage: "grow", grow: null}});
@@ -958,7 +966,7 @@ function bindEditorEvents() {
     await startInteractiveSearch(null, null);
   });
   el("expand-search").addEventListener("click", async () => {
-    if (solving || apiBusy || !S || interactiveJob?.revision !== S.revision) return;
+    if (jobLoop || apiBusy || !S || interactiveJob?.revision !== S.revision) return;
     await continueSearch(true);
   });
   canvas.addEventListener("pointerdown", (e) => {
@@ -1050,7 +1058,6 @@ function bindEditorEvents() {
     }
     if (e.key === "Escape") {
       selectTool(); selectedPiece = null; hoveredPiece = null;
-      el("overlap-picker").hidden = true;
       renderPalette(); renderStones(); refreshStatus(); draw();
     }
   });
@@ -1129,11 +1136,10 @@ function closeOverlapPicker() {
 }
 function clearTransient() {
   clearInteractiveState();
-  pickMode = null; selectedCandidate = null; preview = null;
+  pickMode = null; selectedCandidate = null; hoveredCandidate = null; preview = null;
   selectedPiece = null; clearHover(); highlightedPieces = []; closeOverlapPicker();
   invalidateTrain(); initialSwitches = {};
-  navigationRevision = null;
-  for (const id of ["overlap-picker", "expand-search"]) if (el(id)) el(id).hidden = true;
+  navigationRevision = diagnosticsRevision = null;
   for (const id of ["diagnostics", "train-report"]) if (el(id)) el(id).textContent = "";
   for (const id of ["train-play", "train-step"]) if (el(id)) el(id).disabled = true;
 }
@@ -1235,7 +1241,7 @@ function showOverlapPicker(hits, remove = false) {
 }
 
 async function activateEnd(end) {
-  if (!S || apiBusy || solving) return;
+  if (!S || apiBusy || jobLoop) return;
   closeOverlapPicker(); clearHover();
   if (pickMode && pickMode.revision !== S.revision) { pickMode = null; status("Select the endpoints again.", "err"); return; }
   if (!S.open_ends.some(e => e[0] === end[0] && e[1] === end[1])) return;
@@ -1269,19 +1275,23 @@ function renderNavigation() {
     });
   });
   S.open_ends.forEach(end => add(ends, JSON.stringify(end), `#${end[0] + 1} ${S.layout.placements[end[0]].name} — port ${end[1]}`));
-  for (const id of ["remove-selected", "test-train"]) el(id).disabled = !S.layout.placements.length;
+  for (const id of ["remove-selected", "test-train", "route-best"]) el(id).disabled = !S.layout.placements.length;
   el("use-end").disabled = !S.open_ends.length;
   renderSwitches();
   navigationRevision = S.revision;
 }
+// The revision whose pieces the Check layout rows name; publishing a search
+// moves it along, since publication leaves the layout as it was.
+let diagnosticsRevision = null;
 async function checkLayout() {
   try {
     const report = await api("/api/check", {});
     if (report.revision !== S.revision) return;
+    diagnosticsRevision = report.revision;
     const box = el("diagnostics"); box.replaceChildren();
     const row = (text, indices = []) => {
       const line = document.createElement(indices.length ? "button" : "p"); line.textContent = text;
-      if (indices.length) line.addEventListener("click", () => { if (S.revision === report.revision) focusPieces(indices); });
+      if (indices.length) line.addEventListener("click", () => { if (S.revision === diagnosticsRevision) focusPieces(indices); });
       box.append(line);
     };
     row(report.connector_closed ? "Connectors: exactly closed" : `Connectors: ${report.open_ends.length} open end(s)`, report.open_ends.map(e => e[0]));
@@ -1298,7 +1308,7 @@ async function checkLayout() {
 function bindExtraEvents() {
   bindSearchEvents();
   on("redo", async () => { try { S = await api("/api/redo", {}); redraw(); } catch (error) { status(error.message, "err"); } });
-  on("cancel-search", () => { if (jobLoop) requestJobPause(); });
+  on("pause-search", () => { if (jobLoop) requestJobPause(); });
   on("check-layout", checkLayout);
   on("fit-preview", () => { const pl = previewPlacements(preview); if (pl) { fitView(pl); fitted = true; draw(); } });
   on("use-end", async () => { try { await activateEnd(JSON.parse(el("end-select").value)); } catch (e) { status(e.message, "err"); } });
