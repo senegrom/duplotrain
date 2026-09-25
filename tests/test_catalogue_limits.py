@@ -107,7 +107,7 @@ def test_sparse_fallback_matches_normal_path_after_backtracking(monkeypatch):
     for i in range(30):
         field.add(i, [(rng.uniform(-1000, 1000), rng.uniform(-1000, 1000), 0.0)],
                   rng.choice([16, 32, 80]))
-    for pop in range(4):
+    for _pop in range(4):
         for _ in range(80):
             query = [(rng.uniform(-1200, 1200), rng.uniform(-1200, 1200),
                       rng.choice([0, 42, 57.6, 120]))]

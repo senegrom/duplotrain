@@ -524,7 +524,10 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         width = float(_number(spec.get("width", 40.0)))
         overhang = float(_number(spec.get("end_overhang", 0.0)))
     except (ValueError, TypeError, OverflowError) as exc:
-        raise ValueError("piece width and end overhang must be bounded finite numbers") from exc
+        raise ValueError(
+            f"piece {piece_id!r} needs a finite positive width and a finite, "
+            "non-negative end overhang"
+        ) from exc
     if not (math.isfinite(width) and width > 0 and math.isfinite(overhang) and overhang >= 0):
         raise ValueError(
             f"piece {piece_id!r} needs a finite positive width and a finite, "

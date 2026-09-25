@@ -33,7 +33,8 @@ def _versions(dist):
             data = (dist / path).read_bytes()
             # Only application text contains the build stamp. Runtime and ZIP
             # bytes stay untouched; each manifest verifies the exact served bytes.
-            if "/" not in path and Path(path).suffix in {".js", ".html", ".css", ".py", ".webmanifest"}:
+            if ("/" not in path
+                    and Path(path).suffix in {".js", ".html", ".css", ".py", ".webmanifest"}):
                 data = data.replace(original.encode(), build.encode())
             url = asset["url"].replace(original, build)
             resources["/" + url] = data
@@ -55,11 +56,17 @@ _UPDATE = """async () => {
   const worker = reg.installing || reg.waiting;
   if (!worker) throw new Error('new version did not install');
   const state = wanted => new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { cleanup(); reject(new Error('worker did not become ' + wanted)); }, 90000);
-    const cleanup = () => { clearTimeout(timer); worker.removeEventListener('statechange', check); };
+    const timer = setTimeout(() => {
+      cleanup(); reject(new Error('worker did not become ' + wanted));
+    }, 90000);
+    const cleanup = () => {
+      clearTimeout(timer); worker.removeEventListener('statechange', check);
+    };
     const check = () => {
       if (worker.state === wanted) { cleanup(); resolve(); }
-      else if (worker.state === 'redundant') { cleanup(); reject(new Error('worker became redundant')); }
+      else if (worker.state === 'redundant') {
+        cleanup(); reject(new Error('worker became redundant'));
+      }
     };
     worker.addEventListener('statechange', check); check();
   });
@@ -67,11 +74,14 @@ _UPDATE = """async () => {
   const activated = state('activated');
   await new Promise((resolve, reject) => {
     const channel = new MessageChannel();
-    const timer = setTimeout(() => { cleanup(); reject(new Error('activation reply timed out')); }, 90000);
+    const timer = setTimeout(() => {
+      cleanup(); reject(new Error('activation reply timed out'));
+    }, 90000);
     const cleanup = () => { clearTimeout(timer); channel.port1.close(); channel.port2.close(); };
     channel.port1.onmessage = event => {
       cleanup();
-      if (event.data?.activated) resolve(); else reject(new Error(event.data?.error || 'activation refused'));
+      if (event.data?.activated) resolve();
+      else reject(new Error(event.data?.error || 'activation refused'));
     };
     worker.postMessage({type: 'ACTIVATE'}, [channel.port2]);
   });
@@ -161,11 +171,14 @@ def test_old_tab_restarts_real_engine_after_two_offline_updates(browser, tmp_pat
                 assert len(confirmed["layout"]["placements"]) == 1
                 page.get_by_text("Version and offline access", exact=True).click()
                 page.locator("#offline-install").click()
-                expect(page.locator("#offline-status")).to_contain_text("Offline ready", timeout=180000)
+                expect(page.locator("#offline-status")).to_contain_text(
+                    "Offline ready", timeout=180000,
+                )
                 await_control = """async () => {
                   await navigator.serviceWorker.ready;
                   if (!navigator.serviceWorker.controller) await new Promise(resolve =>
-                    navigator.serviceWorker.addEventListener('controllerchange', resolve, {once: true}));
+                    navigator.serviceWorker.addEventListener(
+                      'controllerchange', resolve, {once: true}));
                 }"""
                 page.evaluate(await_control)
                 update_tab = context.new_page()
@@ -176,7 +189,9 @@ def test_old_tab_restarts_real_engine_after_two_offline_updates(browser, tmp_pat
                     selected[0] = index
                     update_tab.evaluate(_UPDATE)
                     update_tab.reload()
-                    expect(update_tab.locator("#status")).to_contain_text("Engine ready", timeout=90000)
+                    expect(update_tab.locator("#status")).to_contain_text(
+                        "Engine ready", timeout=90000,
+                    )
                     assert update_tab.evaluate("window.duplotrainBuild") == build
                     assert page.evaluate("window.duplotrainBuild") == "ab000001"
                     assert page.evaluate("S.snapshot") == confirmed
@@ -193,7 +208,9 @@ def test_old_tab_restarts_real_engine_after_two_offline_updates(browser, tmp_pat
                 page.evaluate("""() => window.__testWorker.dispatchEvent(new ErrorEvent('error', {
                   message: 'test old engine failure', cancelable: true
                 }))""")
-                page.get_by_role("button", name="Restart engine and restore last confirmed session", exact=True).tap()
+                page.get_by_role(
+                    "button", name="Restart engine and restore last confirmed session", exact=True,
+                ).tap()
                 expect(page.locator("#status")).to_contain_text("Engine restarted", timeout=90000)
                 assert page.evaluate("S.snapshot") == confirmed
                 assert page.evaluate("window.duplotrainBuild") == "ab000001"
