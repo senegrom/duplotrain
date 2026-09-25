@@ -117,8 +117,8 @@ skips pairs the point test would reject.
 
 A fresh loop search skips right-handed moves until a turning move has been
 placed whenever every stock traversal has a mirror twin, since the mirror loop
-has the same canonical signature; `stats.pruned_mirror` counts the skipped
-candidates. Signatures are found by a lazy lexicographic minimum that extends
+has the same canonical signature. Signatures are found by a lazy lexicographic
+minimum that extends
 only the rotations still tied on their prefix, and a solution's layout is
 assembled directly from the engine's exact frames and the recorded joints
 instead of being replayed through the checked constructors.

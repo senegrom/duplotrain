@@ -84,8 +84,6 @@ class NetworkConfig:
 @dataclass
 class NetworkStats:
     nodes: int = 0
-    closed_found: int = 0  # before dedup / final validation
-    rejected_collision: int = 0
     pruned_reachability: int = 0  # subtrees whose open ends can no longer all mate
     duration_s: float = 0.0
     aborted: bool = False
@@ -254,13 +252,11 @@ def enumerate_networks(
         )
 
     def emit() -> None:
-        stats.closed_found += 1
         layout = rebuild()
         key = congruence_key(layout)
         if key in found:
             return
         if _solution_overlaps(layout, 0, cfg.clearance, cfg.collision_spacing):
-            stats.rejected_collision += 1
             return
         if accept is not None and not accept(layout):
             return  # Do not reserve the curve key for an ineligible realization.

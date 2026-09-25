@@ -1751,10 +1751,8 @@ class SolverConfig:
 class SolveStats:
     nodes: int = 0
     closures_found: int = 0  # before deduplication
-    pruned_turn: int = 0
     pruned_reach: int = 0
     pruned_collision: int = 0
-    pruned_mirror: int = 0  # right-handed first turns skipped in loop mode
     pruned_completion: int = 0
     completion_states: int = 0  # planar states in the largest complete reverse layer
     duration_s: float = 0.0
@@ -2457,7 +2455,6 @@ def solve_steps(
             return True
         stub_turns = sum(turn_of[placements[s[0]][0]] for s in stubs) + pass_turns
         if need > remaining_turn + stub_turns:
-            stats.pruned_turn += 1
             return True
         if simple_stock:
             slots = min(total_pieces, depth_limit, f_limit) - used
@@ -2477,7 +2474,6 @@ def solve_steps(
         need_beyond_stubs = max(0, need - stub_turns)
         if need_beyond_stubs > 0:
             if max_turn_any == 0:
-                stats.pruned_turn += 1
                 return True
             h_turn = -(-need_beyond_stubs // max_turn_any)
         else:
@@ -2566,7 +2562,6 @@ def solve_steps(
             rank = piece_rank[pid]
             for entry, exit_port, apply_move in eng.moves[pid]:
                 if not handed and chirality[(pid, entry, exit_port)] < 0:
-                    stats.pruned_mirror += 1
                     continue
                 child = apply_move(cursor)
                 candidates.append(

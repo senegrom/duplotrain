@@ -154,10 +154,11 @@ def test_stone_toggles_on_straights_only(server):
     _, state = server("/api/attach", {"piece": "straight", "entry": 0, "at": None})
     status, state = server("/api/stone", {"placement": 0, "id": "stone_direction"})
     assert status == 200
-    assert state["layout"]["placements"][0]["stones"] == ["stone_direction"]
+    assert state["layout"]["placements"][0]["stone_marks"] == [
+        {"id": "stone_direction", "at": None}]
     # Toggling again removes it.
     status, state = server("/api/stone", {"placement": 0, "id": "stone_direction"})
-    assert state["layout"]["placements"][0]["stones"] == []
+    assert state["layout"]["placements"][0]["stone_marks"] == []
 
     _, state = server(
         "/api/attach", {"piece": "curve", "entry": 0, "at": state["open_ends"][-1]}
@@ -215,7 +216,8 @@ def test_remove_piece_reindexes(server):
     assert status == 200
     assert len(state["layout"]["placements"]) == 2
     assert [p["piece"] for p in state["layout"]["placements"]] == ["straight", "curve"]
-    assert state["layout"]["placements"][0]["stones"] == ["stone_stop"]
+    assert [mark["id"] for mark in state["layout"]["placements"][0]["stone_marks"]] == [
+        "stone_stop"]
     assert len(state["open_ends"]) == 4  # two loose chains now
 
     status, err = server("/api/remove", {"placement": 7})

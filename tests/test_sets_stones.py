@@ -83,12 +83,12 @@ def test_buffers_never_join_a_loop(catalog):
 def test_stones_serialise_with_the_layout(catalog):
     layout = build_chain([(catalog["straight"], 0, 1), (catalog["straight"], 0, 1)])
     layout = layout.with_accessory(0, "stone_direction").with_accessory(1, "stone_stop")
-    assert layout.stones_on(0) == ["stone_direction"]
+    assert layout.stone_entries_on(0) == [("stone_direction", None)]
     rebuilt = layout_from_dict(layout_to_dict(layout), catalog)
     assert rebuilt == layout
-    assert rebuilt.stones_on(1) == ["stone_stop"]
+    assert rebuilt.stone_entries_on(1) == [("stone_stop", None)]
     removed = rebuilt.without_accessory(0, "stone_direction")
-    assert removed.stones_on(0) == []
+    assert removed.stone_entries_on(0) == []
     with pytest.raises(ValueError, match="no 'stone_direction'"):
         removed.without_accessory(0, "stone_direction")
 

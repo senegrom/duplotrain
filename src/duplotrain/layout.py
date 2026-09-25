@@ -548,9 +548,6 @@ class Layout:
             raise ValueError(f"no {accessory_id!r} on placement {placement}")
         return Layout(self.placements, dict(self.links), tuple(accessories))
 
-    def stones_on(self, placement: int) -> list[str]:
-        return [entry[1] for entry in self.accessories if entry[0] == placement]
-
     def stone_entries_on(self, placement: int) -> list[tuple[str, int | None]]:
         """``(stone id, port position or None)`` for one placement."""
         return [

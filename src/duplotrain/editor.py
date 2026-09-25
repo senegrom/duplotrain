@@ -374,7 +374,6 @@ class Session:
                     "ports": ports,
                     "mid": [mid[0], mid[1]],
                     "stone_ok": placement.piece.id in STONE_MOUNTS,
-                    "stones": layout.stones_on(index),
                     "stone_marks": [
                         {"id": sid, "at": pos}
                         for sid, pos in layout.stone_entries_on(index)
