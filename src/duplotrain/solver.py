@@ -425,6 +425,10 @@ class _FieldEngine:
         ):
             return None
         gap = cursor.distance_to(pose)
+        if gap == 0.0 and not cursor.same_point(pose):
+            # Exact ends apart by less than float resolution still make a forced
+            # fit: it must neither pass as exact nor be dropped as no fit.
+            gap = math.ulp(0.0)
         return gap if gap <= budget + 1e-12 else None
 
     def dist(self, a: Pose, b: Pose) -> float:
@@ -669,17 +673,17 @@ def _lattice_step(rot12: tuple, dz: int, turn: int):
 
 
 def _placement_samples(eng, pieces: Mapping[str, PieceType], spacing: float):
-    """Collision samples of placements, rotated once per piece, entry and heading.
+    """Collision samples of placements, rotated once per piece and heading.
 
     Frames of one piece and heading differ only by a translation, so the trig runs
     once per key and a placement adds its frame's offset to the cached bounds.
-    Returns ``samples(pid, entry, frame) -> (local points, offset, world bounds)``.
+    Returns ``samples(pid, frame) -> (local points, offset, world bounds)``.
     """
-    cache: dict[tuple[str, int, int], tuple[list, tuple]] = {}
+    cache: dict[tuple[str, int], tuple[list, tuple]] = {}
 
-    def samples(pid: str, entry: int, frame) -> tuple[list, tuple, tuple]:
+    def samples(pid: str, frame) -> tuple[list, tuple, tuple]:
         hkey, fx, fy, fz, cos_t, sin_t = eng.frame_floats(frame)
-        key = (pid, entry, hkey)
+        key = (pid, hkey)
         cached = cache.get(key)
         if cached is None:
             points = [(cos_t * lx - sin_t * ly, sin_t * lx + cos_t * ly, lz)
@@ -771,11 +775,9 @@ def _slack_padding(slack: float) -> int:
     return -(-numerator * _MM_SCALE // denominator) + 2
 
 
-def _completion_budget(nodes: int, max_nodes: int, base: int | None = None) -> int:
+def _completion_budget(nodes: int, max_nodes: int) -> int:
     """Table expansions a search may have spent after *nodes* DFS nodes."""
-    if base is None:
-        base = min(4096, max_nodes // 8)
-    return min(_TABLE_WORK_CAP, base + _TABLE_WORK_PER_NODE * nodes)
+    return min(_TABLE_WORK_CAP, min(4096, max_nodes // 8) + _TABLE_WORK_PER_NODE * nodes)
 _ROOT_BOUNDS = tuple((math.isqrt(n * _MM_SCALE**2), math.isqrt(n * _MM_SCALE**2) + 1)
                      for n in (2, 3, 6))
 _SLIP_AXES = ((1, 0), (0, 1), (1, 1), (1, -1), (2, 1), (2, -1), (1, 2), (1, -2))
@@ -1083,10 +1085,6 @@ class _CompletionReachability:
                     forward.add((successor.x, successor.y, successor.heading))
             self.predecessors.append(tuple(deltas))
             self.successors.append(tuple(forward))
-        self.probes = 0
-        #: DFS nodes spent by earlier searches that reused these tables; the
-        #: progressive allowance keeps counting from there.
-        self.nodes_spent = 0
         # Geometry-only answers are independent of stock, stubs, and collisions.
         # Keep this cache on the search object; keys contain only immutable poses.
         self.cache: OrderedDict[tuple, bool] = OrderedDict()
@@ -1226,7 +1224,6 @@ class _CompletionReachability:
                             grown.add(Pose(x + dx, y + dy, 0, next_heading))
                 frontier = grown
                 expanded += len(grown)
-                self.probes += len(grown)
                 if expanded > _PROBE_WORK:
                     return None
             if padding is None:
@@ -1531,46 +1528,6 @@ def _canonical_signature(
     return tuple(prefix)
 
 
-def _replay(
-    steps: Sequence[object],
-    pieces: Mapping[str, PieceType],
-    force_final_join: bool,
-    base: Layout | None = None,
-    grow_from: tuple[int, int] | None = None,
-    close_onto: tuple[int, int] | None = None,
-    final_target: tuple[int, int] | None = None,
-) -> Layout:
-    """Rebuild a full Layout (placements + link graph) from a step trace.
-
-    Loop mode (no *base*): the first placed piece plugs onto a virtual face at the
-    origin and the trace must return there.  Completion mode: the trace grows from the
-    open end *grow_from* of *base* and finally joins onto *close_onto*.  A reversing
-    loop overrides either with *final_target*: the walk's end joins that junction stub
-    instead, leaving the anchor face open as the tail.
-    """
-    layout = base if base is not None else Layout()
-    cursor = grow_from
-    target: tuple[int, int] | None = close_onto
-    for step in steps:
-        if isinstance(step, _Place):
-            piece = pieces[step.piece_id]
-            if cursor is None:
-                frame = piece.frame_for(step.entry, ORIGIN)
-                layout, index = layout.with_piece(piece, frame)
-                target = (index, step.entry)
-            else:
-                layout, index = layout.attach(piece, step.entry, cursor)
-            cursor = (index, step.exit)
-        else:
-            assert isinstance(step, _Transit) and cursor is not None
-            layout = layout.join(cursor, (step.placement, step.entry), force=force_final_join)
-            cursor = (step.placement, step.exit)
-    if final_target is not None:
-        target = final_target
-    assert cursor is not None and target is not None
-    return layout.join(cursor, target, force=force_final_join)
-
-
 def _solution_overlaps(
     layout: Layout, n_base: int, clearance: float, spacing: float
 ) -> bool:
@@ -1700,9 +1657,6 @@ class SolverConfig:
     #: such a layout endlessly needs a direction-change action stone on that tail
     #: (and switches the train can trail through, which the modern ones are).
     reversing_loops: bool = False
-    #: Called with the node count every few thousand nodes -- a liveness heartbeat
-    #: for UIs sitting on a long search.  Exceptions from it are the caller's problem.
-    progress: object = None
     #: Arithmetic backend: "auto" uses the integer lattice engine whenever the whole
     #: problem fits the 30-degree grid (every built-in piece does) and falls back to
     #: the general field otherwise; "lattice"/"field" force one, for tests.
@@ -1714,9 +1668,6 @@ class SolverConfig:
     #: tables. Slop fits use physical distance enclosures with the remaining
     #: total gap budget.
     completion_lookahead: int = 10
-    #: The table allowance a search starts with, instead of min(4096, max_nodes // 8):
-    #: a short probe that is part of a larger search keeps the larger one's tables.
-    completion_base_work: int | None = None
     #: Optional extra acceptance audit, applied BEFORE the result limit. Rejected
     #: candidates do not consume result slots. Used to validate expanded bridge
     #: assemblies against their actual component joints, not macro exemptions.
@@ -1741,10 +1692,6 @@ class SolverConfig:
             raise ValueError("max_pieces must be a positive integer or None")
         if type(self.completion_lookahead) is not int or not 0 <= self.completion_lookahead <= 12:
             raise ValueError("completion_lookahead must be an integer from 0 to 12")
-        if self.completion_base_work is not None and (
-            type(self.completion_base_work) is not int or self.completion_base_work < 0
-        ):
-            raise ValueError("completion_base_work must be a non-negative integer or None")
 
 
 @dataclass
@@ -1772,7 +1719,6 @@ class SolveStats:
     completion_bound_depth: int = 0
     completion_bound_states: int = 0  # retained heading envelopes across all depths
     completion_checks: int = 0  # geometric queries actually evaluated
-    completion_probes: int = 0  # poses expanded by forward probes beyond the built layers
     completion_cache_hits: int = 0  # repeated queries answered by the per-search cache
 
 
@@ -1834,14 +1780,13 @@ def solve(
     base: Layout | None = None,
     grow_from: tuple[int, int] | None = None,
     close_onto: tuple[int, int] | None = None,
-    tables: dict | None = None,
 ) -> SolveResult:
     """Run the exact solver to its configured limits (see :func:`solve_steps`).
 
     Interactive callers use ``solve_steps(..., limits=SearchLimits(...))`` instead.
     """
     iterator = solve_steps(inventory, pieces, config, base=base,
-                           grow_from=grow_from, close_onto=close_onto, tables=tables)
+                           grow_from=grow_from, close_onto=close_onto)
     try:
         while True:
             next(iterator)
@@ -1859,7 +1804,6 @@ def solve_steps(
     base: Layout | None = None,
     grow_from: tuple[int, int] | None = None,
     close_onto: tuple[int, int] | None = None,
-    tables: dict | None = None,
     limits: SearchLimits | None = None,
 ) -> Generator[dict, None, SolveResult]:
     """Find closed loops buildable from *inventory*.
@@ -1882,10 +1826,9 @@ def solve_steps(
         base: existing layout to complete.
         grow_from: open end of *base* the new track grows out of.
         close_onto: open end of *base* the new track must finally mate with.
-        tables: a dict the caller keeps while it searches one problem repeatedly
-            (the same *base* and catalogue, possibly with other ends, stock or
-            budgets): the reverse reachability tables one search builds serve the
-            next search of the same ends and stock, and keep growing with it.
+        limits: mutable node, result and completion-depth bounds that replace the
+            config's; ``config.max_nodes`` still sizes the reverse tables' base
+            allowance.
 
     Yields:
         With mutable limits, progress/solution/limit checkpoints. Increase a
@@ -2049,30 +1992,9 @@ def solve_steps(
     # the traversals left in either mode.
     completion = None
     if cfg.completion_lookahead:
-        # The tables depend on the anchor, the move pool and the slop mode only,
-        # so a repeated search of the same ends and stock can keep the previous
-        # search's tables and the allowance they earned.
-        key = (grow_from, close_onto, tuple(sorted(counts.items())), cfg.slop,
-               cfg.completion_lookahead, eng.name)
-        if tables is not None:
-            completion = tables.get(key)
-            if completion is not None and completion.eng.anchor != eng.anchor:
-                completion = None
-        if completion is None:
-            completion = _CompletionReachability(eng, cfg.completion_lookahead, _TABLE_WORK_CAP,
-                                                 slippage=cfg.slop > 0, slop=cfg.slop)
-            if tables is not None:
-                tables[key] = completion
-        else:
-            completion.eng = eng
-        spent = completion.nodes_spent
-        completion._budget = lambda: _completion_budget(
-            spent + stats.nodes, limits.max_nodes if limits else cfg.max_nodes,
-            cfg.completion_base_work)
-    before = (
-        (completion.work_used, completion.checks, completion.probes, completion.cache_hits)
-        if completion is not None else (0, 0, 0, 0)
-    )
+        completion = _CompletionReachability(
+            eng, cfg.completion_lookahead, _TABLE_WORK_CAP, slippage=cfg.slop > 0,
+            slop=cfg.slop, budget=lambda: _completion_budget(stats.nodes, cfg.max_nodes))
     stub_capacity = {
         pid: max(0, len(pieces[pid].ports) - len(pieces[pid].sealed) - 2)
         if pieces[pid].is_junction else 0
@@ -2307,8 +2229,9 @@ def solve_steps(
         """The layout of the current step trace, from the engine's exact frames.
 
         Both engines keep exact frames and the trace records every joint, so this
-        is what ``_replay`` builds, without re-deriving frames or re-checking
-        joints the search has verified; ``_replay`` remains the reference.
+        is what replaying the trace with ``Layout.attach`` and ``Layout.join``
+        builds, without re-deriving frames or re-checking joints the search has
+        verified; the tests replay every trace as the reference.
         """
         placed = list(base.placements) if base is not None else []
         links = dict(base.links) if base is not None else {}
@@ -2400,8 +2323,6 @@ def solve_steps(
         if limits is None and stats.nodes > cfg.max_nodes:
             stats.aborted = True
             return False
-        if cfg.progress is not None and stats.nodes % 4096 == 0:
-            cfg.progress(stats.nodes)
 
         # -- closure ------------------------------------------------------------
         def closing_link_legal() -> bool:
@@ -2596,7 +2517,7 @@ def solve_steps(
                 continue
             piece = pieces[pid]
             frame = eng.frame(pid, entry, cursor)
-            base_pts, offset, bounds = placement_samples(pid, entry, frame)
+            base_pts, offset, bounds = placement_samples(pid, frame)
             index = len(placements)
             ignore = {prev_index} if prev_index is not None else set()
             # Every free connector can become a later joint, not just the exit
@@ -2703,12 +2624,9 @@ def solve_steps(
         ready.clear()
         audit.clear()
         if completion is not None:
-            completion.nodes_spent += stats.nodes
-            if tables is None:
-                # Per-search answers are disposable, including on callback
-                # errors. Explicitly retained tables keep their answers.
-                completion.cache.clear()
-                completion.near_indices.clear()
+            # Per-search answers are disposable, including on callback errors.
+            completion.cache.clear()
+            completion.near_indices.clear()
     if stats.aborted:
         stats.stop_reason = "node_limit"
     elif limits is None and len(solutions) >= cfg.max_results:
@@ -2722,11 +2640,9 @@ def solve_steps(
     if completion is not None:
         stats.completion_states = len(completion.layers[-1])
         stats.completion_height_states = len(completion.height_layers[-1])
-        # Reused tables report only what this search added.
-        stats.completion_work = completion.work_used - before[0]
-        stats.completion_checks = completion.checks - before[1]
-        stats.completion_probes = completion.probes - before[2]
-        stats.completion_cache_hits = completion.cache_hits - before[3]
+        stats.completion_work = completion.work_used
+        stats.completion_checks = completion.checks
+        stats.completion_cache_hits = completion.cache_hits
         stats.completion_bound_depth = len(completion.bounds.layers) - 1
         stats.completion_bound_states = sum(map(len, completion.bounds.layers))
 

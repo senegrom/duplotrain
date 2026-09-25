@@ -340,6 +340,18 @@ def test_both_hosts_refuse_deep_nesting_before_parsing_it(local_editor):
     assert "nested" not in json.loads(adapter.dispatch("/api/clear", name)).get("__error", "")
 
 
+def test_the_nesting_check_reads_an_unterminated_string_once():
+    # A run of escaped quotes that never closes was rescanned from each quote:
+    # quadratic, about 17 s for these 64 KB and hours near the 2 MB limit.
+    from duplotrain.validation import check_json_depth
+
+    text = '{"name": "' + '\\"' * 32_000
+    started = time.process_time()
+    check_json_depth(text)
+    assert time.process_time() - started < 1.0
+    assert "__error" in json.loads(load_adapter().dispatch("/api/clear", text))
+
+
 @pytest.mark.parametrize("raw", [
     b"HEAD / HTTP/1.1\r\nHost: x\r\n\r\n",
     b"GET / HTTP/1.1\r\n" + b"".join(b"X-%d: y\r\n" % i for i in range(101)) + b"\r\n",

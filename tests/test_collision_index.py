@@ -16,6 +16,12 @@ from duplotrain.layout import layout_from_dict
 from tests.editor_support import complete
 
 
+def placed_bounds(points, offset):
+    """World bounds of local sample points placed at *offset*."""
+    ox, oy, oz = offset
+    return bounds_of([(x + ox, y + oy, z + oz) for x, y, z in points])
+
+
 class LinearField(CollisionField):
     def _near_clouds(self, bounds, half_width):
         return self._clouds
@@ -104,7 +110,7 @@ def test_deferred_clouds_are_indexed_deduplicated_and_removed_on_pop():
     for field in (a, b):
         for i in range(3):
             offset = (-512.0, -512.0, float(i))
-            field.add_deferred(100 + i, points, offset, 32, bounds_of(points, offset))
+            field.add_deferred(100 + i, points, offset, 32, placed_bounds(points, offset))
     nearby = a._near_clouds((-512, -512, -512, -512, 0, 0), 32)
     assert len([c for c in nearby if c.placement == 100]) == 1
     compare(a, b, [(-512.0, -512.0, 0.0)], ignore={101})
@@ -171,7 +177,7 @@ def test_randomized_push_pop_ignore_and_query_matches_linear_scan(seed):
             arch = rng.choice([False, True])
             for field in (a, b):
                 field.add_deferred(1000 + step, points, offset, half,
-                                   bounds_of(points, offset), underpass=arch)
+                                   placed_bounds(points, offset), underpass=arch)
         ignore = {cloud.placement for cloud in a._clouds if rng.random() < 0.08}
         query = [(rng.uniform(-1500, 1500), rng.uniform(-1500, 1500),
                   rng.choice([0.0, 42.0, 120.0, 200.0]))]

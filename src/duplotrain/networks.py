@@ -38,6 +38,7 @@ from .geometry import ORIGIN
 from .layout import End, Layout, Placement
 from .pieces import PieceType
 from .solver import (
+    _MAX_SEARCH_DEPTH,
     _TABLE_WORK_CAP,
     Move,
     SolverConfig,
@@ -48,8 +49,8 @@ from .solver import (
     _moves_for,
     _placement_samples,
     _solution_overlaps,
-    _traversal_key,
 )
+from .symmetry import placement_key
 from .validation import check_inventory
 
 __all__ = ["NetworkConfig", "NetworkStats", "NetworkResult", "enumerate_networks"]
@@ -64,7 +65,6 @@ class NetworkConfig:
     use_all_pieces: bool = False
     clearance: float = DEFAULT_CLEARANCE
     collision_spacing: float = 8.0
-    progress: object = None
     #: Exact reverse reachability for this many final placements, as
     #: ``SolverConfig.completion_lookahead``; zero disables the pruning.
     lookahead: int = 10
@@ -107,9 +107,7 @@ def _attach_orientations(piece: PieceType) -> list[int]:
     for entry in range(len(piece.ports)):
         if entry in piece.sealed:
             continue
-        exits = piece.transit(entry)
-        exit_port = exits[0][0] if exits else entry
-        signature = _traversal_key(piece, entry, exit_port)[0]
+        signature = placement_key(piece, piece.frame_for(entry, ORIGIN))
         if signature in seen:
             continue
         seen.add(signature)
@@ -143,12 +141,15 @@ def enumerate_networks(
     orientations = {pid: _attach_orientations(pieces[pid]) for pid in piece_ids}
     overhang_of = {pid: pieces[pid].end_overhang for pid in piece_ids}
     total = sum(counts.values())
+    # The recursive search places at most the solver's depth of pieces; a larger
+    # bound would overflow the stack instead of reporting the piece limit.
+    max_pieces = min(cfg.max_pieces, _MAX_SEARCH_DEPTH)
 
     eng = _compile_lattice(ORIGIN, ORIGIN, piece_obj, moves_by_piece)
     if eng is None:
         eng = _FieldEngine(ORIGIN, ORIGIN, piece_obj, moves_by_piece)
     stats = NetworkStats(
-        engine=eng.name, max_pieces_searched=min(total, cfg.max_pieces)
+        engine=eng.name, max_pieces_searched=min(total, max_pieces)
     )
 
     # Reverse reachability, anchored at the origin like the loop solver's: a
@@ -198,7 +199,7 @@ def enumerate_networks(
         """False proves that no closed network extends the current layout."""
         if completion is None:
             return True
-        budget = min(pass_total[0], cfg.max_pieces) - used
+        budget = min(pass_total[0], max_pieces) - used
         allows = completion.allows
         if budget and any(
             counts[pid] and allows(query, budget - 1)
@@ -269,8 +270,6 @@ def enumerate_networks(
         if stats.nodes > cfg.max_nodes:
             stats.aborted = True
             return False
-        if cfg.progress is not None and stats.nodes % 4096 == 0:
-            cfg.progress(stats.nodes)
 
         if not open_ends:
             if used >= cfg.min_pieces and (not cfg.use_all_pieces or used == total):
@@ -305,7 +304,7 @@ def enumerate_networks(
                 return False
 
         # -- move 2: attach a new piece at the target end ---------------------------
-        if used < cfg.max_pieces:
+        if used < max_pieces:
             for pid in piece_ids:
                 if counts[pid] == 0:
                     continue
@@ -314,7 +313,7 @@ def enumerate_networks(
                     continue
                 for entry in orientations[pid]:
                     frame = eng.frame(pid, entry, target_pose)
-                    base_pts, offset, bounds = samples_for(pid, entry, frame)
+                    base_pts, offset, bounds = samples_for(pid, frame)
                     port_poses = {
                         port: eng.port_world(pid, port, frame)
                         for port in range(len(piece.ports))
@@ -356,35 +355,41 @@ def enumerate_networks(
     # rediscover them. The classes found, and the order they are found in, are
     # therefore unchanged. When every piece is required, only the first pass can
     # use the whole inventory.
-    for pid in piece_ids:
-        if withdrawn and cfg.use_all_pieces:
-            break
-        piece = pieces[pid]
-        entry = orientations[pid][0]
-        frame = eng.frame(pid, entry, eng.start_cursor)
-        placements.append((pid, frame, entry))
-        base_pts, offset, bounds = samples_for(pid, entry, frame)
-        field._add_prepared(
-            0, field._prepare(base_pts, offset=offset), piece.width / 2.0,
-            underpass=piece.underpass, bounds=bounds,
-        )
-        counts[pid] -= 1
-        for port in range(len(piece.ports)):
-            if port in piece.sealed:
-                continue
-            open_ends[(0, port)] = eng.port_world(pid, port, frame)
+    try:
+        for pid in piece_ids:
+            if withdrawn and cfg.use_all_pieces:
+                break
+            piece = pieces[pid]
+            entry = orientations[pid][0]
+            frame = eng.frame(pid, entry, eng.start_cursor)
+            placements.append((pid, frame, entry))
+            base_pts, offset, bounds = samples_for(pid, frame)
+            field._add_prepared(
+                0, field._prepare(base_pts, offset=offset), piece.width / 2.0,
+                underpass=piece.underpass, bounds=bounds,
+            )
+            counts[pid] -= 1
+            for port in range(len(piece.ports)):
+                if port in piece.sealed:
+                    continue
+                open_ends[(0, port)] = eng.port_world(pid, port, frame)
 
-        keep = dfs(1)
+            keep = dfs(1)
 
-        open_ends.clear()
-        counts[pid] += 1
-        field.pop()
-        placements.pop()
-        if not keep:
-            break
-        withdrawn[pid] = counts[pid]
-        counts[pid] = 0
-        pass_total[0] = total - sum(withdrawn.values())
+            open_ends.clear()
+            counts[pid] += 1
+            field.pop()
+            placements.pop()
+            if not keep:
+                break
+            withdrawn[pid] = counts[pid]
+            counts[pid] = 0
+            pass_total[0] = total - sum(withdrawn.values())
+    finally:
+        # The recursive function owns a cell pointing to itself. Break that
+        # cycle, so the collision field and the reachability tables do not
+        # linger until cyclic GC.
+        dfs = None
     for pid, count in withdrawn.items():
         counts[pid] = count
 
@@ -392,7 +397,7 @@ def enumerate_networks(
         stats.stop_reason = "node_limit"
     elif len(found) >= cfg.max_results:
         stats.stop_reason = "result_limit"
-    elif cfg.max_pieces < total:
+    elif max_pieces < total:
         stats.stop_reason = "piece_limit"
     else:
         stats.complete = True

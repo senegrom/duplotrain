@@ -71,14 +71,14 @@ canvas use direct painting.
 
 ## Compact previews
 
-The editor requests `preview_format: "duplotrain-preview/1"` on every call except
-`/api/export`, including the read-only `/api/state` POST; callers that omit it
-receive full previews. A compact candidate carries `format`, `base_revision`,
-`base_count` and `placements` with drawing-only widths and sampled lines. It
-reuses the first `base_count` current placements only while their exact geometry
-is unchanged; otherwise `base_count` is zero and all geometry is included. Exact
-candidate layouts stay in the session; drawing payloads are never inputs to
-candidate application.
+The editor requests `preview_format: "duplotrain-preview/1"` on every call,
+including the read-only `/api/state` POST and the search jobs' requests; callers
+that omit it receive full previews. A compact candidate carries `format`,
+`base_revision`, `base_count` and `placements` with drawing-only widths and
+sampled lines. It reuses the first `base_count` current placements only while
+their exact geometry is unchanged; otherwise `base_count` is zero and all geometry
+is included. Exact candidate layouts stay in the session; drawing payloads are
+never inputs to candidate application.
 
 ## Inventory
 

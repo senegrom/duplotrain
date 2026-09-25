@@ -99,7 +99,8 @@ def test_scarce_turning_stock_preserves_results_across_backtracking(engine, curv
 
 @pytest.mark.parametrize("engine", ["lattice", "field"])
 @pytest.mark.parametrize("bridge", [1, 2, 3])
-def test_return_loop_floor_grants_the_transit_exactly_when_the_loop_fits(engine, bridge):
+def test_return_loop_floor_grants_the_transit_exactly_when_the_loop_fits(engine, bridge,
+                                                                          monkeypatch):
     catalog = default_catalog()
     # The second route starts `bridge` straights beyond the first route's exit, so
     # a tail must place the junction, lay exactly that many straights back to the
@@ -125,9 +126,13 @@ def test_return_loop_floor_grants_the_transit_exactly_when_the_loop_fits(engine,
     result = compare_searches(catalog, {"double_curve": 1, "straight": bridge + 1}, cfg,
                               base, (left, 1), (right, 0))
     assert any(s.layout == witness for s in result.solutions)
-    tables = {}
+    import duplotrain.solver as solver
+
+    built, real = [], solver._CompletionReachability
+    monkeypatch.setattr(solver, "_CompletionReachability",
+                        lambda *args, **kwargs: built.append(real(*args, **kwargs)) or built[-1])
     solve({"double_curve": 1, "straight": bridge + 1}, catalog, cfg, base=base,
-          grow_from=(left, 1), close_onto=(right, 0), tables=tables)
-    (completion,) = tables.values()
+          grow_from=(left, 1), close_onto=(right, 0))
+    (completion,) = built
     # The loop back takes `bridge` traversals, so exactly the shorter ones are too few.
     assert completion.transit_floor("double_curve") == bridge - 1

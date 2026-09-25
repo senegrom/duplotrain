@@ -424,9 +424,43 @@ def test_canonical_signature_equals_the_exhaustive_rotation_minimum(catalog):
         assert _canonical_signature(steps, canon_for, mirror_for=mirror_for) == exhaustive(steps)
 
 
+def replay(steps, pieces, force_final_join, base=None, grow_from=None, close_onto=None,
+           final_target=None):
+    """Rebuild a solution from its step trace with Layout.attach and Layout.join.
+
+    Loop mode (no *base*): the first placed piece plugs onto a virtual face at the
+    origin and the trace must return there.  Completion mode: the trace grows from the
+    open end *grow_from* of *base* and finally joins onto *close_onto*.  A reversing
+    loop overrides either with *final_target*: the walk's end joins that junction stub
+    instead, leaving the anchor face open as the tail.
+    """
+    from duplotrain import Layout
+    from duplotrain.solver import _Place, _Transit
+
+    layout = base if base is not None else Layout()
+    cursor, target = grow_from, close_onto
+    for step in steps:
+        if isinstance(step, _Place):
+            piece = pieces[step.piece_id]
+            if cursor is None:
+                layout, index = layout.with_piece(piece, piece.frame_for(step.entry, ORIGIN))
+                target = (index, step.entry)
+            else:
+                layout, index = layout.attach(piece, step.entry, cursor)
+            cursor = (index, step.exit)
+        else:
+            assert isinstance(step, _Transit) and cursor is not None
+            layout = layout.join(cursor, (step.placement, step.entry), force=force_final_join)
+            cursor = (step.placement, step.exit)
+    if final_target is not None:
+        target = final_target
+    assert cursor is not None and target is not None
+    return layout.join(cursor, target, force=force_final_join)
+
+
 def test_solution_layouts_equal_their_replayed_constructions(catalog):
     from duplotrain import ORIGIN, Layout, build_chain
-    from duplotrain.solver import _Place, _replay, _Transit
+    from duplotrain.solver import _Place, _Transit
 
     # Two crossings in a row: a completion that transits both without a piece,
     # and ones that add pieces around them.
@@ -471,9 +505,9 @@ def test_solution_layouts_equal_their_replayed_constructions(catalog):
                     else:
                         cursor = (step.placement, step.exit)
                 final_target = solution.layout.links[cursor]
-            replayed = _replay(solution.steps, catalog, force_final_join=solution.gap > 0,
-                               base=base, grow_from=grow_from, close_onto=close_onto,
-                               final_target=final_target)
+            replayed = replay(solution.steps, catalog, force_final_join=solution.gap > 0,
+                              base=base, grow_from=grow_from, close_onto=close_onto,
+                              final_target=final_target)
             assert isinstance(solution.layout, Layout) and replayed == solution.layout
             checked += 1
             transits += any(isinstance(step, _Transit) for step in solution.steps)

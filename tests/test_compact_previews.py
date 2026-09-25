@@ -146,3 +146,44 @@ def test_reported_bridge_payload_is_small_and_keeps_eight_audited_candidates():
         assert drawings(compact["layout"]["placements"]) + preview["placements"] == drawings(
             full["preview"]["placements"]
         )
+
+
+@pytest.mark.parametrize("transport", ["direct", "worker"])
+def test_search_job_previews_follow_the_negotiated_contract(transport):
+    session = Session(history=[build_chain([(default_catalog()["curve"], 0, 1)] * 6)],
+                      inventory={"curve": 12})
+    adapter = load_adapter(session)
+
+    def request(path, body):
+        body = {"revision": session.revision, **body}
+        if transport == "direct":
+            return dispatch_session(session, path, body)
+        result = json.loads(adapter.dispatch(path, json.dumps(body)))
+        assert "__error" not in result
+        return result
+
+    for negotiated in (False, True):
+        extra = {"preview_format": PREVIEW_FORMAT} if negotiated else {}
+        job = request("/api/search/start", {"max_results": 2, **extra})
+        while job["status"] == "running":
+            job = request("/api/search/tick", {"job_id": job["job_id"], **extra})
+        published = request("/api/search/publish", {"job_id": job["job_id"], **extra})
+        for candidates in (job["candidates"], published["search_job"]["candidates"],
+                           published["candidates"]):
+            assert candidates
+            assert all(("format" in c["preview"]) == negotiated for c in candidates)
+
+
+@pytest.mark.parametrize("transport", ["worker", "http"])
+def test_a_stale_request_answers_in_the_negotiated_preview_contract(transport):
+    session = candidate_session()
+    adapter = load_adapter(session)
+    body = {"revision": 3, "preview_format": PREVIEW_FORMAT}
+    with running_server(session) as server:
+        if transport == "worker":
+            reply = json.loads(adapter.dispatch("/api/clear", json.dumps(body)))
+        else:
+            status, reply = post(server, "/api/clear", body)
+            assert status == 409
+    assert reply["code"] == "stale_revision"
+    assert reply["state"]["candidates"][0]["preview"]["format"] == PREVIEW_FORMAT

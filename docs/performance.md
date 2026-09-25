@@ -167,9 +167,9 @@ identical to the reference searches without tables.
 | Search | Nodes | Time |
 | --- | ---: | ---: |
 | Completion benchmark suite, 30 cases | | 0.78 s |
-| Reported bridge gap, finite stock, forward / reverse | 1,742 / 718 | 126 / 82 ms |
+| Reported bridge gap, finite stock, forward / reverse | 1,742 / 718 | 139 / 95 ms |
 | Reported bridge gap, unlimited stock, forward / reverse | 1,878 / 854 | |
-| Ordinary plain-track gap (oracle, then a short search) | 138 | 16 ms |
+| Ordinary plain-track gap (oracle, then a short search) | 138 | 24 ms |
 | All loops of 12 curves and 6 straights | 1,915 | 0.07 s |
 | Reversing loops of 12 curves, 4 straights and 2 switches, 100 results | 793 | 57 ms |
 | Loops of at most 14 pieces from 16 curves, 8 straights, 2 switches and a crossing, 100 results | 350 | 27 ms |

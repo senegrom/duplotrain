@@ -4,10 +4,10 @@ A :class:`Placement` is one piece pinned down in world space.  A :class:`Layout`
 set of placements plus the record of which port is plugged into which -- a graph, not
 just a list, so that switches and crossings work as naturally as a plain oval.
 
-Layouts are immutable.  :meth:`Layout.attach` returns a new layout, which keeps the
-solver's backtracking trivially correct and lets finished layouts be cached and hashed.
-The solver itself does not use this class in its inner loop -- it runs on flat tuples
-for speed and only builds a ``Layout`` once a candidate is worth keeping.
+Layouts are immutable: :meth:`Layout.attach` returns a new layout, so an edit
+history or a candidate can keep the layouts it holds. The solver does not use
+this class in its inner loop -- it runs on flat tuples for speed and only builds
+a ``Layout`` once a candidate is worth keeping.
 """
 
 from __future__ import annotations
@@ -301,21 +301,18 @@ class Layout:
         return bool(self.placements) and not self.connectable_ends()
 
     def joint_issues(
-        self, port_poses: Mapping[End, Pose] | None = None, *, since: int = 0
+        self, port_poses: Mapping[End, Pose] | None = None
     ) -> list[dict[str, Any]]:
         """Audit each recorded joint once, independently of topological closure.
 
         Nonzero planar gaps may be deliberate forced fits; importing them is
         allowed, but they must never be called exact. Elevation/heading mismatches
         and incompatible connector bodies cannot be excused by planar slop.
-        This checks joints, not collisions elsewhere along the pieces. With
-        *since*, only joints touching a placement at index *since* or later are
-        audited: the entries of the full audit that involve such a placement, in
-        the same order.
+        This checks joints, not collisions elsewhere along the pieces.
         """
         issues = []
         for a, b in sorted(self.links.items()):
-            if a >= b or (a[0] < since and b[0] < since):
+            if a >= b:
                 continue
             if port_poses is None:
                 pa, pb = self.pose_of(a), self.pose_of(b)

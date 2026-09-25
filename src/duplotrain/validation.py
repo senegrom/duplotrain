@@ -17,7 +17,9 @@ MAX_COEFFICIENT_LENGTH = 48
 # No request of the editor API nests more than about ten levels.
 MAX_JSON_DEPTH = 64
 
-_JSON_STRING = re.compile(r'"(?:[^"\\]|\\.)*"')
+# Possessive, and closed at the end of the text: an unterminated string of
+# escaped quotes is consumed once, never rescanned from each of its quotes.
+_JSON_STRING = re.compile(r'"(?:[^"\\]|\\.)*+"?')
 _NOT_BRACKET = re.compile(r"[^\[\]{}]+")
 _NESTING = {"[": 1, "{": 1, "]": -1, "}": -1}
 

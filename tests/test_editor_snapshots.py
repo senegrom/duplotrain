@@ -196,3 +196,46 @@ def test_session_state_metadata_is_independent_between_responses_and_sessions():
     assert ACCESSORIES == before
     assert session.state()["stones"]["catalog"] == before
     assert Session().state()["stones"]["catalog"] == before
+
+
+def test_a_search_offers_exactly_the_candidates_the_editor_could_save(monkeypatch):
+    import duplotrain.editor_search as editor_search
+    from duplotrain.editor_search import SearchJob
+
+    straight = default_catalog()["straight"]
+    bar = straights(MAX_PLACEMENTS - 5)
+    bar = Layout(bar.placements, {**{(i, 1): (i + 1, 0) for i in range(len(bar) - 1)},
+                                  **{(i + 1, 0): (i, 1) for i in range(len(bar) - 1)}})
+    session = Session(history=[bar], unlimited=True)
+
+    def longer(count):
+        layout, cursor = bar, (len(bar) - 1, 1)
+        for _ in range(count):
+            layout, index = layout.attach(straight, 0, cursor)
+            cursor = (index, 1)
+        return layout
+
+    def saved(job, layout):  # the check an Apply would make
+        try:
+            Session._check_snapshot({**job.snapshot_metadata, "layout": layout_to_dict(layout)})
+        except ValueError:
+            return False
+        return True
+
+    size = len(json.dumps(session.snapshot(), ensure_ascii=True).encode())
+    verdicts = []
+    # The piece limit, then byte budgets that end among the added straights.
+    for budget in (None, size + 600, size + 900):
+        if budget is not None:
+            monkeypatch.setattr(editor, "MAX_SNAPSHOT_BYTES", budget)
+            monkeypatch.setattr(editor_search, "MAX_SNAPSHOT_BYTES", budget)
+        job = SearchJob(session, {"grow": [len(bar) - 1, 1], "close": [0, 0]})
+        try:
+            for count in range(8):
+                layout = longer(count)
+                assert job._saveable(layout) == saved(job, layout), (budget, count)
+                verdicts.append(saved(job, layout))
+        finally:
+            job.close()
+    assert True in verdicts and False in verdicts
+

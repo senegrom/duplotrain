@@ -222,6 +222,6 @@ def test_bridge_stage_audits_only_the_joints_it_adds():
     assert len(job.solutions) == 1
     completed = job.solutions[0].layout
     assert completed.placements[:len(base)] == base.placements
-    assert completed.is_closed and completed.joint_issues(since=len(base)) == []
+    assert completed.is_closed
     assert completed.joint_issues() == forced  # the base's own forced fits, nothing new
     assert not _solution_overlaps(completed, 0, 120.0, 8.0)

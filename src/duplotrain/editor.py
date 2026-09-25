@@ -32,8 +32,7 @@ from .solver import (
     _OverlapAudit,
     _pose_to_lattice,
 )
-from .validation import MAX_SNAPSHOT_BYTES
-from .validation import check_layout_json as check_layout_json
+from .validation import MAX_SNAPSHOT_BYTES, check_layout_json
 
 __all__ = ["Session", "dispatch_session", "RevisionConflictError", "UnknownRouteError"]
 

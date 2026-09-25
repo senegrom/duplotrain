@@ -16,7 +16,6 @@ from importlib import resources
 from time import monotonic
 from typing import Any
 
-from .editor import MUTATING_ROUTES as MUTATING_ROUTES
 from .editor import RevisionConflictError, UnknownRouteError
 from .editor import Session as Session
 from .editor import dispatch_session as dispatch_session
@@ -275,8 +274,9 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             except RevisionConflictError as exc:
                 # The comparison above happened under the same lock as edits.
                 # Return current state, but never replay the rejected mutation.
+                # dispatch_session validated the body and its preview format first.
                 with session.lock:
-                    current = session.state()
+                    current = session.state(preview_format=body.get("preview_format"))
                 self._json(409, {"error": str(exc), "code": "stale_revision", "state": current})
             except UnknownRouteError as exc:
                 self._json(404, {"error": str(exc)})

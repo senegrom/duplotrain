@@ -204,14 +204,6 @@ def test_overhanging_plates_never_mate_in_a_network(catalog, inventory, max_piec
                        for a, b in layout.links.items())
 
 
-def test_network_progress_is_reported_every_4096_nodes(catalog):
-    calls = []
-    result = enumerate_networks({"curve": 8, "straight": 2}, catalog, NetworkConfig(
-        max_pieces=10, lookahead=0, progress=calls.append))
-    assert result.stats.complete and result.stats.nodes > 2 * 4096
-    assert calls == [4096 * k for k in range(1, result.stats.nodes // 4096 + 1)]
-
-
 def test_reachability_prune_respects_caps_and_junction_closures(catalog):
     # Two open ends with two buffers in stock may both be capped; with one
     # buffer only one end may be stranded; a teardrop closes into its own switch.
@@ -384,3 +376,11 @@ def test_networks_do_not_count_the_decimal_tie_oval_twice():
     assert _exact_piece_key(result.layouts[0]) == _exact_piece_key(reference.solutions[0].layout)
     assert result.layouts[0].is_closed and not result.layouts[0].joint_issues()
     assert not _solution_overlaps(result.layouts[0], 0, 120, 8)
+
+
+def test_a_deep_network_search_reports_the_piece_limit_instead_of_overflowing(catalog):
+    # The recursive search stops at the loop solver's depth, 400 pieces.
+    result = enumerate_networks({"straight": 1500}, catalog,
+                                NetworkConfig(max_pieces=1600, max_results=5000, lookahead=0))
+    assert result.stats.stop_reason == "piece_limit" and not result.stats.complete
+    assert result.stats.max_pieces_searched == 400

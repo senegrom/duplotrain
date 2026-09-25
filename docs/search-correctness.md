@@ -220,7 +220,9 @@ rational and radical terms can nearly cancel. Expanding the coefficient bounds
 by a number of millimetres would therefore discard valid forced fits. Slippage
 instead uses physical x/y projections, with eight directions bounding longer
 tails. Each direction is widened by its Euclidean norm times the remaining slop.
-Height coefficients and headings retain their exact constraints.
+Height coefficients and headings retain their exact constraints. Exactness is
+decided on exact poses: ends apart by less than float resolution make a forced
+fit with the smallest positive gap, never an exact fit and never a missed one.
 
 Physical projections are enclosed by integer intervals at `10**9` units per mm.
 Integer square roots give rational lower/upper bounds on sqrt(2), sqrt(3) and
@@ -244,7 +246,7 @@ for the entire tail, including the final joint. Rigid retargeting preserves that
 budget for existing and future reversing targets. Both geometry and future-target
 cache keys include the remaining budget, preventing an answer for one allowance
 from being reused for another. The indexes are cleared together with the query
-cache when a search that built its own tables finishes, raises or is closed.
+cache when a search finishes, raises or is closed.
 
 `tests/test_completion_slippage.py` compares complete ordered solutions against
 lookahead-disabled searches on both engines, including 3-4-5 mm offset endpoints,
@@ -269,11 +271,9 @@ Each DFS node computes its current transit allowances and reversing targets once
 its child visits compute their own values after consuming stock and ports. The
 parent's values remain valid when backtracking restores its state.
 
-The 4096-entry LRU belongs to the tables. A search that built its own empties
-it when it returns, raises or is closed, which avoids retaining its poses
-through the recursive DFS closure cycle; tables a caller keeps across searches
-with `solve(..., tables=...)` keep their decided answers for the same ends and
-stock.
+The 4096-entry LRU belongs to the tables. A search empties it when it
+returns, raises or is closed, which avoids retaining its poses through the
+recursive DFS closure cycle.
 Tests compare complete results and all search counters against
 an uncached evaluator, retain permissive fallback after eviction, separate
 catalogues, and check callback-error cleanup.
@@ -607,11 +607,6 @@ pair's limit apart along an axis, in which case every sample pair is at least
 that far apart and the strict distance test would reject each of them.
 
 ## Joint audits of an extension
-
-`joint_issues(since=k)` reports exactly the entries of the full audit whose
-joint touches a placement at index k or later, in the audit's order; a
-regression checks every k against the filtered full report, with and without
-supplied port poses.
 
 A candidate keeps every base placement at its index and every base link, so
 every joint not among the base's links is new. Acceptance audits all joints and

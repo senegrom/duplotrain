@@ -41,7 +41,7 @@ def assert_same_search(cached, reference):
     # Preprocessing grows with the search effort and a repeated query may extend
     # it a little earlier when evaluated afresh; every answer and therefore every
     # search decision is the same, only the moment some layer was built differs.
-    for key in ("duration_s", "completion_cache_hits", "completion_checks", "completion_probes",
+    for key in ("duration_s", "completion_cache_hits", "completion_checks",
                 "completion_work", "completion_states", "completion_height_states",
                 "completion_bound_depth", "completion_bound_states"):
         old.pop(key)
@@ -160,19 +160,24 @@ def test_solver_releases_cached_poses_on_success_and_callback_failure(monkeypatc
         tables.append(table)
         return table
 
-    def progress(_nodes):
-        raise RuntimeError("cancelled by caller")
+    accepted = 0
+
+    def interrupt_after_eight(_candidate):
+        nonlocal accepted
+        accepted += 1
+        if accepted > 8:
+            raise RuntimeError("cancelled by caller")
+        return True
 
     monkeypatch.setattr(solver, "_CompletionReachability", capture)
     catalog = default_catalog()
     base = build_chain([(catalog["straight"], 0, 1)] * 2 + [(catalog["curve"], 0, 1)] * 4)
     inventory = {"curve": 20, "straight": 6, "ramp": 2, "span": 2,
                  "switch": 2, "crossing": 1, "slope": 2}
-    # The eight-result search now ends before the first progress report, so the
-    # interrupted variant keeps searching until the callback fires.
+    # The interrupted variant runs on past the eighth result into its failing callback.
     config = SolverConfig(min_pieces=0, max_pieces=20, max_results=1000 if interrupt else 8,
                           max_nodes=60_000, slop=slop, reversing_loops=True,
-                          progress=progress if interrupt else None)
+                          solution_filter=interrupt_after_eight if interrupt else None)
     if interrupt:
         with pytest.raises(RuntimeError, match="cancelled by caller"):
             solve(inventory, catalog, config, base=base)

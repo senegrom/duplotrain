@@ -279,29 +279,6 @@ def test_walk_traverses_the_loop(catalog):
     assert [i for i, _, _ in steps] == list(range(12))
 
 
-def test_joint_audit_since_is_the_full_audit_restricted_to_later_placements(catalog):
-    from duplotrain.geometry import Pose
-    from duplotrain.layout import Placement
-
-    curve = catalog["curve"]
-    layout = build_chain([(curve, *LEFT)] * 5)
-    a, b = layout.open_ends()
-    layout = layout.join(a, b, force=True)  # a forced joint between pieces 0 and 4
-    p = layout.placements[2]  # and one piece a millimetre off: two more forced joints
-    shifted = Placement(p.piece, Pose.make(p.frame.x + 1, p.frame.y, p.frame.z, p.frame.heading))
-    layout = Layout(layout.placements[:2] + (shifted,) + layout.placements[3:],
-                    dict(layout.links), layout.accessories)
-    full = layout.joint_issues()
-    assert sorted(tuple(sorted((i["a"][0], i["b"][0]))) for i in full) == [(0, 4), (1, 2), (2, 3)]
-    port_poses = {end: layout.pose_of(end) for pair in layout.links.items() for end in pair}
-    for since in range(len(layout) + 2):
-        expected = [i for i in full if max(i["a"][0], i["b"][0]) >= since]
-        assert layout.joint_issues(since=since) == expected
-        assert layout.joint_issues(port_poses, since=since) == expected
-    assert layout.joint_issues(since=3) == [full[0], full[2]]
-    assert layout.joint_issues(since=5) == []
-
-
 def straights(count):
     straight = default_catalog()["straight"]
     return Layout(tuple(Placement(straight, Pose.make(x=128 * i)) for i in range(count)))

@@ -2,6 +2,7 @@
 
 import random
 from dataclasses import replace
+from fractions import Fraction
 
 import pytest
 
@@ -222,3 +223,26 @@ def test_finite_large_slack_does_not_overflow_and_near_cache_is_bounded():
     assert len(table.cache) == 4096
     assert table.allows(convert(Pose.make(x=1)), 0, 1e308)
     assert not table.allows(convert(Pose.make(x=1, z=1)), 0, 1e308)
+
+
+@pytest.mark.parametrize("through_switch", [False, True])
+def test_exact_ends_closer_than_float_resolution_make_a_forced_fit(through_switch):
+    # One straight grown from x = 128*sqrt2 - 128 ends exactly at 128*sqrt2, a
+    # femtometre short of an end placed at the double nearest 128*sqrt2: exact
+    # poses that differ, with a float distance of 0.0. The fit is forced, never
+    # exact and never dropped, whether it closes the gap or is transited.
+    catalog = default_catalog()
+    straight, switch = catalog["straight"], catalog["switch"]
+    near = Pose.make(x=Fraction(128 * 2 ** 0.5))
+    base, left = Layout().with_piece(straight, Pose(Alg(-256, 128, 0, 0), Alg(0), Alg(0), 0))
+    if through_switch:
+        base, junction = base.with_piece(switch, switch.frame_for(0, near))
+        base, right = base.with_piece(straight, straight.frame_for(0, base.pose_of((junction, 1))))
+    else:
+        base, right = base.with_piece(straight, straight.frame_for(0, near))
+    result = solve({"straight": 1}, catalog, SolverConfig(min_pieces=1, slop=1.0),
+                   base=base, grow_from=(left, 1), close_onto=(right, 0))
+    assert result.stats.engine == "field" and result.solutions
+    for solution in result.solutions:
+        assert not solution.exact and solution.gap > 0.0
+        assert [issue["problems"] for issue in solution.layout.joint_issues()] == [["planar gap"]]

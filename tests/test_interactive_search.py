@@ -143,7 +143,7 @@ def test_core_generator_resumption_matches_uninterrupted_exhaustion(catalog, eng
         a, b = asdict(result.stats), asdict(expected.stats)
         # Raising tiny budgets changes reverse-table construction effort, not
         # the accepted layouts or visited DFS nodes. Compare traversal counters.
-        for key in ("duration_s", "completion_probes", "completion_work", "completion_states"):
+        for key in ("duration_s", "completion_work", "completion_states"):
             a.pop(key)
             b.pop(key)
         assert a == b
@@ -491,7 +491,9 @@ def test_finding_more_stops_at_the_fifty_result_cap(catalog):
         for harder in (False, True):
             job.more(harder=harder)
             assert job.status == "result_cap"
-            assert not job.response(session, {})["resumable"]
+            response = job.response(session, {})
+            # A harder search would have no room to report: neither is offered.
+            assert not response["resumable"] and not response["can_harden"]
         assert job.depth == 26 and job.effort == 1  # no deeper search was started
     finally:
         job.close()
@@ -597,8 +599,8 @@ def test_close_all_gaps_refuses_track_that_already_overlaps_itself(catalog):
     closed = spiral.join((0, 0), (23, 1))
     candidate = Solution(closed, (), 0, True, 0, ("overlap",))
     options = search_options({}, catalog)
-    assert valid_extension(closed, candidate, {}, 1, options, all_gaps=True)
-    assert not valid_extension(closed, candidate, {}, 1, options, all_gaps=True,
+    assert valid_extension(closed, candidate, {}, 1, options)
+    assert not valid_extension(closed, candidate, {}, 1, options,
                                audit=_OverlapAudit(None, 120.0, 8.0))
 
 

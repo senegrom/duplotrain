@@ -7,12 +7,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from duplotrain.gui import (
-    MUTATING_ROUTES,
-    RevisionConflictError,
-    Session,
-    dispatch_session,
-)
+from duplotrain.editor import MUTATING_ROUTES
+from duplotrain.gui import RevisionConflictError, Session, dispatch_session
 from tests.editor_support import complete, load_adapter, post, running_server, unchanged
 
 

@@ -22,7 +22,7 @@ from typing import Any
 from .bridge_completion import _BRIDGE_ID, _bridge, _expand
 from .collision import DEFAULT_CLEARANCE
 from .exact import ZERO
-from .layout import layout_to_dict
+from .layout import Layout, layout_to_dict
 from .solver import (
     SearchLimits,
     Solution,
@@ -31,6 +31,7 @@ from .solver import (
     _solution_overlaps,
     solve_steps,
 )
+from .validation import MAX_LINKS, MAX_PLACEMENTS, MAX_SNAPSHOT_BYTES, check_layout_json
 
 MAX_RESULTS = 50
 MAX_JOB_SECONDS = 1200
@@ -158,8 +159,7 @@ def physical_key(layout, start=0):
     return frozenset(pieces.items()), links, layout.accessories
 
 
-def valid_extension(base, candidate, stock, max_pieces, options, *, all_gaps=False,
-                    audit=None):
+def valid_extension(base, candidate, stock, max_pieces, options, *, audit=None):
     """Acceptance checks of one candidate over *base*.
 
     *base* already fits the room and keep-out limits: a job checks its layout
@@ -176,11 +176,12 @@ def valid_extension(base, candidate, stock, max_pieces, options, *, all_gaps=Fal
             or len(layout) - len(base) > max_pieces
             or any(n - base.piece_counts.get(pid, 0) > stock.get(pid, 0)
                    for pid, n in layout.piece_counts.items())
-            or (all_gaps and layout.connectable_ends())
             or not fits_space(layout.placements[len(base):], options)):
         return False
-    new_issues = [issue for issue in layout.joint_issues()
-                  if tuple(issue["a"]) not in base.links]
+    # Audit only the joints the candidate adds: the base's own, deliberate forced
+    # fits among them, are not the candidate's claim.
+    new_issues = Layout(layout.placements, {a: b for a, b in layout.links.items()
+                                            if a not in base.links}).joint_issues()
     if (any(issue["problems"] != ["planar gap"] for issue in new_issues)
             or (new_issues and candidate.exact)
             or sum(issue["gap_mm"] for issue in new_issues) > candidate.gap + 1e-6):
@@ -306,7 +307,6 @@ class PairSearch:
                     SolverConfig(min_pieces=0, max_pieces=limits.max_pieces,
                                  max_results=MAX_RESULTS, max_nodes=cap, slop=self.slop,
                                  reversing_loops=reversing,
-                                 completion_base_work=min(4096, cap // 8),
                                  solution_filter=accept),
                     base=base, grow_from=grow, close_onto=close, limits=limits)
                 self.cursors.append(Cursor(iterator, limits, name, cap, overhead,
@@ -407,8 +407,18 @@ class SearchJob:
         self.revision = session.revision
         self.base, self.catalog = session.layout, dict(session.catalog)
         self.stock = session.remaining()
-        self.snapshot_metadata = {key: value for key, value in session.snapshot().items()
+        snapshot = session.snapshot()
+        self.snapshot_metadata = {key: value for key, value in snapshot.items()
                                   if key != "layout"}
+        # Every candidate keeps the base's placements, links and stones: the base's
+        # snapshot is checked once here, and _saveable checks only the rest.
+        try:
+            session._check_snapshot(snapshot)
+        except ValueError:
+            self.spare_bytes = -1  # nothing that extends an unsaveable base is saveable
+        else:
+            self.spare_bytes = MAX_SNAPSHOT_BYTES - len(
+                json.dumps(snapshot, ensure_ascii=True).encode("utf-8"))
         self.options = search_options(body.get("options"), self.catalog)
         for pid in self.options["exclude"]:
             self.stock[pid] = 0
@@ -436,7 +446,6 @@ class SearchJob:
             grow, close = _end(grow, "grow"), _end(close, "close")
             if grow == close or grow not in opens or close not in opens:
                 raise ValueError("pick two distinct open ends")
-            self.ends = grow, close
         issues = self.base.joint_issues()
         if (any(issue["problems"] != ["planar gap"] for issue in issues)
                 or (self.all_gaps and issues)):
@@ -451,6 +460,9 @@ class SearchJob:
         self.solutions: list[Solution] = []
         self.reason: str | None = None  # a proof that no ordinary completion exists
         self.keys: set = set()
+        # Per solution index, computed when first shown or ranked.
+        self.ids: dict[int, str] = {}
+        self.costs: dict[str, list] = {}
         self.last_touch = time.monotonic()
         self.status = "running"
         self.stage = "templates"
@@ -475,30 +487,51 @@ class SearchJob:
         return self.multi_nodes if self.all_gaps else self.pool.nodes if self.pool else 0
 
     def _accept(self, candidate):
-        if not valid_extension(self.base, candidate, self.stock, self.depth, self.options,
-                               all_gaps=self.all_gaps):
-            return
-        from .editor import Session
-
-        # A streamed candidate must also be importable/applicable under the
-        # existing size/format guards; do not offer an unsaveable plan.
-        try:
-            Session._check_snapshot({**self.snapshot_metadata,
-                                     "layout": layout_to_dict(candidate.layout)})
-        except ValueError:
-            return
+        # Its producer has checked the extension already: a pair search's stage or
+        # template, each addition of a Close-all plan, or the exact direct join.
         # The same track found from either end is one alternative.
         key = physical_key(candidate.layout, len(self.base))
-        if key not in self.keys:
-            self.keys.add(key)
-            self.solutions.append(candidate)
+        if key in self.keys or not self._saveable(candidate.layout):
+            return
+        self.keys.add(key)
+        self.solutions.append(candidate)
+
+    def _saveable(self, layout):
+        """Session._check_snapshot's verdict on an extension of the checked base.
+
+        A streamed candidate must be importable and applicable under the save and
+        import guards: never offer an unsaveable plan. The guards check each entry
+        on its own, so only the added placements and links need checking, with the
+        totals; the size of what they add bounds the growth of the snapshot.
+        """
+        if self.spare_bytes < 0 or len(layout) > MAX_PLACEMENTS:
+            return False
+        links = self.base.links
+        added = layout_to_dict(Layout(layout.placements[len(self.base):]))["placements"]
+        rows = [[*a, *b] for a, b in layout.links.items() if a < b and a not in links]
+        try:
+            check_layout_json({"format": "duplotrain-layout/1", "placements": added,
+                               "links": rows})
+        except ValueError:
+            return False
+        if len(links) // 2 + len(rows) > MAX_LINKS:
+            return False
+        # Each addition adds its JSON and one separator to the base's snapshot.
+        if len(json.dumps([added, rows], ensure_ascii=True).encode("utf-8")) <= self.spare_bytes:
+            return True
+        from .editor import Session
+
+        try:  # near the size limit: the full check decides
+            Session._check_snapshot({**self.snapshot_metadata, "layout": layout_to_dict(layout)})
+        except ValueError:
+            return False
+        return True
 
     def _all_gaps(self, base, stock, slots):
         """Try complete pair alternatives, debit stock, then backtrack on failure."""
         opens = base.connectable_ends()
         if not opens:
-            yield {"kind": "solution", "solution": Solution(base, (), 0, True, 0,
-                                                            ("all_gaps", layout_key(base)))}
+            yield {"kind": "solution", "solution": Solution(base, (), 0, True, 0, ("all_gaps",))}
             return
         # Most constrained end first: fewest plausible mates within remaining reach.
         def distance(a, b):
@@ -548,7 +581,6 @@ class SearchJob:
                 pair.close()
 
     def tick(self):
-        self.last_touch = time.monotonic()
         if self.status != "running":
             return
         deadline = time.perf_counter() + 0.02
@@ -601,31 +633,31 @@ class SearchJob:
         if self.status != "exhausted" or harder:
             self.status = "running"
 
+    def _cost(self, goal, sol):
+        added = {pid: n - self.base.piece_counts.get(pid, 0)
+                 for pid, n in sol.layout.piece_counts.items()}
+        if goal == "pieces":
+            return sum(added.values())
+        if goal == "footprint":
+            w, h = sol.layout.size()
+            return w * h
+        if goal == "scarce":
+            return sum(n / max(1, self.stock.get(pid, 0)) for pid, n in added.items())
+        if goal == "junctions":
+            return sum(n for pid, n in added.items() if self.catalog[pid].is_junction)
+        if goal == "bridges":
+            return sum(n for pid, n in added.items() if self.catalog[pid].category == "bridge")
+        return 0
+
     def ordered(self):
-        def key(item):
-            index, sol = item
-            added = {pid: n - self.base.piece_counts.get(pid, 0)
-                     for pid, n in sol.layout.piece_counts.items()}
-            goal = self.options["sort"]
-            cost = 0
-            if goal == "pieces":
-                cost = sum(added.values())
-            elif goal == "footprint":
-                w, h = sol.layout.size()
-                cost = w * h
-            elif goal == "scarce":
-                cost = sum(n / max(1, self.stock.get(pid, 0)) for pid, n in added.items())
-            elif goal == "junctions":
-                cost = sum(n for pid, n in added.items() if self.catalog[pid].is_junction)
-            elif goal == "bridges":
-                cost = sum(n for pid, n in added.items()
-                           if self.catalog[pid].category == "bridge")
-            return (not sol.exact, cost, index)
-        return sorted(enumerate(self.solutions), key=key)
+        # Solutions are only ever appended: each cost is computed once per goal.
+        goal = self.options["sort"]
+        costs = self.costs.setdefault(goal, [])
+        costs.extend(self._cost(goal, sol) for sol in self.solutions[len(costs):])
+        return sorted(enumerate(self.solutions),
+                      key=lambda item: (not item[1].exact, costs[item[0]], item[0]))
 
     def response(self, session, body):
-        from .editor import PREVIEW_FORMAT
-
         if "sort" in body:
             if body["sort"] not in SORTS:
                 raise ValueError("unknown candidate sort order")
@@ -633,10 +665,14 @@ class SearchJob:
         page = integer(body.get("page", 0), 0, 6, "page")
         shown = []
         for index, candidate in self.ordered()[page * 8:(page + 1) * 8]:
-            item = session._candidate_json(index, candidate, preview_format=PREVIEW_FORMAT)
+            item = session._candidate_json(index, candidate,
+                                           preview_format=body.get("preview_format"))
             item["revision"] = self.revision
-            item["preview"]["base_revision"] = self.revision
-            item["candidate_id"] = layout_key(candidate.layout)
+            if "base_revision" in item["preview"]:  # a compact preview
+                item["preview"]["base_revision"] = self.revision
+            if index not in self.ids:
+                self.ids[index] = layout_key(candidate.layout)
+            item["candidate_id"] = self.ids[index]
             shown.append(item)
         return {"job_id": self.id, "revision": self.revision, "status": self.status,
                 "stage": self.stage, "searched": self.nodes, "found": len(self.solutions),
@@ -648,7 +684,9 @@ class SearchJob:
                             "keep_out": [list(r) for r in self.options["keep_out"]]},
                 "scope": "best among found candidates; no global optimum guaranteed",
                 "max_pieces": self.depth, "search_effort": self.effort,
-                "can_harden": self.pool is not None or self.all_gaps,
+                # At the result cap a harder search would have no room to report.
+                "can_harden": ((self.pool is not None or self.all_gaps)
+                               and len(self.solutions) < MAX_RESULTS),
                 "resumable": self.status not in (
                     "exhausted", "bounded_complete", "result_cap", "direct_join", "limited")}
 
@@ -670,6 +708,8 @@ class SearchJob:
         self.status = "discarded"
         self.solutions.clear()
         self.keys.clear()
+        self.ids.clear()
+        self.costs.clear()
 
 
 def dispatch_search(session, path, body):

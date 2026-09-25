@@ -83,14 +83,12 @@ _GroupedPoints = tuple[tuple[_Cell, list[_Point]], ...]
 _Bounds = tuple[float, float, float, float, float, float]
 
 
-def bounds_of(points: list[_Point], offset: _Point | None = None) -> _Bounds:
-    """Axis-aligned bounds of *points*, translated by *offset* if given."""
+def bounds_of(points: list[_Point]) -> _Bounds:
+    """Axis-aligned bounds of *points*."""
     xs = [p[0] for p in points]
     ys = [p[1] for p in points]
     zs = [p[2] for p in points]
-    ox, oy, oz = offset if offset is not None else (0.0, 0.0, 0.0)
-    # Translating every point by the same offset translates the extremes exactly.
-    return (ox + min(xs), ox + max(xs), oy + min(ys), oy + max(ys), oz + min(zs), oz + max(zs))
+    return (min(xs), max(xs), min(ys), max(ys), min(zs), max(zs))
 
 
 @dataclass(slots=True)
