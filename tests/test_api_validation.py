@@ -60,8 +60,8 @@ INTEGER_FIELDS = [
     ("/api/stone", "placement", {"id": "stone_stop"}),
     ("/api/stone", "at_port", {"id": "stone_stop", "placement": 0}),
     ("/api/apply", "index", {}),
-    ("/api/solve", "max_results", {"grow": [1, 1], "close": [0, 0], "max_pieces": 1}),
-    ("/api/solve", "max_pieces", {"grow": [1, 1], "close": [0, 0], "max_results": 1}),
+    ("/api/search/start", "max_results", {"grow": [1, 1], "close": [0, 0], "max_pieces": 1}),
+    ("/api/search/start", "max_pieces", {"grow": [1, 1], "close": [0, 0], "max_results": 1}),
 ]
 
 
@@ -76,8 +76,8 @@ END_FIELDS = [
     ("/api/attach", "at", {"piece": "curve", "entry": 0}),
     ("/api/join", "a", {"b": [1, 0]}),
     ("/api/join", "b", {"a": [0, 1]}),
-    ("/api/solve", "grow", {"close": [0, 0], "max_pieces": 1}),
-    ("/api/solve", "close", {"grow": [1, 1], "max_pieces": 1}),
+    ("/api/search/start", "grow", {"close": [0, 0], "max_pieces": 1}),
+    ("/api/search/start", "close", {"grow": [1, 1], "max_pieces": 1}),
 ]
 
 
@@ -99,7 +99,7 @@ def test_endpoint_pairs_validate_each_index_and_shape(endpoint, path, field, bod
 ])
 def test_search_options_reject_wrong_types_without_losing_candidates(endpoint, field, value):
     _, reject = endpoint
-    reject("/api/solve", {"grow": [1, 1], "close": [0, 0], "max_pieces": 1, field: value})
+    reject("/api/search/start", {"grow": [1, 1], "close": [0, 0], "max_pieces": 1, field: value})
 
 
 @pytest.mark.parametrize("field,value", [
@@ -108,7 +108,7 @@ def test_search_options_reject_wrong_types_without_losing_candidates(endpoint, f
 ])
 def test_search_integer_bounds_remain_enforced(endpoint, field, value):
     _, reject = endpoint
-    reject("/api/solve", {"grow": [1, 1], "close": [0, 0], "max_pieces": 1, field: value})
+    reject("/api/search/start", {"grow": [1, 1], "close": [0, 0], "max_pieces": 1, field: value})
 
 
 @pytest.mark.parametrize("counts", [
@@ -130,13 +130,18 @@ def test_inventory_update_is_atomic(counts):
     ("/api/remove", {"placement": 0}),
     ("/api/stone", {"placement": 0, "id": "stone_stop", "at_port": 1}),
     ("/api/apply", {"index": 0}),
-    ("/api/solve", {"grow": [1, 1], "close": [0, 0], "max_results": 1,
-                    "max_pieces": 1, "slop": 0, "reversing": False}),
+    ("/api/search/start", {"grow": [1, 1], "close": [0, 0], "max_results": 1,
+                           "max_pieces": 1, "slop": 0, "reversing": False}),
 ])
 def test_correctly_typed_requests_still_succeed(path, body):
     session = session_with_candidates()
     before = session.revision
     result = dispatch_session(session, path, {"revision": before, **body})
+    if path == "/api/search/start":
+        # A search edits nothing until its suggestions are published.
+        assert result["revision"] == session.revision == before
+        result = dispatch_session(session, "/api/search/publish",
+                                  {"revision": before, "job_id": result["job_id"]})
     assert result["revision"] == session.revision == before + 1
 
 

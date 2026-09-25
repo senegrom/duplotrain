@@ -11,7 +11,7 @@ from duplotrain.editor import PREVIEW_FORMAT, Session, dispatch_session
 from duplotrain.geometry import Pose
 from duplotrain.layout import Layout, build_chain, layout_from_dict, layout_to_dict
 from duplotrain.solver import Solution, _solution_overlaps
-from tests.editor_support import load_adapter, post, running_server, unchanged
+from tests.editor_support import complete, load_adapter, post, running_server, unchanged
 
 
 def candidate_session(count=6):
@@ -127,10 +127,7 @@ def test_reported_bridge_payload_is_small_and_keeps_eight_audited_candidates():
     path = Path(__file__).parent / "fixtures/bridge-gap.json"
     base = layout_from_dict(json.loads(path.read_text()), default_catalog())
     session = Session(history=[base], unlimited=True)
-    result = dispatch_session(session, "/api/solve", {
-        "revision": 0, "max_pieces": 26, "max_results": 8, "preview_format": PREVIEW_FORMAT,
-    })
-    assert result["found"] == 8
+    assert len(complete(session, max_pieces=26, max_results=8).solutions) == 8
     legacy, compact = session.state(), session.state(preview_format=PREVIEW_FORMAT)
     def size(state):
         return len(json.dumps(state, separators=(",", ":")).encode())

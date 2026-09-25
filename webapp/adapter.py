@@ -7,15 +7,6 @@ from duplotrain.validation import MAX_JSON_BYTES, check_json_depth
 
 session = Session()
 
-try:
-    from js import postMessage as _post
-
-    def _progress(nodes: int) -> None:
-        _post(nodes)
-
-except ImportError:  # CPython tests/local host
-    _progress = None
-
 
 def dispatch(path: str, body_json: str | None) -> str:
     """Validate a request, then run the shared dispatcher without partial updates."""
@@ -25,7 +16,7 @@ def dispatch(path: str, body_json: str | None) -> str:
         if body_json:
             check_json_depth(body_json)
         body = json.loads(body_json) if body_json else {}
-        result = dispatch_session(session, path, body, progress=_progress)
+        result = dispatch_session(session, path, body)
         return json.dumps(result, separators=(",", ":"))
     except RevisionConflictError as exc:
         return json.dumps({

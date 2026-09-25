@@ -12,6 +12,7 @@ from time import perf_counter
 
 from duplotrain.catalog import default_catalog
 from duplotrain.editor import PREVIEW_FORMAT, Session
+from duplotrain.editor_search import SearchJob
 from duplotrain.layout import layout_from_dict
 
 
@@ -24,9 +25,12 @@ def main():
     fixture = Path(__file__).resolve().parents[1] / "tests/fixtures/bridge-gap.json"
     base = layout_from_dict(json.loads(fixture.read_text()), default_catalog())
     session = Session(history=[base], unlimited=True)
-    outcome = session.solve_gap(None, None, 0, 8, max_pieces=26)
-    print(json.dumps({"base": len(base), "candidates": outcome["found"],
-                      "search_nodes": outcome["searched"]}))
+    job = SearchJob(session, {"max_pieces": 26})
+    while job.status == "running":
+        job.tick()
+    job.publish(session)
+    print(json.dumps({"base": len(base), "candidates": len(job.solutions),
+                      "search_nodes": job.nodes}))
     for label, preview_format in (("legacy", None), ("compact", PREVIEW_FORMAT)):
         timings = []
         for _ in range(args.repeats):

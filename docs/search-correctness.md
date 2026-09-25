@@ -62,12 +62,12 @@ CLI output.
 
 ## Failed searches leave the editor unchanged
 
-`Session.solve_gap()` validates mating endpoints before searching and publishes
-candidates and a new revision only after a successful result. An already-mating
-pair should be joined instead. Oracle, solver and progress-callback exceptions
-leave the previous candidate list and revision untouched. A successful search,
-including a zero-result search, publishes one new revision so old candidate
-indices cannot be reused.
+A search or train-analysis start that fails validation changes nothing: the
+active job, the published suggestions and the revision stay as they were. An
+already-mating pair is offered as a zero-piece join. An exception while a job
+runs discards the job and leaves the layout and revision untouched. Publishing a
+job's suggestions, including none, is one new revision, so old candidate indices
+cannot be reused.
 
 ## Validate inventory before merging
 
@@ -77,8 +77,8 @@ booleans, numeric strings, negatives, unknown IDs and non-object documents are
 rejected rather than truncated or silently discarded. Valid integer counts from
 all three sources remain additive. File-read errors are reported as CLI errors.
 
-The focused regressions are in `tests/test_networks.py`,
-`tests/test_congruence.py`, `tests/test_solve_atomicity.py`, and
+The focused regressions are in `tests/test_interactive_search.py`,
+`tests/test_api_validation.py`, `tests/test_search_integrity.py` and
 `tests/test_cli_inventory.py`.
 
 ## Completion paths can revisit all free junction ports
@@ -244,8 +244,7 @@ for the entire tail, including the final joint. Rigid retargeting preserves that
 budget for existing and future reversing targets. Both geometry and future-target
 cache keys include the remaining budget, preventing an answer for one allowance
 from being reused for another. The indexes are cleared together with the query
-cache when a search that built its own tables finishes or its progress callback
-raises.
+cache when a search that built its own tables finishes, raises or is closed.
 
 `tests/test_completion_slippage.py` compares complete ordered solutions against
 lookahead-disabled searches on both engines, including 3-4-5 mm offset endpoints,
@@ -271,9 +270,10 @@ its child visits compute their own values after consuming stock and ports. The
 parent's values remain valid when backtracking restores its state.
 
 The 4096-entry LRU belongs to the tables. A search that built its own empties
-it on normal return or a traversal exception, which avoids retaining its poses
-through the recursive DFS closure cycle; tables an editor closing passes from
-one search to the next keep their decided answers for the same ends and stock.
+it when it returns, raises or is closed, which avoids retaining its poses
+through the recursive DFS closure cycle; tables a caller keeps across searches
+with `solve(..., tables=...)` keep their decided answers for the same ends and
+stock.
 Tests compare complete results and all search counters against
 an uncached evaluator, retain permissive fallback after eviction, separate
 catalogues, and check callback-error cleanup.
@@ -606,16 +606,20 @@ stored cell cloud only when its box and the query cell's box are at least the
 pair's limit apart along an axis, in which case every sample pair is at least
 that far apart and the strict distance test would reject each of them.
 
-## Joint audits from an index
+## Joint audits of an extension
 
 `joint_issues(since=k)` reports exactly the entries of the full audit whose
 joint touches a placement at index k or later, in the audit's order; a
 regression checks every k against the filtered full report, with and without
-supplied port poses. The bridge expansion keeps every base placement at its
-index and every base link, so the joints it can change are precisely those
-touching an index at or beyond the base size, which is what the stage audits.
-A regression closes the reported gap over a base with a curve set a millimetre
-off and checks that the candidate's only joint issues are the base's own.
+supplied port poses.
+
+A candidate keeps every base placement at its index and every base link, so
+every joint not among the base's links is new. Acceptance audits all joints and
+holds only the new ones to the candidate's claim: an exact candidate may have
+none, and a forced fit only planar gaps totalling at most its reported gap, so a
+base's own forced fits never block a candidate. A regression closes the reported
+gap over a base with a curve set a millimetre off and checks that the
+candidate's only joint issues are the base's own.
 
 ## Packed lattice keys
 

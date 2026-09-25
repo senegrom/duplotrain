@@ -230,7 +230,7 @@ class Cursor:
 
 
 class PairSearch:
-    """Resumable, alternating-end stages (``completion_search`` runs them in one call)."""
+    """Resumable, alternating-end stages of one closing search."""
 
     def __init__(self, base, catalog, stock, grow, close, depth, effort, slop, reversing,
                  options):
@@ -244,8 +244,8 @@ class PairSearch:
         self.arc_session = Session(catalog=dict(catalog), history=[base], inventory={
             pid: n + base.piece_counts.get(pid, 0) for pid, n in stock.items()
         })
-        # As /api/solve does, a search allowing reversing loops skips the arc
-        # templates: its ordinary stages then find the same closures first.
+        # A search allowing reversing loops skips the arc templates: its
+        # ordinary stages then find the same closures first.
         self.arc = (iter(()) if reversing else
                     self.arc_session._arc_events(grow, close, MAX_RESULTS, depth))
         self.arc_done = False
@@ -275,9 +275,9 @@ class PairSearch:
         stages.append(("full inventory", full, catalog, 60_000, 0, None))
         for name, inventory, pieces, budget, overhead, parts in stages:
             # Plain and bridge stages look for ordinary closures; only the full
-            # inventory also searches reversing ones, as /api/solve does. Forced
-            # fits and reversing closures are not direction-equivalent: those
-            # stages grow from the chosen end only.
+            # inventory also searches reversing ones. Forced fits and reversing
+            # closures are not direction-equivalent: those stages grow from the
+            # chosen end only.
             reversing = self.reversing and name == "full inventory"
             directions = [(self.grow, self.close_end)]
             if not self.slop and not reversing:
@@ -341,7 +341,7 @@ class PairSearch:
         # One exact direction exhausting a contour proves the reversed problem
         # has no further candidates at that bound. Keep the opposite suspended
         # stack for a raised bound, and try this successful direction first in
-        # the next stage, as completion_search.solve_completion does.
+        # the next stage.
         if event["kind"] in ("piece_limit", "exhausted"):
             for peer in stage:
                 if peer is cursor:
@@ -396,7 +396,7 @@ class PairSearch:
         for cursor in self.cursors:
             cursor.close()
         self.cursors.clear()
-        self.arc_session = None
+        self.arc_session = self.audit = None
 
 
 class SearchJob:

@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import socket
 import sys
-import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
@@ -18,7 +17,7 @@ from time import monotonic
 from typing import Any
 
 from .editor import MUTATING_ROUTES as MUTATING_ROUTES
-from .editor import RevisionConflictError, SearchCancelledError, UnknownRouteError
+from .editor import RevisionConflictError, UnknownRouteError
 from .editor import Session as Session
 from .editor import dispatch_session as dispatch_session
 from .validation import MAX_JSON_BYTES, check_json_depth
@@ -49,18 +48,6 @@ _EDITOR_ASSETS = {
 
 
 def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
-    # Cancellation must not wait for the session lock held by a running solve.
-    # Random operation IDs scope cancellation to one request, not the next solve.
-    active: dict[str, threading.Event] = {}
-    operation_lock = threading.Lock()
-
-    def operation_id(body: object) -> str:
-        token = body.get("operation_id") if isinstance(body, dict) else None
-        if (not isinstance(token, str) or not 16 <= len(token) <= 64
-                or not all(c.isascii() and (c.isalnum() or c in "-_") for c in token)):
-            raise ValueError("a valid operation_id is required")
-        return token
-
     class Handler(BaseHTTPRequestHandler):
         BODY_SECONDS = 10.0
 
@@ -282,43 +269,9 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 return
             try:
                 body = self._body()
-                if self.path == "/api/cancel":
-                    token = operation_id(body)
-                    with operation_lock:
-                        event = active.get(token)
-                        if event is not None:
-                            event.set()
-                    self._json(200, {"cancelled": event is not None})
-                    return
-                token = None
-                event = threading.Event()
-                if self.path == "/api/solve" and isinstance(body, dict) and "operation_id" in body:
-                    token = operation_id(body)
-                    with operation_lock:
-                        if token in active:
-                            raise ValueError("operation_id is already active")
-                        active[token] = event
-
-                def check_cancel(final: bool = False) -> None:
-                    # Under the lock /api/cancel takes: past its final check the
-                    # search commits, so from then on it is no longer cancellable.
-                    with operation_lock:
-                        if event.is_set():
-                            raise SearchCancelledError("Search cancelled; layout unchanged")
-                        if final and token is not None:
-                            active.pop(token, None)
-
-                try:
-                    with session.lock:
-                        result = dispatch_session(session, self.path, body,
-                                                  cancel_check=check_cancel)
-                finally:
-                    if token is not None:
-                        with operation_lock:
-                            active.pop(token, None)
+                with session.lock:
+                    result = dispatch_session(session, self.path, body)
                 self._json(200, result)
-            except SearchCancelledError as exc:
-                self._json(409, {"error": str(exc), "code": "cancelled"})
             except RevisionConflictError as exc:
                 # The comparison above happened under the same lock as edits.
                 # Return current state, but never replay the rejected mutation.

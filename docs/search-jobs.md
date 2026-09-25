@@ -3,8 +3,8 @@
 The editor's interactive tools advance bounded engine jobs through short requests.
 There is one job per session. It owns its immutable starting layout, available
 inventory, endpoints and settings; changing the content, restarting the engine or
-starting a different job discards its old continuation. None of the progress
-messages is a layout edit.
+starting a different job discards its old continuation. No job request edits
+the layout.
 
 ## Completion controls
 
@@ -102,7 +102,7 @@ depth in one pass; raising a piece bound on a continuation applies to
 completion mode.
 
 Interactive single-pair jobs run the stages of
-[bridge-completion.md](bridge-completion.md) in the same order as `/api/solve`.
+[bridge-completion.md](bridge-completion.md) in order.
 An exact ordinary stage alternates endpoints; forced fits and reversing
 closures are not direction-equivalent, so those stages grow from the chosen end
 only and run until their own limits stop them. Stage node budgets are shared
@@ -162,6 +162,4 @@ witnesses remain per-run settings, not persistent layout geometry.
 Interactive completion uses `/api/search/start`, then `tick`, `page`,
 `pause`, `resume`, `continue`, `publish` and `discard`; subsequent requests carry
 the job ID and current revision. Train analysis uses `/api/routes/start`, `tick`,
-`pause`, `resume` and `discard`. The synchronous `/api/solve` serves API
-clients; the editor itself uses only the job routes. Errors validate before
-replacing an active job or publishing changes.
+`pause`, `resume` and `discard`.

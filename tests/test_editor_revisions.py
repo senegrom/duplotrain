@@ -13,15 +13,14 @@ from duplotrain.gui import (
     Session,
     dispatch_session,
 )
-from duplotrain.solver import Solution
-from tests.editor_support import load_adapter, post, running_server, unchanged
+from tests.editor_support import complete, load_adapter, post, running_server, unchanged
 
 
 def half_circle_session():
     session = Session(inventory={"curve": 12})
     for i in range(6):
         session.attach("curve", 0, None if i == 0 else (i - 1, 1))
-    session.solve_gap(None, None, slop=0, max_results=3)
+    complete(session, max_results=3)
     assert session.candidates
     return session
 
@@ -144,15 +143,12 @@ def test_pyodide_revision_conflicts_match_http():
     assert stale["state"]["snapshot"] == result["snapshot"]
 
 
-def test_repeated_search_invalidates_the_previous_candidate_indices(monkeypatch):
+def test_repeated_search_invalidates_the_previous_candidate_indices():
     session = Session(unlimited=True)
     session.attach("straight", 0, None)
-    monkeypatch.setattr(Session, "_arc_closures", lambda self, *args: [
-        Solution(layout=self.layout, steps=(), gap=0, exact=True, open_stubs=2, signature=()),
-    ])
-    session.solve_gap(None, None, 0, 1)
+    complete(session, max_results=1)
     old_revision = session.revision
-    session.solve_gap(None, None, 0, 1)
+    complete(session, max_results=1)
     assert session.revision > old_revision
     before = unchanged(session)
     with pytest.raises(ValueError, match="stale"):
@@ -180,7 +176,7 @@ def test_old_candidate_revision_cannot_select_a_new_candidate():
     session = half_circle_session()
     old_revision = session.revision
     session.set_inventory({"curve": 13})
-    session.solve_gap(None, None, 0, 3)
+    complete(session, max_results=3)
     with pytest.raises(ValueError, match="stale"):
         session.apply_candidate(0, old_revision)
 

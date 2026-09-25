@@ -59,8 +59,16 @@ def api(path, body):
 s = api("/api/state", {})
 s = api("/api/attach", {"piece": "curve", "entry": 0, "revision": s["revision"]})
 s = api("/api/attach", {"piece": "curve", "entry": 0, "at": [0, 1], "revision": s["revision"]})
-s = api("/api/solve", {"max_results": 1, "revision": s["revision"]})
-assert s["found"] == 1
+# The resumable search and the route analysis are imported only when first used.
+assert "duplotrain.editor_search" not in sys.modules
+job = api("/api/search/start", {"revision": s["revision"], "max_results": 1})
+body = {"revision": s["revision"], "job_id": job["job_id"]}
+for _ in range(500):
+    if job["status"] != "running":
+        break
+    job = api("/api/search/tick", body)
+assert job["found"] == 1, job
+s = api("/api/search/publish", body)
 assert (s["candidates"][0]["preview"].get("format") == "duplotrain-preview/1") == (
     sys.argv[3] == "compact"
 )
@@ -77,20 +85,7 @@ assert s["snapshot"] == snapshot
 r = json.loads(adapter.dispatch("/api/clear", json.dumps({"revision": 0})))
 assert r["code"] == "stale_revision"
 assert api("/api/state", {})["snapshot"] == snapshot
-# The resumable search and the route analysis are imported only when first used.
-s = api("/api/clear", {"revision": s["revision"]})
-for at in (None, [0, 1]):
-    s = api("/api/attach", {"piece": "curve", "entry": 0, "at": at, "revision": s["revision"]})
-job = api("/api/search/start", {"revision": s["revision"], "max_results": 1})
-body = {"revision": s["revision"], "job_id": job["job_id"]}
-for _ in range(500):
-    if job["status"] != "running":
-        break
-    job = api("/api/search/tick", body)
-assert job["found"] == 1, job
-s = api("/api/search/publish", body)
-s = api("/api/apply", {"index": 0, "revision": s["revision"]})
-assert s["layout"]["exactly_closed"]
+assert "duplotrain.editor_routes" not in sys.modules
 routes = api("/api/routes/start", {"revision": s["revision"]})
 body = {"revision": s["revision"], "job_id": routes["job_id"]}
 for _ in range(500):

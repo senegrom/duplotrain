@@ -8,10 +8,12 @@ import pytest
 
 from duplotrain.catalog import default_catalog
 from duplotrain.collision import UNDERPASS_MIN
+from duplotrain.editor_search import layout_key
 from duplotrain.geometry import ORIGIN, Pose
 from duplotrain.gui import Session
 from duplotrain.layout import Layout
 from duplotrain.solver import SolverConfig, _solution_overlaps, solve
+from tests.editor_support import complete
 from tests.test_completion import crossing_completion
 
 
@@ -142,19 +144,9 @@ def test_sealed_crossing_branch_is_not_a_future_joint(engine, monkeypatch):
     assert not sealed_exempt and sealed_result.stats.pruned_collision
 
 
-def test_gui_completions_never_overlap_the_base(monkeypatch):
-    """A ring containing a switch with a dangling spur, closed via solve_gap:
-    every candidate must pass an independent overlap audit against the base."""
-    import duplotrain.editor as editor
-
-    searches, search = [], editor.solve
-
-    def recorded(*args, **kwargs):
-        result = search(*args, **kwargs)
-        searches.append(result.stats)
-        return result
-
-    monkeypatch.setattr(editor, "solve", recorded)
+def test_gui_completions_never_overlap_the_base():
+    """A ring containing a switch with a dangling spur, closed by the editor's
+    search: every candidate must pass an independent overlap audit against the base."""
     session = Session()
     session.attach("switch", 1, None)
     session.attach("straight", 0, (0, 2))  # spur on the spare branch
@@ -168,8 +160,8 @@ def test_gui_completions_never_overlap_the_base(monkeypatch):
     grow = next(end for end in opens if end[0] == len(base) - 1)
     close = next(end for end in opens if end[0] == 0)
 
-    outcome = session.solve_gap(grow, close, slop=0.0, max_results=6)
-    assert outcome["found"] > 0
+    job = complete(session, grow, close, max_results=6)
+    assert job.solutions
     for solution in session.candidates:
         fresh = [
             hit
@@ -177,9 +169,16 @@ def test_gui_completions_never_overlap_the_base(monkeypatch):
             if (hit[0], hit[1]) not in pre
         ]
         assert fresh == [], f"candidate overlaps the base: {fresh}"
-    # The solver found them, refusing overlapping pieces as it placed them: its
-    # final audit of each closure had nothing left to drop.
-    assert searches and all(s.pruned_collision and not s.dropped_overlap for s in searches)
+    # The plain-track stage found them; the same search refuses overlapping
+    # pieces as it places them, so its final audit has nothing left to drop.
+    assert job.stage == "plain track"
+    stock = {pid: n for pid, n in session.remaining().items()
+             if pid in ("curve", "straight") and n}
+    result = solve(stock, session.catalog, SolverConfig(min_pieces=0, max_results=6),
+                   base=base, grow_from=grow, close_onto=close)
+    assert {layout_key(s.layout) for s in result.solutions} == {
+        layout_key(s.layout) for s in job.solutions}
+    assert result.stats.pruned_collision and not result.stats.dropped_overlap
 
 
 def bridge_with_ground_track(catalog, cross_x):

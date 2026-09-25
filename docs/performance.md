@@ -62,9 +62,7 @@ stock piece, every usable route of a base-only junction and the exact
 retargeting of reversing loops. Tables are built progressively: a search gets
 `min(4096, max_nodes // 8)` expansions at once, earns 24 more per DFS node up to
 262,144, and a depth not yet affordable stays permissive and is asked again
-later. Only decided answers enter an LRU cache of 4,096 entries that lives with
-the tables: one search's own, or the tables an editor closing shares between the
-direction turns of a stage.
+later. Only decided answers enter the tables' LRU cache of 4,096 entries.
 
 Beyond the built layers a query up to three moves deeper is decided exactly by
 a forward probe: the cursor is expanded forward over the same moves and each
@@ -140,18 +138,14 @@ primitives are cached, and the sampled key is cached per exact identity.
 
 ## Editor closings
 
-Unless reversing loops are allowed, the editor first asks an arc oracle, which
-composes its prefix and suffix poses on the lattice and matches them exactly; the
-search stages and their node budgets are in [bridge-completion.md](bridge-completion.md).
-Which end is the hard one is unknown in advance, so each exact ordinary stage
-alternates directions in turns of doubling budget from 1,024 nodes, keeps each
-direction's tables between its turns, and tries first the direction that settled
-the previous stage; forced fits and reversing closures grow from one end. Bridge candidates are expanded and audited before
-they count toward the result limit, and only the joints among their new
-placements are audited, since the base and its links are carried over
-unchanged. Candidate previews use a compact drawing-only contract, and state
-serialisation shares each connector pose between the layout, the joint audit
-and the mating lists.
+The editor's arc oracle composes its prefix and suffix poses on the lattice and
+matches them exactly; the search stages, their order and node budgets are in
+[bridge-completion.md](bridge-completion.md). Which end is the hard one is
+unknown in advance, so each exact ordinary stage runs one suspended search from
+each end, alternating in turns of doubling budget from 1,024 nodes, and the next
+stage starts from the end that settled the previous one. Candidate previews use
+a compact drawing-only contract, and state serialisation shares each connector
+pose between the layout, the joint audit and the mating lists.
 
 ## Editor presentation
 

@@ -11,6 +11,49 @@ from duplotrain import Layout, Pose, build_chain, default_catalog
 from duplotrain.gui import Session
 from duplotrain.layout import layout_from_dict
 from duplotrain.solver import _solution_overlaps
+from tests.editor_support import complete
+
+
+def arc_closures(session, grow, close, max_results, max_pieces=26):
+    """The arc oracle's closures, without the heartbeats that keep a job responsive."""
+    return [s for s in session._arc_events(grow, close, max_results, max_pieces)
+            if s is not None]
+
+
+def test_arc_oracle_finds_winding_ring_closures():
+    """A gap whose only closure winds AWAY from the target (10 same-sign curves
+    looping around) starves the DFS -- the arc oracle must find it instantly."""
+    session = Session()
+    session.set_inventory({"curve": 24, "straight": 8})
+    session.attach("curve", 0, None)
+    session.attach("curve", 0, (0, 1))
+    opens = session.layout.connectable_ends()
+    job = complete(session, opens[1], opens[0], max_results=1)
+    assert len(job.solutions) == 1
+    assert job.nodes == 0 and job.stage == "templates"  # the oracle, not the search
+    added = session.candidates[0].layout.piece_counts["curve"] - 2
+    assert added == 10  # completes the 12-curve circle
+
+
+def test_arc_oracle_levels_through_ramps():
+    """One end atop a half-built climb, the other at ground: no flat chain can
+    close this -- the oracle must descend through a ramp, then ring around."""
+    session = Session()
+    session.set_inventory({"curve": 12, "ramp": 2, "straight": 8})
+    session.attach("curve", 0, None)
+    for _ in range(5):
+        session.attach("curve", 0, (len(session.layout) - 1, 1))
+    high_end = session.layout.connectable_ends()[-1]
+    session.attach("ramp", 0, high_end)
+    tips = session.layout.connectable_ends()
+    grow = next(t for t in tips if float(session.layout.pose_of(t).z) > 1)
+    close = next(t for t in tips if float(session.layout.pose_of(t).z) <= 1)
+    job = complete(session, grow, close, max_results=1)
+    assert len(job.solutions) == 1
+    assert job.nodes == 0
+    counts = dict(session.candidates[0].layout.piece_counts)
+    assert counts["ramp"] == 2  # the descending ramp was added
+    assert counts["curve"] == 12
 
 
 @pytest.mark.parametrize("heading", [0, 1, 5, 23])
@@ -24,7 +67,7 @@ def test_suffix_lookup_keeps_exact_rotated_and_elevated_closures(heading, climbi
     owned = dict(Counter(base.piece_counts) + Counter(stock))
     session = Session(history=[base], inventory=owned)
     grow, close = base.connectable_ends()[-1], base.connectable_ends()[0]
-    found = session._arc_closures(grow, close, 8, 26)
+    found = arc_closures(session, grow, close, 8, 26)
     assert found
     for candidate in found:
         assert candidate.layout.is_closed and not candidate.layout.joint_issues()
@@ -38,7 +81,7 @@ def test_duplicate_straight_bridge_templates_do_not_fill_result_cards():
     layout, a = Layout().with_piece(catalog["straight"], Pose.make())
     layout, b = layout.with_piece(catalog["straight"], Pose.make(x=1152))
     session = Session(history=[layout], inventory={"straight": 2, "ramp": 2, "span": 2})
-    found = session._arc_closures((a, 1), (b, 0), 50, 4)
+    found = arc_closures(session, (a, 1), (b, 0), 50, 4)
     assert found
     keys = [candidate.layout.placements[len(layout):] for candidate in found]
     assert len(keys) == len(set(keys))
@@ -59,7 +102,7 @@ def test_reported_gap_does_not_rebuild_every_suffix_for_every_prefix(monkeypatch
         return original(self, *args)
 
     monkeypatch.setattr(Pose, "then", counted)
-    assert not session._arc_closures((25, 0), (23, 1), 8, 26)
+    assert not arc_closures(session, (25, 0), (23, 1), 8, 26)
     # One walk back per suffix and composed runs take about 1,440 transforms;
     # rebuilding suffixes per prefix takes several times that. Count, never time.
     assert 0 < calls < 2_000
@@ -70,7 +113,7 @@ def test_composed_arc_runs_preserve_finite_stock_order(straights):
     catalog = default_catalog()
     base = build_chain([(catalog["curve"], 0, 1)] * 6)
     session = Session(history=[base], inventory={"curve": 12, "straight": straights})
-    found = session._arc_closures((5, 1), (0, 0), 50, 26)
+    found = arc_closures(session, (5, 1), (0, 0), 50, 26)
     assert [len(s.layout) for s in found] == [12 + 2 * i for i in range(straights // 2 + 1)]
     for candidate in found:
         assert not candidate.layout.joint_issues()
@@ -107,11 +150,11 @@ def test_lattice_oracle_geometry_matches_the_exact_geometry():
                 lattice = _LatticeArcGeometry.compile(catalog, start, target)
                 assert lattice is not None
                 compiled.append(lattice)
-                fast = session._arc_closures(grow, close, 8, 26)
+                fast = arc_closures(session, grow, close, 8, 26)
                 with pytest.MonkeyPatch.context() as mp:
                     mp.setattr(editor._LatticeArcGeometry, "compile",
                                classmethod(lambda cls, *a: None))
-                    exact = session._arc_closures(grow, close, 8, 26)
+                    exact = arc_closures(session, grow, close, 8, 26)
                 assert [s.layout for s in fast] == [s.layout for s in exact]
                 assert [s.signature for s in fast] == [s.signature for s in exact]
     # The two geometries agree step by step, not only on the candidates found.

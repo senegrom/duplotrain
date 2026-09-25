@@ -6,6 +6,7 @@ from duplotrain import ORIGIN, Layout, Pose, SolverConfig, default_catalog, pars
 from duplotrain.explore import congruence_key
 from duplotrain.gui import Session
 from duplotrain.solver import _solution_overlaps
+from tests.editor_support import complete
 
 
 def reversing_base_and_witnesses():
@@ -89,10 +90,10 @@ def test_editor_height_bound_includes_transitable_preplaced_junctions(reverse):
         assert result.solutions[0].exact
 
     session = Session(catalog=catalog, inventory=dict(base.piece_counts), history=[base])
-    result = session.solve_gap(grow, close, slop=0.0, max_results=10, max_pieces=1)
-    assert result["found"] == 1, (
+    job = complete(session, grow, close, max_results=10, max_pieces=1)
+    assert len(job.solutions) == 1, (
         "Both core engines found an exact zero-new-piece completion, but the "
-        f"editor rejected it: {result}"
+        f"editor rejected it: {job.status}"
     )
 
 

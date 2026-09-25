@@ -12,6 +12,7 @@ import duplotrain.solver as solver
 from duplotrain import Layout, Pose, SolverConfig, build_chain, default_catalog
 from duplotrain.gui import Session
 from duplotrain.layout import layout_from_dict
+from tests.editor_support import complete
 
 
 def unfiltered_moves(pieces, stock, base, grow_from, close_onto):
@@ -119,8 +120,8 @@ def test_reported_reverse_gap_needs_fewer_than_one_thousand_nodes(unlimited):
     spare = {"curve": 16, "straight": 4, "ramp": 2, "span": 2}
     owned = dict(Counter(base.piece_counts) + Counter(spare))
     session = Session(history=[base], inventory=owned, unlimited=unlimited)
-    result = session.solve_gap((23, 1), (25, 0), 0, 8)
-    assert result["found"] == 8 and result["searched"] < 1000
+    job = complete(session, (23, 1), (25, 0))
+    assert len(job.solutions) == 8 and job.nodes < 1000
     for candidate in session.candidates:
         assert len(candidate.layout) == len(base) + 24
         assert candidate.layout.is_closed and not candidate.layout.joint_issues()

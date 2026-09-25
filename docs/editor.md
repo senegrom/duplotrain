@@ -152,7 +152,7 @@ explicit redraws, not on hover frames.
 Autosave is independent of all of this, and local copies are not a backup
 service.
 
-## Recovery and cancellation
+## Recovery
 
 When the engine fails, including a fatal error the Python runtime reports
 while answering a request, the overlay offers downloads of the last confirmed
@@ -160,15 +160,9 @@ layout and session from this tab's own state, and a restart that creates a new
 worker and restores a copy of that snapshot; responses from an old worker
 generation are ignored, and a restart resets undo history and suggestions and
 says so. Startup times out after 60 seconds; outstanding calls time out after
-two minutes without a response or progress report. The editor's searches and
-route analyses are interactive jobs that pause without restarting the worker
-([search-jobs.md](search-jobs.md)); the synchronous `/api/solve` route serves API
-clients. On the local host such a search may carry a random
-`operation_id`; `/api/cancel` sets its event without waiting for the session
-lock, the search raises at its next progress or publication checkpoint with
-HTTP 409 and `code: "cancelled"`, the layout stays unchanged, and a cancellation
-for a request not yet registered, past its last checkpoint or already finished
-reports that it was not active.
+two minutes without a response. Every request is short: the editor's searches
+and route analyses are interactive jobs that advance in brief ticks and pause
+without restarting the worker ([search-jobs.md](search-jobs.md)).
 
 ## Interactive completion
 

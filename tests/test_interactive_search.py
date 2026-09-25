@@ -31,7 +31,7 @@ from duplotrain.solver import (
     solve,
     solve_steps,
 )
-from tests.editor_support import load_adapter, post, running_server
+from tests.editor_support import load_adapter, post, running_server, unchanged
 
 
 @pytest.fixture
@@ -222,15 +222,18 @@ def test_invalid_new_request_cannot_discard_existing_job(catalog, body):
 def test_failed_tick_releases_job_and_preserves_confirmed_content(catalog, monkeypatch):
     session = Session(history=[half(catalog)])
     call(session, "start")
-    old, before = session._interactive_job, session.snapshot()
+    old, before = session._interactive_job, unchanged(session)
+
     def fail():
         raise ValueError("candidate audit error")
-    monkeypatch.setattr(old, "tick", fail)
+
+    # A failure inside the search, not in the route around it.
+    monkeypatch.setattr(old.pool, "step", fail)
     with pytest.raises(ValueError, match="audit error"):
         call(session, "tick")
     assert session._interactive_job is None
     assert old.status == "discarded" and not old.pool.cursors
-    assert session.snapshot() == before
+    assert unchanged(session) == before
 
 
 def test_expiry_releases_only_retained_search(catalog):
@@ -733,12 +736,24 @@ def test_interactive_forced_fit_preserves_exactness_and_joint_budget(catalog, sl
         job.close()
 
 
-def test_ends_at_different_heights_explain_the_proof_instead_of_searching(catalog):
-    # Both ramps climb and no ramp is left to come down: nothing to search.
-    up = build_chain([(catalog["straight"], 0, 1), (catalog["ramp"], 0, 1)]
-                     + [(catalog["straight"], 0, 1)] * 2)
-    session = Session(history=[up], inventory={"straight": 3, "ramp": 1, "curve": 12})
+@pytest.mark.parametrize("chain, inventory, rise", [
+    (["straight", "ramp", "straight", "straight"],
+     {"straight": 3, "ramp": 1, "curve": 12}, 58),
+    # Both ramps and spans climb in series: a sky-high end.
+    (["ramp", "span", "span", "ramp"],
+     {"ramp": 2, "span": 2, "curve": 12, "straight": 8}, 154),
+])
+def test_ends_at_different_heights_explain_the_proof_instead_of_searching(catalog, chain,
+                                                                          inventory, rise):
+    # No ramp is left to come down: nothing to search.
+    up = build_chain([(catalog[pid], 0, 1) for pid in chain])
+    session = Session(history=[up], inventory=inventory)
     state = call(session, "start")
     assert state["status"] == "exhausted" and state["complete"] and state["searched"] == 0
+    assert f"differ by {rise} mm in height" in state["reason"]
     assert "can never come back down" in state["reason"]
-    assert state["reason"] == session.solve_gap(None, None, 0, 8)["reason"]
+    # Publishing no suggestions is still one new revision.
+    revision = session.revision
+    published = call(session, "publish")
+    assert published["revision"] == session.revision == revision + 1
+    assert session._candidate_revision == session.revision and not session.candidates

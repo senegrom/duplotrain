@@ -1,23 +1,19 @@
-"""Bounded, floor-level bridge completions for the editor.
+"""The complete standard bridge as one search move, for the editor's bridge stage.
 
-This is a heuristic stage, not an exhaustive search: it tries at most one complete
-ramp/span/span/ramp assembly plus ordinary track. The general solver remains the
-fallback. Every macro is expanded and audited with the real pieces before publication.
+The stage (see ``editor_search.PairSearch``) is a heuristic, not an exhaustive
+search: it tries at most one complete ramp/span/span/ramp assembly plus ordinary
+track, and the full-inventory stage remains the fallback. Every macro is expanded
+and audited with the real pieces before publication.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import replace
 
 from .catalog import default_catalog
-from .collision import DEFAULT_CLEARANCE
-from .completion_search import solve_completion as solve
-from .exact import ZERO
 from .geometry import ORIGIN
 from .layout import End, Layout, Placement, build_chain
 from .pieces import Path, PieceType, Port, Ramp, Route
-from .solver import Solution, SolverConfig, SolveResult, _OverlapAudit
 
 _BRIDGE_ID = "_completion_bridge"
 _RECIPE = (("ramp", 0, 1), ("span", 0, 1), ("span", 1, 0), ("ramp", 1, 0))
@@ -74,80 +70,3 @@ def _expand(layout: Layout, parts: Layout) -> Layout:
     accessories = tuple((indices[entry[0]], *entry[1:]) for entry in layout.accessories)
     return Layout(tuple(placements), links, accessories)
 
-
-def bridge_completion(
-    base: Layout,
-    catalog: Mapping[str, PieceType],
-    remaining: Mapping[str, int],
-    grow: End,
-    close: End,
-    *,
-    max_pieces: int,
-    max_results: int,
-    max_nodes: int,
-    progress: object = None,
-    memo: dict | None = None,
-) -> SolveResult | None:
-    """Try one conventional bridge, counting all four components against the limits.
-
-    Restricting this stage to ground-level ends avoids floating curves and inverted
-    bridges. Other elevations and multiple bridges remain available to the fallback.
-    A macro costs one search move but four real pieces, so reserve three slots. This
-    deliberately under-searches bridge-free routes; the plain stage handles those.
-    """
-    if (max_pieces < 4 or remaining.get("ramp", 0) < 2 or remaining.get("span", 0) < 2
-            or base.pose_of(grow).z != ZERO or base.pose_of(close).z != ZERO):
-        return None
-    bridge = _bridge(catalog)
-    if bridge is None:
-        return None
-    macro, parts = bridge
-    inventory = {pid: n for pid in ("curve", "straight")
-                 if (n := remaining.get(pid, 0)) > 0}
-    inventory[_BRIDGE_ID] = 1
-    before = base.piece_counts
-    accepted: dict[tuple, Solution] = {}
-    audit = _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
-
-    def accept(candidate: Solution) -> bool:
-        if candidate.signature in accepted:
-            return True
-        expanded = _expand(candidate.layout, parts)
-        # Macro adjacency exemptions are broader than those of its components.
-        # Audit BEFORE counting a result: invalid early macros must not fill all
-        # the result slots and hide valid bridges further along the search.
-        if len(expanded) - len(base) > max_pieces or any(
-            n - before.get(pid, 0) > remaining.get(pid, 0)
-            for pid, n in expanded.piece_counts.items()
-        ):
-            return False
-        if any(
-            placement.frame.z != ZERO
-            for placement in expanded.placements[len(base):]
-            if placement.piece.id in ("curve", "straight", "ramp")
-        ):
-            return False
-        # The base and its links are unchanged, so only joints of new placements
-        # can differ from the search's exact fits; a base with a deliberate forced
-        # fit keeps its bridge candidates.
-        if expanded.joint_issues(since=len(base)) or audit.overlaps(expanded):
-            return False
-        accepted[candidate.signature] = replace(
-            candidate, layout=expanded, steps=(),
-            signature=("standard_bridge", candidate.signature),
-        )
-        return True
-
-    result = solve(
-        inventory, {**catalog, _BRIDGE_ID: macro},
-        SolverConfig(min_pieces=0, max_pieces=max_pieces - 3, max_results=max_results,
-                     max_nodes=max_nodes, progress=progress, solution_filter=accept),
-        base=base, grow_from=grow, close_onto=close, memo=memo,
-    )
-    candidates = [accepted[candidate.signature] for candidate in result.solutions
-                  if accept(candidate)]
-    # Even an exhausted macro search proves nothing about the whole inventory.
-    return SolveResult(candidates, replace(
-        result.stats, complete=False, stop_reason="bridge_search",
-        max_pieces_searched=result.stats.max_pieces_searched + 3,
-    ))

@@ -16,6 +16,7 @@ from duplotrain import (
 )
 from duplotrain.gui import Session
 from duplotrain.solver import _solution_overlaps
+from tests.editor_support import complete
 
 
 def signatures(result):
@@ -109,9 +110,9 @@ def test_editor_can_apply_a_completion_from_the_improved_search():
     base = build_chain([(catalog["curve"], 0, 1)] * 6)
     session = Session(catalog=catalog, inventory={"curve": 12, "straight": 4}, history=[base])
     before_revision = session.revision
-    outcome = session.solve_gap(None, None, 0.0, 8, reversing=True)
-    assert outcome["found"] == 3 and outcome["complete"]
-    assert outcome["searched"] < 500
+    job = complete(session, reversing=True)
+    assert len(job.solutions) == 3 and job.complete
+    assert job.nodes < 500
     assert session.revision == before_revision + 1
     session.apply_candidate(0, revision=session.revision)
     assert session.layout.is_closed and not session.layout.joint_issues()

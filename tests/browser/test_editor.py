@@ -196,6 +196,8 @@ def test_search_limit_message_and_deeper_search(editor):
     assert page.locator("#expand-search").is_visible()
     page.locator("#expand-search").tap()
     page.wait_for_selector(".cand")
+    # Suggestions stream in while the search runs; read them once published.
+    page.wait_for_function("!solving && !apiBusy")
     assert len(session.candidates[0].layout) == 34
     assert not errors
 

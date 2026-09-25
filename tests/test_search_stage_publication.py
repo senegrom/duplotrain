@@ -18,9 +18,6 @@ def test_interactive_quota_preserves_first_stage_and_publishes_job_counters(slop
     session = Session(history=[base])
     session.inventory.update(curve=12, straight=4)
     stock = session.remaining()
-    legacy = session.solve_gap(None, None, slop, 8, reversing=True)
-    original = [layout_key(s.layout) for s in session.candidates]
-    assert legacy["found"] == 3
     before = session.snapshot()
     dispatch_session(session, "/api/search/start", {
         "revision": session.revision, "slop": slop, "reversing": True,
@@ -34,7 +31,10 @@ def test_interactive_quota_preserves_first_stage_and_publishes_job_counters(slop
         assert job.status == "results_ready"
         keys = [layout_key(s.layout) for s in job.solutions]
         assert len(keys) == len(set(keys)) == 8
-        assert keys[:3] == original
+        # The plain-track stage settles first with its three closures; the quota
+        # then continues into the later stages instead of stopping there.
+        plain = [not set(s.layout.piece_counts) - {"curve", "straight"} for s in job.solutions]
+        assert plain == [True] * 3 + [False] * 5
         for sol in job.solutions:
             assert sol.layout.placements[:len(base)] == base.placements
             assert all(sol.layout.links[a] == b for a, b in base.links.items())

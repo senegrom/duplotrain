@@ -14,6 +14,7 @@ from time import perf_counter
 
 import duplotrain.collision as collision
 from duplotrain import Pose, build_chain, default_catalog
+from duplotrain.editor_search import SearchJob
 from duplotrain.gui import Session
 from duplotrain.layout import Layout, layout_from_dict
 from duplotrain.solver import _solution_overlaps
@@ -39,17 +40,19 @@ def scene(extra_loops):
 def run(base, grow, close):
     session = Session(history=[base], unlimited=True)
     started = perf_counter()
-    outcome = session.solve_gap(grow, close, 0.0, 8)
+    job = SearchJob(session, {"grow": grow, "close": close})
+    while job.status == "running":
+        job.tick()
     elapsed = perf_counter() - started
-    assert len(session.candidates) == 8
-    for candidate in session.candidates:
+    assert len(job.solutions) == 8
+    for candidate in job.solutions:
         layout = candidate.layout
         assert len(layout) - len(base) == 24
         assert layout.placements[:len(base)] == base.placements
         assert all(layout.links[a] == b for a, b in base.links.items())
         assert layout.is_closed and not layout.joint_issues()
         assert not _solution_overlaps(layout, 0, 120.0, 8.0)
-    return elapsed, outcome
+    return elapsed, job
 
 
 def bound_work(base, grow, close):
@@ -87,11 +90,11 @@ def main():
         base, grow, close = scene(loops)
         times = []
         for _ in range(args.repeats):
-            elapsed, outcome = run(base, grow, close)
+            elapsed, job = run(base, grow, close)
             times.append(elapsed)
         row = {"base_pieces": len(base), "synthetic_extra_loops": loops,
-               "seconds": round(median(times), 4), "nodes": outcome["searched"],
-               "found": outcome["found"]}
+               "seconds": round(median(times), 4), "nodes": job.nodes,
+               "found": len(job.solutions)}
         if args.count_bounds:
             row["bounds_considered"] = bound_work(base, grow, close)
         print(json.dumps(row), flush=True)

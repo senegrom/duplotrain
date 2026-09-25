@@ -59,7 +59,7 @@ test("worker crash rejects every pending request and displays literal error text
   const h = harness();
   await boot(h);
   const a = assert.rejects(h.window.duplotrainApi("/api/state"), /<b>crashed<\/b>/);
-  const b = assert.rejects(h.window.duplotrainApi("/api/solve", {}), /<b>crashed<\/b>/);
+  const b = assert.rejects(h.window.duplotrainApi("/api/search/tick", {}), /<b>crashed<\/b>/);
   h.workers[0].onerror({message: "<b>crashed</b>", preventDefault() {}});
   await Promise.all([a, b]);
   assert.equal(h.workers[0].terminated, true);
@@ -190,11 +190,13 @@ test("restart restores an isolated copy of this tab's snapshot and ignores late 
   assert.equal(h.timers.size, 0);
 });
 
-test("progress renews the inactivity watchdog, silence rejects pending operations", async () => {
+test("each answer renews the inactivity watchdog, silence rejects pending operations", async () => {
   const h = harness(); await recoverableBoot(h);
-  const pending = assert.rejects(h.window.duplotrainApi("/api/solve", {}), /No engine response or progress/);
+  const answered = h.window.duplotrainApi("/api/state", {});
+  const pending = assert.rejects(h.window.duplotrainApi("/api/search/tick", {}), /No engine response for two minutes/);
   const old = [...h.timers.keys()][0];
-  h.workers[0].emit(5000);
+  h.workers[0].emit({id: h.workers[0].sent.at(-2).id, res: "{}"});
+  await answered;
   assert.equal(h.timers.has(old), false); assert.equal(h.timers.size, 1);
   [...h.timers.values()][0]();
   await pending;

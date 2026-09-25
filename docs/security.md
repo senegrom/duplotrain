@@ -63,9 +63,9 @@ access. The browser CI jobs additionally build and test the actual pinned runtim
 
 ## Editor consistency and recoverable saves
 
-Every mutating API route (including solve and restore) requires an integer
-`revision` copied from the state the client actually displayed. The HTTP server
-checks it under the same session lock as the mutation. Missing, malformed or
+Every mutating API route (including the search jobs and restore) requires an
+integer `revision` copied from the state the client actually displayed. The HTTP
+server checks it under the same session lock as the mutation. Missing, malformed or
 stale revisions receive HTTP 409 with `code: "stale_revision"` and the current
 `state`, without changing the session. Read-only state/export requests do not
 require a revision. Non-browser JSON clients must follow this contract too.
@@ -80,9 +80,8 @@ The editor refreshes from a conflict response and clears old tools/previews,
 but never automatically retries the rejected action against newly indexed
 pieces. A conflict from a fresh engine at revision 0, such as a restarted local
 server, restores the newest confirmed session there instead of adopting, and
-autosaving, the empty one ([editor.md](editor.md#autosave)). Each new search also
-advances the revision because candidate indices can change even when the layout
-does not. Revisions prevent stale edits; they are not credentials.
+autosaving, the empty one ([editor.md](editor.md#autosave)). Revisions prevent
+stale edits; they are not credentials.
 
 Before committing an edit, the session validates its proposed snapshot with the
 same layout limits as import/recovery (1,500 pieces and 200 action stones), plus

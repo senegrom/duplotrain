@@ -16,6 +16,7 @@ from time import perf_counter
 from duplotrain import build_chain, default_catalog
 from duplotrain.collision import CollisionField
 from duplotrain.editor import PREVIEW_FORMAT, Session
+from duplotrain.editor_search import SearchJob
 from duplotrain.editor_tools import check_session
 from duplotrain.geometry import Pose
 from duplotrain.layout import Layout, Placement, layout_from_dict
@@ -66,8 +67,11 @@ def main():
     sessions = [(f"completed_{len(layout)}", Session(history=[layout], unlimited=True))
                 for layout in (completed, expanded(completed, 38), expanded(completed, 118))]
     session = Session(history=[gap], unlimited=True)
-    outcome = session.solve_gap(None, None, 0, 8, max_pieces=26)
-    assert outcome["found"] == 8 and outcome["searched"] == 1878
+    job = SearchJob(session, {"max_pieces": 26})
+    while job.status == "running":
+        job.tick()
+    job.publish(session)
+    assert len(job.solutions) == 8 and job.nodes == 1878
     sessions.append(("gap_8_candidates", session))
     if args.states_dir:
         args.states_dir.mkdir(parents=True, exist_ok=True)

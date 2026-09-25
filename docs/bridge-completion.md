@@ -22,9 +22,9 @@ layouts.
 `search_effort` is an integer API parameter from 1 to 16, defaulting to 1. It scales
 the plain, bridge and full-inventory budgets of 25,000, 250,000 and 60,000 nodes. If
 the plain inventory is already the whole box, that search uses the full budget.
-Progress counters accumulate across stages instead of restarting. A synchronous
-`/api/solve` retry starts over with its larger budget; the editor's **Search
-harder** resumes the same job instead ([search-jobs.md](search-jobs.md)).
+A job's `searched` count accumulates across stages instead of restarting, and
+**Search harder** resumes the same job with larger budgets
+([search-jobs.md](search-jobs.md)).
 
 ## Regression case
 

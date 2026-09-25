@@ -6,20 +6,27 @@ from pathlib import Path
 
 import pytest
 
-import duplotrain.bridge_completion as bridge_module
-import duplotrain.editor as editor
+import duplotrain.editor_search as editor_search
 from duplotrain import build_chain, default_catalog
-from duplotrain.bridge_completion import _bridge, _expand, bridge_completion
+from duplotrain.bridge_completion import _BRIDGE_ID, _bridge, _expand
+from duplotrain.editor_search import PairSearch, SearchJob, physical_key, search_options
 from duplotrain.geometry import ORIGIN
 from duplotrain.gui import Session, dispatch_session
 from duplotrain.layout import layout_from_dict, layout_to_dict
-from duplotrain.solver import Solution, SolveResult, SolveStats, _solution_overlaps
+from duplotrain.solver import Solution, _solution_overlaps
+from tests.editor_support import complete
 
 FIXTURES = Path(__file__).parent / "fixtures"
+SPARE = {"curve": 16, "straight": 4, "ramp": 2, "span": 2}
 
 
 def load(name):
     return layout_from_dict(json.loads((FIXTURES / name).read_text()), default_catalog())
+
+
+def owned(base):
+    """The fixture's own pieces plus the spare box; no coordinates or recipe."""
+    return {pid: base.piece_counts.get(pid, 0) + SPARE.get(pid, 0) for pid in default_catalog()}
 
 
 def assert_extension(base, completed, remaining=None, max_pieces=26):
@@ -37,6 +44,11 @@ def assert_extension(base, completed, remaining=None, max_pieces=26):
     assert layout_from_dict(layout_to_dict(completed), default_catalog()) == completed
 
 
+def pair_search(base, catalog, stock, grow, close, depth=26, effort=1):
+    return PairSearch(base, catalog, stock, grow, close, depth, effort, 0, False,
+                      search_options(None, catalog))
+
+
 def test_supplied_bridge_witness_is_valid_and_preserves_the_gap():
     base, witness = load("bridge-gap.json"), load("bridge-completed.json")
     assert len(base) == 59 and len(witness) == 83
@@ -48,27 +60,32 @@ def test_supplied_bridge_witness_is_valid_and_preserves_the_gap():
 @pytest.mark.parametrize("reversing", [False, True])
 def test_editor_finds_a_standard_bridge_without_being_given_the_witness(unlimited, reversing):
     base = load("bridge-gap.json")
-    # Only the stock counts are supplied; no coordinates or recipe of the answer.
-    spare = {"curve": 16, "straight": 4, "ramp": 2, "span": 2}
-    owned = {pid: base.piece_counts.get(pid, 0) + spare.get(pid, 0)
-             for pid in default_catalog()}
-    session = Session(history=[base], inventory=owned, unlimited=unlimited)
+    session = Session(history=[base], inventory=owned(base), unlimited=unlimited)
     remaining = session.remaining()
-    progress = []
-    result = dispatch_session(session, "/api/solve", {
-        "revision": 0, "max_pieces": 26, "max_results": 8, "reversing": reversing,
-    }, progress=progress.append)
-    assert result["found"] > 0 and result["stop_reason"] == "bridge_search"
-    assert result["searched"] <= 275_002
-    assert not result["complete"]
-    assert progress == sorted(progress) and progress
+    job = complete(session, max_pieces=26, max_results=8, reversing=reversing)
+    assert len(job.solutions) == 8 and job.stage == "standard bridge"
+    assert job.nodes < 2_000 and not job.complete
     for candidate in session.candidates:
-        assert len(candidate.layout) == 83
+        assert candidate.signature[0] == "standard_bridge" and len(candidate.layout) == 83
         assert_extension(base, candidate.layout, remaining)
-    session.apply_candidate(0, revision=result["revision"])
+    session.apply_candidate(0, revision=session.revision)
     assert_extension(base, session.layout, remaining)
     session.undo()
     assert session.layout == base
+
+
+def test_either_end_closes_the_reported_gap_with_the_same_tracks():
+    base = load("bridge-gap.json")
+    found = []
+    for grow, close in (((25, 0), (23, 1)), ((23, 1), (25, 0))):
+        job = complete(Session(history=[base], inventory=owned(base)), grow, close)
+        # The plain stage from (25, 0) could wander for tens of thousands of
+        # nodes; the other end proves it impossible in about a hundred, and the
+        # bridge stage then starts from that end.
+        assert len(job.solutions) == 8 and job.stage == "standard bridge"
+        assert job.nodes < 3_000
+        found.append({physical_key(s.layout, len(base)) for s in job.solutions})
+    assert found[0] == found[1]
 
 
 def test_macro_expands_in_both_directions_and_keeps_action_stones():
@@ -89,53 +106,61 @@ def test_macro_expands_in_both_directions_and_keeps_action_stones():
 
 
 @pytest.mark.parametrize("problem", ["one_ramp", "one_span", "depth", "elevated", "custom"])
-def test_inapplicable_macro_stage_defers_without_searching(monkeypatch, problem):
+def test_inapplicable_macro_stage_never_searches(problem):
     catalog = default_catalog()
     base = build_chain([(catalog["straight"], 0, 1)])
     stock = {"ramp": 2, "span": 2}
-    cap = 26
+    depth = 26
     if problem == "one_ramp":
         stock["ramp"] = 1
     elif problem == "one_span":
         stock["span"] = 1
     elif problem == "depth":
-        cap = 3
+        depth = 3
     elif problem == "elevated":
         base = build_chain([(catalog["ramp"], 0, 1)])
     else:
         catalog["ramp"] = replace(catalog["ramp"], underpass=False)
+    pool = pair_search(base, catalog, stock, (0, 1), (0, 0), depth)
+    try:
+        # A macro needs two ramps, two spans, four free slots, floor-level ends
+        # and the standard geometry: otherwise the stage is absent, or blocked
+        # when only the depth is short.
+        bridge = [c for c in pool.cursors if c.stage == "standard bridge"]
+        assert bridge == [] if problem != "depth" else bridge and all(c.blocked for c in bridge)
+    finally:
+        pool.close()
 
-    def unexpected(*args, **kwargs):
-        pytest.fail("inapplicable stage must not run a search")
 
-    monkeypatch.setattr(bridge_module, "solve", unexpected)
-    assert bridge_completion(base, catalog, stock, (0, 1), (0, 0),
-                             max_pieces=cap, max_results=1, max_nodes=10) is None
-
-
-def test_macro_uses_real_piece_and_stock_limits_and_reaudits(monkeypatch):
-    catalog = default_catalog()
-    base = build_chain([(catalog["straight"], 0, 1)])
+def test_macro_stage_counts_real_pieces_and_stock_and_reaudits(monkeypatch):
+    catalog, base = default_catalog(), load("bridge-gap.json")
     calls = []
-    witness = load("bridge-completed.json")
+    real = editor_search.solve_steps
 
-    def search(stock, pieces, config, **kwargs):
-        calls.append((stock, config))
-        return SolveResult([Solution(witness, (), 0, True, 0, ())], SolveStats())
+    def recorded(inventory, pieces, config, **kwargs):
+        calls.append((inventory, config, kwargs["limits"]))
+        return real(inventory, pieces, config, **kwargs)
 
-    monkeypatch.setattr(bridge_module, "solve", search)
-    monkeypatch.setattr(bridge_module, "_expand", lambda *args: witness)
-    # Use the fixture's actual base and inventory; independently reject the expanded audit.
-    base = load("bridge-gap.json")
-    remaining = {"curve": 16, "straight": 4, "ramp": 2, "span": 2}
-    monkeypatch.setattr(bridge_module, "_OverlapAudit", type(
-        "RejectAll", (bridge_module._OverlapAudit,), {"overlaps": lambda self, layout: True}))
-    result = bridge_completion(base, catalog, remaining, (25, 0), (23, 1),
-                               max_pieces=24, max_results=1, max_nodes=1234)
-    stock, config = calls[0]
-    assert config.max_pieces == 21 and config.max_nodes == 1234
-    assert stock == {"curve": 16, "straight": 4, "_completion_bridge": 1}
-    assert result.solutions == [] and not result.stats.complete
+    monkeypatch.setattr(editor_search, "solve_steps", recorded)
+    pool = pair_search(base, catalog, dict(SPARE), (25, 0), (23, 1), depth=24)
+    try:
+        stage = [call for call in calls if _BRIDGE_ID in call[0]]
+        assert len(stage) == 2  # both directions of an exact stage
+        for inventory, config, limits in stage:
+            # One search move stands for four real pieces: three slots are reserved.
+            assert inventory == {"curve": 16, "straight": 4, _BRIDGE_ID: 1}
+            assert config.max_pieces == limits.max_pieces == 21
+            assert config.max_nodes == 250_000
+        # The expanded macro is audited against the base before it can count.
+        witness = load("bridge-completed.json")
+        monkeypatch.setattr(editor_search, "_expand", lambda *args: witness)
+        accept = stage[0][1].solution_filter
+        candidate = Solution(witness, (), 0, True, 0, ())
+        assert accept(candidate)
+        pool.audit = type("RejectAll", (), {"overlaps": lambda self, layout: True})()
+        assert not accept(candidate)
+    finally:
+        pool.close()
 
 
 @pytest.mark.parametrize("bad", [True, False, 0, 17, -1, 1.5, "2", None])
@@ -143,71 +168,48 @@ def test_invalid_search_effort_does_not_mutate_the_session(bad):
     session = Session()
     before = session.snapshot(), session.revision
     with pytest.raises(ValueError, match="search effort"):
-        dispatch_session(session, "/api/solve", {"revision": 0, "search_effort": bad})
+        dispatch_session(session, "/api/search/start", {"revision": 0, "search_effort": bad})
     assert (session.snapshot(), session.revision) == before
+    assert session._interactive_job is None
 
 
-def test_search_effort_scales_all_three_stages(monkeypatch):
+def test_search_effort_scales_all_three_stages():
     catalog = default_catalog()
     base = build_chain([(catalog["straight"], 0, 1)])
-    calls = []
-
-    def search(stock, pieces, config, **kwargs):
-        calls.append(config.max_nodes)
-        return SolveResult([], SolveStats(complete=False, stop_reason="node_limit"))
-
-    def bridges(*args, **kwargs):
-        calls.append(kwargs["max_nodes"])
-        return SolveResult([], SolveStats())
-
-    monkeypatch.setattr(Session, "_arc_closures", lambda *args: [])
-    monkeypatch.setattr(editor, "solve", search)
-    monkeypatch.setattr(editor, "bridge_completion", bridges)
     for effort in (1, 2, 16):
         session = Session(history=[base], unlimited=True)
-        calls.clear()
-        result = dispatch_session(session, "/api/solve", {
-            "revision": 0, "search_effort": effort,
-        })
-        assert calls == [25_000 * effort, 250_000 * effort, 60_000 * effort]
-        assert result["search_effort"] == effort
+        job = SearchJob(session, {"search_effort": effort})
+        try:
+            assert {c.stage: c.cap for c in job.pool.cursors} == {
+                "plain track": 25_000 * effort, "standard bridge": 250_000 * effort,
+                "full inventory": 60_000 * effort}
+            assert job.response(session, {})["search_effort"] == effort
+        finally:
+            job.close()
 
 
-def test_two_ended_search_keeps_the_reported_gap_below_fifty_thousand_nodes():
+def test_a_rejected_bridge_expansion_does_not_stop_the_stage(monkeypatch):
     base = load("bridge-gap.json")
-    session = Session(history=[base], unlimited=True)
-    outcome = session.solve_gap(None, None, 0, 8)
-    assert len(session.candidates) == 8
-    assert outcome["searched"] < 50_000
-    for candidate in session.candidates:
-        assert_extension(base, candidate.layout, session.remaining())
-
-
-def test_expanded_bridge_rejections_do_not_fill_result_slots(monkeypatch):
-    base = load("bridge-gap.json")
-    catalog = default_catalog()
     attempts = 0
 
     # Only the bridge stage's own auditor rejects; the core solver keeps its own.
-    class RejectFirst(bridge_module._OverlapAudit):
+    class RejectFirst(editor_search._OverlapAudit):
         def overlaps(self, layout):
             nonlocal attempts
             attempts += 1
             return attempts == 1 or super().overlaps(layout)
 
-    monkeypatch.setattr(bridge_module, "_OverlapAudit", RejectFirst)
-    result = bridge_completion(base, catalog, {"curve": 16, "straight": 4, "ramp": 2, "span": 2},
-                               (23, 1), (25, 0), max_pieces=26, max_results=1, max_nodes=250_000)
-    assert len(result.solutions) == 1 and attempts >= 2
-    assert result.stats.dropped_filter >= 1
-    assert_extension(base, result.solutions[0].layout)
+    monkeypatch.setattr(editor_search, "_OverlapAudit", RejectFirst)
+    job = complete(Session(history=[base], inventory=owned(base)), max_results=1)
+    assert len(job.solutions) == 1 and attempts >= 2
+    assert_extension(base, job.solutions[0].layout)
 
 
 def test_bridge_stage_audits_only_the_joints_it_adds():
     from duplotrain.geometry import Pose
     from duplotrain.layout import Layout, Placement
 
-    base, catalog = load("bridge-gap.json"), default_catalog()
+    base = load("bridge-gap.json")
     # A deliberate forced fit inside the base: one curve sits a millimetre off.
     p = base.placements[40]
     shifted = Placement(p.piece, Pose.make(p.frame.x + 1, p.frame.y, p.frame.z, p.frame.heading))
@@ -215,10 +217,10 @@ def test_bridge_stage_audits_only_the_joints_it_adds():
                   dict(base.links), base.accessories)
     forced = base.joint_issues()
     assert [issue["problems"] for issue in forced] == [["planar gap"]] * 2
-    result = bridge_completion(base, catalog, {"curve": 16, "straight": 4, "ramp": 2, "span": 2},
-                               (23, 1), (25, 0), max_pieces=26, max_results=1, max_nodes=250_000)
-    assert len(result.solutions) == 1
-    completed = result.solutions[0].layout
+    job = complete(Session(history=[base], inventory=owned(base)), (23, 1), (25, 0),
+                   max_results=1)
+    assert len(job.solutions) == 1
+    completed = job.solutions[0].layout
     assert completed.placements[:len(base)] == base.placements
     assert completed.is_closed and completed.joint_issues(since=len(base)) == []
     assert completed.joint_issues() == forced  # the base's own forced fits, nothing new

@@ -13,6 +13,7 @@ import pytest
 from duplotrain import Pose, SolverConfig, build_chain, default_catalog, solve
 from duplotrain.collision import CollisionField, _bound_cells, bounds_of
 from duplotrain.layout import layout_from_dict
+from tests.editor_support import complete
 
 
 class LinearField(CollisionField):
@@ -228,7 +229,8 @@ def test_reported_bridge_search_is_unchanged(monkeypatch):
         if not indexed:
             monkeypatch.setattr(CollisionField, "_near_clouds", LinearField._near_clouds)
         session = Session(history=[base], unlimited=True)
-        outcomes.append(session.solve_gap(None, None, 0, 8))
+        job = complete(session)
+        outcomes.append((job.status, job.nodes, len(job.solutions)))
         sessions.append(session)
         assert queries or not indexed
     assert outcomes[0] == outcomes[1]

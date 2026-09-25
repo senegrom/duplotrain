@@ -220,6 +220,37 @@ def test_completion_ends_must_name_real_ports(catalog, ends):
               grow_from=ends[0], close_onto=ends[1])
 
 
+@pytest.mark.parametrize("engine", ["lattice", "field"])
+def test_rejected_candidates_do_not_exhaust_the_result_limit(catalog, engine):
+    base = build_chain([(catalog["curve"], 0, 1)] * 6)
+    seen = []
+
+    def accept(candidate):
+        seen.append(candidate.piece_count)
+        return candidate.piece_count == 16  # six base curves + six curves/four straights
+
+    result = solve({"curve": 6, "straight": 4}, catalog, SolverConfig(
+        min_pieces=0, max_results=1, engine=engine, solution_filter=accept), base=base)
+    assert result.solutions and len(result.solutions[0].layout) == 16
+    assert result.stats.dropped_filter > 0
+    assert 12 in seen and 16 in seen
+    assert result.solutions[0].layout.is_closed
+    assert not solver_module._solution_overlaps(result.solutions[0].layout, 0, 120, 8)
+
+
+def test_filter_validation_and_exceptions_are_not_silenced(catalog):
+    with pytest.raises(ValueError, match="solution_filter"):
+        SolverConfig(solution_filter=42)
+    base = build_chain([(catalog["curve"], 0, 1)] * 6)
+
+    def fail(candidate):
+        raise RuntimeError("audit failed")
+
+    with pytest.raises(RuntimeError, match="audit failed"):
+        solve({"curve": 6, "straight": 4}, catalog, SolverConfig(solution_filter=fail),
+              base=base)
+
+
 def test_base_junction_types_need_not_be_in_the_catalogue(catalog):
     base = build_chain([(catalog["switch"], 0, 1)])
     subset = {pid: catalog[pid] for pid in ("curve", "straight")}

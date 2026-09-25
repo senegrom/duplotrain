@@ -130,6 +130,17 @@ def test_overhanging_plates_refuse_to_mate(catalog):
     layout.attach(catalog["straight"], 0, layout.open_ends()[-1])
 
 
+def test_mating_hints_never_offer_overlapping_road_plates(catalog):
+    layout, a = Layout().with_piece(catalog["level_crossing"], Pose.make())
+    layout, b = layout.with_piece(catalog["level_crossing"], Pose.make(x=128))
+    layout, c = layout.with_piece(catalog["straight"], Pose.make(x=128))
+    assert ((a, 1), (b, 0)) not in layout.matable_pairs()
+    assert ((a, 1), (c, 0)) in layout.matable_pairs()
+    assert [[a, 1], [b, 0]] not in Session(history=[layout]).state()["matable"]
+    for first, second in layout.matable_pairs():
+        layout.join(first, second)  # each advertised joint can actually be made
+
+
 def test_bridge_dimensions_are_exact(catalog):
     from fractions import Fraction
 
@@ -158,6 +169,13 @@ def test_join_rejects_non_meeting_ends(catalog):
         layout.join(a, b)
     forced = layout.join(a, b, force=True)
     assert forced.is_closed
+
+
+def test_even_a_forced_joint_cannot_link_an_end_to_itself(catalog):
+    layout = build_chain([(catalog["straight"], 0, 1)])
+    with pytest.raises(ValueError, match="itself"):
+        layout.join((0, 0), (0, 0), force=True)
+    assert not layout.links
 
 
 def test_layout_copies_and_freezes_constructor_collections():

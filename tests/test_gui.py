@@ -6,9 +6,7 @@ import urllib.request
 
 import pytest
 
-from duplotrain.catalog import default_catalog
 from duplotrain.gui import Session, make_server
-from duplotrain.layout import build_chain
 
 
 @pytest.fixture()
@@ -98,9 +96,12 @@ def test_solve_and_apply_close_the_loop(server):
         )
     assert len(state["layout"]["placements"]) == 6
 
-    status, state = server("/api/solve", {"slop": 0, "max_results": 8})
+    status, job = server("/api/search/start", {"slop": 0, "max_results": 8})
+    while status == 200 and job["status"] == "running":
+        status, job = server("/api/search/tick", {"job_id": job["job_id"]})
+    status, state = server("/api/search/publish", {"job_id": job["job_id"]})
     assert status == 200
-    assert state["found"] >= 1
+    assert state["search_job"]["found"] >= 1
     exact = [c for c in state["candidates"] if c["exact"]]
     assert exact
     assert exact[0]["added"] == {"curve": 6}
@@ -256,86 +257,6 @@ def test_unlimited_sandbox_mode(server):
     assert status == 200
     assert state["inventory"]["unlimited"] is False
     assert state["inventory"]["remaining"]["crossing"] == 0
-
-
-def test_arc_oracle_finds_winding_ring_closures():
-    """A gap whose only closure winds AWAY from the target (10 same-sign curves
-    looping around) starves the DFS -- the arc oracle must find it instantly."""
-    from duplotrain.gui import Session
-
-    session = Session()
-    session.set_inventory({"curve": 24, "straight": 8})
-    session.attach("curve", 0, None)
-    session.attach("curve", 0, (0, 1))
-    opens = session.layout.connectable_ends()
-    outcome = session.solve_gap(opens[1], opens[0], slop=0.0, max_results=5)
-    assert outcome["found"] > 0
-    assert outcome["searched"] == 0  # the oracle, not the search
-    added = session.candidates[0].layout.piece_counts["curve"] - 2
-    assert added == 10  # completes the 12-curve circle
-
-
-def test_height_impossibility_is_reported_with_a_reason():
-    """Both ramps and spans climbing in series leave a sky-high end no search
-    can ever bring down -- solve_gap must say so instead of searching."""
-    from duplotrain.gui import Session
-
-    session = Session()
-    session.set_inventory({"ramp": 2, "span": 2, "curve": 12, "straight": 8})
-    session.attach("ramp", 0, None)
-    session.attach("span", 0, (0, 1))
-    session.attach("span", 0, (1, 1))
-    session.attach("ramp", 0, (2, 1))
-    opens = session.layout.connectable_ends()
-    outcome = session.solve_gap(opens[1], opens[0], slop=0.0, max_results=5)
-    assert outcome["found"] == 0
-    assert "height" in outcome["reason"]
-    assert "154" in outcome["reason"]
-
-
-def test_arc_oracle_levels_through_ramps():
-    """One end atop a half-built climb, the other at ground: no flat chain can
-    close this -- the oracle must descend through a ramp, then ring around."""
-    from duplotrain.gui import Session
-
-    session = Session()
-    session.set_inventory({"curve": 12, "ramp": 2, "straight": 8})
-    session.attach("curve", 0, None)
-    for _ in range(5):
-        session.attach("curve", 0, (len(session.layout) - 1, 1))
-    high_end = session.layout.connectable_ends()[-1]
-    session.attach("ramp", 0, high_end)
-    tips = session.layout.connectable_ends()
-    grow = next(t for t in tips if float(session.layout.pose_of(t).z) > 1)
-    close = next(t for t in tips if float(session.layout.pose_of(t).z) <= 1)
-    outcome = session.solve_gap(grow, close, slop=0.0, max_results=5)
-    assert outcome["found"] > 0
-    assert outcome["searched"] == 0
-    counts = dict(session.candidates[0].layout.piece_counts)
-    assert counts["ramp"] == 2  # the descending ramp was added
-    assert counts["curve"] == 12
-
-
-def long_gap_session():
-    catalog = default_catalog()
-    layout = build_chain([(catalog["straight"], 0, 1)] * 34)
-    for index in range(32, 0, -1):
-        layout = layout.remove(index)
-    return Session(catalog=catalog, inventory={"straight": 34}, history=[layout])
-
-
-def test_piece_depth_limit_is_not_a_proof_of_impossibility():
-    session = long_gap_session()
-    outcome = session.solve_gap((0, 1), (1, 0), 0, 3)
-    assert outcome["found"] == 0
-    assert not outcome["aborted"]
-    assert not outcome["complete"]
-    assert outcome["stop_reason"] == "piece_limit"
-    assert outcome["max_pieces_searched"] == 26
-    deeper = session.solve_gap((0, 1), (1, 0), 0, 3, max_pieces=64)
-    assert deeper["found"] == 1
-    assert deeper["complete"]
-    assert session.candidates[0].piece_count == 34
 
 
 @pytest.mark.parametrize("coefficient", ["1e999999999", "1/0"])

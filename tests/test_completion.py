@@ -9,6 +9,7 @@ from duplotrain.gui import Session
 from duplotrain.layout import Layout, Placement, build_chain
 from duplotrain.pieces import parse_piece
 from duplotrain.solver import SolverConfig, _solution_overlaps, solve
+from tests.editor_support import complete
 
 LEFT = (0, 1)
 
@@ -233,8 +234,8 @@ def test_zero_piece_contour_retains_limit_reporting(engine, limit, reason):
 def test_editor_can_apply_a_completion_without_new_inventory():
     catalog, base, grow, close = preplaced_crossing_gap()
     session = Session(catalog=catalog, history=[base], inventory={})
-    result = session.solve_gap(grow, close, 0.0, 10)
-    assert result["found"] == 1 and result["complete"]
+    job = complete(session, grow, close, max_results=10)
+    assert len(job.solutions) == 1 and job.complete
     session.apply_candidate(0, revision=session.revision)
     assert session.layout.placements == base.placements
     assert session.layout.links[(1, 1)] == (0, 0)

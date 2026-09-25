@@ -51,3 +51,19 @@ def load_adapter(session=None):
     spec.loader.exec_module(adapter)
     adapter.session = Session() if session is None else session
     return adapter
+
+
+def complete(session, grow=None, close=None, **body):
+    """Run a closing search through the editor's routes to its stop, and publish
+    its suggestions so ``apply_candidate`` can use them. Returns the job."""
+    from duplotrain.editor import dispatch_session
+
+    if grow is not None:
+        body = {**body, "grow": grow, "close": close}
+    dispatch_session(session, "/api/search/start", {**body, "revision": session.revision})
+    job = session._interactive_job
+    while job.status == "running":
+        job.tick()
+    dispatch_session(session, "/api/search/publish",
+                     {"revision": session.revision, "job_id": job.id})
+    return job

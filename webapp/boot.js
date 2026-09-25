@@ -42,9 +42,9 @@ window.duplotrainBuild = "__BUILD__";
   }
   function heartbeat() {
     clearTimeout(idleTimer);
-    // This is an inactivity timeout, not a cap on a search that reports progress.
+    // Every request is short, a search tick included: a silent engine is stuck.
     if (pending.size) idleTimer = setTimeout(() => fail(new Error(
-      "No engine response or progress for two minutes. The last confirmed session can be downloaded."
+      "No engine response for two minutes. The last confirmed session can be downloaded."
     )), 120000);
   }
   window.duplotrainApi = (path, body) => new Promise((resolve, reject) => {
@@ -86,10 +86,6 @@ window.duplotrainBuild = "__BUILD__";
           if (data && data.ready) {
             ready = true; clearTimeout(bootTimer); rejectReady = null; resolve(); return;
           }
-          if (typeof data === "number" && Number.isFinite(data)) {
-            if (pending.size) { heartbeat(); options.status(`searching… ${data.toLocaleString()} states explored`); }
-            return;
-          }
           if (data?.fatal) { fail(new Error(`The engine failed and must restart (${data.fatal})`)); return; }
           const {id, res, err} = data || {}, call = pending.get(id);
           if (!call) return;
@@ -120,8 +116,7 @@ window.duplotrainBuild = "__BUILD__";
       const snapshot = options.checkpoint?.();
       // Copy before terminating; recovery never falls back to a different tab's save.
       const saved = snapshot ? JSON.parse(JSON.stringify(snapshot)) : null;
-      const error = new Error("Search cancelled; restarting from the last confirmed session");
-      error.code = "cancelled"; stop(error);
+      stop(new Error("The engine restarted; the last confirmed session is being restored"));
       await start(saved);
     } finally { restarting = false; }
   }

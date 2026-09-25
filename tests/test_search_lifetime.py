@@ -11,6 +11,7 @@ import duplotrain.solver as solver
 from duplotrain import SolverConfig, build_chain, default_catalog
 from duplotrain.editor import Session
 from duplotrain.layout import layout_from_dict
+from tests.editor_support import complete
 
 
 @pytest.fixture
@@ -56,13 +57,14 @@ def test_solver_releases_fields_on_every_normal_stop(mode, retain_tables, tracke
     assert all(ref() is None for ref in tracked_fields)
 
 
-def test_bridge_portfolio_releases_every_stage_field(tracked_fields):
+def test_a_closed_bridge_search_releases_every_stage_field(tracked_fields):
     data = json.loads((Path(__file__).parent / "fixtures/bridge-gap.json").read_text())
     base = layout_from_dict(data, default_catalog())
     for _ in range(3):
         session = Session(history=[base], unlimited=True)
-        outcome = session.solve_gap(None, None, 0, 8)
-        assert outcome["found"] == 8 and outcome["searched"] == 1878
+        job = complete(session)
+        assert len(job.solutions) == 8 and job.nodes == 1878
+        job.close()
         assert all(ref() is None for ref in tracked_fields)
     assert tracked_fields
 

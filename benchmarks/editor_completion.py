@@ -15,6 +15,7 @@ from time import perf_counter, process_time
 
 import duplotrain.gui as gui
 from duplotrain import build_chain, default_catalog
+from duplotrain.editor_search import SearchJob
 from duplotrain.layout import layout_from_dict, layout_to_dict
 from duplotrain.solver import _solution_overlaps
 
@@ -58,10 +59,12 @@ def main():
                                   **({"inventory": owned} if owned is not None else {}))
             started = perf_counter()
             cpu_started = process_time()
-            result = session.solve_gap(grow, close, 0, 8)
+            job = SearchJob(session, {"grow": grow, "close": close})
+            while job.status == "running":
+                job.tick()
             cpu_timings.append(process_time() - cpu_started)
             timings.append(perf_counter() - started)
-            for candidate in session.candidates:
+            for candidate in job.solutions:
                 assert candidate.layout.placements[:len(base)] == base.placements
                 assert all(candidate.layout.links[a] == b for a, b in base.links.items())
                 assert not candidate.layout.joint_issues()
@@ -69,14 +72,14 @@ def main():
         # The ordered exact layouts and signatures must agree across checkouts,
         # not merely the number of solutions. This is outside the timed region.
         evidence = [(layout_to_dict(s.layout), repr(s.signature), s.gap, s.exact, s.kind)
-                    for s in session.candidates]
+                    for s in job.solutions]
         digest = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
         print(json.dumps({"case": name, "seconds": round(median(timings), 4),
                           "cpu_seconds": round(median(cpu_timings), 4),
                           "solutions_sha256": digest,
-                          "nodes": result["searched"], "found": result["found"],
-                          "added": [len(s.layout) - len(base) for s in session.candidates],
-                          "stop": result["stop_reason"]}), flush=True)
+                          "nodes": job.nodes, "found": len(job.solutions),
+                          "added": [len(s.layout) - len(base) for s in job.solutions],
+                          "stage": job.stage, "status": job.status}), flush=True)
 
 
 if __name__ == "__main__":
