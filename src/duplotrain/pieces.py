@@ -59,6 +59,13 @@ MAX_CATALOGUE_NUMBER_BITS = 512
 #: Widest piece and longest end overhang, mm. A collision query scans the grid
 #: cells its own and the widest stored piece's half widths can reach.
 MAX_PIECE_WIDTH = 1_000.0
+#: Narrowest piece, mm: sampled every 8 mm, two narrower tracks could cross unseen
+#: between the samples.
+MIN_PIECE_WIDTH = 8.0
+#: Paths per piece and segments per path. Preprocessing grows with the square of
+#: a piece's paths, sampling with its segments; real pieces use two and one.
+MAX_PATHS = 16
+MAX_SEGMENTS = 64
 
 
 def _number(value: Any) -> Fraction:
@@ -107,6 +114,8 @@ def parse_length(value: Any) -> Alg:
         return alg(_number(value))
     if isinstance(value, dict):
         if "alg" in value:
+            if not isinstance(value["alg"], (list, tuple)) or len(value["alg"]) != 4:
+                raise ValueError(f"an alg length takes a list of four numbers, not {value!r}")
             a, b, c, d = (_number(x) for x in value["alg"])
             return Alg(a, b, c, d)
         if "chord" in value:
@@ -427,6 +436,13 @@ def _parse_segment(spec: dict[str, Any]) -> Segment:
         segment = Ramp(run=parse_length(spec["run"]), rise=parse_length(spec["rise"]))
     else:
         raise ValueError(f"unknown segment type {kind!r}")
+    # Zero or negative lengths turn a piece's connectors into itself: a folded
+    # piece would pass as a loop.
+    if isinstance(segment, Arc):
+        if not (segment.radius > 0 and segment.degrees):
+            raise ValueError("an arc needs a positive radius and a nonzero angle")
+    elif not segment.run > 0:
+        raise ValueError(f"a {kind} segment needs a positive run")
     if not segment.length() <= MAX_SEGMENT_LENGTH:
         raise ValueError(f"a {kind} segment may be at most {MAX_SEGMENT_LENGTH:g} mm long")
     return segment
@@ -444,6 +460,12 @@ def _parse_path(spec: dict[str, Any]) -> Path:
         parse_length(start_spec.get("z", 0)),
         degrees_to_steps(_number(start_spec.get("heading_deg", 0))),
     )
+    # Far from the piece's origin, float samples of its track lose their precision.
+    if not all(abs(float(v)) <= MAX_SEGMENT_LENGTH for v in (start.x, start.y, start.z)):
+        raise ValueError(f"a path may start at most {MAX_SEGMENT_LENGTH:g} mm from the "
+                         "piece's origin")
+    if len(spec["segments"]) > MAX_SEGMENTS:
+        raise ValueError(f"a path may have at most {MAX_SEGMENTS} segments")
     segments = tuple(_parse_segment(s) for s in spec["segments"])
     if not segments:
         raise ValueError("a path needs at least one segment")
@@ -493,9 +515,28 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
     """Build a :class:`PieceType` from its JSON/dict description."""
     if not isinstance(spec, dict):
         raise ValueError("a piece must be an object")
-    piece_id = spec.get("id", "?")
+    piece_id = spec.get("id")
+    if not isinstance(piece_id, str) or not piece_id:
+        raise ValueError("a piece needs an id, a non-empty text")
     if not isinstance(spec.get("paths", []), list):
         raise ValueError(f"piece {piece_id!r} paths must be a list")
+    if len(spec.get("paths", [])) > MAX_PATHS:
+        raise ValueError(f"piece {piece_id!r} may have at most {MAX_PATHS} paths")
+    # Coercion would misread these: "false" is a true string, "10" two port numbers.
+    texts = {"name": piece_id, "category": "track", "notes": ""}
+    for key, default in texts.items():
+        if not isinstance(spec.get(key, default), str):
+            raise ValueError(f"piece {piece_id!r} {key} must be text")
+    for key in ("part_numbers", "port_names"):
+        value = spec.get(key, ())
+        if not isinstance(value, (list, tuple)) or not all(isinstance(v, str) for v in value):
+            raise ValueError(f"piece {piece_id!r} {key} must be a list of texts")
+    for key in ("underpass", "provisional"):
+        if not isinstance(spec.get(key, False), bool):
+            raise ValueError(f"piece {piece_id!r} {key} must be true or false")
+    sealed = spec.get("sealed_ports", ())
+    if not isinstance(sealed, (list, tuple)) or any(type(i) is not int for i in sealed):
+        raise ValueError(f"piece {piece_id!r} sealed_ports must be a list of port numbers")
     try:
         paths = tuple(_parse_path(p) for p in spec["paths"])
     except KeyError as exc:
@@ -509,7 +550,7 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
             f"piece {piece_id!r} collapsed to {len(ports)} port(s); its paths must have "
             "distinct endpoints"
         )
-    sealed = frozenset(int(i) for i in spec.get("sealed_ports", ()))
+    sealed = frozenset(sealed)
     bad_sealed = sorted(i for i in sealed if not 0 <= i < len(ports))
     if bad_sealed:
         raise ValueError(
@@ -518,19 +559,20 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         )
     if len(sealed) >= len(ports):
         raise ValueError(f"piece {piece_id!r} seals every port; nothing could attach to it")
-    unfit = (f"piece {piece_id!r} needs a finite positive width and a finite, non-negative "
-             f"end overhang, each at most {MAX_PIECE_WIDTH:g} mm")
+    unfit = (f"piece {piece_id!r} needs a finite width from {MIN_PIECE_WIDTH:g} to "
+             f"{MAX_PIECE_WIDTH:g} mm and a finite, non-negative end overhang of at most "
+             f"{MAX_PIECE_WIDTH:g} mm")
     try:  # the exact reader refuses booleans, text Fraction would crawl over, inf, nan
         width = float(_number(spec.get("width", 40.0)))
         overhang = float(_number(spec.get("end_overhang", 0.0)))
     except ValueError as exc:
         raise ValueError(unfit) from exc
-    if not (0 < width <= MAX_PIECE_WIDTH and 0 <= overhang <= MAX_PIECE_WIDTH):
+    if not (MIN_PIECE_WIDTH <= width <= MAX_PIECE_WIDTH and 0 <= overhang <= MAX_PIECE_WIDTH):
         raise ValueError(unfit)
 
     return PieceType(
-        id=spec["id"],
-        name=spec.get("name", spec["id"]),
+        id=piece_id,
+        name=spec.get("name", piece_id),
         category=spec.get("category", "track"),
         paths=paths,
         ports=ports,
@@ -538,10 +580,10 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         width=width,
         end_overhang=overhang,
         sealed=sealed,
-        underpass=bool(spec.get("underpass", False)),
+        underpass=spec.get("underpass", False),
         part_numbers=tuple(spec.get("part_numbers", ())),
         notes=spec.get("notes", ""),
-        provisional=bool(spec.get("provisional", False)),
+        provisional=spec.get("provisional", False),
     )
 
 

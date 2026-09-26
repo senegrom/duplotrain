@@ -139,7 +139,8 @@ def _completion_moves(
     ports and never reopen them, so this initial superset stays conservative.
 
     Keep all types in the result (possibly with no moves): the engines still need
-    their port geometry for targets, and collision/replay use the complete base.
+    their port geometry for targets, and collision checks and the assembled layout
+    use the complete base.
     Canonical representatives retain the exact endpoint transform of a route.
     """
     available: dict[str, set[tuple[int, int]]] = {}
@@ -598,6 +599,8 @@ class _LatticeEngine:
         if cursor[5] != anchor[5] or cursor[4] != anchor[4]:
             return None
         gap = self.dist(cursor, anchor)
+        if gap == 0.0 and cursor[:4] != anchor[:4]:
+            gap = math.ulp(0.0)  # apart by less than float resolution, as below
         return gap if gap <= budget + 1e-12 else None
 
     def connects(self, cursor: tuple, pose: tuple) -> bool:
@@ -614,6 +617,10 @@ class _LatticeEngine:
         if (cursor[5] - pose[5]) % 12 != 6 or cursor[4] != pose[4]:
             return None
         gap = self.dist(cursor, pose)
+        if gap == 0.0 and cursor[:4] != pose[:4]:
+            # Exact ends apart by less than float resolution still make a forced
+            # fit: it must neither pass as exact nor be dropped as no fit.
+            gap = math.ulp(0.0)
         return gap if gap <= budget + 1e-12 else None
 
     def dist(self, a: tuple, b: tuple) -> float:
@@ -740,9 +747,10 @@ def _compile_lattice(
             dz = z_from_alg(m.dz)
             if delta is None or dz is None:
                 return None
-            compiled.append(
-                (m.entry, m.exit, _lattice_step(_lattice_rotations(delta), dz, m.dheading // 2))
-            )
+            rotations = _lattice_rotations(delta)
+            if any(abs(value) >= _MOVE_LIMIT for rotation in rotations for value in rotation):
+                return None
+            compiled.append((m.entry, m.exit, _lattice_step(rotations, dz, m.dheading // 2)))
         moves[pid] = compiled
 
     return _LatticeEngine(anchor_l, start_l, moves, frames0, port_locals)
@@ -757,6 +765,12 @@ def _compile_lattice(
 # coefficient projections, these remain valid when a tiny real gap has large,
 # cancelling radical coefficients. Integer arithmetic keeps rounding one-sided.
 _MM_SCALE = 10**9
+_ROOT_BOUNDS = tuple((math.isqrt(n * _MM_SCALE**2), math.isqrt(n * _MM_SCALE**2) + 1)
+                     for n in (2, 3, 6))
+_SLIP_AXES = ((1, 0), (0, 1), (1, 1), (1, -1), (2, 1), (2, -1), (1, 2), (1, -2))
+_SLIP_NORMS = tuple(math.isqrt((a * a + b * b) * _MM_SCALE**2) + 1
+                    for a, b in _SLIP_AXES)
+
 #: Reverse-table preprocessing is paid for progressively: every search gets a
 #: small base allowance, each DFS node spent earns more, and a hard cap bounds
 #: the total. Short searches never pay for deep tables; long ones earn them.
@@ -778,11 +792,6 @@ def _slack_padding(slack: float) -> int:
 def _completion_budget(nodes: int, max_nodes: int) -> int:
     """Table expansions a search may have spent after *nodes* DFS nodes."""
     return min(_TABLE_WORK_CAP, min(4096, max_nodes // 8) + _TABLE_WORK_PER_NODE * nodes)
-_ROOT_BOUNDS = tuple((math.isqrt(n * _MM_SCALE**2), math.isqrt(n * _MM_SCALE**2) + 1)
-                     for n in (2, 3, 6))
-_SLIP_AXES = ((1, 0), (0, 1), (1, 1), (1, -1), (2, 1), (2, -1), (1, 2), (1, -2))
-_SLIP_NORMS = tuple(math.isqrt((a * a + b * b) * _MM_SCALE**2) + 1
-                    for a, b in _SLIP_AXES)
 
 
 def _alg_interval(value: Alg) -> tuple[int, int]:
@@ -960,14 +969,16 @@ class _CompletionBounds:
 # _PACK_BIAS, in 32-bit fields above the heading. Keys are equal exactly when the
 # planar poses are, and a move adds a constant per heading, so a reverse layer
 # grows by one int addition per pose and move instead of building a tuple.
-# Coordinates beyond 2^31 lattice units (107 km) would not fit; no layout comes
-# near, and the search's own poses stay within its horizon of the base.
+# Coordinates beyond 2^31 lattice units (107 km) would not fit.
 _PACK_BIAS = 1 << 31
 _PACK_MASK = (1 << 32) - 1
 #: A problem whose anchor, start or base junction lies beyond this many lattice
-#: units (53 km) runs on the field engine: the search reaches only metres from
-#: them, so its packed poses keep clear of the 2^31 field limit.
+#: units (53 km) runs on the field engine, as does one with a move of _MOVE_LIMIT
+#: units (3.4 km) or more: the reverse tables hold poses at most fifteen moves
+#: from the anchor (twelve layers and a three-move probe), so their packed keys
+#: keep clear of the 2^31 field limit.
 _PACK_LIMIT = 1 << 30
+_MOVE_LIMIT = _PACK_LIMIT >> 4
 
 
 def _packable(pose: tuple) -> bool:
@@ -1535,7 +1546,7 @@ def _solution_overlaps(
 
     The search prunes colliding placements as it goes, but its exemption
     bookkeeping is intricate (anchors, stubs, transits, forced fits).  This
-    checks the replayed layout against its real link graph: a solution is
+    checks the assembled layout against its real link graph: a solution is
     rejected if any piece the search added (index >= *n_base*) overlaps a
     placement it is not directly joined to.  Contact already present inside the
     base layout is the caller's business and stays exempt.
@@ -1628,9 +1639,12 @@ class _OverlapAudit:
 # Configuration and results
 # --------------------------------------------------------------------------------------
 
-#: Placements a search stacks at most: far beyond any real box, and well inside
-#: Python's default recursion limit with transits and callers on the stack too.
+#: Placements a search stacks at most: far beyond any real box.
 _MAX_SEARCH_DEPTH = 400
+#: Each placement or transit of a walk is one nested generator frame. A walk stops
+#: at this many, well inside Python's default recursion limit with its callers on
+#: the stack too, however many base junctions it could still pass through.
+_MAX_WALK_STEPS = 2 * _MAX_SEARCH_DEPTH
 
 
 @dataclass(frozen=True, slots=True)
@@ -1698,7 +1712,6 @@ class SolverConfig:
 class SolveStats:
     nodes: int = 0
     closures_found: int = 0  # before deduplication
-    pruned_reach: int = 0
     pruned_collision: int = 0
     pruned_completion: int = 0
     completion_states: int = 0  # planar states in the largest complete reverse layer
@@ -2139,13 +2152,13 @@ def solve_steps(
         # traversal count; a candidate one move on can reach no more than this.
         reverse, retarget, allows = eng.reverse, eng.retarget, completion.allows
         entries = [(index, port, reverse(pose)) for index, port, pose in stubs]
+        entries_of: dict[int, list] = {}
+        for index, port, entry in entries:
+            entries_of.setdefault(index, []).append((port, entry))
         transits = transit_turns = 0
         for index, pid, count, eligible in owned:
-            if any(
-                allows(retarget(cursor, entry), loose, slack)
-                for stub_index, port, entry in entries
-                if stub_index == index and port in eligible
-            ):
+            if any(allows(retarget(cursor, entry), loose, slack)
+                   for port, entry in entries_of[index] if port in eligible):
                 transits += count
                 transit_turns += count * turn_of[pid]
         targets = (tuple(entry for _index, _port, entry in entries)
@@ -2307,7 +2320,7 @@ def solve_steps(
         placement legitimately butts against. *handed* is False only while a
         one-handed loop search has not yet placed a turning move.
         """
-        nonlocal remaining_span, remaining_turn
+        nonlocal remaining_span, remaining_turn, walk_cut
         if limits is not None:
             # Suspended generator frames own the exact DFS/backtracking state.
             # A caller may raise a limit and resume without revisiting any node.
@@ -2372,7 +2385,6 @@ def solve_steps(
                 home = need = 0
         stub_reach = sum(span_of[placements[s[0]][0]] for s in stubs)
         if home > remaining_span + stub_reach + (cfg.slop - slack_used) + 1e-6:
-            stats.pruned_reach += 1
             return True
         stub_turns = sum(turn_of[placements[s[0]][0]] for s in stubs) + pass_turns
         if need > remaining_turn + stub_turns:
@@ -2381,7 +2393,6 @@ def solve_steps(
             slots = min(total_pieces, depth_limit, f_limit) - used
             reach = _stock_span_budget(counts, stock_spans, slots)
             if home > reach + stub_reach + (cfg.slop - slack_used) + 1e-6:
-                stats.pruned_reach += 1
                 return True
         # IDA* contour (completion mode): at least this many more pieces are needed.
         # Transits through open stubs advance the walk without costing a piece, so
@@ -2400,7 +2411,6 @@ def solve_steps(
         else:
             h_turn = 0
         if used + max(h_dist, h_turn) > f_limit:
-            stats.pruned_reach += 1
             return True
 
         query_slack = slack_left if cfg.slop > 0 else None
@@ -2453,6 +2463,9 @@ def solve_steps(
                     )
                     if j is None:  # that exit is not open
                         continue
+                    if len(steps) >= _MAX_WALK_STEPS:
+                        walk_cut = True
+                        continue
                     if frame is None:  # a base placement: its poses were precomputed
                         out_pose = base_stub_poses[(pidx, exit_port)]
                     else:
@@ -2468,6 +2481,9 @@ def solve_steps(
 
         # -- place a new piece -----------------------------------------------------
         if used >= min(depth_limit, f_limit):
+            return True
+        if len(steps) >= _MAX_WALK_STEPS:
+            walk_cut = True
             return True
         candidates: list[tuple[float, int, str, int, int, object]] = []
         cursor_overhangs = (
@@ -2505,7 +2521,6 @@ def solve_steps(
         for _heuristic, _prio, pid, entry, exit_port, next_cursor in candidates:
             if (child_reach is not None
                     and eng.dist_home(next_cursor) > child_reach[pid] + slack_left + 1e-6):
-                stats.pruned_reach += 1
                 continue
             # Reject an impossible endpoint before sampling collision geometry or
             # spending a DFS node. Leaving this piece in counts only enlarges the
@@ -2581,6 +2596,7 @@ def solve_steps(
     # One Python frame per placement or transit: stay well inside the default
     # recursion limit, and report the cut like any other piece limit.
     depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH)
+    walk_cut = False
     if cfg.max_pieces is not None:
         depth_limit = min(depth_limit, cfg.max_pieces)
     try:
@@ -2616,6 +2632,10 @@ def solve_steps(
                 if limits is None and (len(solutions) >= cfg.max_results or stats.aborted):
                     break
                 f_limit += 1
+            while walk_cut and limits is not None:
+                # No bound a caller can raise lifts the walk's cap: never finish
+                # as if the search had been exhausted.
+                yield {"kind": "piece_limit", "nodes": stats.nodes, "depth": depth_limit}
     finally:
         # The recursive function owns a cell pointing to itself. Break that
         # cycle once the stack has unwound, so collision fields, geometry and
@@ -2631,7 +2651,7 @@ def solve_steps(
         stats.stop_reason = "node_limit"
     elif limits is None and len(solutions) >= cfg.max_results:
         stats.stop_reason = "result_limit"
-    elif depth_limit < total_pieces:
+    elif depth_limit < total_pieces or walk_cut:
         stats.stop_reason = "piece_limit"
     else:
         stats.complete = True

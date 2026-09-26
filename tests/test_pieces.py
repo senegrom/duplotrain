@@ -182,7 +182,7 @@ def test_unknown_segment_type_rejected():
 
 @pytest.mark.parametrize("change,message", [
     ({"sealed_ports": [0, 1]}, "seals every port"),
-    ({"width": float("nan")}, "finite positive width"),
+    ({"width": float("nan")}, "finite width"),
     ({"end_overhang": float("-inf")}, "non-negative end overhang"),
     ({"paths": [{"segments": [{"type": "straight", "run": "1e16000000"}]}]}, "catalogue number"),
     ({"paths": [{"segments": [{"type": "straight", "run": "1/0"}]}]}, "divides by zero"),
@@ -195,10 +195,35 @@ def test_unknown_segment_type_rejected():
      "512 bits"),
     ({"paths": [{"segments": [{"type": "straight", "run": {"alg": [0, 10**400, 0, 0]}}]}]},
      "512 bits"),
-    ({"width": 10**400}, "finite positive width"),
-    ({"width": True}, "finite positive width"),
-    ({"width": 1001}, "at most 1000 mm"),
+    ({"width": 10**400}, "finite width"),
+    ({"width": True}, "finite width"),
+    ({"width": 1001}, "from 8 to 1000 mm"),
+    # Narrower tracks could cross between the 8 mm collision samples.
+    ({"width": 7.5}, "from 8 to 1000 mm"),
     ({"end_overhang": 1e12}, "at most 1000 mm"),
+    # A zero or negative length folds a piece onto itself: it would pass as a loop.
+    ({"paths": [{"segments": [{"type": "straight", "run": -128}]}]}, "positive run"),
+    ({"paths": [{"segments": [{"type": "straight", "run": 0}]}]}, "positive run"),
+    ({"paths": [{"segments": [{"type": "ramp", "run": 0, "rise": 5}]}]}, "positive run"),
+    ({"paths": [{"segments": [{"type": "arc", "radius": -256, "degrees": 30}]}]},
+     "positive radius"),
+    ({"paths": [{"segments": [{"type": "arc", "radius": 256, "degrees": 0}]}]}, "nonzero angle"),
+    ({"paths": [{"segments": [{"type": "straight", "run": 8}]}] * 17}, "at most 16 paths"),
+    ({"paths": [{"segments": [{"type": "straight", "run": 8}] * 65}]}, "at most 64 segments"),
+    ({"paths": [{"start": {"x": 10_001}, "segments": [{"type": "straight", "run": 64}]}]},
+     "at most 10000 mm from"),
+    # Types are checked, never coerced: "false" is a true string, "10" two ports.
+    ({"underpass": "false"}, "true or false"),
+    ({"provisional": "no"}, "true or false"),
+    ({"sealed_ports": [1.9]}, "list of port numbers"),
+    ({"sealed_ports": [True]}, "list of port numbers"),
+    ({"sealed_ports": "10"}, "list of port numbers"),
+    ({"sealed_ports": 5}, "list of port numbers"),
+    ({"name": 5}, "name must be text"),
+    ({"part_numbers": [6377]}, "list of texts"),
+    ({"port_names": ["a", 1]}, "list of texts"),
+    ({"paths": [{"segments": [{"type": "straight", "run": {"alg": "1234"}}]}]},
+     "four numbers"),
 ])
 def test_catalogue_values_are_bounded_and_meaningful(change, message):
     spec = {"id": "odd", "paths": [{"segments": [{"type": "straight", "run": 64}]}], **change}
@@ -213,3 +238,11 @@ def test_the_bounds_admit_every_value_the_text_format_reads():
                           "paths": [{"segments": [{"type": "straight", "run": 128}]}]})
     assert widest.width == widest.end_overhang == 1000
 
+
+@pytest.mark.parametrize("piece_id", [None, "", 7])
+def test_a_piece_needs_a_text_id(piece_id):
+    spec = {"paths": [{"segments": [{"type": "straight", "run": 64}]}]}
+    if piece_id is not None:
+        spec["id"] = piece_id
+    with pytest.raises(ValueError, match="needs an id"):
+        parse_piece(spec)

@@ -28,8 +28,9 @@ from dataclasses import dataclass, field
 
 __all__ = ["CollisionField", "TOUCH_MARGIN", "DEFAULT_CLEARANCE", "UNDERPASS_MIN"]
 
-#: Two tracks may come this close (mm) before it counts as an overlap.  Set just under
-#: the 64 mm piece width so flush parallel tracks are allowed.
+#: Overlap allowance, mm: two tracks' centreline samples clash only when closer than
+#: the sum of their half widths less this margin, so flush parallel tracks (a width
+#: apart) do not count as overlapping.
 TOUCH_MARGIN = 2.0
 
 #: Vertical separation (mm) at which one track clears another regardless of piece

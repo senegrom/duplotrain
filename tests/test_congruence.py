@@ -171,12 +171,16 @@ def test_full_circles_share_one_sector_union(turn):
 
 
 def test_degenerate_segments_do_not_reweight_a_line_or_arc():
-    assert congruence_key(track([line(64), line(0), line(192)])) == (
-        congruence_key(track([line(256)]))
-    )
-    assert congruence_key(track([arc(30), arc(0), arc(60)])) == (
-        congruence_key(track([arc(90)]))
-    )
+    # A catalogue refuses them; a piece built from segment objects may hold them.
+    def rebuilt(segments, whole):
+        piece = parse_piece({"id": "custom", "width": 64, "paths": [{"segments": [whole]}]})
+        path = replace(piece.paths[0], segments=segments)
+        return build_chain([(replace(piece, paths=(path,)), 0, 1)])
+
+    lines = (Straight(Alg(64)), Straight(Alg(0)), Straight(Alg(192)))
+    assert congruence_key(rebuilt(lines, line(256))) == congruence_key(track([line(256)]))
+    arcs = (Arc(Alg(128), 30), Arc(Alg(128), 0), Arc(Alg(128), 60))
+    assert congruence_key(rebuilt(arcs, arc(90))) == congruence_key(track([arc(90)]))
 
 
 def test_unknown_segment_subclasses_keep_their_own_shape():

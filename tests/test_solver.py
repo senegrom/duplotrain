@@ -592,3 +592,69 @@ def test_a_catalogue_keyed_apart_from_its_piece_ids_is_refused():
     catalog = default_catalog()
     with pytest.raises(ValueError, match="must agree"):
         solve({"my_curve": 12}, {"my_curve": catalog["curve"]})
+
+
+def test_lattice_ends_apart_by_less_than_float_resolution_make_a_forced_fit():
+    import math
+    from itertools import islice
+
+    from duplotrain.solver import _compile_lattice, _flat_xy
+
+    def convergents():  # of sqrt3 = [1; 1, 2, 1, 2, ...]
+        p0, q0, p1, q1 = 1, 0, 1, 1
+        for a in [1, 2] * 40:
+            p0, q0, p1, q1 = p1, q1, a * p1 + p0, a * q1 + q0
+            yield p1, q1
+
+    # Exact lattice poses p - q*sqrt3 mm apart, which floats cannot tell apart.
+    p, q = next((p, q) for p, q in islice(convergents(), 80)
+                if math.dist(_flat_xy((20 * p, -40 * q, 0, 20 * q, 0, 0)),
+                             _flat_xy((0, 0, 0, 0, 0, 0))) == 0.0)
+    engine = _compile_lattice(ORIGIN, ORIGIN, {}, {})
+    cursor = (20 * p, -40 * q, 0, 20 * q, 0, engine.anchor[5])
+    assert engine.near_anchor(cursor, 1.0) == math.ulp(0.0)
+    mate = (*cursor[:5], (cursor[5] + 6) % 12)
+    assert engine.near_pose(cursor, (0, 0, 0, 0, 0, mate[5]), 1.0) == math.ulp(0.0)
+    assert engine.near_pose(cursor, mate, 1.0) == 0.0  # the same point, facing it
+
+
+def test_moves_too_long_for_the_packed_table_keys_run_on_the_field_engine(monkeypatch, catalog):
+    base = build_chain([(catalog["curve"], 0, 1)] * 9)
+    ends = base.connectable_ends()
+    config = SolverConfig(min_pieces=1, max_pieces=5, max_results=10)
+    lattice = solve({"curve": 4, "straight": 2}, catalog, config,
+                    base=base, grow_from=ends[-1], close_onto=ends[0])
+    monkeypatch.setattr(solver_module, "_MOVE_LIMIT", 1)  # every move is too long
+    field = solve({"curve": 4, "straight": 2}, catalog, config,
+                  base=base, grow_from=ends[-1], close_onto=ends[0])
+    assert (lattice.stats.engine, field.stats.engine) == ("lattice", "field")
+    assert [s.signature for s in field.solutions] == [s.signature for s in lattice.solutions]
+
+
+def crossings_in_a_row(catalog, n):
+    """Unlinked crossings end to end, then a straight: a walk of n free transits."""
+    from duplotrain.geometry import Pose
+    from duplotrain.layout import Layout, Placement, layout_from_dict, layout_to_dict
+
+    placements = [Placement(catalog["crossing"], Pose.make(128 * k, 0, 0, 0)) for k in range(n)]
+    placements.append(Placement(catalog["straight"], Pose.make(128 * n, 0, 0, 0)))
+    # Unlinked, as a layout file may be: the editor's import accepts it.
+    return layout_from_dict(layout_to_dict(Layout(tuple(placements), {})), catalog)
+
+
+def test_a_walk_stops_at_its_step_cap_and_says_so(monkeypatch, catalog):
+    base = crossings_in_a_row(catalog, 30)
+    config = SolverConfig(min_pieces=0, max_results=1)
+    walked = solve({}, catalog, config, base=base, grow_from=(0, 1), close_onto=(30, 0))
+    assert len(walked.solutions) == 1 and walked.stats.stop_reason == "result_limit"
+    # Fewer nested frames than the walk needs: no RecursionError, no false exhaustion.
+    monkeypatch.setattr(solver_module, "_MAX_WALK_STEPS", 20)
+    cut = solve({}, catalog, config, base=base, grow_from=(0, 1), close_onto=(30, 0))
+    assert not cut.solutions and not cut.stats.complete
+    assert cut.stats.stop_reason == "piece_limit"
+    # A stepwise search keeps reporting the cut instead of finishing as exhausted.
+    steps = solver_module.solve_steps({}, catalog, config, base=base, grow_from=(0, 1),
+                                      close_onto=(30, 0), limits=solver_module.SearchLimits())
+    events = [next(steps)["kind"] for _ in range(3)]
+    steps.close()
+    assert events[-2:] == ["piece_limit", "piece_limit"]

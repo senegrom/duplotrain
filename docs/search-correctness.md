@@ -94,13 +94,18 @@ In completion mode, `SolverConfig(min_pieces=0)` permits a path consisting only
 of connections and transits through existing junctions. The search visits the
 zero-new-piece depth contour even with an empty inventory, but never emits an
 empty fresh loop. Minimum/use-all constraints and node/result caps still apply.
-The editor also permits these no-new-inventory completions.
+The editor also permits these no-new-inventory completions. A walk nests one
+generator frame per placement or transit; it stops at 800 of them, within
+Python's recursion limit, and the search then reports a piece limit rather than
+an exhausted search.
 
 ## Exact reverse reachability is an overapproximation
 
 For completion searches, reverse breadth-first tables contain all planar-pose
 and height projections that can reach the anchor in at most k traversals, for
-k up to the horizon of ten. Both arithmetic engines use exact values. Separating the projections
+k up to the lookahead horizon
+([performance.md](performance.md#reverse-reachability-tables)). Both arithmetic
+engines use exact values. Separating the projections
 avoids multiplying states for bridge routes: each may admit a different route,
 which enlarges the allowed set. The move pool includes routes through preplaced
 pieces, even when none remain in inventory. Stock counts, placement frames and
@@ -620,8 +625,11 @@ candidate's only joint issues are the base's own.
 
 A key is injective on planar poses whose coordinates stay below 2^31 lattice
 units, 107 km. A problem whose anchor, start or base junction ports lie beyond
-2^30 lattice units (53 km) runs on the field engine instead; the search reaches
-only metres from them, so its keys stay in range. The key ignores the height;
+2^30 lattice units (53 km), or with a move of 2^26 units (3.4 km) or more, runs
+on the field engine instead. The reverse tables then hold poses at most fifteen
+moves from the anchor (twelve layers and a three-move probe), so their keys stay
+in range, and a query for a pose beyond that reach can only miss a prune, never
+make a wrong one. The key ignores the height;
 the height layers are separate. A move's
 packed delta is the difference of the keys of its endpoint and its origin at
 each heading, and adding it to any key of that heading yields the key of the
