@@ -609,8 +609,8 @@ that far apart and the strict distance test would reject each of them.
 ## Joint audits of an extension
 
 A candidate keeps every base placement at its index and every base link, so
-every joint not among the base's links is new. Acceptance audits all joints and
-holds only the new ones to the candidate's claim: an exact candidate may have
+every joint not among the base's links is new. Acceptance audits only those new
+joints and holds them to the candidate's claim: an exact candidate may have
 none, and a forced fit only planar gaps totalling at most its reported gap, so a
 base's own forced fits never block a candidate. A regression closes the reported
 gap over a base with a curve set a millimetre off and checks that the

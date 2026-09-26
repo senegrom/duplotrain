@@ -73,10 +73,11 @@ completions, debits the shared remaining stock, and backtracks when a choice
 prevents a later gap from closing. Already matching, compatible ends can be
 joined without adding pieces. Track that already overlaps itself is refused
 before the search starts, since no plan could then be overlap-free as a whole.
-Each added piece is audited for overlaps against all the track before it when
-its pair is solved, and only a complete plan reducing the open-end count to zero
-is offered, after the final exact-joint, unchanged-base, inventory and size
-checks.
+Each pair's addition is checked when that pair is solved: its pieces for overlaps
+against all the track before them, and its new joints, the unchanged base, the
+stock left and the remaining added-piece allowance. Only a complete plan reducing
+the open-end count to zero is offered, and only when the save and import guards
+accept it.
 
 The plan search tries at most eight distinct alternatives per pair, permits at
 most 128 added pieces across the whole plan, and has a shared node allowance.
@@ -102,7 +103,8 @@ completion mode.
 
 Interactive single-pair jobs run the stages of
 [bridge-completion.md](bridge-completion.md) in order.
-An exact ordinary stage alternates endpoints; forced fits and reversing
+An exact ordinary stage alternates endpoints
+([performance.md](performance.md#editor-closings)); forced fits and reversing
 closures are not direction-equivalent, so those stages grow from the chosen end
 only and run until their own limits stop them. Stage node budgets are shared
 across directions, not multiplied for each direction. Template generation is separate
@@ -113,7 +115,8 @@ whatever produced them: the core search's replay audit, the arc oracle, or, for
 an expanded bridge macro, a shared incremental auditor before the candidate
 counts as a result. The base, stock, size, joint and room checks run once, where
 the candidate is produced; the job then keeps one candidate per physical track
-and only those its save and import guards accept.
+and only those its save and import guards accept. A search that sets a closure
+aside for those guards says so, and running out of search then proves nothing.
 
 One tick processes at most 32 checkpoint events and aims to return after about
 20 ms between checkpoints. This is not a hard execution deadline: preprocessing,

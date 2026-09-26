@@ -8,12 +8,11 @@ import pytest
 
 from duplotrain.catalog import default_catalog
 from duplotrain.collision import UNDERPASS_MIN
-from duplotrain.editor_search import layout_key
 from duplotrain.geometry import ORIGIN, Pose
 from duplotrain.gui import Session
 from duplotrain.layout import Layout
 from duplotrain.solver import SolverConfig, _solution_overlaps, solve
-from tests.editor_support import complete
+from tests.editor_support import complete, layout_key
 from tests.test_completion import crossing_completion
 
 

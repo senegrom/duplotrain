@@ -10,7 +10,6 @@ atomic.
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 import time
@@ -107,55 +106,39 @@ def fits_space(layout, options):
         for line in placement.centrelines(4.0):
             if not math.isfinite(pad) or any(not math.isfinite(v) for point in line for v in point):
                 return False
-            if room is not None and any(
-                x - pad < room[0] or y - pad < room[1]
-                or x + pad > room[2] or y + pad > room[3] for x, y, _ in line
-            ):
+            xs, ys = [x for x, _, _ in line], [y for _, y, _ in line]
+            x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+            if room is not None and (x0 - pad < room[0] or y0 - pad < room[1]
+                                     or x1 + pad > room[2] or y1 + pad > room[3]):
                 return False
             for r in keep:
                 box = (r[0] - pad, r[1] - pad, r[2] + pad, r[3] + pad)
+                if x1 < box[0] or x0 > box[2] or y1 < box[1] or y0 > box[3]:
+                    continue  # the line's extent cannot reach this rectangle
                 if (any(_segment_box(a, b, box) for a, b in zip(line, line[1:], strict=False))
                         or (len(line) == 1 and _segment_box(line[0], line[0], box))):
                     return False
     return True
 
 
-def layout_key(layout):
-    """Exact anchored layout identity, independent of placement emission order."""
-    data = layout_to_dict(layout)
-    order = sorted(range(len(data["placements"])), key=lambda i: json.dumps(
-        data["placements"][i], sort_keys=True, separators=(",", ":")))
-    remap = {old: new for new, old in enumerate(order)}
-    links = []
-    for a, ap, b, bp in data["links"]:
-        left, right = sorted(((remap[a], ap), (remap[b], bp)))
-        links.append((*left, *right))
-    # Accessories on the unchanged base also follow the reindexing. Their saved
-    # representation is not assumed here; exact full tuples are normalized.
-    stones = sorted(((remap[entry[0]], *entry[1:]) for entry in layout.accessories),
-                    key=lambda entry: json.dumps(entry, separators=(",", ":")))
-    normal = {"placements": [data["placements"][i] for i in order],
-              "links": sorted(links), "accessories": stones}
-    return hashlib.sha256(json.dumps(normal, sort_keys=True, separators=(",", ":"))
-                          .encode()).hexdigest()
-
-
-def physical_key(layout, start=0):
-    """Identity of the track from placement *start* on, over a shared prefix.
+def physical_key(layout, base):
+    """Identity of the track *layout* adds to *base*, which it extends unchanged.
 
     Connectors have no gender: a piece placed from its other end has another
     frame and port order but lies in the same place. So a piece is its id with
     the set of its world connector poses, and a link joins two such poses or a
-    connector of the shared prefix, named by index.
+    connector of the base, named by index. The base's own links are common to
+    every extension and left out.
     """
-    placements = layout.placements
+    placements, start = layout.placements, len(base)
 
     def end(placement, port):
         return (placement, port) if placement < start else placements[placement].port_pose(port)
 
     pieces = Counter((p.piece.id, frozenset(map(p.port_pose, range(len(p.piece.ports)))))
                      for p in placements[start:])
-    links = frozenset(frozenset((end(*a), end(*b))) for a, b in layout.links.items())
+    links = frozenset(frozenset((end(*a), end(*b))) for a, b in layout.links.items()
+                      if a not in base.links)
     return frozenset(pieces.items()), links, layout.accessories
 
 
@@ -169,12 +152,12 @@ def valid_extension(base, candidate, stock, max_pieces, options, *, audit=None):
     yet: an expanded bridge macro. Every other producer already audited exactly
     these placements with the same clearance and spacing.
     """
-    layout = candidate.layout
+    layout, base_counts = candidate.layout, base.piece_counts
     if (layout.placements[:len(base)] != base.placements
             or any(layout.links.get(a) != b for a, b in base.links.items())
             or layout.accessories != base.accessories
             or len(layout) - len(base) > max_pieces
-            or any(n - base.piece_counts.get(pid, 0) > stock.get(pid, 0)
+            or any(n - base_counts.get(pid, 0) > stock.get(pid, 0)
                    for pid, n in layout.piece_counts.items())
             or not fits_space(layout.placements[len(base):], options)):
         return False
@@ -195,6 +178,7 @@ class Cursor:
     limits: SearchLimits
     stage: str
     cap: int
+    budget: int = 0  # the stage's node budget at search effort 1
     overhead: int = 0
     nodes: int = 0
     depth: int = 0
@@ -251,8 +235,9 @@ class PairSearch:
                     self.arc_session._arc_events(grow, close, MAX_RESULTS, depth))
         self.arc_done = False
         self.slop, self.reversing, self.options = slop, reversing, options
-        # Expanded bridge macros are new geometry: audit them before they count.
-        self.audit = _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
+        # Expanded bridge macros are new geometry: audit them before they count,
+        # against the base, with one auditor built when the first one arrives.
+        self.audit = None
         self._build()
 
     @property
@@ -294,22 +279,24 @@ class PairSearch:
                                    signature=("standard_bridge", sol.signature))
 
                 def accept(sol, expand=expand, parts=parts):
+                    if parts is None:
+                        return valid_extension(base, sol, stock, self.depth, self.options)
                     sol = expand(sol)
-                    if parts is not None and any(
-                        p.frame.z != ZERO for p in sol.layout.placements[len(base):]
-                        if p.piece.id in ("curve", "straight", "ramp")
-                    ):
+                    if any(p.frame.z != ZERO for p in sol.layout.placements[len(base):]
+                           if p.piece.id in ("curve", "straight", "ramp")):
                         return False
+                    if self.audit is None:
+                        self.audit = _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
                     return valid_extension(base, sol, stock, self.depth, self.options,
-                                           audit=self.audit if parts is not None else None)
+                                           audit=self.audit)
 
+                # The limits bound nodes, results and depth; max_nodes still sizes
+                # the reverse tables' base allowance.
                 iterator = solve_steps(inventory, pieces,
-                    SolverConfig(min_pieces=0, max_pieces=limits.max_pieces,
-                                 max_results=MAX_RESULTS, max_nodes=cap, slop=self.slop,
-                                 reversing_loops=reversing,
-                                 solution_filter=accept),
+                    SolverConfig(min_pieces=0, max_nodes=cap, slop=self.slop,
+                                 reversing_loops=reversing, solution_filter=accept),
                     base=base, grow_from=grow, close_onto=close, limits=limits)
-                self.cursors.append(Cursor(iterator, limits, name, cap, overhead,
+                self.cursors.append(Cursor(iterator, limits, name, cap, budget, overhead,
                                            blocked=bool(overhead and self.depth < 4),
                                            expand=expand, direction=direction))
 
@@ -373,13 +360,15 @@ class PairSearch:
 
     def harder(self):
         old_depth = self.depth
-        self.depth, self.effort = min(128, self.depth * 2), min(16, self.effort * 2)
+        self.depth, self.effort = _harder(self.depth, self.effort)
         for cursor in self.cursors:
             if cursor.exhausted:
                 continue
-            cursor.cap = min(cursor.cap * 2, (250_000 if cursor.overhead else
-                              25_000 if cursor.stage == "plain track" else 60_000) * 16)
-            cursor.limits.max_nodes = cursor.cap
+            cursor.cap = min(cursor.cap * 2, cursor.budget * 16)
+            # The doubling turns go on: the two ends of an exact stage still take
+            # turns, now within the raised budget.
+            cursor.limits.max_nodes = max(cursor.limits.max_nodes,
+                                          min(cursor.cap, cursor.nodes * 2))
             cursor.limits.max_pieces = max(1, self.depth - cursor.overhead)
             cursor.blocked = bool(cursor.overhead and self.depth < 4)
         if self.depth > old_depth:
@@ -399,6 +388,11 @@ class PairSearch:
         self.arc_session = self.audit = None
 
 
+def _harder(depth, effort):
+    """Search harder: twice the depth and the effort, up to 128 pieces and 16."""
+    return min(128, depth * 2), min(16, effort * 2)
+
+
 class SearchJob:
     def __init__(self, session, body):
         from .editor import _end
@@ -410,15 +404,10 @@ class SearchJob:
         snapshot = session.snapshot()
         self.snapshot_metadata = {key: value for key, value in snapshot.items()
                                   if key != "layout"}
-        # Every candidate keeps the base's placements, links and stones: the base's
-        # snapshot is checked once here, and _saveable checks only the rest.
-        try:
-            session._check_snapshot(snapshot)
-        except ValueError:
-            self.spare_bytes = -1  # nothing that extends an unsaveable base is saveable
-        else:
-            self.spare_bytes = MAX_SNAPSHOT_BYTES - len(
-                json.dumps(snapshot, ensure_ascii=True).encode("utf-8"))
+        # Every candidate keeps the base's placements, links and stones, which
+        # passed the save check when they were committed: _saveable checks the rest.
+        self.spare_bytes = MAX_SNAPSHOT_BYTES - len(
+            json.dumps(snapshot, ensure_ascii=True).encode("utf-8"))
         self.options = search_options(body.get("options"), self.catalog)
         for pid in self.options["exclude"]:
             self.stock[pid] = 0
@@ -458,11 +447,12 @@ class SearchJob:
             raise ValueError(
                 "Existing track crosses the room/keep-out limits; no pieces were moved")
         self.solutions: list[Solution] = []
-        self.reason: str | None = None  # a proof that no ordinary completion exists
+        # Why nothing, or not everything, found is offered: an impossibility proof,
+        # or closures beyond the save limits.
+        self.reason: str | None = None
         self.keys: set = set()
-        # Per solution index, computed when first shown or ranked.
-        self.ids: dict[int, str] = {}
-        self.costs: dict[str, list] = {}
+        self.unsaveable = 0  # closures found but too large to save
+        self.costs: dict[str, list] = {}  # per ranking goal, one per solution index
         self.last_touch = time.monotonic()
         self.status = "running"
         self.stage = "templates"
@@ -471,16 +461,20 @@ class SearchJob:
         self.multi_cap = 335_000 * self.effort
         self.pool = None
         if self.all_gaps:
+            self.stage = f"close all: {len(opens)} open ends"
             self.multi = self._all_gaps(self.base, self.stock, self.depth)
         elif self.base.pose_of(grow).connects_to(self.base.pose_of(close)):
             closed = self.base.join(grow, close)
             self._accept(Solution(closed, (), 0, True, len(closed.connectable_ends()), ("join",)))
-            self.status = "direct_join"
+            self.status, self.stage = "direct_join", "direct join"
         elif not reversing and (reason := session._height_gap_reason(grow, close, self.stock)):
             self.reason, self.status, self.complete = reason, "exhausted", True
+            self.stage = "height check"
         else:
             self.pool = PairSearch(self.base, self.catalog, self.stock, grow, close,
                                    self.depth, self.effort, slop, reversing, self.options)
+            if reversing:  # the arc templates do not run
+                self.stage = self.pool.cursors[0].stage
 
     @property
     def nodes(self):
@@ -490,8 +484,14 @@ class SearchJob:
         # Its producer has checked the extension already: a pair search's stage or
         # template, each addition of a Close-all plan, or the exact direct join.
         # The same track found from either end is one alternative.
-        key = physical_key(candidate.layout, len(self.base))
-        if key in self.keys or not self._saveable(candidate.layout):
+        key = physical_key(candidate.layout, self.base)
+        if key in self.keys:
+            return
+        if not self._saveable(candidate.layout):
+            # Not offered, but it exists: the search proves nothing impossible.
+            self.unsaveable += 1
+            self.reason = ("Some closures would make the session too large to save "
+                           f"({MAX_PLACEMENTS:,} pieces or 2 MB); they are not offered.")
             return
         self.keys.add(key)
         self.solutions.append(candidate)
@@ -542,6 +542,7 @@ class SearchJob:
                    for pid, n in stock.items() if n)
         grow = min(opens, key=lambda a: (sum(distance(a, b) <= span + 1e-6
                                              for b in opens if b != a), a))
+        base_counts = base.piece_counts
         for close in sorted((b for b in opens if b != grow), key=lambda b: (distance(grow, b), b)):
             if base.pose_of(grow).connects_to(base.pose_of(close)):
                 try:
@@ -568,11 +569,11 @@ class SearchJob:
                     if event["kind"] != "solution":
                         continue
                     candidate = event["solution"]
-                    key = physical_key(candidate.layout, len(base))
+                    key = physical_key(candidate.layout, base)
                     if key in seen or len(candidate.layout.connectable_ends()) >= len(opens):
                         continue
                     seen.add(key)
-                    used = {pid: n - base.piece_counts.get(pid, 0)
+                    used = {pid: n - base_counts.get(pid, 0)
                             for pid, n in candidate.layout.piece_counts.items()}
                     remaining = {pid: n - used.get(pid, 0) for pid, n in stock.items()}
                     yield from self._all_gaps(candidate.layout, remaining,
@@ -603,7 +604,8 @@ class SearchJob:
                     break
             elif event["kind"] in ("limited", "exhausted"):
                 self.status = event["kind"]
-                self.complete = not self.all_gaps and event["kind"] == "exhausted"
+                self.complete = (not self.all_gaps and event["kind"] == "exhausted"
+                                 and not self.unsaveable)
                 break
             if time.perf_counter() >= deadline:
                 break
@@ -624,18 +626,16 @@ class SearchJob:
                 # New depth contours of multi-gap orchestration are a new bounded
                 # plan search; ordinary DFS resumes at its saved exact checkpoint.
                 self.multi.close()
-                self.depth = min(128, self.depth * 2)
-                self.effort = min(16, self.effort * 2)
+                self.depth, self.effort = _harder(self.depth, self.effort)
                 self.multi_cap = self.multi_nodes + 335_000 * self.effort
                 self.multi = self._all_gaps(self.base, self.stock, self.depth)
             self.complete = False
         self.target = min(MAX_RESULTS, max(self.target * 2, len(self.solutions) + 8))
-        if self.status != "exhausted" or harder:
-            self.status = "running"
+        self.status = "running"
 
     def _cost(self, goal, sol):
-        added = {pid: n - self.base.piece_counts.get(pid, 0)
-                 for pid, n in sol.layout.piece_counts.items()}
+        base_counts = self.base.piece_counts
+        added = {pid: n - base_counts.get(pid, 0) for pid, n in sol.layout.piece_counts.items()}
         if goal == "pieces":
             return sum(added.values())
         if goal == "footprint":
@@ -670,9 +670,6 @@ class SearchJob:
             item["revision"] = self.revision
             if "base_revision" in item["preview"]:  # a compact preview
                 item["preview"]["base_revision"] = self.revision
-            if index not in self.ids:
-                self.ids[index] = layout_key(candidate.layout)
-            item["candidate_id"] = self.ids[index]
             shown.append(item)
         return {"job_id": self.id, "revision": self.revision, "status": self.status,
                 "stage": self.stage, "searched": self.nodes, "found": len(self.solutions),
@@ -687,7 +684,7 @@ class SearchJob:
                 # At the result cap a harder search would have no room to report.
                 "can_harden": ((self.pool is not None or self.all_gaps)
                                and len(self.solutions) < MAX_RESULTS),
-                "resumable": self.status not in (
+                "resumable": len(self.solutions) < MAX_RESULTS and self.status not in (
                     "exhausted", "bounded_complete", "result_cap", "direct_join", "limited")}
 
     def publish(self, session):
@@ -703,12 +700,11 @@ class SearchJob:
     def close(self):
         if self.pool:
             self.pool.close()
-        if self.all_gaps and hasattr(self, "multi"):
+        if self.all_gaps:
             self.multi.close()
         self.status = "discarded"
         self.solutions.clear()
         self.keys.clear()
-        self.ids.clear()
         self.costs.clear()
 
 

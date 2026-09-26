@@ -665,8 +665,10 @@ class Session:
     ):
         """Instant oracle for ring-shaped closures the DFS chronically misses.
 
-        Tries every ``leveler + j straights + k same-sign curves + m straights +
-        leveler`` chain (j, m <= 8, k <= 13), where a leveler is a short run of
+        Yields the closures, and None as a heartbeat between exact pose checks.
+        Tries ``leveler + j straights + k same-sign curves + m straights + leveler``
+        chains (j, m <= 8, k <= 13; the 60 shortest leveler pairs whose climbs
+        cancel the height difference), where a leveler is a short run of
         climbing pieces: any one-directional ramp/span sequence of up to four
         pieces, or the full up-and-over bridge.  This closes winding rings the
         search's toward-target ordering starves on -- ten curves looping to a
@@ -676,7 +678,7 @@ class Session:
         checks.
         """
         if not all(pid in self.catalog for pid in ("curve", "straight", "ramp", "span")):
-            return []
+            return
         remaining = self.remaining()
         base = self.layout
         n_base = len(base)
@@ -761,7 +763,6 @@ class Session:
         start, target = geometry.start, geometry.target
         want_heading = (geometry.heading(target) + 12) % 24
         audit = _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
-        found: list[Solution] = []
         seen_pre = {}
         prefixes = {}
         suffixes = {}
@@ -809,8 +810,6 @@ class Session:
                                 continue
                             if j + m > remaining.get("straight", 0):
                                 continue
-                            if not pre and not post and not k:
-                                continue
                             try:
                                 closed = build(pre, j, k, entry, m, post)
                             except ValueError:
@@ -823,20 +822,16 @@ class Session:
                             if key in seen_layouts:
                                 continue
                             seen_layouts.add(key)
-                            found.append(
-                                Solution(
-                                    layout=closed,
-                                    steps=(),
-                                    gap=0.0,
-                                    exact=True,
-                                    open_stubs=len(closed.connectable_ends()),
-                                    signature=("arc", pre, j, k, entry, m, post),
-                                )
+                            yield Solution(
+                                layout=closed,
+                                steps=(),
+                                gap=0.0,
+                                exact=True,
+                                open_stubs=len(closed.connectable_ends()),
+                                signature=("arc", pre, j, k, entry, m, post),
                             )
-                            yield found[-1]
-                            if len(found) >= max_results:
-                                return found
-        return found
+                            if len(seen_layouts) >= max_results:
+                                return
 
     def _height_gap_reason(self, grow: End, close: End,
                            remaining: Mapping[str, int]) -> str | None:

@@ -1,5 +1,6 @@
 """Small transport helpers; each test keeps its own scenarios and assertions."""
 
+import hashlib
 import http.client
 import importlib.util
 import json
@@ -8,6 +9,23 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from duplotrain.gui import Session, make_server
+from duplotrain.layout import layout_to_dict
+
+
+def layout_key(layout):
+    """Exact anchored layout identity, independent of placement emission order."""
+    data = layout_to_dict(layout)
+    order = sorted(range(len(data["placements"])), key=lambda i: json.dumps(
+        data["placements"][i], sort_keys=True, separators=(",", ":")))
+    remap = {old: new for new, old in enumerate(order)}
+    links = sorted(tuple(x for end in sorted(((remap[a], ap), (remap[b], bp))) for x in end)
+                   for a, ap, b, bp in data["links"])
+    stones = sorted(((remap[entry[0]], *entry[1:]) for entry in layout.accessories),
+                    key=lambda entry: json.dumps(entry, separators=(",", ":")))
+    normal = {"placements": [data["placements"][i] for i in order],
+              "links": links, "accessories": stones}
+    return hashlib.sha256(json.dumps(normal, sort_keys=True, separators=(",", ":"))
+                          .encode()).hexdigest()
 
 
 def unchanged(session):

@@ -84,7 +84,7 @@ def test_either_end_closes_the_reported_gap_with_the_same_tracks():
         # bridge stage then starts from that end.
         assert len(job.solutions) == 8 and job.stage == "standard bridge"
         assert job.nodes < 3_000
-        found.append({physical_key(s.layout, len(base)) for s in job.solutions})
+        found.append({physical_key(s.layout, base) for s in job.solutions})
     assert found[0] == found[1]
 
 
@@ -149,7 +149,7 @@ def test_macro_stage_counts_real_pieces_and_stock_and_reaudits(monkeypatch):
         for inventory, config, limits in stage:
             # One search move stands for four real pieces: three slots are reserved.
             assert inventory == {"curve": 16, "straight": 4, _BRIDGE_ID: 1}
-            assert config.max_pieces == limits.max_pieces == 21
+            assert limits.max_pieces == 21
             assert config.max_nodes == 250_000
         # The expanded macro is audited against the base before it can count.
         witness = load("bridge-completed.json")

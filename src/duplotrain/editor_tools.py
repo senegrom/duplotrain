@@ -135,7 +135,7 @@ def check_session(session: Session) -> dict[str, Any]:
                                 "owned": have, "missing": count - have, "placements": indices})
     provisional = [i for i, p in enumerate(layout) if p.piece.provisional]
     return {"revision": session.revision, "open_ends": opens, "joint_issues": joints,
-            "connector_closed": bool(len(layout)) and layout.is_closed and not joints,
+            "connector_closed": layout.is_closed and not joints,
             "overlaps": overlaps, "overlap_check_complete": complete,
             "missing": missing, "sandbox": session.unlimited, "provisional": provisional,
             "model_note": "Sampled model check (8 mm); not a physical-clearance guarantee."}

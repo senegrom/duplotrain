@@ -16,9 +16,7 @@ from duplotrain.editor_search import (
     PairSearch,
     SearchJob,
     fits_space,
-    layout_key,
     search_options,
-    valid_extension,
 )
 from duplotrain.geometry import Pose
 from duplotrain.layout import Layout, Placement, layout_from_dict
@@ -26,12 +24,11 @@ from duplotrain.solver import (
     SearchLimits,
     Solution,
     SolverConfig,
-    _OverlapAudit,
     _solution_overlaps,
     solve,
     solve_steps,
 )
-from tests.editor_support import load_adapter, post, running_server, unchanged
+from tests.editor_support import layout_key, load_adapter, post, running_server, unchanged
 
 
 @pytest.fixture
@@ -298,6 +295,7 @@ def test_empty_stock_touching_ends_join_without_spinning_on_find_more(catalog):
     session = Session(history=[base], inventory={"curve": 12})
     job = SearchJob(session, {})
     assert len(job.solutions) == 1 and job.status == "direct_join"
+    assert job.stage == "direct join"
     job.more()
     job.more(harder=True)
     job.tick()
@@ -488,6 +486,7 @@ def test_finding_more_stops_at_the_fifty_result_cap(catalog):
     try:
         job.solutions = [Solution(half(catalog), (), 0.0, True, 2, ())] * MAX_RESULTS
         job.status = "results_ready"
+        assert not job.response(session, {})["resumable"]  # the cap leaves no room
         for harder in (False, True):
             job.more(harder=harder)
             assert job.status == "result_cap"
@@ -526,8 +525,6 @@ def test_exclusions_do_not_change_owned_inventory_and_ranked_pages_keep_identity
                    for p in candidate.layout.placements[len(session.layout):])
     response = job.response(session, {"page": 1})
     assert len(response["candidates"]) == 8
-    for item in response["candidates"]:
-        assert item["candidate_id"] == layout_key(job.solutions[item["index"]].layout)
     assert not response["optimal"] and session.snapshot() == before
     ranked = [len(sol.layout) for _, sol in job.ordered()]
     assert ranked == sorted(ranked)
@@ -576,32 +573,12 @@ def test_each_sort_ranks_exact_candidates_by_its_own_cost_then_discovery(catalog
         job.close()
 
 
-def test_exact_dedup_is_independent_of_new_placement_order(catalog):
-    original = build_chain([(catalog["curve"], 0, 1)] * 3)
-    n = len(original)
-    reversed_layout = Layout(tuple(reversed(original.placements)), {
-        (n - 1 - a, ap): (n - 1 - b, bp) for (a, ap), (b, bp) in original.links.items()
-    })
-    assert layout_key(original) == layout_key(reversed_layout)
-    moved = Layout(tuple(Placement(p.piece, Pose(p.frame.x + 1, p.frame.y,
-                                                p.frame.z, p.frame.heading)) for p in original),
-                   original.links)
-    assert layout_key(moved) != layout_key(original)
-
-
 def test_close_all_gaps_refuses_track_that_already_overlaps_itself(catalog):
     # Two full turns of curves lie on top of each other: no plan can be overlap-free.
     spiral = build_chain([(catalog["curve"], 0, 1)] * 24)
     session = Session(history=[spiral], inventory={"curve": 30})
     with pytest.raises(ValueError, match="overlaps itself"):
         call(session, "start", all_gaps=True)
-    # The explicit whole-layout auditor rejects it as well.
-    closed = spiral.join((0, 0), (23, 1))
-    candidate = Solution(closed, (), 0, True, 0, ("overlap",))
-    options = search_options({}, catalog)
-    assert valid_extension(closed, candidate, {}, 1, options)
-    assert not valid_extension(closed, candidate, {}, 1, options,
-                               audit=_OverlapAudit(None, 120.0, 8.0))
 
 
 def test_harder_retains_existing_exact_dfs_objects_and_lifts_depth(catalog):
@@ -754,8 +731,25 @@ def test_ends_at_different_heights_explain_the_proof_instead_of_searching(catalo
     assert state["status"] == "exhausted" and state["complete"] and state["searched"] == 0
     assert f"differ by {rise} mm in height" in state["reason"]
     assert "can never come back down" in state["reason"]
+    assert state["stage"] == "height check"
     # Publishing no suggestions is still one new revision.
     revision = session.revision
     published = call(session, "publish")
     assert published["revision"] == session.revision == revision + 1
     assert session._candidate_revision == session.revision and not session.candidates
+
+
+def test_closures_beyond_the_save_limits_are_no_proof_that_none_exist(catalog, monkeypatch):
+    import duplotrain.editor_search as editor_search
+
+    # The half circle's only closure adds six curves: allow one piece fewer.
+    monkeypatch.setattr(editor_search, "MAX_PLACEMENTS", len(half(catalog)) + 5)
+    session = Session(history=[half(catalog)], inventory={"curve": 12})
+    job = SearchJob(session, {})
+    try:
+        settle(job)
+        assert not job.solutions
+        assert job.status == "exhausted" and not job.complete
+        assert job.unsaveable and "too large to save" in job.reason
+    finally:
+        job.close()
