@@ -146,8 +146,6 @@ def render_layout(
                 step = 3
                 for s in range(0, len(line) - 1, step):
                     chunk = line[s : s + step + 1]
-                    if len(chunk) < 2:
-                        continue
                     chunk_z = sum(p[2] for p in line3d[s : s + step + 1]) / len(
                         line3d[s : s + step + 1]
                     )
@@ -280,16 +278,16 @@ def render_layout(
         line = placement.centrelines()[0]
         mx, my, mz = line[len(line) // 2]
         if mz > 1.0:
-                ax.text(
-                    mx,
-                    my,
-                    f"+{mz:.0f}mm",
-                    fontsize=7,
-                    ha="center",
-                    va="center",
-                    color="#5a4a33",
-                    zorder=7,
-                )
+            ax.text(
+                mx,
+                my,
+                f"+{mz:.0f}mm",
+                fontsize=7,
+                ha="center",
+                va="center",
+                color="#5a4a33",
+                zorder=7,
+            )
 
     width, height = layout.size()
     if title is None:

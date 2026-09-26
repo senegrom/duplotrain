@@ -17,9 +17,12 @@ def runner():
     return CliRunner()
 
 
-def test_solve_output_under_a_file_is_refused_without_a_traceback(runner, tmp_path):
+def test_solve_output_under_a_file_is_refused_without_a_traceback(runner, tmp_path,
+                                                                 monkeypatch):
     blocker = tmp_path / "afile.txt"
     blocker.write_text("not a directory")
+    # Refused before the search, which could take minutes.
+    monkeypatch.setattr("duplotrain.cli.solve", lambda *args: pytest.fail("searched first"))
     result = runner.invoke(main, ["solve", "--curve", "12", "--top", "1",
                                   "-o", str(blocker / "sub")])
     assert result.exit_code == 1 and "cannot create" in result.output
@@ -50,6 +53,19 @@ def test_solve_output_replaces_an_earlier_runs_loops(runner, monkeypatch, tmp_pa
     assert sorted(path.name for path in tmp_path.iterdir()) == [
         "loop_01.json", "loop_01.json.bak", "loop_07.png", "loop_1.json", "notes.txt"]
     assert len(json.loads((tmp_path / "loop_01.json").read_text())["placements"]) == 12
+
+
+def test_a_solve_that_finds_nothing_still_replaces_earlier_results(runner, monkeypatch,
+                                                                   tmp_path):
+    from duplotrain import cli
+
+    monkeypatch.setattr(cli, "_get_renderer", lambda required=True: None)  # JSON only
+    out = tmp_path / "out"
+    assert runner.invoke(main, ["solve", "--curve", "12", "-o", str(out)]).exit_code == 0
+    assert list(out.glob("loop_*.json"))
+    result = runner.invoke(main, ["solve", "--set", "10872", "-o", str(out)])
+    assert result.exit_code == 0 and "No closed loop fits" in result.output
+    assert not list(out.glob("loop_*"))
 
 
 def test_gui_on_a_port_in_use_fails_politely(runner):

@@ -278,10 +278,10 @@ class LoopClassification:
       sweeps every tile, each of its routes end to end, in both directions (hence
       each infinitely often).
 
-    Each level implies the ones above it.  ``witness`` is an endless start for the
-    local property; ``counterexample`` is the first (start, tongue setting, outcome)
-    that breaks the weakest failed universal property -- the first "no" down the
-    ladder, so a layout that is not looping gets a run that actually ends.
+    Each level implies the ones above it.  ``counterexample`` is the first (start,
+    tongue setting, outcome) that breaks the weakest failed universal property -- the
+    first "no" down the ladder, so a layout that is not looping gets a run that
+    actually ends. It is None exactly when the layout is perfectly looping.
     """
 
     locally_looping: bool
@@ -375,14 +375,14 @@ def classify(
     :class:`ClassificationLimitError` before simulation, never return a partial
     verdict. Pass a larger budget (or ``None`` for unbounded enumeration) explicitly.
     A single run longer than :func:`drive`'s step budget raises
-    :class:`DriveLimitError`, again instead of a verdict.
+    :class:`DriveLimitError`, again instead of a verdict. A layout with no drivable
+    track (none at all, or only buffers) has no train to place: ValueError.
     """
-    if not layout.placements:
-        raise ValueError("nothing to classify")
     if max_runs is not None and (type(max_runs) is not int or max_runs < 1):
         raise ValueError("max_runs must be a positive integer or None")
-
     starts = _all_starts(layout)
+    if not starts:
+        raise ValueError("nothing to classify: no drivable track")
     required_runs = len(starts) * math.prod(
         len(options) for _, options in _tongue_choices(layout)
     )
@@ -391,7 +391,7 @@ def classify(
             f"classification needs {required_runs:,} runs, exceeding max_runs={max_runs:,}; "
             "increase max_runs to classify this layout"
         )
-    assignments = _tongue_assignments(layout) if starts else ()
+    assignments = _tongue_assignments(layout)
     everything = drivable_universe(layout)
 
     locally = False

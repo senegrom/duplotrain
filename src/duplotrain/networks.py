@@ -222,7 +222,7 @@ def enumerate_networks(
     # The field bins a candidate's samples once some placement's bounds come within reach.
     samples_for = _placement_samples(eng, pieces, cfg.collision_spacing)
 
-    placements: list[tuple[str, object, int]] = []  # (pid, engine frame, entry used)
+    placements: list[tuple[str, object]] = []  # (pid, engine frame)
     field = CollisionField(clearance=cfg.clearance)
     links: dict[tuple[int, int], tuple[int, int]] = {}
     open_ends: dict[tuple[int, int], object] = {}  # end -> engine pose
@@ -248,7 +248,7 @@ def enumerate_networks(
         # symmetric one, so the layout is assembled directly rather than replaying
         # every attachment and join through Layout's checked constructors.
         return Layout(
-            [Placement(pieces[pid], eng.to_pose(frame)) for pid, frame, _entry in placements],
+            [Placement(pieces[pid], eng.to_pose(frame)) for pid, frame in placements],
             dict(links),
         )
 
@@ -324,7 +324,7 @@ def enumerate_networks(
                     if not field.place(index, base_pts, offset, piece.width / 2.0, bounds,
                                        exempt, underpass=piece.underpass):
                         continue
-                    placements.append((pid, frame, entry))
+                    placements.append((pid, frame))
                     counts[pid] -= 1
                     del open_ends[target]
                     links[target] = (index, entry)
@@ -362,7 +362,7 @@ def enumerate_networks(
             piece = pieces[pid]
             entry = orientations[pid][0]
             frame = eng.frame(pid, entry, eng.start_cursor)
-            placements.append((pid, frame, entry))
+            placements.append((pid, frame))
             base_pts, offset, bounds = samples_for(pid, frame)
             field._add_prepared(
                 0, field._prepare(base_pts, offset=offset), piece.width / 2.0,
@@ -390,8 +390,6 @@ def enumerate_networks(
         # cycle, so the collision field and the reachability tables do not
         # linger until cyclic GC.
         dfs = None
-    for pid, count in withdrawn.items():
-        counts[pid] = count
 
     if stats.aborted:
         stats.stop_reason = "node_limit"

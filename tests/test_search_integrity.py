@@ -1,5 +1,6 @@
 """Search regressions: eligibility before dedup, exact symmetries and honest limits."""
 
+import pickle
 from dataclasses import replace
 
 import pytest
@@ -180,6 +181,8 @@ def test_perfection_wrappers_retain_stats_and_can_require_exhaustion(family, lim
         with pytest.raises(IncompleteSearchError) as error:
             result.require_complete()
         assert error.value.result is result
+        again = pickle.loads(pickle.dumps(error.value))  # as from a worker process
+        assert str(again) == str(error.value) and again.result.stats == result.stats
         with pytest.raises(IncompleteSearchError, match=reason):
             search(require_complete=True)
 

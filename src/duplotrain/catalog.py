@@ -319,8 +319,8 @@ def load_catalog(*paths: str | Path, include_default: bool = True) -> dict[str, 
         for spec in DEFAULT_CATALOG_SPECS:
             specs[spec["id"]] = spec
     for path in paths:
-        with open(path, encoding="utf-8-sig") as fh:  # a byte-order mark is harmless
-            data = json.load(fh)
+        # From bytes, JSON takes UTF-8 (with or without a byte-order mark), -16 or -32.
+        data = json.loads(Path(path).read_bytes())
         if isinstance(data, dict):
             if "pieces" not in data:
                 raise ValueError(f"catalogue {path} has no 'pieces' key")

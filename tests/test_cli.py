@@ -167,6 +167,7 @@ def test_sets_command_lists_known_sets(runner):
     assert result.exit_code == 0
     for code in ("10874", "10875", "10872", "10882"):
         assert code in result.output
+    assert "38507" in result.output  # a set's notes: the stop stone's part number
 
 
 def test_solve_with_set_shortcut(runner):
@@ -286,6 +287,11 @@ def test_classify_and_gui_reject_impossible_requests(runner, tmp_path):
                                  "links": []}))
     result = runner.invoke(main, ["classify", str(empty)])
     assert result.exit_code == 1 and "nothing to classify" in result.output
+    buffers = tmp_path / "buffer.json"  # a lone buffer holds no train
+    buffers.write_text(json.dumps(layout_to_dict(
+        build_chain([(default_catalog()["buffer"], 0, 1)]))))
+    result = runner.invoke(main, ["classify", str(buffers)])
+    assert result.exit_code == 1 and "no drivable track" in result.output
     result = runner.invoke(main, ["gui", "--port", "70000", "--no-browser"])
     assert result.exit_code == 2 and "70000" in result.output
 
@@ -302,33 +308,17 @@ def test_classify_refuses_track_whose_joints_cannot_exist(runner, tmp_path):
     assert result.exit_code == 1 and "joints fit exactly" in result.output
 
 
-def test_a_solve_that_finds_nothing_still_replaces_earlier_results(runner, monkeypatch,
-                                                                   tmp_path):
-    monkeypatch.setattr(cli, "_get_renderer", lambda required=True: None)  # JSON only
-    out = tmp_path / "out"
-    assert runner.invoke(main, ["solve", "--curve", "12", "-o", str(out)]).exit_code == 0
-    assert list(out.glob("loop_*.json"))
-    result = runner.invoke(main, ["solve", "--set", "10872", "-o", str(out)])
-    assert result.exit_code == 0 and "No closed loop fits" in result.output
-    assert not list(out.glob("loop_*"))
-
-
-def test_json_files_may_start_with_a_byte_order_mark(runner, tmp_path):
+@pytest.mark.parametrize("encoding", ["utf-8-sig", "utf-16"])
+def test_json_files_may_be_saved_in_any_unicode_encoding(runner, tmp_path, encoding):
     catalog = default_catalog()
     circle = build_chain([(catalog["curve"], 0, 1)] * 12).join((11, 1), (0, 0))
     layout = tmp_path / "circle.json"
-    layout.write_bytes(json.dumps(layout_to_dict(circle)).encode("utf-8-sig"))
+    layout.write_bytes(json.dumps(layout_to_dict(circle)).encode(encoding))
     inventory = tmp_path / "box.json"
-    inventory.write_bytes(json.dumps({"curve": 12}).encode("utf-8-sig"))
+    inventory.write_bytes(json.dumps({"curve": 12}).encode(encoding))
     extra = tmp_path / "extra.json"
-    extra.write_bytes(json.dumps({"pieces": []}).encode("utf-8-sig"))
+    extra.write_bytes(json.dumps({"pieces": []}).encode(encoding))
     assert runner.invoke(main, ["check", str(layout)]).exit_code == 0
     result = runner.invoke(main, ["solve", "--inventory", str(inventory), "--catalog", str(extra)])
     assert result.exit_code == 0 and "distinct loop(s) found" in result.output
 
-
-def test_an_inventory_of_zero_counts_asks_what_you_own(runner, tmp_path):
-    inventory = tmp_path / "empty-box.json"
-    inventory.write_text(json.dumps({"curve": 0, "straight": 0}))
-    result = runner.invoke(main, ["solve", "--inventory", str(inventory)])
-    assert result.exit_code == 2 and "Tell me what you own" in result.output

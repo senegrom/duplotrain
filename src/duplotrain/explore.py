@@ -31,7 +31,7 @@ from .catalog import STONE_MOUNTS
 from .drive import LoopClassification, classify
 from .layout import Layout
 from .pieces import PieceType
-from .solver import Solution, SolverConfig, SolveStats, solve
+from .solver import Solution, SolverConfig, SolveStats, _Place, solve
 
 if TYPE_CHECKING:
     from .networks import NetworkConfig, NetworkStats
@@ -54,6 +54,10 @@ class IncompleteSearchError(RuntimeError):
     def __init__(self, result: PerfectResult) -> None:
         self.result = result
         super().__init__(f"search incomplete: {result.stats.stop_reason}")
+
+    def __reduce__(self):
+        # Rebuilt from the result, not the message (pickling, copying).
+        return type(self), (self.result,)
 
 
 class PerfectResult(list[tuple[Layout, LoopClassification]]):
@@ -140,7 +144,7 @@ def find_perfect_loops(
 
 def _lobe_recipe(teardrop: Solution, pieces: Mapping[str, PieceType]) -> list:
     """The self-contained switch-onward part of a teardrop's step trace."""
-    steps = [s for s in teardrop.steps if type(s).__name__ == "_Place"]
+    steps = [s for s in teardrop.steps if isinstance(s, _Place)]
     if len(steps) != len(teardrop.steps):
         raise ValueError("teardrop recipe with transits is not replayable here")
     # The walk's last piece closes into a stub of the switch that starts the lobe.

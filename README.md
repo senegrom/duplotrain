@@ -243,7 +243,8 @@ and initial tongue setting, where a layout sits on the ladder:
 | **perfectly looping** | …sweeping every tile in both directions, infinitely often |
 
 (`duplotrain classify layout.json` prints the verdict and a counterexample start;
-it refuses a layout whose joints do not fit exactly, which `duplotrain check` lists.)
+it refuses a layout without drivable track, and one whose joints do not fit exactly,
+which `duplotrain check` lists.)
 
 Classification streams switch settings and checks the total run count before
 simulation. Above the default 100,000 runs it raises `ClassificationLimitError`

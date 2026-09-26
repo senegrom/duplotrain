@@ -71,3 +71,10 @@ def test_inventory_read_errors_are_reported_politely(tmp_path):
     result = CliRunner().invoke(cli.main, ["solve", "--inventory", str(tmp_path)])
     assert result.exit_code != 0 and "bad inventory file" in result.output
     assert "Traceback" not in result.output
+
+
+def test_an_inventory_of_zero_counts_asks_what_you_own(tmp_path):
+    inventory = tmp_path / "empty-box.json"
+    inventory.write_text(json.dumps({"curve": 0, "straight": 0}))
+    result = CliRunner().invoke(cli.main, ["solve", "--inventory", str(inventory)])
+    assert result.exit_code == 2 and "Tell me what you own" in result.output

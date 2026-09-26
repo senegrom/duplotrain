@@ -20,9 +20,10 @@ from rich.console import Console
 from rich.table import Table
 
 from .catalog import default_catalog, load_catalog
-from .drive import DEFAULT_MAX_RUNS
+from .drive import DEFAULT_MAX_RUNS, ClassificationLimitError, DriveLimitError, classify
 from .layout import layout_from_dict, layout_to_dict
 from .scoring import score_solution
+from .sets import SETS, inventory_for_sets
 from .solver import SolverConfig, solve
 from .validation import MAX_JSON_BYTES, check_inventory
 
@@ -119,13 +120,12 @@ def _inventory_options(fn):
 @main.command(name="sets")
 def sets_cmd() -> None:
     """List the LEGO sets the inventory shortcut knows about."""
-    from .sets import SETS
-
     table = Table(title="Known DUPLO train sets (use with: solve --set 10882)")
     table.add_column("set", style="bold")
     table.add_column("name")
     table.add_column("track pieces")
     table.add_column("action stones")
+    table.add_column("notes", max_width=60)
     for s in SETS.values():
         table.add_row(
             s.code,
@@ -133,6 +133,7 @@ def sets_cmd() -> None:
             ", ".join(f"{n}x {pid}" for pid, n in s.pieces.items()),
             ", ".join(f"{n}x {sid.removeprefix('stone_')}" for sid, n in s.stones.items())
             or "-",
+            s.notes,
         )
     console.print(table)
 
@@ -207,8 +208,6 @@ def solve_cmd(
     inventory: dict[str, int] = {k: v for k, v in flag_counts.items() if v > 0}
     stones: dict[str, int] = {}
     if set_codes:
-        from .sets import inventory_for_sets
-
         try:
             set_pieces, stones = inventory_for_sets(set_codes)
         except ValueError as exc:
@@ -217,8 +216,7 @@ def solve_cmd(
             inventory[k] = inventory.get(k, 0) + v
     if inventory_path:
         try:
-            with open(inventory_path, encoding="utf-8-sig") as fh:
-                raw_counts = json.load(fh)
+            raw_counts = json.loads(Path(inventory_path).read_bytes())
             # Validate the original values, before merging can mask a negative
             # count or int() can truncate a fraction/accept a boolean.
             check_inventory(raw_counts, catalog)
@@ -249,6 +247,8 @@ def solve_cmd(
             use_all_pieces=use_all,
             reversing_loops=reversing,
         )
+        # Before the search: an unusable directory must not cost a whole search.
+        out_dir = _output_dir(out) if out else None
         with console.status("searching for loops..."):
             result = solve(inventory, catalog, config)
     except ValueError as exc:
@@ -263,7 +263,8 @@ def solve_cmd(
         key=lambda pair: -pair[0],
     )
     # Even a run that finds nothing replaces an earlier run's files.
-    out_dir = _fresh_output_dir(Path(out)) if out else None
+    if out_dir is not None:
+        _clear_earlier_results(out_dir)
 
     console.print(
         f"[bold]{len(scored)}[/bold] distinct loop(s) found "
@@ -344,12 +345,17 @@ def _get_renderer(required: bool = True):
     return render_layout
 
 
-def _fresh_output_dir(out_dir: Path) -> Path:
-    """Create *out_dir* and delete an earlier run's loop_NN files from it."""
+def _output_dir(out: str) -> Path:
+    out_dir = Path(out)
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         raise click.ClickException(f"cannot create {out_dir}: {exc}") from exc
+    return out_dir
+
+
+def _clear_earlier_results(out_dir: Path) -> None:
+    """Delete an earlier run's loop_NN files from *out_dir*."""
     # The directory holds one run's results: an earlier run's files would
     # outnumber a smaller result set, or picture other loops than the JSON
     # beside them when this run saves no images.
@@ -360,7 +366,6 @@ def _fresh_output_dir(out_dir: Path) -> Path:
     except OSError as exc:
         raise click.ClickException(
             f"cannot replace the earlier results in {out_dir}: {exc}") from exc
-    return out_dir
 
 
 def _load_layout(layout_file: str, catalog):
@@ -369,8 +374,8 @@ def _load_layout(layout_file: str, catalog):
             raw = fh.read(MAX_JSON_BYTES + 1)
         if len(raw) > MAX_JSON_BYTES:
             raise ValueError("layout file larger than 2 MB")
-        # Editors on Windows often save a byte-order mark.
-        return layout_from_dict(json.loads(raw.decode("utf-8-sig")), catalog)
+        # From bytes, JSON takes UTF-8 (with or without a byte-order mark), -16 or -32.
+        return layout_from_dict(json.loads(raw), catalog)
     except _BAD_FILE as exc:
         raise click.ClickException(f"bad layout file: {exc}") from exc
 
@@ -463,8 +468,6 @@ def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...], max_runs: int
     under every initial switch-tongue setting, with the layout's action stones in
     effect. Joints must be exact: `check` lists any that are not.
     """
-    from .drive import ClassificationLimitError, DriveLimitError, classify
-
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
     if layout.joint_issues():
@@ -476,7 +479,7 @@ def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...], max_runs: int
         verdict = classify(layout, max_runs=max_runs)
     except ClassificationLimitError as exc:
         raise click.ClickException(str(exc).replace("max_runs", "--max-runs")) from exc
-    except (ValueError, DriveLimitError) as exc:  # an empty layout; an endless-run guard
+    except (ValueError, DriveLimitError) as exc:  # no drivable track; an endless-run guard
         raise click.ClickException(str(exc)) from exc
     ladder = [
         ("locally looping", verdict.locally_looping, "some placement runs forever"),
@@ -488,7 +491,7 @@ def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...], max_runs: int
         mark = "[green]yes[/green]" if holds else "[red]no[/red]"
         console.print(f"  {name:20s} {mark}   [dim]{meaning}[/dim]")
     console.print(f"[dim]{verdict.runs} simulated runs[/dim]")
-    if verdict.counterexample and not verdict.perfectly_looping:
+    if verdict.counterexample:
         start, tongues, outcome = verdict.counterexample
         detail = f" with tongues {tongues}" if tongues else ""
         console.print(
