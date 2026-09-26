@@ -100,7 +100,10 @@ def main():
                        "check_ms": check_ms, "state_ms": state_ms,
                        "pair_checks": pair_checks,
                        "report_sha256": hashlib.sha256(encoded(report).encode()).hexdigest(),
-                       "state_sha256": hashlib.sha256(body.encode()).hexdigest(),
+                       # The engine instance is random per session: not hashed.
+                       "state_sha256": hashlib.sha256(encoded(
+                           {k: v for k, v in json.loads(body).items() if k != "instance"}
+                       ).encode()).hexdigest(),
                        "compact_bytes": len(body.encode()),
                        "spaced_bytes": len(json.dumps(json.loads(body)).encode())}), flush=True)
 

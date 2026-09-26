@@ -301,10 +301,13 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
 
     from duplotrain.catalog import default_catalog
     from duplotrain.layout import layout_to_dict
+    from tests.browser.conftest import required_browser
 
     dist = os.environ.get("DUPLOTRAIN_STATIC_DIST")
     if not dist:
-        pytest.skip("set DUPLOTRAIN_STATIC_DIST to a built webapp/dist directory")
+        # A lost variable must not turn the built-app test green on CI.
+        (pytest.fail if required_browser() else pytest.skip)(
+            "set DUPLOTRAIN_STATIC_DIST to a built webapp/dist directory")
     policy = re.search(
         r'Content-Security-Policy "([^"\n]+)"',
         (Path(dist) / ".htaccess").read_text(),
@@ -430,8 +433,8 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         expect(page.locator("#status")).to_contain_text("Connectors closed")
         assert len(export_layout()["placements"]) == 14
 
-        # A longer tail exercises heading-conditioned bounds beyond the six-step
-        # exact table. Preview and apply must preserve the hand-built base in WASM.
+        # A longer tail exercises heading-conditioned bounds beyond the exact
+        # tables' horizon and probe. Preview and apply must preserve the hand-built base in WASM.
         long_gap = build_chain([(catalog["straight"], 0, 1)] * 4
                                + [(catalog["curve"], 0, 1)] * 2)
         page.locator("#importfile").set_input_files({

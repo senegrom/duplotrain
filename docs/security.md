@@ -37,7 +37,7 @@ this HTTP listener, with the same engine rules.
 
 ## Reproducible dependency downloads
 
-All three workflows use read-only repository tokens (only the Pages deploy job
+Both workflows use read-only repository tokens (only the Pages deploy job
 also holds Pages-write and OIDC tokens), disable checkout credential persistence,
 and pin actions to upstream commit SHAs. Version comments allow
 Dependabot to maintain those pins, and it checks Python and GitHub Actions

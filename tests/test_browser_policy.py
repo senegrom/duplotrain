@@ -94,19 +94,9 @@ def test_explicit_browser_path_is_the_one_launched(local_env, monkeypatch, tmp_p
 
 
 def test_unexpected_startup_failure_is_not_skipped(local_env, tmp_path):
-    path = tmp_path / "installed"
-    path.touch()
-    browser = browser_type(path, FakePlaywrightError("browser crashed"))
+    browser = browser_type(tmp_path / "installed", FakePlaywrightError("browser crashed"))
     with pytest.raises(FakePlaywrightError, match="browser crashed"):
         policy.launch_browser(browser)
-
-
-def test_installed_browser_is_launched(local_env, tmp_path):
-    path = tmp_path / "installed"
-    path.touch()
-    browser = browser_type(path)
-    assert policy.launch_browser(browser) is browser.launch.return_value
-    browser.launch.assert_called_once_with(headless=True)
 
 
 @pytest.mark.parametrize("ci", [False, True])

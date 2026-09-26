@@ -124,8 +124,8 @@ only the rotations still tied on their prefix, and a solution's layout is
 assembled directly from the engine's exact frames and the recorded joints
 instead of being replayed through the checked constructors.
 
-The network enumerator prunes with the same tables (`NetworkConfig.lookahead`,
-default 10): every open end of a closed network must reach another open end or
+The network enumerator prunes with the same tables (`NetworkConfig.lookahead`):
+every open end of a closed network must reach another open end or
 a spare port of a junction the walk placed, so once no buffer or other cap is
 left in stock a node is cut when an end is stranded. Each piece type roots the
 enumeration once and a later pass withdraws the types rooted before it, whose

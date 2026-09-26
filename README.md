@@ -355,8 +355,7 @@ straight. It does not enumerate every combination of multiple optional stones.
 Exhaustion refers to that policy, the catalogue, and the sampled collision/congruence
 model — closure itself remains exact. For larger inventories, compose layouts
 constructively and verify their dynamics with `classify`. The end-to-end network and
-loop tests run in every application check, and again weekly in the Extended search
-checks workflow.
+loop tests run in every application check.
 
 The switch dynamics yields a little theorem the machine confirms by exhaustion: a
 dead-end cap **reflects** a train back through the branch it came from, so a trailing
@@ -390,11 +389,12 @@ walk places), and a separate turn bound keeps a crossing from lending a curve's
 turn. The pruning removes only branches without closures: exhaustive and
 result-limited searches return the same solutions as without it, and the
 independent collision audit still checks every returned candidate.
-`SolverConfig.completion_lookahead` (`NetworkConfig.lookahead` for networks;
-default 10, 0 disables) sets the exact horizon, and `stats.pruned_completion` and
-the other `completion_*` counters report the effect.
-[docs/search-correctness.md](docs/search-correctness.md) gives the argument and
-[docs/performance.md](docs/performance.md#measuring) the budgets and benchmark.
+`SolverConfig.completion_lookahead` (`NetworkConfig.lookahead` for networks; 0
+disables) sets the exact horizon, and `stats.pruned_completion` and the other
+`completion_*` counters report the effect.
+[docs/search-correctness.md](docs/search-correctness.md) gives the argument,
+[docs/performance.md](docs/performance.md#reverse-reachability-tables) the horizon
+and budgets, and [its benchmarks](docs/performance.md#measuring) the measurements.
 
 Elevation is modelled (ramps carry `z`; closure requires returning to the anchor's
 height). Blanket collision clearance defaults to 120 mm; underpass-enabled pieces

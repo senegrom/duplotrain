@@ -106,6 +106,19 @@ def test_caches_key_geometry_not_piece_id_or_current_layout():
 
 
 def test_all_shared_caches_are_bounded():
+    import importlib
+    import pkgutil
+
+    import duplotrain
+
+    # Every module-level cache, including ones added later, has a size bound.
+    unbounded = [
+        f"{info.name}.{name}"
+        for info in pkgutil.iter_modules(duplotrain.__path__)
+        for name, value in vars(importlib.import_module(f"duplotrain.{info.name}")).items()
+        if hasattr(value, "cache_parameters") and value.cache_parameters()["maxsize"] is None
+    ]
+    assert not unbounded
     assert _cached_moves.cache_parameters()["maxsize"] == 128
     assert _sample_paths.cache_parameters()["maxsize"] == 128
     assert _port_pose.cache_parameters()["maxsize"] == 4096

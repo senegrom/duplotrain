@@ -17,6 +17,7 @@ import pytest
 from duplotrain.catalog import default_catalog
 from duplotrain.layout import build_chain, layout_to_dict
 from tests.browser import test_editor as editor_tests
+from tests.browser.conftest import required_browser
 from tests.browser.tls import localhost_tls, runner_test_ca
 
 editor = editor_tests.editor
@@ -135,7 +136,9 @@ def exercise_cached_canvas(page):
 def _built_app(browser_type):
     """The built web app and its production CSP, or a skip where it cannot run."""
     if not os.environ.get("DUPLOTRAIN_STATIC_DIST"):
-        pytest.skip("set DUPLOTRAIN_STATIC_DIST to a built webapp/dist directory")
+        # A lost variable must not turn the built-app tests green on CI.
+        (pytest.fail if required_browser() else pytest.skip)(
+            "set DUPLOTRAIN_STATIC_DIST to a built webapp/dist directory")
     if browser_type.name == "webkit" and os.environ.get("DUPLOTRAIN_TEST_SYSTEM_CA") != "1":
         pytest.skip("WebKit offline tests need the opted-in disposable CI runner "
                     "(DUPLOTRAIN_TEST_SYSTEM_CA=1, see tests/browser/tls.py)")
@@ -407,8 +410,9 @@ def test_a_tab_left_open_across_three_updates_restarts_its_engine_offline(browse
             assert new_tab.evaluate("window.duplotrainBuild") == build
             assert old_tab.evaluate("window.duplotrainBuild") == "ab000001"
             assert old_tab.evaluate("S.snapshot") == confirmed
-        # Both tabs answered the last activation's handshake: it deleted the version
-        # the third update superseded and kept the one the old tab runs.
+        # Both tabs answered the last activation's handshake: it kept the version
+        # active before it (ab000003) and the old tab's (ab000001), and deleted
+        # ab000002.
         kept = new_tab.evaluate("caches.keys()")
         assert [any(name.endswith(":" + version) for name in kept) for version in names] == [
             True, False, True, True]

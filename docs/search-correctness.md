@@ -111,7 +111,7 @@ which enlarges the allowed set. The move pool includes routes through preplaced
 pieces, even when none remain in inventory. Stock counts, placement frames and
 collisions are also ignored. Absence from either complete projection proves a
 tail impossible; membership still requires actual coupled 3D geometry, inventory,
-replay and the final actual-link overlap check.
+exact joints and the final actual-link overlap check.
 
 A transit consumes two compatible free ports on one placement and no new piece.
 Each placement contributes at most half the number of free ports that have a
@@ -200,7 +200,8 @@ Slippage changes position, never heading, so it cannot enlarge the turn allowanc
 lookahead disabled on both arithmetic engines, including scarce stock, backtracking,
 free turning transits on rotated and elevated switches, and a custom junction
 traversed twice. Independent witnesses include forced joints and zero new pieces.
-The mixed-inventory benchmarks also pin eight audited results below 25,000 nodes
+The mixed-inventory benchmarks in `tests/test_completion_slippage.py` also pin
+eight audited results below 25,000 nodes
 for exact, 1 mm and 5 mm searches.
 
 ## Stock-aware reach and base routes
@@ -627,9 +628,9 @@ candidate's only joint issues are the base's own.
 A key is injective on planar poses whose coordinates stay below 2^31 lattice
 units, 107 km. A problem whose anchor, start or base junction ports lie beyond
 2^30 lattice units (53 km), or with a move of 2^26 units (3.4 km) or more, runs
-on the field engine instead. The reverse tables then hold poses at most fifteen
-moves from the anchor (twelve layers and a three-move probe), so their keys stay
-in range, and a query for a pose beyond that reach can only miss a prune, never
+on the field engine instead. On the lattice engine the reverse tables hold poses
+at most fifteen moves from the anchor (at most twelve layers, the largest
+`completion_lookahead`, and a three-move probe), so their keys stay in range, and a query for a pose beyond that reach can only miss a prune, never
 make a wrong one. The key ignores the height;
 the height layers are separate. A move's
 packed delta is the difference of the keys of its endpoint and its origin at

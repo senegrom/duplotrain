@@ -1,4 +1,4 @@
-"""Bounded fraction parser regressions for CodeQL alert #52."""
+"""Layout coefficients parse only the bounded fraction grammar."""
 
 from fractions import Fraction
 

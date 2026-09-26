@@ -50,9 +50,8 @@ def synthetic_runtime_build(monkeypatch, tmp_path):
     return source, dist
 
 
-@pytest.mark.parametrize("name", [*build.EDITOR_SCRIPTS, "editor.css", "editor.html"])
 def test_all_frontend_sources_change_the_stamp_and_rebuild_is_deterministic(
-    synthetic_runtime_build, name,
+    synthetic_runtime_build,
 ):
     source, dist = synthetic_runtime_build
     build.main()
@@ -60,12 +59,13 @@ def test_all_frontend_sources_change_the_stamp_and_rebuild_is_deterministic(
     build.main()
     assert before == {p.relative_to(dist): p.read_bytes()
                       for p in dist.rglob("*") if p.is_file()}
-    old = next(dist.glob("duplotrain-src-*.zip")).name
-    asset = source / "src/duplotrain/static" / name
-    asset.write_text(asset.read_text() + "\n")
-    build.main()
-    assert len(list(dist.glob("duplotrain-src-*.zip"))) == 1
-    assert next(dist.glob("duplotrain-src-*.zip")).name != old
+    for name in (*build.EDITOR_SCRIPTS, "editor.css", "editor.html"):
+        old = next(dist.glob("duplotrain-src-*.zip")).name
+        asset = source / "src/duplotrain/static" / name
+        asset.write_text(asset.read_text() + "\n")
+        build.main()
+        assert len(list(dist.glob("duplotrain-src-*.zip"))) == 1, name
+        assert next(dist.glob("duplotrain-src-*.zip")).name != old, name
     assert "__V__" not in (dist / "index.html").read_text()
 
 
