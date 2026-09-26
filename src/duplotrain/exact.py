@@ -14,7 +14,7 @@ values are not rational, but they all live in the number field ``Q(sqrt2, sqrt3)
     a + b*sqrt2 + c*sqrt3 + d*sqrt6        with a, b, c, d rational
 
 That field is closed under the arithmetic we need, and it is big enough for *any* angle
-that is a multiple of 15 degrees -- so 15, 22.5-free but 30, 45, 60, 90 all work.  That
+that is a multiple of 15 degrees (15, 30, 45, 60, 90, ..., though not 22.5).  That
 leaves room for crossings at 45 or 90 degrees and any future piece on a 15-degree grid
 without giving up exactness.
 
@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from fractions import Fraction
+from functools import lru_cache
 from typing import Union
 
 __all__ = ["Alg", "ZERO", "ONE", "SQRT2", "SQRT3", "SQRT6", "alg", "AlgLike"]
@@ -47,6 +48,17 @@ def _exact_fraction(value) -> Fraction:
     if isinstance(value, float):
         return Fraction(str(value))
     return Fraction(value)
+
+
+@lru_cache(maxsize=32)
+def _radical_bounds(bits: int) -> tuple[tuple[Fraction, Fraction], ...]:
+    """Rational lower and upper bounds, 2**-bits apart, on sqrt2, sqrt3 and sqrt6."""
+    scale = 1 << bits
+    return tuple(
+        (Fraction(math.isqrt(n * scale * scale), scale),
+         Fraction(math.isqrt(n * scale * scale) + 1, scale))
+        for n in (2, 3, 6)
+    )
 
 
 @dataclass(frozen=True, slots=True, init=False, eq=False, repr=False)
@@ -219,6 +231,29 @@ class Alg:
 
     def __bool__(self) -> bool:
         return bool(self.a or self.b or self.c or self.d)
+
+    def sign(self) -> int:
+        """-1, 0 or 1, exactly: the comparisons below use floats, this does not.
+
+        Rational bounds on the three radicals are refined until they separate the
+        value from zero, which every nonzero field element eventually allows.
+        """
+        if not self:
+            return 0
+        if self.is_rational():
+            return 1 if self.a > 0 else -1
+        bits = 16
+        while True:
+            low = high = self.a
+            for coefficient, (lo, hi) in zip(self.coeffs()[1:], _radical_bounds(bits),
+                                             strict=True):
+                low += coefficient * (lo if coefficient >= 0 else hi)
+                high += coefficient * (hi if coefficient >= 0 else lo)
+            if low > 0:
+                return 1
+            if high < 0:
+                return -1
+            bits *= 2
 
     def __lt__(self, other: AlgLike) -> bool:
         # Exact sign comparison would need interval refinement; float is fine for

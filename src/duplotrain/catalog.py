@@ -327,8 +327,13 @@ def load_catalog(*paths: str | Path, include_default: bool = True) -> dict[str, 
             entries = data["pieces"]
         else:
             entries = data
+        seen = set()
         for spec in entries:
             if "id" not in spec:
                 raise ValueError(f"piece spec without an id in {path}")
+            # Later files override earlier ones; within one, a repeat is a mistake.
+            if spec["id"] in seen:
+                raise ValueError(f"piece id {spec['id']!r} appears twice in {path}")
+            seen.add(spec["id"])
             specs[spec["id"]] = spec
     return parse_pieces(specs.values())

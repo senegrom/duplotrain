@@ -539,6 +539,7 @@ class _LatticeEngine:
         port_locals: Mapping[tuple[str, int], tuple],
     ) -> None:
         self.anchor = _flat(anchor)
+        self._mate = self.reverse(self.anchor)  # the pose that closes onto the anchor
         self.start_cursor = _flat(start_cursor)
         self.moves = moves
         self._frames0 = frames0  # (pid, entry) -> (rotated deltas x12, dz, turn)
@@ -595,13 +596,7 @@ class _LatticeEngine:
         return cursor == self.anchor
 
     def near_anchor(self, cursor: tuple, budget: float) -> float | None:
-        anchor = self.anchor
-        if cursor[5] != anchor[5] or cursor[4] != anchor[4]:
-            return None
-        gap = self.dist(cursor, anchor)
-        if gap == 0.0 and cursor[:4] != anchor[:4]:
-            gap = math.ulp(0.0)  # apart by less than float resolution, as below
-        return gap if gap <= budget + 1e-12 else None
+        return self.near_pose(cursor, self._mate, budget)
 
     def connects(self, cursor: tuple, pose: tuple) -> bool:
         return (
@@ -1055,8 +1050,7 @@ class _CompletionReachability:
         self._lattice = eng.name == "lattice"
         self.key = _pack_lattice if self._lattice else eng.level
         self.layers = [frozenset((self.key(eng.anchor),))]
-        self.frontier = self.layers[0]
-        self.frontiers = [self.frontier]  # the poses each layer added
+        self.frontiers = [self.layers[0]]  # the poses each layer added
         self.height_layers = [frozenset((eng.height(eng.anchor),))]
         self.height_frontier = self.height_layers[0]
         self.bounds = _CompletionBounds(eng, slippage=slippage)
@@ -1180,26 +1174,25 @@ class _CompletionReachability:
         """Publish planar layers up to *traversals*; False leaves the query permissive."""
         predecessors = self.predecessors
         while len(self.layers) <= traversals:
-            work = len(self.frontier) * len(self.moves)
+            work = len(self.frontiers[-1]) * len(self.moves)
             if work > self.work_left:
                 return False
             self.work_used += work
             previous = self.layers[-1]
             frontier = set()
             if self._lattice:
-                for key in self.frontier:
+                for key in self.frontiers[-1]:
                     for delta in predecessors[key & 15]:
                         predecessor = key + delta
                         if predecessor not in previous:
                             frontier.add(predecessor)
             else:
-                for pose in self.frontier:
+                for pose in self.frontiers[-1]:
                     x, y = pose.x, pose.y
                     for dx, dy, next_heading in predecessors[pose.heading]:
                         predecessor = Pose(x + dx, y + dy, 0, next_heading)
                         if predecessor not in previous:
                             frontier.add(predecessor)
-            self.frontier = frontier
             self.frontiers.append(frontier)
             self.layers.append(previous | frontier)
         return True
@@ -1311,7 +1304,7 @@ class _CompletionReachability:
                        for heading, group in self.near_indices[start].items()}
             start += 1
         for depth in range(start, traversals + 1):
-            for pose in self.frontiers[depth] if depth else self.layers[0]:
+            for pose in self.frontiers[depth]:
                 box = boxes.get(pose)
                 if box is None:
                     low, high = enclose(pose)
@@ -1658,7 +1651,8 @@ class SolverConfig:
     #: Upper bound on pieces placed (loop length / grown completion length).  With a
     #: huge inventory an unbounded depth-first dive is the enemy: a 300 mm gap needs
     #: a dozen pieces, not two hundred.  None = no bound beyond the recursive search's
-    #: own ``_MAX_SEARCH_DEPTH``; either limit reports ``stop_reason="piece_limit"``.
+    #: own ``_MAX_SEARCH_DEPTH``. Either, and a walk cut at ``_MAX_WALK_STEPS``,
+    #: reports ``stop_reason="piece_limit"``.
     max_pieces: int | None = None
     max_results: int = 100
     max_nodes: int = 2_000_000
@@ -2118,17 +2112,17 @@ def solve_steps(
         # All candidate moves at this DFS node share these allowances and targets.
         # Recursive visits build their own context after consuming stock/stubs;
         # backtracking restores this node's state before the next candidate.
-        free_by_placement: dict[int, set[int]] = {}
-        for index, port, _pose in stubs:
-            free_by_placement.setdefault(index, set()).add(port)
+        stubs_of: dict[int, list] = {}  # placement -> its open (port, pose)s
+        for index, port, pose in stubs:
+            stubs_of.setdefault(index, []).append((port, pose))
         slots = min(total_pieces, depth_limit, f_limit) - used
         owned = []  # (placement, piece id, transit count, ports with a partner)
         loose = slots
-        for index, ports in free_by_placement.items():
-            if len(ports) < 2:
+        for index, open_ports in stubs_of.items():
+            if len(open_ports) < 2:
                 continue
             pid = placements[index][0]
-            eligible = eligible_ports(piece_obj[pid], ports)
+            eligible = eligible_ports(piece_obj[pid], {port for port, _pose in open_ports})
             count = len(eligible) // 2
             if count:
                 owned.append((index, pid, count, eligible))
@@ -2151,17 +2145,13 @@ def solve_steps(
         # reach one of that junction's spare entries first. Ask with the loosest
         # traversal count; a candidate one move on can reach no more than this.
         reverse, retarget, allows = eng.reverse, eng.retarget, completion.allows
-        entries = [(index, port, reverse(pose)) for index, port, pose in stubs]
-        entries_of: dict[int, list] = {}
-        for index, port, entry in entries:
-            entries_of.setdefault(index, []).append((port, entry))
         transits = transit_turns = 0
         for index, pid, count, eligible in owned:
-            if any(allows(retarget(cursor, entry), loose, slack)
-                   for port, entry in entries_of[index] if port in eligible):
+            if any(allows(retarget(cursor, reverse(pose)), loose, slack)
+                   for port, pose in stubs_of[index] if port in eligible):
                 transits += count
                 transit_turns += count * turn_of[pid]
-        targets = (tuple(entry for _index, _port, entry in entries)
+        targets = (tuple(reverse(pose) for _index, _port, pose in stubs)
                    if cfg.reversing_loops else ())
         return (transits, transit_turns, targets, future_targets, max_turn, future_items)
 
@@ -2545,7 +2535,6 @@ def solve_steps(
                 for port in range(len(piece.ports))
                 if port not in (entry, exit_port) and port not in piece.sealed
             )
-            slack_left = cfg.slop - slack_used
             if placements and not (
                 overhang_of[pid] > 0 and overhang_of[placements[anchor_index][0]] > 0
             ):
@@ -2593,8 +2582,8 @@ def solve_steps(
                 return False
         return True
 
-    # One Python frame per placement or transit: stay well inside the default
-    # recursion limit, and report the cut like any other piece limit.
+    # Placements stop at _MAX_SEARCH_DEPTH and a walk's frames at _MAX_WALK_STEPS
+    # (see dfs), inside the default recursion limit; either cut is a piece limit.
     depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH)
     walk_cut = False
     if cfg.max_pieces is not None:
@@ -2633,9 +2622,9 @@ def solve_steps(
                     break
                 f_limit += 1
             while walk_cut and limits is not None:
-                # No bound a caller can raise lifts the walk's cap: never finish
-                # as if the search had been exhausted.
-                yield {"kind": "piece_limit", "nodes": stats.nodes, "depth": depth_limit}
+                # No bound a caller can raise lifts the walk's cap: report it on every
+                # resume, never finishing as if the search had been exhausted.
+                yield {"kind": "walk_limit", "nodes": stats.nodes, "depth": depth_limit}
     finally:
         # The recursive function owns a cell pointing to itself. Break that
         # cycle once the stack has unwound, so collision fields, geometry and

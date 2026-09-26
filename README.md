@@ -91,12 +91,13 @@ Lengths may be plain numbers, exact fractions (`"384/5"`), field elements
 (`{"alg": [a, b, c, d]}` = `a + b√2 + c√3 + d√6`), or arc chords
 (`{"chord": {"radius": 256, "degrees": 30}}`). A catalogue is read as untrusted
 input, its fields checked rather than coerced: a number written as text takes at
-most 64 characters and a decimal exponent of at most 64, and every numerator and
-denominator at most 512 bits. A piece has at most 16 paths of at most 64
-segments, each path starting at most 10,000 mm from the piece's origin; a
-segment is at most 10,000 mm long, with a positive run or radius and a nonzero
-arc angle; and a piece is 8 to 1,000 mm wide, with an end overhang of at most
-1,000 mm.
+most 64 characters and a decimal exponent of at most 64, every numerator and
+denominator at most 512 bits, and an `alg` coefficient at most 1,000,000 in size.
+A piece has at most 16 paths of at most 64 segments, each path at most 10,000 mm
+long and starting within 10,000 mm of the piece's origin along each axis; every
+segment has a positive run or radius, an arc turns less than a full circle, no
+two connectors of a piece share a point, and a piece is 8 to 1,000 mm wide, with
+an end overhang of at most 1,000 mm.
 
 ## Install & use
 
@@ -405,7 +406,7 @@ cyclotomic ring (1/20)·ℤ[e^{iπ/6}], where rotation is an *integer* 4×4 map.
 compiles the problem for this integer lattice engine automatically (several times
 faster than the field; it's what makes the browser build usable) and falls back
 to the general ℚ(√2,√3) field for anything off-grid — a user piece on the 45° lattice,
-say. Conformance tests run every solver mode on both engines and require identical
+say — or too far away for the lattice's packed keys. Conformance tests run every solver mode on both engines and require identical
 solutions.
 
 **Current limits worth knowing:**

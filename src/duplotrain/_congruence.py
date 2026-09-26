@@ -14,7 +14,7 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass
 from fractions import Fraction
-from functools import cmp_to_key, lru_cache
+from functools import cmp_to_key
 from math import gcd, lcm
 from typing import TYPE_CHECKING
 
@@ -28,39 +28,11 @@ if TYPE_CHECKING:
 _Point = tuple[Alg, Alg, Alg]
 
 
-@lru_cache(maxsize=32)
-def _radical_bounds(bits: int) -> tuple[tuple[Fraction, Fraction], ...]:
-    scale = 1 << bits
-    return tuple(
-        (Fraction(math.isqrt(n * scale * scale), scale),
-         Fraction(math.isqrt(n * scale * scale) + 1, scale))
-        for n in (2, 3, 6)
-    )
-
-
 def _compare(a: Alg, b: Alg) -> int:
-    """Exact interval ordering; Alg.__lt__ deliberately uses floats elsewhere.
-
-    Refining rational bounds on the three radicals eventually separates every
-    nonzero field element from zero. A rounded comparison must not bridge gaps
-    between collinear runs or erase an extremely short segment.
-    """
-    diff = a - b
-    if not diff:
-        return 0
-    if diff.is_rational():
-        return 1 if diff.a > 0 else -1
-    bits = 16
-    while True:
-        low = high = diff.a
-        for coefficient, (lo, hi) in zip(diff.coeffs()[1:], _radical_bounds(bits), strict=True):
-            low += coefficient * (lo if coefficient >= 0 else hi)
-            high += coefficient * (hi if coefficient >= 0 else lo)
-        if low > 0:
-            return 1
-        if high < 0:
-            return -1
-        bits *= 2
+    """Exact ordering (Alg.__lt__ deliberately uses floats elsewhere): a rounded
+    comparison must not bridge gaps between collinear runs or erase an extremely
+    short segment."""
+    return (a - b).sign()
 
 
 def _xyz(pose: Pose) -> _Point:

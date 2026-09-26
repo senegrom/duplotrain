@@ -49,8 +49,9 @@ workspace is released at once rather than at the next cyclic collection.
 When the ends and every piece fit the 30-degree lattice, as standard track
 always does, poses are integer 6-tuples and every move, frame and port delta is
 precomputed for all twelve headings, so the hot path is tuple additions and
-compares; custom 15-degree geometry falls back to the exact field engine with
-the same search. Reverse tables pack a planar lattice pose into one int, four
+compares; custom 15-degree geometry, and a problem too large for the packed
+keys ([search-correctness.md](search-correctness.md#packed-lattice-keys)), fall
+back to the exact field engine with the same search. Reverse tables pack a planar lattice pose into one int, four
 32-bit coordinate fields above the heading, so a layer grows by one int
 addition per pose and move and every membership query hashes a small int.
 

@@ -51,8 +51,12 @@ __all__ = [
 #: Catalogue numbers: an integer ratio, or a decimal whose exponent stays small.
 _INTEGER = re.compile(r"[+-]?\d+")
 _DECIMAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE]([+-]?\d+))?")
-#: Longest single segment a catalogue piece may have, mm: sampling cost grows with it.
-MAX_SEGMENT_LENGTH = 10_000.0
+#: Longest path of a catalogue piece, and the farthest a path may start from the
+#: piece's origin along each axis, mm: sampling cost grows with a piece's track.
+MAX_PATH_LENGTH = 10_000.0
+#: Largest coefficient of an {"alg": ...} length. The float images that bound a
+#: path's length and start then stay within a nanometre; signs are decided exactly.
+MAX_ALG_COEFFICIENT = 1_000_000
 #: A JSON integer escapes the text limits above: bound every numerator and
 #: denominator, which still admits each 64-character decimal they accept.
 MAX_CATALOGUE_NUMBER_BITS = 512
@@ -117,6 +121,9 @@ def parse_length(value: Any) -> Alg:
             if not isinstance(value["alg"], (list, tuple)) or len(value["alg"]) != 4:
                 raise ValueError(f"an alg length takes a list of four numbers, not {value!r}")
             a, b, c, d = (_number(x) for x in value["alg"])
+            if any(abs(x) > MAX_ALG_COEFFICIENT for x in (a, b, c, d)):
+                raise ValueError("an alg length's coefficients may be at most "
+                                 f"{MAX_ALG_COEFFICIENT:,} in size")
             return Alg(a, b, c, d)
         if "chord" in value:
             spec = value["chord"]
@@ -161,8 +168,6 @@ class Straight(Segment):
     """A straight run of the given length."""
 
     run: Alg
-
-    turn_steps = 0
 
     def delta(self) -> tuple[Alg, Alg, Alg]:
         return (self.run, alg(0), alg(0))
@@ -241,8 +246,6 @@ class Ramp(Segment):
 
     run: Alg
     rise: Alg
-
-    turn_steps = 0
 
     def delta(self) -> tuple[Alg, Alg, Alg]:
         return (self.run, alg(0), self.rise)
@@ -436,15 +439,14 @@ def _parse_segment(spec: dict[str, Any]) -> Segment:
         segment = Ramp(run=parse_length(spec["run"]), rise=parse_length(spec["rise"]))
     else:
         raise ValueError(f"unknown segment type {kind!r}")
-    # Zero or negative lengths turn a piece's connectors into itself: a folded
-    # piece would pass as a loop.
+    # Zero or negative lengths fold a piece onto itself, so it would pass as a
+    # loop; signs are exact, since cancelling coefficients can fool a float.
     if isinstance(segment, Arc):
-        if not (segment.radius > 0 and segment.degrees):
-            raise ValueError("an arc needs a positive radius and a nonzero angle")
-    elif not segment.run > 0:
+        if segment.radius.sign() <= 0 or not 0 < abs(segment.degrees) < 360:
+            raise ValueError("an arc needs a positive radius and a nonzero angle below "
+                             "a full turn")
+    elif segment.run.sign() <= 0:
         raise ValueError(f"a {kind} segment needs a positive run")
-    if not segment.length() <= MAX_SEGMENT_LENGTH:
-        raise ValueError(f"a {kind} segment may be at most {MAX_SEGMENT_LENGTH:g} mm long")
     return segment
 
 
@@ -461,14 +463,16 @@ def _parse_path(spec: dict[str, Any]) -> Path:
         degrees_to_steps(_number(start_spec.get("heading_deg", 0))),
     )
     # Far from the piece's origin, float samples of its track lose their precision.
-    if not all(abs(float(v)) <= MAX_SEGMENT_LENGTH for v in (start.x, start.y, start.z)):
-        raise ValueError(f"a path may start at most {MAX_SEGMENT_LENGTH:g} mm from the "
-                         "piece's origin")
+    if not all(abs(float(v)) <= MAX_PATH_LENGTH for v in (start.x, start.y, start.z)):
+        raise ValueError(f"a path may start at most {MAX_PATH_LENGTH:g} mm from the "
+                         "piece's origin along each axis")
     if len(spec["segments"]) > MAX_SEGMENTS:
         raise ValueError(f"a path may have at most {MAX_SEGMENTS} segments")
     segments = tuple(_parse_segment(s) for s in spec["segments"])
     if not segments:
         raise ValueError("a path needs at least one segment")
+    if not sum(segment.length() for segment in segments) <= MAX_PATH_LENGTH:
+        raise ValueError(f"a path may be at most {MAX_PATH_LENGTH:g} mm long")
     return Path(start=start, segments=segments)
 
 
@@ -550,6 +554,11 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
             f"piece {piece_id!r} collapsed to {len(ports)} port(s); its paths must have "
             "distinct endpoints"
         )
+    # Two connectors at one point mate each other: a piece joined to itself (a
+    # full-turn path, say) would pass as a loop of one.
+    spots = {(port.pose.x, port.pose.y, port.pose.z) for port in ports}
+    if len(spots) < len(ports):
+        raise ValueError(f"piece {piece_id!r} has two connectors at one point")
     sealed = frozenset(sealed)
     bad_sealed = sorted(i for i in sealed if not 0 <= i < len(ports))
     if bad_sealed:

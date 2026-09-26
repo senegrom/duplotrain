@@ -96,8 +96,8 @@ zero-new-piece depth contour even with an empty inventory, but never emits an
 empty fresh loop. Minimum/use-all constraints and node/result caps still apply.
 The editor also permits these no-new-inventory completions. A walk nests one
 generator frame per placement or transit; it stops at 800 of them, within
-Python's recursion limit, and the search then reports a piece limit rather than
-an exhausted search.
+Python's recursion limit, and the search then reports a piece limit (a stepwise
+search a `walk_limit` on every resume) rather than an exhausted search.
 
 ## Exact reverse reachability is an overapproximation
 

@@ -24,6 +24,13 @@ def arc(degrees):
     return {"type": "arc", "radius": 128, "degrees": degrees}
 
 
+def built(segments, like=None):
+    """One piece from segment objects a catalogue may refuse, on *like*'s ports."""
+    piece = parse_piece({"id": "custom", "width": 64, "paths": [{"segments": [like or line(64)]}]})
+    path = replace(piece.paths[0], segments=tuple(segments))
+    return build_chain([(replace(piece, paths=(path,)), 0, 1)])
+
+
 def transform(layout, heading, mirror, dx=431):
     placements = []
     for placement in layout:
@@ -165,22 +172,19 @@ def test_a_gap_or_change_in_grade_is_not_merged():
 
 @pytest.mark.parametrize("turn", [-360, 360, 720])
 def test_full_circles_share_one_sector_union(turn):
-    full = track([arc(turn)])
-    split = track([arc(15 if turn > 0 else -15)] * (abs(turn) // 15))
-    assert congruence_key(full) == congruence_key(split) == congruence_key(track([arc(360)]))
+    # A catalogue refuses a piece that turns full circle; one built directly may.
+    full = built([Arc(Alg(128), turn)])
+    split = built([Arc(Alg(128), 15 if turn > 0 else -15)] * (abs(turn) // 15))
+    assert congruence_key(full) == congruence_key(split) == (
+        congruence_key(built([Arc(Alg(128), 360)])))
 
 
 def test_degenerate_segments_do_not_reweight_a_line_or_arc():
     # A catalogue refuses them; a piece built from segment objects may hold them.
-    def rebuilt(segments, whole):
-        piece = parse_piece({"id": "custom", "width": 64, "paths": [{"segments": [whole]}]})
-        path = replace(piece.paths[0], segments=segments)
-        return build_chain([(replace(piece, paths=(path,)), 0, 1)])
-
     lines = (Straight(Alg(64)), Straight(Alg(0)), Straight(Alg(192)))
-    assert congruence_key(rebuilt(lines, line(256))) == congruence_key(track([line(256)]))
+    assert congruence_key(built(lines, line(256))) == congruence_key(track([line(256)]))
     arcs = (Arc(Alg(128), 30), Arc(Alg(128), 0), Arc(Alg(128), 60))
-    assert congruence_key(rebuilt(arcs, arc(90))) == congruence_key(track([arc(90)]))
+    assert congruence_key(built(arcs, arc(90))) == congruence_key(track([arc(90)]))
 
 
 def test_unknown_segment_subclasses_keep_their_own_shape():

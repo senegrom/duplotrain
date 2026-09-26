@@ -1,5 +1,6 @@
 """Piece parsing and the derived ports, routes and deltas."""
 
+import json
 from fractions import Fraction
 
 import pytest
@@ -208,6 +209,19 @@ def test_unknown_segment_type_rejected():
     ({"paths": [{"segments": [{"type": "arc", "radius": -256, "degrees": 30}]}]},
      "positive radius"),
     ({"paths": [{"segments": [{"type": "arc", "radius": 256, "degrees": 0}]}]}, "nonzero angle"),
+    # A full turn or more: one piece would coil over itself or join its own ends.
+    ({"paths": [{"segments": [{"type": "arc", "radius": 256, "degrees": 360}]}]},
+     "below a full turn"),
+    ({"paths": [{"segments": [{"type": "arc", "radius": 256, "degrees": -390}]}]},
+     "below a full turn"),
+    ({"paths": [{"segments": [{"type": "arc", "radius": 128, "degrees": 15}] * 24}]},
+     "two connectors at one point"),
+    ({"paths": [{"segments": [{"type": "straight", "run": 6000}] * 2}]}, "at most 10000 mm long"),
+    # Exact signs: cancelling coefficients just below zero are still a negative run.
+    ({"paths": [{"segments": [{"type": "straight", "run": {"alg": [-665857, 470832, 0, 0]}}]}]},
+     "positive run"),
+    ({"paths": [{"segments": [{"type": "straight", "run": {"alg": [0, 0, 1_000_001, 0]}}]}]},
+     "at most 1,000,000 in size"),
     ({"paths": [{"segments": [{"type": "straight", "run": 8}]}] * 17}, "at most 16 paths"),
     ({"paths": [{"segments": [{"type": "straight", "run": 8}] * 65}]}, "at most 64 segments"),
     ({"paths": [{"start": {"x": 10_001}, "segments": [{"type": "straight", "run": 64}]}]},
@@ -246,3 +260,13 @@ def test_a_piece_needs_a_text_id(piece_id):
         spec["id"] = piece_id
     with pytest.raises(ValueError, match="needs an id"):
         parse_piece(spec)
+
+
+def test_a_catalogue_file_names_each_piece_once(tmp_path):
+    from duplotrain.catalog import load_catalog
+
+    straight = {"paths": [{"segments": [{"type": "straight", "run": 64}]}]}
+    path = tmp_path / "twice.json"
+    path.write_text(json.dumps([{"id": "mine", **straight}, {"id": "mine", **straight}]))
+    with pytest.raises(ValueError, match="appears twice"):
+        load_catalog(path)

@@ -13,9 +13,9 @@ from duplotrain.exact import Alg
 from duplotrain.geometry import ORIGIN, Pose
 from duplotrain.gui import Session
 from duplotrain.layout import Layout, Placement, build_chain, layout_from_dict, layout_to_dict
-from duplotrain.pieces import Straight, parse_piece
+from duplotrain.pieces import Arc, Straight, parse_piece
 from duplotrain.validation import check_layout_json
-from tests.test_congruence import track, transform
+from tests.test_congruence import built, track, transform
 
 
 @pytest.fixture(scope="module")
@@ -392,7 +392,7 @@ def test_length_unions_partial_overlaps_but_not_gaps_or_parallel_layers():
 
 @pytest.mark.parametrize("turn", [-720, -360, 360, 720])
 def test_multi_turn_arc_length_counts_its_curve_once(turn):
-    layout = track([{"type": "arc", "radius": 128, "degrees": turn}])
+    layout = built([Arc(Alg(128), turn)])  # beyond what a catalogue accepts
     assert layout.track_length() == pytest.approx(256 * math.pi)
 
 

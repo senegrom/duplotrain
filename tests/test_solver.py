@@ -145,19 +145,7 @@ def test_slop_reports_engineered_gap(catalog):
     sum has magnitude >= 2 mm), so with slop every solution must be a forced fit
     reporting exactly that 2 mm gap -- never relabelled exact.
     """
-    from duplotrain.catalog import DEFAULT_CATALOG_SPECS
-    from duplotrain.pieces import parse_pieces
-
-    specs = list(DEFAULT_CATALOG_SPECS) + [
-        {
-            "id": "stretched",
-            "name": "Stretched straight (test)",
-            "category": "track",
-            "width": 64,
-            "paths": [{"segments": [{"type": "straight", "run": 130}]}],
-        }
-    ]
-    pieces = parse_pieces(specs)
+    pieces = stretched_catalog()
     inventory = {"curve": 12, "straight": 1, "stretched": 1}
 
     exact_only = solve(inventory, pieces, SolverConfig(use_all_pieces=True))
@@ -657,4 +645,4 @@ def test_a_walk_stops_at_its_step_cap_and_says_so(monkeypatch, catalog):
                                       close_onto=(30, 0), limits=solver_module.SearchLimits())
     events = [next(steps)["kind"] for _ in range(3)]
     steps.close()
-    assert events[-2:] == ["piece_limit", "piece_limit"]
+    assert events[-2:] == ["walk_limit", "walk_limit"]

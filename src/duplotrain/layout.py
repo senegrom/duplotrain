@@ -20,9 +20,10 @@ from functools import lru_cache
 from types import MappingProxyType
 from typing import Any, Literal
 
+from ._congruence import curve_length
 from .catalog import ACCESSORIES, STONE_MOUNTS
 from .exact import Alg
-from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose, cos_sin
+from .geometry import DEGREES_PER_STEP, HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .pieces import Path as TrackPath
 from .pieces import PieceType, _sample_paths
 from .validation import check_layout_json, rational_coefficient
@@ -385,8 +386,6 @@ class Layout:
         Count every junction route, but count shared line/arc sections only once.
         Unknown Segment subclasses contribute their declared length.
         """
-        from ._congruence import curve_length
-
         return curve_length(self)
 
     # -- construction ----------------------------------------------------------
@@ -725,8 +724,6 @@ def build_chain(
     Handy in tests and at the REPL: ``build_chain([(curve, 0, 1)] * 12)`` lays twelve
     curves nose to tail.
     """
-    from .geometry import ORIGIN
-
     layout = Layout()
     cursor: End | None = None
     for piece, entry, exit_port in pieces:
