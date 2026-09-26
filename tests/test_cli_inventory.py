@@ -13,7 +13,7 @@ from duplotrain.solver import SolveResult, SolveStats
 
 @pytest.mark.parametrize("count", [
     -1, -0.1, 0.5, 12.0, 12.75, True, False, None, "12", {}, [],
-    float("nan"), float("inf"),
+    float("nan"), float("inf"), 10_001, 10**320,
 ])
 def test_invalid_json_counts_are_rejected_before_merging(tmp_path, monkeypatch, count):
     def search(*args, **kwargs):

@@ -35,7 +35,7 @@ from .layout import End, Layout
 
 __all__ = [
     "ClassificationLimitError", "DriveLimitError", "DriveReport", "DriveTerminal", "drive",
-    "classify", "drivable_universe",
+    "LoopClassification", "classify", "drivable_universe",
 ]
 
 #: Stones that affect motion.
@@ -281,7 +281,8 @@ class LoopClassification:
     Each level implies the ones above it.  ``counterexample`` is the first (start,
     tongue setting, outcome) that breaks the weakest failed universal property -- the
     first "no" down the ladder, so a layout that is not looping gets a run that
-    actually ends. It is None exactly when the layout is perfectly looping.
+    actually ends. It is None when the layout is perfectly looping, and when it has
+    no drivable track to place a train on (no runs at all).
     """
 
     locally_looping: bool
@@ -375,14 +376,15 @@ def classify(
     :class:`ClassificationLimitError` before simulation, never return a partial
     verdict. Pass a larger budget (or ``None`` for unbounded enumeration) explicitly.
     A single run longer than :func:`drive`'s step budget raises
-    :class:`DriveLimitError`, again instead of a verdict. A layout with no drivable
-    track (none at all, or only buffers) has no train to place: ValueError.
+    :class:`DriveLimitError`, again instead of a verdict. An empty layout raises
+    ValueError; one of buffers alone (a closed network can be two buffers face to
+    face) has nowhere to place a train, so it makes no runs and no claim.
     """
+    if not layout.placements:
+        raise ValueError("nothing to classify")
     if max_runs is not None and (type(max_runs) is not int or max_runs < 1):
         raise ValueError("max_runs must be a positive integer or None")
     starts = _all_starts(layout)
-    if not starts:
-        raise ValueError("nothing to classify: no drivable track")
     required_runs = len(starts) * math.prod(
         len(options) for _, options in _tongue_choices(layout)
     )

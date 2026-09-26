@@ -105,7 +105,22 @@ def test_check_reports_open_ends_behind_many_buffer_faces(runner, tmp_path):
 
 @pytest.mark.parametrize("option, value", [
     ("--min-pieces", "-1"), ("--max-results", "0"), ("--max-nodes", "0"), ("--slop", "-1"),
+    ("--slop", "inf"), ("--slop", "nan"), ("--curve", "10001"),
 ])
 def test_solve_rejects_out_of_range_options_like_the_other_commands(runner, option, value):
     result = runner.invoke(main, ["solve", "--curve", "12", option, value])
     assert result.exit_code == 2 and option in result.output
+
+
+def test_an_output_directory_that_cannot_be_written_is_refused_before_the_search(
+        runner, monkeypatch, tmp_path):
+    from duplotrain import cli
+
+    def denied(**kwargs):
+        raise PermissionError("Access is denied")
+
+    denying = type("Denied", (), {"TemporaryFile": staticmethod(denied)})
+    monkeypatch.setattr(cli, "tempfile", denying)
+    monkeypatch.setattr(cli, "solve", lambda *args: pytest.fail("searched first"))
+    result = runner.invoke(main, ["solve", "--curve", "12", "-o", str(tmp_path / "out")])
+    assert result.exit_code == 1 and "cannot write to" in result.output

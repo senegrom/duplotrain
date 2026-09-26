@@ -16,6 +16,7 @@ import math
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
+from .catalog import ACCESSORIES
 from .layout import Layout
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -146,9 +147,8 @@ def render_layout(
                 step = 3
                 for s in range(0, len(line) - 1, step):
                     chunk = line[s : s + step + 1]
-                    chunk_z = sum(p[2] for p in line3d[s : s + step + 1]) / len(
-                        line3d[s : s + step + 1]
-                    )
+                    heights = [p[2] for p in line3d[s : s + step + 1]]
+                    chunk_z = sum(heights) / len(heights)
                     poly = _band(chunk, half_width)
                     ax.fill(
                         [p[0] for p in poly],
@@ -218,8 +218,6 @@ def render_layout(
 
     # Action stones clipped onto pieces (mid-piece, or pulled toward a port face).
     if layout.accessories:
-        from .catalog import ACCESSORIES
-
         for k, entry in enumerate(layout.accessories):
             index, stone_id = entry[0], entry[1]
             at_port = entry[2] if len(entry) > 2 else None

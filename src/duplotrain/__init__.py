@@ -10,11 +10,10 @@ Quick taste::
     render_layout(best.layout, "oval.png")
 """
 
-from typing import TYPE_CHECKING
-
 from .catalog import ACCESSORIES, default_catalog, load_catalog
 from .drive import (
     ClassificationLimitError,
+    DriveLimitError,
     DriveReport,
     LoopClassification,
     classify,
@@ -35,6 +34,7 @@ from .geometry import ORIGIN, Pose
 from .layout import Layout, Placement, build_chain, layout_from_dict, layout_to_dict
 from .networks import NetworkConfig, enumerate_networks
 from .pieces import PieceType, parse_piece, parse_pieces
+from .render import render_layout
 from .scoring import ScoreWeights, score_solution
 from .sets import SETS, inventory_for_sets
 from .solver import Solution, SolverConfig, SolveResult, solve
@@ -69,6 +69,7 @@ __all__ = [
     "DriveReport",
     "LoopClassification",
     "ClassificationLimitError",
+    "DriveLimitError",
     "congruence_key",
     "find_perfect_loops",
     "find_perfect_networks",
@@ -83,13 +84,3 @@ __all__ = [
     "__version__",
 ]
 
-
-if TYPE_CHECKING:  # give type checkers and IDEs the real signature
-    from .render import render_layout
-else:
-
-    def render_layout(*args, **kwargs):
-        """Lazy proxy for :func:`duplotrain.render.render_layout` (needs matplotlib)."""
-        from .render import render_layout as _render
-
-        return _render(*args, **kwargs)

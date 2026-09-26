@@ -501,3 +501,28 @@ else:
                              capture_output=True, timeout=15, check=False)
     assert process.returncode == 0, process.stderr
     assert process.stdout.strip() == "first simulation started"
+
+
+def test_a_layout_of_buffers_alone_gets_a_verdict_of_no_runs():
+    # enumerate_networks returns two buffers face to face as a closed network.
+    catalog = default_catalog()
+    pair = build_chain([(catalog["buffer"], 0, 1)]).attach(
+        catalog["buffer"], 0, (0, 0))[0]
+    verdict = classify(pair)
+    assert verdict.runs == 0 and not verdict.locally_looping
+    assert verdict.counterexample is None
+
+
+def test_teardrops_found_by_a_completion_are_told_apart_like_fresh_ones():
+    # A completion places its pieces after its base: step k is placement len(base) + k.
+    from duplotrain.explore import is_stem_tailed
+
+    catalog = default_catalog()
+    base = build_chain([(catalog["straight"], 0, 1)] * 2)
+    found = solve({"switch": 1, "curve": 12, "straight": 2}, catalog,
+                  SolverConfig(reversing_loops=True, min_pieces=1, max_results=200), base=base)
+    teardrops = [s for s in found.solutions if s.kind == "reversing"]
+    stem_tailed = [s for s in teardrops if is_stem_tailed(s, catalog)]  # none raises
+    assert stem_tailed and len(stem_tailed) < len(teardrops)
+    dogbone = make_dogbone(stem_tailed[0], catalog)
+    assert dogbone.is_closed and classify(dogbone).perfectly_looping

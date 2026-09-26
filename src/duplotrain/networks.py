@@ -190,9 +190,7 @@ def enumerate_networks(
             )
         closing_queries[pid] = tuple(queries)
 
-    # Types withdrawn from the current root pass (see the root loop below),
-    # and the pieces the pass can still place.
-    withdrawn: dict[str, int] = {}
+    # The pieces the current root pass can still place (see the root loop below).
     pass_total = [total]
 
     def closable(used: int) -> bool:
@@ -357,8 +355,6 @@ def enumerate_networks(
     # use the whole inventory.
     try:
         for pid in piece_ids:
-            if withdrawn and cfg.use_all_pieces:
-                break
             piece = pieces[pid]
             entry = orientations[pid][0]
             frame = eng.frame(pid, entry, eng.start_cursor)
@@ -380,11 +376,10 @@ def enumerate_networks(
             counts[pid] += 1
             field.pop()
             placements.pop()
-            if not keep:
+            if not keep or cfg.use_all_pieces:
                 break
-            withdrawn[pid] = counts[pid]
+            pass_total[0] -= counts[pid]
             counts[pid] = 0
-            pass_total[0] = total - sum(withdrawn.values())
     finally:
         # The recursive function owns a cell pointing to itself. Break that
         # cycle, so the collision field and the reachability tables do not

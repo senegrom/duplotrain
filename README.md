@@ -247,7 +247,8 @@ and initial tongue setting, where a layout sits on the ladder:
 | **completely looping** | …and every run covers the whole track |
 | **perfectly looping** | …sweeping every tile in both directions, infinitely often |
 
-(`duplotrain classify layout.json` prints the verdict and a counterexample start;
+(`duplotrain classify layout.json` prints the verdict and, unless the layout is
+perfectly looping, a counterexample start;
 it refuses a layout without drivable track, and one whose joints do not fit exactly,
 which `duplotrain check` lists.)
 

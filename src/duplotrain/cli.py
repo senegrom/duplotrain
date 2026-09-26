@@ -13,19 +13,22 @@ import importlib
 import json
 import math
 import re
+import tempfile
 from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
+from . import __version__
 from .catalog import default_catalog, load_catalog
 from .drive import DEFAULT_MAX_RUNS, ClassificationLimitError, DriveLimitError, classify
 from .layout import layout_from_dict, layout_to_dict
 from .scoring import score_solution
 from .sets import SETS, inventory_for_sets
 from .solver import SolverConfig, solve
-from .validation import MAX_JSON_BYTES, check_inventory
+from .validation import MAX_INVENTORY_COUNT, MAX_JSON_BYTES, check_inventory
 
 console = Console()
 
@@ -36,6 +39,8 @@ _BAD_FILE = (ValueError, TypeError, KeyError, OSError, RecursionError)
 
 #: The files ``solve -o`` writes, one pair per saved loop.
 _SAVED_NAME = re.compile(r"loop_\d{2,}\.(?:json|png)")
+#: The smallest loop ``solve`` looks for unless told otherwise.
+_MIN_PIECES = 4
 
 
 def _catalog(paths: tuple[str, ...]):
@@ -57,6 +62,13 @@ def _write_image(render_layout, layout: object, target: str, **options: object) 
         raise click.ClickException(f"cannot write {target}: {exc}") from exc
 
 
+def _finite(_ctx: click.Context, _param: click.Parameter, value: float) -> float:
+    """A --slop budget: FloatRange admits inf and nan, a gap budget must be finite."""
+    if not math.isfinite(value):
+        raise click.BadParameter("must be finite")
+    return value
+
+
 _catalog_option = click.option(
     "--catalog",
     "catalog_paths",
@@ -67,7 +79,7 @@ _catalog_option = click.option(
 
 
 @click.group()
-@click.version_option(package_name="duplotrain")
+@click.version_option(version=__version__, prog_name="duplotrain")
 def main() -> None:
     """Model DUPLO train track and find layouts that loop nicely."""
 
@@ -100,8 +112,10 @@ def pieces(catalog_paths: tuple[str, ...], as_json: bool) -> None:
     table.add_column("parts")
     table.add_column("notes", max_width=60)
     for p in catalog.values():
-        name = p.name + (" [dim](provisional)[/dim]" if p.provisional else "")
-        table.add_row(p.id, name, str(len(p.ports)), ", ".join(p.part_numbers), p.notes)
+        # Catalogue text is printed as it is, never read as markup.
+        name = escape(p.name) + (" [dim](provisional)[/dim]" if p.provisional else "")
+        table.add_row(escape(p.id), name, str(len(p.ports)), escape(", ".join(p.part_numbers)),
+                      escape(p.notes))
     console.print(table)
 
 
@@ -110,7 +124,7 @@ def _inventory_options(fn):
         fn = click.option(
             f"--{pid.replace('_', '-')}",
             pid,
-            type=click.IntRange(min=0),
+            type=click.IntRange(0, MAX_INVENTORY_COUNT),
             default=0,
             help=f"Non-negative whole number of '{pid}' pieces you own.",
         )(fn)
@@ -161,9 +175,11 @@ def sets_cmd() -> None:
     type=click.FloatRange(min=0),
     default=0.0,
     show_default=True,
+    callback=_finite,
     help="Total closing gap (mm) the joints may absorb; 0 = exact loops only.",
 )
-@click.option("--min-pieces", type=click.IntRange(min=0), default=4, show_default=True)
+@click.option("--min-pieces", type=click.IntRange(min=0), default=_MIN_PIECES,
+              show_default=True)
 @click.option("--max-results", type=click.IntRange(min=1), default=25, show_default=True)
 @click.option("--max-nodes", type=click.IntRange(min=1), default=2_000_000, show_default=True)
 @click.option("--use-all", is_flag=True, help="Only layouts using every owned piece.")
@@ -217,8 +233,8 @@ def solve_cmd(
     if inventory_path:
         try:
             raw_counts = json.loads(Path(inventory_path).read_bytes())
-            # Validate the original values, before merging can mask a negative
-            # count or int() can truncate a fraction/accept a boolean.
+            # Validate the file's own values: once merged with the flags', a
+            # negative count could hide in the sum.
             check_inventory(raw_counts, catalog)
             for k, v in raw_counts.items():
                 inventory[k] = inventory.get(k, 0) + v
@@ -276,11 +292,24 @@ def solve_cmd(
         if not stats.complete:
             console.print("No loop found within the search limits; a closure may still exist.")
             return
-        console.print(
-            "No closed loop fits. Try adding curves (12 make a circle), or allow "
-            "forced fits with [bold]--slop 5[/bold]."
-        )
+        # Suggest only what this run did not try already.
+        tips = ["without [bold]--use-all[/bold]"] if use_all else []
+        if min_pieces > _MIN_PIECES:
+            tips.append("a lower [bold]--min-pieces[/bold]")
+        tips.append("more curves (12 make a circle)")
+        if not slop:
+            tips.append("forced fits with [bold]--slop 5[/bold]")
+        console.print("No closed loop fits. Try " + ", or ".join(tips) + ".")
         return
+
+    # One closure label and size per loop, for the table and the pictures alike.
+    rows = []
+    for score, sol in scored:
+        closure = "exact" if sol.exact else f"forced ({sol.gap:.1f} mm)"
+        if sol.kind == "reversing":
+            closure += " reversing"
+        width, height = sol.layout.size()
+        rows.append((score, sol, closure, f"{width / 10:.0f} x {height / 10:.0f}"))
 
     table = Table(title="Loops, nicest first")
     table.add_column("#", justify="right")
@@ -289,27 +318,17 @@ def solve_cmd(
     table.add_column("size (cm)", justify="right")
     table.add_column("closure")
     table.add_column("stubs", justify="right")
-    for rank, (score, sol) in enumerate(scored, start=1):
-        width, height = sol.layout.size()
+    for rank, (score, sol, closure, size) in enumerate(rows, start=1):
         counts = " ".join(
             f"{n}x{pid}" for pid, n in sorted(sol.layout.piece_counts.items())
         )
-        closure = "exact" if sol.exact else f"forced ({sol.gap:.1f} mm)"
-        if sol.kind == "reversing":
-            closure += " reversing"
-        table.add_row(
-            str(rank),
-            f"{score:.0f}",
-            counts,
-            f"{width / 10:.0f} x {height / 10:.0f}",
-            closure,
-            str(sol.open_stubs),
-        )
+        table.add_row(str(rank), f"{score:.0f}", escape(counts), size, closure,
+                      str(sol.open_stubs))
     console.print(table)
 
     if out_dir is not None:
         render_layout = _get_renderer(required=False)
-        for rank, (score, sol) in enumerate(scored[:top], start=1):
+        for rank, (score, sol, closure, size) in enumerate(rows[:top], start=1):
             stem = out_dir / f"loop_{rank:02d}"
             try:
                 with open(f"{stem}.json", "w", encoding="utf-8") as fh:
@@ -317,16 +336,12 @@ def solve_cmd(
             except OSError as exc:
                 raise click.ClickException(f"cannot write {stem}.json: {exc}") from exc
             if render_layout is not None:
-                closure = "exact" if sol.exact else f"forced {sol.gap:.1f} mm"
-                width, height = sol.layout.size()
                 _write_image(
                     render_layout, sol.layout, f"{stem}.png",
-                    title=(
-                        f"#{rank}  score {score:.0f}  |  {closure}  |  "
-                        f"{width / 10:.0f} x {height / 10:.0f} cm"
-                    ),
+                    title=f"#{rank}  score {score:.0f}  |  {closure}  |  {size} cm",
                 )
-        console.print(f"Saved the top {min(top, len(scored))} to [bold]{out_dir}[/bold]")
+        console.print(f"Saved the top {min(top, len(scored))} to "
+                      f"[bold]{escape(str(out_dir))}[/bold]")
 
 
 def _get_renderer(required: bool = True):
@@ -346,11 +361,18 @@ def _get_renderer(required: bool = True):
 
 
 def _output_dir(out: str) -> Path:
+    """Create *out*, and check this run can write and list it, before the search."""
     out_dir = Path(out)
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         raise click.ClickException(f"cannot create {out_dir}: {exc}") from exc
+    try:
+        with tempfile.TemporaryFile(dir=out_dir):
+            pass
+        next(out_dir.iterdir(), None)
+    except OSError as exc:
+        raise click.ClickException(f"cannot write to {out_dir}: {exc}") from exc
     return out_dir
 
 
@@ -392,14 +414,14 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
     layout = _load_layout(layout_file, catalog)
     target = _image_target(out) if out else str(Path(layout_file).with_suffix(".png"))
     _write_image(render_layout, layout, target)
-    console.print(f"Wrote [bold]{target}[/bold]")
+    console.print(f"Wrote [bold]{escape(target)}[/bold]")
 
 
 @main.command()
 @click.argument("layout_file", type=click.Path(exists=True))
 @_catalog_option
 @click.option(
-    "--slop", type=click.FloatRange(min=0), default=0.0, show_default=True,
+    "--slop", type=click.FloatRange(min=0), default=0.0, show_default=True, callback=_finite,
     help="Accept this total planar joint gap in mm; never ignores height or heading errors.",
 )
 def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None:
@@ -408,8 +430,6 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
     A positive --slop accepts a forced fit within that total planar gap budget,
     not an exact closure or a guarantee that physical track will fit.
     """
-    if not math.isfinite(slop):
-        raise click.BadParameter("must be finite", param_hint="--slop")
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
     width, height = layout.size()
@@ -479,8 +499,10 @@ def classify_cmd(layout_file: str, catalog_paths: tuple[str, ...], max_runs: int
         verdict = classify(layout, max_runs=max_runs)
     except ClassificationLimitError as exc:
         raise click.ClickException(str(exc).replace("max_runs", "--max-runs")) from exc
-    except (ValueError, DriveLimitError) as exc:  # no drivable track; an endless-run guard
+    except (ValueError, DriveLimitError) as exc:  # an empty layout; an endless-run guard
         raise click.ClickException(str(exc)) from exc
+    if not verdict.runs:  # only buffers: nowhere to place a train
+        raise click.ClickException("nothing to classify: no drivable track")
     ladder = [
         ("locally looping", verdict.locally_looping, "some placement runs forever"),
         ("looping", verdict.looping, "every placement runs forever"),
@@ -533,7 +555,7 @@ def demo(out: str) -> None:
     target = _image_target(out)
     _write_image(render_layout, best.layout, target, title="The classic DUPLO oval")
     console.print(
-        f"The starter oval closes exactly; picture in [bold]{target}[/bold]. "
+        f"The starter oval closes exactly; picture in [bold]{escape(target)}[/bold]. "
         "Now try:  duplotrain solve --curve 12 --straight 4 --switch 2 -o out"
     )
 

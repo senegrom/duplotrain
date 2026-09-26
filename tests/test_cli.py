@@ -322,3 +322,46 @@ def test_json_files_may_be_saved_in_any_unicode_encoding(runner, tmp_path, encod
     result = runner.invoke(main, ["solve", "--inventory", str(inventory), "--catalog", str(extra)])
     assert result.exit_code == 0 and "distinct loop(s) found" in result.output
 
+
+def test_catalogue_text_and_paths_are_printed_as_they_are(runner, tmp_path):
+    # Brackets are rich markup: "[/]" used to crash the table, "[v2]" to vanish.
+    catalogue = tmp_path / "mine.json"
+    catalogue.write_text(json.dumps({"pieces": [{
+        "id": "arc[/]", "name": "My arc [v2]", "part_numbers": ["[x]"], "width": 64,
+        "paths": [{"segments": [{"type": "arc", "radius": 256, "degrees": 30}]}]}]}))
+    result = runner.invoke(main, ["pieces", "--catalog", str(catalogue)])
+    assert result.exit_code == 0, result.output
+    assert "arc[/]" in result.output and "My arc [v2]" in result.output
+    box = tmp_path / "box.json"
+    box.write_text(json.dumps({"arc[/]": 12}))
+    out = tmp_path / "out [new]"
+    cli_args = ["solve", "--catalog", str(catalogue), "--inventory", str(box), "-o", str(out)]
+    result = runner.invoke(main, cli_args)
+    assert result.exit_code == 0, result.output
+    printed = "".join(result.output.split())  # rich wraps long lines
+    assert "12xarc[/]" in printed and "out[new]" in printed
+
+
+@pytest.mark.parametrize("args, tip, not_tip", [
+    (["--curve", "12", "--straight", "1", "--use-all"], "without --use-all", None),
+    (["--set", "10872", "--slop", "10"], "more curves", "--slop 5"),
+])
+def test_no_loop_advice_suggests_only_what_the_run_did_not_try(runner, args, tip, not_tip):
+    result = runner.invoke(main, ["solve", *args])
+    assert result.exit_code == 0 and "No closed loop fits" in result.output
+    assert tip in result.output
+    assert not_tip is None or not_tip not in result.output
+
+
+def test_saved_pictures_carry_the_same_closure_label_as_the_table(runner, monkeypatch, tmp_path):
+    titles = []
+
+    def render(layout, path, title):
+        titles.append(title)
+        Path(path).write_bytes(b"")
+
+    monkeypatch.setattr(cli, "_get_renderer", lambda required=True: render)
+    result = runner.invoke(main, ["solve", "--curve", "12", "--straight", "2", "--switch", "1",
+                                  "--reversing", "--top", "50", "-o", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert any("reversing" in title for title in titles)
