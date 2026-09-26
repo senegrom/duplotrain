@@ -9,19 +9,20 @@ const clean=x=>JSON.parse(JSON.stringify(x));
 function cacheStorage(){
   const map=new Map();let failedPut=false;
   return {map,failPut(value=true){failedPut=value;},async keys(){return [...map.keys()];},
+    async has(key){return map.has(key);},
     async delete(key){return map.delete(key);},async open(key){
       if(!map.has(key))map.set(key,new Map());const store=map.get(key);
       const name=k=>typeof k==="string"?k:k.url;
       // Model stored bytes, not long-lived tee streams in Node's Response.clone.
       return {async match(k){const value=store.get(name(k));return value?
         new Response(value.body.slice(0),{status:value.status,headers:value.headers}):undefined;},async put(k,v){
-        if(failedPut)throw new Error("quota exceeded");store.set(name(k),{
+        if(failedPut)throw new DOMException("quota exceeded","QuotaExceededError");store.set(name(k),{
           body:await v.arrayBuffer(),status:v.status,headers:[...v.headers]});},
         async delete(k){return store.delete(name(k));}};
     }};
 }
 function worker({build="aaa",caches=cacheStorage(),bad=null,now=()=>Date.now(),page="",
-  timers={setTimeout,clearTimeout},stream=null,clients=async()=>[]}={}){
+  timers={setTimeout,clearTimeout,setInterval,clearInterval},stream=null,clients=async()=>[]}={}){
   const assets=[{url:"index.html",body:`<html>build ${build}${page}</html>`},
     {url:`editor.js?v=${build}`,body:`const build='${build}'`},
     {url:`worker.js?v=${build}`,body:`const engine='${build}'`}];
@@ -48,7 +49,8 @@ function worker({build="aaa",caches=cacheStorage(),bad=null,now=()=>Date.now(),p
   vm.runInContext(template.replaceAll("__BUILD__",build).replace("__VERSION__",version)
     .replace("__ASSETS__",JSON.stringify(manifest)),ctx);
   const run=code=>vm.runInContext(code,ctx);
-  return {ctx,run,caches,assets,manifest,handlers,calls,setOffline:v=>{offline=v;},activated:()=>activated,
+  return {ctx,run,caches,assets,manifest,handlers,calls,setOffline:v=>{offline=v;},setBad:v=>{bad=v;},
+    activated:()=>activated,
     async install(){let promise;handlers.install({waitUntil:p=>{promise=p;}});return promise;},
     async activate(){let promise;handlers.activate({waitUntil:p=>{promise=p;}});return promise;},
     async message(type){let promise,result;handlers.message({data:{type},ports:[{postMessage:r=>{result=r;}}],waitUntil:p=>{promise=p;}});
@@ -77,7 +79,20 @@ for(const bad of ["index.html","editor.js?v=bbb","network","long"])test(`failed 
   assert.equal((await next.ctx.offlineStatus()).ready,false);
   assert.equal((await old.ctx.offlineStatus()).ready,true);
   assert.ok(caches.map.has("other-app"));assert.equal(next.activated(),0);
-  assert.ok(!caches.map.has(next.run("CACHE")));
+  // Only verified files stay, for the next attempt to resume from.
+  for(const [url,entry] of caches.map.get(next.run("CACHE"))){
+    const asset=next.assets.find(a=>new URL(a.url,scope).href===url);
+    if(asset)assert.equal(Buffer.from(entry.body).toString(),asset.body);
+  }
+});
+
+test("an interrupted installation resumes with the files it already verified",async()=>{
+  const w=worker({bad:"worker.js?v=aaa"});
+  await assert.rejects(w.install(),/verification failed: worker\.js/);
+  assert.equal(w.calls.length,3);
+  w.setBad(null);w.calls.length=0;
+  assert.equal((await w.install()).ready,true);
+  assert.deepEqual(w.calls,[new URL("worker.js?v=aaa",scope).href]);
 });
 
 test("a corrupt asset of exactly the promised size fails its SHA-256 check",async()=>{
@@ -87,13 +102,15 @@ test("a corrupt asset of exactly the promised size fails its SHA-256 check",asyn
   const served=await (await next.ctx.fetch(new URL(next.assets[1].url,scope).href,{})).text();
   assert.equal(Buffer.byteLength(served),next.manifest[1].bytes);assert.notEqual(served,next.assets[1].body);
   await assert.rejects(next.install(),/verification failed: editor\.js\?v=bbb/);
-  assert.equal((await next.ctx.offlineStatus()).ready,false);assert.ok(!caches.map.has(next.run("CACHE")));
+  assert.equal((await next.ctx.offlineStatus()).ready,false);
+  assert.ok(!caches.map.get(next.run("CACHE")).has(new URL(next.assets[1].url,scope).href));
   assert.equal((await old.ctx.offlineStatus()).ready,true);
 });
 
 test("quota failure cannot mark a partial installation ready",async()=>{
   const w=worker();w.caches.failPut();await assert.rejects(w.install(),/quota/);
   assert.equal((await w.ctx.offlineStatus()).ready,false);
+  assert.ok(!w.caches.map.has(w.run("CACHE")));  // out of space, the partial version gives it back
   const reply=await w.message("ACTIVATE");assert.equal(reply.ready,false);assert.match(reply.error,/incomplete/);
   assert.equal(w.activated(),0);
 });
@@ -138,8 +155,9 @@ test("activation keeps this and the newest older version, never unrelated or unf
   const other=await caches.open("other-app");await other.put("https://example.test/other",new Response("keep"));
   const versions=[];
   for(const build of ["aaa","bbb","ccc"]){const w=worker({build,caches,now});await w.install();versions.push(w);}
-  const partial=worker({build:"ddd",caches,now});await (await caches.open(partial.run("CACHE"))).put(
-    new URL("index.html",scope).href,new Response("still installing"));
+  const partial=worker({build:"ddd",caches,now}),installing=await caches.open(partial.run("CACHE"));
+  await installing.put(new URL("index.html",scope).href,new Response("still installing"));
+  await installing.put(partial.run("progressOf(VERSION)"),new Response("",{headers:{"X-Progress":String(clock)}}));
   await versions[2].activate();
   const kept=[...caches.map.keys()];
   assert.ok(kept.includes("other-app")&&kept.includes(partial.run("CACHE")));
@@ -150,7 +168,7 @@ test("activation keeps this and the newest older version, never unrelated or unf
   assert.match(await (await versions[2].request("editor.js?v=bbb")).text(),/bbb/);
 });
 
-test("activation keeps the version open tabs run, not a superseded waiting update",async()=>{
+test("activation keeps the previously active version, not a superseded waiting update",async()=>{
   const caches=cacheStorage();let clock=1000;const now=()=>clock++;
   const a=worker({build:"aaa",caches,now});await a.install();await a.activate();  // tabs run aaa
   const b=worker({build:"bbb",caches,now});await b.install();                      // waits, never applied
@@ -177,7 +195,9 @@ test("a changed page under an unchanged build stamp installs as a new version",a
 // Timers the test advances, and bodies that arrive when the test sends them.
 function clock(){
   let now=0,next=0;const timers=new Map();
+  const every=(id,fn,ms)=>timers.set(id,{fn:()=>{every(id,fn,ms);fn();},at:now+ms});
   return {setTimeout(fn,ms){timers.set(++next,{fn,at:now+ms});return next;},clearTimeout(id){timers.delete(id);},
+    setInterval(fn,ms){every(++next,fn,ms);return next;},clearInterval(id){timers.delete(id);},
     advance(ms){now+=ms;for(const [id,t] of [...timers])if(t.at<=now){timers.delete(id);t.fn();}}};
 }
 const settle=async()=>{for(let i=0;i<10;i++)await new Promise(resolve=>setImmediate(resolve));};
@@ -219,7 +239,36 @@ test("a slow but steady download completes; a quiet minute aborts it",async()=>{
   assert.equal(outcome,null);assert.equal(stalled.waiting.length,0);
   stalledTime.advance(1);await settle();
   assert.match(String(outcome),/aborted/);
-  assert.ok(!v.caches.map.has(v.run("CACHE")));
+  assert.equal((await v.ctx.offlineStatus()).ready,false);
+  assert.ok(!v.caches.map.get(v.run("CACHE")).has(new URL("index.html",scope).href));
+});
+
+test("an installation abandoned for an hour is reclaimed by the next activation",async()=>{
+  const caches=cacheStorage();let clock=1000;const now=()=>clock;
+  const partial=worker({build:"ddd",caches,now,bad:"network"});
+  await assert.rejects(partial.install(),/offline/);
+  assert.ok(caches.map.has(partial.run("CACHE")));
+  const a=worker({build:"aaa",caches,now});await a.install();
+  clock+=3600000;await a.activate();
+  assert.ok(caches.map.has(partial.run("CACHE")));  // an hour without progress: may still run
+  clock+=1;await a.activate();
+  assert.ok(!caches.map.has(partial.run("CACHE")));
+  assert.equal((await a.ctx.offlineStatus()).ready,true);
+});
+
+test("a long installation request tells the page it is still working",async()=>{
+  const time=clock(),bodies=feeds(),w=worker({timers:time,stream:bodies.stream});
+  const replies=[];let done;
+  w.handlers.message({data:{type:"INSTALL"},ports:[{postMessage:r=>replies.push(clean(r))}],waitUntil:p=>{done=p;}});
+  for(let i=0;i<w.assets.length;i++){
+    const {asset,control}=await requested(bodies);
+    control.enqueue(new TextEncoder().encode(asset.body));await settle();
+    time.advance(20000);control.close();
+  }
+  await done;
+  assert.equal(replies.filter(r=>r.working).length,w.assets.length);
+  assert.deepEqual(replies.at(-1),{build:"aaa",ready:true,assets:3});
+  time.advance(60000);assert.equal(replies.length,w.assets.length+1);  // no heartbeat after the answer
 });
 
 function liveTab(id, build, url=scope) {

@@ -63,6 +63,11 @@ WORKER_EXCLUDES = {
 
 WORKER_INIT = b'''"""Minimal package marker for the Pyodide editor worker."""\n'''
 
+#: Static files the build does not copy: index.html is made from editor.html, and
+#: the root icons answer only the local server's automatic requests (/favicon.ico);
+#: the page links its icons under icons/.
+NOT_SHIPPED = {"editor.html", "favicon.ico", "apple-touch-icon.png", "duplotrain-icon.svg"}
+
 
 def text_bytes(path: Path) -> bytes:
     """A text file's bytes with LF newlines, whatever the checkout used.
@@ -212,7 +217,7 @@ def build_source_zip(entries: list[tuple[str, bytes]] | None = None) -> bytes:
 #: Pyodide needs (wasm compilation) and keeps scripts external-only.
 _CSP = (
     "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; "
-    "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
+    "style-src 'self'; img-src 'self'; font-src 'self'; "
     "connect-src 'self'; worker-src 'self'; object-src 'none'; "
     "base-uri 'self'; form-action 'self'; frame-ancestors 'none'; "
     "manifest-src 'self'; upgrade-insecure-requests"
@@ -287,7 +292,7 @@ def build_index(meta_csp: bool = False) -> None:
     # Commit raster exports so the static build and installed Python editor use
     # identical icons without needing image-rendering dependencies at build time.
     for source in sorted(static.rglob("*")):
-        if not source.is_file() or source.name == "editor.html":
+        if not source.is_file() or source.relative_to(static).as_posix() in NOT_SHIPPED:
             continue
         dest = DIST / source.relative_to(static)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -316,7 +321,9 @@ def build_offline_worker(stamp: str, runtime: str, zip_name: str, zip_content: s
     paths += [f"{name}?v={stamp}" for name in (*EDITOR_SCRIPTS, "editor.css",
                                                "boot.js", "worker.js", "adapter.py")]
     paths += [f"{runtime}/{name}" for name in PYODIDE_FILES]
-    paths += [p.relative_to(DIST).as_posix() for p in sorted((DIST / "icons").rglob("*"))
+    # The icons the source ships: dist is refreshed in place and may hold stale ones.
+    static = ROOT / "src" / "duplotrain" / "static"
+    paths += [p.relative_to(static).as_posix() for p in sorted((static / "icons").rglob("*"))
               if p.is_file()]
     assets = []
     for url in paths:

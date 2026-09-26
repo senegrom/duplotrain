@@ -5,7 +5,7 @@
 let apiBusy = false;
 async function send(path, body) {
   if (window.duplotrainApi) return window.duplotrainApi(path, body);
-  const res = await fetch(path, body === undefined ? {} : {
+  const res = await fetch(path, {
     method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
   });
   const data = await res.json();
@@ -528,7 +528,7 @@ function fitView(placements = S && S.layout.placements) {
 
 // ---------- UI wiring ----------
 function el(id) { return document.getElementById(id); }
-const on = (id, action) => el(id)?.addEventListener("click", action);
+const on = (id, action) => el(id).addEventListener("click", action);
 
 function status(msg, cls) {
   const s = el("status");
@@ -642,9 +642,10 @@ function renderPalette() {
       row.owned = owned;
     }
     for (const {button, variant: v} of row.buttons) {
-      button.disabled = !unlimited && remaining <= 0;
-      button.classList.toggle("armed", !!armed && armed.piece === row.id &&
-                             armed.entry === v.entry && armed.exit === v.exit);
+      const isArmed = !!armed && armed.piece === row.id && armed.entry === v.entry && armed.exit === v.exit;
+      // An armed button stays clickable to disarm it, stock or not.
+      button.disabled = !unlimited && remaining <= 0 && !isArmed;
+      button.classList.toggle("armed", isArmed);
     }
   }
 }
@@ -965,10 +966,6 @@ function bindEditorEvents() {
     }
     await startInteractiveSearch(null, null);
   });
-  el("expand-search").addEventListener("click", async () => {
-    if (jobLoop || apiBusy || !S || interactiveJob?.revision !== S.revision) return;
-    await continueSearch(true);
-  });
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button !== 0 || !S) return;
     e.preventDefault();
@@ -1140,8 +1137,8 @@ function clearTransient() {
   selectedPiece = null; clearHover(); highlightedPieces = []; closeOverlapPicker();
   invalidateTrain(); initialSwitches = {};
   navigationRevision = diagnosticsRevision = null;
-  for (const id of ["diagnostics", "train-report"]) if (el(id)) el(id).textContent = "";
-  for (const id of ["train-play", "train-step"]) if (el(id)) el(id).disabled = true;
+  for (const id of ["diagnostics", "train-report"]) el(id).textContent = "";
+  for (const id of ["train-play", "train-step"]) el(id).disabled = true;
 }
 function discardStaleInteraction() {
   if (!S) return;
@@ -1169,7 +1166,7 @@ function drawHighlights() {
   if (trainTrace?.revision === S.revision && trainTrace.complete) {
     const overlays = [["train-unvisited", trainTrace.unvisited, "#be6712"],
       ["train-cycle", trainTrace.cycle_pieces, "#168277"]];
-    for (const [id, pieces, color] of overlays) if (el(id)?.checked) {
+    for (const [id, pieces, color] of overlays) if (el(id).checked) {
       for (const index of pieces || []) {
         const pl = S.layout.placements[index];
         if (pl) for (const line of pl.lines) for (let i = 0; i + 1 < line.length; i++)
@@ -1308,7 +1305,6 @@ async function checkLayout() {
 function bindExtraEvents() {
   bindSearchEvents();
   on("redo", async () => { try { S = await api("/api/redo", {}); redraw(); } catch (error) { status(error.message, "err"); } });
-  on("pause-search", () => { if (jobLoop) requestJobPause(); });
   on("check-layout", checkLayout);
   on("fit-preview", () => { const pl = previewPlacements(preview); if (pl) { fitView(pl); fitted = true; draw(); } });
   on("use-end", async () => { try { await activateEnd(JSON.parse(el("end-select").value)); } catch (e) { status(e.message, "err"); } });
@@ -1322,14 +1318,14 @@ function bindExtraEvents() {
     if (!S.layout.placements[placement]) return;
     try { S = await api("/api/remove", {placement}); redraw(); } catch (e) { status(e.message, "err"); }
   });
-  el("piece-select")?.addEventListener("change", () => { selectedPiece = Number(el("piece-select").value); focusPieces([selectedPiece]); });
-  el("end-select")?.addEventListener("change", () => { try { focusPieces([JSON.parse(el("end-select").value)[0]]); } catch (_) {} });
+  el("piece-select").addEventListener("change", () => { selectedPiece = Number(el("piece-select").value); focusPieces([selectedPiece]); });
+  el("end-select").addEventListener("change", () => { try { focusPieces([JSON.parse(el("end-select").value)[0]]); } catch (_) {} });
   on("save-project", () => {
     try { const data = projectSnapshot(); downloadJSON(data, "project.json"); markProjectSaved(data); }
     catch (e) { status(e.message, "err"); }
   });
   on("open-project", () => el("projectfile").click());
-  el("projectfile")?.addEventListener("change", readProjectFile);
+  el("projectfile").addEventListener("change", readProjectFile);
   on("save-local", saveLocalProject);
   on("load-local", async () => {
     const revision = S && S.revision;
@@ -1347,9 +1343,9 @@ function bindExtraEvents() {
   on("save-discard-confirm", discardKeptCheckpoint);
   on("rename-local", () => manageLocalProject("rename"));
   on("delete-local", () => manageLocalProject("delete"));
-  el("project-slots")?.addEventListener("change", closeProjectManagement);
+  el("project-slots").addEventListener("change", closeProjectManagement);
   for (const id of ["project-name", "max-pieces", "slop", "reversing"])
-    el(id)?.addEventListener("input", updateProjectStatus);
+    el(id).addEventListener("input", updateProjectStatus);
   on("test-train", testTrain); on("train-step", () => { closeOverlapPicker(); stopTrain(); advanceTrain(); });
   on("train-play", () => {
     closeOverlapPicker(); stopTrain();
@@ -1359,8 +1355,8 @@ function bindExtraEvents() {
     if (trainTrace.cycle_start !== null || trainStep + 1 < traceLength()) trainTimer = setInterval(advanceTrain, 500);
   });
   on("train-pause", stopTrain);
-  el("train-start")?.addEventListener("change", () => { invalidateTrain(); draw(); });
-  for (const id of ["train-unvisited", "train-cycle"]) el(id)?.addEventListener("change", draw);
+  el("train-start").addEventListener("change", () => { invalidateTrain(); draw(); });
+  for (const id of ["train-unvisited", "train-cycle"]) el(id).addEventListener("change", draw);
   canvas.addEventListener("pointerleave", () => { clearHover(); draw(); });
   canvas.addEventListener("keydown", e => {
     if (e.key === "Enter") { e.preventDefault(); el("use-end").click(); }

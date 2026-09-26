@@ -2,6 +2,26 @@
 "use strict";
 
 let dispatch = null;
+// Every chunk the runtime and engine downloads bring, at most once a second, tells
+// the page that loading still makes progress.
+let reported = 0;
+const rawFetch = globalThis.fetch.bind(globalThis);
+// A strict worker must assign through globalThis: Chromium refuses a bare "fetch =".
+globalThis.fetch = async (...args) => {
+  const response = await rawFetch(...args);
+  if (!response.body) return response;
+  const reader = response.body.getReader();
+  const body = new ReadableStream({
+    async pull(controller) {
+      const {done, value} = await reader.read();
+      if (done) { controller.close(); return; }
+      if (Date.now() - reported >= 1000) { reported = Date.now(); postMessage({loading: true}); }
+      controller.enqueue(value);
+    },
+    cancel(reason) { return reader.cancel(reason); },
+  });
+  return new Response(body, {status: response.status, statusText: response.statusText, headers: response.headers});
+};
 async function checkedFetch(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Could not load ${url}: HTTP ${response.status}`);

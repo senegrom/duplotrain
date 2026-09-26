@@ -40,6 +40,11 @@ def dependency(monkeypatch, tmp_path):
     return vendor, opener, data
 
 
+def test_the_reviewed_pyodide_digest_is_pinned():
+    assert build.PYODIDE_SHA256["0.27.7"] == (
+        "9bc8f127db6c590b191b9aee754022cb41b1a36c7bac233776c11c5ecb541be8")
+
+
 def test_verified_download_is_cached(dependency):
     vendor, opener, data = dependency
     target = build.fetch_pyodide("0.27.7")
@@ -205,6 +210,13 @@ def permission_blocks(text):
                 scopes[scope.strip()] = level.split(" #", 1)[0].strip().strip("'\"")
         found[owner] = scopes
     return found
+
+
+def test_the_page_policy_allows_no_inline_styles_and_the_page_needs_none():
+    # Styles live in editor.css; the scripts' CSSOM writes stay allowed.
+    assert "'unsafe-inline'" not in build._CSP and "data:" not in build._CSP
+    html = (ROOT / "src" / "duplotrain" / "static" / "editor.html").read_text(encoding="utf-8")
+    assert not re.search(r"\sstyle=|<style", html)
 
 
 def test_workflows_use_read_only_tokens_and_immutable_actions():

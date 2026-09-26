@@ -19,10 +19,9 @@ budget and 128 added pieces. Its result allowance also increases. Pagination
 builds eight candidate cards at a time; sorting never changes the underlying
 candidate identity used for Apply.
 
-**Pause at next checkpoint** and **Stop with results found** both stop the
-engine at its next checkpoint, without destroying its worker or undo history,
-and publish the accepted suggestions; Stop is offered once the running search
-has found some. **Resume** continues the stored job. A preview arriving
+**Pause at next checkpoint** stops the engine at its next checkpoint, without
+destroying its worker or undo history, and publishes the accepted suggestions.
+**Resume** continues the stored job. A preview arriving
 while the search is running is not directly applicable: the engine must first
 publish its candidate revision. Starting a new search withdraws the suggestions
 published before it. Applying a suggestion is one normal, undoable edit and

@@ -16,7 +16,8 @@ function downloadText(text, filename, type = "text/plain") {
   const blob = new Blob([text], {type});
   const url = URL.createObjectURL(blob), anchor = document.createElement("a");
   anchor.href = url; anchor.download = filename; anchor.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Some browsers (iOS Safari) ask before downloading: the URL must outlive the question.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 function downloadJSON(data, filename) { downloadText(JSON.stringify(data, null, 2), filename, "application/json"); }
 function projectContentKey(data) {
@@ -91,7 +92,7 @@ function readLocalProject(key, raw) {
 }
 function closeProjectManagement() {
   projectManagement = null;
-  if (el("project-manage")) el("project-manage").hidden = true;
+  el("project-manage").hidden = true;
 }
 function renderProjects() {
   const select = el("project-slots"), previous = select.value;

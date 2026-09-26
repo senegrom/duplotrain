@@ -81,13 +81,49 @@ test("boot errors and timeout both settle startup and offer recovery", async () 
   }
 });
 
-test("the engine gets a minute to load and a pending call two minutes of silence", async () => {
+test("engine loading fails only after a minute without progress", async () => {
   const h = harness();
   const promise = h.window.duplotrainBoot({refresh: async () => {}, status() {}});
   assert.deepEqual([...h.delays.values()], [60000]);
+  // Download progress restarts the minute: a slow first visit is not a stalled one.
+  const first = [...h.timers.keys()][0];
+  h.workers[0].emit({loading: true});
+  assert.equal(h.timers.has(first), false); assert.deepEqual([...h.delays.values()], [60000]);
+  [...h.timers.values()][0]();
+  await promise;
+  assert.match(h.body.children[0].children[0].textContent, /stalled for a minute/);
+  const again = harness();
+  const booting = again.window.duplotrainBoot({refresh: async () => {}, status() {}});
+  again.workers[0].emit({loading: true});
+  again.workers[0].emit({ready: true}); await booting;
+  assert.equal(again.delays.size, 0);
+  again.workers[0].emit({loading: true});  // a late report arms nothing
+  assert.equal(again.delays.size, 0);
+});
+
+test("the engine worker reports download progress while the runtime loads", async () => {
+  const messages = [];
+  const context = vm.createContext({
+    importScripts() {}, Response, ReadableStream,
+    fetch: async () => new Response("runtime bytes"),
+    loadPyodide: async () => {
+      await (await context.fetch("pyodide.asm.wasm")).arrayBuffer();
+      throw new Error("stop after the runtime download");
+    },
+    postMessage: message => messages.push(message), console, onmessage: null,
+  });
+  vm.runInContext(fs.readFileSync(path.join(root, "webapp/worker.js"), "utf8"), context);
+  for (let i = 0; i < 20 && messages.length < 2; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(messages[0].loading, true);
+  assert.match(messages[1].bootError, /stop after the runtime download/);
+});
+
+test("a pending call gets two minutes of silence", async () => {
+  const h = harness();
+  const promise = h.window.duplotrainBoot({refresh: async () => {}, status() {}});
   h.workers[0].emit({ready: true}); await promise;
   assert.equal(h.delays.size, 0);
-  const call = h.window.duplotrainApi("/api/state");
+  const call = h.window.duplotrainApi("/api/state", {});
   assert.deepEqual([...h.delays.values()], [120000]);
   h.workers[0].emit({id: h.workers[0].sent[0].id, res: "{}"}); await call;
   assert.equal(h.delays.size, 0);

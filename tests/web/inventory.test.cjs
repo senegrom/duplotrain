@@ -29,3 +29,15 @@ test("new action stone input remains stable during normal redraw", () => {
   assert.equal(input.value, "73"); assert.equal(h.context.document.activeElement, input);
   assert.equal(input.attributes["aria-label"], "Stop stone owned");
 });
+
+test("an armed piece whose stock runs out stays clickable to disarm, like an armed stone", () => {
+  const state = scene([], 3);
+  state.palette = [{id: "straight", name: "Straight",
+    variants: [{entry: 0, exit: 1, label: "ahead"}, {entry: 1, exit: 0, label: "back"}]}];
+  state.inventory = {owned: {straight: 1}, remaining: {straight: 0}, unlimited: false};
+  const h = harness({state});
+  h.run('armed = {piece: "straight", pieceName: "Straight", entry: 0, exit: 1, label: "ahead"}; renderPalette()');
+  const [ahead, back] = h.run("paletteRows[0].buttons").map(row => row.button);
+  assert.equal(ahead.classes.has("armed"), true); assert.equal(ahead.disabled, false);
+  assert.equal(back.disabled, true);  // nothing left to arm
+});

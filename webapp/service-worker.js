@@ -11,12 +11,16 @@ const PREFIX = "duplotrain-offline/1:" + encodeURIComponent(SCOPE) + ":";
 const CACHE = PREFIX + VERSION;
 const MARKER = new URL(".offline-complete-" + VERSION, SCOPE).href;
 const INDEX = new URL("index.html", SCOPE).href;
+// An unfinished installation of another version that has made no progress for
+// this long no longer runs: the next activation reclaims its space.
+const ABANDONED_MS = 3600000;
 let installing = null;
 const absolute = path => new URL(path, SCOPE).href;
+const progressOf = version => absolute(".offline-progress-" + version);
 const hex = bytes => [...new Uint8Array(bytes)].map(v => v.toString(16).padStart(2, "0")).join("");
 
 async function offlineStatus() {
-  if (!(await caches.keys()).includes(CACHE)) return {build: BUILD, ready: false};
+  if (!(await caches.has(CACHE))) return {build: BUILD, ready: false};
   const cache = await caches.open(CACHE);
   if (!(await cache.match(MARKER))) return {build: BUILD, ready: false};
   for (const asset of ASSETS) if (!(await cache.match(absolute(asset.url)))) return {build: BUILD, ready: false};
@@ -26,8 +30,7 @@ async function offlineStatus() {
 // however long a slow but steady link needs for the largest runtime file.
 async function download(asset) {
   const url = absolute(asset.url);
-  if (new URL(url).origin !== new URL(SCOPE).origin || !url.startsWith(SCOPE))
-    throw new Error("Offline asset outside application scope");
+  if (!url.startsWith(SCOPE)) throw new Error("Offline asset outside application scope");
   const controller = new AbortController();
   let timer;
   const alive = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(), 60000); };
@@ -50,32 +53,45 @@ async function download(asset) {
   } catch (error) { controller.abort(); throw error; }
   finally { clearTimeout(timer); }
 }
+// Each attempt keeps the assets it verified, so an installation cut short, by a
+// lost connection or the browser's time limit for one event, resumes where it
+// stopped. Only verified bytes are ever stored under this version's name.
 async function installVersion() {
   if (installing) return installing;
   installing = (async () => {
-    if ((await offlineStatus()).ready) return offlineStatus();
+    const status = await offlineStatus();
+    if (status.ready) return status;
     const cache = await caches.open(CACHE);
-    // A missing marker makes a partial version unusable for offline navigation.
-    await cache.delete(MARKER);
     try {
+      // A missing marker makes a partial version unusable for offline navigation.
+      await cache.delete(MARKER);
+      const progress = () => cache.put(progressOf(VERSION),
+        new Response("", {headers: {"X-Progress": String(Date.now())}}));
+      await progress();
       for (const asset of ASSETS) {
+        const url = absolute(asset.url);
+        if (await cache.match(url)) continue;
         const {response, data} = await download(asset);
         // Reconstruct with original headers, preserving MIME and CSP. Avoid a
         // stale Content-Encoding/Length after fetch has decoded the response.
         const headers = new Headers(response.headers);
         headers.delete("Content-Encoding"); headers.set("Content-Length", String(data.byteLength));
-        await cache.put(absolute(asset.url), new Response(data, {status: 200, headers}));
+        await cache.put(url, new Response(data, {status: 200, headers}));
+        await progress();
       }
       // The marker also records when this version completed, for pruning.
       await cache.put(MARKER, new Response(BUILD, {headers: {"Content-Type": "text/plain",
         "X-Installed": String(Date.now())}}));
-      return offlineStatus();
+      await cache.delete(progressOf(VERSION));
     } catch (error) {
-      // Delete ONLY this incomplete version. Previously verified versions and
-      // other applications' caches/projects are never touched.
-      await caches.delete(CACHE);
+      // Out of space, a version that cannot finish gives its space back. Other
+      // verified versions and other applications' caches are never touched.
+      if (error?.name === "QuotaExceededError") await caches.delete(CACHE);
       throw error;
     }
+    const done = await offlineStatus();
+    if (!done.ready) throw new Error("Offline version is incomplete after installation");
+    return done;
   })();
   try { return await installing; } finally { installing = null; }
 }
@@ -116,7 +132,8 @@ async function liveClientBuilds() {
 }
 // Keep this version, the newest previous active version, and every live tab's
 // build. Multiple content versions can share a build stamp: retain all matches.
-// Incomplete caches are left alone because another installation may own them.
+// Another version's unfinished installation keeps its verified files for its
+// next attempt until it has made no progress for ABANDONED_MS.
 async function activateVersion() {
   const cache = await caches.open(CACHE), marker = await cache.match(MARKER);
   if (marker) {
@@ -127,9 +144,14 @@ async function activateVersion() {
   const complete = [];
   for (const name of await caches.keys()) {
     if (!name.startsWith(PREFIX) || name === CACHE) continue;
-    const older = await (await caches.open(name)).match(absolute(".offline-complete-" + name.slice(PREFIX.length)));
+    const version = name.slice(PREFIX.length), other = await caches.open(name);
+    const older = await other.match(absolute(".offline-complete-" + version));
     if (older) complete.push({name, build: await older.text(), activated: Number(older.headers.get("X-Activated")) || 0,
       installed: Number(older.headers.get("X-Installed")) || 0});
+    else {
+      const progress = await other.match(progressOf(version));
+      if (Date.now() - (Number(progress?.headers.get("X-Progress")) || 0) > ABANDONED_MS) await caches.delete(name);
+    }
   }
   complete.sort((a, b) => b.activated - a.activated || b.installed - a.installed);
   const live = await liveClientBuilds();
@@ -150,14 +172,19 @@ self.addEventListener("message", event => {
   const reply = event.ports?.[0];
   if (!reply || !["STATUS", "INSTALL", "ACTIVATE"].includes(event.data?.type)) return;
   event.waitUntil((async () => {
+    // The page waits as long as this worker still works on its request.
+    const beat = setInterval(() => reply.postMessage({working: true}), 20000);
     try {
       if (event.data.type === "ACTIVATE") {
         if (!(await offlineStatus()).ready) throw new Error("New offline version is incomplete");
         await self.skipWaiting(); reply.postMessage({build: BUILD, activated: true});
       } else reply.postMessage(event.data.type === "INSTALL" ? await installVersion() : await offlineStatus());
     } catch (error) { reply.postMessage({error: String(error), build: BUILD, ready: false}); }
+    finally { clearInterval(beat); }
   })());
 });
+// Assets are stored under bare URLs; a host's Vary header must not hide them.
+const stored = {ignoreVary: true};
 async function serve(request) {
   const cache = await caches.open(CACHE);
   if (request.mode === "navigate") {
@@ -167,7 +194,7 @@ async function serve(request) {
     if ((await offlineStatus()).ready) return cache.match(INDEX);
     return fetch(request);
   }
-  const own = await cache.match(request);
+  const own = await cache.match(request, stored);
   if (own && await cache.match(MARKER)) return own;
   // Keep exact old URLs available during an explicit update in another tab.
   // Never ignore query strings or use another application's cache.
@@ -175,15 +202,14 @@ async function serve(request) {
     const older = await caches.open(name);
     const marker = absolute(".offline-complete-" + name.slice(PREFIX.length));
     if (!(await older.match(marker))) continue;
-    const hit = await older.match(request);
+    const hit = await older.match(request, stored);
     if (hit) return hit;
   }
   return fetch(request);  // no runtime caching of arbitrary data or API responses
 }
 self.addEventListener("fetch", event => {
   const request = event.request, url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== new URL(SCOPE).origin ||
-      !url.href.startsWith(SCOPE) || url.pathname.includes("/api/") ||
+  if (request.method !== "GET" || !url.href.startsWith(SCOPE) || url.pathname.includes("/api/") ||
       url.pathname.endsWith("/service-worker.js")) return;
   event.respondWith(serve(request));
 });

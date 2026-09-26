@@ -49,10 +49,16 @@ def version(dist):
 
 def test_offline_manifest_covers_actual_byte_hashes_and_versioned_editor(synthetic_runtime_build):
     source, dist = synthetic_runtime_build
+    (dist / "icons").mkdir(parents=True)
+    (dist / "icons" / "duplotrain-app-64-v0.png").write_bytes(b"left by an earlier build")
     build.main()
     stamp, entries = manifest(dist)
     urls = [a["url"] for a in entries]
     assert len(urls) == len(set(urls))
+    assert "icons/duplotrain-app-64-v0.png" not in urls
+    # The root icons serve only the local server; the page links those under icons/.
+    assert not any((dist / name).exists()
+                   for name in ("favicon.ico", "apple-touch-icon.png", "duplotrain-icon.svg"))
     assert "index.html" in urls and "manifest.webmanifest" in urls
     # An installed app offline still shows its icons: every icon the build ships,
     # and every one the page and the web manifest name, is in the manifest.
@@ -152,8 +158,3 @@ def test_a_service_worker_change_changes_the_stamp_and_manifest(
     assert all(before not in entry["url"] for entry in entries)
     assert len(list(dist.glob("duplotrain-src-*.zip"))) == 1
 
-
-def test_the_reviewed_pyodide_digest_is_pinned():
-    # The service worker's behaviour is tested in tests/web/offline-worker.test.cjs.
-    assert build.PYODIDE_SHA256["0.27.7"] == (
-        "9bc8f127db6c590b191b9aee754022cb41b1a36c7bac233776c11c5ecb541be8")

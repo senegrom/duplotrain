@@ -62,7 +62,7 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
     if (!worker || !ready) return reject(new Error("engine is not ready"));
     const id = ++seq;
     try {
-      const encoded = body === undefined ? null : JSON.stringify(body);
+      const encoded = JSON.stringify(body);
       pending.set(id, {resolve, reject});
       worker.postMessage({id, path, body: encoded}); heartbeat();
     } catch (error) { pending.delete(id); heartbeat(); reject(error); }
@@ -90,9 +90,16 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
           if (worker === current) fail(new Error(event.message || "worker error"));
         };
         current.onmessageerror = () => { if (worker === current) fail(new Error("invalid worker message")); };
+        // Loading fails only after a minute without progress: a first visit
+        // downloads the whole runtime, however slow the link.
+        const loading = () => {
+          clearTimeout(bootTimer);
+          bootTimer = setTimeout(() => fail(new Error("engine loading stalled for a minute")), 60000);
+        };
         current.addEventListener("message", ({data}) => {
           // Late responses from an old generation must never restore old state.
           if (worker !== current) return;
+          if (data?.loading) { if (!ready) loading(); return; }
           if (data && data.bootError) { fail(new Error(data.bootError)); return; }
           if (data && data.ready) {
             ready = true; clearTimeout(bootTimer); rejectReady = null; resolve(); return;
@@ -103,7 +110,7 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
           pending.delete(id); heartbeat();
           if (err) call.reject(new Error(err)); else call.resolve(res);
         });
-        bootTimer = setTimeout(() => fail(new Error("engine loading timed out")), 60000);
+        loading();
       });
       if (snapshot) {
         const state = await window.duplotrainApi("/api/restore", {

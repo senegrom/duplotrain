@@ -35,7 +35,7 @@
     <button id="clear" class="ghost">clear</button>
     <button id="export">⭳ export JSON</button>
     <button id="import">⭱ import JSON</button>
-    <input id="importfile" type="file" accept=".json,application/json" style="display:none">
+    <input id="importfile" type="file" accept=".json,application/json" hidden>
   </div>
   <details>
     <summary>Projects and backups</summary>
@@ -54,7 +54,7 @@
     <label>slop <input id="slop" type="number" min="0" step="0.5" value="0"> mm</label>
     <button id="solve" class="primary">Close the loop</button>
   </div>
-  <label class="solverow" style="font-size:12px" title="also propose teardrops that close into a switch branch — the train then needs a direction-change stone on the open tail">
+  <label class="solverow small" title="also propose teardrops that close into a switch branch — the train then needs a direction-change stone on the open tail">
     <input id="reversing" type="checkbox"> allow reversing loops (uses the ↔ stone)
   </label>
   <label class="solverow">Search up to
@@ -77,7 +77,6 @@
   <button id="find-more" hidden>Find more alternatives</button>
   <button id="expand-search" hidden>Search harder</button>
   <button id="resume-search" hidden>Resume search</button>
-  <button id="stop-results" hidden>Stop with results found</button>
   <div id="search-report" role="status"></div>
   <div class="buttons"><button id="candidate-prev" hidden>Previous</button><span id="candidate-page"></span><button id="candidate-next" hidden>Next</button></div>
   <button id="pause-search" hidden>Pause at next checkpoint</button>
@@ -116,14 +115,14 @@
     <button id="place-first">Place armed first piece</button>
     <p>Arm a piece or choose Close the loop, then use an end. Ctrl/Cmd+Z: undo; Shift+Z or Ctrl+Y: redo.</p>
   </details>
-  <h2>Your sets <span style="font-weight:400">(one click adds its pieces)</span></h2>
-  <div id="sets" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-  <label class="solverow" style="font-size:12px" title="sandbox: ignore inventory limits — place anything, and the solver may draw from a bottomless box">
+  <h2>Your sets <span>(one click adds its pieces)</span></h2>
+  <div id="sets"></div>
+  <label class="solverow small" title="sandbox: ignore inventory limits — place anything, and the solver may draw from a bottomless box">
     <input id="unlimited" type="checkbox"> infinite pieces (sandbox)
   </label>
-  <h2>Action stones <span style="font-weight:400">(arm one, click a straight)</span></h2>
-  <div id="stones" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-  <h2>Pieces <span style="font-weight:400">(arm one, then click a red arrow)</span></h2>
+  <h2>Action stones <span>(arm one, click a straight)</span></h2>
+  <div id="stones"></div>
+  <h2>Pieces <span>(arm one, then click a red arrow)</span></h2>
   <div id="palette"></div>
 </div>
 <div id="stage">

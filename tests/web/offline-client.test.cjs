@@ -149,7 +149,7 @@ for (const outcome of ["installed", "redundant"]) {
     next.state = outcome; next.emit();
     assert.equal(h.el("offline-update").hidden, outcome !== "installed");
     assert.match(h.el("offline-status").textContent, outcome === "installed" ?
-      /Update available and verified/ : /Update failed; existing version kept/);
+      /Update available and verified/ : /Update failed; the existing version was kept/);
     assert.equal(h.counts().reloads, 0);
   });
 }
@@ -162,7 +162,9 @@ test("an installation whose worker turns redundant is reported as failed, never 
   next.state = "redundant"; next.emit();
   await installing;
   assert.deepEqual(h.messages, []);  // the failed worker is never asked to install
-  assert.match(h.el("offline-status").textContent, /installation failed.*Previous version kept/);
+  // A first installation had no version to keep.
+  assert.match(h.el("offline-status").textContent,
+    /installation failed\. Retry online\. Portable project downloads remain available\.$/);
 });
 
 test("offline installation outside a secure context registers nothing", async () => {
@@ -194,4 +196,40 @@ test("one registration is watched for updates once, however often it is installe
   h.run("bindOfflineEvents()"); await turn();
   for (let i = 0; i < 3; i++) await h.run("installOffline()");
   assert.equal(listeners.length, 1);
+});
+
+test("a first installation is reported ready, never as an update to apply", async () => {
+  const h = client(); const next = serviceWorker("installing");
+  Object.assign(h.context.registration, {installing: next, active: null});
+  h.run("offlineRegistration = registration; watchOfflineUpdates(registration)");
+  h.el("offline-update").hidden = true; h.registrationEvent("updatefound");
+  // Browsers list a first installation as waiting for a moment before it activates.
+  Object.assign(h.context.registration, {installing: null, waiting: next});
+  next.state = "installed"; next.emit();
+  assert.equal(h.el("offline-update").hidden, true);
+  assert.doesNotMatch(h.el("offline-status").textContent, /Update/);
+  Object.assign(h.context.registration, {waiting: null, active: next});
+  next.state = "activated"; next.emit(); await turn();
+  assert.deepEqual(h.messages, ["STATUS"]);
+  assert.match(h.el("offline-status").textContent, /Offline ready/);
+  assert.equal(h.el("offline-update").hidden, true);
+});
+
+test("an offline request waits while the worker works and gives up after a silent minute", async () => {
+  const channels = [], timers = new Map();
+  let now = 0, next = 0;
+  class Channel { constructor() { this.port1 = {close() {}}; this.port2 = {}; channels.push(this); } }
+  const h = harness({overrides: {MessageChannel: Channel,
+    setTimeout(fn, ms) { timers.set(++next, {fn, at: now + ms}); return next; },
+    clearTimeout(id) { timers.delete(id); }}});
+  const advance = ms => { now += ms; for (const [id, t] of [...timers]) if (t.at <= now) { timers.delete(id); t.fn(); } };
+  h.context.worker = {postMessage() {}};
+  const working = h.run("offlineMessage(worker, 'INSTALL')");
+  for (let i = 0; i < 10; i++) { advance(50000); channels[0].port1.onmessage({data: {working: true}}); }
+  channels[0].port1.onmessage({data: {ready: true, build: "b1"}});
+  assert.deepEqual({...await working}, {ready: true, build: "b1"});
+  let outcome = null;
+  h.run("offlineMessage(worker, 'INSTALL')").then(() => { outcome = "answered"; }, e => { outcome = e.message; });
+  advance(59999); await turn(); assert.equal(outcome, null);
+  advance(1); await turn(); assert.match(outcome, /stopped responding/);
 });

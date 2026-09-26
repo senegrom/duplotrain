@@ -304,17 +304,18 @@ def test_built_app_reloads_offline(browser):
     exercise_offline_reload(browser.browser_type, session.snapshot())
 
 
-def _three_builds(dist):
-    """The built app under three build stamps: three real, content-stamped versions.
+def _builds(dist, count):
+    """The built app under *count* build stamps: real, content-stamped versions.
 
-    Per version, what the server answers for each path: the bytes and their type.
+    Per version, what the server answers for each path (the bytes and their type),
+    and the offline version names.
     """
     source = (dist / "service-worker.js").read_text()
     original = re.search(r'const BUILD = "([a-f0-9]+)";', source).group(1)
     assets = json.loads(re.search(r"const ASSETS = (\[.*\]);", source).group(1))
     template = (Path(__file__).parents[2] / "webapp/service-worker.js").read_text()
-    versions = []
-    for build in ("ab000001", "ab000002", "ab000003"):
+    versions, names = [], []
+    for build in (f"ab{n:06d}" for n in range(1, count + 1)):
         served, manifest = {}, []
         for asset in assets:
             path = asset["url"].split("?", 1)[0]
@@ -333,14 +334,15 @@ def _three_builds(dist):
         served["/service-worker.js"] = (worker.encode(), "text/javascript")
         served["/"] = served["/index.html"]
         versions.append(served)
-    return versions
+        names.append(version)
+    return versions, names
 
 
-def test_a_tab_left_open_across_two_updates_restarts_its_engine_offline(browser, tmp_path):
+def test_a_tab_left_open_across_three_updates_restarts_its_engine_offline(browser, tmp_path):
     from playwright.sync_api import expect
 
     dist, policy = _built_app(browser.browser_type)
-    versions, current = _three_builds(dist), [0]
+    (versions, names), current = _builds(dist, 4), [0]
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -388,12 +390,12 @@ def test_a_tab_left_open_across_two_updates_restarts_its_engine_offline(browser,
           if (!navigator.serviceWorker.controller) await new Promise(resolve =>
             navigator.serviceWorker.addEventListener("controllerchange", resolve, {once: true}));
         }""")
-        # Another tab installs and applies two updates, as a user would.
+        # Another tab installs and applies three updates, as a user would.
         new_tab = context.new_page()
         new_tab.on("pageerror", lambda error: errors.append(str(error)))
         new_tab.on("dialog", lambda dialog: dialog.accept())
         new_tab.goto(url)
-        for index, build in ((1, "ab000002"), (2, "ab000003")):
+        for index, build in ((1, "ab000002"), (2, "ab000003"), (3, "ab000004")):
             current[0] = index
             expect(new_tab.locator("#status")).to_contain_text("Engine ready", timeout=90000)
             _open_offline_panel(new_tab)
@@ -405,6 +407,11 @@ def test_a_tab_left_open_across_two_updates_restarts_its_engine_offline(browser,
             assert new_tab.evaluate("window.duplotrainBuild") == build
             assert old_tab.evaluate("window.duplotrainBuild") == "ab000001"
             assert old_tab.evaluate("S.snapshot") == confirmed
+        # Both tabs answered the last activation's handshake: it deleted the version
+        # the third update superseded and kept the one the old tab runs.
+        kept = new_tab.evaluate("caches.keys()")
+        assert [any(name.endswith(":" + version) for name in kept) for version in names] == [
+            True, False, True, True]
         # With the network gone, the old tab still has its own version's files.
         stop_server()
         with pytest.raises(OSError):

@@ -9,9 +9,9 @@ function invalidateTrain() {
   closeOverlapPicker();
   stopTrain(); trainTrace = null; trainStep = -1; trainConfigSequence++;
   for (const id of ["train-play", "train-step", "train-unvisited", "train-cycle"])
-    if (el(id)) el(id).disabled = true;
-  for (const id of ["train-unvisited", "train-cycle"]) if (el(id)) el(id).checked = false;
-  if (el("train-report")) el("train-report").textContent = "";
+    el(id).disabled = true;
+  for (const id of ["train-unvisited", "train-cycle"]) el(id).checked = false;
+  el("train-report").textContent = "";
 }
 function renderSwitches() {
   const box = el("train-switches");
@@ -53,10 +53,9 @@ function showTrainStep() {
   if (!trainTrace || trainTrace.revision !== S?.revision) { stopTrain(); return; }
   const t = trainTrace, step = t.steps[trainStep];
   const terminal = trainStep === t.steps.length ? t.terminal : null;
-  const count = t.visited_drivable?.length ?? t.visited?.length ?? 0;
-  const total = t.drivable_count ?? S.layout.placements.length;
+  const count = t.visited_drivable.length, total = t.drivable_count;
   const reason = {stop_stone: "stop stone", buffer: "buffer", open_end: "open end", dead_route: "no onward route"};
-  el("train-report").textContent = t.outcome === "limit" ? `${t.limit || 10000}-step limit reached; no verdict or coverage claim made.` :
+  el("train-report").textContent = t.outcome === "limit" ? `${t.limit}-step limit reached; no verdict or coverage claim made.` :
     `Model result from this start: ${t.outcome}. ${count} / ${total} drivable pieces visited; ${t.reversals} reversal(s)` +
     `${t.period === null ? "" : `; cycle ${t.period} steps`}. Selected initial switches; not a claim about every start.` +
     (step ? ` Step ${trainStep + 1}/${t.steps.length}: #${step[0] + 1}, port ${step[1]} → ${step[2]}.` : "") +

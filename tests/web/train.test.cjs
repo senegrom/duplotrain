@@ -10,7 +10,8 @@ const tracks = () => [track([[-100, 0, 100], [100, 0, 100]], "Top"),
 
 test("train trace steps, pauses and expires without claiming all starting states", async () => {
   const trace = {revision: 1, outcome: "endless", start: [0, 0], steps: [[0, 0, 1], [1, 0, 1]],
-    cycle_start: 0, period: 2, reversals: 0, visited: [0, 1], complete: true};
+    cycle_start: 0, period: 2, reversals: 0, visited: [0, 1], visited_drivable: [0, 1], drivable_count: 2,
+    complete: true};
   const h = harness({events: true, overrides: {api: async () => trace}});
   h.el("train-start").value = "[0,0]";
   await h.run("testTrain()"); assert.match(h.el("train-report").textContent, /not a claim about every start/);
@@ -46,6 +47,7 @@ for (const immediate of [true, false]) test(`train ${immediate ? "immediate" : "
 test("step limit disables playback and coverage rather than highlighting supposedly unvisited track", async () => {
   const h = harness({state: scene(tracks()), events: true, overrides: {api: async () => ({
     revision: 1, outcome: "limit", limit: 3, steps: [], complete: false, terminal: null, unvisited: null,
+    visited_drivable: [], drivable_count: 3,
   })}});
   h.el("train-start").value = "[0,0]"; await h.run("testTrain()");
   assert.match(h.el("train-report").textContent, /3-step limit.*no verdict or coverage claim/);

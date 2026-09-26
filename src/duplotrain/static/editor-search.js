@@ -12,7 +12,7 @@ function visibleCandidates() {
 function clearInteractiveState() {
   jobSequence++; interactiveJob = routeAnalysis = null;
   jobPauseRequested = true; jobLoop = false; refreshBusy();
-  if (el("route-report")) el("route-report").textContent = "";
+  el("route-report").textContent = "";
   renderJobControls();
 }
 function discardInteractiveJob() {
@@ -27,19 +27,19 @@ function rectangleInput(text) {
   return values;
 }
 function readSearchOptions() {
-  const room = (el("room-bounds")?.value || "").trim();
-  const keep = (el("keep-out")?.value || "").trim();
+  const room = (el("room-bounds").value || "").trim();
+  const keep = (el("keep-out").value || "").trim();
   const keep_out = keep ? keep.split(/\n/).filter(s => s.trim()).map(rectangleInput) : [];
   if (keep_out.length > 32) throw new Error("Use at most 32 keep-out rectangles.");
-  return {sort: el("candidate-sort")?.value || "discovery", exclude: [...exclusions].sort(),
+  return {sort: el("candidate-sort").value || "discovery", exclude: [...exclusions].sort(),
     room: room ? rectangleInput(room) : null, keep_out};
 }
 function restoreSearchOptions(options) {
   exclusions = new Set(options?.exclude || []); exclusionKey = null;
-  if (el("candidate-sort")) el("candidate-sort").value = options?.sort || "discovery";
+  el("candidate-sort").value = options?.sort || "discovery";
   const text = rect => rect.map(v => v / 10).join(", ");
-  if (el("room-bounds")) el("room-bounds").value = options?.room ? text(options.room) : "";
-  if (el("keep-out")) el("keep-out").value = (options?.keep_out || []).map(text).join("\n");
+  el("room-bounds").value = options?.room ? text(options.room) : "";
+  el("keep-out").value = (options?.keep_out || []).map(text).join("\n");
   renderSearchOptions();
 }
 function renderSearchOptions() {
@@ -61,7 +61,6 @@ function renderSearchOptions() {
   }
 }
 // What a search can still do; its controls and its final message both follow these.
-function canFindMore(job) { return job.found < 50 && job.resumable; }
 function canHarden(job) {
   return job.can_harden && !job.complete && !(job.max_pieces >= 128 && job.search_effort >= 16);
 }
@@ -71,32 +70,31 @@ function searchOutcome(job) {
   const summary = job.found ? `${job.found} alternative(s) found — preview and apply.` :
     job.reason || (job.complete ? "No completion fits the remaining inventory under these settings." :
       "No completion found within these limits. A closure may still exist.");
-  const next = [canFindMore(job) && "Find more resumes this search",
+  const next = [job.resumable && "Find more resumes this search",
                 canHarden(job) && "Search harder raises its limits"].filter(Boolean);
   return next.length ? `${summary} ${next.join("; ")}.` : summary;
 }
 function renderJobControls() {
   const show = (id, visible, disabled = false) => {
-    const target = el(id); if (target) { target.hidden = !visible; target.disabled = disabled; }
+    const target = el(id); target.hidden = !visible; target.disabled = disabled;
   };
   const job = interactiveJob, active = !!job && job.revision === S?.revision;
-  show("find-more", active && canFindMore(job), jobLoop);
+  show("find-more", active && job.resumable, jobLoop);
   show("resume-search", active && job.status === "paused", jobLoop);
-  show("stop-results", active && job.status === "running" && job.found > 0);
   if (active) {
     show("expand-search", canHarden(job), jobLoop);
     const total = Math.max(1, Math.ceil(job.found / 8));
-    if (el("candidate-page")) el("candidate-page").textContent = `Page ${job.page + 1} / ${total}`;
+    el("candidate-page").textContent = `Page ${job.page + 1} / ${total}`;
     show("candidate-prev", total > 1, jobLoop || job.page === 0);
     show("candidate-next", total > 1, jobLoop || job.page + 1 >= total);
-    if (el("search-report")) el("search-report").textContent =
+    el("search-report").textContent =
       `${job.stage}: ${job.searched.toLocaleString()} search nodes; ${job.found} distinct alternative(s). ` +
       `${job.status.replaceAll("_", " ")}. Sorted best among found only; no global optimum guaranteed. ` +
       "Constraints shown belong to this search; changed controls apply to a new search.";
   } else {
     for (const id of ["candidate-prev", "candidate-next", "expand-search"]) show(id, false);
-    if (el("candidate-page")) el("candidate-page").textContent = "";
-    if (el("search-report")) el("search-report").textContent = "";
+    el("candidate-page").textContent = "";
+    el("search-report").textContent = "";
   }
   if (S) show("close-all", true, jobLoop || (S.open_ends?.length ?? 0) < 2);
   // A route analysis pauses with its own button.
@@ -119,7 +117,7 @@ function jobRequestFailed(error, sequence, drop) {
   status(error.message, "err");
 }
 // The ranking is presentation: every request of a search carries the chosen one.
-const jobView = () => ({page: searchPage, sort: el("candidate-sort")?.value || "discovery"});
+const jobView = () => ({page: searchPage, sort: el("candidate-sort").value || "discovery"});
 async function publishSearch(sequence) {
   if (!interactiveJob || sequence !== jobSequence) return;
   const chosenIndex = (interactiveJob.candidates || []).find(c =>
@@ -218,7 +216,7 @@ async function searchPageTo(page) {
   const sequence = jobSequence;
   try {
     const response = await api("/api/search/page", {job_id: interactiveJob.job_id,
-      revision: interactiveJob.revision, page, sort: el("candidate-sort").value || "discovery"});
+      revision: interactiveJob.revision, ...jobView(), page});
     if (!jobCurrent(sequence, response)) return;
     interactiveJob = response; searchPage = response.page;
     renderCandidates(); renderJobControls(); draw();
@@ -259,7 +257,7 @@ async function driveRouteTicks(sequence) {
     if (sequence === jobSequence) {
       // A failed tick ends the analysis, as it ends a search.
       failure = error.message; routeAnalysis = null;
-      if (el("route-report")) el("route-report").textContent = "";
+      el("route-report").textContent = "";
     } else if (error.code === "stale_revision") status(error.message, "err");
   } finally { if (sequence === jobSequence) {
     jobLoop = false; refreshBusy(); renderJobControls(); refreshStatus();
@@ -293,17 +291,18 @@ async function useRouteWitness(counterexample = false) {
 }
 function bindSearchEvents() {
   on("find-more", () => continueSearch());
+  on("expand-search", () => continueSearch(true));
   on("resume-search", () => continueSearch(false, true));
+  on("pause-search", () => { if (jobLoop) requestJobPause(); });
   on("close-all", () => startInteractiveSearch(null, null, 1, true));
-  on("stop-results", requestJobPause);
   on("candidate-prev", () => searchPageTo(Math.max(0, searchPage - 1)));
   on("candidate-next", () => searchPageTo(searchPage + 1));
-  el("candidate-sort")?.addEventListener("change", () => {
+  el("candidate-sort").addEventListener("change", () => {
     updateProjectStatus();
     // A running search re-ranks at its next checkpoint, from the first page.
     if (jobLoop) searchPage = 0; else searchPageTo(0);
   });
-  for (const id of ["room-bounds", "keep-out"]) el(id)?.addEventListener("input", updateProjectStatus);
+  for (const id of ["room-bounds", "keep-out"]) el(id).addEventListener("input", updateProjectStatus);
   const excludeKinds = kind => {
     for (const p of S?.palette || []) {
       if (kind === "bridges" ? p.category === "bridge" : p.junction) exclusions.add(p.id);
@@ -326,7 +325,7 @@ function bindSearchEvents() {
     } catch (error) {
       jobRequestFailed(error, sequence, () => {
         routeAnalysis = null;
-        if (el("route-report")) el("route-report").textContent = "";
+        el("route-report").textContent = "";
       });
     }
   });

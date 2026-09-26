@@ -14,7 +14,6 @@ function editor(transport = "http") {
   let current = state(7);
   const dispatch = (url, body) => {
     calls.push({url, body});
-    if (url === "/api/export") return current.snapshot.layout;
     if (body.revision !== current.revision) throw Object.assign(new Error("Your action was not applied"), {
       code: "stale_revision", state: current,
     });

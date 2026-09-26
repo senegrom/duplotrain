@@ -220,7 +220,8 @@ def test_pause_and_save_controls_take_clicks_while_a_search_runs(editor):
     page.evaluate("() => { startInteractiveSearch(null, null); }")  # runs until paused
     page.wait_for_function("jobLoop && document.body.classList.contains('busy')")
     events = "id => getComputedStyle(document.getElementById(id)).pointerEvents"
-    for control in ("pause-search", "export", "save-project"):
+    for control in ("pause-search", "route-pause", "train-pause", "export", "save-project",
+                    "save-download"):
         assert page.evaluate(events, control) != "none", control
     assert page.evaluate(events, "check-layout") == "none"
     page.locator("#pause-search").click()

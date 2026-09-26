@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const {harness, scene, track} = require("./reliability-harness.cjs");
 const clean = x => JSON.parse(JSON.stringify(x));
 const turn = () => new Promise(resolve => setImmediate(resolve));
-const candidate = (index, revision = 7) => ({index, revision, candidate_id: `candidate-${index}`,
+const candidate = (index, revision = 7) => ({index, revision,
   exact: true, gap: 0, kind: "loop", added: {curve: 6}, size_cm: [50, 50], open_stubs: 0,
   preview: {format: "duplotrain-preview/1", base_count: 0, base_revision: revision, placements: []}});
 const job = (extra = {}) => ({job_id: "job-A", revision: 7, status: "running", stage: "plain track",
@@ -201,20 +201,6 @@ test("Pause stops a route analysis at its next checkpoint and offers Resume", as
   assert.equal(h.run("routeAnalysis.status"), "paused");
   assert.equal(h.el("route-pause").hidden, true);
   assert.equal(h.el("route-resume").hidden, false);
-});
-
-test("Stop with results is offered only while a running search has found some", async () => {
-  const h = app();
-  const offered = extra => {
-    h.context.current = job(extra); h.run("interactiveJob = current; renderJobControls()");
-    return !h.el("stop-results").hidden;
-  };
-  assert.equal(offered({found: 0}), false);
-  assert.equal(offered({found: 3, status: "paused"}), false);
-  assert.equal(offered({found: 3, revision: 6}), false);  // a search of an older layout
-  assert.equal(offered({found: 3}), true);
-  await h.el("stop-results").click();
-  assert.equal(h.run("jobPauseRequested"), true);
 });
 
 test("viewport culling submits only visible track and includes edge padding", () => {
@@ -510,12 +496,17 @@ for (const [status, extra, offered] of [
   });
 }
 
-test("a search pauses with Pause and Stop, a route analysis with its own Pause", () => {
+test("a search pauses with its one Pause, a route analysis with its own", async () => {
   const h = app();
-  const pauses = () => ["stop-results", "pause-search", "route-pause"].filter(id => !h.el(id).hidden);
+  const pauses = () => ["pause-search", "route-pause"].filter(id => !h.el(id).hidden);
   h.context.running = job({found: 3, candidates: [candidate(0)]});
   h.run("interactiveJob = running; jobLoop = true; renderJobControls()");
-  assert.deepEqual(pauses(), ["stop-results", "pause-search"]);
+  assert.deepEqual(pauses(), ["pause-search"]);
+  await h.el("pause-search").click();
+  assert.equal(h.run("jobPauseRequested"), true);
+  h.run("jobPauseRequested = false; jobLoop = false; renderJobControls()");
+  await h.el("pause-search").click();  // a stale click after the search stopped
+  assert.equal(h.run("jobPauseRequested"), false);
   h.context.analysis = route();
   h.run("interactiveJob = null; routeAnalysis = analysis; renderJobControls()");
   assert.deepEqual(pauses(), ["route-pause"]);

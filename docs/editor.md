@@ -113,7 +113,8 @@ that session; a local server that is already running keeps its newer session,
 and a tab that loses the race to restore a fresh engine shows what the other tab
 restored and keeps autosaving. After a server restart the first tab to act
 restores the newest confirmed session into the new server: its own, unless
-another tab autosaved since this tab last did, in which case that checkpoint.
+another tab autosaved since this tab last did, in which case that checkpoint,
+and it keeps autosaving from there.
 Checkpoints carry unique revisions and Web Locks serialise writes across tabs: a
 tab that sees another writer pauses its autosave and asks you to export before
 reloading, and redrawing or closing a stale tab never rewrites a newer
@@ -159,7 +160,8 @@ while answering a request, the overlay offers downloads of the last confirmed
 layout and session from this tab's own state, and a restart that creates a new
 worker and restores a copy of that snapshot; responses from an old worker
 generation are ignored, and a restart resets undo history and suggestions and
-says so. Startup times out after 60 seconds; outstanding calls time out after
+says so. Startup fails after a minute without loading progress, however long a
+first visit takes to download the runtime; outstanding calls time out after
 two minutes without a response. Every request is short: the editor's searches
 and route analyses are interactive jobs that advance in brief ticks and pause
 without restarting the worker ([search-jobs.md](search-jobs.md)).
@@ -202,7 +204,10 @@ ship with LF newlines, so one commit names one offline version on every build
 host. An offline version is marked
 ready only after all resources verify and the completion marker is written. A
 download fails once no bytes arrive for a minute, not when a slow but steady
-link needs longer for a large runtime file. Cached
+link needs longer for a large runtime file. An installation cut short, by a lost
+connection or the browser's time limit for one task, keeps the files it verified
+and resumes from them, and the page waits as long as the service worker reports
+that it is still working. Cached
 responses preserve the build's CSP and MIME headers. Project/autosave data is
 not stored in these application-code caches.
 
@@ -213,15 +218,17 @@ rechecks readiness and waits for activation before reloading. Download a project
 first: an explicit reload still resets in-memory undo and search progress.
 
 A failed installation, failed digest or storage quota error does not replace an
-older verified version or delete unrelated application caches. Versioned asset
+older verified version or delete unrelated application caches; running out of
+space deletes only the unfinished version. Versioned asset
 URLs keep old live tabs on coherent resources: activating a version keeps the
 version that was active before it and every version an open tab reports running,
 so a tab left open across several updates can still restart its engine offline;
 the other older versions, such as a waiting update that was superseded, are
 deleted. An open tab that does not answer within 1.5 seconds (a page older than
 this handshake, a suspended tab), a tab that opens meanwhile, or a reported build
-no complete version holds keeps every version for that activation; a version
-that is still installing is left alone.
+no complete version holds keeps every version for that activation. Another
+version's unfinished installation is left alone until it has made no progress
+for an hour, and then deleted.
 Browser eviction or missing entries can remove offline availability, so readiness
 is checked and installation can be repaired online. This is not a permanent
 storage guarantee or a substitute for portable project backups. The desktop local
@@ -241,11 +248,15 @@ artifact by name, the deploy job first downloads it by the build job's artifact
 ID and checks the same digest: a same-name upload from any other job would carry
 a new ID, and the deploy would fail rather than publish it.
 
-The offline browser test boots the built app in a fresh profile under the
-production CSP, installs the offline version, stops the resource server, reloads
-the real engine from the cache and recovers the confirmed session; any page error
-fails it. Chromium serves it over HTTP loopback. WebKit needs HTTPS under that
-policy, so its variant runs only on the disposable GitHub-hosted runner, which
-installs a short-lived test CA by explicit opt-in (`DUPLOTRAIN_TEST_SYSTEM_CA=1`)
-and removes it afterwards; elsewhere it is skipped. `tests/browser/tls.py` and
+The offline browser tests boot the built app in a fresh profile under the
+production CSP; any page error fails them. One installs the offline version,
+stops the resource server, reloads the real engine from the cache and recovers
+the confirmed session. The other keeps a tab open while a second tab installs
+and applies three updates through the editor's own buttons, checks that the last
+activation deleted the superseded version but kept the open tab's, then stops
+the server and restarts the first tab's engine from its own version. Chromium
+serves them over HTTP loopback. WebKit needs HTTPS under that policy, so its
+variants run only on the disposable GitHub-hosted runner, which installs a
+short-lived test CA by explicit opt-in (`DUPLOTRAIN_TEST_SYSTEM_CA=1`) and
+removes it afterwards; elsewhere they are skipped. `tests/browser/tls.py` and
 `tests/browser/test_path_web.py` give the details.
