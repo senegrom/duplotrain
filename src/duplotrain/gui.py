@@ -32,7 +32,6 @@ _EDITOR_ASSETS = {
     )},
     "/editor.css": "text/css; charset=utf-8",
     "/manifest.webmanifest": "application/manifest+json",
-    "/duplotrain-icon.svg": "image/svg+xml",
     "/favicon.ico": "image/x-icon",
     "/apple-touch-icon.png": "image/png",
     "/icons/duplotrain-favicon-v1.ico": "image/x-icon",

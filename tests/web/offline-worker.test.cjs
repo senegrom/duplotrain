@@ -14,11 +14,15 @@ function cacheStorage(){
       if(!map.has(key))map.set(key,new Map());const store=map.get(key);
       const name=k=>typeof k==="string"?k:k.url;
       // Model stored bytes, not long-lived tee streams in Node's Response.clone.
-      return {async match(k){const value=store.get(name(k));return value?
-        new Response(value.body.slice(0),{status:value.status,headers:value.headers}):undefined;},async put(k,v){
+      // As a browser: a stored Vary header hides an entry from a request unless
+      // the match ignores it (assets are stored under bare URLs).
+      return {async match(k,options){const value=store.get(name(k));
+        if(value&&typeof k!=="string"&&!options?.ignoreVary&&value.headers.some(([n])=>n.toLowerCase()==="vary"))
+          return undefined;
+        return value?new Response(value.body.slice(0),{status:value.status,headers:value.headers}):undefined;},async put(k,v){
         if(failedPut)throw new DOMException("quota exceeded","QuotaExceededError");store.set(name(k),{
           body:await v.arrayBuffer(),status:v.status,headers:[...v.headers]});},
-        async delete(k){return store.delete(name(k));}};
+        async delete(k){return store.delete(name(k));},async keys(){return [...store.keys()];}};
     }};
 }
 function worker({build="aaa",caches=cacheStorage(),bad=null,now=()=>Date.now(),page="",
@@ -40,7 +44,7 @@ function worker({build="aaa",caches=cacheStorage(),bad=null,now=()=>Date.now(),p
       bad==="same-length"&&asset?.url.startsWith("editor.js")?asset.body.slice(0,-1)+"x":
       asset?.body||"network fallback";
     return new Response(body,{headers:{"Content-Type":asset?.url==="index.html"?"text/html":"application/javascript",
-      "Content-Security-Policy":"default-src 'self'","Content-Encoding":"gzip"}});
+      "Content-Security-Policy":"default-src 'self'","Content-Encoding":"gzip","Vary":"User-Agent"}});
   };
   const ctx=vm.createContext({URL,Response,Request,Headers,Uint8Array,ArrayBuffer,AbortController,
     crypto:webcrypto,caches,fetch,MessageChannel,...timers,Date:{now},
@@ -238,7 +242,7 @@ test("a slow but steady download completes; a quiet minute aborts it",async()=>{
   stalledTime.advance(59999);await settle();
   assert.equal(outcome,null);assert.equal(stalled.waiting.length,0);
   stalledTime.advance(1);await settle();
-  assert.match(String(outcome),/aborted/);
+  assert.match(String(outcome),/stalled for a minute: index\.html/);
   assert.equal((await v.ctx.offlineStatus()).ready,false);
   assert.ok(!v.caches.map.get(v.run("CACHE")).has(new URL("index.html",scope).href));
 });
@@ -254,6 +258,17 @@ test("an installation abandoned for an hour is reclaimed by the next activation"
   clock+=1;await a.activate();
   assert.ok(!caches.map.has(partial.run("CACHE")));
   assert.equal((await a.ctx.offlineStatus()).ready,true);
+});
+
+test("activation reclaims an older worker's unstamped leftovers, never a cache just opened",async()=>{
+  const caches=cacheStorage(),now=()=>5000000;
+  const leftover=worker({build:"ddd",caches,now}),opening=worker({build:"eee",caches,now});
+  await (await caches.open(leftover.run("CACHE"))).put(new URL("index.html",scope).href,
+    new Response("an older worker's partial download"));
+  await caches.open(opening.run("CACHE"));  // an installation about to stamp it
+  const a=worker({build:"aaa",caches,now});await a.install();await a.activate();
+  assert.ok(!caches.map.has(leftover.run("CACHE")));
+  assert.ok(caches.map.has(opening.run("CACHE")));
 });
 
 test("a long installation request tells the page it is still working",async()=>{

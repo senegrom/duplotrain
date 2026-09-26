@@ -1,4 +1,4 @@
-/* Bridge the editor to the worker. __BUILD__ is replaced by webapp/build.py. */
+/* Bridge the editor to the worker; webapp/build.py stamps the build into it. */
 "use strict";
 window.duplotrainBuild = "__BUILD__";
 
@@ -90,11 +90,12 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
           if (worker === current) fail(new Error(event.message || "worker error"));
         };
         current.onmessageerror = () => { if (worker === current) fail(new Error("invalid worker message")); };
-        // Loading fails only after a minute without progress: a first visit
-        // downloads the whole runtime, however slow the link.
-        const loading = () => {
+        // Loading fails only after a minute without a progress report. The first
+        // report may take longer: the worker loads the runtime's main script in one
+        // blocking piece before it can report anything, so it gets five minutes.
+        const loading = (ms = 60000) => {
           clearTimeout(bootTimer);
-          bootTimer = setTimeout(() => fail(new Error("engine loading stalled for a minute")), 60000);
+          bootTimer = setTimeout(() => fail(new Error("engine loading stalled")), ms);
         };
         current.addEventListener("message", ({data}) => {
           // Late responses from an old generation must never restore old state.
@@ -110,7 +111,7 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
           pending.delete(id); heartbeat();
           if (err) call.reject(new Error(err)); else call.resolve(res);
         });
-        loading();
+        loading(300000);
       });
       if (snapshot) {
         const state = await window.duplotrainApi("/api/restore", {

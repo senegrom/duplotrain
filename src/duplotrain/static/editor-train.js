@@ -15,7 +15,6 @@ function invalidateTrain() {
 }
 function renderSwitches() {
   const box = el("train-switches");
-  if (!box?.replaceChildren) return;
   box.replaceChildren(); initialSwitches = {}; switchControls.clear();
   for (const item of S.train_switches || []) {
     initialSwitches[item.placement] = item.default;

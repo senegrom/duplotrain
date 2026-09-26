@@ -8,7 +8,7 @@ const candidate = (index, revision = 7) => ({index, revision,
   exact: true, gap: 0, kind: "loop", added: {curve: 6}, size_cm: [50, 50], open_stubs: 0,
   preview: {format: "duplotrain-preview/1", base_count: 0, base_revision: revision, placements: []}});
 const job = (extra = {}) => ({job_id: "job-A", revision: 7, status: "running", stage: "plain track",
-  searched: 32, found: 0, target: 8, page: 0, candidates: [], complete: false, optimal: false,
+  searched: 32, found: 0, page: 0, candidates: [], complete: false,
   max_pieces: 26, search_effort: 1, resumable: true, can_harden: true, ...extra});
 const route = (extra = {}) => ({job_id: "route-A", revision: 7, status: "running", scope: "all",
   runs: 1, required_runs: "4", step_limited_runs: 0, total_drivable: 3, best: null,
@@ -580,4 +580,11 @@ test("hovering a card keeps its ghost while the search ticks on", () => {
   assert.equal(h.run("preview.placements[0].n"), 1);
   h.el("cands").children[1].fire("pointerleave");
   assert.equal(h.run("preview"), null);
+});
+
+test("a search's reason is shown beside the alternatives it did find", () => {
+  const h = app();
+  const reason = "Some closures would make the session too large to save; they are not offered.";
+  h.context.done = job({status: "exhausted", found: 3, reason, resumable: false, can_harden: false});
+  assert.match(h.run("searchOutcome(done)"), /3 alternative\(s\) found.*too large to save/);
 });

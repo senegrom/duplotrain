@@ -3,6 +3,7 @@
 let offlineRegistration = null, offlineWorking = false;
 // Error texts may or may not end their sentence; a notice goes on after them.
 const sentence = text => /[.!?]$/.test(text) ? text : `${text}.`;
+const UPDATE_READY = "Update available and verified. Save a project before applying it; no automatic reload.";
 function offlineNotice(message) {
   el("offline-status").textContent = `Build ${window.duplotrainBuild || "local server"}. ${message}`;
 }
@@ -46,13 +47,23 @@ async function showOfflineStatus() {
   const r = offlineRegistration;
   if (!r) { offlineNotice("Not installed for offline use."); return; }
   const result = await offlineMessage(r.active || r.waiting, "STATUS");
-  const same = result.build === window.duplotrainBuild;
-  offlineNotice(result.ready ? (same ? "Offline ready (verified complete app)." :
-    `Offline build ${result.build} is ready. Save your project before reloading it.`) :
-    "Offline files are missing or incomplete. Reinstall while online.");
-  // Only a waiting version is an update: reloading otherwise opens the active
-  // offline build, which may be older than this page.
-  el("offline-update").hidden = !r.waiting;
+  // Only a version waiting behind an active one is an update: reloading otherwise
+  // opens the active offline build, which may be older than this page.
+  const update = !!(r.waiting && r.active);
+  offlineNotice(update ? UPDATE_READY : !result.ready ?
+    "Offline files are missing or incomplete. Reinstall while online." :
+    result.build === window.duplotrainBuild ? "Offline ready (verified complete app)." :
+    `Offline build ${result.build} is ready. Save your project before reloading it.`);
+  el("offline-update").hidden = !update;
+}
+// Read the registration without registering or installing anything: another tab
+// may have installed offline access since this one started.
+async function findRegistration() {
+  const scope = new URL("./", location.href).href;
+  const r = await navigator.serviceWorker.getRegistration(scope);
+  if (!r || r.scope !== scope) return null;
+  offlineRegistration = r; watchOfflineUpdates(r);
+  return r;
 }
 // The browser hands back the same registration each time: listen to it once.
 const watchedRegistrations = new WeakSet();
@@ -61,15 +72,20 @@ function watchOfflineUpdates(r) {
   watchedRegistrations.add(r);
   r.addEventListener("updatefound", () => {
     // Without an active version this is a first installation, which activates by
-    // itself (browsers list it as waiting for a moment all the same).
+    // itself (browsers list it as waiting for a moment all the same). A version
+    // that installed and is later replaced turns redundant too: that is no failure.
     const installing = r.installing, update = !!r.active;
+    let installed = false;
     installing?.addEventListener("statechange", () => {
-      if (installing.state === "installed" && update) {
+      const state = installing.state;
+      installed ||= state === "installed";
+      if (offlineWorking) return;  // an explicit action reports its own outcome
+      if (state === "installed" && update) {
         el("offline-update").hidden = false;
-        offlineNotice("Update available and verified. Save a project before applying it; no automatic reload.");
-      } else if (installing.state === "activated" && !update) {
+        offlineNotice(UPDATE_READY);
+      } else if (state === "activated" && !update) {
         showOfflineStatus().catch(error => offlineNotice(sentence(error.message)));
-      } else if (installing.state === "redundant") {
+      } else if (state === "redundant" && !installed) {
         offlineNotice(update ? "Update failed; the existing version was kept. Retry online." :
           "Offline installation failed. Retry online.");
       }
@@ -85,29 +101,29 @@ async function installOffline() {
     offlineNotice("Downloading and verifying the complete application…");
     const r = await navigator.serviceWorker.register("./service-worker.js", {scope: "./", updateViaCache: "none"});
     offlineRegistration = r; watchOfflineUpdates(r);
-    const worker = await awaitOfflineWorker(r);
-    const result = await offlineMessage(worker, "INSTALL");
-    offlineNotice(result.ready && result.build === window.duplotrainBuild ? "Offline ready (complete version verified)." :
-      `Build ${result.build} is ready offline. Save your project before switching versions.`);
-    el("offline-update").hidden = !r.waiting;
+    await offlineMessage(await awaitOfflineWorker(r), "INSTALL");
+    await showOfflineStatus();
   } catch (error) { offlineNotice(`${sentence(error.message)} Portable project downloads remain available.`); }
   finally { offlineWorking = false; }
 }
 async function checkOfflineUpdate() {
   if (offlineWorking) return;
+  offlineWorking = true;
   try {
-    if (!offlineRegistration) { offlineNotice("Install offline access first. The normal online app revalidates on reload."); return; }
-    await offlineRegistration.update();
-    if (offlineRegistration.installing) await awaitOfflineWorker(offlineRegistration);
+    const r = offlineRegistration || await findRegistration();
+    if (!r) { offlineNotice("Install offline access first. The normal online app revalidates on reload."); return; }
+    await r.update();
+    if (r.installing) await awaitOfflineWorker(r);
     await showOfflineStatus();
-  } catch (error) { offlineNotice(`Update check failed: ${sentence(error.message)} Existing offline version kept.`); }
+  } catch (error) { offlineNotice(`Update check failed: ${sentence(error.message)}`); }
+  finally { offlineWorking = false; }
 }
 async function applyOfflineUpdate() {
   if (offlineWorking || jobLoop || apiBusy) { offlineNotice("Finish or pause the current operation before updating."); return; }
   if (!window.confirm("Reload the app with the verified offline version? Download a project first. In-memory undo and search progress will be reset.")) return;
   offlineWorking = true;
   try {
-    const r = offlineRegistration;
+    const r = offlineRegistration || await findRegistration();
     if (!r) throw new Error("No offline version is installed");
     if (!(await offlineMessage(r.waiting || r.active, "STATUS")).ready)
       throw new Error("Offline version is incomplete; reinstall online before reloading.");
@@ -132,11 +148,6 @@ function bindOfflineEvents() {
     for (const id of ["offline-install", "offline-check"]) el(id).disabled = true;
     return;
   }
-  // Read existing registrations without registering/installing anything silently.
-  navigator.serviceWorker.getRegistration(new URL("./", location.href).href).then(r => {
-    const scope = new URL("./", location.href).href;
-    if (!r || r.scope !== scope) return;
-    offlineRegistration = r; watchOfflineUpdates(r);
-    if (r.active || r.waiting) return showOfflineStatus();
-  }).catch(error => offlineNotice(sentence(error.message)));
+  findRegistration().then(r => { if (r && (r.active || r.waiting)) return showOfflineStatus(); })
+    .catch(error => offlineNotice(sentence(error.message)));
 }

@@ -44,7 +44,7 @@ function restoreSearchOptions(options) {
 }
 function renderSearchOptions() {
   const box = el("search-exclusions");
-  if (!S || !box?.replaceChildren) return;
+  if (!S) return;
   const key = JSON.stringify([(S.palette || []).map(p => [p.id, p.name]), [...exclusions].sort()]);
   if (key === exclusionKey) return;
   exclusionKey = key; box.replaceChildren();
@@ -67,7 +67,9 @@ function canHarden(job) {
 function searchOutcome(job) {
   if (job.status === "paused")
     return `Search paused${job.found ? ` with ${job.found} alternative(s) — preview and apply` : ""}. Resume continues it.`;
-  const summary = job.found ? `${job.found} alternative(s) found — preview and apply.` :
+  // A reason also explains what was found: closures set aside, walks cut short.
+  const found = `${job.found} alternative(s) found — preview and apply.`;
+  const summary = job.found ? (job.reason ? `${found} ${job.reason}` : found) :
     job.reason || (job.complete ? "No completion fits the remaining inventory under these settings." :
       "No completion found within these limits. A closure may still exist.");
   const next = [job.resumable && "Find more resumes this search",
@@ -228,7 +230,7 @@ function requestJobPause() {
 }
 function showRouteAnalysis() {
   const r = routeAnalysis, out = el("route-report");
-  if (!r || !out || r.revision !== S?.revision) return;
+  if (!r || r.revision !== S?.revision) return;
   out.replaceChildren();
   const line = text => { const p = document.createElement("p"); p.textContent = text; out.append(p); };
   line(`${r.runs.toLocaleString()} / ${r.required_runs} runs checked (${r.scope === "all" ? "all starts" : "selected start"}, all initial switch settings). ${r.status}.`);

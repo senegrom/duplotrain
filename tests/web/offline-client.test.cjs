@@ -10,17 +10,19 @@ function serviceWorker(state) {
 }
 function client({confirm = true, ready = true, waiting = false, fail = false, existing = false,
   activeBuild = "test-build", workerState = "activated"} = {}) {
-  let reloads = 0, registrations = 0, confirmations = 0, updates = 0;
+  let reloads = 0, registrations = 0, confirmations = 0, updates = 0, registered = existing;
   const messages = [], registrationListeners = {};
   const worker = serviceWorker(workerState);
-  const registration = {scope: "https://example.test/train/", active: waiting ? null : worker,
-    waiting: waiting ? worker : null, installing: null,
+  // A waiting version is an update: it waits behind an active one.
+  const registration = {scope: "https://example.test/train/",
+    active: waiting ? serviceWorker("activated") : worker, waiting: waiting ? worker : null,
+    installing: null,
     addEventListener(name, fn) { registrationListeners[name] = fn; }, async update() { updates++; }};
   const h = harness({overrides: {isSecureContext: true, URL, clearTimeout() {},
     location: {href: "https://example.test/train/index.html", pathname: "/train/index.html"},
     window: {duplotrainBuild: "test-build", addEventListener() {},
       confirm() { confirmations++; return confirm; }, location: {reload() { reloads++; }}},
-    navigator: {serviceWorker: {async getRegistration() { return existing ? registration : null; },
+    navigator: {serviceWorker: {async getRegistration() { return registered ? registration : null; },
       async register() { registrations++; return registration; }}},
     offlineMessage: async (_worker, type) => {
       messages.push(type);
@@ -29,7 +31,8 @@ function client({confirm = true, ready = true, waiting = false, fail = false, ex
     }}});
   h.context.registration = registration;
   return {...h, messages, worker, registrationEvent: name => registrationListeners[name](),
-    counts: () => ({reloads, registrations, confirmations}), updates: () => updates};
+    counts: () => ({reloads, registrations, confirmations}), updates: () => updates,
+    register: () => { registered = true; }};
 }
 const turn = () => new Promise(resolve => setImmediate(resolve));
 
@@ -136,6 +139,7 @@ test("checking for an update reports it but never reloads or activates", async (
   assert.deepEqual(h.messages, ["STATUS"]);
   assert.deepEqual(h.counts(), {reloads: 0, registrations: 0, confirmations: 0});
   assert.equal(h.el("offline-update").hidden, false);
+  assert.match(h.el("offline-status").textContent, /Update available and verified/);
 });
 
 for (const outcome of ["installed", "redundant"]) {
@@ -232,4 +236,26 @@ test("an offline request waits while the worker works and gives up after a silen
   h.run("offlineMessage(worker, 'INSTALL')").then(() => { outcome = "answered"; }, e => { outcome = e.message; });
   advance(59999); await turn(); assert.equal(outcome, null);
   advance(1); await turn(); assert.match(outcome, /stopped responding/);
+});
+
+test("a version that installed and was later replaced is not reported as failed", async () => {
+  const h = client({existing: true}); h.run("bindOfflineEvents()");
+  await turn();
+  const next = serviceWorker("installing");
+  h.context.registration.installing = next; h.registrationEvent("updatefound");
+  Object.assign(h.context.registration, {installing: null, waiting: next});
+  next.state = "installed"; next.emit();
+  next.state = "redundant"; next.emit();  // superseded by a newer update, say
+  assert.match(h.el("offline-status").textContent, /Update available and verified/);
+});
+
+test("a tab opened before another tab installed offline access finds it", async () => {
+  const h = client(); h.run("bindOfflineEvents()");
+  await turn();
+  assert.equal(h.run("offlineRegistration"), null);
+  h.register();  // another tab installs
+  await h.run("checkOfflineUpdate()");
+  assert.equal(h.updates(), 1); assert.deepEqual(h.messages, ["STATUS"]);
+  assert.doesNotMatch(h.el("offline-status").textContent, /Install offline access first/);
+  assert.match(h.el("offline-status").textContent, /Offline ready/);
 });

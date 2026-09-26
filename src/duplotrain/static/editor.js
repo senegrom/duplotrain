@@ -1128,8 +1128,7 @@ function flushHover() {
 function clearHover() { pendingHover = null; hoveredPiece = null; }
 function closeOverlapPicker() {
   activeOverlap = null;
-  const box = el("overlap-picker");
-  if (box) box.hidden = true;
+  el("overlap-picker").hidden = true;
 }
 function clearTransient() {
   clearInteractiveState();
@@ -1258,9 +1257,8 @@ async function activateEnd(end) {
   }
 }
 function renderNavigation() {
-  if (!S || navigationRevision === S.revision || !document.createElement) return;
+  if (!S || navigationRevision === S.revision) return;
   const pieces = el("piece-select"), ends = el("end-select"), starts = el("train-start");
-  if (!pieces?.replaceChildren || !ends?.replaceChildren || !starts?.replaceChildren) return;
   pieces.replaceChildren(); ends.replaceChildren(); starts.replaceChildren();
   const add = (select, value, label) => {
     const option = document.createElement("option"); option.value = value; option.textContent = label; select.append(option);

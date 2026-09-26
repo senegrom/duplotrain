@@ -26,14 +26,17 @@ route. Relative scope, start URL and asset URLs keep the same files working on
 GitHub Pages and at the local editor's root.
 The manifest configures Home Screen launch; it does not add offline support.
 
-The PNG/ICO files are committed as Python package data and copied into
-`webapp/dist/` by the static build. They stay out of the Pyodide worker archive.
+The PNG/ICO exports under `icons/` are committed as Python package data and
+copied into `webapp/dist/` by the static build. They stay out of the Pyodide
+worker archive.
 Image-export dependencies are only needed when changing the artwork, not to
 install, build or use the app.
 
 Icon URLs include `duplotrain` and a revision in their physical filenames. For
 future artwork changes, bump
 `v1` in the exporter, HTML, manifest and local server asset allowlist together.
-Conventional `favicon.ico` and `apple-touch-icon.png` aliases are also included.
+Conventional `favicon.ico` and `apple-touch-icon.png` aliases, and the SVG source,
+are served only by the local editor, for browsers' automatic requests; the static
+build leaves them out, since the page links its icons under `icons/`.
 An existing iOS Home Screen shortcut may need to be removed and re-added to
 refresh its cached icon.

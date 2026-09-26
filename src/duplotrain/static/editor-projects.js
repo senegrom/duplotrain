@@ -35,7 +35,6 @@ function markProjectSaved(data, slot = null) {
 }
 function updateProjectStatus() {
   const notice = el("project-status");
-  if (!notice) return;
   let message;
   try {
     if (!S?.snapshot) message = "No project loaded.";

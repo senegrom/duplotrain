@@ -32,8 +32,11 @@ async function download(asset) {
   const url = absolute(asset.url);
   if (!url.startsWith(SCOPE)) throw new Error("Offline asset outside application scope");
   const controller = new AbortController();
-  let timer;
-  const alive = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort(), 60000); };
+  let timer, stalled = false;
+  const alive = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { stalled = true; controller.abort(); }, 60000);
+  };
   alive();
   try {
     const response = await fetch(url, {cache: "no-store", credentials: "same-origin", redirect: "error", signal: controller.signal});
@@ -50,8 +53,10 @@ async function download(asset) {
     if (size !== data.byteLength || hex(await crypto.subtle.digest("SHA-256", data)) !== asset.sha256)
       throw new Error(`Offline version verification failed: ${asset.url}`);
     return {response, data};
-  } catch (error) { controller.abort(); throw error; }
-  finally { clearTimeout(timer); }
+  } catch (error) {
+    controller.abort();
+    throw stalled ? new Error(`Offline download stalled for a minute: ${asset.url}`) : error;
+  } finally { clearTimeout(timer); }
 }
 // Each attempt keeps the assets it verified, so an installation cut short, by a
 // lost connection or the browser's time limit for one event, resumes where it
@@ -63,11 +68,12 @@ async function installVersion() {
     if (status.ready) return status;
     const cache = await caches.open(CACHE);
     try {
-      // A missing marker makes a partial version unusable for offline navigation.
-      await cache.delete(MARKER);
+      // Stamped first: another version's activation leaves a stamped cache alone.
       const progress = () => cache.put(progressOf(VERSION),
         new Response("", {headers: {"X-Progress": String(Date.now())}}));
       await progress();
+      // A missing marker makes a partial version unusable for offline navigation.
+      await cache.delete(MARKER);
       for (const asset of ASSETS) {
         const url = absolute(asset.url);
         if (await cache.match(url)) continue;
@@ -149,8 +155,12 @@ async function activateVersion() {
     if (older) complete.push({name, build: await older.text(), activated: Number(older.headers.get("X-Activated")) || 0,
       installed: Number(older.headers.get("X-Installed")) || 0});
     else {
+      // Without a stamp, a cache holding files is an older worker's leftover; an
+      // empty one is an installation opened this moment, not stamped yet.
       const progress = await other.match(progressOf(version));
-      if (Date.now() - (Number(progress?.headers.get("X-Progress")) || 0) > ABANDONED_MS) await caches.delete(name);
+      const stamp = Number(progress?.headers.get("X-Progress")) || 0;
+      if (Date.now() - stamp > ABANDONED_MS && (progress || (await other.keys()).length))
+        await caches.delete(name);
     }
   }
   complete.sort((a, b) => b.activated - a.activated || b.installed - a.installed);

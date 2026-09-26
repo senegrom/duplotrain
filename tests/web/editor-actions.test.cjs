@@ -49,17 +49,18 @@ function file(piece) {
     finish: () => resolve(JSON.stringify(state(0, piece).snapshot.layout)), resolve, reject};
 }
 
-for (const transport of ["http", "worker"]) {
-  test(`${transport} export preserves the displayed layout when another tab changes the engine`, async () => {
-    const e = editor(transport);
-    const displayed = JSON.parse(e.run("JSON.stringify(S.snapshot.layout)"));
-    e.server(state(8, "curve"));
-    await e.el("export").fire("click");
-    assert.equal(e.downloads.length, 1);
-    assert.deepEqual(JSON.parse(await e.downloads[0].text()), displayed);
-    assert.equal(e.calls.length, 0);
-  });
+// Export asks no engine, whichever the transport: it writes the displayed layout.
+test("export preserves the displayed layout when another tab changes the engine", async () => {
+  const e = editor("http");
+  const displayed = JSON.parse(e.run("JSON.stringify(S.snapshot.layout)"));
+  e.server(state(8, "curve"));
+  await e.el("export").fire("click");
+  assert.equal(e.downloads.length, 1);
+  assert.deepEqual(JSON.parse(await e.downloads[0].text()), displayed);
+  assert.equal(e.calls.length, 0);
+});
 
+for (const transport of ["http", "worker"]) {
   test(`${transport} a slower earlier import cannot replace the latest file selection`, async () => {
     const e = editor(transport), first = file("straight"), latest = file("curve");
     const pending = e.import(first), chosen = e.import(latest);

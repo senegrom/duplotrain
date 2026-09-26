@@ -63,9 +63,10 @@ WORKER_EXCLUDES = {
 
 WORKER_INIT = b'''"""Minimal package marker for the Pyodide editor worker."""\n'''
 
-#: Static files the build does not copy: index.html is made from editor.html, and
-#: the root icons answer only the local server's automatic requests (/favicon.ico);
-#: the page links its icons under icons/.
+#: Static files the build does not copy: index.html is made from editor.html,
+#: favicon.ico and apple-touch-icon.png answer only the local server's automatic
+#: requests, and duplotrain-icon.svg is the source the icons are exported from; the
+#: page links its icons under icons/.
 NOT_SHIPPED = {"editor.html", "favicon.ico", "apple-touch-icon.png", "duplotrain-icon.svg"}
 
 
@@ -229,7 +230,7 @@ assert "frame-ancestors" not in _META_CSP and '"' not in _META_CSP
 
 HTACCESS = """\
 # duplotrain: Pyodide needs 'wasm-unsafe-eval' to compile its WebAssembly.
-# All scripts stay external and same-origin (no 'unsafe-inline' for scripts).
+# Scripts and styles stay external and same-origin: no 'unsafe-inline' at all.
 <IfModule mod_headers.c>
   Header always set Content-Security-Policy "__CSP__"
 

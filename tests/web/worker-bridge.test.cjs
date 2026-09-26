@@ -84,14 +84,15 @@ test("boot errors and timeout both settle startup and offer recovery", async () 
 test("engine loading fails only after a minute without progress", async () => {
   const h = harness();
   const promise = h.window.duplotrainBoot({refresh: async () => {}, status() {}});
-  assert.deepEqual([...h.delays.values()], [60000]);
+  // Five minutes for the first report: the runtime's main script loads in one piece.
+  assert.deepEqual([...h.delays.values()], [300000]);
   // Download progress restarts the minute: a slow first visit is not a stalled one.
   const first = [...h.timers.keys()][0];
   h.workers[0].emit({loading: true});
   assert.equal(h.timers.has(first), false); assert.deepEqual([...h.delays.values()], [60000]);
   [...h.timers.values()][0]();
   await promise;
-  assert.match(h.body.children[0].children[0].textContent, /stalled for a minute/);
+  assert.match(h.body.children[0].children[0].textContent, /engine loading stalled/);
   const again = harness();
   const booting = again.window.duplotrainBoot({refresh: async () => {}, status() {}});
   again.workers[0].emit({loading: true});

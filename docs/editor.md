@@ -160,9 +160,9 @@ while answering a request, the overlay offers downloads of the last confirmed
 layout and session from this tab's own state, and a restart that creates a new
 worker and restores a copy of that snapshot; responses from an old worker
 generation are ignored, and a restart resets undo history and suggestions and
-says so. Startup fails after a minute without loading progress, however long a
-first visit takes to download the runtime; outstanding calls time out after
-two minutes without a response. Every request is short: the editor's searches
+says so. Startup fails after a minute without a loading progress report (five
+minutes before the first, while the runtime's main script loads in one piece);
+outstanding calls time out after two minutes without a response. Every request is short: the editor's searches
 and route analyses are interactive jobs that advance in brief ticks and pause
 without restarting the worker ([search-jobs.md](search-jobs.md)).
 
@@ -206,8 +206,9 @@ ready only after all resources verify and the completion marker is written. A
 download fails once no bytes arrive for a minute, not when a slow but steady
 link needs longer for a large runtime file. An installation cut short, by a lost
 connection or the browser's time limit for one task, keeps the files it verified
-and resumes from them, and the page waits as long as the service worker reports
-that it is still working. Cached
+and resumes from them, though each file must still arrive within that five-minute
+limit (the largest needs about 85 kbit/s); the page waits as long as the service
+worker reports that it is still working. Cached
 responses preserve the build's CSP and MIME headers. Project/autosave data is
 not stored in these application-code caches.
 
@@ -253,7 +254,8 @@ production CSP; any page error fails them. One installs the offline version,
 stops the resource server, reloads the real engine from the cache and recovers
 the confirmed session. The other keeps a tab open while a second tab installs
 and applies three updates through the editor's own buttons, checks that the last
-activation deleted the superseded version but kept the open tab's, then stops
+activation kept the version active before it and the open tab's and deleted the
+one between them, then stops
 the server and restarts the first tab's engine from its own version. Chromium
 serves them over HTTP loopback. WebKit needs HTTPS under that policy, so its
 variants run only on the disposable GitHub-hosted runner, which installs a
