@@ -276,9 +276,9 @@ Each DFS node computes its current transit allowances and reversing targets once
 its child visits compute their own values after consuming stock and ports. The
 parent's values remain valid when backtracking restores its state.
 
-The 4096-entry LRU belongs to the tables. A search empties it when it
-returns, raises or is closed, which avoids retaining its poses through the
-recursive DFS closure cycle.
+The tables' LRU cache ([performance.md](performance.md#reverse-reachability-tables))
+belongs to one search, which empties it when it returns, raises or is closed;
+this avoids retaining its poses through the recursive DFS closure cycle.
 Tests compare complete results and all search counters against
 an uncached evaluator, retain permissive fallback after eviction, separate
 catalogues, and check callback-error cleanup.
@@ -358,10 +358,11 @@ shared cell. The final overlap audit of every returned layout bins eagerly.
 
 ## The bounds index only screens
 
-A field of at least 128 clouds keeps a lazy 256 mm grid of sample bounding
-boxes for the broad phase. A query expands by its own half-width plus the
-greatest stored half-width less the touching margin, boxes spanning more than
-64 cells live in a fallback list, oversized or non-finite queries take the
+A large field keeps a lazy grid of sample bounding boxes for the broad phase
+(its sizes are in [performance.md](performance.md#collision-checks)). A query
+expands by its own half-width plus the greatest stored half-width less the
+touching margin, boxes spanning too many cells live in a fallback list,
+oversized or non-finite queries take the
 linear path, and grid boundaries round outward, so every cloud the linear scan
 would consider is returned; each returned cloud is still tested with its own
 width, the box inequalities and the sampled points. Clouds are deduplicated by

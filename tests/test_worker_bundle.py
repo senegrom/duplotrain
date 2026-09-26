@@ -51,7 +51,7 @@ assert "duplotrain.gui" not in sys.modules
 assert "http.server" not in sys.modules
 assert "webbrowser" not in sys.modules
 def api(path, body):
-    if sys.argv[3] == "compact" and path != "/api/export":
+    if sys.argv[3] == "compact":
         body = {**body, "preview_format": "duplotrain-preview/1"}
     result = json.loads(adapter.dispatch(path, json.dumps(body)))
     assert "__error" not in result, result

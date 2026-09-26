@@ -59,7 +59,8 @@ an expected checksum from an untrusted download during the build itself.
 
 `tests/test_build_security.py` checks tampered downloads/caches, unsafe archive
 members, unknown versions, and the workflow hardening invariants without network
-access. The browser CI jobs additionally build and test the actual pinned runtime.
+access. CI builds and tests the actual pinned runtime
+([editor.md](editor.md#checks-and-deployment)).
 
 ## Editor consistency and recoverable saves
 

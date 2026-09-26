@@ -3,9 +3,10 @@
 Every speed-up keeps results identical: the same solutions in the same order,
 the same node counts and pruning counters, byte-identical congruence keys and
 bit-identical sampled floats. A change is verified by differentials against
-the previous tree before it lands. Speed is measured as process CPU time on one
-machine and is never a test assertion; tests assert operation counts, and only
-the deadline tests bound elapsed time.
+the previous tree before it lands. Speed is measured on one machine. Tests
+assert operation counts, not speed: only the deadline tests bound elapsed time,
+and one test holds the JSON nesting check's scan of an unterminated string to a
+second of CPU time (`tests/test_http_security.py`).
 
 ## Measuring
 
@@ -20,9 +21,10 @@ both inventory modes and hashes the ordered exact layouts,
 synthetic remote circles, `benchmarks/editor_payload.py` measures state
 serialisation, and `benchmarks/editor_presentation.py` times Check layout and
 warm state responses on the completed layout and on synthetic layouts of 539
-and 1,499 pieces. Point `PYTHONPATH` at an older checkout to run the same script
-against it, and compare CPU time rather than wall time when other work shares
-the machine.
+and 1,499 pieces. Every script reports medians, of wall-clock time, and
+`benchmarks/editor_completion.py` also of process CPU time. Point `PYTHONPATH`
+at an older checkout to run the same script against it, on an otherwise quiet
+machine.
 
 ## Exact arithmetic and bounded caches
 
@@ -154,15 +156,15 @@ cached in a 2,048-entry LRU and copied into fresh lists for every response, and
 a 32-entry LRU keeps the footprint of a placement tuple, so a state or candidate
 response does not resample or remeasure geometry it has already served; neither
 cache holds a session, revision, link or ownership. Both hosts send compact
-JSON. From 128 pieces Check layout shortlists pairs through the collision field's
-bounds index ([editor.md](editor.md#check-layout)); on the synthetic 1,499-piece
+JSON. On large layouts Check layout shortlists pairs through the collision
+field's bounds index ([editor.md](editor.md#check-layout)); on the synthetic 1,499-piece
 layout that leaves about ten thousand pair tests. Browser drawing and picking are
 described in [editor.md](editor.md#drawing-and-picking).
 
 ## Representative times
 
-Process CPU time on one machine, the mean of many runs, with results
-identical to the reference searches without tables.
+Medians of repeated runs on one machine, with results identical to the
+reference searches without tables.
 
 | Search | Nodes | Time |
 | --- | ---: | ---: |

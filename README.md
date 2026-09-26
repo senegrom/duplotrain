@@ -445,9 +445,9 @@ DUPLOTRAIN_BROWSER=webkit DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m py
 ```
 
 Tests marked `browser` need playwright plus a downloaded browser. Locally they skip
-when playwright or the chosen browser is missing, the two tests of the built app
+when playwright or the chosen browser is missing, the three tests of the built app
 skip without `DUPLOTRAIN_STATIC_DIST`, the built-app boot test also skips without
-`openssl` on the PATH, and the WebKit offline reload test runs only on the opted-in
+`openssl` on the PATH, and the two WebKit offline tests run only on the opted-in
 CI runner ([docs/editor.md](docs/editor.md#checks-and-deployment)); CI sets
 `DUPLOTRAIN_REQUIRE_BROWSER=1`, and explicit browser paths and every browser startup
 failure are errors. The two-finger pinch test runs on Chromium only.

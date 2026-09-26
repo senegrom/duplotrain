@@ -13,6 +13,7 @@ authors = [{ name = "senegrom" }]
 keywords = ["lego", "duplo", "train", "track", "layout", "geometry"]
 classifiers = [
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Games/Entertainment",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
