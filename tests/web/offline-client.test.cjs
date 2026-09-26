@@ -259,3 +259,12 @@ test("a tab opened before another tab installed offline access finds it", async 
   assert.doesNotMatch(h.el("offline-status").textContent, /Install offline access first/);
   assert.match(h.el("offline-status").textContent, /Offline ready/);
 });
+
+test("an update the browser already offers applies while a check still runs", async () => {
+  const h = client({existing: true, waiting: true}); h.run("offlineRegistration = registration");
+  h.context.registration.update = () => new Promise(() => {});  // a check still on the network
+  h.run("checkOfflineUpdate()");
+  await h.run("applyOfflineUpdate()");
+  assert.deepEqual(h.messages, ["STATUS", "ACTIVATE"]);
+  assert.equal(h.counts().reloads, 1);
+});

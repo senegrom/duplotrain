@@ -79,7 +79,7 @@ function watchOfflineUpdates(r) {
     installing?.addEventListener("statechange", () => {
       const state = installing.state;
       installed ||= state === "installed";
-      if (offlineWorking) return;  // an explicit action reports its own outcome
+      if (offlineWorking) return;  // an installation or an update applied reports itself
       if (state === "installed" && update) {
         el("offline-update").hidden = false;
         offlineNotice(UPDATE_READY);
@@ -106,9 +106,10 @@ async function installOffline() {
   } catch (error) { offlineNotice(`${sentence(error.message)} Portable project downloads remain available.`); }
   finally { offlineWorking = false; }
 }
+// A check does not hold offlineWorking: an update the browser found by itself may
+// already be offered, and applying it must not wait for the check.
 async function checkOfflineUpdate() {
   if (offlineWorking) return;
-  offlineWorking = true;
   try {
     const r = offlineRegistration || await findRegistration();
     if (!r) { offlineNotice("Install offline access first. The normal online app revalidates on reload."); return; }
@@ -116,7 +117,6 @@ async function checkOfflineUpdate() {
     if (r.installing) await awaitOfflineWorker(r);
     await showOfflineStatus();
   } catch (error) { offlineNotice(`Update check failed: ${sentence(error.message)}`); }
-  finally { offlineWorking = false; }
 }
 async function applyOfflineUpdate() {
   if (offlineWorking || jobLoop || apiBusy) { offlineNotice("Finish or pause the current operation before updating."); return; }
