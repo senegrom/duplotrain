@@ -79,6 +79,13 @@ def test_an_exact_stage_alternates_doubling_turns_within_one_shared_cap(monkeypa
         if not slop:
             assert turns[:4] == [((5, 1), 1024), ((0, 0), 1024), ((5, 1), 2048),
                                  ((0, 0), 2048)]
+            # Search harder: both ends spend the doubled budget in turns, not one.
+            before = len(turns)
+            pool.harder()
+            while pool.step()["kind"] not in ("limited", "exhausted"):
+                pass
+            assert {grow for grow, _ in turns[before:]} == {(5, 1), (0, 0)}
+            assert sum(c.nodes for c in pool.cursors) == 120_000
     finally:
         pool.close()
 
@@ -99,30 +106,13 @@ def test_piece_depth_limit_is_not_a_proof_of_impossibility():
     assert session.candidates[0].piece_count == 34
 
 
-def test_search_harder_keeps_both_ends_of_an_exact_stage_taking_turns(monkeypatch):
-    catalog, turns = default_catalog(), []
-
-    def never_settles(inventory, pieces, config, *, base, grow_from, close_onto, limits):
-        while True:
-            turns.append(grow_from)
-            yield {"kind": "node_limit", "nodes": limits.max_nodes, "depth": 1}
-
-    monkeypatch.setattr(editor_search, "solve_steps", never_settles)
-    pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog,
-                      {"curve": 6, "straight": 4}, (5, 1), (0, 0), 26, 1, 0, False,
-                      search_options(None, catalog))
+def test_a_reversing_search_names_its_first_stage_from_the_start(gap):
+    # A reversing search runs no arc templates: its first stage names it at once.
+    job = SearchJob(Session(history=[gap], unlimited=True), {"reversing": True})
     try:
-        while pool.step()["kind"] not in ("limited", "exhausted"):
-            pass
-        before = len(turns)
-        pool.harder()
-        while pool.step()["kind"] not in ("limited", "exhausted"):
-            pass
-        # The doubled budget is spent by turns from both ends, not by one.
-        assert set(turns[before:]) == {(5, 1), (0, 0)}
-        assert sum(c.nodes for c in pool.cursors) == 120_000
+        assert job.stage == job.pool.cursors[0].stage != "templates"
     finally:
-        pool.close()
+        job.close()
 
 
 @pytest.mark.parametrize("slop", [0, 5])

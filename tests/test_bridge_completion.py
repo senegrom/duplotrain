@@ -225,3 +225,26 @@ def test_bridge_stage_audits_only_the_joints_it_adds():
     assert completed.is_closed
     assert completed.joint_issues() == forced  # the base's own forced fits, nothing new
     assert not _solution_overlaps(completed, 0, 120.0, 8.0)
+
+
+def test_the_templates_and_the_bridge_stage_share_one_overlap_auditor(monkeypatch):
+    import duplotrain.editor as editor_module
+
+    built = []
+
+    class Counting(editor_search._OverlapAudit):
+        def __init__(self, *args, **kwargs):
+            built.append(args[0])
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(editor_search, "_OverlapAudit", Counting)
+    monkeypatch.setattr(editor_module, "_OverlapAudit", Counting)
+    base = load("bridge-gap.json")
+    job = complete(Session(history=[base], inventory=owned(base)), max_results=50)
+    try:
+        job.more(harder=True)  # the templates come again, at a greater depth
+        while job.status == "running":
+            job.tick()
+    finally:
+        job.close()
+    assert len(built) == 1 and built[0] is base

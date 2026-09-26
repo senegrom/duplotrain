@@ -395,6 +395,7 @@ def test_close_all_gaps_offers_each_plan_once(catalog):
         session.remove_piece(index)
     base = session.layout
     job = SearchJob(session, {"all_gaps": True, "max_pieces": 14})
+    assert job.stage == "close all: 4 open ends"
     settle(job)
     assert len(job.solutions) == 8
     assert len({physical(s.layout, len(base)) for s in job.solutions}) == 8
@@ -525,7 +526,7 @@ def test_exclusions_do_not_change_owned_inventory_and_ranked_pages_keep_identity
                    for p in candidate.layout.placements[len(session.layout):])
     response = job.response(session, {"page": 1})
     assert len(response["candidates"]) == 8
-    assert not response["optimal"] and session.snapshot() == before
+    assert session.snapshot() == before
     ranked = [len(sol.layout) for _, sol in job.ordered()]
     assert ranked == sorted(ranked)
     job.close()
@@ -751,5 +752,26 @@ def test_closures_beyond_the_save_limits_are_no_proof_that_none_exist(catalog, m
         assert not job.solutions
         assert job.status == "exhausted" and not job.complete
         assert job.unsaveable and "too large to save" in job.reason
+        # Exhausted all the same: a harder search would only find them again.
+        assert not job.response(session, {})["can_harden"]
+    finally:
+        job.close()
+
+
+def test_a_walk_cut_short_says_so_and_offers_no_harder_search(catalog, monkeypatch):
+    import duplotrain.solver as solver_module
+    from tests.test_solver import crossings_in_a_row
+
+    # A row of unlinked crossings is a walk of free transits; a lower cap cuts it.
+    monkeypatch.setattr(solver_module, "_MAX_WALK_STEPS", 20)
+    base = crossings_in_a_row(catalog, 30)
+    session = Session(history=[base], inventory=dict(base.piece_counts))
+    job = SearchJob(session, {"grow": [0, 1], "close": [30, 0]})
+    try:
+        settle(job)
+        response = job.response(session, {})
+        assert job.status == "limited" and not job.complete
+        assert "more existing junctions than a search can follow" in job.reason
+        assert not response["can_harden"]
     finally:
         job.close()

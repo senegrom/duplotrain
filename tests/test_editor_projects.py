@@ -6,6 +6,7 @@ import json
 
 import pytest
 
+from duplotrain.catalog import default_catalog
 from duplotrain.editor import Session, dispatch_session
 from duplotrain.editor_tools import validate_project
 from tests.editor_support import load_adapter, post, running_server, unchanged
@@ -75,11 +76,11 @@ def test_invalid_project_session_cannot_partially_restore():
         dispatch_session(s, "/api/project/open", {"data": data, "revision": s.revision})
     assert unchanged(s) == before
     with pytest.raises(ValueError):
-        validate_project({**data, "name": " "})
+        validate_project({**data, "name": " "}, default_catalog())
 
 
 def test_project_validation_does_not_modify_input():
     original = project(Session(), view={"x": 0, "y": 0, "scale": 1})
     before = copy.deepcopy(original)
-    validate_project(original)
+    validate_project(original, default_catalog())
     assert original == before

@@ -32,7 +32,7 @@ from .solver import (
     _OverlapAudit,
     _pose_to_lattice,
 )
-from .validation import MAX_SNAPSHOT_BYTES, check_layout_json
+from .validation import MAX_INVENTORY_COUNT, MAX_SNAPSHOT_BYTES, check_layout_json
 
 __all__ = ["Session", "dispatch_session", "RevisionConflictError", "UnknownRouteError"]
 
@@ -54,9 +54,6 @@ DEFAULT_STONES = {sid: 1 for sid in ACCESSORIES}
 #: Per-piece count reported while the sandbox "infinite pieces" mode is on: big
 #: enough to never run out in practice, small enough to keep every sum finite.
 UNLIMITED_COUNT = 999
-
-
-MAX_INVENTORY_COUNT = 10_000
 
 # An opt-in presentation contract; saved layouts and full previews do not change.
 PREVIEW_FORMAT = "duplotrain-preview/1"
@@ -364,7 +361,6 @@ class Session:
                 {
                     "piece": placement.piece.id,
                     "name": placement.piece.name,
-                    "category": placement.piece.category,
                     **drawing,
                     "ports": ports,
                     "mid": [mid[0], mid[1]],
@@ -383,7 +379,6 @@ class Session:
             "exactly_closed": layout.is_closed and not joint_issues,
             "joint_issues": joint_issues,
             "size_cm": [round(width / 10, 1), round(height / 10, 1)],
-            "piece_counts": layout.piece_counts,
         }
 
     def snapshot(self, *, layout: Layout | None = None) -> dict[str, Any]:
@@ -462,9 +457,7 @@ class Session:
                     label = "turn left" if turn > 0 else "turn right"
                 else:
                     label = f"{entry_name}→{exit_name}"
-                variants.append(
-                    {"entry": move.entry, "exit": move.exit, "label": label, "turn": turn}
-                )
+                variants.append({"entry": move.entry, "exit": move.exit, "label": label})
             if not variants:
                 # No drivable route (a buffer stop): still placeable by hand through
                 # each real connector -- attaching only needs an entry port.
@@ -473,7 +466,7 @@ class Session:
                 ]
                 for p in unsealed:
                     label = "cap the end" if len(unsealed) == 1 else f"via {piece.ports[p].name}"
-                    variants.append({"entry": p, "exit": p, "label": label, "turn": 0})
+                    variants.append({"entry": p, "exit": p, "label": label})
             palette.append(
                 {
                     "id": pid,
@@ -661,11 +654,13 @@ class Session:
         self._push(self.layout.with_accessory(placement, stone_id, at_port=at_port), "place stone")
 
     def _arc_events(
-        self, grow: End, close: End, max_results: int, max_pieces: int = 26
+        self, grow: End, close: End, max_results: int, max_pieces: int, *, auditor=None
     ):
         """Instant oracle for ring-shaped closures the DFS chronically misses.
 
-        Yields the closures, and None as a heartbeat between exact pose checks.
+        Yields the closures, and None as a heartbeat once per leveler pair.
+        *auditor* returns the base's shared overlap auditor; without it the oracle
+        builds its own.
         Tries ``leveler + j straights + k same-sign curves + m straights + leveler``
         chains (j, m <= 8, k <= 13; the 60 shortest leveler pairs whose climbs
         cancel the height difference), where a leveler is a short run of
@@ -762,7 +757,7 @@ class Session:
 
         start, target = geometry.start, geometry.target
         want_heading = (geometry.heading(target) + 12) % 24
-        audit = _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
+        audit = auditor() if auditor else _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
         seen_pre = {}
         prefixes = {}
         suffixes = {}

@@ -3,8 +3,8 @@
 A job owns suspended exact solver generators; ticks only advance those generators.
 Candidates are checked against the job's base, stock, size, joints and room before
 they leave the job. Each candidate's final placements are audited for overlaps
-exactly once, by whatever produced them: the core search's replay audit, the arc
-oracle, or, for an expanded bridge macro, before it counts as a result. No
+exactly once, by whatever produced them: the core search's final overlap audit,
+the arc oracle, or, for an expanded bridge macro, before it counts as a result. No
 candidate event is an edit: publication/application remains revision checked and
 atomic.
 """
@@ -115,8 +115,7 @@ def fits_space(layout, options):
                 box = (r[0] - pad, r[1] - pad, r[2] + pad, r[3] + pad)
                 if x1 < box[0] or x0 > box[2] or y1 < box[1] or y0 > box[3]:
                     continue  # the line's extent cannot reach this rectangle
-                if (any(_segment_box(a, b, box) for a, b in zip(line, line[1:], strict=False))
-                        or (len(line) == 1 and _segment_box(line[0], line[0], box))):
+                if any(_segment_box(a, b, box) for a, b in zip(line, line[1:], strict=False)):
                     return False
     return True
 
@@ -127,8 +126,8 @@ def physical_key(layout, base):
     Connectors have no gender: a piece placed from its other end has another
     frame and port order but lies in the same place. So a piece is its id with
     the set of its world connector poses, and a link joins two such poses or a
-    connector of the base, named by index. The base's own links are common to
-    every extension and left out.
+    connector of the base, named by index. The base's own links and stones are
+    common to every extension and left out.
     """
     placements, start = layout.placements, len(base)
 
@@ -139,7 +138,7 @@ def physical_key(layout, base):
                      for p in placements[start:])
     links = frozenset(frozenset((end(*a), end(*b))) for a, b in layout.links.items()
                       if a not in base.links)
-    return frozenset(pieces.items()), links, layout.accessories
+    return frozenset(pieces.items()), links
 
 
 def valid_extension(base, candidate, stock, max_pieces, options, *, audit=None):
@@ -178,12 +177,13 @@ class Cursor:
     limits: SearchLimits
     stage: str
     cap: int
-    budget: int = 0  # the stage's node budget at search effort 1
+    budget: int  # the stage's node budget at search effort 1
     overhead: int = 0
     nodes: int = 0
     depth: int = 0
     blocked: bool = False
     exhausted: bool = False
+    cut: bool = False  # a walk too long for the recursion limit: no bound lifts it
     expand: Any = None
     direction: int = 0  # 0 grows from the chosen end, 1 from the other one
 
@@ -205,6 +205,8 @@ class Cursor:
                 self.blocked = True
         elif event["kind"] in ("piece_limit", "result_limit"):
             self.blocked = True
+        elif event["kind"] == "walk_limit":
+            self.blocked = self.cut = True
         elif event["kind"] == "solution" and self.expand is not None:
             event = {**event, "solution": self.expand(event["solution"])}
         return event
@@ -229,16 +231,24 @@ class PairSearch:
         self.arc_session = Session(catalog=dict(catalog), history=[base], inventory={
             pid: n + base.piece_counts.get(pid, 0) for pid, n in stock.items()
         })
+        self.slop, self.reversing, self.options = slop, reversing, options
+        # One overlap auditor of the base, built when first needed, serves the arc
+        # templates and the bridge stage's expanded macros (new geometry).
+        self.audit = None
         # A search allowing reversing loops skips the arc templates: its
         # ordinary stages then find the same closures first.
-        self.arc = (iter(()) if reversing else
-                    self.arc_session._arc_events(grow, close, MAX_RESULTS, depth))
+        self.arc = iter(()) if reversing else self._templates()
         self.arc_done = False
-        self.slop, self.reversing, self.options = slop, reversing, options
-        # Expanded bridge macros are new geometry: audit them before they count,
-        # against the base, with one auditor built when the first one arrives.
-        self.audit = None
         self._build()
+
+    def _auditor(self):
+        if self.audit is None:
+            self.audit = _OverlapAudit(self.base, DEFAULT_CLEARANCE, 8.0)
+        return self.audit
+
+    def _templates(self):
+        return self.arc_session._arc_events(self.grow, self.close_end, MAX_RESULTS,
+                                            self.depth, auditor=self._auditor)
 
     @property
     def nodes(self):
@@ -285,10 +295,8 @@ class PairSearch:
                     if any(p.frame.z != ZERO for p in sol.layout.placements[len(base):]
                            if p.piece.id in ("curve", "straight", "ramp")):
                         return False
-                    if self.audit is None:
-                        self.audit = _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
                     return valid_extension(base, sol, stock, self.depth, self.options,
-                                           audit=self.audit)
+                                           audit=self._auditor())
 
                 # The limits bound nodes, results and depth; max_nodes still sizes
                 # the reverse tables' base allowance.
@@ -343,7 +351,7 @@ class PairSearch:
                 first_stage = self.cursors[left[0]].stage
                 self.active = next((i for i in left if self.cursors[i].stage == first_stage
                                     and self.cursors[i].direction == cursor.direction), left[0])
-        elif event["kind"] in ("node_limit", "result_limit"):
+        elif event["kind"] in ("node_limit", "result_limit", "walk_limit"):
             left = [i for i, c in enumerate(self.cursors) if not c.blocked and not c.exhausted]
             other = next((i for i in left if i != self.active
                           and self.cursors[i].stage == cursor.stage), None)
@@ -362,7 +370,7 @@ class PairSearch:
         old_depth = self.depth
         self.depth, self.effort = _harder(self.depth, self.effort)
         for cursor in self.cursors:
-            if cursor.exhausted:
+            if cursor.exhausted or cursor.cut:
                 continue
             cursor.cap = min(cursor.cap * 2, cursor.budget * 16)
             # The doubling turns go on: the two ends of an exact stage still take
@@ -374,8 +382,7 @@ class PairSearch:
         if self.depth > old_depth:
             if hasattr(self.arc, "close"):
                 self.arc.close()
-            self.arc = (iter(()) if self.reversing else self.arc_session._arc_events(
-                self.grow, self.close_end, MAX_RESULTS, self.depth))
+            self.arc = iter(()) if self.reversing else self._templates()
             self.arc_done = False
         self.active = 0
 
@@ -451,7 +458,7 @@ class SearchJob:
         # or closures beyond the save limits.
         self.reason: str | None = None
         self.keys: set = set()
-        self.unsaveable = 0  # closures found but too large to save
+        self.unsaveable = False  # a closure was found too large to save
         self.costs: dict[str, list] = {}  # per ranking goal, one per solution index
         self.last_touch = time.monotonic()
         self.status = "running"
@@ -489,7 +496,7 @@ class SearchJob:
             return
         if not self._saveable(candidate.layout):
             # Not offered, but it exists: the search proves nothing impossible.
-            self.unsaveable += 1
+            self.unsaveable = True
             self.reason = ("Some closures would make the session too large to save "
                            f"({MAX_PLACEMENTS:,} pieces or 2 MB); they are not offered.")
             return
@@ -504,7 +511,7 @@ class SearchJob:
         on its own, so only the added placements and links need checking, with the
         totals; the size of what they add bounds the growth of the snapshot.
         """
-        if self.spare_bytes < 0 or len(layout) > MAX_PLACEMENTS:
+        if len(layout) > MAX_PLACEMENTS:
             return False
         links = self.base.links
         added = layout_to_dict(Layout(layout.placements[len(self.base):]))["placements"]
@@ -592,10 +599,8 @@ class SearchJob:
                 except StopIteration:
                     self.status = "bounded_complete"
                     break
-            elif self.pool:
+            else:  # a job that runs has a pair search or a plan search
                 event = self.pool.step()
-            else:
-                break
             self.stage = event.get("stage", self.stage)
             if event["kind"] == "solution":
                 self._accept(event["solution"])
@@ -606,6 +611,9 @@ class SearchJob:
                 self.status = event["kind"]
                 self.complete = (not self.all_gaps and event["kind"] == "exhausted"
                                  and not self.unsaveable)
+                if self.pool and self.reason is None and any(c.cut for c in self.pool.cursors):
+                    self.reason = ("Some walks pass through more existing junctions than a "
+                                   "search can follow; closures along them were not searched.")
                 break
             if time.perf_counter() >= deadline:
                 break
@@ -614,7 +622,7 @@ class SearchJob:
         if not harder and self.status in ("limited", "bounded_complete", "exhausted"):
             return  # a larger result quota does not lift an exhausted work/depth limit
         if self.pool is None and not self.all_gaps:
-            return  # a direct zero-piece join has no suspended search frontier
+            return  # a direct join or a height refusal has no search to continue
         if len(self.solutions) >= MAX_RESULTS:
             self.status = "result_cap"
             return
@@ -673,19 +681,20 @@ class SearchJob:
             shown.append(item)
         return {"job_id": self.id, "revision": self.revision, "status": self.status,
                 "stage": self.stage, "searched": self.nodes, "found": len(self.solutions),
-                "target": self.target, "page": page, "candidates": shown,
-                "complete": self.complete, "optimal": False, "reason": self.reason,
+                "page": page, "candidates": shown,
+                "complete": self.complete, "reason": self.reason,
                 "options": {"sort": self.options["sort"],
                             "exclude": list(self.options["exclude"]),
                             "room": list(self.options["room"]) if self.options["room"] else None,
                             "keep_out": [list(r) for r in self.options["keep_out"]]},
-                "scope": "best among found candidates; no global optimum guaranteed",
                 "max_pieces": self.depth, "search_effort": self.effort,
-                # At the result cap a harder search would have no room to report.
-                "can_harden": ((self.pool is not None or self.all_gaps)
-                               and len(self.solutions) < MAX_RESULTS),
+                # A harder search needs room to report and something left to search:
+                # not at the result cap, not once exhausted, not walks cut short only.
+                "can_harden": (len(self.solutions) < MAX_RESULTS and self.status != "exhausted"
+                               and (self.all_gaps or (self.pool is not None and not all(
+                                   c.exhausted or c.cut for c in self.pool.cursors)))),
                 "resumable": len(self.solutions) < MAX_RESULTS and self.status not in (
-                    "exhausted", "bounded_complete", "result_cap", "direct_join", "limited")}
+                    "exhausted", "bounded_complete", "direct_join", "limited")}
 
     def publish(self, session):
         session._interactive_job = None

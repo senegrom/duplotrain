@@ -111,12 +111,16 @@ across directions, not multiplied for each direction. Template generation is sep
 from DFS and its bounded list is regenerated when a higher depth is requested.
 Room restrictions and publication guards run before a solution is streamed.
 Each candidate's final placements are audited for overlaps exactly once, by
-whatever produced them: the core search's replay audit, the arc oracle, or, for
+whatever produced them: the core search's final overlap audit, the arc oracle, or, for
 an expanded bridge macro, a shared incremental auditor before the candidate
 counts as a result. The base, stock, size, joint and room checks run once, where
 the candidate is produced; the job then keeps one candidate per physical track
 and only those its save and import guards accept. A search that sets a closure
 aside for those guards says so, and running out of search then proves nothing.
+A walk too long for the solver to follow
+([search-correctness.md](search-correctness.md#completion-paths-can-revisit-all-free-junction-ports))
+stops its stage short in the same way: the search says so and offers no Search
+harder.
 
 One tick processes at most 32 checkpoint events and aims to return after about
 20 ms between checkpoints. This is not a hard execution deadline: preprocessing,

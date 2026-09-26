@@ -14,6 +14,9 @@ MAX_LINKS = 6000
 # Leave room for the request/checkpoint envelope around a saved session.
 MAX_SNAPSHOT_BYTES = MAX_JSON_BYTES - 1024
 MAX_COEFFICIENT_LENGTH = 48
+#: Most pieces of one kind anyone owns. A search stacks at most 400 pieces, so a
+#: larger count changes no result; it only risks overflowing the float sums.
+MAX_INVENTORY_COUNT = 10_000
 # No request of the editor API nests more than about ten levels.
 MAX_JSON_DEPTH = 64
 
@@ -24,16 +27,16 @@ _NOT_BRACKET = re.compile(r"[^\[\]{}]+")
 _NESTING = {"[": 1, "{": 1, "]": -1, "}": -1}
 
 
-def check_json_depth(text: str, limit: int = MAX_JSON_DEPTH) -> None:
-    """Refuse JSON nested deeper than *limit* before a recursive parser sees it.
+def check_json_depth(text: str) -> None:
+    """Refuse JSON nested deeper than MAX_JSON_DEPTH before a recursive parser sees it.
 
     The browser engine's WebAssembly stack overflows long before Python's
     recursion limit and leaves the runtime unusable, so both hosts check this
     first. Brackets inside strings do not count.
     """
     brackets = _NOT_BRACKET.sub("", _JSON_STRING.sub("", text))
-    if max(accumulate(map(_NESTING.__getitem__, brackets)), default=0) > limit:
-        raise ValueError(f"JSON nested more than {limit} levels deep")
+    if max(accumulate(map(_NESTING.__getitem__, brackets)), default=0) > MAX_JSON_DEPTH:
+        raise ValueError(f"JSON nested more than {MAX_JSON_DEPTH} levels deep")
 
 
 def _signed_decimal(text: str) -> bool:
@@ -126,5 +129,6 @@ def check_inventory(inventory: Mapping[str, int], pieces: Mapping) -> None:
     for piece_id, count in inventory.items():
         if piece_id not in pieces:
             raise ValueError(f"inventory names unknown piece {piece_id!r}")
-        if type(count) is not int or count < 0:
-            raise ValueError(f"inventory count for {piece_id!r} must be a non-negative integer")
+        if type(count) is not int or not 0 <= count <= MAX_INVENTORY_COUNT:
+            raise ValueError(f"inventory count for {piece_id!r} must be a non-negative integer "
+                             f"of at most {MAX_INVENTORY_COUNT:,}")

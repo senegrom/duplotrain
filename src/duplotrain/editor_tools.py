@@ -28,7 +28,7 @@ def _number(value: object, low: float, high: float, name: str) -> float:
     return float(value)
 
 
-def validate_project(data: object, catalog=None) -> dict[str, Any]:
+def validate_project(data: object, catalog) -> dict[str, Any]:
     """Validate preferences before the caller atomically restores the session."""
     if not isinstance(data, dict) or data.get("format") != PROJECT_FORMAT:
         raise ValueError("unrecognised project format")
@@ -64,10 +64,8 @@ def validate_project(data: object, catalog=None) -> dict[str, Any]:
             "slop": _number(search.get("slop"), 0, 1e9, "slop"),
         }
         if "options" in search:
-            from .catalog import default_catalog
             from .editor_search import search_options
-            result["search"]["options"] = search_options(
-                search["options"], default_catalog() if catalog is None else catalog)
+            result["search"]["options"] = search_options(search["options"], catalog)
     return {"format": PROJECT_FORMAT, "name": name.strip(),
             "session": session, "preferences": result}
 
