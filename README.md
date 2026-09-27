@@ -255,7 +255,8 @@ which `duplotrain check` lists.)
 
 Classification streams switch settings and checks the total run count before
 simulation. Above the default 100,000 runs it raises `ClassificationLimitError`
-without issuing a partial verdict. Increase `classify(layout, max_runs=...)` or
+without issuing a partial verdict, and a single run longer than 100,000 steps
+raises `DriveLimitError`. Increase `classify(layout, max_runs=...)` or
 `duplotrain classify layout.json --max-runs ...` for larger layouts; library callers
 can explicitly request unbounded enumeration with `max_runs=None`.
 

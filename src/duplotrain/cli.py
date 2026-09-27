@@ -18,17 +18,18 @@ from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.markup import escape
 from rich.table import Table
+from rich.text import Text
 
 from . import __version__
 from .catalog import default_catalog, load_catalog
 from .drive import DEFAULT_MAX_RUNS, ClassificationLimitError, DriveLimitError, classify
 from .layout import layout_from_dict, layout_to_dict
+from .render import render_layout
 from .scoring import score_solution
 from .sets import SETS, inventory_for_sets
 from .solver import SolverConfig, solve
-from .validation import MAX_INVENTORY_COUNT, MAX_JSON_BYTES, check_inventory
+from .validation import MAX_INVENTORY_COUNT, check_inventory, read_json_file
 
 console = Console()
 
@@ -40,7 +41,7 @@ _BAD_FILE = (ValueError, TypeError, KeyError, OSError, RecursionError)
 #: The files ``solve -o`` writes, one pair per saved loop.
 _SAVED_NAME = re.compile(r"loop_\d{2,}\.(?:json|png)")
 #: The smallest loop ``solve`` looks for unless told otherwise.
-_MIN_PIECES = 4
+_MIN_PIECES = SolverConfig().min_pieces
 
 
 def _catalog(paths: tuple[str, ...]):
@@ -58,7 +59,8 @@ def _image_target(out: str) -> str:
 def _write_image(render_layout, layout: object, target: str, **options: object) -> None:
     try:
         render_layout(layout, path=target, **options)
-    except (ValueError, OSError) as exc:  # unknown format, missing directory
+    # An unknown format, a missing directory, a format that needs LaTeX.
+    except (ValueError, OSError, RuntimeError) as exc:
         raise click.ClickException(f"cannot write {target}: {exc}") from exc
 
 
@@ -73,7 +75,7 @@ _catalog_option = click.option(
     "--catalog",
     "catalog_paths",
     multiple=True,
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, dir_okay=False),
     help="Extra piece-catalogue JSON, overriding built-ins by id.",
 )
 
@@ -112,10 +114,12 @@ def pieces(catalog_paths: tuple[str, ...], as_json: bool) -> None:
     table.add_column("parts")
     table.add_column("notes", max_width=60)
     for p in catalog.values():
-        # Catalogue text is printed as it is, never read as markup.
-        name = escape(p.name) + (" [dim](provisional)[/dim]" if p.provisional else "")
-        table.add_row(escape(p.id), name, str(len(p.ports)), escape(", ".join(p.part_numbers)),
-                      escape(p.notes))
+        # Catalogue text is printed as it is: Text is never read as markup or emoji.
+        name = Text(p.name)
+        if p.provisional:
+            name.append(" (provisional)", style="dim")
+        table.add_row(Text(p.id), name, str(len(p.ports)), Text(", ".join(p.part_numbers)),
+                      Text(p.notes))
     console.print(table)
 
 
@@ -163,7 +167,7 @@ def sets_cmd() -> None:
 @click.option(
     "--inventory",
     "inventory_path",
-    type=click.Path(exists=True),
+    type=click.Path(exists=True, dir_okay=False),
     help=(
         'JSON file {"curve": 12, "straight": 4, ...}; merged with the flags. '
         "Pieces added via --catalog have no dedicated flag and are counted here."
@@ -232,7 +236,7 @@ def solve_cmd(
             inventory[k] = inventory.get(k, 0) + v
     if inventory_path:
         try:
-            raw_counts = json.loads(Path(inventory_path).read_bytes())
+            raw_counts = read_json_file(inventory_path)
             # Validate the file's own values: once merged with the flags', a
             # negative count could hide in the sum.
             check_inventory(raw_counts, catalog)
@@ -245,6 +249,10 @@ def solve_cmd(
             "Tell me what you own, e.g.:  duplotrain solve --curve 12 --straight 4 "
             "or --set 10874 --set 10882"
         )
+    try:
+        check_inventory(inventory, catalog)
+    except ValueError as exc:
+        raise click.ClickException(f"the counts added together: {exc}") from exc
 
     if reversing is None:
         reversing = stones.get("stone_direction", 0) > 0
@@ -264,7 +272,7 @@ def solve_cmd(
             reversing_loops=reversing,
         )
         # Before the search: an unusable directory must not cost a whole search.
-        out_dir = _output_dir(out) if out else None
+        out_dir = _output_dir(out) if out is not None else None
         with console.status("searching for loops..."):
             result = solve(inventory, catalog, config)
     except ValueError as exc:
@@ -278,30 +286,12 @@ def solve_cmd(
         ),
         key=lambda pair: -pair[0],
     )
-    # Even a run that finds nothing replaces an earlier run's files.
-    if out_dir is not None:
-        _clear_earlier_results(out_dir)
-
     console.print(
         f"[bold]{len(scored)}[/bold] distinct loop(s) found "
         f"({stats.nodes:,} states searched in {stats.duration_s:.1f}s"
         + (f", [yellow]stopped: {stats.stop_reason}[/yellow]" if not stats.complete else "")
         + ")"
     )
-    if not scored:
-        if not stats.complete:
-            console.print("No loop found within the search limits; a closure may still exist.")
-            return
-        # Suggest only what this run did not try already.
-        tips = ["without [bold]--use-all[/bold]"] if use_all else []
-        if min_pieces > _MIN_PIECES:
-            tips.append("a lower [bold]--min-pieces[/bold]")
-        tips.append("more curves (12 make a circle)")
-        if not slop:
-            tips.append("forced fits with [bold]--slop 5[/bold]")
-        console.print("No closed loop fits. Try " + ", or ".join(tips) + ".")
-        return
-
     # One closure label and size per loop, for the table and the pictures alike.
     rows = []
     for score, sol in scored:
@@ -310,38 +300,56 @@ def solve_cmd(
             closure += " reversing"
         width, height = sol.layout.size()
         rows.append((score, sol, closure, f"{width / 10:.0f} x {height / 10:.0f}"))
+    if rows:
+        table = Table(title="Loops, nicest first")
+        table.add_column("#", justify="right")
+        table.add_column("score", justify="right")
+        table.add_column("pieces")
+        table.add_column("size (cm)", justify="right")
+        table.add_column("closure")
+        table.add_column("stubs", justify="right")
+        for rank, (score, sol, closure, size) in enumerate(rows, start=1):
+            counts = " ".join(
+                f"{n}x{pid}" for pid, n in sorted(sol.layout.piece_counts.items())
+            )
+            table.add_row(str(rank), f"{score:.0f}", Text(counts), size, closure,
+                          str(sol.open_stubs))
+        console.print(table)
+    elif not stats.complete:
+        console.print("No loop found within the search limits; a closure may still exist.")
+    else:
+        # Suggest only what this run did not try already.
+        tips = ["without [bold]--use-all[/bold]"] if use_all else []
+        if min_pieces > _MIN_PIECES:
+            tips.append("a lower [bold]--min-pieces[/bold]")
+        if inventory.get("curve", 0) < 12:
+            tips.append("more curves (12 make a circle)")
+        if slop < 5:
+            tips.append("forced fits with [bold]--slop 5[/bold]")
+        console.print("No closed loop fits." + (f" Try {', or '.join(tips)}." if tips else ""))
+    if out_dir is None:
+        return
 
-    table = Table(title="Loops, nicest first")
-    table.add_column("#", justify="right")
-    table.add_column("score", justify="right")
-    table.add_column("pieces")
-    table.add_column("size (cm)", justify="right")
-    table.add_column("closure")
-    table.add_column("stubs", justify="right")
-    for rank, (score, sol, closure, size) in enumerate(rows, start=1):
-        counts = " ".join(
-            f"{n}x{pid}" for pid, n in sorted(sol.layout.piece_counts.items())
-        )
-        table.add_row(str(rank), f"{score:.0f}", escape(counts), size, closure,
-                      str(sol.open_stubs))
-    console.print(table)
-
-    if out_dir is not None:
-        render_layout = _get_renderer(required=False)
-        for rank, (score, sol, closure, size) in enumerate(rows[:top], start=1):
-            stem = out_dir / f"loop_{rank:02d}"
-            try:
-                with open(f"{stem}.json", "w", encoding="utf-8") as fh:
-                    json.dump(layout_to_dict(sol.layout), fh, indent=2)
-            except OSError as exc:
-                raise click.ClickException(f"cannot write {stem}.json: {exc}") from exc
-            if render_layout is not None:
-                _write_image(
-                    render_layout, sol.layout, f"{stem}.png",
-                    title=f"#{rank}  score {score:.0f}  |  {closure}  |  {size} cm",
-                )
-        console.print(f"Saved the top {min(top, len(scored))} to "
-                      f"[bold]{escape(str(out_dir))}[/bold]")
+    # Even a run that finds nothing replaces an earlier run's files, once its
+    # results are shown: a file that cannot be deleted must not hide them.
+    _clear_earlier_results(out_dir)
+    if not rows:
+        return
+    render_layout = _get_renderer(required=False)
+    for rank, (score, sol, closure, size) in enumerate(rows[:top], start=1):
+        stem = out_dir / f"loop_{rank:02d}"
+        try:
+            with open(f"{stem}.json", "w", encoding="utf-8") as fh:
+                json.dump(layout_to_dict(sol.layout), fh, indent=2)
+        except OSError as exc:
+            raise click.ClickException(f"cannot write {stem}.json: {exc}") from exc
+        if render_layout is not None:
+            _write_image(
+                render_layout, sol.layout, f"{stem}.png",
+                title=f"#{rank}  score {score:.0f}  |  {closure}  |  {size} cm",
+            )
+    console.print(f"Saved the top {min(top, len(scored))} to",
+                  Text(str(out_dir), style="bold"))
 
 
 def _get_renderer(required: bool = True):
@@ -355,13 +363,13 @@ def _get_renderer(required: bool = True):
             raise click.ClickException(message) from exc
         console.print(f"{message}; writing layout JSON only", style="yellow", markup=False)
         return None
-    from .render import render_layout
-
     return render_layout
 
 
 def _output_dir(out: str) -> Path:
     """Create *out*, and check this run can write and list it, before the search."""
+    if not out:  # not the current directory, whose loop_NN files would go
+        raise click.UsageError("-o needs a directory name")
     out_dir = Path(out)
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -392,18 +400,13 @@ def _clear_earlier_results(out_dir: Path) -> None:
 
 def _load_layout(layout_file: str, catalog):
     try:
-        with open(layout_file, "rb") as fh:
-            raw = fh.read(MAX_JSON_BYTES + 1)
-        if len(raw) > MAX_JSON_BYTES:
-            raise ValueError("layout file larger than 2 MB")
-        # From bytes, JSON takes UTF-8 (with or without a byte-order mark), -16 or -32.
-        return layout_from_dict(json.loads(raw), catalog)
+        return layout_from_dict(read_json_file(layout_file), catalog)
     except _BAD_FILE as exc:
         raise click.ClickException(f"bad layout file: {exc}") from exc
 
 
 @main.command()
-@click.argument("layout_file", type=click.Path(exists=True))
+@click.argument("layout_file", type=click.Path(exists=True, dir_okay=False))
 @_catalog_option
 @click.option("-o", "--out", type=click.Path(dir_okay=False), default=None)
 def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) -> None:
@@ -414,11 +417,11 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
     layout = _load_layout(layout_file, catalog)
     target = _image_target(out) if out else str(Path(layout_file).with_suffix(".png"))
     _write_image(render_layout, layout, target)
-    console.print(f"Wrote [bold]{escape(target)}[/bold]")
+    console.print("Wrote", Text(target, style="bold"))
 
 
 @main.command()
-@click.argument("layout_file", type=click.Path(exists=True))
+@click.argument("layout_file", type=click.Path(exists=True, dir_okay=False))
 @_catalog_option
 @click.option(
     "--slop", type=click.FloatRange(min=0), default=0.0, show_default=True, callback=_finite,
@@ -475,7 +478,7 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
 
 
 @main.command(name="classify")
-@click.argument("layout_file", type=click.Path(exists=True))
+@click.argument("layout_file", type=click.Path(exists=True, dir_okay=False))
 @click.option(
     "--max-runs", type=click.IntRange(min=1), default=DEFAULT_MAX_RUNS, show_default=True,
     help="Maximum simulations; exceeding this budget produces no verdict.",
@@ -554,10 +557,9 @@ def demo(out: str) -> None:
     best = result.solutions[0]
     target = _image_target(out)
     _write_image(render_layout, best.layout, target, title="The classic DUPLO oval")
-    console.print(
-        f"The starter oval closes exactly; picture in [bold]{escape(target)}[/bold]. "
-        "Now try:  duplotrain solve --curve 12 --straight 4 --switch 2 -o out"
-    )
+    console.print(Text.assemble(
+        "The starter oval closes exactly; picture in ", (target, "bold"),
+        ". Now try:  duplotrain solve --curve 12 --straight 4 --switch 2 -o out"))
 
 
 if __name__ == "__main__":

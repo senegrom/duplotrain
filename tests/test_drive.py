@@ -526,3 +526,30 @@ def test_teardrops_found_by_a_completion_are_told_apart_like_fresh_ones():
     assert stem_tailed and len(stem_tailed) < len(teardrops)
     dogbone = make_dogbone(stem_tailed[0], catalog)
     assert dogbone.is_closed and classify(dogbone).perfectly_looping
+
+
+def test_a_teardrop_closing_into_its_base_switch_is_told_apart_too():
+    # Grown from a branch of the base's one switch, every lobe runs branch to branch:
+    # stem-tailed. Grown from the stem, none is.
+    from duplotrain.explore import is_stem_tailed
+
+    catalog = default_catalog()
+    base, _ = Layout().with_piece(catalog["switch"], ORIGIN)
+    config = SolverConfig(reversing_loops=True, min_pieces=1, max_results=200, max_nodes=300_000)
+    for grow, close, stem_tailed in (((0, 0), (0, 1), False), ((0, 1), (0, 0), True)):
+        found = solve({"curve": 12, "straight": 4}, catalog, config, base=base,
+                      grow_from=grow, close_onto=close)
+        teardrops = [s for s in found.solutions if s.kind == "reversing"]
+        assert teardrops
+        assert all(is_stem_tailed(s, catalog) == stem_tailed for s in teardrops)
+    dogbone = make_dogbone(teardrops[0], catalog)
+    assert dogbone.is_closed and classify(dogbone).perfectly_looping
+
+
+def test_the_package_exports_what_classify_returns_and_raises():
+    import duplotrain
+
+    verdict = classify(build_chain([(default_catalog()["curve"], 0, 1)] * 12))
+    assert isinstance(verdict, duplotrain.LoopClassification)
+    assert duplotrain.DriveLimitError is DriveLimitError
+    assert duplotrain.ClassificationLimitError is ClassificationLimitError

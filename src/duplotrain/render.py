@@ -110,6 +110,8 @@ def render_layout(
 ) -> Figure:
     """Draw *layout*; save to *path* if given, and return the figure.
 
+    The *title*, by default the piece counts and size, is drawn as plain text.
+
     A figure made only to be saved is a standalone :class:`~matplotlib.figure.Figure`:
     pyplot's backend and open figures stay as they were. A caller's *ax* keeps its
     figure open.
@@ -217,30 +219,29 @@ def render_layout(
                 )
 
     # Action stones clipped onto pieces (mid-piece, or pulled toward a port face).
-    if layout.accessories:
-        for k, entry in enumerate(layout.accessories):
-            index, stone_id = entry[0], entry[1]
-            at_port = entry[2] if len(entry) > 2 else None
-            info = ACCESSORIES.get(stone_id, {})
-            line = layout.placements[index].centrelines()[0]
-            mx, my, _ = line[len(line) // 2]
-            if at_port is not None:
-                px, py = layout.placements[index].port_pose(at_port).xy()
-                mx, my = 0.82 * px + 0.18 * mx, 0.82 * py + 0.18 * my
-            offset = 30.0 * sum(
-                1 for j, other in enumerate(layout.accessories)
-                if other[0] == index and j < k
-            )
-            ax.plot(
-                mx,
-                my + offset,
-                "o",
-                color=info.get("color", "#888888"),
-                markersize=11,
-                markeredgecolor="white",
-                markeredgewidth=1.6,
-                zorder=6.5,
-            )
+    for k, entry in enumerate(layout.accessories):
+        index, stone_id = entry[0], entry[1]
+        at_port = entry[2] if len(entry) > 2 else None
+        info = ACCESSORIES.get(stone_id, {})
+        line = layout.placements[index].centrelines()[0]
+        mx, my, _ = line[len(line) // 2]
+        if at_port is not None:
+            px, py = layout.placements[index].port_pose(at_port).xy()
+            mx, my = 0.82 * px + 0.18 * mx, 0.82 * py + 0.18 * my
+        offset = 30.0 * sum(
+            1 for j, other in enumerate(layout.accessories)
+            if other[0] == index and j < k
+        )
+        ax.plot(
+            mx,
+            my + offset,
+            "o",
+            color=info.get("color", "#888888"),
+            markersize=11,
+            markeredgecolor="white",
+            markeredgewidth=1.6,
+            zorder=6.5,
+        )
 
     # Joints and open ends.
     for index, placement in enumerate(layout):
@@ -287,11 +288,12 @@ def render_layout(
                 zorder=7,
             )
 
-    width, height = layout.size()
     if title is None:
+        width, height = layout.size()
         counts = ", ".join(f"{n} {pid}" for pid, n in sorted(layout.piece_counts.items()))
         title = f"{counts}  |  {width / 10:.0f} x {height / 10:.0f} cm"
-    ax.set_title(title, fontsize=10)
+    # Plain text: a "$" in a piece id is no mathematics.
+    ax.set_title(title, fontsize=10, parse_math=False)
     ax.set_aspect("equal")
     ax.margins(0.08)
     ax.set_xticks([])

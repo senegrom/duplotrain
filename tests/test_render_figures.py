@@ -41,3 +41,14 @@ def test_a_failed_save_leaves_no_figure_behind(layout, tmp_path):
     with pytest.raises(OSError):
         render_layout(layout, path=str(tmp_path / "missing" / "ring.png"))
     assert plt.get_fignums() == before
+
+
+def test_the_default_title_is_plain_text(tmp_path):
+    # Dollar signs in a piece id are no mathematics: read as math, this one failed
+    # the save.
+    from duplotrain.pieces import parse_piece
+
+    piece = parse_piece({"id": "arc$\\frac$", "paths": [
+        {"segments": [{"type": "arc", "radius": 256, "degrees": 30}]}]})
+    figure = render_layout(build_chain([(piece, 0, 1)] * 12), path=str(tmp_path / "ring.png"))
+    assert figure.axes[0].get_title().startswith("12 arc$\\frac$  |")

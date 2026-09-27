@@ -20,6 +20,13 @@ def runner():
     return CliRunner()
 
 
+def test_version_is_the_package_version(runner):
+    from duplotrain import __version__
+
+    result = runner.invoke(main, ["--version"])
+    assert result.exit_code == 0 and result.output == f"duplotrain, version {__version__}\n"
+
+
 def test_pieces_lists_catalog(runner):
     result = runner.invoke(main, ["pieces"])
     assert result.exit_code == 0
@@ -324,14 +331,16 @@ def test_json_files_may_be_saved_in_any_unicode_encoding(runner, tmp_path, encod
 
 
 def test_catalogue_text_and_paths_are_printed_as_they_are(runner, tmp_path):
-    # Brackets are rich markup: "[/]" used to crash the table, "[v2]" to vanish.
+    # Brackets are rich markup: "[/]" used to crash the table, "[v2]" to vanish;
+    # ":ok:" is an emoji code, and a closing backslash came out doubled.
     catalogue = tmp_path / "mine.json"
     catalogue.write_text(json.dumps({"pieces": [{
-        "id": "arc[/]", "name": "My arc [v2]", "part_numbers": ["[x]"], "width": 64,
+        "id": "arc[/]", "name": "My arc [v2] :ok: v2\\", "part_numbers": ["[x]"], "width": 64,
         "paths": [{"segments": [{"type": "arc", "radius": 256, "degrees": 30}]}]}]}))
     result = runner.invoke(main, ["pieces", "--catalog", str(catalogue)])
     assert result.exit_code == 0, result.output
     assert "arc[/]" in result.output and "My arc [v2]" in result.output
+    assert ":ok: v2\\ " in result.output  # the name wraps in its column
     box = tmp_path / "box.json"
     box.write_text(json.dumps({"arc[/]": 12}))
     out = tmp_path / "out [new]"
@@ -345,6 +354,7 @@ def test_catalogue_text_and_paths_are_printed_as_they_are(runner, tmp_path):
 @pytest.mark.parametrize("args, tip, not_tip", [
     (["--curve", "12", "--straight", "1", "--use-all"], "without --use-all", None),
     (["--set", "10872", "--slop", "10"], "more curves", "--slop 5"),
+    (["--curve", "12", "--min-pieces", "13", "--slop", "2"], "--slop 5", "more curves"),
 ])
 def test_no_loop_advice_suggests_only_what_the_run_did_not_try(runner, args, tip, not_tip):
     result = runner.invoke(main, ["solve", *args])

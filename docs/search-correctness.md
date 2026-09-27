@@ -67,19 +67,20 @@ active job, the published suggestions and the revision stay as they were. An
 already-mating pair is offered as a zero-piece join. An exception while a job
 runs discards the job and leaves the layout and revision untouched. Publishing a
 job's suggestions, including none, is one new revision, so old candidate indices
-cannot be reused.
+cannot be reused. The focused regressions are in `tests/test_interactive_search.py`.
 
 ## Validate inventory before merging
 
-CLI piece counts must be non-negative integers. JSON counts are validated before
-being added to flags and boxed-set counts. Fractions, floats (including `12.0`),
+Piece counts must be integers from 0 to 10,000 wherever they are given: CLI flags,
+JSON inventories, the editor and `solve()`/`enumerate_networks()`. JSON counts are
+validated before being added to flags and boxed-set counts, and the sums before
+any search. Fractions, floats (including `12.0`),
 booleans, numeric strings, negatives, unknown IDs and non-object documents are
 rejected rather than truncated or silently discarded. Valid integer counts from
 all three sources remain additive. File-read errors are reported as CLI errors.
 
-The focused regressions are in `tests/test_interactive_search.py`,
-`tests/test_api_validation.py`, `tests/test_search_integrity.py` and
-`tests/test_cli_inventory.py`.
+The focused regressions are in `tests/test_api_validation.py`,
+`tests/test_search_integrity.py` and `tests/test_cli_inventory.py`.
 
 ## Completion paths can revisit all free junction ports
 

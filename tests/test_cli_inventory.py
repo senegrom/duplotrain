@@ -68,9 +68,13 @@ def test_valid_flags_sets_and_json_counts_are_still_additive(tmp_path, monkeypat
 
 
 def test_inventory_read_errors_are_reported_politely(tmp_path):
-    result = CliRunner().invoke(cli.main, ["solve", "--inventory", str(tmp_path)])
-    assert result.exit_code != 0 and "bad inventory file" in result.output
-    assert "Traceback" not in result.output
+    big = tmp_path / "big.json"
+    big.write_bytes(b" " * (2 * 1024 * 1024 + 1))
+    for path, code, message in ((tmp_path, 2, "is a directory"),
+                                (big, 1, "larger than 2 MB")):
+        result = CliRunner().invoke(cli.main, ["solve", "--inventory", str(path)])
+        assert result.exit_code == code and message in result.output
+        assert "Traceback" not in result.output
 
 
 def test_an_inventory_of_zero_counts_asks_what_you_own(tmp_path):
@@ -78,3 +82,13 @@ def test_an_inventory_of_zero_counts_asks_what_you_own(tmp_path):
     inventory.write_text(json.dumps({"curve": 0, "straight": 0}))
     result = CliRunner().invoke(cli.main, ["solve", "--inventory", str(inventory)])
     assert result.exit_code == 2 and "Tell me what you own" in result.output
+
+
+def test_counts_added_together_are_bounded_before_anything_is_written(tmp_path):
+    box = tmp_path / "box.json"
+    box.write_text(json.dumps({"curve": 10_000}))
+    out = tmp_path / "out"
+    result = CliRunner().invoke(cli.main, ["solve", "--curve", "5", "--inventory", str(box),
+                                           "-o", str(out)])
+    assert result.exit_code == 1 and "the counts added together" in result.output
+    assert not out.exists()

@@ -150,13 +150,33 @@ def _lobe_recipe(teardrop: Solution, pieces: Mapping[str, PieceType]) -> list:
     # The steps place the pieces after a completion's base: step k is placement
     # offset + k. The walk's last piece closes into a stub of the switch that starts
     # the lobe (the first junction in the trace may be a crossing on the tail).
-    offset = len(teardrop.layout) - len(steps)
-    target = (teardrop.layout.links.get((offset + len(steps) - 1, steps[-1].exit))
-              if steps else None)
-    if (target is None or target[0] < offset
-            or not pieces[steps[target[0] - offset].piece_id].is_junction):
+    layout = teardrop.layout
+    offset = len(layout) - len(steps)
+    target = layout.links.get((offset + len(steps) - 1, steps[-1].exit)) if steps else None
+    if target is None:
         raise ValueError("no junction in the teardrop recipe")
-    return steps[target[0] - offset:]
+    if target[0] >= offset:
+        lobe = steps[target[0] - offset:]
+    else:
+        # A completion closing into the base junction it grew from: the lobe is that
+        # junction, entered from its one port routed to the walk's start, then the walk.
+        junction = layout.placements[target[0]].piece
+        start = layout.links.get((offset, steps[0].entry))
+        if start is None or start[0] != target[0]:
+            raise ValueError("the teardrop's lobe runs through its base layout")
+        tails = [port for port in range(len(junction.ports)) if port != target[1]
+                 and any(exit_port == start[1] for exit_port, _ in junction.transit(port))]
+        if len(tails) != 1:
+            raise ValueError("the teardrop's junction has no single tail")
+        lobe = [_Place(junction.id, tails[0], start[1]), *steps]
+    if not pieces[lobe[0].piece_id].is_junction:
+        raise ValueError("no junction in the teardrop recipe")
+    return lobe
+
+
+def _stem_tailed(lobe: list, pieces: Mapping[str, PieceType]) -> bool:
+    """Does the train entering the lobe's junction from the tail choose a branch?"""
+    return len(pieces[lobe[0].piece_id].transit(lobe[0].entry)) > 1
 
 
 def is_stem_tailed(teardrop: Solution, pieces: Mapping[str, PieceType]) -> bool:
@@ -170,17 +190,15 @@ def is_stem_tailed(teardrop: Solution, pieces: Mapping[str, PieceType]) -> bool:
     comes back.  Only the stem-tailed kind composes into a perfect dogbone.
 
     Non-reversing solutions (plain loops, junction-free traces) are simply not
-    teardrops: False, not an error.
+    teardrops, and a lobe that cannot be replayed from the steps (transits, or a
+    completion's lobe through its base) cannot compose: False, not an error.
     """
     if teardrop.kind != "reversing":
         return False
     try:
-        lobe = _lobe_recipe(teardrop, pieces)
+        return _stem_tailed(_lobe_recipe(teardrop, pieces), pieces)
     except ValueError:
         return False
-    piece = pieces[lobe[0].piece_id]
-    options = [exit_port for exit_port, _ in piece.transit(lobe[0].entry)]
-    return len(options) > 1
 
 
 def pick_stem_tailed(
@@ -282,7 +300,11 @@ def make_dogbone(
     """
     if teardrop.kind != "reversing":
         raise ValueError("make_dogbone wants a reversing (teardrop) solution")
-    if not is_stem_tailed(teardrop, pieces):
+    # The teardrop's step trace is tail pieces, then the switch, then the lobe that
+    # closes into the switch's other branch.  The lobe recipe -- switch onward -- is
+    # self-contained: replayed anywhere it lands back on its own switch.
+    lobe = _lobe_recipe(teardrop, pieces)
+    if not _stem_tailed(lobe, pieces):
         raise ValueError(
             "this teardrop is branch-tailed (a one-way trap); pick the stem-tailed "
             "variant, e.g. via pick_stem_tailed()"
@@ -297,10 +319,6 @@ def make_dogbone(
         layout, index = layout.attach(pieces["straight"], 0, cursor)
         cursor = (index, 1)
 
-    # The teardrop's step trace is tail pieces, then the switch, then the lobe that
-    # closes into the switch's other branch.  The lobe recipe -- switch onward -- is
-    # self-contained: replayed anywhere it lands back on its own switch.
-    lobe = _lobe_recipe(teardrop, pieces)
     layout, switch_index = layout.attach(
         pieces[lobe[0].piece_id], lobe[0].entry, cursor
     )

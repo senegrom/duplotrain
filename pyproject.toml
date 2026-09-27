@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "duplotrain"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Model LEGO DUPLO train track and find closed layouts that loop nicely."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -31,12 +31,15 @@ dev = ["pytest>=8.0", "matplotlib>=3.8", "ruff>=0.6"]
 [project.scripts]
 duplotrain = "duplotrain.cli:main"
 
+[tool.setuptools.dynamic]
+version = { attr = "duplotrain.__version__" }
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
 duplotrain = [
-    "static/*.html", "static/*.js", "static/*.css", "static/*.webmanifest", "static/*.svg",
+    "static/*.html", "static/*.js", "static/*.css", "static/*.webmanifest",
     "static/*.ico", "static/*.png", "static/icons/*.png", "static/icons/*.ico",
 ]
 

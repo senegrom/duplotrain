@@ -68,6 +68,38 @@ def test_a_solve_that_finds_nothing_still_replaces_earlier_results(runner, monke
     assert not list(out.glob("loop_*"))
 
 
+def test_results_are_shown_before_earlier_results_are_replaced(runner, monkeypatch, tmp_path):
+    # An earlier run's file that cannot be deleted (open elsewhere, read-only) must
+    # not hide what the search found.
+    import click
+
+    from duplotrain import cli
+
+    def locked(out_dir):
+        raise click.ClickException("cannot replace the earlier results")
+
+    monkeypatch.setattr(cli, "_clear_earlier_results", locked)
+    result = runner.invoke(main, ["solve", "--curve", "12", "-o", str(tmp_path)])
+    assert result.exit_code == 1 and "Loops, nicest first" in result.output
+
+
+def test_an_empty_output_name_is_refused_not_ignored(runner):
+    result = runner.invoke(main, ["solve", "--curve", "12", "-o", ""])
+    assert result.exit_code == 2 and "-o needs a directory name" in result.output
+
+
+def test_a_format_that_needs_latex_is_reported_politely(tmp_path):
+    import click
+
+    from duplotrain import cli
+
+    def pgf(layout, path, **options):  # matplotlib without a LaTeX installation
+        raise RuntimeError("'xelatex' not found")
+
+    with pytest.raises(click.ClickException, match="cannot write x.pgf: 'xelatex' not found"):
+        cli._write_image(pgf, None, "x.pgf")
+
+
 def test_gui_on_a_port_in_use_fails_politely(runner):
     with socket.socket() as taken:
         taken.bind(("127.0.0.1", 0))
