@@ -335,16 +335,18 @@ class PairSearch:
             return {"kind": "progress", "stage": cursor.stage}
         cursor.limits.max_nodes = min(cursor.limits.max_nodes, cursor.nodes + remaining_budget)
         event = cursor.advance()
-        # One exact direction exhausting a contour proves the reversed problem
-        # has no further candidates at that bound. Keep the opposite suspended
-        # stack for a raised bound, and try this successful direction first in
-        # the next stage.
+        # A direction running out of search proves that the reversed problem has
+        # nothing more, and the full inventory's that no stage has: the others
+        # search subsets of its stock and moves. Those are settled, whatever stopped
+        # them. A piece limit keeps the opposite suspended stack for a raised bound.
+        # Either way this direction goes first in the next stage.
         if event["kind"] in ("piece_limit", "exhausted"):
-            for peer in stage:
+            settled = (self.cursors if event["kind"] == "exhausted"
+                       and cursor.stage == "full inventory" else stage)
+            for peer in settled:
                 if peer is cursor:
                     continue
                 if event["kind"] == "exhausted":
-                    # Settled, whatever stopped it: nothing it missed is left.
                     peer.close()
                     peer.exhausted, peer.blocked, peer.cut = True, False, False
                 else:
@@ -381,6 +383,9 @@ class PairSearch:
             cursor.limits.max_nodes = max(cursor.limits.max_nodes,
                                           min(cursor.cap, cursor.nodes * 2))
             cursor.limits.max_pieces = max(1, self.depth - cursor.overhead)
+            # A direction stopped at its result limit (repeats of one track from
+            # the other end, say) resumes too.
+            cursor.limits.max_results *= 2
             cursor.blocked = bool(cursor.overhead and self.depth < 4)
         if self.depth > old_depth:
             if hasattr(self.arc, "close"):
@@ -438,7 +443,7 @@ class SearchJob:
                 raise ValueError("Close all gaps requires 2–10 open ends")
         else:
             grow, close = body.get("grow"), body.get("close")
-            if grow is None or close is None:
+            if grow is None and close is None:
                 if len(opens) != 2:
                     raise ValueError("pick two open ends, or use Close all gaps")
                 grow, close = opens[-1], opens[0]
@@ -614,15 +619,15 @@ class SearchJob:
                 self.status = event["kind"]
                 self.complete = (not self.all_gaps and event["kind"] == "exhausted"
                                  and not self.unsaveable)
-                # From the live cursors: a stage's other direction may have settled
-                # a cut walk since an earlier stop.
-                if self.pool and not self.unsaveable:
-                    self.reason = ("Some walks pass through more existing junctions than a "
-                                   "search can follow; closures along them were not searched."
-                                   if any(c.cut for c in self.pool.cursors) else None)
                 break
             if time.perf_counter() >= deadline:
                 break
+        # From the live cursors at every stop, results found included: a stage's
+        # other direction may have settled a cut walk since an earlier stop.
+        if self.status != "running" and self.pool and not self.unsaveable:
+            self.reason = ("Some walks pass through more existing junctions than a "
+                                   "search can follow; closures along them were not searched."
+                           if any(c.cut for c in self.pool.cursors) else None)
 
     def more(self, *, harder=False):
         if not harder and self.status in ("limited", "bounded_complete", "exhausted"):
@@ -691,7 +696,7 @@ class SearchJob:
                 "complete": self.complete, "reason": self.reason,
                 "options": {"room": list(self.options["room"]) if self.options["room"] else None,
                             "keep_out": [list(r) for r in self.options["keep_out"]]},
-                "max_pieces": self.depth, "search_effort": self.effort,
+                "max_pieces": self.depth,
                 # A harder search needs room to report, limits left to raise and
                 # something left to search: not every direction exhausted or cut short.
                 "can_harden": (len(self.solutions) < MAX_RESULTS

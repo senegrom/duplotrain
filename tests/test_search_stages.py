@@ -190,3 +190,58 @@ def test_interactive_quota_preserves_first_stage_and_publishes_job_counters(slop
         assert all(c["revision"] == published["revision"] for c in published["candidates"])
     finally:
         job.close()
+
+
+def test_the_full_inventory_running_out_of_search_settles_every_stage(monkeypatch):
+    # Earlier stages search subsets of its stock and moves: once it has run out of
+    # search, a plain stage stopped at its cap has nothing left to find either.
+    catalog = default_catalog()
+
+    def plain_capped(inventory, pieces, config, *, base, grow_from, close_onto, limits):
+        if set(inventory) <= {"curve", "straight"}:
+            while True:
+                yield {"kind": "node_limit", "nodes": limits.max_nodes, "depth": 1}
+        yield {"kind": "progress", "nodes": 5, "depth": 1}
+
+    monkeypatch.setattr(editor_search, "solve_steps", plain_capped)
+    pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog,
+                      {"curve": 6, "straight": 4, "buffer": 1}, (5, 1), (0, 0), 26, 1, 0,
+                      False, search_options(None, catalog))
+    try:
+        while (event := pool.step())["kind"] not in ("limited", "exhausted"):
+            pass
+        assert event["kind"] == "exhausted"
+        assert all(c.exhausted and not c.blocked for c in pool.cursors)
+    finally:
+        pool.close()
+
+
+def test_search_harder_lifts_a_directions_result_limit(monkeypatch):
+    # A direction can reach its 50 results with repeats of tracks the other end
+    # found: Search harder, which it offers, must let it go on.
+    catalog, found = default_catalog(), []
+
+    def repeats(inventory, pieces, config, *, base, grow_from, close_onto, limits):
+        count = 0
+        while True:
+            if count >= limits.max_results:
+                yield {"kind": "result_limit", "nodes": count, "depth": 1}
+            else:
+                count += 1
+                found.append(grow_from)
+                yield {"kind": "solution", "solution": None, "nodes": count, "depth": 1}
+
+    monkeypatch.setattr(editor_search, "solve_steps", repeats)
+    pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog,
+                      {"curve": 6, "straight": 4}, (5, 1), (0, 0), 26, 1, 0, False,
+                      search_options(None, catalog))
+    try:
+        while pool.step()["kind"] not in ("limited", "exhausted"):
+            pass
+        before = len(found)
+        pool.harder()
+        while pool.step()["kind"] not in ("limited", "exhausted"):
+            pass
+        assert len(found) > before
+    finally:
+        pool.close()

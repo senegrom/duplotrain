@@ -41,7 +41,6 @@ def test_actual_bridge_best_route_and_exhaustive_model_coverage(completed, scope
         assert result["runs"] == required and result["required_runs"] == str(required)
         assert result["best"]["visited"] == 57
         assert result["best"]["cycle_visited"] == 26
-        assert result["outcomes"] == {"endless": required}
         assert result["classification"] == {
             "locally_looping": True, "looping": True,
             "completely_looping": False, "perfectly_looping": False,
@@ -99,7 +98,7 @@ def test_runs_share_one_ten_million_step_allowance(completed, monkeypatch):
     result = finished(job)
     assert result["required_runs"] == "11008" and job.max_runs == 100000
     assert result["runs"] == result["step_limited_runs"] == 1000
-    assert result["steps"] == 10_000_000
+    assert job.steps == 10_000_000
     assert result["status"] == "limited" and not result["complete"]
     assert result["classification"] is None and result["best"] is None
     job.close()

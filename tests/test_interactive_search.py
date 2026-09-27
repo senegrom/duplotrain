@@ -791,3 +791,85 @@ def test_a_walk_cut_short_is_settled_when_the_other_direction_runs_out(catalog, 
             assert job.status == "exhausted" and job.complete and job.reason is None
         finally:
             job.close()
+
+
+def test_search_harder_is_not_offered_at_its_ceiling(catalog):
+    # The engine alone decides, the 128-piece and effort-16 ceiling included.
+    session = Session(history=[half(catalog)], inventory={"curve": 12})
+    job = SearchJob(session, {"max_pieces": 128, "search_effort": 16})
+    try:
+        job.status = "limited"
+        assert not job.response(session, {})["can_harden"]
+        job.depth = 64  # one limit left to raise
+        assert job.response(session, {})["can_harden"]
+    finally:
+        job.close()
+
+
+def test_a_later_stop_drops_a_walk_reason_the_harder_search_settled(catalog, monkeypatch):
+    import duplotrain.editor_search as editor_search
+
+    # One end is cut at once; the other stops at the stage cap, so the job is
+    # limited with the walk reason. Search harder lets that end run out of
+    # search, which settles the cut: the job ends exhausted, without the reason.
+    def search(inventory, pieces, config, *, base, grow_from, close_onto, limits):
+        if grow_from == (5, 1):
+            while True:
+                yield {"kind": "walk_limit", "nodes": 1, "depth": 1}
+        nodes = 0
+        while nodes < 100_000:  # beyond the 60,000-node stage cap at effort 1
+            nodes = limits.max_nodes
+            yield {"kind": "node_limit", "nodes": nodes, "depth": 1}
+
+    monkeypatch.setattr(editor_search, "solve_steps", search)
+    # Five spare curves cannot close the half circle: the arc templates find nothing,
+    # and the one stage is the full inventory, searched from both ends.
+    session = Session(history=[half(catalog)], inventory={"curve": 11})
+    job = SearchJob(session, {"grow": [5, 1], "close": [0, 0]})
+    try:
+        settle(job)
+        assert job.status == "limited" and "junctions" in job.reason
+        job.more(harder=True)
+        settle(job)
+        assert job.status == "exhausted" and job.complete and job.reason is None
+    finally:
+        job.close()
+
+
+def test_a_stop_with_results_rereads_the_walk_reason_too(catalog):
+    # A reason from an earlier stop must not outlive its cut when the job next
+    # stops because it found enough.
+    session = Session(history=[half(catalog)], unlimited=True)
+    job = SearchJob(session, {})
+    try:
+        job.reason = "Some walks pass through more existing junctions than a search can follow."
+        settle(job)
+        assert job.status == "results_ready" and job.reason is None
+    finally:
+        job.close()
+
+
+def test_a_cut_walk_releases_its_suspended_search(catalog, monkeypatch):
+    import inspect
+
+    import duplotrain.solver as solver_module
+    from tests.test_solver import crossings_in_a_row
+
+    monkeypatch.setattr(solver_module, "_MAX_WALK_STEPS", 20)
+    base = crossings_in_a_row(catalog, 30)
+    session = Session(history=[base], inventory=dict(base.piece_counts))
+    job = SearchJob(session, {"grow": [0, 1], "close": [30, 0]})
+    try:
+        settle(job)
+        cut = [c for c in job.pool.cursors if c.cut]
+        assert cut and all(inspect.getgeneratorstate(c.iterator) == inspect.GEN_CLOSED
+                           for c in cut)
+    finally:
+        job.close()
+
+
+def test_a_start_names_both_ends_or_neither(catalog):
+    # With one end missing, the default pair would silently grow from another end.
+    session = Session(history=[half(catalog)], inventory={"curve": 12})
+    with pytest.raises(ValueError, match="close must be"):
+        SearchJob(session, {"grow": [5, 1]})

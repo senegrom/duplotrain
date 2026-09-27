@@ -9,7 +9,7 @@ const candidate = (index, revision = 7) => ({index, revision,
   preview: {format: "duplotrain-preview/1", base_count: 0, base_revision: revision, placements: []}});
 const job = (extra = {}) => ({job_id: "job-A", revision: 7, status: "running", stage: "plain track",
   searched: 32, found: 0, page: 0, candidates: [], complete: false,
-  max_pieces: 26, search_effort: 1, resumable: true, can_harden: true, ...extra});
+  max_pieces: 26, resumable: true, can_harden: true, ...extra});
 const route = (extra = {}) => ({job_id: "route-A", revision: 7, status: "running", scope: "all",
   runs: 1, required_runs: "4", step_limited_runs: 0, total_drivable: 3, best: null,
   counterexample: null, classification: null, complete: false, ...extra});

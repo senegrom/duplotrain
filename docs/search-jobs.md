@@ -40,8 +40,8 @@ from its next checkpoint, starting at the first page.
 Per-piece exclusion checkboxes, and the junction/bridge shortcuts, affect the
 next new search's available pieces, not owned inventory or existing track.
 A paused search retains its captured exclusions and room constraints. Its
-preview displays those captured constraints even when new values have been
-typed for the next search. Sorting the current result sample is allowed.
+preview draws the captured room and keep-out rectangles even when new values have
+been typed for the next search. Sorting the current result sample is allowed.
 
 ### Room and keep-out rectangles
 

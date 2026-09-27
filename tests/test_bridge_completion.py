@@ -183,7 +183,7 @@ def test_search_effort_scales_all_three_stages():
             assert {c.stage: c.cap for c in job.pool.cursors} == {
                 "plain track": 25_000 * effort, "standard bridge": 250_000 * effort,
                 "full inventory": 60_000 * effort}
-            assert job.response(session, {})["search_effort"] == effort
+            assert job.effort == effort
         finally:
             job.close()
 

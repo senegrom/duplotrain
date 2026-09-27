@@ -4,7 +4,6 @@ from __future__ import annotations
 import math
 import time
 import uuid
-from collections import Counter
 
 from .drive import (
     DriveLimitError,
@@ -49,7 +48,6 @@ class RouteJob:
         self.iterator = ((start, settings) for settings in _tongue_assignments(self.layout)
                          for start in self.starts)
         self.runs = self.steps = self.limited_runs = 0
-        self.outcomes = Counter()
         self.best = self.best_score = None
         # The first run breaking each universal property, as drive.classify
         # records them: the counterexample breaks the weakest one that failed.
@@ -81,15 +79,13 @@ class RouteJob:
                     return
                 continue
             self.steps += len(report.steps)
-            self.outcomes[report.outcome] += 1
             visited = len(report.visited & self.universe)
             cycle = (len({step[0] for step in report.steps[report.cycle_start:]} & self.universe)
                      if report.cycle_start is not None else 0)
             score = ((cycle, visited) if self.goal == "cycle" else (visited, cycle))
             score += (report.outcome == "endless", -len(report.steps))
             witness = {"start": list(start), "switch_states": dict(settings),
-                       "visited": visited, "cycle_visited": cycle, "outcome": report.outcome,
-                       "period": report.period}
+                       "visited": visited, "cycle_visited": cycle, "outcome": report.outcome}
             if self.best is None or score > self.best_score:
                 self.best, self.best_score = witness, score
             if report.outcome == "endless":
@@ -116,12 +112,11 @@ class RouteJob:
                               "perfectly_looping": self.locally and self.perfectly}
         return {"job_id": self.id, "revision": self.revision, "status": self.status,
                 "scope": self.scope, "runs": self.runs, "required_runs": str(self.required),
-                "step_limited_runs": self.limited_runs,
-                "steps": self.steps, "total_drivable": len(self.universe),
+                "step_limited_runs": self.limited_runs, "total_drivable": len(self.universe),
                 "best": self.best, "counterexample": (
                     self.failures.get("looping") or self.failures.get("completely")
                     or self.failures.get("perfectly")),
-                "outcomes": dict(self.outcomes), "classification": classification,
+                "classification": classification,
                 "complete": self.complete}
 
     def close(self):

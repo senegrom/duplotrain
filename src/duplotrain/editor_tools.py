@@ -51,23 +51,21 @@ def validate_project(data: object, catalog) -> dict[str, Any]:
             "scale": _number(view.get("scale"), 0.000001, 4, "view scale"),
         }
     if "search" in prefs:
+        from .editor_search import integer, search_options
+
         search = prefs["search"]
         if not isinstance(search, dict):
             raise ValueError("project search settings must be an object")
-        pieces, reversing = search.get("max_pieces"), search.get("reversing")
-        if type(pieces) is not int or not 1 <= pieces <= 128:
-            raise ValueError("max_pieces must be an integer from 1 to 128")
-        if type(reversing) is not bool:
+        if type(search.get("reversing")) is not bool:
             raise ValueError("reversing must be a boolean")
         result["search"] = {
-            "max_pieces": pieces, "reversing": reversing,
+            "max_pieces": integer(search.get("max_pieces"), 1, 128, "max_pieces"),
+            "reversing": search["reversing"],
             "slop": _number(search.get("slop"), 0, 1e9, "slop"),
         }
         if "options" in search:
-            from .editor_search import search_options
             result["search"]["options"] = search_options(search["options"], catalog)
-    return {"format": PROJECT_FORMAT, "name": name.strip(),
-            "session": session, "preferences": result}
+    return {"name": name.strip(), "session": session, "preferences": result}
 
 
 def check_session(session: Session) -> dict[str, Any]:
