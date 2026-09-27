@@ -119,6 +119,10 @@ def test_ci_keeps_both_versions_both_browsers_and_minimal_install():
     assert "python: ['3.12', '3.13']" in jobs["python"]
     assert "browser: [chromium, webkit]" in jobs["browser"]
     assert "DUPLOTRAIN_REQUIRE_BROWSER: '1'" in jobs["browser"]
+    # Without these, the built-app and WebKit offline tests would skip unnoticed.
+    assert "DUPLOTRAIN_STATIC_DIST: ${{ github.workspace }}/webapp/dist" in jobs["browser"]
+    assert ("DUPLOTRAIN_TEST_SYSTEM_CA: ${{ matrix.browser == 'webkit' && '1' || '0' }}"
+            in jobs["browser"])
     assert "-m 'not browser'" in jobs["python"]
     assert 'find_spec(\'matplotlib\') is None' in jobs["base-install"]
     assert 'duplotrain solve' in jobs["base-install"]

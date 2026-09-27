@@ -8,7 +8,7 @@ import pytest
 
 @pytest.mark.parametrize("name,args", [
     ("completion", ["--case", "offset_circle_slop_5"]),
-    ("collision_index", ["--extra-loops", "0"]),
+    ("collision_index", ["--extra-loops", "0", "--count-bounds"]),
     ("editor_completion", []),
     ("editor_payload", []),
     ("editor_presentation", []),
@@ -19,3 +19,8 @@ def test_benchmark_script_runs_and_reports_json(name, args, monkeypatch, capsys)
     script.main()
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) >= 2 and all(isinstance(json.loads(line), dict) for line in lines)
+    if name == "editor_completion":  # docs/performance.md#representative-times
+        nodes = {row["case"]: row["nodes"] for row in map(json.loads, lines[1:])}
+        assert nodes["mixed_gap"] == 138
+        assert [nodes[f"reported_{stock}_{end}"] for stock in ("finite", "unlimited")
+                for end in ("forward", "reverse")] == [1742, 718, 1878, 854]

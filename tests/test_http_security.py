@@ -202,30 +202,6 @@ def test_get_cannot_mutate(local_editor):
     assert_rejected(local_editor, 404, method="GET")
 
 
-def test_get_with_a_late_body_still_reads_the_refusal(local_editor):
-    """A GET that promises a body arriving after its headers is a mutation attempt.
-
-    The refusal must drain those late bytes before closing: closing with unread
-    data is an abortive close, and on Windows the reset discards the response
-    already sent, so the client would report a connection error instead of 404.
-    """
-    session, port = local_editor
-    before = session.state()
-    with socket.create_connection(("127.0.0.1", port), timeout=3) as sock:
-        sock.sendall(
-            f"GET /api/clear HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n"
-            "Content-Type: application/json\r\nContent-Length: 2\r\n\r\n".encode()
-        )
-        time.sleep(0.1)
-        sock.sendall(b"{}")
-        response = http.client.HTTPResponse(sock, method="GET")
-        response.begin()
-        payload = json.loads(response.read())
-    assert response.status == 404
-    assert "error" in payload
-    assert session.state() == before
-
-
 def test_a_refused_body_is_drained_before_the_refusal_is_sent(monkeypatch):
     """A refused request's declared body is read before the refusal goes out.
 
@@ -271,6 +247,9 @@ def test_a_refused_body_is_drained_before_the_refusal_is_sent(monkeypatch):
 @pytest.mark.parametrize("head, body, expected", [
     pytest.param("GET / HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 200, id="page"),
     pytest.param("GET /api/state HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 200, id="state"),
+    # A GET promising a body is a mutation attempt: its refusal is read all the same.
+    pytest.param("GET /api/clear HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 404,
+                 id="get-mutation"),
     pytest.param("POST /api/clear HTTP/1.1\r\nTransfer-Encoding: chunked\r\n",
                  b"2\r\n{}\r\n0\r\n\r\n", 409, id="chunked"),
     pytest.param("POST /api/clear HTTP/1.1\r\nContent-Length: 2\r\nContent-Length: 2\r\n",

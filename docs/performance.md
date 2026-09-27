@@ -17,8 +17,9 @@ stop reasons, preprocessing work and median times; `--suite`, `--case`,
 `--max-nodes` select variants. `benchmarks/editor_completion.py` times whole
 editor closings of the reported 59-piece bridge gap in both directions and
 both inventory modes and hashes the ordered exact layouts,
-`benchmarks/collision_index.py --count-bounds` scales that problem with
-synthetic remote circles, `benchmarks/editor_payload.py` measures state
+`benchmarks/collision_index.py` scales that problem with synthetic remote
+circles (`--count-bounds` also counts the clouds its broad phase considers),
+`benchmarks/editor_payload.py` measures state
 serialisation, and `benchmarks/editor_presentation.py` times Check layout and
 warm state responses on the completed layout and on synthetic layouts of 539
 and 1,499 pieces. Every script reports medians, of wall-clock time, and
@@ -60,7 +61,8 @@ addition per pose and move and every membership query hashes a small int.
 A completion must bring its walking end to the selected target and a loop must
 bring it back to its origin face. Reverse breadth-first tables hold every
 planar pose and, separately, every height that can reach that anchor in at
-most k traversals, for k up to a horizon of ten, over the pooled moves of every
+most k traversals, for k up to a horizon of ten by default (`completion_lookahead`,
+from 0, which disables the tables, to 12), over the pooled moves of every
 stock piece, every usable route of a base-only junction and the exact
 retargeting of reversing loops. Tables are built progressively: a search gets
 `min(4096, max_nodes // 8)` expansions at once, earns 24 more per DFS node up to

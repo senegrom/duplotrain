@@ -356,8 +356,7 @@ direction stone, then tries zero or one additional mid-piece stone on each eligi
 straight. It does not enumerate every combination of multiple optional stones.
 Exhaustion refers to that policy, the catalogue, and the sampled collision/congruence
 model — closure itself remains exact. For larger inventories, compose layouts
-constructively and verify their dynamics with `classify`. The end-to-end network and
-loop tests run in every application check.
+constructively and verify their dynamics with `classify`.
 
 The switch dynamics yields a little theorem the machine confirms by exhaustion: a
 dead-end cap **reflects** a train back through the branch it came from, so a trailing
@@ -392,8 +391,8 @@ turn. The pruning removes only branches without closures: exhaustive and
 result-limited searches return the same solutions as without it, and the
 independent collision audit still checks every returned candidate.
 `SolverConfig.completion_lookahead` (`NetworkConfig.lookahead` for networks; 0
-disables) sets the exact horizon, and `stats.pruned_completion` and the other
-`completion_*` counters report the effect.
+disables) sets the exact horizon; `stats.pruned_completion` and the other
+`completion_*` counters report the effect (`stats.pruned_reachability` for networks).
 [docs/search-correctness.md](docs/search-correctness.md) gives the argument,
 [docs/performance.md](docs/performance.md#reverse-reachability-tables) the horizon
 and budgets, and [its benchmarks](docs/performance.md#measuring) the measurements.

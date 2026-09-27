@@ -1,22 +1,22 @@
 """The editor's HTTP API, exercised over a real local socket."""
 
 import json
-import threading
 import urllib.request
 
 import pytest
 
 from duplotrain.gui import Session, make_server
+from tests.editor_support import running_server
 
 
 @pytest.fixture()
 def server():
-    session = Session()
-    srv = make_server(session, port=0)
-    thread = threading.Thread(target=srv.serve_forever, daemon=True)
-    thread.start()
-    base = f"http://127.0.0.1:{srv.server_port}"
+    with running_server(Session()) as srv:
+        yield client(f"http://127.0.0.1:{srv.server_port}")
 
+
+def client(base):
+    """JSON calls to the editor at *base*, each at the revision the last one saw."""
     revision = 0
 
     def call(path, body=None):
@@ -41,9 +41,7 @@ def server():
             return exc.code, json.loads(exc.read())
 
     call.base = base  # expose for raw fetches
-    yield call
-    srv.shutdown()
-    srv.server_close()
+    return call
 
 
 def test_editor_page_serves(server):
