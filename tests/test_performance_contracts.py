@@ -10,7 +10,7 @@ import pytest
 
 from duplotrain.catalog import _default_catalog_items, default_catalog
 from duplotrain.collision import CollisionField
-from duplotrain.exact import Alg, _exact_fraction
+from duplotrain.exact import Alg
 from duplotrain.geometry import ORIGIN, Pose
 from duplotrain.gui import Session
 from duplotrain.layout import (
@@ -36,37 +36,6 @@ from duplotrain.solver import (
     _turn_capacity,
     solve,
 )
-
-
-def full_product(x, y):
-    a, b, c, d = x.coeffs()
-    e, f, g, h = y.coeffs()
-    return (a * e + 2 * b * f + 3 * c * g + 6 * d * h,
-            a * f + b * e + 3 * c * h + 3 * d * g,
-            a * g + c * e + 2 * b * h + 2 * d * f,
-            a * h + d * e + b * g + c * f)
-
-
-def test_scalar_arithmetic_entry_points_keep_exact_coercion():
-    # Alg-by-Alg products are compared in test_exact_fastpaths; here the scalar
-    # entry points, including reflected subtraction.
-    x = Alg(1, 2, 3, 4)
-    for scalar in (0, 1, -3, Fraction(7, 13), 152.4):
-        y = Alg(scalar)
-        assert (x * scalar).coeffs() == full_product(x, y)
-        assert (scalar * x).coeffs() == full_product(y, x)
-        assert scalar - x == y - x
-
-
-def test_fraction_reuse_does_not_retain_subclass_behaviour():
-    value = Fraction(7, 13)
-    assert _exact_fraction(value) is value
-
-    class CustomFraction(Fraction):
-        pass
-
-    assert type(_exact_fraction(CustomFraction(7, 13))) is Fraction
-    assert Alg(152.4).a == Fraction(762, 5)
 
 
 @pytest.mark.parametrize("pid", list(default_catalog()))
@@ -111,7 +80,8 @@ def test_all_shared_caches_are_bounded():
 
     import duplotrain
 
-    # Every module-level cache, including ones added later, has a size bound.
+    # Every module-level functools cache, including ones added later, has a size
+    # bound (the congruence dict caches: test_congruence).
     unbounded = [
         f"{info.name}.{name}"
         for info in pkgutil.iter_modules(duplotrain.__path__)
@@ -249,33 +219,6 @@ def test_shared_exact_values_are_immutable_and_still_copyable():
         pose.x.a = Fraction(999)
 
 
-def test_collision_groups_points_per_cell_and_reuses_query_neighbourhood():
-    class CountingGrid(dict):
-        gets = 0
-
-        def get(self, key, default=None):
-            self.gets += 1
-            return super().get(key, default)
-
-    field = CollisionField()
-    field._grid = CountingGrid()
-    stored = [(float(x), 0.0, 0.0) for x in range(0, 65, 4)]
-    prepared = field._prepare(stored)
-    field._add_prepared(0, prepared, 32.0)
-    # All points fit one 96 mm cell, represented by one placement group rather
-    # than repeating width/index/underpass metadata on every sample. The prepared
-    # list itself is retained, so a successful clash check need not regroup it.
-    assert len(field._grid[(0, 0)]) == 1
-    assert field._grid[(0, 0)][0].points is prepared[0][1]
-
-    # A same-cell query consults the 3x3 neighbourhood once, not once per point.
-    # Keep it far enough in z that every scanned point is non-colliding.
-    query = [(float(x), 0.0, 200.0) for x in range(0, 65, 4)]
-    query_groups = field._prepare(query)
-    assert not field._clashes_prepared(query_groups, 32.0, ignore=set())
-    assert field._grid.gets == 9
-
-
 def test_solver_bins_collision_samples_only_for_placements_within_reach(monkeypatch):
     from collections import defaultdict
 
@@ -377,21 +320,6 @@ def test_cached_local_footprint_matches_direct_layout_bounds():
                 (x0 + bx0, y0 + by0, x0 + bx1, y0 + by1), abs=1e-12
             )
     assert _local_footprint_bounds.cache_info().hits > 0
-
-
-def test_alg_hash_memo_is_not_a_constructor_field():
-    x = Alg(1, 2, 3, 4)
-    assert hash(x) == hash(Alg(1, 2, 3, 4))  # memoises x's hash
-    # A copy with other coefficients must not inherit that memo: equal values
-    # hash equal, so the copy is found in sets and dicts of fresh values.
-    y = replace(x, a=5)
-    assert y == Alg(5, 2, 3, 4)
-    assert hash(y) == hash(Alg(5, 2, 3, 4)) and hash(y) != hash(x)
-    assert y in {Alg(5, 2, 3, 4)} and {y: 1}[Alg(5, 2, 3, 4)] == 1
-    assert pickle.loads(pickle.dumps(x)) == x
-    assert hash(pickle.loads(pickle.dumps(x))) == hash(x)
-    assert hash(copy.deepcopy(x)) == hash(x)
-    assert repr(x) == repr(Alg(1, 2, 3, 4))
 
 
 def test_cached_sample_clouds_are_bit_identical_and_immutable():

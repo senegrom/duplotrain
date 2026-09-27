@@ -11,7 +11,26 @@ from duplotrain import SolverConfig, build_chain, default_catalog, solve
 from duplotrain.exact import Alg
 from duplotrain.geometry import Pose, cos_sin
 from duplotrain.layout import _port_pose, _rotated_local_pose
-from tests.test_performance_contracts import full_product
+
+
+def full_product(x, y):
+    a, b, c, d = x.coeffs()
+    e, f, g, h = y.coeffs()
+    return (a * e + 2 * b * f + 3 * c * g + 6 * d * h,
+            a * f + b * e + 3 * c * h + 3 * d * g,
+            a * g + c * e + 2 * b * h + 2 * d * f,
+            a * h + d * e + b * g + c * f)
+
+
+def test_scalar_arithmetic_entry_points_keep_exact_coercion():
+    # Alg-by-Alg products are compared in test_exact_fastpaths; here the scalar
+    # entry points, including reflected subtraction.
+    x = Alg(1, 2, 3, 4)
+    for scalar in (0, 1, -3, Fraction(7, 13), 152.4):
+        y = Alg(scalar)
+        assert (x * scalar).coeffs() == full_product(x, y)
+        assert (scalar * x).coeffs() == full_product(y, x)
+        assert scalar - x == y - x
 
 
 def generic_add(x, y):

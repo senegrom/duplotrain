@@ -217,11 +217,23 @@ def test_unknown_segment_type_rejected():
     ({"paths": [{"segments": [{"type": "arc", "radius": 128, "degrees": 15}] * 24}]},
      "two connectors at one point"),
     ({"paths": [{"segments": [{"type": "straight", "run": 6000}] * 2}]}, "at most 10000 mm long"),
-    # Exact signs: cancelling coefficients just below zero are still a negative run.
-    ({"paths": [{"segments": [{"type": "straight", "run": {"alg": [-665857, 470832, 0, 0]}}]}]},
+    # Exact signs: this run is -3.2e-14 mm, though its float image is +7.3e-12.
+    ({"paths": [{"segments": [{"type": "straight",
+                               "run": {"alg": [4114, 11592, 10472, -15777]}}]}]},
      "positive run"),
     ({"paths": [{"segments": [{"type": "straight", "run": {"alg": [0, 0, 1_000_001, 0]}}]}]},
      "at most 1,000,000 in size"),
+    # Each 30-degree chord grows the coefficients: the bound applies after it too.
+    ({"paths": [{"segments": [{"type": "straight", "run": {"chord": {
+        "radius": {"chord": {"radius": 900_000, "degrees": 30}}, "degrees": 30}}}]}]},
+     "at most 1,000,000 in size"),
+    ({"paths": [{"segments": [{"type": "straight",
+                               "run": {"chord": {"radius": 256, "degrees": 45}}}]}]},
+     "45 deg is not a multiple of 30 deg"),
+    # Catalogue text is printed: no terminal commands in it.
+    ({"name": "Arc \x1b]0;title\x07"}, "control characters"),
+    ({"id": "odd\x9b2J"}, "control characters"),
+    ({"part_numbers": ["6377\r"]}, "control characters"),
     ({"paths": [{"segments": [{"type": "straight", "run": 8}]}] * 17}, "at most 16 paths"),
     ({"paths": [{"segments": [{"type": "straight", "run": 8}] * 65}]}, "at most 64 segments"),
     ({"paths": [{"start": {"x": 10_001}, "segments": [{"type": "straight", "run": 64}]}]},
@@ -260,6 +272,15 @@ def test_a_piece_needs_a_text_id(piece_id):
         spec["id"] = piece_id
     with pytest.raises(ValueError, match="needs an id"):
         parse_piece(spec)
+
+
+def test_a_catalogue_file_takes_at_most_2_mb(tmp_path):
+    from duplotrain.catalog import load_catalog
+
+    path = tmp_path / "big.json"
+    path.write_bytes(b"[" + b" " * (2 * 1024 * 1024) + b"]")
+    with pytest.raises(ValueError, match="larger than 2 MB"):
+        load_catalog(path)
 
 
 def test_a_catalogue_file_names_each_piece_once(tmp_path):

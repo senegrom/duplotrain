@@ -1,7 +1,8 @@
-"""Bounded parsing for untrusted layout JSON (shared by the CLI and editor)."""
+"""Bounded parsing for untrusted JSON: layouts, inventories and catalogues."""
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Mapping
 from fractions import Fraction
@@ -25,6 +26,18 @@ MAX_JSON_DEPTH = 64
 _JSON_STRING = re.compile(r'"(?:[^"\\]|\\.)*+"?')
 _NOT_BRACKET = re.compile(r"[^\[\]{}]+")
 _NESTING = {"[": 1, "{": 1, "]": -1, "}": -1}
+
+
+def read_json_file(path) -> object:
+    """Parse a JSON file of at most MAX_JSON_BYTES.
+
+    From bytes, JSON takes UTF-8 (with or without a byte-order mark), -16 or -32.
+    """
+    with open(path, "rb") as fh:
+        raw = fh.read(MAX_JSON_BYTES + 1)
+    if len(raw) > MAX_JSON_BYTES:
+        raise ValueError(f"{path} is larger than 2 MB")
+    return json.loads(raw)
 
 
 def check_json_depth(text: str) -> None:
@@ -119,7 +132,7 @@ def check_layout_json(data: object) -> None:
 
 
 def check_inventory(inventory: Mapping[str, int], pieces: Mapping) -> None:
-    """Both enumerators accept only known IDs and non-negative integer counts."""
+    """Both enumerators accept only known IDs and integer counts from 0 to 10,000."""
     if not isinstance(inventory, Mapping):
         raise ValueError("inventory must be a mapping of piece ids to counts")
     # The solver keys its traversal tables by piece id and looks them up by key.

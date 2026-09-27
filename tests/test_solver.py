@@ -16,7 +16,7 @@ def catalog():
 
 
 def assert_loop_is_sound(solution, catalog):
-    """Every reported loop must replay into a layout whose links all truly mate."""
+    """Every recorded link of a reported loop truly mates (exactly, or within its gap)."""
     layout = solution.layout
     for a, b in layout.links.items():
         if a < b:
@@ -183,7 +183,7 @@ def test_starter_box_has_exactly_four_shapes(catalog):
     assert sizes == [(576, 832), (640, 815), (687, 768), (704, 704)]
 
 
-def test_results_are_replayable_layouts(catalog):
+def test_results_walk_round_in_piece_count_steps(catalog):
     result = solve({"curve": 12, "straight": 4}, catalog, SolverConfig(max_results=5))
     for sol in result.solutions:
         assert sol.layout.is_closed or sol.open_stubs > 0
@@ -543,6 +543,19 @@ def test_mirror_twins_closing_into_a_crossing_are_one_result():
         assert len(keys) == len(set(keys)) == 2
 
 
+def test_a_sideways_step_below_float_resolution_keeps_its_hand():
+    # The one-handed loop search sorts U-turns by the sign of their sideways step,
+    # decided exactly: in floats both of this hairpin's turns looked alike, and
+    # the search skipped the one loop two of them make.
+    from duplotrain.pieces import parse_piece
+
+    radius = {"alg": ["-1.41421356237309504", 1, 0, 0]}  # 8.8e-18 mm, 0.0 as a float
+    hairpin = parse_piece({"id": "hairpin", "width": 8, "paths": [
+        {"segments": [{"type": "arc", "radius": radius, "degrees": 180}]}]})
+    result = solve({"hairpin": 2}, {"hairpin": hairpin}, SolverConfig(min_pieces=2))
+    assert result.stats.complete and len(result.solutions) == 1
+
+
 def test_a_slop_search_far_from_the_origin_runs_on_the_field_engine():
     from duplotrain.geometry import Pose
 
@@ -619,13 +632,13 @@ def test_moves_too_long_for_the_packed_table_keys_run_on_the_field_engine(monkey
     assert [s.signature for s in field.solutions] == [s.signature for s in lattice.solutions]
 
 
-def crossings_in_a_row(catalog, n):
+def crossings_in_a_row(catalog, n, end_heading=0):
     """Unlinked crossings end to end, then a straight: a walk of n free transits."""
     from duplotrain.geometry import Pose
     from duplotrain.layout import Layout, Placement, layout_from_dict, layout_to_dict
 
     placements = [Placement(catalog["crossing"], Pose.make(128 * k, 0, 0, 0)) for k in range(n)]
-    placements.append(Placement(catalog["straight"], Pose.make(128 * n, 0, 0, 0)))
+    placements.append(Placement(catalog["straight"], Pose.make(128 * n, 0, 0, end_heading)))
     # Unlinked, as a layout file may be: the editor's import accepts it.
     return layout_from_dict(layout_to_dict(Layout(tuple(placements), {})), catalog)
 

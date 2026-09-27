@@ -158,3 +158,23 @@ def test_cell_box_pretest_never_changes_a_verdict():
             assert field.clashes(points, half, ignore, underpass=underpass) is expected
             verdicts[expected] += 1
     assert verdicts[True] > 50 and verdicts[False] > 50
+
+
+def test_collision_groups_points_per_cell_and_reuses_query_neighbourhood():
+    field = CollisionField()
+    field._grid = CountingGrid()
+    stored = [(float(x), 0.0, 0.0) for x in range(0, 65, 4)]
+    prepared = field._prepare(stored)
+    field._add_prepared(0, prepared, 32.0)
+    # All points fit one 96 mm cell, represented by one placement group rather
+    # than repeating width/index/underpass metadata on every sample. The prepared
+    # list itself is retained, so a successful clash check need not regroup it.
+    assert len(field._grid[(0, 0)]) == 1
+    assert field._grid[(0, 0)][0].points is prepared[0][1]
+
+    # A same-cell query consults the 3x3 neighbourhood once, not once per point.
+    # Keep it far enough in z that every scanned point is non-colliding.
+    query = [(float(x), 0.0, 200.0) for x in range(0, 65, 4)]
+    query_groups = field._prepare(query)
+    assert not field._clashes_prepared(query_groups, 32.0, ignore=set())
+    assert field._grid.gets == 9

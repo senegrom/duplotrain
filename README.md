@@ -89,15 +89,16 @@ duplotrain solve --catalog my-measurements.json --curve 12 --ramp 2 --span 2 ...
 
 Lengths may be plain numbers, exact fractions (`"384/5"`), field elements
 (`{"alg": [a, b, c, d]}` = `a + b√2 + c√3 + d√6`), or arc chords
-(`{"chord": {"radius": 256, "degrees": 30}}`). A catalogue is read as untrusted
-input, its fields checked rather than coerced: a number written as text takes at
-most 64 characters and a decimal exponent of at most 64, every numerator and
-denominator at most 512 bits, and an `alg` coefficient at most 1,000,000 in size.
+(`{"chord": {"radius": 256, "degrees": 30}}`, a multiple of 30 degrees). A
+catalogue is read as untrusted input, its fields checked rather than coerced: a
+file takes at most 2 MB, a number written as text at most 64 characters and a
+decimal exponent of at most 64, every numerator and denominator at most 512 bits,
+and the coefficients of an `alg` or chord length at most 1,000,000 in size.
 A piece has at most 16 paths of at most 64 segments, each path at most 10,000 mm
 long and starting within 10,000 mm of the piece's origin along each axis; every
 segment has a positive run or radius, an arc turns less than a full circle, no
 two connectors of a piece share a point, and a piece is 8 to 1,000 mm wide, with
-an end overhang of at most 1,000 mm.
+an end overhang of at most 1,000 mm. Its texts hold no control characters.
 
 ## Install & use
 

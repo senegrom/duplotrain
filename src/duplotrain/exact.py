@@ -256,11 +256,10 @@ class Alg:
             bits *= 2
 
     def __lt__(self, other: AlgLike) -> bool:
-        # Exact sign comparison would need interval refinement; float is fine for
-        # ordering (used only for sorting and bounding boxes, never for equality).
-        # All four operators derive from the same float comparison so that distinct
-        # values with identical float images compare as consistently unordered rather
-        # than each claiming to exceed the other.
+        # Ordering compares float images, for callers sorting values; decisions
+        # use sign(). All four operators derive from the same float comparison so
+        # that distinct values with identical float images compare as consistently
+        # unordered rather than each claiming to exceed the other.
         return float(self) < float(Alg.coerce(other))
 
     def __le__(self, other: AlgLike) -> bool:

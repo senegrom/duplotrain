@@ -202,12 +202,8 @@ def test_unknown_segment_subclasses_keep_their_own_shape():
 
 
 def test_interval_ordering_does_not_round_away_a_nonzero_field_element():
-    p, q = 1, 0
-    for _ in range(80):
-        p, q = p + 2 * q, p + q
-    assert p * p - 2 * q * q == 1
-    tiny_negative = Alg(-p, q)
-    assert tiny_negative != 0
+    tiny_negative = Alg(4114, 11592, 10472, -15777)  # -3.2e-14
+    assert float(tiny_negative) > 0  # its float image has the wrong sign
     assert _compare(tiny_negative, Alg(0)) < 0
     assert _compare(-tiny_negative, Alg(0)) > 0
     assert _compare(tiny_negative, tiny_negative) == 0

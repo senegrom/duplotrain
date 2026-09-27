@@ -51,11 +51,13 @@ __all__ = [
 #: Catalogue numbers: an integer ratio, or a decimal whose exponent stays small.
 _INTEGER = re.compile(r"[+-]?\d+")
 _DECIMAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE]([+-]?\d+))?")
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 #: Longest path of a catalogue piece, and the farthest a path may start from the
 #: piece's origin along each axis, mm: sampling cost grows with a piece's track.
 MAX_PATH_LENGTH = 10_000.0
-#: Largest coefficient of an {"alg": ...} length. The float images that bound a
-#: path's length and start then stay within a nanometre; signs are decided exactly.
+#: Largest coefficient of an {"alg": ...} or {"chord": ...} length. The float images
+#: that bound a path's length and start then stay within a nanometre; signs are
+#: decided exactly.
 MAX_ALG_COEFFICIENT = 1_000_000
 #: A JSON integer escapes the text limits above: bound every numerator and
 #: denominator, which still admits each 64-character decimal they accept.
@@ -120,18 +122,22 @@ def parse_length(value: Any) -> Alg:
         if "alg" in value:
             if not isinstance(value["alg"], (list, tuple)) or len(value["alg"]) != 4:
                 raise ValueError(f"an alg length takes a list of four numbers, not {value!r}")
-            a, b, c, d = (_number(x) for x in value["alg"])
-            if any(abs(x) > MAX_ALG_COEFFICIENT for x in (a, b, c, d)):
-                raise ValueError("an alg length's coefficients may be at most "
-                                 f"{MAX_ALG_COEFFICIENT:,} in size")
-            return Alg(a, b, c, d)
-        if "chord" in value:
+            length = Alg(*(_number(x) for x in value["alg"]))
+        elif "chord" in value:
             spec = value["chord"]
             radius = parse_length(spec["radius"])
-            half = degrees_to_steps(_number(spec["degrees"]) / 2)
-            _, sin_half = cos_sin(half)
-            return radius * sin_half * 2
-        raise ValueError(f"unrecognised length expression {value!r}")
+            degrees = _number(spec["degrees"])
+            if degrees % 30:  # the half angle must lie on the 15-degree lattice
+                raise ValueError(f"a chord's angle of {degrees} deg is not a multiple of 30 deg")
+            _, sin_half = cos_sin(degrees_to_steps(degrees / 2))
+            length = radius * sin_half * 2
+        else:
+            raise ValueError(f"unrecognised length expression {value!r}")
+        # Also after a chord's product: nested chords grow the coefficients.
+        if any(abs(x) > MAX_ALG_COEFFICIENT for x in length.coeffs()):
+            raise ValueError("a length's alg coefficients may be at most "
+                             f"{MAX_ALG_COEFFICIENT:,} in size")
+        return length
     raise TypeError(f"cannot read a length from {value!r}")
 
 
@@ -468,12 +474,12 @@ def _parse_path(spec: dict[str, Any]) -> Path:
                          "piece's origin along each axis")
     if len(spec["segments"]) > MAX_SEGMENTS:
         raise ValueError(f"a path may have at most {MAX_SEGMENTS} segments")
-    segments = tuple(_parse_segment(s) for s in spec["segments"])
-    if not segments:
+    path = Path(start=start, segments=tuple(_parse_segment(s) for s in spec["segments"]))
+    if not path.segments:
         raise ValueError("a path needs at least one segment")
-    if not sum(segment.length() for segment in segments) <= MAX_PATH_LENGTH:
+    if not path.length() <= MAX_PATH_LENGTH:
         raise ValueError(f"a path may be at most {MAX_PATH_LENGTH:g} mm long")
-    return Path(start=start, segments=segments)
+    return path
 
 
 def _derive_ports_and_routes(
@@ -527,14 +533,19 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
     if len(spec.get("paths", [])) > MAX_PATHS:
         raise ValueError(f"piece {piece_id!r} may have at most {MAX_PATHS} paths")
     # Coercion would misread these: "false" is a true string, "10" two port numbers.
-    texts = {"name": piece_id, "category": "track", "notes": ""}
-    for key, default in texts.items():
+    texts = [piece_id]
+    for key, default in {"name": piece_id, "category": "track", "notes": ""}.items():
         if not isinstance(spec.get(key, default), str):
             raise ValueError(f"piece {piece_id!r} {key} must be text")
+        texts.append(spec.get(key, default))
     for key in ("part_numbers", "port_names"):
         value = spec.get(key, ())
         if not isinstance(value, (list, tuple)) or not all(isinstance(v, str) for v in value):
             raise ValueError(f"piece {piece_id!r} {key} must be a list of texts")
+        texts.extend(value)
+    # Catalogue text is printed: a control character would reach a terminal as a command.
+    if any(_CONTROL.search(text) for text in texts):
+        raise ValueError(f"piece {piece_id!r} text may not contain control characters")
     for key in ("underpass", "provisional"):
         if not isinstance(spec.get(key, False), bool):
             raise ValueError(f"piece {piece_id!r} {key} must be true or false")
@@ -549,11 +560,6 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         raise ValueError(f"piece {piece_id!r} has no paths")
 
     ports, routes = _derive_ports_and_routes(paths, spec.get("port_names"))
-    if len(ports) < 2:
-        raise ValueError(
-            f"piece {piece_id!r} collapsed to {len(ports)} port(s); its paths must have "
-            "distinct endpoints"
-        )
     # Two connectors at one point mate each other: a piece joined to itself (a
     # full-turn path, say) would pass as a loop of one.
     spots = {(port.pose.x, port.pose.y, port.pose.z) for port in ports}

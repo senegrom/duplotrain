@@ -97,7 +97,7 @@ empty fresh loop. Minimum/use-all constraints and node/result caps still apply.
 The editor also permits these no-new-inventory completions. A walk nests one
 generator frame per placement or transit; it stops at 800 of them, within
 Python's recursion limit, and the search then reports a piece limit (a stepwise
-search a `walk_limit` on every resume) rather than an exhausted search.
+completion search a `walk_limit` on every resume) rather than an exhausted search.
 
 ## Exact reverse reachability is an overapproximation
 
@@ -128,8 +128,8 @@ cannot prune a branch while a future junction could supply another target. A
 regression pins a valid teardrop even when the selected original target is 100 m
 away, which a bound on the original endpoints alone would reject.
 
-Both projections share the same preprocessing budget, and a layer is published
-only when both are complete. Slop queries use the physical enclosures below.
+Both projections share the same preprocessing budget, and each publishes a layer
+only once that layer is complete. Slop queries use the physical enclosures below.
 Partial layers never reject a candidate: a cap falls back to DFS without changing
 completeness or stop reasons. `completion_work` records the actual expansions.
 
@@ -286,11 +286,11 @@ catalogues, and check callback-error cleanup.
 
 ## Input and snapshot boundaries preserve exactness
 
-Arc angles, start headings and chord angles are checked as exact multiples of
-15 before any integer conversion. For example, 30.9 degrees is rejected rather
-than changed into a 30-degree curve, and 30.0000000001 rather than snapped to 30.
-Integral float/string inputs are normalized to integers while retaining signed
-and multi-turn sweeps. Layout construction copies and freezes the link graph,
+Arc angles and start headings are checked as exact multiples of 15, and chord
+angles as exact multiples of 30, before any integer conversion. For example, 30.9
+degrees is rejected rather than changed into a 30-degree curve, and 30.0000000001
+rather than snapped to 30. Integral float/string inputs are normalized to integers
+while retaining signed sweeps. Layout construction copies and freezes the link graph,
 placements and accessory collections; copying and pickling retain that boundary.
 Editor responses copy nested accessory metadata, so modifying a response cannot
 change the catalogue or other sessions.

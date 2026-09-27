@@ -32,12 +32,12 @@ replace the built-ins.
 
 from __future__ import annotations
 
-import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from .pieces import PieceType, parse_pieces
+from .validation import read_json_file
 
 __all__ = ["DEFAULT_CATALOG_SPECS", "default_catalog", "load_catalog"]
 
@@ -319,8 +319,7 @@ def load_catalog(*paths: str | Path, include_default: bool = True) -> dict[str, 
         for spec in DEFAULT_CATALOG_SPECS:
             specs[spec["id"]] = spec
     for path in paths:
-        # From bytes, JSON takes UTF-8 (with or without a byte-order mark), -16 or -32.
-        data = json.loads(Path(path).read_bytes())
+        data = read_json_file(path)
         if isinstance(data, dict):
             if "pieces" not in data:
                 raise ValueError(f"catalogue {path} has no 'pieces' key")

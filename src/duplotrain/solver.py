@@ -10,8 +10,10 @@ reported with their gap, never silently blessed.
 
 Symmetry handling
     Anchoring the first piece at the origin quotients away translation and rotation.
-    Reflections and starting-point choices are removed afterwards by canonicalising
-    each found loop's step signature over rotation and reversal and deduplicating.
+    Starting-point choices, direction and reflections are removed afterwards: each
+    found loop's step signature is canonicalised over rotation, reversal and its
+    mirror image (through each piece's mirror-traversal table) and deduplicated.
+    Loop mode also walks one handedness only when every mirror twin is buildable.
 
 Junctions
     A switch placed mid-loop contributes one of its routes; its third port dangles as
@@ -1919,9 +1921,7 @@ def solve_steps(
         turn = move.dheading % HEADING_STEPS
         if turn and turn != HEADING_STEPS // 2:
             return 1 if turn < HEADING_STEPS // 2 else -1
-        if move.dy == 0:
-            return 0
-        return 1 if move.dy > 0 else -1
+        return move.dy.sign()
 
     chirality = {
         (move.piece_id, move.entry, move.exit): _move_sign(move)
@@ -2022,11 +2022,6 @@ def solve_steps(
             )
         return eligible
 
-    def transit_bound(piece: PieceType, ports) -> int:
-        # Each transit consumes two ports; this is an upper bound even when routes
-        # share a stem. In particular, separate switches' lone stubs cannot pair.
-        return len(eligible_ports(piece, ports)) // 2
-
     future_transits: dict[str, int] = {}
     reversing_queries: dict[str, tuple] = {}
     if completion is not None:
@@ -2038,7 +2033,9 @@ def solve_steps(
             if piece.is_junction:
                 for entry, exit_port, apply_move in eng.moves[pid]:
                     free = set(range(len(piece.ports))) - piece.sealed - {entry, exit_port}
-                    capacity = max(capacity, transit_bound(piece, free))
+                    # Each transit consumes two ports: an upper bound even when routes
+                    # share a stem. Separate switches' lone stubs cannot pair.
+                    capacity = max(capacity, len(eligible_ports(piece, free)) // 2)
                     frame = eng.frame(pid, entry, eng.anchor)
                     out = apply_move(eng.anchor)
                     if cfg.reversing_loops:
@@ -2583,7 +2580,8 @@ def solve_steps(
         return True
 
     # Placements stop at _MAX_SEARCH_DEPTH and a walk's frames at _MAX_WALK_STEPS
-    # (see dfs), inside the default recursion limit; either cut is a piece limit.
+    # (see dfs), inside the default recursion limit; either cut is a piece limit,
+    # though a stepwise completion search reports a walk cut as walk_limit.
     depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH)
     walk_cut = False
     if cfg.max_pieces is not None:
