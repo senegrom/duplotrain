@@ -1,18 +1,12 @@
 """Scarce stock and unavailable base routes must not enlarge the tail search."""
 
 import itertools
-import json
 import math
-from collections import Counter
-from pathlib import Path
 
 import pytest
 
 import duplotrain.solver as solver
 from duplotrain import Layout, Pose, SolverConfig, build_chain, default_catalog
-from duplotrain.gui import Session
-from duplotrain.layout import layout_from_dict
-from tests.editor_support import complete
 
 
 def unfiltered_moves(pieces, stock, base, grow_from, close_onto):
@@ -111,20 +105,3 @@ def test_stronger_prunes_preserve_complete_results(engine, slop, shape, monkeypa
     for candidate in improved.solutions:
         assert candidate.layout.placements[:len(base)] == base.placements
         assert not solver._solution_overlaps(candidate.layout, len(base), 120, 8)
-
-
-@pytest.mark.parametrize("unlimited", [False, True])
-def test_reported_reverse_gap_needs_fewer_than_one_thousand_nodes(unlimited):
-    data = json.loads((Path(__file__).parent / "fixtures/bridge-gap.json").read_text())
-    base = layout_from_dict(data, default_catalog())
-    spare = {"curve": 16, "straight": 4, "ramp": 2, "span": 2}
-    owned = dict(Counter(base.piece_counts) + Counter(spare))
-    session = Session(history=[base], inventory=owned, unlimited=unlimited)
-    job = complete(session, (23, 1), (25, 0))
-    assert len(job.solutions) == 8 and job.nodes < 1000
-    for candidate in session.candidates:
-        assert len(candidate.layout) == len(base) + 24
-        assert candidate.layout.is_closed and not candidate.layout.joint_issues()
-        assert candidate.layout.placements[:len(base)] == base.placements
-        assert all(candidate.layout.links[a] == b for a, b in base.links.items())
-        assert not solver._solution_overlaps(candidate.layout, 0, 120, 8)

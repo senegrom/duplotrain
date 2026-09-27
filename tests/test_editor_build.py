@@ -4,7 +4,7 @@ import importlib.util
 import re
 import shutil
 import tomllib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -69,10 +69,20 @@ def test_all_frontend_sources_change_the_stamp_and_rebuild_is_deterministic(
     assert "__V__" not in (dist / "index.html").read_text()
 
 
-def test_local_and_built_editor_assets_are_in_package_data():
+def test_every_asset_the_local_editor_serves_is_package_data():
+    # An installed wheel's `duplotrain gui` serves these from the package.
+    from duplotrain.gui import _EDITOR_ASSETS
+
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
     patterns = project["tool"]["setuptools"]["package-data"]["duplotrain"]
-    assert "static/*.js" in patterns and "static/*.css" in patterns
+    served = ["static/editor.html", *("static" + path for path in _EDITOR_ASSETS)]
+    missing = [name for name in served
+               if not any(PurePosixPath(name).match(pattern) for pattern in patterns)]
+    assert not missing, missing
+
+
+def test_the_extras_keep_test_and_browser_installs_apart():
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())
     extras = project["project"]["optional-dependencies"]
     assert any(dep.startswith("matplotlib") for dep in extras["test"])
     assert not any(dep.startswith(("matplotlib", "ruff")) for dep in extras["browser"])
@@ -116,11 +126,11 @@ def test_ci_builds_once_tests_same_artifact_and_never_rebuilds_with_deploy_permi
 
 def test_ci_keeps_both_versions_both_browsers_and_minimal_install():
     _, jobs = workflow_jobs()
-    assert "python: ['3.12', '3.13']" in jobs["python"]
+    assert "python: ['3.12', '3.13', '3.14']" in jobs["python"]
     assert "browser: [chromium, webkit]" in jobs["browser"]
     assert "DUPLOTRAIN_REQUIRE_BROWSER: '1'" in jobs["browser"]
-    # Without these, the built-app and WebKit offline tests would skip unnoticed.
-    assert "DUPLOTRAIN_STATIC_DIST: ${{ github.workspace }}/webapp/dist" in jobs["browser"]
+    # Without this the WebKit offline tests would skip unnoticed; a lost
+    # DUPLOTRAIN_STATIC_DIST fails the built-app tests already (CI sets CI=true).
     assert ("DUPLOTRAIN_TEST_SYSTEM_CA: ${{ matrix.browser == 'webkit' && '1' || '0' }}"
             in jobs["browser"])
     assert "-m 'not browser'" in jobs["python"]

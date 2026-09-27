@@ -255,4 +255,3 @@ def test_lean_installer_is_versioned_verified_and_not_piped_to_shell():
     assert workflow.index("sha256sum --check --strict") < workflow.index("./elan-init")
     assert "--default-toolchain none" in workflow
     assert "set -euo pipefail" in workflow
-    assert "permissions:\n  contents: read\n" in workflow

@@ -242,9 +242,10 @@ this browser service worker.
 ## Checks and deployment
 
 The application workflow lints, runs the node suite once, runs the Python
-suite on two interpreters, smoke-tests the CLI on a minimal install, builds the
-Pages bundle once as an immutable artifact, and runs the Chromium and WebKit
-browser suites against that artifact after verifying its digest. The deploy job
+suite on three interpreters (3.12 to 3.14), smoke-tests the CLI on a minimal
+install, builds the Pages bundle once as an immutable artifact, and runs the
+Chromium and WebKit browser suites against that artifact after verifying its
+digest. The deploy job
 of the same run publishes that artifact only after every gate passes on a push
 to `main` or a manual run there; it has no checkout and no build step, and
 nothing is selected across workflows. Because the Pages action selects the

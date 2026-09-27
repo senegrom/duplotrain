@@ -57,21 +57,20 @@ def run(base, grow, close):
 
 def bound_work(base, grow, close):
     """Separate untimed run; count clouds sent to the exact AABB rejection test."""
-    name = "_near_clouds" if hasattr(collision.CollisionField, "_near_clouds") else "near"
-    original = getattr(collision.CollisionField, name)
+    original = collision.CollisionField._near_clouds
     total = 0
 
     def measured(field, bounds, half, *args):
         nonlocal total
         result = original(field, bounds, half, *args)
-        total += len(result) if name == "_near_clouds" else len(field._clouds)
+        total += len(result)
         return result
 
-    setattr(collision.CollisionField, name, measured)
+    collision.CollisionField._near_clouds = measured
     try:
         run(base, grow, close)
     finally:
-        setattr(collision.CollisionField, name, original)
+        collision.CollisionField._near_clouds = original
     return total
 
 

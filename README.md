@@ -444,7 +444,7 @@ ruff check src webapp tests benchmarks
 python -m pytest -m 'not browser'
 node --test tests/web/*.test.cjs
 # Browser integration, including the real Pyodide worker:
-python -m pip install playwright
+python -m pip install -e '.[browser]'
 python -m playwright install chromium webkit
 python webapp/build.py --pages
 DUPLOTRAIN_STATIC_DIST="$PWD/webapp/dist" python -m pytest tests/browser -m browser

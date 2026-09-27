@@ -20,7 +20,10 @@ def test_benchmark_script_runs_and_reports_json(name, args, monkeypatch, capsys)
     lines = capsys.readouterr().out.splitlines()
     assert len(lines) >= 2 and all(isinstance(json.loads(line), dict) for line in lines)
     if name == "editor_completion":  # docs/performance.md#representative-times
-        nodes = {row["case"]: row["nodes"] for row in map(json.loads, lines[1:])}
-        assert nodes["mixed_gap"] == 138
-        assert [nodes[f"reported_{stock}_{end}"] for stock in ("finite", "unlimited")
-                for end in ("forward", "reverse")] == [1742, 718, 1878, 854]
+        rows = {row["case"]: row for row in map(json.loads, lines[1:])}
+        assert rows["mixed_gap"]["nodes"] == 138
+        reported = [rows[f"reported_{stock}_{end}"] for stock in ("finite", "unlimited")
+                    for end in ("forward", "reverse")]
+        assert [row["nodes"] for row in reported] == [1742, 718, 1878, 854]
+        # Eight 24-piece closings each, which the benchmark audits as it goes.
+        assert all(row["found"] == 8 and row["added"] == [24] * 8 for row in reported)

@@ -15,9 +15,9 @@ completion cases (ten exact, 20 with slippage) and reports nodes, results,
 stop reasons, preprocessing work and median times; `--suite`, `--case`,
 `--lookahead 0` (the reference search without tables), `--engine field` and
 `--max-nodes` select variants. `benchmarks/editor_completion.py` times whole
-editor closings of the reported 59-piece bridge gap in both directions and
-both inventory modes and hashes the ordered exact layouts,
-`benchmarks/collision_index.py` scales that problem with synthetic remote
+editor closings of four small gaps and of the reported 59-piece bridge gap in both
+directions and both inventory modes, and hashes the ordered exact layouts;
+`benchmarks/collision_index.py` scales the bridge gap with synthetic remote
 circles (`--count-bounds` also counts the clouds its broad phase considers),
 `benchmarks/editor_payload.py` measures state
 serialisation, and `benchmarks/editor_presentation.py` times Check layout and

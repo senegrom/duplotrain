@@ -71,7 +71,7 @@ def main():
     while job.status == "running":
         job.tick()
     job.publish(session)
-    assert len(job.solutions) == 8 and job.nodes == 1878
+    assert len(job.solutions) == 8  # the benchmark test pins its nodes
     sessions.append(("gap_8_candidates", session))
     if args.states_dir:
         args.states_dir.mkdir(parents=True, exist_ok=True)

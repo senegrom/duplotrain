@@ -60,7 +60,7 @@ def test_editor_html_and_manifest_reference_only_allowlisted_assets():
     "/duplotrain-icon.svg", "/duplotrain-icon.svg.bak", "/pyproject.toml",
     "/icons/duplotrain-app-192-v1.png/..", "/icons/", "/icons",
 ])
-def test_paths_outside_the_allowlist_are_refused_without_touching_the_filesystem(
+def test_paths_outside_the_allowlist_are_refused(
     editor_port, path,
 ):
     status, headers, body = get(editor_port, path)

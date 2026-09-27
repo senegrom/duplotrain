@@ -294,7 +294,8 @@ rather than snapped to 30. Integral float/string inputs are normalized to intege
 while retaining signed sweeps. Layout construction copies and freezes the link graph,
 placements and accessory collections; copying and pickling retain that boundary.
 Editor responses copy nested accessory metadata, so modifying a response cannot
-change the catalogue or other sessions.
+change the catalogue or other sessions. These boundaries are covered in
+`tests/test_pieces.py`, `tests/test_layout.py` and `tests/test_editor_snapshots.py`.
 
 ## Classification never reports a budget-limited verdict
 
@@ -305,10 +306,8 @@ settings lazily, so it neither materializes an exponential assignment list nor
 treats an unfinished universal check as a proof. Regressions refuse 24 switches
 under the default budget before any simulation and, on Linux, run an unbounded
 25-switch classification to its first simulation within 64 MiB of additional
-address space (`tests/test_drive.py`).
-
-These boundaries are covered in `tests/test_pieces.py`, `tests/test_layout.py`,
-`tests/test_editor_snapshots.py`, `tests/test_drive.py` and `tests/test_cli.py`.
+address space (`tests/test_drive.py`; the CLI's `--max-runs` refusal in
+`tests/test_cli.py`).
 
 ## Reversals start another ordered pass
 
