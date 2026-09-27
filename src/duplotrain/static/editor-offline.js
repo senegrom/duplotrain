@@ -50,7 +50,11 @@ async function installVerified(worker, failure) {
   requestedWorkers.add(worker);
   const reply = offlineMessage(worker, "INSTALL");
   if (INSTALLED.includes(worker.state)) return reply;  // repairs a verified version
-  const settled = untilState(worker, INSTALLED, failure);
+  // WebKit may report the worker redundant just before its reply says why: a
+  // redundant worker fails the installation once its reply has had a second.
+  const settled = untilState(worker, INSTALLED, failure).catch(error =>
+    Promise.race([reply, new Promise(resolve => setTimeout(resolve, 1000))])
+      .then(() => { throw error; }));
   reply.catch(() => {}); settled.catch(() => {});  // whichever fails first explains it
   await Promise.race([reply, settled]);
   return settled;

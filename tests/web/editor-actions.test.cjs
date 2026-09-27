@@ -188,8 +188,8 @@ test("a sideways wheel swipe does not zoom", () => {
 test("a wheel zooms by the distance scrolled, however it is split up", () => {
   const zoom = (...events) => {
     const e = editor(), before = e.run("view.scale");
-    for (const [deltaY, deltaMode = 0] of events) e.el("canvas").fire("wheel",
-      {deltaX: 0, deltaY, deltaMode, clientX: 10, clientY: 10, preventDefault() {}});
+    for (const [deltaY, deltaMode = 0, ctrlKey = false] of events) e.el("canvas").fire("wheel",
+      {deltaX: 0, deltaY, deltaMode, ctrlKey, clientX: 10, clientY: 10, preventDefault() {}});
     return e.run("view.scale") / before;
   };
   const same = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
@@ -197,6 +197,8 @@ test("a wheel zooms by the distance scrolled, however it is split up", () => {
   same(zoom([100]), 1 / 1.12);  // a mouse notch
   same(zoom([3, 1]), zoom([99]));  // three lines: a notch as some browsers count it
   same(zoom([1000]), zoom([100]));  // no one event beyond a notch
+  // A trackpad pinch is ctrl+wheel with deltaY = -100 ln(scale): it zooms by its scale.
+  same(zoom(...Array(10).fill([-100 * Math.log(2) / 10, 0, true])), 2);
 });
 
 test("fitting keeps to the zoom range, so zooming out never zooms in", () => {
@@ -205,12 +207,12 @@ test("fitting keeps to the zoom range, so zooming out never zooms in", () => {
   assert.equal(e.run("view.scale"), 0.08);
 });
 
-test("a canvas resize repaints at once, and only when its size changes", () => {
+test("a paint keeps the canvas store at its CSS size times the pixel ratio", () => {
   const e = editor();
-  let paints = 0;
-  e.context.devicePixelRatio = 2; e.context.paint = () => { paints++; };
-  e.run("canvas.width = 0; canvas.height = 0; resize()");
-  assert.equal(e.run("canvas.width"), 1000); assert.equal(paints, 1);
-  e.run("resize()");
-  assert.equal(paints, 1);
+  e.context.devicePixelRatio = 2;
+  e.run("ctx = {setTransform() {}, clearRect() {}}; S = null; canvas.width = 0; paint()");
+  assert.deepEqual([e.run("canvas.width"), e.run("canvas.height")], [1000, 1000]);
+  e.context.devicePixelRatio = 1.5;  // another monitor: no element resizes
+  e.run("paint()");
+  assert.equal(e.run("canvas.width"), 750);
 });

@@ -320,15 +320,6 @@ async function saveSession() {
 
 let canvas, ctx;
 
-function resize() {
-  const width = Math.floor(canvas.clientWidth * devicePixelRatio);
-  const height = Math.floor(canvas.clientHeight * devicePixelRatio);
-  if (canvas.width === width && canvas.height === height) return;
-  // A new size clears the canvas: repaint it at once, not a frame later.
-  canvas.width = width; canvas.height = height;
-  paint();
-}
-
 function worldToScreen(x, y) {
   return [ (x - view.x) * view.scale + canvas.clientWidth / 2,
            -(y - view.y) * view.scale + canvas.clientHeight / 2 ];
@@ -424,6 +415,14 @@ function stoneMountAt(sx, sy) {
 
 function paint() {
   if (!ctx || !canvas) return;
+  // The backing store follows the CSS size and the pixel ratio: a ratio change
+  // alone (another monitor) resizes no element, and a page zoom can keep the
+  // store's size while moving the drawing. A new size clears the canvas.
+  const width = Math.floor(canvas.clientWidth * devicePixelRatio);
+  const height = Math.floor(canvas.clientHeight * devicePixelRatio);
+  if (canvas.width !== width || canvas.height !== height) {
+    canvas.width = width; canvas.height = height;
+  }
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   if (!S) return;
@@ -911,7 +910,8 @@ function bindEditorEvents() {
       event.returnValue = "";
     }
   });
-  if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
+  // A new CSS size repaints at once, not a frame later.
+  if (window.ResizeObserver) new ResizeObserver(paint).observe(canvas);
   el("undo").addEventListener("click", async () => {
     try { S = await api("/api/undo", {}); redraw(); } catch (e) { status(e.message, "err"); }
   });
@@ -1040,8 +1040,10 @@ function bindEditorEvents() {
     const p = canvasPoint(e);
     // By the distance scrolled: a mouse notch (100 px, or three lines) zooms 12%, and
     // a trackpad's many small steps as much in all; no one event more than a notch.
+    // A trackpad pinch arrives as ctrl+wheel with deltaY = -100 ln(scale): its own scale.
     const pixels = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 800 : 1);
-    zoomAt(1.12 ** (-Math.max(-100, Math.min(100, pixels)) / 100), p.x, p.y);
+    const notch = Math.log(1.12), step = -pixels / 100 * (e.ctrlKey ? 1 : notch);
+    zoomAt(Math.exp(Math.max(-notch, Math.min(notch, step))), p.x, p.y);
   }, {passive: false});
   el("zoom-in").addEventListener("click", () => zoomAt(1.25, canvas.clientWidth / 2, canvas.clientHeight / 2));
   el("zoom-out").addEventListener("click", () => zoomAt(1 / 1.25, canvas.clientWidth / 2, canvas.clientHeight / 2));
@@ -1078,7 +1080,7 @@ function initializeEditor() {
   bindEditorEvents();
   renderProjects();
   bindOfflineEvents();
-  resize();
+  paint();
   if (window.duplotrainBoot) {
     window.duplotrainBoot({ refresh, status,
       checkpoint: () => S && S.snapshot,

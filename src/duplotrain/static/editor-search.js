@@ -269,7 +269,7 @@ async function startRouteAnalysis(scope = "all") {
   try {
     const response = await api("/api/routes/start", {scope,
       ...(scope === "selected" ? {start: JSON.parse(el("train-start").value)} : {}),
-      goal: el("route-goal").value || "visited", max_runs: Number(el("route-max-runs").value || 20000), max_steps: 10000});
+      goal: el("route-goal").value || "visited", max_runs: Number(el("route-max-runs").value || 20000)});
     if (!jobCurrent(sequence, response)) return;
     interactiveJob = null; routeAnalysis = response;
     await driveRouteTicks(sequence);

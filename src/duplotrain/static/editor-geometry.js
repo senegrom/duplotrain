@@ -104,7 +104,8 @@ function drawBaseTrack(layout) {
     } finally { ctx = original; }
     baseRaster = {key, placements: layout.placements};
   }
-  ctx.drawImage(rasterSurface, 0, 0, canvas.clientWidth, canvas.clientHeight);
+  // 1:1 in device pixels: the store's size is the CSS size times the ratio, rounded down.
+  ctx.drawImage(rasterSurface, 0, 0, canvas.width / ratio, canvas.height / ratio);
 }
 function drawFloorConstraints() {
   let options;

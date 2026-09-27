@@ -40,7 +40,7 @@ async function testTrain() {
   const sequence = trainConfigSequence;
   try {
     const start = JSON.parse(el("train-start").value);
-    const trace = await api("/api/drive", {start, max_steps: 10000, switch_states: {...initialSwitches}});
+    const trace = await api("/api/drive", {start, switch_states: {...initialSwitches}});
     if (sequence !== trainConfigSequence || trace.revision !== S.revision) return;
     trainTrace = trace; trainStep = -1; showTrainStep(); draw();
   } catch (error) {

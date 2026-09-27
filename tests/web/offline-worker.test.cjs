@@ -37,6 +37,7 @@ function worker({build="aaa",caches=cacheStorage(),bad=null,now=()=>Date.now(),p
   const fetch=async(req,init)=>{
     const url=typeof req==="string"?req:req.url;calls.push(url);
     if(offline||bad==="network")throw new Error("offline");
+    if(bad==="lost")throw new TypeError("network error");  // what a dropped connection throws
     const asset=assets.find(a=>new URL(a.url,scope).href===url);
     if(stream&&asset)return new Response(stream(asset,init.signal),{headers:{"Content-Type":"text/html"}});
     const body=bad===asset?.url?"corrupt":bad==="long"&&asset?asset.body+" and more":
@@ -109,6 +110,12 @@ test("a corrupt asset of exactly the promised size fails its SHA-256 check",asyn
   assert.equal((await next.ctx.offlineStatus()).ready,false);
   assert.ok(!caches.map.get(next.run("CACHE")).has(new URL(next.assets[1].url,scope).href));
   assert.equal((await old.ctx.offlineStatus()).ready,true);
+});
+
+test("a connection lost mid-download names the file it was fetching",async()=>{
+  const w=worker();w.setBad("lost");
+  const reply=await w.message("INSTALL");
+  assert.equal(reply.error,"Offline download failed: index.html");
 });
 
 test("quota failure cannot mark a partial installation ready",async()=>{

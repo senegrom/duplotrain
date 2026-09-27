@@ -55,7 +55,9 @@ async function download(asset) {
     return {response, data};
   } catch (error) {
     controller.abort();
-    throw stalled ? new Error(`Offline download stalled for a minute: ${asset.url}`) : error;
+    // A lost connection reads "network error" or "Load failed": name the file.
+    throw stalled ? new Error(`Offline download stalled for a minute: ${asset.url}`) :
+      error?.name === "TypeError" ? new Error(`Offline download failed: ${asset.url}`) : error;
   } finally { clearTimeout(timer); }
 }
 // Each attempt keeps the assets it verified, so an installation cut short, by a

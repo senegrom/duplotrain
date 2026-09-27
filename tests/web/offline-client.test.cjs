@@ -186,6 +186,21 @@ test("an installation that fails says why", async () => {
     /stalled for a minute: pyodide\.asm\.wasm\. Portable project downloads remain available\.$/);
 });
 
+test("an installation's reason survives a redundant state arriving first", async () => {
+  // WebKit may say the worker is redundant just before its reply says why.
+  const h = client(); const next = serviceWorker("installing");
+  Object.assign(h.context.registration, {installing: next, active: null});
+  let fail;
+  h.context.offlineMessage = () => new Promise((_resolve, reject) => { fail = reject; });
+  const installing = h.run("installOffline()");
+  await turn();
+  next.state = "redundant"; await next.emit();
+  fail(new Error("Offline download failed: pyodide.asm.wasm"));
+  await installing;
+  assert.match(h.el("offline-status").textContent,
+    /Offline download failed: pyodide\.asm\.wasm\. Portable project downloads remain available\.$/);
+});
+
 test("a page that starts while an update installs still offers it", async () => {
   const h = client({existing: true}); const next = serviceWorker("installing");
   h.context.registration.installing = next;  // its updatefound fired before this page
