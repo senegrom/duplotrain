@@ -228,8 +228,6 @@ def test_bridge_stage_audits_only_the_joints_it_adds():
 
 
 def test_the_templates_and_the_bridge_stage_share_one_overlap_auditor(monkeypatch):
-    import duplotrain.editor as editor_module
-
     built = []
 
     class Counting(editor_search._OverlapAudit):
@@ -238,7 +236,6 @@ def test_the_templates_and_the_bridge_stage_share_one_overlap_auditor(monkeypatc
             super().__init__(*args, **kwargs)
 
     monkeypatch.setattr(editor_search, "_OverlapAudit", Counting)
-    monkeypatch.setattr(editor_module, "_OverlapAudit", Counting)
     base = load("bridge-gap.json")
     job = complete(Session(history=[base], inventory=owned(base)), max_results=50)
     try:

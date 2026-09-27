@@ -90,6 +90,33 @@ def test_an_exact_stage_alternates_doubling_turns_within_one_shared_cap(monkeypa
         pool.close()
 
 
+def test_the_last_direction_of_a_stage_runs_before_the_next_stage_starts(monkeypatch):
+    # One end of the plain stage is cut at once: the other end spends the stage's
+    # whole budget, as a one-direction stage does, before the full inventory runs.
+    catalog, turns = default_catalog(), []
+
+    def one_end_cut(inventory, pieces, config, *, base, grow_from, close_onto, limits):
+        stage = "plain" if set(inventory) <= {"curve", "straight"} else "full"
+        while True:
+            turns.append(stage)
+            if stage == "plain" and grow_from == (5, 1):
+                yield {"kind": "walk_limit", "nodes": 10, "depth": 1}
+            yield {"kind": "node_limit", "nodes": limits.max_nodes, "depth": 1}
+
+    monkeypatch.setattr(editor_search, "solve_steps", one_end_cut)
+    pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog,
+                      {"curve": 6, "straight": 4, "switch": 1}, (5, 1), (0, 0), 26, 1, 0,
+                      False, search_options(None, catalog))
+    try:
+        while pool.step()["kind"] not in ("limited", "exhausted"):
+            pass
+        first_full = turns.index("full")
+        assert "plain" not in turns[first_full:]
+        assert sum(c.nodes for c in pool.cursors if c.stage == "plain track") == 25_000
+    finally:
+        pool.close()
+
+
 def test_piece_depth_limit_is_not_a_proof_of_impossibility():
     catalog = default_catalog()
     layout = build_chain([(catalog["straight"], 0, 1)] * 34)

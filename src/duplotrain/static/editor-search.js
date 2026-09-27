@@ -60,10 +60,7 @@ function renderSearchOptions() {
     label.append(input, ` ${piece.name}`); box.append(label);
   }
 }
-// What a search can still do; its controls and its final message both follow these.
-function canHarden(job) {
-  return job.can_harden && !job.complete && !(job.max_pieces >= 128 && job.search_effort >= 16);
-}
+// What a search can still do; its controls and its final message both follow the engine.
 function searchOutcome(job) {
   if (job.status === "paused")
     return `Search paused${job.found ? ` with ${job.found} alternative(s) — preview and apply` : ""}. Resume continues it.`;
@@ -73,7 +70,7 @@ function searchOutcome(job) {
     job.reason || (job.complete ? "No completion fits the remaining inventory under these settings." :
       "No completion found within these limits. A closure may still exist.");
   const next = [job.resumable && "Find more resumes this search",
-                canHarden(job) && "Search harder raises its limits"].filter(Boolean);
+                job.can_harden && "Search harder raises its limits"].filter(Boolean);
   return next.length ? `${summary} ${next.join("; ")}.` : summary;
 }
 function renderJobControls() {
@@ -84,7 +81,7 @@ function renderJobControls() {
   show("find-more", active && job.resumable, jobLoop);
   show("resume-search", active && job.status === "paused", jobLoop);
   if (active) {
-    show("expand-search", canHarden(job), jobLoop);
+    show("expand-search", job.can_harden, jobLoop);
     const total = Math.max(1, Math.ceil(job.found / 8));
     el("candidate-page").textContent = `Page ${job.page + 1} / ${total}`;
     show("candidate-prev", total > 1, jobLoop || job.page === 0);
@@ -179,14 +176,14 @@ async function driveSearchTicks(sequence) {
     }
   }
 }
-async function startInteractiveSearch(grow, close, effort = 1, allGaps = false) {
+async function startInteractiveSearch(grow, close, allGaps = false) {
   if (!S || jobLoop || apiBusy) return;
   const sequence = ++jobSequence; jobPauseRequested = false;
   try {
     // Close all gaps plans exact, non-reversing joins only: slop and reversing
     // are settings of Close the loop.
-    const body = {grow, close, max_results: 8, max_pieces: Number(el("max-pieces").value),
-      slop: allGaps ? 0 : Number(el("slop").value), search_effort: effort,
+    const body = {grow, close, max_pieces: Number(el("max-pieces").value),
+      slop: allGaps ? 0 : Number(el("slop").value),
       reversing: !allGaps && el("reversing").checked, all_gaps: allGaps, options: readSearchOptions()};
     selectTool();
     const response = await api("/api/search/start", body);
@@ -296,7 +293,7 @@ function bindSearchEvents() {
   on("expand-search", () => continueSearch(true));
   on("resume-search", () => continueSearch(false, true));
   on("pause-search", () => { if (jobLoop) requestJobPause(); });
-  on("close-all", () => startInteractiveSearch(null, null, 1, true));
+  on("close-all", () => startInteractiveSearch(null, null, true));
   on("candidate-prev", () => searchPageTo(Math.max(0, searchPage - 1)));
   on("candidate-next", () => searchPageTo(searchPage + 1));
   el("candidate-sort").addEventListener("change", () => {

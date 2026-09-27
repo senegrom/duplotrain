@@ -115,16 +115,14 @@ class RouteJob:
                               "completely_looping": self.locally and self.completely,
                               "perfectly_looping": self.locally and self.perfectly}
         return {"job_id": self.id, "revision": self.revision, "status": self.status,
-                "scope": self.scope, "goal": self.goal, "runs": self.runs,
-                "required_runs": str(self.required), "max_runs": self.max_runs,
-                "max_steps": self.max_steps, "step_limited_runs": self.limited_runs,
+                "scope": self.scope, "runs": self.runs, "required_runs": str(self.required),
+                "step_limited_runs": self.limited_runs,
                 "steps": self.steps, "total_drivable": len(self.universe),
                 "best": self.best, "counterexample": (
                     self.failures.get("looping") or self.failures.get("completely")
                     or self.failures.get("perfectly")),
                 "outcomes": dict(self.outcomes), "classification": classification,
-                "complete": self.complete, "optimal": self.complete,
-                "model_only": True}
+                "complete": self.complete}
 
     def close(self):
         iterator, self.iterator = self.iterator, None

@@ -100,9 +100,9 @@ test("Find more continues the same job with a stable candidate index, separate f
   const calls = []; let h;
   h = app({api: async (path, body) => {
     calls.push({path, body: clean(body)});
-    if (path.endsWith("/continue")) return job({target: 16, found: 16, status: "results_ready", candidates: [candidate(0)]});
+    if (path.endsWith("/continue")) return job({found: 16, status: "results_ready", candidates: [candidate(0)]});
     if (path.endsWith("/publish")) return {...h.context.S, revision: 8,
-      search_job: job({revision: 8, found: 16, target: 16, status: "results_ready", candidates: [candidate(0,8)]})};
+      search_job: job({revision: 8, found: 16, status: "results_ready", candidates: [candidate(0,8)]})};
     throw new Error(path);
   }});
   h.context.initial = job({status: "results_ready", found: 8, candidates: [candidate(0)]});
@@ -161,9 +161,9 @@ test("route analysis labels incomplete bounds and loads the selected witness onl
   const h=app({testTrain:async ()=>{traceBody={start:h.el("train-start").value,
     switches:clean(h.run("initialSwitches"))};}});
   h.context.report={job_id:"route-A",revision:7,status:"limited",scope:"selected",runs:3,
-    required_runs:"64",max_runs:3,max_steps:10000,step_limited_runs:0,total_drivable:83,
+    required_runs:"64",step_limited_runs:0,total_drivable:83,
     best:{start:[0,0],switch_states:{5:2,6:2},visited:57,cycle_visited:26},counterexample:null,
-    complete:false,optimal:false,classification:null};
+    complete:false,classification:null};
   h.run("routeAnalysis=report; showRouteAnalysis()");
   const text=h.el("route-report").children.map(c=>c.textContent).join(" ");
   assert.match(text,/among completed runs so far/); assert.match(text,/No universal verdict/);
@@ -473,7 +473,7 @@ test("a paused search reports the pause, never a failure to find", async () => {
 
 for (const [status, extra, offered] of [
   ["direct_join", {found: 1, resumable: false, can_harden: false}, []],
-  ["exhausted", {found: 3, resumable: false, complete: true}, []],
+  ["exhausted", {found: 3, resumable: false, complete: true, can_harden: false}, []],
   ["limited", {found: 3, resumable: false}, ["Search harder"]],
   ["result_cap", {found: 50, resumable: false, can_harden: false}, []],
   ["results_ready", {found: 8}, ["Find more", "Search harder"]],

@@ -196,8 +196,8 @@ def trace_train(
         raise ValueError("Fix incompatible joints before testing the train")
     universe = drivable_universe(layout)
     common = {"revision": session.revision, "start": list(start),
-              "initial_switch_states": initial, "total_pieces": len(layout),
-              "drivable_count": len(universe), "terminal": None}
+              "initial_switch_states": initial, "drivable_count": len(universe),
+              "terminal": None}
     try:
         report = drive(layout, start=start, switch_states=initial, max_steps=max_steps)
     except DriveLimitError:

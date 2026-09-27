@@ -37,7 +37,7 @@ def test_actual_bridge_best_route_and_exhaustive_model_coverage(completed, scope
     job = RouteJob(session, {"scope": scope, "start": [0, 0], "max_runs": 20000})
     try:
         result = finished(job)
-        assert result["complete"] and result["optimal"]
+        assert result["complete"]
         assert result["runs"] == required and result["required_runs"] == str(required)
         assert result["best"]["visited"] == 57
         assert result["best"]["cycle_visited"] == 26
@@ -72,7 +72,7 @@ def test_run_cap_is_partial_never_universal(completed):
     result = finished(job)
     assert result["runs"] == 3 and result["status"] == "limited"
     assert result["best"] and result["classification"] is None
-    assert not result["complete"] and not result["optimal"]
+    assert not result["complete"]
     job.close()
 
 
@@ -97,7 +97,7 @@ def test_runs_share_one_ten_million_step_allowance(completed, monkeypatch):
     monkeypatch.setattr(routes, "drive", limited)
     job = RouteJob(Session(history=[completed]), {"max_runs": 100000, "max_steps": 10000})
     result = finished(job)
-    assert result["required_runs"] == "11008" and result["max_runs"] == 100000
+    assert result["required_runs"] == "11008" and job.max_runs == 100000
     assert result["runs"] == result["step_limited_runs"] == 1000
     assert result["steps"] == 10_000_000
     assert result["status"] == "limited" and not result["complete"]

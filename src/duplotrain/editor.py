@@ -16,7 +16,6 @@ from functools import lru_cache
 from typing import Any
 
 from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
-from .collision import DEFAULT_CLEARANCE
 from .editor_tools import switch_choices
 from .geometry import ORIGIN, Pose, steps_to_degrees
 from .lattice import LatticePoint, from_alg_xy, z_from_alg
@@ -29,7 +28,6 @@ from .solver import (
     _lattice_rotations,
     _lattice_step,
     _moves_for,
-    _OverlapAudit,
     _pose_to_lattice,
 )
 from .validation import MAX_INVENTORY_COUNT, MAX_SNAPSHOT_BYTES, check_layout_json
@@ -654,13 +652,12 @@ class Session:
         self._push(self.layout.with_accessory(placement, stone_id, at_port=at_port), "place stone")
 
     def _arc_events(
-        self, grow: End, close: End, max_results: int, max_pieces: int, *, auditor=None
+        self, grow: End, close: End, max_results: int, max_pieces: int, *, auditor
     ):
         """Instant oracle for ring-shaped closures the DFS chronically misses.
 
         Yields the closures, and None as a heartbeat once per leveler pair.
-        *auditor* returns the base's shared overlap auditor; without it the oracle
-        builds its own.
+        *auditor* returns the base's shared overlap auditor.
         Tries ``leveler + j straights + k same-sign curves + m straights + leveler``
         chains (j, m <= 8, k <= 13; the 60 shortest leveler pairs whose climbs
         cancel the height difference), where a leveler is a short run of
@@ -757,7 +754,7 @@ class Session:
 
         start, target = geometry.start, geometry.target
         want_heading = (geometry.heading(target) + 12) % 24
-        audit = auditor() if auditor else _OverlapAudit(base, DEFAULT_CLEARANCE, 8.0)
+        audit = auditor()
         seen_pre = {}
         prefixes = {}
         suffixes = {}

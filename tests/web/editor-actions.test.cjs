@@ -152,7 +152,7 @@ test("a search re-enables redo when the server kept the redo stack", async () =>
   const before = {...scene([track([[0, 0, 0], [100, 0, 0]])], 5), can_undo: true, can_redo: true,
     open_ends: [[0, 0], [0, 1]]};
   const done = {job_id: "job", revision: 5, status: "exhausted", stage: "full inventory", searched: 12,
-    found: 0, target: 8, page: 0, candidates: [], complete: true, resumable: false, can_harden: false};
+    found: 0, page: 0, candidates: [], complete: true, resumable: false, can_harden: false};
   const api = async path => path.endsWith("/start") ? done :
     {...before, revision: 6, search_job: {...done, revision: 6}};
   const h = harness({state: before, overrides: {api}});

@@ -103,7 +103,7 @@ def test_reported_layout_coverage_is_separate_from_cycle(fixture, total):
     session = Session(history=[layout])
     result = trace_train(session, [0, 0])
     assert result["outcome"] == "endless"
-    assert result["drivable_count"] == result["total_pieces"] == total
+    assert result["drivable_count"] == len(layout) == total
     assert len(result["visited_drivable"]) == 41
     assert len(result["unvisited"]) == total - 41
     assert len(result["cycle_pieces"]) == 26

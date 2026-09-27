@@ -119,8 +119,9 @@ and only those its save and import guards accept. A search that sets a closure
 aside for those guards says so, and running out of search then proves nothing.
 A walk too long for the solver to follow
 ([search-correctness.md](search-correctness.md#completion-paths-can-revisit-all-free-junction-ports))
-stops its stage short in the same way: the search says so and offers no Search
-harder.
+stops its direction for good, and the search says so unless the stage's other
+direction runs out of search, which settles the rest. Search harder cannot lift
+the cut: it is offered only while another stage or direction can still go further.
 
 One tick processes at most 32 checkpoint events and aims to return after about
 20 ms between checkpoints. This is not a hard execution deadline: preprocessing,

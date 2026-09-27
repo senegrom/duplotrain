@@ -8,15 +8,18 @@ import pytest
 
 import duplotrain.editor as editor
 from duplotrain import Layout, Pose, build_chain, default_catalog
+from duplotrain.collision import DEFAULT_CLEARANCE
 from duplotrain.gui import Session
 from duplotrain.layout import layout_from_dict
-from duplotrain.solver import _solution_overlaps
+from duplotrain.solver import _OverlapAudit, _solution_overlaps
 from tests.editor_support import complete
 
 
 def arc_closures(session, grow, close, max_results, max_pieces=26):
     """The arc oracle's closures, without the heartbeats that keep a job responsive."""
-    return [s for s in session._arc_events(grow, close, max_results, max_pieces)
+    audit = _OverlapAudit(session.layout, DEFAULT_CLEARANCE, 8.0)
+    return [s for s in session._arc_events(grow, close, max_results, max_pieces,
+                                           auditor=lambda: audit)
             if s is not None]
 
 

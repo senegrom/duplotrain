@@ -206,7 +206,9 @@ class Cursor:
         elif event["kind"] in ("piece_limit", "result_limit"):
             self.blocked = True
         elif event["kind"] == "walk_limit":
+            # No bound lifts the cut: the suspended search can only repeat it.
             self.blocked = self.cut = True
+            self.close()
         elif event["kind"] == "solution" and self.expand is not None:
             event = {**event, "solution": self.expand(event["solution"])}
         return event
@@ -282,14 +284,14 @@ class PairSearch:
                 cap = budget * self.effort
                 limits = SearchLimits(min(1024, cap), MAX_RESULTS, max(1, self.depth - overhead))
 
-                def expand(sol, parts=parts):
-                    if parts is None:
-                        return sol
-                    return replace(sol, layout=_expand(sol.layout, parts), steps=(),
-                                   signature=("standard_bridge", sol.signature))
+                expand = None  # only a bridge stage's macro becomes its parts
+                if parts is not None:
+                    def expand(sol, parts=parts):
+                        return replace(sol, layout=_expand(sol.layout, parts), steps=(),
+                                       signature=("standard_bridge", sol.signature))
 
-                def accept(sol, expand=expand, parts=parts):
-                    if parts is None:
+                def accept(sol, expand=expand):
+                    if expand is None:
                         return valid_extension(base, sol, stock, self.depth, self.options)
                     sol = expand(sol)
                     if any(p.frame.z != ZERO for p in sol.layout.placements[len(base):]
@@ -342,8 +344,9 @@ class PairSearch:
                 if peer is cursor:
                     continue
                 if event["kind"] == "exhausted":
+                    # Settled, whatever stopped it: nothing it missed is left.
                     peer.close()
-                    peer.exhausted = True
+                    peer.exhausted, peer.blocked, peer.cut = True, False, False
                 else:
                     peer.blocked = True
             left = [i for i, c in enumerate(self.cursors) if not c.blocked and not c.exhausted]
@@ -357,8 +360,8 @@ class PairSearch:
                           and self.cursors[i].stage == cursor.stage), None)
             if other is not None:
                 self.active = other
-            elif len(stage) == 1 and self.active in left:
-                pass  # a one-direction stage runs until its own limits stop it
+            elif self.active in left:
+                pass  # a stage's last direction runs until its own limits stop it
             elif left:
                 self.active = next((i for i in left if i != self.active), left[0])
         # A single cursor stopping is not a whole-problem exhaustion verdict.
@@ -611,9 +614,12 @@ class SearchJob:
                 self.status = event["kind"]
                 self.complete = (not self.all_gaps and event["kind"] == "exhausted"
                                  and not self.unsaveable)
-                if self.pool and self.reason is None and any(c.cut for c in self.pool.cursors):
+                # From the live cursors: a stage's other direction may have settled
+                # a cut walk since an earlier stop.
+                if self.pool and not self.unsaveable:
                     self.reason = ("Some walks pass through more existing junctions than a "
-                                   "search can follow; closures along them were not searched.")
+                                   "search can follow; closures along them were not searched."
+                                   if any(c.cut for c in self.pool.cursors) else None)
                 break
             if time.perf_counter() >= deadline:
                 break
@@ -683,14 +689,13 @@ class SearchJob:
                 "stage": self.stage, "searched": self.nodes, "found": len(self.solutions),
                 "page": page, "candidates": shown,
                 "complete": self.complete, "reason": self.reason,
-                "options": {"sort": self.options["sort"],
-                            "exclude": list(self.options["exclude"]),
-                            "room": list(self.options["room"]) if self.options["room"] else None,
+                "options": {"room": list(self.options["room"]) if self.options["room"] else None,
                             "keep_out": [list(r) for r in self.options["keep_out"]]},
                 "max_pieces": self.depth, "search_effort": self.effort,
-                # A harder search needs room to report and something left to search:
-                # not at the result cap, not once exhausted, not walks cut short only.
-                "can_harden": (len(self.solutions) < MAX_RESULTS and self.status != "exhausted"
+                # A harder search needs room to report, limits left to raise and
+                # something left to search: not every direction exhausted or cut short.
+                "can_harden": (len(self.solutions) < MAX_RESULTS
+                               and (self.depth, self.effort) != _harder(self.depth, self.effort)
                                and (self.all_gaps or (self.pool is not None and not all(
                                    c.exhausted or c.cut for c in self.pool.cursors)))),
                 "resumable": len(self.solutions) < MAX_RESULTS and self.status not in (

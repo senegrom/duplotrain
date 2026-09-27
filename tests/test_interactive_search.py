@@ -567,7 +567,7 @@ def test_each_sort_ranks_exact_candidates_by_its_own_cost_then_discovery(catalog
         ]
         assert [index for index, _ in job.ordered()] == [1, 2, 3, 4, 0]  # discovery
         response = job.response(session, {"sort": goal})
-        assert response["options"]["sort"] == goal
+        assert job.options["sort"] == goal
         assert [item["index"] for item in response["candidates"]] == order
         assert [index for index, _ in job.ordered()] == order
     finally:
@@ -614,10 +614,8 @@ def test_response_constraints_are_copied_and_cannot_change_the_saved_problem(cat
     try:
         response = job.response(session, {})
         response["options"]["room"][0] = 100000
-        response["options"]["exclude"].append("curve")
         response["options"]["keep_out"][0][0] = -100000
         assert job.options["room"][0] == -2000
-        assert job.options["exclude"] == []
         assert job.options["keep_out"][0][0] == 3000
     finally:
         job.close()
@@ -775,3 +773,21 @@ def test_a_walk_cut_short_says_so_and_offers_no_harder_search(catalog, monkeypat
         assert not response["can_harden"]
     finally:
         job.close()
+
+
+def test_a_walk_cut_short_is_settled_when_the_other_direction_runs_out(catalog, monkeypatch):
+    import duplotrain.solver as solver_module
+    from tests.test_solver import crossings_in_a_row
+
+    # Walks from the first crossing are cut; from the turned straight, three curves
+    # run out of search, which proves that no closure exists either way round.
+    monkeypatch.setattr(solver_module, "_MAX_WALK_STEPS", 20)
+    base = crossings_in_a_row(catalog, 30, end_heading=6)
+    session = Session(history=[base], inventory={**base.piece_counts, "curve": 3})
+    for grow, close in (([0, 1], [30, 0]), ([30, 0], [0, 1])):
+        job = SearchJob(session, {"grow": grow, "close": close})
+        try:
+            settle(job)
+            assert job.status == "exhausted" and job.complete and job.reason is None
+        finally:
+            job.close()
