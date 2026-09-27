@@ -22,6 +22,8 @@ globalThis.fetch = async (...args) => {
   });
   return new Response(body, {status: response.status, statusText: response.statusText, headers: response.headers});
 };
+// The page shows these texts: an error's message, not its "Error: " name.
+const errorText = error => error?.message || String(error);
 async function checkedFetch(url) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Could not load ${url}: HTTP ${response.status}`);
@@ -39,7 +41,7 @@ const booted = (async () => {
   dispatch = pyodide.pyimport("adapter").dispatch;
   postMessage({ready: true});
 })();
-booted.catch(error => postMessage({bootError: String(error)}));
+booted.catch(error => postMessage({bootError: errorText(error)}));
 onmessage = async ({data: {id, path, body}}) => {
   try {
     await booted;
@@ -47,6 +49,6 @@ onmessage = async ({data: {id, path, body}}) => {
   } catch (error) {
     // After a fatal error Pyodide "can no longer be used": the page must restart
     // the engine rather than keep sending requests to this runtime.
-    postMessage(error?.pyodide_fatal_error ? {id, fatal: String(error)} : {id, err: String(error)});
+    postMessage(error?.pyodide_fatal_error ? {id, fatal: errorText(error)} : {id, err: errorText(error)});
   }
 };

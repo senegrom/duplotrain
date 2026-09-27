@@ -35,8 +35,9 @@ install, build or use the app.
 Icon URLs include `duplotrain` and a revision in their physical filenames. For
 future artwork changes, bump
 `v1` in the exporter, HTML, manifest and local server asset allowlist together.
-Conventional `favicon.ico` and `apple-touch-icon.png` aliases, and the SVG source,
-are served only by the local editor, for browsers' automatic requests; the static
-build leaves them out, since the page links its icons under `icons/`.
+Conventional `favicon.ico` and `apple-touch-icon.png` aliases are served only by
+the local editor, for browsers' automatic requests; the static build leaves them
+out, since the page links its icons under `icons/`. Neither host serves the SVG
+source.
 An existing iOS Home Screen shortcut may need to be removed and re-added to
 refresh its cached icon.

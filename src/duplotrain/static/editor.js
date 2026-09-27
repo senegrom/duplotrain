@@ -321,9 +321,12 @@ async function saveSession() {
 let canvas, ctx;
 
 function resize() {
-  canvas.width = canvas.clientWidth * devicePixelRatio;
-  canvas.height = canvas.clientHeight * devicePixelRatio;
-  draw();
+  const width = Math.floor(canvas.clientWidth * devicePixelRatio);
+  const height = Math.floor(canvas.clientHeight * devicePixelRatio);
+  if (canvas.width === width && canvas.height === height) return;
+  // A new size clears the canvas: repaint it at once, not a frame later.
+  canvas.width = width; canvas.height = height;
+  paint();
 }
 
 function worldToScreen(x, y) {
@@ -522,8 +525,8 @@ function fitView(placements = S && S.layout.placements) {
       }
   view.x = (x0 + x1) / 2; view.y = (y0 + y1) / 2;
   const pad = 180;
-  view.scale = Math.min((canvas.clientWidth) / (x1 - x0 + pad),
-                        (canvas.clientHeight) / (y1 - y0 + pad), 1.6);
+  view.scale = clampScale(Math.min((canvas.clientWidth) / (x1 - x0 + pad),
+                                   (canvas.clientHeight) / (y1 - y0 + pad), 1.6));
 }
 
 // ---------- UI wiring ----------
@@ -813,9 +816,11 @@ const canvasPoint = (e) => {
   const r = canvas.getBoundingClientRect();
   return {x: e.clientX - r.left, y: e.clientY - r.top};
 };
+// Every way of zooming, fitting included, keeps to one range.
+function clampScale(scale) { return Math.min(4, Math.max(0.08, scale)); }
 function zoomAt(factor, sx, sy) {
   const [wx, wy] = screenToWorld(sx, sy);
-  view.scale = Math.min(4, Math.max(0.08, view.scale * factor));
+  view.scale = clampScale(view.scale * factor);
   const [nx, ny] = screenToWorld(sx, sy);
   view.x += wx - nx; view.y += wy - ny;
   draw();
@@ -906,7 +911,6 @@ function bindEditorEvents() {
       event.returnValue = "";
     }
   });
-  window.addEventListener("resize", resize);
   if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
   el("undo").addEventListener("click", async () => {
     try { S = await api("/api/undo", {}); redraw(); } catch (e) { status(e.message, "err"); }
@@ -993,7 +997,7 @@ function bindEditorEvents() {
       const world = screenToWorld(before.x, before.y);
       Object.assign(old, p, {moved: true});
       const after = pairMetrics();
-      if (before.distance > 1) view.scale = Math.min(4, Math.max(0.08, view.scale * after.distance / before.distance));
+      if (before.distance > 1) view.scale = clampScale(view.scale * after.distance / before.distance);
       const now = screenToWorld(after.x, after.y);
       view.x += world[0] - now[0]; view.y += world[1] - now[1];
     } else {
@@ -1034,7 +1038,10 @@ function bindEditorEvents() {
     e.preventDefault();
     if (!e.deltaY) return; // a sideways swipe is not a zoom
     const p = canvasPoint(e);
-    zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, p.x, p.y);
+    // By the distance scrolled: a mouse notch (100 px, or three lines) zooms 12%, and
+    // a trackpad's many small steps as much in all; no one event more than a notch.
+    const pixels = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 800 : 1);
+    zoomAt(1.12 ** (-Math.max(-100, Math.min(100, pixels)) / 100), p.x, p.y);
   }, {passive: false});
   el("zoom-in").addEventListener("click", () => zoomAt(1.25, canvas.clientWidth / 2, canvas.clientHeight / 2));
   el("zoom-out").addEventListener("click", () => zoomAt(1 / 1.25, canvas.clientWidth / 2, canvas.clientHeight / 2));

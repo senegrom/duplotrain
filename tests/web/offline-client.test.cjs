@@ -2,14 +2,16 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {harness} = require("./reliability-harness.cjs");
-// A service worker whose state changes the test announces with emit().
+// A service worker whose state changes the test announces with emit(). As in a
+// browser, what the one listener queued runs before the next listener.
 function serviceWorker(state) {
   const listeners = new Set();
   return {state, addEventListener(_name, fn) { listeners.add(fn); },
-    removeEventListener(_name, fn) { listeners.delete(fn); }, emit() { for (const fn of [...listeners]) fn(); }};
+    removeEventListener(_name, fn) { listeners.delete(fn); },
+    async emit() { for (const fn of [...listeners]) if (listeners.has(fn)) { fn(); await turn(); } }};
 }
 function client({confirm = true, ready = true, waiting = false, fail = false, existing = false,
-  activeBuild = "test-build", workerState = "activated"} = {}) {
+  activeBuild = "test-build", workerState = "activated", reason = "Download failed; previous cache retained"} = {}) {
   let reloads = 0, registrations = 0, confirmations = 0, updates = 0, registered = existing;
   const messages = [], registrationListeners = {};
   const worker = serviceWorker(workerState);
@@ -26,7 +28,7 @@ function client({confirm = true, ready = true, waiting = false, fail = false, ex
       async register() { registrations++; return registration; }}},
     offlineMessage: async (_worker, type) => {
       messages.push(type);
-      if (fail) throw new Error("Download failed; previous cache retained");
+      if (fail) throw new Error(reason);
       return {ready, build: activeBuild};
     }}});
   h.context.registration = registration;
@@ -163,12 +165,71 @@ test("an installation whose worker turns redundant is reported as failed, never 
   Object.assign(h.context.registration, {installing: next, active: null});
   const installing = h.run("installOffline()");
   await turn();
-  next.state = "redundant"; next.emit();
+  h.registrationEvent("updatefound");  // the background watcher sees it too, and keeps quiet
+  next.state = "redundant"; await next.emit();
   await installing;
-  assert.deepEqual(h.messages, []);  // the failed worker is never asked to install
+  assert.deepEqual(h.messages, ["INSTALL"]);  // the installing worker is asked how it ends
   // A first installation had no version to keep.
   assert.match(h.el("offline-status").textContent,
     /installation failed\. Retry online\. Portable project downloads remain available\.$/);
+});
+
+test("an installation that fails says why", async () => {
+  const h = client({fail: true, reason: "Offline download stalled for a minute: pyodide.asm.wasm"});
+  const next = serviceWorker("installing");
+  Object.assign(h.context.registration, {installing: next, active: null});
+  const installing = h.run("installOffline()");
+  await turn();
+  next.state = "redundant"; await next.emit();
+  await installing;
+  assert.match(h.el("offline-status").textContent,
+    /stalled for a minute: pyodide\.asm\.wasm\. Portable project downloads remain available\.$/);
+});
+
+test("a page that starts while an update installs still offers it", async () => {
+  const h = client({existing: true}); const next = serviceWorker("installing");
+  h.context.registration.installing = next;  // its updatefound fired before this page
+  h.el("offline-update").hidden = true; h.run("bindOfflineEvents()");
+  await turn();
+  Object.assign(h.context.registration, {installing: null, waiting: next});
+  next.state = "installed"; await next.emit();
+  assert.equal(h.el("offline-update").hidden, false);
+  assert.match(h.el("offline-status").textContent, /Update available and verified/);
+});
+
+test("a check says what it does and when it found nothing newer", async () => {
+  const h = client({existing: true}); h.run("offlineRegistration = registration");
+  let during;
+  h.context.registration.update = async () => { during = h.el("offline-status").textContent; };
+  await h.run("checkOfflineUpdate()");
+  assert.match(during, /Checking for an update/);
+  assert.match(h.el("offline-status").textContent, /No newer version found\. Offline ready/);
+});
+
+test("a check that finds an update follows its download to the Apply button", async () => {
+  const h = client({existing: true}); h.run("offlineRegistration = registration");
+  const next = serviceWorker("installing");
+  h.context.registration.update = async () => { h.context.registration.installing = next; };
+  h.el("offline-update").hidden = true;
+  const checking = h.run("checkOfflineUpdate()");
+  await turn();
+  assert.match(h.el("offline-status").textContent, /Downloading and verifying the update/);
+  assert.deepEqual(h.messages, ["INSTALL"]);
+  Object.assign(h.context.registration, {installing: null, waiting: next});
+  next.state = "installed"; await next.emit();
+  await checking;
+  assert.equal(h.el("offline-update").hidden, false);
+  assert.match(h.el("offline-status").textContent, /Update available and verified/);
+});
+
+test("an update superseded before it activates stops the apply at once", async () => {
+  const h = client({waiting: true, workerState: "installed"}); h.run("offlineRegistration = registration");
+  const applying = h.run("applyOfflineUpdate()");
+  await turn();
+  h.worker.state = "redundant"; await h.worker.emit();
+  await applying;
+  assert.equal(h.counts().reloads, 0);
+  assert.match(h.el("offline-status").textContent, /Update did not activate; no reload performed/);
 });
 
 test("offline installation outside a secure context registers nothing", async () => {

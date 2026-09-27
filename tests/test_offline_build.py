@@ -8,6 +8,8 @@ import zipfile
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import pytest
+
 from tests import test_editor_build as build_tests
 
 build = build_tests.build
@@ -130,7 +132,7 @@ def test_one_commit_names_one_offline_version_on_every_build_host(
     monkeypatch.setattr(build, "WEBAPP", webapp)
     for root in (source / "src/duplotrain", webapp):
         for path in root.rglob("*"):
-            if path.suffix in (".py", ".js", ".css", ".html", ".webmanifest", ".svg"):
+            if path.suffix in (".py", ".js", ".css", ".html", ".webmanifest"):
                 text = path.read_bytes().replace(b"\r\n", b"\n")
                 path.write_bytes(text.replace(b"\n", b"\r\n"))
     build.main()
@@ -139,8 +141,9 @@ def test_one_commit_names_one_offline_version_on_every_build_host(
     assert version(dist)
 
 
-def test_a_service_worker_change_changes_the_stamp_and_manifest(
-    synthetic_runtime_build, monkeypatch, tmp_path,
+@pytest.mark.parametrize("changed", ["adapter.py", "boot.js", "worker.js", "service-worker.js"])
+def test_a_worker_or_bootstrap_change_changes_the_stamp_and_manifest(
+    synthetic_runtime_build, monkeypatch, tmp_path, changed,
 ):
     _source, dist = synthetic_runtime_build
     build.main()
@@ -149,8 +152,9 @@ def test_a_service_worker_change_changes_the_stamp_and_manifest(
     webapp.mkdir()
     for name in ("adapter.py", "boot.js", "worker.js", "service-worker.js"):
         (webapp / name).write_bytes((build.WEBAPP / name).read_bytes())
-    path = webapp / "service-worker.js"
-    path.write_text(path.read_text() + "\n// changed implementation\n")
+    path = webapp / changed
+    comment = "#" if changed.endswith(".py") else "//"
+    path.write_text(path.read_text() + f"\n{comment} changed implementation\n")
     monkeypatch.setattr(build, "WEBAPP", webapp)
     build.main()
     after, entries = manifest(dist)

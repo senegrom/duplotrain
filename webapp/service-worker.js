@@ -189,7 +189,9 @@ self.addEventListener("message", event => {
         if (!(await offlineStatus()).ready) throw new Error("New offline version is incomplete");
         await self.skipWaiting(); reply.postMessage({build: BUILD, activated: true});
       } else reply.postMessage(event.data.type === "INSTALL" ? await installVersion() : await offlineStatus());
-    } catch (error) { reply.postMessage({error: String(error), build: BUILD, ready: false}); }
+    } catch (error) {
+      reply.postMessage({error: error?.message || String(error), build: BUILD, ready: false});
+    }
     finally { clearInterval(beat); }
   })());
 });

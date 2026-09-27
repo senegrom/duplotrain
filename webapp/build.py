@@ -80,7 +80,7 @@ def text_bytes(path: Path) -> bytes:
 
 
 #: Static assets shipped as text, so with LF newlines (see ``text_bytes``).
-TEXT_SUFFIXES = (".js", ".css", ".webmanifest", ".svg")
+TEXT_SUFFIXES = (".js", ".css", ".webmanifest")
 
 
 def framed(name: str, payload: bytes) -> bytes:

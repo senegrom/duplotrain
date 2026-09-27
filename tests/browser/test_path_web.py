@@ -249,7 +249,7 @@ def _exercise_offline_reload(page, stop_server):
     # Fail promptly with the UI's actual reason rather than waiting three minutes
     # after a rejected registration or integrity check.
     expect(page.locator("#offline-status")).to_contain_text(
-        re.compile(r"Offline ready|Portable project downloads remain available"), timeout=180000,
+        re.compile(r"Offline ready|failed|remain available"), timeout=180000,
     )
     expect(page.locator("#offline-status")).to_contain_text("Offline ready")
     # Inspect native lifecycle state before removing the network. A ready cache

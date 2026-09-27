@@ -57,8 +57,8 @@ def test_editor_html_and_manifest_reference_only_allowlisted_assets():
 @pytest.mark.parametrize("path", [
     "/icons/../editor.html", "/static/editor.html", "/icons/duplotrain-app-192-v1.png/",
     "/ICONS/duplotrain-app-192-v1.png", "/icons/duplotrain-app-192-v2.png",
-    "/duplotrain-icon.svg.bak", "/pyproject.toml", "/icons/duplotrain-app-192-v1.png/..",
-    "/icons/", "/icons",
+    "/duplotrain-icon.svg", "/duplotrain-icon.svg.bak", "/pyproject.toml",
+    "/icons/duplotrain-app-192-v1.png/..", "/icons/", "/icons",
 ])
 def test_paths_outside_the_allowlist_are_refused_without_touching_the_filesystem(
     editor_port, path,

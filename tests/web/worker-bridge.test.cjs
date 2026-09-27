@@ -81,7 +81,7 @@ test("boot errors and timeout both settle startup and offer recovery", async () 
   }
 });
 
-test("engine loading fails only after a minute without progress", async () => {
+test("engine loading fails only after five minutes, then a minute, without progress", async () => {
   const h = harness();
   const promise = h.window.duplotrainBoot({refresh: async () => {}, status() {}});
   // Five minutes for the first report: the runtime's main script loads in one piece.
@@ -153,7 +153,8 @@ test("worker boot reports failed runtime requests instead of unpacking HTTP erro
   vm.runInContext(fs.readFileSync(path.join(root, "webapp/worker.js"), "utf8"), context);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(messages.length, 1);
-  assert.match(messages[0].bootError, /HTTP 404/);
+  // The page shows the message itself, without an "Error: " prefix.
+  assert.match(messages[0].bootError, /^Could not load .*: HTTP 404$/);
 });
 
 test("adapter conflicts preserve their code and current state through the worker bridge", async () => {

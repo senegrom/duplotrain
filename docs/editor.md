@@ -208,13 +208,16 @@ link needs longer for a large runtime file. An installation cut short, by a lost
 connection or the browser's time limit for one task, keeps the files it verified
 and resumes from them, though each file must still arrive within that five-minute
 limit (the largest needs about 85 kbit/s); the page waits as long as the service
-worker reports that it is still working. Cached
+worker reports that it is still working, and a failed installation names its
+reason. Cached
 responses preserve the build's CSP and MIME headers. Project/autosave data is
 not stored in these application-code caches.
 
 The status shows the loaded build and whether the complete corresponding version
-is available. Update checks install a verified waiting version without forcing
-activation or reloading an unsaved design. Applying it requires confirmation,
+is available. A check says when it finds nothing newer. An update, found by a
+check or by the browser itself, even one already downloading when a tab opens,
+installs as a verified waiting version without forcing activation or reloading
+an unsaved design. Applying it requires confirmation,
 rechecks readiness and waits for activation before reloading. Download a project
 first: an explicit reload still resets in-memory undo and search progress.
 
