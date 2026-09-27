@@ -553,3 +553,21 @@ def test_the_package_exports_what_classify_returns_and_raises():
     assert isinstance(verdict, duplotrain.LoopClassification)
     assert duplotrain.DriveLimitError is DriveLimitError
     assert duplotrain.ClassificationLimitError is ClassificationLimitError
+
+
+def test_make_dogbone_says_why_it_cannot_build(catalog):
+    # Nothing stem-tailed to pick, and a completion grown from a switch branch that
+    # closed into the stem: the train off its tail never comes back.
+    with pytest.raises(ValueError, match="none of them is stem-tailed"):
+        make_dogbone(None, catalog)
+    base, _ = Layout().with_piece(catalog["switch"], ORIGIN)
+    found = solve({"curve": 12, "straight": 2}, catalog,
+                  SolverConfig(reversing_loops=True, min_pieces=1, max_results=200,
+                               max_nodes=300_000), base=base, grow_from=(0, 1),
+                  close_onto=(0, 2))
+    closing_into_the_stem = [s for s in found.solutions if s.kind == "reversing"
+                             and s.layout.links.get((len(s.layout) - 1, s.steps[-1].exit))
+                             == (0, 0)]
+    assert closing_into_the_stem
+    with pytest.raises(ValueError, match="branch-tailed"):
+        make_dogbone(closing_into_the_stem[0], catalog)

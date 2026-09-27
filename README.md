@@ -151,10 +151,13 @@ direction-change**. A layout doesn't have to be a plain closed loop to run forev
 With `reversing_loops` enabled (`--reversing`, on automatically when your `--set`s
 include the green stone, or the checkbox in the GUI) the solver also proposes
 **teardrops**: the walk closes into the switch's *other branch* instead of back on
-itself. The train always exits through the stem, bounces off the direction stone on
-the tail, comes back in and trails through the points — endless running from one
-switch and twelve curves, no full circle of spare track required. Exactly three
-distinct teardrop shapes exist for switch + 12 curves; the solver proves it.
+itself. On a *stem-tailed* teardrop the train always exits through the stem, bounces
+off the direction stone on the tail, comes back in and trails through the points —
+endless running from one switch and twelve curves, no full circle of spare track
+required. Switch + 12 curves make exactly three distinct teardrop shapes, one of them
+stem-tailed; the solver proves it. `duplotrain solve` lists only stem-tailed
+teardrops; the library and the GUI also offer the branch-tailed kind, which
+[never returns the train](#driving-and-the-looping-ladder) to its tail.
 
 In the GUI, stones are armed from their own palette and clipped onto straights with a
 click; buffers cap open ends (their bumper face draws as a bar and is not clickable);

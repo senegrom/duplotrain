@@ -83,6 +83,22 @@ def test_results_are_shown_before_earlier_results_are_replaced(runner, monkeypat
     assert result.exit_code == 1 and "Loops, nicest first" in result.output
 
 
+def test_render_never_draws_over_its_own_layout_file(runner, tmp_path):
+    source = tmp_path / "ring.png"  # a layout saved under a picture's name
+    layout = build_chain([(default_catalog()["curve"], 0, 1)] * 12)
+    source.write_text(json.dumps(layout_to_dict(layout)))
+    result = runner.invoke(main, ["render", str(source)])
+    assert result.exit_code == 2 and "would replace the layout file" in result.output
+    assert json.loads(source.read_text()) == layout_to_dict(layout)
+
+
+def test_a_layout_file_takes_at_most_2_mb(runner, tmp_path):
+    big = tmp_path / "big.json"
+    big.write_bytes(b" " * (2 * 1024 * 1024 + 1))
+    result = runner.invoke(main, ["check", str(big)])
+    assert result.exit_code == 1 and "larger than 2 MB" in result.output
+
+
 def test_an_empty_output_name_is_refused_not_ignored(runner):
     result = runner.invoke(main, ["solve", "--curve", "12", "-o", ""])
     assert result.exit_code == 2 and "-o needs a directory name" in result.output

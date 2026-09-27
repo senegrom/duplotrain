@@ -24,6 +24,7 @@ from rich.text import Text
 from . import __version__
 from .catalog import default_catalog, load_catalog
 from .drive import DEFAULT_MAX_RUNS, ClassificationLimitError, DriveLimitError, classify
+from .explore import is_stem_tailed
 from .layout import layout_from_dict, layout_to_dict
 from .render import render_layout
 from .scoring import score_solution
@@ -186,14 +187,15 @@ def sets_cmd() -> None:
               show_default=True)
 @click.option("--max-results", type=click.IntRange(min=1), default=25, show_default=True)
 @click.option("--max-nodes", type=click.IntRange(min=1), default=2_000_000, show_default=True)
-@click.option("--use-all", is_flag=True, help="Only layouts using every owned piece.")
+@click.option("--use-all", is_flag=True,
+              help="Only layouts using every owned piece a loop can take (no buffer).")
 @click.option(
     "--reversing/--no-reversing",
     default=None,
     help=(
-        "Also propose reversing loops (teardrops closing into a switch branch); the "
-        "train needs a direction-change stone on the tail. Default: on when a --set "
-        "provides that stone."
+        "Also propose reversing loops: stem-tailed teardrops, whose train turns back "
+        "off a direction-change stone on the tail. Default: on when a --set provides "
+        "that stone."
     ),
 )
 @click.option(
@@ -270,6 +272,10 @@ def solve_cmd(
             max_nodes=max_nodes,
             use_all_pieces=use_all,
             reversing_loops=reversing,
+            # A branch-tailed teardrop takes the train into its lobe for good: only
+            # a stem-tailed one turns it back off the stone.
+            solution_filter=(lambda sol: sol.kind != "reversing"
+                             or is_stem_tailed(sol, catalog)) if reversing else None,
         )
         # Before the search: an unusable directory must not cost a whole search.
         out_dir = _output_dir(out) if out is not None else None
@@ -416,6 +422,8 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
     target = _image_target(out) if out else str(Path(layout_file).with_suffix(".png"))
+    if Path(target).resolve() == Path(layout_file).resolve():
+        raise click.UsageError("the picture would replace the layout file; name it with -o")
     _write_image(render_layout, layout, target)
     console.print("Wrote", Text(target, style="bold"))
 
@@ -471,7 +479,8 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
                     f"Within requested slop budget {slop:g} mm; physical fit not verified."
                 )
                 return
-            console.print(f"Not accepted as closed within slop budget {slop:g} mm.")
+            if layout.is_closed:  # an open layout's reason is its open ends
+                console.print(f"Not accepted as closed within slop budget {slop:g} mm.")
         else:
             console.print("[red]Incompatible joint(s); planar slop cannot repair these.[/red]")
     raise click.exceptions.Exit(1)

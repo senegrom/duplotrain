@@ -164,14 +164,22 @@ def _lobe_recipe(teardrop: Solution, pieces: Mapping[str, PieceType]) -> list:
         start = layout.links.get((offset, steps[0].entry))
         if start is None or start[0] != target[0]:
             raise ValueError("the teardrop's lobe runs through its base layout")
-        tails = [port for port in range(len(junction.ports)) if port != target[1]
-                 and any(exit_port == start[1] for exit_port, _ in junction.transit(port))]
+        tails = [port for port in range(len(junction.ports))
+                 if port not in (start[1], target[1])]
         if len(tails) != 1:
             raise ValueError("the teardrop's junction has no single tail")
+        if not any(exit_port == start[1] for exit_port, _ in junction.transit(tails[0])):
+            # The tail leads to where the walk closed, not to where it began: a
+            # train off the tail rounds the lobe one way and never comes back.
+            raise ValueError(_BRANCH_TAILED)
         lobe = [_Place(junction.id, tails[0], start[1]), *steps]
     if not pieces[lobe[0].piece_id].is_junction:
         raise ValueError("no junction in the teardrop recipe")
     return lobe
+
+
+_BRANCH_TAILED = ("this teardrop is branch-tailed (a one-way trap); pick the stem-tailed "
+                  "variant, e.g. via pick_stem_tailed()")
 
 
 def _stem_tailed(lobe: list, pieces: Mapping[str, PieceType]) -> bool:
@@ -298,6 +306,8 @@ def make_dogbone(
     Requires a *stem-tailed* teardrop (see :func:`is_stem_tailed`); the branch-tailed
     kind would compose into two one-way traps that never exchange the train.
     """
+    if teardrop is None:  # what pick_stem_tailed returns when it finds none
+        raise ValueError("no teardrop to build from: none of them is stem-tailed")
     if teardrop.kind != "reversing":
         raise ValueError("make_dogbone wants a reversing (teardrop) solution")
     # The teardrop's step trace is tail pieces, then the switch, then the lobe that
@@ -305,10 +315,7 @@ def make_dogbone(
     # self-contained: replayed anywhere it lands back on its own switch.
     lobe = _lobe_recipe(teardrop, pieces)
     if not _stem_tailed(lobe, pieces):
-        raise ValueError(
-            "this teardrop is branch-tailed (a one-way trap); pick the stem-tailed "
-            "variant, e.g. via pick_stem_tailed()"
-        )
+        raise ValueError(_BRANCH_TAILED)
     layout = teardrop.layout
     opens = layout.connectable_ends()
     if len(opens) != 1:

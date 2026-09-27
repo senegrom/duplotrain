@@ -246,7 +246,7 @@ def test_check_rejects_garbage_layout(runner, tmp_path):
 
 
 # Out-of-range counts and slop are covered in test_cli_failures.py.
-@pytest.mark.parametrize("args", [["--slop", "nan"], ["--top", "-1", "-o", "out"]])
+@pytest.mark.parametrize("args", [["--top", "-1", "-o", "out"]])
 def test_invalid_solve_options_fail_politely(runner, tmp_path, args):
     with runner.isolated_filesystem(temp_dir=tmp_path):
         result = runner.invoke(main, ["solve", "--curve", "12", *args])
@@ -375,3 +375,34 @@ def test_saved_pictures_carry_the_same_closure_label_as_the_table(runner, monkey
                                   "--reversing", "--top", "50", "-o", str(tmp_path)])
     assert result.exit_code == 0, result.output
     assert any("reversing" in title for title in titles)
+
+
+def test_reversing_lists_only_teardrops_that_turn_the_train_back(runner, monkeypatch):
+    # Of switch + 12 curves' three teardrops, two are branch-tailed: a train off
+    # their tail circles the lobe for good, never back to the stone.
+    from duplotrain.explore import is_stem_tailed
+
+    results = []
+
+    def recording(inventory, catalog, config):
+        results.append(solve(inventory, catalog, config))
+        return results[-1]
+
+    monkeypatch.setattr(cli, "solve", recording)
+    result = runner.invoke(main, ["solve", "--curve", "12", "--switch", "1", "--reversing",
+                                  "--use-all"])
+    assert result.exit_code == 0, result.output
+    teardrops = [s for s in results[0].solutions if s.kind == "reversing"]
+    assert len(teardrops) == 1 and is_stem_tailed(teardrops[0], default_catalog())
+
+
+def test_check_blames_open_ends_not_the_slop_budget(runner, tmp_path):
+    # One forced joint within the budget, and an open switch branch.
+    catalog = default_catalog()
+    ring = build_chain([(catalog["switch"], 0, 1)] + [(catalog["curve"], 0, 1)] * 5
+                       + [(catalog["straight"], 0, 1)] + [(catalog["curve"], 0, 1)] * 6)
+    path = tmp_path / "open.json"
+    path.write_text(json.dumps(layout_to_dict(ring.join((12, 1), (0, 0), force=True))))
+    result = runner.invoke(main, ["check", str(path), "--slop", "1000"])
+    assert result.exit_code == 1 and "open end" in result.output
+    assert "slop budget" not in result.output
