@@ -15,6 +15,8 @@ MAX_LINKS = 6000
 # Leave room for the request/checkpoint envelope around a saved session.
 MAX_SNAPSHOT_BYTES = MAX_JSON_BYTES - 1024
 MAX_COEFFICIENT_LENGTH = 48
+#: Longest piece or action-stone id, in a layout and in a catalogue alike.
+MAX_ID_LENGTH = 40
 #: Most pieces of one kind anyone owns. A search stacks at most 400 pieces, so a
 #: larger count changes no result; it only risks overflowing the float sums.
 MAX_INVENTORY_COUNT = 10_000
@@ -37,7 +39,9 @@ def read_json_file(path) -> object:
         raw = fh.read(MAX_JSON_BYTES + 1)
     if len(raw) > MAX_JSON_BYTES:
         raise ValueError(f"{path} is larger than 2 MB")
-    return json.loads(raw)
+    text = raw.decode(json.detect_encoding(raw), "surrogatepass")
+    check_json_depth(text)  # a recursive parser, and nested catalogue lengths
+    return json.loads(text)
 
 
 def check_json_depth(text: str) -> None:
@@ -97,7 +101,7 @@ def check_layout_json(data: object) -> None:
     for entry in placements:
         if not isinstance(entry, dict):
             raise ValueError("placement entries must be objects")
-        if not isinstance(entry.get("piece"), str) or len(entry["piece"]) > 40:
+        if not isinstance(entry.get("piece"), str) or len(entry["piece"]) > MAX_ID_LENGTH:
             raise ValueError("invalid piece id")
         frame = entry.get("frame")
         if not isinstance(frame, dict):
@@ -125,7 +129,7 @@ def check_layout_json(data: object) -> None:
         if not isinstance(entry, list) or not 2 <= len(entry) <= 3:
             raise ValueError("accessory rows must be [index, stone] or [index, stone, port]")
         if (type(entry[0]) is not int or abs(entry[0]) > 10**6
-                or not isinstance(entry[1], str) or len(entry[1]) > 40):
+                or not isinstance(entry[1], str) or len(entry[1]) > MAX_ID_LENGTH):
             raise ValueError("accessory row out of bounds")
         if len(entry) == 3 and (type(entry[2]) is not int or abs(entry[2]) > 64):
             raise ValueError("accessory port out of bounds")

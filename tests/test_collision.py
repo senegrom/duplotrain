@@ -178,3 +178,19 @@ def test_collision_groups_points_per_cell_and_reuses_query_neighbourhood():
     query_groups = field._prepare(query)
     assert not field._clashes_prepared(query_groups, 32.0, ignore=set())
     assert field._grid.gets == 9
+
+
+def test_collision_pop_restores_exact_previous_grid_and_width():
+    field = CollisionField()
+    first = [(0.0, 0.0, 0.0), (5.0, 5.0, 0.0), (10.0, 10.0, 0.0)]
+    second = [(1.0, 1.0, 0.0), (6.0, 6.0, 0.0), (11.0, 11.0, 0.0)]
+    field.add(0, first, 80.0)
+    grid_before = {key: list(bucket) for key, bucket in field._grid.items()}
+    field.add(1, second, 32.0)
+    assert field._max_half_width == 80.0
+    field.pop()
+    assert field._max_half_width == 80.0
+    assert field._grid == grid_before
+    field.pop()
+    assert field._max_half_width == 0.0
+    assert field._grid == {}

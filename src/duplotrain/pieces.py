@@ -32,6 +32,7 @@ from typing import Any
 
 from .exact import Alg, alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose, cos_sin, degrees_to_steps
+from .validation import MAX_ID_LENGTH
 
 __all__ = [
     "Segment",
@@ -51,7 +52,9 @@ __all__ = [
 #: Catalogue numbers: an integer ratio, or a decimal whose exponent stays small.
 _INTEGER = re.compile(r"[+-]?\d+")
 _DECIMAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE]([+-]?\d+))?")
-_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+#: Control characters but tab and newline, and unpaired surrogates, which no
+#: terminal can print.
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\ud800-\udfff]")
 #: Longest path of a catalogue piece, and the farthest a path may start from the
 #: piece's origin along each axis, mm: sampling cost grows with a piece's track.
 MAX_PATH_LENGTH = 10_000.0
@@ -125,6 +128,8 @@ def parse_length(value: Any) -> Alg:
             length = Alg(*(_number(x) for x in value["alg"]))
         elif "chord" in value:
             spec = value["chord"]
+            if not isinstance(spec, dict):
+                raise ValueError(f"a chord takes an object with a radius and degrees, not {spec!r}")
             radius = parse_length(spec["radius"])
             degrees = _number(spec["degrees"])
             if degrees % 30:  # the half angle must lie on the 15-degree lattice
@@ -138,7 +143,7 @@ def parse_length(value: Any) -> Alg:
             raise ValueError("a length's alg coefficients may be at most "
                              f"{MAX_ALG_COEFFICIENT:,} in size")
         return length
-    raise TypeError(f"cannot read a length from {value!r}")
+    raise ValueError(f"cannot read a length from {value!r}")
 
 
 # --------------------------------------------------------------------------------------
@@ -526,8 +531,8 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
     if not isinstance(spec, dict):
         raise ValueError("a piece must be an object")
     piece_id = spec.get("id")
-    if not isinstance(piece_id, str) or not piece_id:
-        raise ValueError("a piece needs an id, a non-empty text")
+    if not isinstance(piece_id, str) or not piece_id or len(piece_id) > MAX_ID_LENGTH:
+        raise ValueError(f"a piece needs an id, a text of 1 to {MAX_ID_LENGTH} characters")
     if not isinstance(spec.get("paths", []), list):
         raise ValueError(f"piece {piece_id!r} paths must be a list")
     if len(spec.get("paths", [])) > MAX_PATHS:
@@ -545,7 +550,8 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
         texts.extend(value)
     # Catalogue text is printed: a control character would reach a terminal as a command.
     if any(_CONTROL.search(text) for text in texts):
-        raise ValueError(f"piece {piece_id!r} text may not contain control characters")
+        raise ValueError(f"piece {piece_id!r} text may hold no control characters but tabs "
+                         "and newlines, and no unpaired surrogates")
     for key in ("underpass", "provisional"):
         if not isinstance(spec.get(key, False), bool):
             raise ValueError(f"piece {piece_id!r} {key} must be true or false")

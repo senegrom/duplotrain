@@ -152,22 +152,6 @@ def test_rotated_transform_caches_match_direct_geometry():
             assert placement.centrelines(spacing) == expected_lines
 
 
-def test_collision_pop_restores_exact_previous_grid_and_width():
-    field = CollisionField()
-    first = [(0.0, 0.0, 0.0), (5.0, 5.0, 0.0), (10.0, 10.0, 0.0)]
-    second = [(1.0, 1.0, 0.0), (6.0, 6.0, 0.0), (11.0, 11.0, 0.0)]
-    field.add(0, first, 80.0)
-    grid_before = {key: list(bucket) for key, bucket in field._grid.items()}
-    field.add(1, second, 32.0)
-    assert field._max_half_width == 80.0
-    field.pop()
-    assert field._max_half_width == 80.0
-    assert field._grid == grid_before
-    field.pop()
-    assert field._max_half_width == 0.0
-    assert field._grid == {}
-
-
 def test_state_and_candidate_return_values_cannot_poison_later_responses(monkeypatch):
     session = Session()
     session.attach("curve", 0, None)

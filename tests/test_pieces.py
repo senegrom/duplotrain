@@ -234,6 +234,10 @@ def test_unknown_segment_type_rejected():
     ({"name": "Arc \x1b]0;title\x07"}, "control characters"),
     ({"id": "odd\x9b2J"}, "control characters"),
     ({"part_numbers": ["6377\r"]}, "control characters"),
+    # No terminal can print a lone surrogate, which JSON's \ud800 escape makes.
+    ({"notes": "a\ud800b"}, "unpaired surrogates"),
+    # A layout names its pieces by id in at most 40 characters: so does a catalogue.
+    ({"id": "p" * 41}, "1 to 40 characters"),
     ({"paths": [{"segments": [{"type": "straight", "run": 8}]}] * 17}, "at most 16 paths"),
     ({"paths": [{"segments": [{"type": "straight", "run": 8}] * 65}]}, "at most 64 segments"),
     ({"paths": [{"start": {"x": 10_001}, "segments": [{"type": "straight", "run": 64}]}]},
@@ -272,6 +276,21 @@ def test_a_piece_needs_a_text_id(piece_id):
         spec["id"] = piece_id
     with pytest.raises(ValueError, match="needs an id"):
         parse_piece(spec)
+
+
+def test_catalogue_notes_may_run_over_several_lines():
+    piece = parse_piece({"id": "note", "notes": "measured twice:\n\tthen cut",
+                         "paths": [{"segments": [{"type": "straight", "run": 64}]}]})
+    assert piece.notes == "measured twice:\n\tthen cut"
+
+
+def test_a_catalogue_file_nests_at_most_64_levels(tmp_path):
+    from duplotrain.catalog import load_catalog
+
+    path = tmp_path / "deep.json"
+    path.write_text("[" * 65 + "]" * 65)
+    with pytest.raises(ValueError, match="nested more than 64 levels"):
+        load_catalog(path)
 
 
 def test_a_catalogue_file_takes_at_most_2_mb(tmp_path):

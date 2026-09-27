@@ -1374,7 +1374,7 @@ class _Place:
 
 @dataclass(frozen=True, slots=True)
 class _Transit:
-    placement: int  # ordinal of the _Place step that created the piece re-entered
+    placement: int  # layout index of the piece re-entered: base placements come first
     entry: int
     exit: int
 
@@ -1663,8 +1663,10 @@ class SolverConfig:
     collision_spacing: float = 8.0
     #: Also accept layouts that close into an open junction stub instead of the
     #: anchor -- a teardrop whose walk ends against its own switch's other branch.
-    #: The train then always exits through the stem toward the open tail, so running
-    #: such a layout endlessly needs a direction-change action stone on that tail
+    #: On a stem-tailed one the train keeps exiting through the stem toward the open
+    #: tail; a branch-tailed one takes it into its lobe for good (explore's
+    #: is_stem_tailed tells them apart). Running either endlessly needs a
+    #: direction-change action stone on that tail
     #: (and switches the train can trail through, which the modern ones are).
     reversing_loops: bool = False
     #: Arithmetic backend: "auto" uses the integer lattice engine whenever the whole
@@ -1883,7 +1885,11 @@ def solve_steps(
             )
         base_pids = [p.piece.id for p in base.placements]
 
-    counts: dict[str, int] = {pid: n for pid, n in inventory.items() if n > 0}
+    # A piece no traversal can place, such as a buffer with its one open face,
+    # never joins a walk: kept in the stock, it would widen every piece budget
+    # below (the search then drowned) and no layout could use every piece.
+    counts: dict[str, int] = {pid: n for pid, n in inventory.items()
+                              if n > 0 and _cached_moves(pieces[pid])}
     piece_ids = sorted(counts)
     piece_obj: dict[str, PieceType] = {pid: pieces[pid] for pid in piece_ids}
     if base is not None:
@@ -2084,7 +2090,7 @@ def solve_steps(
     pass_turns = sum(turn_of[pid] * n * _spare_passes(piece_obj[pid])
                      for pid, n in counts.items())
 
-    # Admissible per-piece bounds for the completion-mode IDA* contour: one piece
+    # Admissible per-piece bounds for the IDA* contour (loop mode's depth limit): one piece
     # advances at most max_span_any millimetres and swings at most max_turn_any
     # heading steps, so pieces-needed >= max(dist/span, need/turn).
     max_span_any = max(span_of.values(), default=1.0) or 1.0
@@ -2381,7 +2387,7 @@ def solve_steps(
             reach = _stock_span_budget(counts, stock_spans, slots)
             if home > reach + stub_reach + (cfg.slop - slack_used) + 1e-6:
                 return True
-        # IDA* contour (completion mode): at least this many more pieces are needed.
+        # IDA* contour (loop mode's depth limit): at least this many more pieces are needed.
         # Transits through open stubs advance the walk without costing a piece, so
         # the admissible estimate must discount what the stubs could contribute
         # (mirroring the plain reach/turn prunes above).

@@ -98,7 +98,8 @@ A piece has at most 16 paths of at most 64 segments, each path at most 10,000 mm
 long and starting within 10,000 mm of the piece's origin along each axis; every
 segment has a positive run or radius, an arc turns less than a full circle, no
 two connectors of a piece share a point, and a piece is 8 to 1,000 mm wide, with
-an end overhang of at most 1,000 mm. Its texts hold no control characters.
+an end overhang of at most 1,000 mm. Its id takes at most 40 characters, and its
+texts hold no control characters but tabs and newlines.
 
 ## Install & use
 

@@ -65,16 +65,12 @@ def test_buffer_seals_its_far_end(catalog):
 
 
 def test_buffers_never_join_a_loop(catalog):
-    result = solve(
-        {"curve": 12, "buffer": 2},
-        catalog,
-        SolverConfig(use_all_pieces=True),
-    )
-    assert result.solutions == []  # a loop cannot pass through a dead face
-    assert result.stats.complete
-    result = solve({"curve": 12, "buffer": 2}, catalog)
-    assert result.solutions  # without use-all the circle simply leaves them in the box
-    assert all("buffer" not in s.layout.piece_counts for s in result.solutions)
+    # A loop cannot pass through a dead face: the circle leaves the buffers in the
+    # box, and use-all asks for every piece a loop can take.
+    for config in (SolverConfig(), SolverConfig(use_all_pieces=True)):
+        result = solve({"curve": 12, "buffer": 2}, catalog, config)
+        assert result.solutions and result.stats.complete
+        assert all("buffer" not in s.layout.piece_counts for s in result.solutions)
 
 
 # -- action stones ---------------------------------------------------------------
@@ -124,12 +120,9 @@ def test_teardrop_found_with_reversing(catalog):
 
 
 def test_reversing_never_replaces_plain_loops(catalog):
-    """When an ordinary loop exists it is still found and ranked first."""
-    result = solve(
-        {"curve": 12},
-        catalog,
-        SolverConfig(reversing_loops=True, max_results=10),
-    )
-    assert result.solutions
-    assert result.solutions[0].kind == "loop"
-    assert result.solutions[0].exact
+    """Ordinary loops are still found, and ranked before the reversing ones."""
+    result = solve({"curve": 12, "switch": 1}, catalog,
+                   SolverConfig(reversing_loops=True, max_results=100))
+    kinds = [s.kind for s in result.solutions]
+    assert result.stats.complete and {"loop", "reversing"} <= set(kinds)
+    assert kinds == sorted(kinds, key=lambda kind: kind != "loop")

@@ -23,8 +23,8 @@ def full_product(x, y):
 
 
 def test_scalar_arithmetic_entry_points_keep_exact_coercion():
-    # Alg-by-Alg products are compared in test_exact_fastpaths; here the scalar
-    # entry points, including reflected subtraction.
+    # Alg-by-Alg products are compared in test_sparse_and_dense_products_are_exact
+    # below; here the scalar entry points, including reflected subtraction.
     x = Alg(1, 2, 3, 4)
     for scalar in (0, 1, -3, Fraction(7, 13), 152.4):
         y = Alg(scalar)

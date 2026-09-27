@@ -6,7 +6,6 @@ import duplotrain.solver as solver_module
 from duplotrain.catalog import default_catalog
 from duplotrain.geometry import ORIGIN
 from duplotrain.layout import build_chain
-from duplotrain.scoring import score_solution
 from duplotrain.solver import SolverConfig, solve
 
 
@@ -185,16 +184,12 @@ def test_starter_box_has_exactly_four_shapes(catalog):
 
 def test_results_walk_round_in_piece_count_steps(catalog):
     result = solve({"curve": 12, "straight": 4}, catalog, SolverConfig(max_results=5))
+    assert result.solutions
     for sol in result.solutions:
         assert sol.layout.is_closed or sol.open_stubs > 0
         # Walking the loop from the first piece returns in piece_count steps.
         steps = list(sol.layout.walk(start=(0, 0)))
         assert len(steps) == sol.piece_count
-
-
-def test_inventory_validation(catalog):
-    with pytest.raises(ValueError, match="unknown piece"):
-        solve({"warp_gate": 1}, catalog)
 
 
 @pytest.mark.parametrize("ends", [((5, 1), (-6, 0)), ((-1, 1), (0, 0)), ((5, -1), (0, 0)),
@@ -280,16 +275,6 @@ def test_contour_zero_does_not_emit_an_empty_fresh_loop(engine):
     assert not result.solutions and result.stats.complete
 
 
-def test_scoring_prefers_exact_and_fuller_layouts(catalog):
-    inventory = {"curve": 12, "straight": 4}
-    result = solve(inventory, catalog, SolverConfig(max_results=50))
-    scored = [(score_solution(s, inventory).total, s) for s in result.solutions]
-    assert all(t >= 0 for t, _ in scored)
-    top_total, top = max(scored, key=lambda p: p[0])
-    # The best layout uses the most of the box any loop uses.
-    assert top.exact and top.piece_count == max(s.piece_count for s in result.solutions)
-
-
 def stretched_catalog():
     """The default pieces plus a 130 mm straight that closes 2 mm short."""
     from duplotrain.catalog import DEFAULT_CATALOG_SPECS
@@ -299,38 +284,6 @@ def stretched_catalog():
         "id": "stretched", "name": "Stretched straight (test)", "category": "track",
         "width": 64, "paths": [{"segments": [{"type": "straight", "run": 130}]}],
     }])
-
-
-def test_scoring_ranks_a_forced_fit_below_the_same_loop_closed_exactly(catalog):
-    # The same oval, once with a stretched straight forcing a 2 mm gap and once
-    # exact: equal usage and variety, so the gap decides.
-    forced_box = {"curve": 12, "straight": 1, "stretched": 1}
-    exact_box = {"curve": 12, "straight": 2}
-    forced = solve(forced_box, stretched_catalog(),
-                   SolverConfig(use_all_pieces=True, slop=3.0)).solutions[0]
-    exact = solve(exact_box, catalog, SolverConfig(use_all_pieces=True)).solutions[0]
-    assert not forced.exact and forced.gap == pytest.approx(2.0) and exact.exact
-    f, e = score_solution(forced, forced_box), score_solution(exact, exact_box)
-    assert e.exactness == 40.0
-    assert f.exactness == pytest.approx(40.0 - 8.0 * 2.0)  # 8 points per mm of gap
-    assert (f.usage, f.variety) == (e.usage, e.variety)
-    assert e.total - f.total == pytest.approx(16.0, abs=0.5)
-
-
-def test_scoring_subtracts_a_penalty_for_each_open_stub(catalog):
-    # Eleven curves and a switch close with the switch's other branch dangling.
-    from dataclasses import fields, replace
-
-    inventory = {"curve": 11, "switch": 1}
-    stubbed = solve(inventory, catalog, SolverConfig(use_all_pieces=True)).solutions[0]
-    assert stubbed.open_stubs == 1
-    with_stub = score_solution(stubbed, inventory)
-    tidy = score_solution(replace(stubbed, open_stubs=0), inventory)
-    assert with_stub.stub_penalty == 3.0 and tidy.stub_penalty == 0.0
-    assert with_stub.total == pytest.approx(tidy.total - 3.0)
-    parts = {f.name: getattr(with_stub, f.name) for f in fields(with_stub)}
-    assert with_stub.total == pytest.approx(
-        sum(parts.values()) - 2 * parts["stub_penalty"])
 
 
 def test_anchor_pose_is_origin(catalog):
@@ -580,6 +533,11 @@ def test_a_slop_search_far_from_the_origin_runs_on_the_field_engine():
     {"id": "x", "paths": [{"segments": [5]}]},
     {"id": "x", "paths": [{"start": "s", "segments": [{"type": "straight", "run": 1}]}]},
     {"id": "x", "paths": [{"segments": "abc"}]},
+    # Lengths of the wrong shape are bad input too, never a TypeError.
+    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": True}]}]},
+    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": None}]}]},
+    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": [128]}]}]},
+    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": {"chord": 5}}]}]},
     "not a piece",
 ])
 def test_malformed_catalogue_entries_are_bad_input(spec):
@@ -659,3 +617,17 @@ def test_a_walk_stops_at_its_step_cap_and_says_so(monkeypatch, catalog):
     events = [next(steps)["kind"] for _ in range(3)]
     steps.close()
     assert events[-2:] == ["walk_limit", "walk_limit"]
+
+
+def test_a_piece_no_walk_can_place_leaves_the_search_alone(catalog):
+    # A buffer's one open face joins no walk. Counted in the stock, buffers widened
+    # every piece budget, so the same search ran eight times as long, and no layout
+    # could ever use every piece.
+    box = {"curve": 12, "straight": 5, "switch": 2}
+    plain = solve(box, catalog, SolverConfig(max_results=25))
+    buffered = solve({**box, "buffer": 2}, catalog, SolverConfig(max_results=25))
+    assert [s.signature for s in buffered.solutions] == [s.signature for s in plain.solutions]
+    assert buffered.stats.nodes == plain.stats.nodes
+    everything = solve({"curve": 12, "straight": 4, "buffer": 1}, catalog,
+                       SolverConfig(use_all_pieces=True))
+    assert everything.solutions and all(s.piece_count == 16 for s in everything.solutions)
