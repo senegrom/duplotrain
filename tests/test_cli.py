@@ -245,15 +245,6 @@ def test_check_rejects_garbage_layout(runner, tmp_path):
     assert "Traceback" not in result.output
 
 
-# Out-of-range counts and slop are covered in test_cli_failures.py.
-@pytest.mark.parametrize("args", [["--top", "-1", "-o", "out"]])
-def test_invalid_solve_options_fail_politely(runner, tmp_path, args):
-    with runner.isolated_filesystem(temp_dir=tmp_path):
-        result = runner.invoke(main, ["solve", "--curve", "12", *args])
-        assert result.exit_code != 0 and not Path("out").exists()
-    assert isinstance(result.exception, SystemExit)  # a polite exit, not a crash
-
-
 @pytest.mark.parametrize("contents", [
     "[" * 100_000 + "]" * 100_000,                              # absurd nesting
     json.dumps({"pieces": [{"id": "x", "paths": 5}]}),          # wrong shapes

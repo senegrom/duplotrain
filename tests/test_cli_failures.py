@@ -153,7 +153,7 @@ def test_check_reports_open_ends_behind_many_buffer_faces(runner, tmp_path):
 
 @pytest.mark.parametrize("option, value", [
     ("--min-pieces", "-1"), ("--max-results", "0"), ("--max-nodes", "0"), ("--slop", "-1"),
-    ("--slop", "inf"), ("--slop", "nan"), ("--curve", "10001"),
+    ("--slop", "inf"), ("--slop", "nan"), ("--curve", "10001"), ("--top", "-1"),
 ])
 def test_solve_rejects_out_of_range_options_like_the_other_commands(runner, option, value):
     result = runner.invoke(main, ["solve", "--curve", "12", option, value])

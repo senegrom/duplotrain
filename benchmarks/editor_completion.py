@@ -67,7 +67,7 @@ def main():
             for candidate in job.solutions:
                 assert candidate.layout.placements[:len(base)] == base.placements
                 assert all(candidate.layout.links[a] == b for a, b in base.links.items())
-                assert not candidate.layout.joint_issues()
+                assert candidate.layout.is_closed and not candidate.layout.joint_issues()
                 assert not _solution_overlaps(candidate.layout, 0, 120, 8)
         # The ordered exact layouts and signatures must agree across checkouts,
         # not merely the number of solutions. This is outside the timed region.

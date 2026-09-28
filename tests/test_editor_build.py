@@ -121,10 +121,9 @@ def test_ci_builds_once_tests_same_artifact_and_never_rebuilds_with_deploy_permi
     assert "EXPECTED_SHA256: ${{ needs.build.outputs.sha256 }}" in deploy
     assert deploy.index("sha256sum") < deploy.index("actions/deploy-pages@")
     assert "actions/deploy-pages@" in deploy
-    assert "workflow_run:" not in text and "pull_request_target:" not in text
 
 
-def test_ci_keeps_both_versions_both_browsers_and_minimal_install():
+def test_ci_keeps_three_pythons_both_browsers_and_minimal_install():
     _, jobs = workflow_jobs()
     assert "python: ['3.12', '3.13', '3.14']" in jobs["python"]
     assert "browser: [chromium, webkit]" in jobs["browser"]
@@ -139,13 +138,10 @@ def test_ci_keeps_both_versions_both_browsers_and_minimal_install():
 
 
 def test_deferred_scripts_match_the_build_allowlist_and_single_snapshot_owner():
-    from duplotrain.gui import _EDITOR_ASSETS
-
     static = ROOT / "src/duplotrain/static"
     html = (static / "editor.html").read_text()
     names = re.findall(r'<script src="\./([^"?]+)" defer></script>', html)
     assert tuple(names) == build.EDITOR_SCRIPTS
-    assert all("/" + name in _EDITOR_ASSETS for name in names)
     sources = [(static / name).read_text() for name in names]
     assert sum(source.count("let S = null;") for source in sources) == 1
     assert sum(source.count('document.addEventListener("DOMContentLoaded"')

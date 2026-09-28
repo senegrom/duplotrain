@@ -99,7 +99,7 @@ def test_teardrop_needs_reversing_mode(catalog):
 
 
 def test_teardrop_found_with_reversing(catalog):
-    """switch + 12 curves closes branch-onto-branch: the endless one-stone layout."""
+    """switch + 12 curves close into their own switch: three teardrop shapes."""
     result = solve(
         {"switch": 1, "curve": 12},
         catalog,
@@ -111,7 +111,7 @@ def test_teardrop_found_with_reversing(catalog):
         assert sol.kind == "reversing"
         assert sol.exact
         assert sol.piece_count == 13
-        # The tail connector (the switch's stem side) stays open for the stone.
+        # One connector stays open: the end of the tail.
         assert sol.open_stubs == 1
         # Every recorded link truly mates.
         for a, b in sol.layout.links.items():
