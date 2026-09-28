@@ -35,7 +35,9 @@ def test_update_verification_and_activation_exclude_edits(browser, phase):
             {ready: true, activated: true};
           void applyOfflineUpdate();
         }""", phase)
-        page.wait_for_function("apiBusy && window.rejectUpdate")
+        # Return a boolean: Playwright invokes a function-valued predicate, which
+        # would otherwise call the rejection callback and end our held update.
+        page.wait_for_function("apiBusy && typeof window.rejectUpdate === 'function'")
         assert page.locator("body").evaluate("el => el.classList.contains('busy')")
         assert page.locator("#place-first").evaluate(
             "el => getComputedStyle(el).pointerEvents") == "none"
