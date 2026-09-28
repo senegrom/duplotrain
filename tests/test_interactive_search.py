@@ -755,10 +755,10 @@ def test_interactive_forced_fit_preserves_exactness_and_joint_budget(catalog, sl
 
 
 @pytest.mark.parametrize("chain, inventory, rise", [
-    (["straight", "ramp", "straight", "straight"],
-     {"straight": 3, "ramp": 1, "curve": 12}, 58),
-    # Both ramps and spans climb in series: a sky-high end.
-    (["ramp", "span", "span", "ramp"],
+    (["straight", "ramp", "span"],
+     {"straight": 3, "ramp": 1, "span": 1, "curve": 12}, 77),
+    # A further ramp after an arch climbs higher still: a sky-high end.
+    (["ramp", "span", "ramp", "span"],
      {"ramp": 2, "span": 2, "curve": 12, "straight": 8}, 154),
 ])
 def test_ends_at_different_heights_explain_the_proof_instead_of_searching(catalog, chain,

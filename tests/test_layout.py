@@ -154,6 +154,34 @@ def test_bridge_dimensions_are_exact(catalog):
     assert crest.z == Alg(Fraction(384, 5))  # exactly 76.8 mm at the mid-bridge joint
 
 
+def test_bridge_parts_join_only_as_the_parts_can(catalog):
+    ramp, span, straight = catalog["ramp"], catalog["span"], catalog["straight"]
+    # A ramp's top carries only an arch's foot, and an arch's foot rests only on a
+    # ramp's top: never on floor track, a crest or another ramp's foot.
+    for chain in ([(straight, 0, 1), (ramp, 1, 0)], [(straight, 0, 1), (span, 0, 1)],
+                  [(ramp, 0, 1), (ramp, 0, 1)], [(ramp, 0, 1), (span, 0, 1), (span, 0, 1)]):
+        with pytest.raises(ValueError, match="arch's foot"):
+            build_chain(chain)
+    # A further ramp after an arch climbs higher still; a crest also takes track
+    # raised on bricks.
+    higher = build_chain([(ramp, 0, 1), (span, 0, 1), (ramp, 0, 1), (span, 0, 1)])
+    assert higher.pose_of((3, 1)).z == Alg(Fraction(768, 5))  # 153.6 mm
+    assert not build_chain([(ramp, 0, 1), (span, 0, 1), (straight, 0, 1)]).joint_issues()
+
+
+def test_a_ramps_top_and_track_that_meet_are_no_joint(catalog):
+    ramp, straight = catalog["ramp"], catalog["straight"]
+    layout, _ = Layout().with_piece(ramp, ORIGIN)
+    layout, flat = layout.with_piece(straight, straight.frame_for(0, layout.pose_of((0, 1))))
+    assert layout.pose_of((0, 1)).connects_to(layout.pose_of((flat, 0)))
+    assert ((0, 1), (flat, 0)) not in layout.matable_pairs()
+    with pytest.raises(ValueError, match="arch's foot"):
+        layout.join((0, 1), (flat, 0), force=True)  # no play in the connectors helps
+    imported = Layout(layout.placements, {(0, 1): (flat, 0), (flat, 0): (0, 1)})
+    assert [issue["problems"] for issue in imported.joint_issues()] == [
+        ["mismatched bridge joint"]]
+
+
 def test_attach_rejects_occupied_end(catalog):
     curve = catalog["curve"]
     layout = build_chain([(curve, *LEFT), (curve, *LEFT)])

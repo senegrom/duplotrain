@@ -626,3 +626,39 @@ def test_a_piece_no_walk_can_place_leaves_the_search_alone(catalog):
     buffered = solve({**box, "buffer": 2}, catalog, SolverConfig(max_results=25))
     assert [s.signature for s in buffered.solutions] == [s.signature for s in plain.solutions]
     assert buffered.stats.nodes == plain.stats.nodes
+
+
+def test_loops_use_bridge_parts_only_as_they_join(catalog):
+    # The steam train and bridge sets: a ramp's top carries an arch's foot, and
+    # arches meet at a crest, climb on with a further ramp or take raised track.
+    result = solve({"curve": 12, "straight": 12, "ramp": 2, "span": 2}, catalog,
+                   SolverConfig(max_results=25))
+    assert result.solutions
+    for solution in result.solutions:
+        layout = solution.layout
+        for a, b in layout.links.items():
+            kinds = {layout.placements[end[0]].piece.ports[end[1]].kind for end in (a, b)}
+            assert kinds in ({"track"}, {"ramp_top", "arch_foot"})
+
+    def on_the_floor(layout):
+        return len({min(placement.port_pose(port).z for port in range(len(placement.piece.ports)))
+                    for placement in layout if placement.piece.category != "bridge"}) == 1
+
+    # Some carry the whole bridge over track that all lies on the floor.
+    assert any(on_the_floor(solution.layout) for solution in result.solutions)
+
+
+def test_a_completion_never_runs_under_the_floor(catalog):
+    # A 1024 mm gap in floor track: a bridge climbs over it and straights fill it,
+    # but a bridge hung under the floor, its arches down from the floor track,
+    # is no layout.
+    base = build_chain([(catalog["straight"], 0, 1)])
+    base, far = base.with_piece(catalog["straight"], ORIGIN.then(1152, 0, 0, 0))
+    result = solve({"straight": 8, "ramp": 2, "span": 2}, catalog,
+                   SolverConfig(min_pieces=1, max_results=50), base=base,
+                   grow_from=(0, 1), close_onto=(far, 0))
+    lowest = [min(float(placement.port_pose(port).z) for placement in solution.layout
+                  for port in range(len(placement.piece.ports)))
+              for solution in result.solutions]
+    assert result.stats.complete and lowest and min(lowest) == 0.0
+    assert any("span" in solution.layout.piece_counts for solution in result.solutions)

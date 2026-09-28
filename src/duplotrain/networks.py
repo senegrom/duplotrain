@@ -36,7 +36,7 @@ from .collision import DEFAULT_CLEARANCE, CollisionField
 from .explore import congruence_key
 from .geometry import ORIGIN
 from .layout import End, Layout, Placement
-from .pieces import PieceType
+from .pieces import PieceType, kinds_mate
 from .solver import (
     _MAX_SEARCH_DEPTH,
     _TABLE_WORK_CAP,
@@ -140,6 +140,8 @@ def enumerate_networks(
     moves_by_piece: dict[str, list[Move]] = {pid: _moves_for(pieces[pid]) for pid in piece_ids}
     orientations = {pid: _attach_orientations(pieces[pid]) for pid in piece_ids}
     overhang_of = {pid: pieces[pid].end_overhang for pid in piece_ids}
+    # Connector kinds (pieces.PORT_KINDS): a ramp's top joins only an arch's foot.
+    kinds_of = {pid: tuple(port.kind for port in pieces[pid].ports) for pid in piece_ids}
     total = sum(counts.values())
     # The recursive search places at most the solver's depth of pieces; a larger
     # bound would overflow the stack instead of reporting the piece limit.
@@ -280,6 +282,7 @@ def enumerate_networks(
         target = min(open_ends)  # the canonical end everything must go through
         target_pose = open_ends[target]
         target_pid = placements[target[0]][0]
+        target_kind = kinds_of[target_pid][target[1]]
 
         # -- move 1: join the target end to another open end that mates exactly ----
         for other, pose in sorted(open_ends.items()):
@@ -288,6 +291,8 @@ def enumerate_networks(
             if not eng.connects(target_pose, pose):
                 continue
             if overhang_of[target_pid] > 0 and overhang_of[placements[other[0]][0]] > 0:
+                continue
+            if not kinds_mate(target_kind, kinds_of[placements[other[0]][0]][other[1]]):
                 continue
             del open_ends[target]
             del open_ends[other]
@@ -310,6 +315,8 @@ def enumerate_networks(
                 if overhang_of[target_pid] > 0 and overhang_of[pid] > 0:
                     continue
                 for entry in orientations[pid]:
+                    if not kinds_mate(target_kind, kinds_of[pid][entry]):
+                        continue
                     frame = eng.frame(pid, entry, target_pose)
                     base_pts, offset, bounds = samples_for(pid, frame)
                     port_poses = {

@@ -75,6 +75,17 @@ MIN_PIECE_WIDTH = 8.0
 #: a piece's paths, sampling with its segments; real pieces use two and one.
 MAX_PATHS = 16
 MAX_SEGMENTS = 64
+#: Connector kinds. Every end of ordinary track is a "track" connector, a jigsaw
+#: tab and socket that mates any other. The bridge joins its ramp and its arch by
+#: an overlap instead: a ramp's top carries only an arch's foot, and an arch's
+#: foot rests only on a ramp's top.
+PORT_KINDS = ("track", "ramp_top", "arch_foot")
+_MATING = frozenset({("track", "track"), ("ramp_top", "arch_foot"), ("arch_foot", "ramp_top")})
+
+
+def kinds_mate(a: str, b: str) -> bool:
+    """Can a connector of kind *a* mate one of kind *b*?"""
+    return (a, b) in _MATING
 
 
 def _number(value: Any) -> Fraction:
@@ -319,11 +330,13 @@ class Port:
     """A connector on the edge of a piece.
 
     ``pose`` sits at the connector face and its heading points *outward*, away from the
-    piece.  Two pieces mate when one port's pose faces exactly opposite the other's.
+    piece.  Two pieces mate when one port's pose faces exactly opposite the other's
+    and their kinds mate (see :data:`PORT_KINDS`).
     """
 
     name: str
     pose: Pose
+    kind: str = "track"
 
 
 @dataclass(frozen=True, slots=True)
@@ -488,7 +501,7 @@ def _parse_path(spec: dict[str, Any]) -> Path:
 
 
 def _derive_ports_and_routes(
-    paths: Sequence[Path], names: Sequence[str] | None
+    paths: Sequence[Path], names: Sequence[str] | None, kinds: Sequence[str] = ()
 ) -> tuple[tuple[Port, ...], tuple[Route, ...]]:
     """Collect path endpoints into a deduplicated port list plus the routes joining them.
 
@@ -523,6 +536,12 @@ def _derive_ports_and_routes(
                 f"piece declares {len(names)} port names but has {len(ports)} ports"
             )
         ports = [Port(name=n, pose=p.pose) for n, p in zip(names, ports, strict=True)]
+    if kinds:
+        if len(kinds) != len(ports):
+            raise ValueError(
+                f"piece declares {len(kinds)} port kinds but has {len(ports)} ports"
+            )
+        ports = [Port(p.name, p.pose, kind) for p, kind in zip(ports, kinds, strict=True)]
     return tuple(ports), tuple(routes)
 
 
@@ -560,6 +579,10 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
     sealed = spec.get("sealed_ports", ())
     if not isinstance(sealed, (list, tuple)) or any(type(i) is not int for i in sealed):
         raise ValueError(f"piece {piece_id!r} sealed_ports must be a list of port numbers")
+    kinds = spec.get("port_kinds", ())
+    if not isinstance(kinds, (list, tuple)) or any(kind not in PORT_KINDS for kind in kinds):
+        raise ValueError(f"piece {piece_id!r} port_kinds must be a list of "
+                         f"{', '.join(PORT_KINDS)}")
     try:
         paths = tuple(_parse_path(p) for p in spec["paths"])
     except KeyError as exc:
@@ -567,7 +590,7 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
     if not paths:
         raise ValueError(f"piece {piece_id!r} has no paths")
 
-    ports, routes = _derive_ports_and_routes(paths, spec.get("port_names"))
+    ports, routes = _derive_ports_and_routes(paths, spec.get("port_names"), kinds)
     # Two connectors at one point mate each other: a piece joined to itself (a
     # full-turn path, say) would pass as a loop of one.
     spots = {(port.pose.x, port.pose.y, port.pose.z) for port in ports}

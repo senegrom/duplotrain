@@ -431,7 +431,10 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         candidate.get_by_role("button", name="Preview", exact=True).tap()
         candidate.get_by_role("button", name="Apply").tap()
         expect(page.locator("#status")).to_contain_text("Connectors closed")
-        assert len(export_layout()["placements"]) == 14
+        # The ramp's top carries an arch: over the crest, down the second ramp and
+        # round the six curves back.
+        assert sorted(p["piece"] for p in export_layout()["placements"]) == (
+            ["curve"] * 12 + ["ramp"] * 2 + ["span"] * 2)
 
         # A longer tail exercises heading-conditioned bounds beyond the exact
         # tables' horizon and probe. Preview and apply must preserve the hand-built base in WASM.

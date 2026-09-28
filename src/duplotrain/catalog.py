@@ -211,11 +211,14 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
             {"segments": [{"type": "ramp", "run": 320, "rise": "288/5"}]},
         ],
         "port_names": ["low", "high"],
+        # Its top carries only an arch's foot; its foot is an ordinary connector.
+        "port_kinds": ["track", "ramp_top"],
         "notes": (
             "Inclined approach from sets 2738/10508/10872. Run 320 mm (confirmed: the "
             "full 4-piece bridge spans exactly 8 straights = 1024 mm, duplo-schienen "
             "Regel 5/6); rises 57.6 mm = 3 DUPLO bricks (a 76.8 mm rise is impossible "
-            "inside the part's ~88 mm overall height). Mean grade 18%."
+            "inside the part's ~88 mm overall height). Mean grade 18%. Its top takes "
+            "only an arch's foot."
         ),
     },
     {
@@ -230,15 +233,18 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
             {"segments": [{"type": "ramp", "run": 192, "rise": "96/5"}]},
         ],
         "port_names": ["low", "high"],
+        # Its foot rests only on a ramp's top; its crest is an ordinary connector.
+        "port_kinds": ["arch_foot", "track"],
         "notes": (
             "Half-arch middle section; the deck is NOT level -- it keeps rising 19.2 mm "
             "(1 brick) over its 192 mm run and crests at 76.8 mm (4 bricks) where the "
-            "two arches meet mid-bridge. Modelled piecewise-linear. Physically its low "
-            "end is a special overlap joint onto the ramp needing 2-brick supports (no "
-            "normal pin/socket); modelled as a normal port since the solver has no "
-            "port-type machinery. UNDERPASS (user-verified 2026-08-04): a train passes "
-            "beneath the arch near the crest -- provisional pending real measurements "
-            "of deck height, ramp rise and under-arch clearance."
+            "two arches meet mid-bridge. Modelled piecewise-linear. Its low end is a "
+            "special overlap joint onto a ramp's top, needing 2-brick supports (no "
+            "normal pin/socket), so it joins nothing else; the crest takes another "
+            "arch, or a further ramp to climb higher. UNDERPASS (user-verified "
+            "2026-08-04): a train passes beneath the arch near the crest -- provisional "
+            "pending real measurements of deck height, ramp rise and under-arch "
+            "clearance."
         ),
     },
 ]

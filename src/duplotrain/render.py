@@ -1,8 +1,9 @@
 """Draw layouts, top-down, with matplotlib.
 
 The drawing is deliberately toy-like: a grey ballast band per piece, two rails, sleeper
-ticks, and dots at the joints.  Raised and climbing track is tinted by its height,
-and bridge pieces have their elevation printed on them.  Output format follows the
+ticks, and dots at the joints.  Raised and climbing track is tinted by its height above
+the layout's lowest track, and bridge pieces and track raised on bricks have their
+elevation printed on them.  Output format follows the
 file extension (``.png``, ``.svg``, ``.pdf``); pass no path to get the figure back
 for further fiddling.
 
@@ -128,10 +129,17 @@ def render_layout(
     else:
         fig = ax.figure
 
+    # Heights count from the layout's lowest track, which stands on the floor: a
+    # fresh loop's coordinates start wherever its walk began, perhaps up a bridge.
+    sampled = [(placement, placement.centrelines(spacing=6.0)) for placement in layout]
+    ground = min((z for _placement, lines in sampled for line in lines for _x, _y, z in line),
+                 default=0.0)
+    sampled = [(placement, [[(x, y, z - ground) for x, y, z in line] for line in lines])
+               for placement, lines in sampled]
+
     # Ballast bands first, then rails and sleepers on top, so overlaps look right.
     features: list[tuple[float, list[list[tuple[float, float, float]]], float]] = []
-    for placement in layout:
-        lines3d = placement.centrelines(spacing=6.0)
+    for placement, lines3d in sampled:
         mean_z = sum(z for line in lines3d for _x, _y, z in line) / max(
             1, sum(len(line) for line in lines3d)
         )
@@ -270,13 +278,12 @@ def render_layout(
                     zorder=6,
                 )
 
-    # Elevation labels on raised bridge pieces.
-    for placement in layout:
-        if placement.piece.category != "bridge":
-            continue
-        line = placement.centrelines()[0]
+    # Elevation labels on raised bridge pieces, and on track raised on bricks.
+    for placement, lines3d in sampled:
+        line = lines3d[0]
         mx, my, mz = line[len(line) // 2]
-        if mz > 1.0:
+        raised = min(z for _x, _y, z in line) > 1.0
+        if mz > 1.0 and (placement.piece.category == "bridge" or raised):
             ax.text(
                 mx,
                 my,

@@ -240,12 +240,15 @@ def test_solver_bins_collision_samples_only_for_placements_within_reach(monkeypa
     monkeypatch.setattr(CollisionField, "add_deferred", measured_defer)
     monkeypatch.setattr(CollisionField, "_bin_deferred", measured_bin)
     catalog = default_catalog()
-    # A bridge gap: the deck and ramps bring some candidates within reach of
-    # track that is not their own neighbour, most candidates stay clear of it.
+    # A bridge gap whose arch must pass over a loose straight: the arches bring
+    # some candidates within reach of track that is not their own neighbour, most
+    # candidates stay clear of it.
     base = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
-    result = solve({"curve": 6, "straight": 4, "ramp": 1, "span": 2}, catalog,
-                   SolverConfig(min_pieces=0, max_pieces=20, max_results=8), base=base)
-    assert len(result.solutions) == 8
+    base, _ = base.with_piece(catalog["straight"], Pose.make(x=-512, y=448, heading=6))
+    result = solve({"curve": 8, "straight": 8, "ramp": 1, "span": 2}, catalog,
+                   SolverConfig(min_pieces=0, max_pieces=20, max_results=8), base=base,
+                   grow_from=(6, 1), close_onto=(0, 0))
+    assert len(result.solutions) == 1
     # The search field is the only one that defers placements (audits add eagerly).
     (log,) = [log for log in events.values() if ("defer",) in log]
     kinds = [event[0] for event in log]
@@ -311,7 +314,8 @@ def test_cached_sample_clouds_are_bit_identical_and_immutable():
 
     catalog = default_catalog()
     layout = build_chain([(catalog["curve"], 0, 1), (catalog["straight"], 0, 1),
-                          (catalog["ramp"], 0, 1), (catalog["switch"], 0, 2)])
+                          (catalog["ramp"], 0, 1), (catalog["span"], 0, 1),
+                          (catalog["switch"], 0, 2)])
     for placement in layout:
         for spacing in (8.0, 10.0):
             flat = [p for line in placement.centrelines(spacing) for p in line]

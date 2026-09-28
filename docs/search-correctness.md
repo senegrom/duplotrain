@@ -14,6 +14,27 @@ compare loop and network enumeration on wide circles, including a catalogue that
 requires the general field engine. Collision checks remain sampled and inherit
 the catalogue's geometry and underpass assumptions.
 
+## Bridge joints and the floor
+
+A ramp's top carries only an arch's foot, and an arch's foot rests only on a ramp's
+top (`pieces.PORT_KINDS`). The loop and completion searches check that rule wherever
+the walk makes a joint: a placement's entry against the connector the walk stands
+on, a transit or a reversing closure into an open stub, and the closing joint onto
+the anchor, which in a fresh loop is the first piece's entry. A search with no such
+connector checks nothing. The reverse tables, the future-junction queries and the
+collision exemptions ignore connector kinds, which only enlarges what they allow.
+Network enumeration checks the rule at its joins and attachments; `Layout.attach`
+and `Layout.join` refuse such a joint, forced or not, so the editor's arc templates
+skip it; and `joint_issues` names one recorded in an imported layout.
+
+A completion also keeps its added track at or above the base's lowest connector,
+the floor: a candidate whose exit would go under it is never placed, and the arc
+templates drop such a closure. A fresh loop has no floor, only heights relative to
+one another, so the renderer measures them from its lowest track. Regressions check
+that the loops of the steam train and bridge sets join bridge parts only as the
+parts can, that a completion across a gap in floor track never runs under the
+floor, and that two buffers close a ramp and an arch one way only.
+
 ## Centreline identity is independent of piece boundaries
 
 `congruence_key()` normalizes the union before sampling: touching and overlapping
@@ -109,10 +130,10 @@ k up to the lookahead horizon
 engines use exact values. Separating the projections
 avoids multiplying states for bridge routes: each may admit a different route,
 which enlarges the allowed set. The move pool includes routes through preplaced
-pieces, even when none remain in inventory. Stock counts, placement frames and
-collisions are also ignored. Absence from either complete projection proves a
-tail impossible; membership still requires actual coupled 3D geometry, inventory,
-exact joints and the final actual-link overlap check.
+pieces, even when none remain in inventory. Stock counts, connector kinds,
+placement frames and collisions are also ignored. Absence from either complete
+projection proves a tail impossible; membership still requires actual coupled 3D
+geometry, inventory, exact joints and the final actual-link overlap check.
 
 A transit consumes two compatible free ports on one placement and no new piece.
 Each placement contributes at most half the number of free ports that have a

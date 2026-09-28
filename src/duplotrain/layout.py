@@ -25,13 +25,16 @@ from .catalog import ACCESSORIES, STONE_MOUNTS
 from .exact import Alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .pieces import Path as TrackPath
-from .pieces import PieceType, _sample_paths
+from .pieces import PieceType, _sample_paths, kinds_mate
 from .validation import check_layout_json, rational_coefficient
 
 __all__ = ["Placement", "End", "Layout", "layout_to_dict", "layout_from_dict"]
 
 #: A specific connector on a specific placed piece.
 End = tuple[int, int]
+
+#: Why two connectors whose kinds do not mate cannot join (see pieces.PORT_KINDS).
+_BRIDGE_JOINT = "a ramp's top takes only an arch's foot, and an arch's foot only a ramp's top"
 
 
 def _alg_to_json(value: Alg) -> list[str]:
@@ -250,6 +253,11 @@ class Layout:
         """True when *end* is a dead face (a buffer's bumper) that can never mate."""
         return end[1] in self.placements[end[0]].piece.sealed
 
+    def _kinds_mate(self, a: End, b: End) -> bool:
+        """Do the connector kinds at *a* and *b* mate (see pieces.PORT_KINDS)?"""
+        return kinds_mate(self.placements[a[0]].piece.ports[a[1]].kind,
+                          self.placements[b[0]].piece.ports[b[1]].kind)
+
     def connectable_ends(self) -> list[End]:
         """Open ends something could actually plug into."""
         links = self.links
@@ -284,7 +292,7 @@ class Layout:
             if a < b and not (
                 self.placements[a[0]].piece.end_overhang > 0
                 and self.placements[b[0]].piece.end_overhang > 0
-            )
+            ) and self._kinds_mate(a, b)
         ]
 
     def pose_of(self, end: End) -> Pose:
@@ -334,6 +342,8 @@ class Layout:
             if (self.placements[a[0]].piece.end_overhang > 0
                     and self.placements[b[0]].piece.end_overhang > 0):
                 problems.append("overlapping connector plates")
+            if not self._kinds_mate(a, b):
+                problems.append("mismatched bridge joint")
             if problems:
                 issues.append({
                     "a": list(a), "b": list(b),
@@ -399,8 +409,9 @@ class Layout:
         """Plug *piece* into the open end *at*, entering through *entry_port*.
 
         Raises:
-            ValueError: if *at* is already occupied, or both mating ends carry a body
-                overhang (two level-crossing plates cannot share a joint).
+            ValueError: if *at* is already occupied, both mating ends carry a body
+                overhang (two level-crossing plates cannot share a joint), or their
+                connector kinds do not mate (a ramp's top takes only an arch's foot).
         """
         if at in self.links:
             raise ValueError(f"end {at} is already connected to {self.links[at]}")
@@ -414,6 +425,8 @@ class Layout:
                 f"{host.id} and {piece.id} both overhang their connectors; their "
                 "plates would overlap, so they cannot join directly"
             )
+        if not kinds_mate(host.ports[at[1]].kind, piece.ports[entry_port].kind):
+            raise ValueError(f"{host.id} and {piece.id} cannot join there: {_BRIDGE_JOINT}")
         # pose_of() already points outward from the existing piece, which is exactly the
         # direction the layout continues in -- what frame_for() wants.
         frame = piece.frame_for(entry_port, self.pose_of(at))
@@ -457,8 +470,8 @@ class Layout:
         says the ends do not exactly coincide.
 
         Raises:
-            ValueError: if either end is occupied, or (unless forced) the two do not
-                physically meet.
+            ValueError: if either end is occupied, their connector kinds do not mate,
+                or (unless forced) the two do not physically meet.
         """
         if a == b:
             raise ValueError("a connector cannot join to itself")
@@ -474,6 +487,10 @@ class Layout:
                 f"{piece_a.id} and {piece_b.id} both overhang their connectors; "
                 "their plates would overlap, so they cannot join directly"
             )
+        # Not even forced: a play in the connectors cannot make an overlap joint.
+        if not self._kinds_mate(a, b):
+            raise ValueError(f"{piece_a.id} and {piece_b.id} cannot join there: "
+                             f"{_BRIDGE_JOINT}")
         pose_a, pose_b = self.pose_of(a), self.pose_of(b)
         if not force and not pose_a.connects_to(pose_b):
             raise ValueError(

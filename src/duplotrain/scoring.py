@@ -27,6 +27,11 @@ weight can be overridden.  The components:
 ``stub_penalty``
     Open switch branches dangling off the loop.  Mild by default: a stub is untidy but
     also a place to park the second train.
+
+``stack_penalty``
+    Ordinary track raised above the layout's lowest track, which needs a stack of
+    DUPLO bricks under each piece.  A bridge carries itself; raised track is allowed,
+    but the loop standing on the floor ranks first.
 """
 
 from __future__ import annotations
@@ -48,6 +53,7 @@ class ScoreWeights:
     squareness: float = 10.0
     variety: float = 10.0
     stub_penalty: float = 3.0  # per dangling branch
+    stack_penalty: float = 2.0  # per ordinary piece raised on bricks
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +64,7 @@ class ScoreBreakdown:
     squareness: float
     variety: float
     stub_penalty: float
+    stack_penalty: float = 0.0
 
     @property
     def total(self) -> float:
@@ -68,6 +75,7 @@ class ScoreBreakdown:
             + self.squareness
             + self.variety
             - self.stub_penalty
+            - self.stack_penalty
         )
 
 
@@ -104,6 +112,15 @@ def score_solution(
 
     stub_penalty = w.stub_penalty * solution.open_stubs
 
+    # A bridge part carries itself; flat or sloped ordinary track above the lowest
+    # track needs bricks under it.
+    lows = [(placement.piece.category, min(placement.port_pose(port).z
+                                           for port in range(len(placement.piece.ports))))
+            for placement in layout]
+    floor = min((low for _category, low in lows), default=0)
+    raised = sum(category != "bridge" and low != floor for category, low in lows)
+    stack_penalty = w.stack_penalty * raised
+
     return ScoreBreakdown(
         exactness=exactness,
         usage=usage,
@@ -111,4 +128,5 @@ def score_solution(
         squareness=squareness,
         variety=variety,
         stub_penalty=stub_penalty,
+        stack_penalty=stack_penalty,
     )

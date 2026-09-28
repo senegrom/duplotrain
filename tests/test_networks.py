@@ -109,12 +109,12 @@ def test_lattice_frames_convert_back_to_exact_layout_poses(catalog):
     from duplotrain.geometry import ORIGIN
     from duplotrain.solver import _compile_lattice, _flat, _moves_for, _pose_to_lattice
 
-    pieces = {pid: catalog[pid] for pid in ("straight", "curve", "switch", "ramp")}
+    pieces = {pid: catalog[pid] for pid in ("straight", "curve", "switch", "ramp", "span")}
     moves = {pid: _moves_for(p) for pid, p in pieces.items()}
     eng = _compile_lattice(ORIGIN, ORIGIN, pieces, moves)
     layout = build_chain([(catalog["curve"], 0, 1), (catalog["straight"], 0, 1),
-                          (catalog["switch"], 0, 2), (catalog["ramp"], 1, 0),
-                          (catalog["curve"], 1, 0)])
+                          (catalog["switch"], 0, 2), (catalog["ramp"], 0, 1),
+                          (catalog["span"], 0, 1), (catalog["curve"], 1, 0)])
     for placement in layout:
         frame = _flat(_pose_to_lattice(placement.frame))
         assert eng.to_pose(frame) == placement.frame
@@ -384,3 +384,12 @@ def test_a_deep_network_search_reports_the_piece_limit_instead_of_overflowing(ca
                                 NetworkConfig(max_pieces=1600, max_results=5000, lookahead=0))
     assert result.stats.stop_reason == "piece_limit" and not result.stats.complete
     assert result.stats.max_pieces_searched == 400
+
+
+def test_networks_join_bridge_parts_only_as_they_can(catalog):
+    # Two buffers close a ramp and an arch only one way: a buffer at the ramp's
+    # foot, the arch's foot on the ramp's top, a buffer on bricks at the crest.
+    result = enumerate_networks({"ramp": 1, "span": 1, "buffer": 2}, catalog,
+                                NetworkConfig(use_all_pieces=True, max_results=50))
+    assert result.stats.complete and len(result.layouts) == 1
+    assert not result.layouts[0].joint_issues()

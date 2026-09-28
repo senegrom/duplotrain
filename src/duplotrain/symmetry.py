@@ -20,7 +20,7 @@ def pose_key(pose: Pose, mirror: bool = False) -> tuple:
 
 
 def placement_key(piece: PieceType, frame: Pose, mirror: bool = False) -> tuple:
-    """Identify full geometry and route incidence, not just endpoint positions.
+    """Identify full geometry, route incidence and connector kinds, not just endpoints.
 
     Primitive sequences are intentionally not simplified across segment splits:
     failing to merge a redundant move is safe; merging distinct shapes is not.
@@ -62,6 +62,7 @@ def placement_key(piece: PieceType, frame: Pose, mirror: bool = False) -> tuple:
     ))
     return (
         "paths",
-        tuple(sorted((port, i in piece.sealed) for i, port in enumerate(ports))),
+        tuple(sorted((port, i in piece.sealed, piece.ports[i].kind)
+                     for i, port in enumerate(ports))),
         tuple(sorted(paths)), routes,
     )

@@ -277,6 +277,9 @@ def test_a_chord_without_its_radius_is_bad_input():
     ({"port_names": ["a", 1]}, "list of texts"),
     ({"paths": [{"segments": [{"type": "straight", "run": {"alg": "1234"}}]}]},
      "four numbers"),
+    ({"port_kinds": ["track"]}, "1 port kinds but has 2 ports"),
+    ({"port_kinds": ["track", "bridge"]}, "port_kinds must be a list of track"),
+    ({"port_kinds": "track"}, "port_kinds must be a list"),
 ])
 def test_catalogue_values_are_bounded_and_meaningful(change, message):
     spec = {"id": "odd", "paths": [{"segments": [{"type": "straight", "run": 64}]}], **change}
@@ -299,6 +302,16 @@ def test_a_piece_needs_a_text_id(piece_id):
         spec["id"] = piece_id
     with pytest.raises(ValueError, match="needs an id"):
         parse_piece(spec)
+
+
+def test_port_kinds_name_how_each_end_joins():
+    spec = {"id": "deck", "paths": [{"segments": [{"type": "straight", "run": 64}]}]}
+    piece = parse_piece({**spec, "port_kinds": ["arch_foot", "track"]})
+    assert [port.kind for port in piece.ports] == ["arch_foot", "track"]
+    assert [port.kind for port in parse_piece(spec).ports] == ["track", "track"]
+    catalog = default_catalog()
+    assert [port.kind for port in catalog["ramp"].ports] == ["track", "ramp_top"]
+    assert [port.kind for port in catalog["span"].ports] == ["arch_foot", "track"]
 
 
 def test_catalogue_notes_may_run_over_several_lines():

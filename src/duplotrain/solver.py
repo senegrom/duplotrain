@@ -47,7 +47,7 @@ from .exact import Alg
 from .geometry import HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .lattice import ROT_COS_SIN, SCALE, LatticePoint, LatticePose, from_alg_xy, z_from_alg
 from .layout import Layout, Placement
-from .pieces import PieceType
+from .pieces import PieceType, kinds_mate
 from .symmetry import placement_key, pose_key
 from .validation import check_inventory
 
@@ -384,6 +384,15 @@ class _FieldEngine:
     def height(pose: Pose) -> Alg:
         return pose.z
 
+    @staticmethod
+    def height_of(z: Alg) -> Alg:
+        """An exact elevation in this engine's height units."""
+        return z
+
+    @staticmethod
+    def below(pose: Pose, height: Alg) -> bool:
+        return (pose.z - height).sign() < 0
+
     def retarget(self, cursor: Pose, target: Pose) -> Pose:
         """Move target onto the anchor, applying the same rigid motion to cursor."""
         turn = self.anchor.heading - target.heading
@@ -569,6 +578,15 @@ class _LatticeEngine:
     @staticmethod
     def height(pose: tuple) -> int:
         return pose[4]
+
+    @staticmethod
+    def height_of(z: Alg) -> int | None:
+        """An exact elevation in this engine's height units, None off the lattice."""
+        return z_from_alg(z)
+
+    @staticmethod
+    def below(pose: tuple, height: int) -> bool:
+        return pose[4] < height
 
     def retarget(self, cursor: tuple, target: tuple) -> tuple:
         """Exact SE(2) change of target, with an independent height translation."""
@@ -1951,6 +1969,10 @@ def solve_steps(
     span_of = {pid: _max_span(p) for pid, p in piece_obj.items()}
     turn_of = {pid: _turn_capacity(p) for pid, p in piece_obj.items()}
     overhang_of = {pid: p.end_overhang for pid, p in piece_obj.items()}
+    # Connector kinds (pieces.PORT_KINDS): a ramp's top joins only an arch's foot.
+    # With no such connector anywhere, every walk carries None and checks nothing.
+    kinds_of = {pid: tuple(port.kind for port in p.ports) for pid, p in piece_obj.items()}
+    kinds_matter = any(kind != "track" for kinds in kinds_of.values() for kind in kinds)
     total_pieces = sum(counts.values())
 
     stats = SolveStats()
@@ -1972,6 +1994,12 @@ def solve_steps(
         start_cursor = base.pose_of(grow_from)
         start_prev = grow_from[0]
         anchor_index = close_onto[0]
+    # The kinds of the walk's first connector and of the anchor it closes onto; a
+    # fresh loop's anchor is its first piece's entry, which the steps name.
+    start_kind = target_kind = None
+    if kinds_matter and base is not None:
+        start_kind = kinds_of[base.placements[grow_from[0]].piece.id][grow_from[1]]
+        target_kind = kinds_of[base.placements[close_onto[0]].piece.id][close_onto[1]]
 
     # Pick the arithmetic backend: integer lattice when everything fits, else field.
     if cfg.engine not in ("auto", "lattice", "field"):
@@ -2006,6 +2034,13 @@ def solve_steps(
                 for port in range(len(placement.piece.ports))
             }
     stats.engine = eng.name
+    # Completion mode: the base's lowest connector stands on the floor, and added
+    # track may not go under it. A fresh loop has no floor: only the heights of
+    # its pieces relative to one another are fixed.
+    floor = None
+    if base is not None and any(move.dz for pid in piece_ids for move in moves_by_piece[pid]):
+        floor = eng.height_of(min((placement.port_pose(port).z for placement in base.placements
+                                   for port in range(len(placement.piece.ports))), key=float))
     placement_samples = _placement_samples(eng, pieces, cfg.collision_spacing)
     # A fresh loop closes onto the origin face exactly as a completion closes onto
     # its target, so the same reverse tables prune walks that cannot return with
@@ -2312,13 +2347,14 @@ def solve_steps(
             ready.append(candidate)
 
     def dfs(cursor, used: int, slack_used: float, prev_index: int | None,
-            handed: bool) -> Generator[dict, None, bool]:
+            handed: bool, kind: str | None) -> Generator[dict, None, bool]:
         """Depth-first over moves; returns False when global limits say stop.
 
         *prev_index* is the placement owning the connector the walk currently stands
         on -- the last piece placed, or the junction just transited -- which the next
         placement legitimately butts against. *handed* is False only while a
-        one-handed loop search has not yet placed a turning move.
+        one-handed loop search has not yet placed a turning move. *kind* is that
+        connector's kind, None where no kind needs checking.
         """
         nonlocal remaining_span, remaining_turn, walk_cut
         if limits is not None:
@@ -2340,9 +2376,14 @@ def solve_steps(
         # -- closure ------------------------------------------------------------
         def closing_link_legal() -> bool:
             # The final join links the piece the cursor stands on to the anchor piece;
-            # two overhanging plates cannot share that joint.
+            # two overhanging plates cannot share that joint, nor two connectors
+            # whose kinds do not mate.
             if prev_index is None or not placements:
                 return True
+            if kind is not None and not kinds_mate(
+                    kind, target_kind if base is not None
+                    else kinds_of[placements[0][0]][steps[0].entry]):
+                return False
             return not (
                 overhang_of[placements[prev_index][0]] > 0
                 and overhang_of[placements[anchor_index][0]] > 0
@@ -2431,6 +2472,8 @@ def solve_steps(
                     and overhang_of[placements[pidx][0]] > 0
                 ):
                     continue  # two overhanging plates cannot share the joint
+                if kind is not None and not kinds_mate(kind, kinds_of[placements[pidx][0]][port]):
+                    continue
                 if eng.connects(cursor, pose):
                     joint_gap = 0.0
                 else:
@@ -2479,7 +2522,8 @@ def solve_steps(
                     stubs[:] = [s for k, s in enumerate(snapshot) if k not in (i, j)]
                     steps.append(_Transit(pidx, port, exit_port))
                     keep_going = yield from dfs(
-                        out_pose, used, slack_used + joint_gap, pidx, handed)
+                        out_pose, used, slack_used + joint_gap, pidx, handed,
+                        kinds_of[stub_pid][exit_port] if kinds_matter else None)
                     steps.pop()
                     stubs[:] = snapshot
                     if not keep_going:
@@ -2506,7 +2550,11 @@ def solve_steps(
             for entry, exit_port, apply_move in eng.moves[pid]:
                 if not handed and chirality[(pid, entry, exit_port)] < 0:
                     continue
+                if kind is not None and not kinds_mate(kind, kinds_of[pid][entry]):
+                    continue  # say, an arch's foot on anything but a ramp's top
                 child = apply_move(cursor)
+                if floor is not None and eng.below(child, floor):
+                    continue  # track under the floor the base stands on
                 candidates.append(
                     (candidate_score(child, stub_refs), rank, pid, entry, exit_port, child)
                 )
@@ -2584,7 +2632,8 @@ def solve_steps(
             steps.append(_Place(pid, entry, exit_port))
 
             keep_going = yield from dfs(next_cursor, used + 1, slack_used, index,
-                             handed or chirality[(pid, entry, exit_port)] != 0)
+                             handed or chirality[(pid, entry, exit_port)] != 0,
+                             kinds_of[pid][exit_port] if kinds_matter else None)
 
             steps.pop()
             for _ in range(new_stubs):
@@ -2610,7 +2659,7 @@ def solve_steps(
             # Loop mode enumerates everything reachable; one full-depth pass.
             f_limit = depth_limit
             stats.max_pieces_searched = f_limit
-            yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed)
+            yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed, start_kind)
         else:
             # Completion mode runs IDA*: grow the pieces-needed contour until closures
             # appear.  Uninformed depth-first dies here whenever the inventory is broad
@@ -2633,7 +2682,8 @@ def solve_steps(
                 if f_limit > depth_limit:
                     break
                 stats.max_pieces_searched = f_limit
-                if not (yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed)):
+                if not (yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed,
+                                       start_kind)):
                     break
                 if limits is None and (len(solutions) >= cfg.max_results or stats.aborted):
                     break

@@ -77,7 +77,7 @@ def test_incomplete_reverse_layer_falls_back_to_full_search(monkeypatch):
 def test_bridge_completion_finds_more_results_with_the_same_node_budget():
     catalog = default_catalog()
     base = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
-    inventory = {"curve": 6, "straight": 4, "ramp": 1, "span": 2}
+    inventory = {"curve": 8, "straight": 6, "ramp": 1, "span": 2}
     cfg = SolverConfig(min_pieces=0, max_pieces=16, max_results=8, max_nodes=25_000,
                        reversing_loops=True)
     plain = solve(inventory, catalog, replace(cfg, completion_lookahead=0), base=base)

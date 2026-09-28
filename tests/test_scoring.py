@@ -52,4 +52,22 @@ def test_scoring_subtracts_a_penalty_for_each_open_stub(catalog):
     assert with_stub.total == pytest.approx(tidy.total - 3.0)
     parts = {f.name: getattr(with_stub, f.name) for f in fields(with_stub)}
     assert with_stub.total == pytest.approx(
-        sum(parts.values()) - 2 * parts["stub_penalty"])
+        sum(parts.values()) - 2 * (parts["stub_penalty"] + parts["stack_penalty"]))
+
+
+def test_each_piece_raised_on_bricks_costs_a_stack(catalog):
+    from duplotrain.layout import build_chain
+    from duplotrain.scoring import ScoreWeights
+    from duplotrain.solver import Solution
+
+    ramp, span, straight = catalog["ramp"], catalog["span"], catalog["straight"]
+
+    def penalty(chain):
+        layout = build_chain(chain)
+        solution = Solution(layout, (), 0.0, True, len(layout.connectable_ends()), ())
+        return score_solution(solution, {"ramp": 1, "span": 1, "straight": 1}).stack_penalty
+
+    # Bridge parts carry themselves; a straight at the crest stands on bricks.
+    assert penalty([(ramp, 0, 1), (span, 0, 1)]) == 0
+    assert penalty([(ramp, 0, 1), (span, 0, 1), (straight, 0, 1)]) == ScoreWeights().stack_penalty
+    assert penalty([(straight, 0, 1), (ramp, 0, 1), (span, 0, 1)]) == 0

@@ -7,7 +7,8 @@ heuristic, not a proof of completeness. Other elevations, custom bridge geometry
 and multiple bridges still use the general solver. Plain and bridge stages prefer
 ordinary closures even when reversing loops are allowed; the full-inventory
 fallback also searches reversing closures. Collision and underpass thresholds are
-the general solver's.
+the general solver's, and every stage keeps to the bridge's joints and the floor
+([search-correctness.md](search-correctness.md#bridge-joints-and-the-floor)).
 
 The bridge macro uses the exact four ramp/span/span/ramp segments and their sampled
 height profile. It is enabled only for the standard bridge geometry, sufficient

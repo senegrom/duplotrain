@@ -661,8 +661,9 @@ class Session:
         Tries ``leveler + j straights + k same-sign curves + m straights + leveler``
         chains (j, m <= 8, k <= 13; the 60 shortest leveler pairs whose climbs
         cancel the height difference), where a leveler is a short run of
-        climbing pieces: any one-directional ramp/span sequence of up to four
-        pieces, or the full up-and-over bridge.  This closes winding rings the
+        climbing pieces: a one-directional ramp/span sequence of up to four
+        pieces that the bridge's joints allow, or the full up-and-over bridge.
+        This closes winding rings the
         search's toward-target ordering starves on -- ten curves looping to a
         neighbouring fork tip -- and their versions through bridges: finish the
         descent from a half-built climb, or a ring that carries a whole bridge.
@@ -674,6 +675,9 @@ class Session:
         remaining = self.remaining()
         base = self.layout
         n_base = len(base)
+        # The base's lowest connector stands on the floor: no template goes under it.
+        floor = min(float(placement.port_pose(port).z) for placement in base
+                    for port in range(len(placement.piece.ports)))
         curve, straight = self.catalog["curve"], self.catalog["straight"]
         ramp, span = self.catalog["ramp"], self.catalog["span"]
         deltas = {
@@ -802,9 +806,13 @@ class Session:
                                 continue
                             if j + m > remaining.get("straight", 0):
                                 continue
-                            try:
+                            try:  # attach and join refuse joints no bridge makes
                                 closed = build(pre, j, k, entry, m, post)
                             except ValueError:
+                                continue
+                            if any(float(placement.port_pose(port).z) < floor - 1e-6
+                                   for placement in closed.placements[n_base:]
+                                   for port in range(len(placement.piece.ports))):
                                 continue
                             if audit.overlaps(closed):
                                 continue
