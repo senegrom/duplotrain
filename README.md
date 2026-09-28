@@ -155,10 +155,12 @@ include the green stone, or the checkbox in the GUI) the solver also proposes
 **teardrops**: the walk closes into the switch's *other branch* instead of back on
 itself. On a *stem-tailed* teardrop the train always exits through the stem, bounces
 off the direction stone on the tail, comes back in and trails through the points —
-endless running from one switch and twelve curves, no full circle of spare track
-required. Switch + 12 curves make exactly three distinct teardrop shapes, one of them
-stem-tailed; the solver proves it. `duplotrain solve` lists only stem-tailed
-teardrops; the library and the GUI also offer the branch-tailed kind, which
+endless running from one switch, twelve curves and a straight for the stone, no full
+circle of spare track required. Switch + 12 curves make exactly three distinct
+teardrop shapes, one of them stem-tailed; the solver proves it. `duplotrain solve`
+lists only the teardrops that bring the train back — stem-tailed, with a straight on
+the tail — and saves each with the stone clipped onto that straight; the library and
+the GUI also offer the others, such as the branch-tailed kind, which
 [never returns the train](#driving-and-the-looping-ladder) to its tail.
 
 In the GUI, stones are armed from their own palette and clipped onto straights with a

@@ -22,7 +22,7 @@ from rich.table import Table
 from rich.text import Text
 
 from . import __version__
-from .catalog import default_catalog, load_catalog
+from .catalog import STONE_MOUNTS, default_catalog, load_catalog
 from .drive import DEFAULT_MAX_RUNS, ClassificationLimitError, DriveLimitError, classify
 from .explore import is_stem_tailed
 from .layout import layout_from_dict, layout_to_dict
@@ -43,6 +43,18 @@ _BAD_FILE = (ValueError, TypeError, KeyError, OSError, RecursionError)
 _SAVED_NAME = re.compile(r"loop_\d{2,}\.(?:json|png)")
 #: The smallest loop ``solve`` looks for unless told otherwise.
 _MIN_PIECES = SolverConfig().min_pieces
+
+
+def _tail_mount(sol) -> int | None:
+    """The straight nearest a teardrop's open end, where its stone clips on.
+
+    A loop's walk lays the tail first, from that end to the junction its lobe
+    closes into; a walk that starts at that junction leaves no tail.
+    """
+    layout = sol.layout
+    junction = layout.links[(len(layout) - 1, sol.steps[-1].exit)][0]
+    return next((index for index in range(junction)
+                 if layout.placements[index].piece.id in STONE_MOUNTS), None)
 
 
 def _catalog(paths: tuple[str, ...]):
@@ -188,14 +200,15 @@ def sets_cmd() -> None:
 @click.option("--max-results", type=click.IntRange(min=1), default=25, show_default=True)
 @click.option("--max-nodes", type=click.IntRange(min=1), default=2_000_000, show_default=True)
 @click.option("--use-all", is_flag=True,
-              help="Only layouts using every owned piece a loop can take (no buffer).")
+              help="Only layouts using every owned piece a loop can take (no buffer or "
+                   "off-ramp).")
 @click.option(
     "--reversing/--no-reversing",
     default=None,
     help=(
-        "Also propose reversing loops: stem-tailed teardrops, whose train turns back "
-        "off a direction-change stone on the tail. Default: on when a --set provides "
-        "that stone."
+        "Also propose reversing loops: stem-tailed teardrops with a straight on the "
+        "tail, where a direction-change stone turns the train back. Default: on when "
+        "a --set provides that stone."
     ),
 )
 @click.option(
@@ -264,6 +277,17 @@ def solve_cmd(
                 "enabled (--no-reversing to disable).[/dim]"
             )
 
+    set_aside: set[tuple] = set()
+
+    def turns_back(sol) -> bool:
+        # A branch-tailed teardrop takes the train into its lobe for good, and one
+        # without a straight on its tail has nowhere for the stone.
+        if sol.kind != "reversing" or (is_stem_tailed(sol, catalog)
+                                       and _tail_mount(sol) is not None):
+            return True
+        set_aside.add(sol.signature)
+        return False
+
     try:
         config = SolverConfig(
             slop=slop,
@@ -272,10 +296,7 @@ def solve_cmd(
             max_nodes=max_nodes,
             use_all_pieces=use_all,
             reversing_loops=reversing,
-            # A branch-tailed teardrop takes the train into its lobe for good: only
-            # a stem-tailed one turns it back off the stone.
-            solution_filter=(lambda sol: sol.kind != "reversing"
-                             or is_stem_tailed(sol, catalog)) if reversing else None,
+            solution_filter=turns_back if reversing else None,
         )
         # Before the search: an unusable directory must not cost a whole search.
         out_dir = _output_dir(out) if out is not None else None
@@ -333,6 +354,10 @@ def solve_cmd(
         if slop < 5:
             tips.append("forced fits with [bold]--slop 5[/bold]")
         console.print("No closed loop fits." + (f" Try {', or '.join(tips)}." if tips else ""))
+    if set_aside:
+        console.print(f"[dim]Not listed: {len(set_aside)} teardrop(s) that cannot bring the "
+                      "train back (branch-tailed, or no straight on the tail for the "
+                      "stone).[/dim]")
     if out_dir is None:
         return
 
@@ -344,14 +369,17 @@ def solve_cmd(
     render_layout = _get_renderer(required=False)
     for rank, (score, sol, closure, size) in enumerate(rows[:top], start=1):
         stem = out_dir / f"loop_{rank:02d}"
+        # A teardrop is saved with its stone, clipped where the train turns back.
+        layout = (sol.layout.with_accessory(_tail_mount(sol), "stone_direction")
+                  if sol.kind == "reversing" else sol.layout)
         try:
             with open(f"{stem}.json", "w", encoding="utf-8") as fh:
-                json.dump(layout_to_dict(sol.layout), fh, indent=2)
+                json.dump(layout_to_dict(layout), fh, indent=2)
         except OSError as exc:
             raise click.ClickException(f"cannot write {stem}.json: {exc}") from exc
         if render_layout is not None:
             _write_image(
-                render_layout, sol.layout, f"{stem}.png",
+                render_layout, layout, f"{stem}.png",
                 title=f"#{rank}  score {score:.0f}  |  {closure}  |  {size} cm",
             )
     console.print(f"Saved the top {min(top, len(scored))} to",
@@ -455,10 +483,10 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
         return
     if layout.is_closed:
         console.print("[yellow]Fully linked, but not exactly closed.[/yellow]")
+    elif not len(layout):
+        console.print("[yellow]Empty layout; no closed track.[/yellow]")
     else:
         console.print(f"[yellow]{len(layout.connectable_ends())} open end(s).[/yellow]")
-        if not len(layout):
-            console.print("Empty layout; no closed track.")
         for a, b, gap in layout.gaps(limit=5):
             console.print(f"  Open ends {a} <-> {b}: gap {gap:.6g} mm")
     for joint in issues:

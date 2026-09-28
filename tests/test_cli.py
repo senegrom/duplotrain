@@ -9,7 +9,7 @@ from click.testing import CliRunner
 import duplotrain.cli as cli
 from duplotrain import ORIGIN, Layout, build_chain, classify, default_catalog
 from duplotrain.cli import main
-from duplotrain.layout import layout_to_dict
+from duplotrain.layout import layout_from_dict, layout_to_dict
 from duplotrain.scoring import score_solution
 from duplotrain.solver import SolverConfig, SolveResult, SolveStats, solve
 from tests.test_drive import switches
@@ -377,9 +377,11 @@ def test_saved_pictures_carry_the_same_closure_label_as_the_table(runner, monkey
     assert any("reversing" in title for title in titles)
 
 
-def test_reversing_lists_only_teardrops_that_turn_the_train_back(runner, monkeypatch):
-    # Of switch + 12 curves' three teardrops, two are branch-tailed: a train off
-    # their tail circles the lobe for good, never back to the stone.
+def test_reversing_lists_only_teardrops_that_turn_the_train_back(runner, monkeypatch,
+                                                                   tmp_path):
+    # A branch-tailed teardrop takes the train into its lobe for good, and one
+    # without a straight on its tail has nowhere for the stone. Each one listed is
+    # saved with its stone: a train there runs forever.
     from duplotrain.explore import is_stem_tailed
 
     results = []
@@ -389,11 +391,30 @@ def test_reversing_lists_only_teardrops_that_turn_the_train_back(runner, monkeyp
         return results[-1]
 
     monkeypatch.setattr(cli, "solve", recording)
-    result = runner.invoke(main, ["solve", "--curve", "12", "--switch", "1", "--reversing",
-                                  "--use-all"])
+    monkeypatch.setattr(cli, "_get_renderer", lambda required=True: None)
+    result = runner.invoke(main, ["solve", "--curve", "12", "--switch", "1", "--straight", "2",
+                                  "--reversing", "--top", "50", "-o", str(tmp_path)])
     assert result.exit_code == 0, result.output
     teardrops = [s for s in results[0].solutions if s.kind == "reversing"]
-    assert len(teardrops) == 1 and is_stem_tailed(teardrops[0], default_catalog())
+    assert len(teardrops) == 2 and all(is_stem_tailed(s, default_catalog()) for s in teardrops)
+    saved = [layout_from_dict(json.loads(path.read_text()), default_catalog())
+             for path in sorted(tmp_path.glob("loop_*.json"))]
+    stoned = [layout for layout in saved if layout.accessories]
+    assert len(stoned) == 2 and all(classify(layout).locally_looping for layout in stoned)
+    # Switch + 12 curves: two teardrops are branch-tailed, the third has no tail.
+    result = runner.invoke(main, ["solve", "--curve", "12", "--switch", "1", "--reversing",
+                                  "--use-all"])
+    printed = " ".join(result.output.split())
+    assert result.exit_code == 0 and "No closed loop fits" in printed
+    assert "Not listed: 3 teardrop(s) that cannot bring the train back" in printed
+
+
+def test_check_names_an_empty_layout_once(runner, tmp_path):
+    path = tmp_path / "empty.json"
+    path.write_text(json.dumps({"format": "duplotrain-layout/1", "placements": []}))
+    result = runner.invoke(main, ["check", str(path)])
+    assert result.exit_code == 1 and "Empty layout" in result.output
+    assert "open end" not in result.output
 
 
 def test_check_blames_open_ends_not_the_slop_budget(runner, tmp_path):
