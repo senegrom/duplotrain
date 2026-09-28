@@ -326,9 +326,11 @@ def load_catalog(*paths: str | Path, include_default: bool = True) -> dict[str, 
             entries = data["pieces"]
         else:
             entries = data
+        if not isinstance(entries, list):
+            raise ValueError(f"catalogue {path} must hold a list of pieces")
         seen = set()
         for spec in entries:
-            if "id" not in spec:
+            if not isinstance(spec, dict) or not isinstance(spec.get("id"), str):
                 raise ValueError(f"piece spec without an id in {path}")
             # Later files override earlier ones; within one, a repeat is a mistake.
             if spec["id"] in seen:

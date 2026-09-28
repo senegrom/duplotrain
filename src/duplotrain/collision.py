@@ -302,7 +302,11 @@ class CollisionField:
         ignore: set[int],
         underpass: bool = False,
     ) -> bool:
-        """Would a piece with these sample points overlap anything already placed?"""
+        """Would a piece with these sample points overlap anything already placed?
+
+        A placement that ``place`` or ``add_deferred`` left deferred counts only once
+        ``near`` has binned it: ask ``near`` with these samples' bounds first.
+        """
         return self._clashes_prepared(
             self._prepare(points), half_width, ignore, underpass=underpass
         )

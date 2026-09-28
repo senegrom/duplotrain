@@ -1486,6 +1486,18 @@ def _canonical_signature(
             if (entry, stub_port) in canon_for.get(pid, {}):
                 lobe = [(i, p, x, e) for (i, p, e, x) in reversed(visits[first + 1:])]
                 walks.append((visits[:first] + [(inst, pid, entry, stub_port)] + lobe, exit_))
+        # A fresh walk may as well start by another open port of its first piece
+        # that is routed to the port it leaves by: the same layout, anchored there.
+        if cyclic:
+            for walk, port in list(walks):
+                inst, pid, entry, exit_ = walk[0]
+                used = {entry, exit_, *(p for i, _pid, e, x in walk[1:] if i == inst
+                                        for p in (e, x))}
+                if stub_inst == inst:
+                    used.add(port)
+                for other, leaves in canon_for.get(pid, {}):
+                    if leaves == exit_ and other not in used:
+                        walks.append(([(inst, pid, other, exit_)] + walk[1:], port))
         candidates = []
         for walk, port in walks:
             candidates.append(with_join(walk, port))
@@ -1664,10 +1676,9 @@ class SolverConfig:
     #: Also accept layouts that close into an open junction stub instead of the
     #: anchor -- a teardrop whose walk ends against its own switch's other branch.
     #: On a stem-tailed one the train keeps exiting through the stem toward the open
-    #: tail; a branch-tailed one takes it into its lobe for good (explore's
-    #: is_stem_tailed tells them apart). Running either endlessly needs a
-    #: direction-change action stone on that tail
-    #: (and switches the train can trail through, which the modern ones are).
+    #: tail, where a direction-change action stone turns it back (through switches
+    #: the train can trail through, which the modern ones are); a branch-tailed one
+    #: takes it into its lobe for good. explore's is_stem_tailed tells them apart.
     reversing_loops: bool = False
     #: Arithmetic backend: "auto" uses the integer lattice engine whenever the whole
     #: problem fits the 30-degree grid (every built-in piece does) and falls back to
@@ -1744,7 +1755,7 @@ class Solution:
     open_stubs: int
     signature: tuple
     #: "loop" -- an ordinary closed circuit; "reversing" -- closes into a junction
-    #: stub, drivable endlessly only with a direction-change stone on the open tail.
+    #: stub, leaving a tail open (see SolverConfig.reversing_loops).
     kind: str = "loop"
 
     @property
@@ -1996,10 +2007,6 @@ def solve_steps(
             }
     stats.engine = eng.name
     placement_samples = _placement_samples(eng, pieces, cfg.collision_spacing)
-    # Free transits only ever traverse a junction's own routes: those of a base
-    # junction with open ports, or of a junction still in stock. The allowance
-    # cap bounds every transit count the search can ask for, one extra for the
-    # candidate junction a query may add before its stock is consumed.
     # A fresh loop closes onto the origin face exactly as a completion closes onto
     # its target, so the same reverse tables prune walks that cannot return with
     # the traversals left in either mode.
@@ -2435,7 +2442,13 @@ def solve_steps(
                     if gap is None:
                         continue
                     joint_gap = gap
-                if cfg.reversing_loops and steps and eligible(used):
+                # Closing into the first piece by a port routed to the one the walk
+                # left it by builds a plain loop, with a stub where it started: loop
+                # mode finds that loop anyway.
+                if cfg.reversing_loops and steps and eligible(used) and not (
+                        base is None and pidx == 0 and any(
+                            exit_port == port for exit_port, _route
+                            in piece_obj[placements[0][0]].transit(steps[0].exit))):
                     # Closing INTO the stub (rather than driving through) makes a
                     # reversing loop: the walk's end mates this branch, and the train
                     # thereafter shuttles out through the junction's other route.

@@ -181,6 +181,29 @@ def test_unknown_segment_type_rejected():
         )
 
 
+@pytest.mark.parametrize("spec", [
+    {"id": "x", "paths": "abc"},
+    {"id": "x", "paths": [{"segments": [5]}]},
+    {"id": "x", "paths": [{"start": "s", "segments": [{"type": "straight", "run": 1}]}]},
+    {"id": "x", "paths": [{"segments": "abc"}]},
+    # Lengths of the wrong shape are bad input too, never a TypeError.
+    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": True}]}]},
+    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": None}]}]},
+    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": [128]}]}]},
+    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": {"chord": 5}}]}]},
+    "not a piece",
+])
+def test_malformed_catalogue_entries_are_bad_input(spec):
+    with pytest.raises(ValueError):
+        parse_piece(spec)
+
+
+def test_a_chord_without_its_radius_is_bad_input():
+    # parse_length is public: its callers get bad input, not a KeyError.
+    with pytest.raises(ValueError, match="cannot read a length from None"):
+        parse_length({"chord": {"degrees": 30}})
+
+
 @pytest.mark.parametrize("change,message", [
     ({"sealed_ports": [0, 1]}, "seals every port"),
     ({"width": float("nan")}, "finite width"),
@@ -269,7 +292,7 @@ def test_the_bounds_admit_every_value_the_text_format_reads():
     assert widest.width == widest.end_overhang == 1000
 
 
-@pytest.mark.parametrize("piece_id", [None, "", 7])
+@pytest.mark.parametrize("piece_id", [None, "", 7, " ", "\t", "a\nb"])
 def test_a_piece_needs_a_text_id(piece_id):
     spec = {"paths": [{"segments": [{"type": "straight", "run": 64}]}]}
     if piece_id is not None:
@@ -299,6 +322,17 @@ def test_a_catalogue_file_takes_at_most_2_mb(tmp_path):
     path = tmp_path / "big.json"
     path.write_bytes(b"[" + b" " * (2 * 1024 * 1024) + b"]")
     with pytest.raises(ValueError, match="larger than 2 MB"):
+        load_catalog(path)
+
+
+@pytest.mark.parametrize("contents", ["[5]", "null", '{"pieces": 5}', '[["id"]]',
+                                      '[{"id": []}]'])
+def test_a_catalogue_file_of_the_wrong_shape_is_bad_input(tmp_path, contents):
+    from duplotrain.catalog import load_catalog
+
+    path = tmp_path / "odd.json"
+    path.write_text(contents)
+    with pytest.raises(ValueError):
         load_catalog(path)
 
 

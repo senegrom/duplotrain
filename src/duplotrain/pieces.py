@@ -130,8 +130,8 @@ def parse_length(value: Any) -> Alg:
             spec = value["chord"]
             if not isinstance(spec, dict):
                 raise ValueError(f"a chord takes an object with a radius and degrees, not {spec!r}")
-            radius = parse_length(spec["radius"])
-            degrees = _number(spec["degrees"])
+            radius = parse_length(spec.get("radius"))
+            degrees = _number(spec.get("degrees"))
             if degrees % 30:  # the half angle must lie on the 15-degree lattice
                 raise ValueError(f"a chord's angle of {degrees} deg is not a multiple of 30 deg")
             _, sin_half = cos_sin(degrees_to_steps(degrees / 2))
@@ -531,8 +531,10 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
     if not isinstance(spec, dict):
         raise ValueError("a piece must be an object")
     piece_id = spec.get("id")
-    if not isinstance(piece_id, str) or not piece_id or len(piece_id) > MAX_ID_LENGTH:
-        raise ValueError(f"a piece needs an id, a text of 1 to {MAX_ID_LENGTH} characters")
+    # An id names the piece on one line: a table row, an inventory key.
+    if (not isinstance(piece_id, str) or not piece_id.strip() or len(piece_id) > MAX_ID_LENGTH
+            or "\t" in piece_id or "\n" in piece_id):
+        raise ValueError(f"a piece needs an id, one line of 1 to {MAX_ID_LENGTH} characters")
     if not isinstance(spec.get("paths", []), list):
         raise ValueError(f"piece {piece_id!r} paths must be a list")
     if len(spec.get("paths", [])) > MAX_PATHS:

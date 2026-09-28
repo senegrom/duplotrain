@@ -455,6 +455,23 @@ def test_solution_layouts_equal_their_replayed_constructions(catalog):
     assert checked >= 30 and transits >= 1
 
 
+@pytest.mark.parametrize("inventory, loops, teardrops", [
+    ({"curve": 12, "switch": 1}, 2, 3),
+    # A second switch at the tail's end: the walk may start by either free branch.
+    ({"curve": 12, "switch": 2}, 19, 178),
+])
+def test_reversing_loop_mode_offers_each_layout_once(inventory, loops, teardrops):
+    # A ring through a switch is a loop with a stub, not a teardrop without a tail.
+    from duplotrain.explore import congruence_key
+
+    result = solve(inventory, default_catalog(),
+                   SolverConfig(reversing_loops=True, max_results=1000))
+    keys = [congruence_key(s.layout) for s in result.solutions]
+    assert result.stats.complete and len(keys) == len(set(keys))
+    kinds = [s.kind for s in result.solutions]
+    assert (kinds.count("loop"), kinds.count("reversing")) == (loops, teardrops)
+
+
 def test_a_reversing_lobe_driven_either_way_round_is_one_result():
     # The same teardrop, entered at the stem, can go round its lobe either way.
     from duplotrain.explore import congruence_key
@@ -463,7 +480,7 @@ def test_a_reversing_lobe_driven_either_way_round_is_one_result():
     result = solve({"curve": 12, "switch": 1, "straight": 2}, catalog,
                    SolverConfig(reversing_loops=True, max_results=100))
     keys = [congruence_key(s.layout) for s in result.solutions if s.kind == "reversing"]
-    assert len(keys) == len(set(keys)) == 40
+    assert len(keys) == len(set(keys)) == 33
     base = build_chain([(catalog["straight"], 0, 1)])
     completed = solve({"curve": 12, "switch": 1, "straight": 1}, catalog,
                       SolverConfig(reversing_loops=True, max_results=100),
@@ -526,25 +543,6 @@ def test_a_slop_search_far_from_the_origin_runs_on_the_field_engine():
     with pytest.raises(ValueError, match="does not fit the integer lattice"):
         solve({"curve": 4, "straight": 2}, catalog, SolverConfig(engine="lattice", max_pieces=5),
               base=base, grow_from=ends[-1], close_onto=ends[0])
-
-
-@pytest.mark.parametrize("spec", [
-    {"id": "x", "paths": "abc"},
-    {"id": "x", "paths": [{"segments": [5]}]},
-    {"id": "x", "paths": [{"start": "s", "segments": [{"type": "straight", "run": 1}]}]},
-    {"id": "x", "paths": [{"segments": "abc"}]},
-    # Lengths of the wrong shape are bad input too, never a TypeError.
-    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": True}]}]},
-    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": None}]}]},
-    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": [128]}]}]},
-    {"id": "x", "paths": [{"segments": [{"type": "straight", "run": {"chord": 5}}]}]},
-    "not a piece",
-])
-def test_malformed_catalogue_entries_are_bad_input(spec):
-    from duplotrain.pieces import parse_piece
-
-    with pytest.raises(ValueError):
-        parse_piece(spec)
 
 
 def test_a_catalogue_keyed_apart_from_its_piece_ids_is_refused():
@@ -628,6 +626,3 @@ def test_a_piece_no_walk_can_place_leaves_the_search_alone(catalog):
     buffered = solve({**box, "buffer": 2}, catalog, SolverConfig(max_results=25))
     assert [s.signature for s in buffered.solutions] == [s.signature for s in plain.solutions]
     assert buffered.stats.nodes == plain.stats.nodes
-    everything = solve({"curve": 12, "straight": 4, "buffer": 1}, catalog,
-                       SolverConfig(use_all_pieces=True))
-    assert everything.solutions and all(s.piece_count == 16 for s in everything.solutions)

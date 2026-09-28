@@ -535,8 +535,13 @@ and drive the lobe backwards to close into the first branch. When the closure
 is exact both walks build the same layout, so the signature is the minimum over
 both walks (and their mirror images in loop mode); a forced fit keeps its
 misfit at the closing joint, so its two walks are different layouts and keep
-separate signatures. A regression checks that no reversing result, in loop or
-completion mode, repeats a layout.
+separate signatures. In loop mode a walk that starts at a junction may as well
+start by another of its open ports routed to the same exit, so the signature
+takes the minimum over those starts too; and a walk that closes into its own
+first piece by a port routed to the one it left by builds a plain loop with a
+stub where it started, which loop mode finds as a loop, so it is no reversing
+result. Regressions check that no reversing result, in loop or completion mode,
+repeats a layout or a plain loop.
 
 The closing joint names a port of the junction closed into, and each candidate
 names it as its own walk numbers that junction: a symmetric piece written with
