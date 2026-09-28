@@ -1,5 +1,6 @@
 """Real suspended searches, safety boundaries and atomic editor publication."""
 import gc
+import inspect
 import json
 import weakref
 from collections import Counter
@@ -395,7 +396,7 @@ def test_close_all_gaps_offers_each_plan_once(catalog):
         session.remove_piece(index)
     base = session.layout
     job = SearchJob(session, {"all_gaps": True, "max_pieces": 14})
-    assert job.stage == "close all: 4 open ends"
+    assert job.stage == "close all: 4 open ends left"
     settle(job)
     assert len(job.solutions) == 8
     assert len({physical(s.layout, len(base)) for s in job.solutions}) == 8
@@ -479,6 +480,10 @@ def test_a_search_takes_at_most_32_keep_out_rectangles(catalog):
     with pytest.raises(ValueError, match="at most 32"):
         call(session, "start", options={"keep_out": [square] * 33})
     assert session._interactive_job is None
+    # A null list, like a null room, restricts nothing; another value is no list.
+    assert search_options({"keep_out": None}, catalog)["keep_out"] == []
+    with pytest.raises(ValueError, match="must be a list"):
+        search_options({"keep_out": "none"}, catalog)
 
 
 def test_finding_more_stops_at_the_fifty_result_cap(catalog):
@@ -580,6 +585,41 @@ def test_close_all_gaps_refuses_track_that_already_overlaps_itself(catalog):
     session = Session(history=[spiral], inventory={"curve": 30})
     with pytest.raises(ValueError, match="overlaps itself"):
         call(session, "start", all_gaps=True)
+
+
+def test_close_all_gaps_joins_ends_that_already_meet(catalog):
+    # A ring closed by hand but never joined, one curve missing elsewhere: the two
+    # curves that meet only touch, as joined neighbours do.
+    ring = build_chain([(catalog["curve"], 0, 1)] * 12).remove(6)
+    session = Session(history=[ring], inventory={"curve": 12})
+    job = SearchJob(session, {"all_gaps": True, "max_pieces": 2})
+    try:
+        settle(job)
+        assert [len(s.layout) - len(ring) for s in job.solutions] == [1]
+        assert all(s.layout.is_closed and not s.layout.joint_issues() for s in job.solutions)
+    finally:
+        job.close()
+
+
+def test_close_all_gaps_keeps_the_forced_fits_already_in_the_track(catalog):
+    # Two half circles 5 mm apart, forced together at both joints, one curve
+    # missing: Close the loop leaves the track's own forced fits be, and so does
+    # Close all gaps.
+    curve = (catalog["curve"], 0, 1)
+    first = build_chain([curve] * 6)
+    second = build_chain([curve] * 6, start=first.pose_of((5, 1)).then(3, 4, 0, 0))
+    ring = Layout(first.placements + second.placements, {
+        **first.links, **{(i + 6, p): (j + 6, q) for (i, p), (j, q) in second.links.items()}})
+    base = ring.join((5, 1), (6, 0), force=True).join((11, 1), (0, 0), force=True).remove(2)
+    assert [issue["problems"] for issue in base.joint_issues()] == [["planar gap"]] * 2
+    session = Session(history=[base], inventory={"curve": 12})
+    job = SearchJob(session, {"all_gaps": True, "max_pieces": 2})
+    try:
+        settle(job)
+        assert [len(s.layout) - len(base) for s in job.solutions] == [1]
+        assert job.solutions[0].layout.joint_issues() == base.joint_issues()
+    finally:
+        job.close()
 
 
 def test_harder_retains_existing_exact_dfs_objects_and_lifts_depth(catalog):
@@ -771,6 +811,10 @@ def test_a_walk_cut_short_says_so_and_offers_no_harder_search(catalog, monkeypat
         assert job.status == "limited" and not job.complete
         assert "more existing junctions than a search can follow" in job.reason
         assert not response["can_harden"]
+        # The cut direction releases its suspended search.
+        cut = [c for c in job.pool.cursors if c.cut]
+        assert cut and all(inspect.getgeneratorstate(c.iterator) == inspect.GEN_CLOSED
+                           for c in cut)
     finally:
         job.close()
 
@@ -849,27 +893,10 @@ def test_a_stop_with_results_rereads_the_walk_reason_too(catalog):
         job.close()
 
 
-def test_a_cut_walk_releases_its_suspended_search(catalog, monkeypatch):
-    import inspect
-
-    import duplotrain.solver as solver_module
-    from tests.test_solver import crossings_in_a_row
-
-    monkeypatch.setattr(solver_module, "_MAX_WALK_STEPS", 20)
-    base = crossings_in_a_row(catalog, 30)
-    session = Session(history=[base], inventory=dict(base.piece_counts))
-    job = SearchJob(session, {"grow": [0, 1], "close": [30, 0]})
-    try:
-        settle(job)
-        cut = [c for c in job.pool.cursors if c.cut]
-        assert cut and all(inspect.getgeneratorstate(c.iterator) == inspect.GEN_CLOSED
-                           for c in cut)
-    finally:
-        job.close()
-
-
-def test_a_start_names_both_ends_or_neither(catalog):
+@pytest.mark.parametrize("body, missing", [({"grow": [5, 1]}, "close"),
+                                           ({"close": [0, 0]}, "grow")])
+def test_a_start_names_both_ends_or_neither(catalog, body, missing):
     # With one end missing, the default pair would silently grow from another end.
     session = Session(history=[half(catalog)], inventory={"curve": 12})
-    with pytest.raises(ValueError, match="close must be"):
-        SearchJob(session, {"grow": [5, 1]})
+    with pytest.raises(ValueError, match=f"{missing} must be"):
+        SearchJob(session, body)

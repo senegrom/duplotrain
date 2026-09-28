@@ -205,7 +205,7 @@ def test_the_full_inventory_running_out_of_search_settles_every_stage(monkeypatc
 
     monkeypatch.setattr(editor_search, "solve_steps", plain_capped)
     pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog,
-                      {"curve": 6, "straight": 4, "buffer": 1}, (5, 1), (0, 0), 26, 1, 0,
+                      {"curve": 6, "straight": 4, "switch": 1}, (5, 1), (0, 0), 26, 1, 0,
                       False, search_options(None, catalog))
     try:
         while (event := pool.step())["kind"] not in ("limited", "exhausted"):
@@ -245,3 +245,16 @@ def test_search_harder_lifts_a_directions_result_limit(monkeypatch):
         assert len(found) > before
     finally:
         pool.close()
+
+
+def test_pieces_no_walk_can_place_add_no_stage():
+    # Buffers beside plain track: the solver drops them, so a plain stage would
+    # search the full stage's problem again.
+    catalog = default_catalog()
+    half = build_chain([(catalog["curve"], 0, 1)] * 6)
+    session = Session(history=[half], inventory={"curve": 20, "buffer": 2})
+    job = SearchJob(session, {})
+    try:
+        assert {cursor.stage for cursor in job.pool.cursors} == {"full inventory"}
+    finally:
+        job.close()

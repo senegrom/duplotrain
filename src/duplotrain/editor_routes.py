@@ -23,8 +23,11 @@ class RouteJob:
 
         self.id, self.revision = uuid.uuid4().hex, session.revision
         self.layout = session.layout
-        if not self.layout or self.layout.joint_issues():
-            raise ValueError("Train analysis needs track with compatible joints")
+        if not self.layout:
+            raise ValueError("Train analysis needs track")
+        if self.layout.joint_issues():
+            raise ValueError("Train analysis needs track whose joints fit exactly; "
+                             "Check layout lists the others")
         self.starts = _all_starts(self.layout)
         scope = body.get("scope", "all")
         if scope not in ("all", "selected"):

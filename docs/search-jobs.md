@@ -70,9 +70,10 @@ defaults.
 non-reversing joins; the slop and reversing settings belong to **Close the
 loop**. It chooses a constrained end, tries possible mates and alternative
 completions, debits the shared remaining stock, and backtracks when a choice
-prevents a later gap from closing. Already matching, compatible ends can be
-joined without adding pieces. Track that already overlaps itself is refused
-before the search starts, since no plan could then be overlap-free as a whole.
+prevents a later gap from closing. Already matching, compatible ends are
+joined without adding pieces. Track that already overlaps itself, apart from
+such meeting ends, is refused before the search starts, since no plan could then
+be overlap-free as a whole. Forced fits already in the track stay as they are.
 Each pair's addition is checked when that pair is solved: its pieces for overlaps
 against all the track before them, and its new joints, the unchanged base, the
 stock left and the remaining added-piece allowance. Only a complete plan reducing
@@ -117,11 +118,14 @@ counts as a result. The base, stock, size, joint and room checks run once, where
 the candidate is produced; the job then keeps one candidate per physical track
 and only those its save and import guards accept. A search that sets a closure
 aside for those guards says so, and running out of search then proves nothing.
-A walk too long for the solver to follow
+A direction that runs out of search settles the rest of its stage, since the
+reversed problem has nothing more either; in the full-inventory stage it settles
+every stage, since the others search subsets of its stock and moves. A walk too
+long for the solver to follow
 ([search-correctness.md](search-correctness.md#completion-paths-can-revisit-all-free-junction-ports))
-stops its direction for good, and the search says so unless the stage's other
-direction runs out of search, which settles the rest. Search harder cannot lift
-the cut: it is offered only while another stage or direction can still go further.
+stops its direction for good, and the search says so unless a settlement covers
+that direction. Search harder cannot lift the cut: it is offered only while
+another stage or direction can still go further.
 
 One tick processes at most 32 checkpoint events and aims to return after about
 20 ms between checkpoints. This is not a hard execution deadline: preprocessing,

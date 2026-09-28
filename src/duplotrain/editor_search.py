@@ -26,6 +26,7 @@ from .solver import (
     SearchLimits,
     Solution,
     SolverConfig,
+    _cached_moves,
     _OverlapAudit,
     _solution_overlaps,
     solve_steps,
@@ -67,8 +68,12 @@ def search_options(data, catalog):
     if (not isinstance(exclude, list) or len(exclude) > len(catalog)
             or any(not isinstance(pid, str) or pid not in catalog for pid in exclude)):
         raise ValueError("excluded pieces must be catalogue identifiers")
-    keep = data.get("keep_out", [])
-    if not isinstance(keep, list) or len(keep) > 32:
+    keep = data.get("keep_out")
+    if keep is None:  # like a null room: no restriction
+        keep = []
+    if not isinstance(keep, list):
+        raise ValueError("keep-out rectangles must be a list")
+    if len(keep) > 32:
         raise ValueError("use at most 32 keep-out rectangles")
     return {"sort": sort, "exclude": sorted(set(exclude)),
             "room": rectangle(data["room"]) if data.get("room") is not None else None,
@@ -259,7 +264,9 @@ class PairSearch:
     def _build(self):
         base, catalog, stock = self.base, self.catalog, self.stock
         plain = {pid: n for pid, n in stock.items() if pid in ("curve", "straight") and n}
-        full = {pid: n for pid, n in stock.items() if n}
+        # The solver drops pieces no walk can place: with those alone beside plain
+        # track, a plain stage would search the full stage's problem.
+        full = {pid: n for pid, n in stock.items() if n and _cached_moves(catalog[pid])}
         stages = []
         if plain and plain != full:
             stages.append(("plain track", plain, catalog, 25_000, 0, None))
@@ -403,6 +410,16 @@ class PairSearch:
         self.arc_session = self.audit = None
 
 
+def _meeting_ends_joined(layout):
+    """*layout* with its exactly meeting ends joined, as a plan joins them."""
+    for a, b in layout.matable_pairs():
+        try:
+            layout = layout.join(a, b)
+        except ValueError:
+            pass  # coincident but catalogue-incompatible connectors stay apart
+    return layout
+
+
 def _harder(depth, effort):
     """Search harder: twice the depth and the effort, up to 128 pieces and 16."""
     return min(128, depth * 2), min(16, effort * 2)
@@ -450,12 +467,11 @@ class SearchJob:
             grow, close = _end(grow, "grow"), _end(close, "close")
             if grow == close or grow not in opens or close not in opens:
                 raise ValueError("pick two distinct open ends")
-        issues = self.base.joint_issues()
-        if (any(issue["problems"] != ["planar gap"] for issue in issues)
-                or (self.all_gaps and issues)):
+        if any(issue["problems"] != ["planar gap"] for issue in self.base.joint_issues()):
             raise ValueError("Fix incompatible existing joints before starting this search")
         # A plan must be overlap-free as a whole, which no addition can make it.
-        if self.all_gaps and _solution_overlaps(self.base, 0, DEFAULT_CLEARANCE, 8.0):
+        if self.all_gaps and _solution_overlaps(_meeting_ends_joined(self.base), 0,
+                                                DEFAULT_CLEARANCE, 8.0):
             raise ValueError("The existing track overlaps itself; Check layout lists the "
                              "pieces. Fix it before closing all gaps")
         if not fits_space(self.base, self.options):
@@ -476,7 +492,7 @@ class SearchJob:
         self.multi_cap = 335_000 * self.effort
         self.pool = None
         if self.all_gaps:
-            self.stage = f"close all: {len(opens)} open ends"
+            self.stage = f"close all: {len(opens)} open ends left"
             self.multi = self._all_gaps(self.base, self.stock, self.depth)
         elif self.base.pose_of(grow).connects_to(self.base.pose_of(close)):
             closed = self.base.join(grow, close)
@@ -578,7 +594,8 @@ class SearchJob:
                     before = pair.nodes
                     event = pair.step()
                     self.multi_nodes += pair.nodes - before
-                    yield {"kind": "progress", "stage": f"close all: {len(opens)} open ends"}
+                    yield {"kind": "progress",
+                           "stage": f"close all: {len(opens)} open ends left"}
                     if event["kind"] in ("limited", "exhausted"):
                         break
                     if event["kind"] != "solution":
@@ -622,11 +639,11 @@ class SearchJob:
                 break
             if time.perf_counter() >= deadline:
                 break
-        # From the live cursors at every stop, results found included: a stage's
-        # other direction may have settled a cut walk since an earlier stop.
+        # From the live cursors at every stop, results found included: a settlement
+        # may have covered a cut walk since an earlier stop.
         if self.status != "running" and self.pool and not self.unsaveable:
             self.reason = ("Some walks pass through more existing junctions than a "
-                                   "search can follow; closures along them were not searched."
+                           "search can follow; closures along them were not searched."
                            if any(c.cut for c in self.pool.cursors) else None)
 
     def more(self, *, harder=False):
@@ -677,9 +694,7 @@ class SearchJob:
                       key=lambda item: (not item[1].exact, costs[item[0]], item[0]))
 
     def response(self, session, body):
-        if "sort" in body:
-            if body["sort"] not in SORTS:
-                raise ValueError("unknown candidate sort order")
+        if "sort" in body:  # validated by dispatch_search
             self.options["sort"] = body["sort"]
         page = integer(body.get("page", 0), 0, 6, "page")
         shown = []

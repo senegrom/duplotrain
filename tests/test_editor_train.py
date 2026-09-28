@@ -10,7 +10,8 @@ from duplotrain.catalog import default_catalog
 from duplotrain.drive import DriveLimitError, drive
 from duplotrain.editor import Session, dispatch_session
 from duplotrain.editor_tools import trace_train
-from duplotrain.layout import build_chain, layout_from_dict
+from duplotrain.geometry import Pose
+from duplotrain.layout import Layout, Placement, build_chain, layout_from_dict
 from tests.editor_support import load_adapter, post, running_server, unchanged
 
 
@@ -27,6 +28,29 @@ def test_train_rejects_invalid_start_without_mutation(start):
     with pytest.raises((ValueError, TypeError)):
         trace_train(s, start)
     assert unchanged(s) == before
+
+
+def test_a_train_starts_where_route_analysis_would():
+    # A buffer holds no train: both refuse it, with the same words.
+    s = Session(unlimited=True)
+    s.attach("straight", 0, None)
+    s.attach("buffer", 0, [0, 1])
+    with pytest.raises(ValueError, match="drivable track"):
+        trace_train(s, [1, 0])
+    with pytest.raises(ValueError, match="drivable track"):
+        dispatch_session(s, "/api/routes/start", {"revision": s.revision,
+                                                  "scope": "selected", "start": [1, 0]})
+
+
+def test_train_tools_name_a_forced_fit_a_joint_that_does_not_fit_exactly():
+    c = default_catalog()
+    apart = Layout((Placement(c["straight"], Pose.make()),
+                    Placement(c["straight"], Pose.make(x=131))))
+    s = Session(history=[apart.join((0, 1), (1, 0), force=True)])
+    with pytest.raises(ValueError, match="joints fit exactly"):
+        trace_train(s, [0, 0])
+    with pytest.raises(ValueError, match="joints fit exactly"):
+        dispatch_session(s, "/api/routes/start", {"revision": s.revision})
 
 
 @pytest.mark.parametrize("limit", [0, 10001, True, 1.5, "4"])

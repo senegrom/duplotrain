@@ -36,6 +36,14 @@ def test_diagnostics_use_existing_height_collision_rules(z, expected):
     assert bool(report["overlaps"]) == expected
 
 
+def test_ends_that_meet_unjoined_are_no_overlap():
+    # A ring closed by hand but never joined: its two ends only touch.
+    c = default_catalog()
+    ring = build_chain([(c["curve"], 0, 1)] * 12)
+    report = check_session(Session(history=[ring]))
+    assert not report["overlaps"] and len(report["open_ends"]) == 2
+
+
 def test_diagnostics_reports_stone_shortages_even_in_sandbox():
     s = Session(unlimited=True, stones={})
     s.attach("straight", 0, None)

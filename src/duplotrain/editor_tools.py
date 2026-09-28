@@ -73,7 +73,8 @@ def check_session(session: Session) -> dict[str, Any]:
 
     At most 200 overlap pairs are returned. Reaching that limit is explicitly
     incomplete, never a collision-free verdict. Accepted layouts already have
-    a 1500-piece bound. Direct neighbours use the solver's existing exemption.
+    a 1500-piece bound. Direct neighbours, and pieces whose ends meet exactly,
+    use the solver's existing exemption.
     """
     layout = session.layout
     opens = [list(end) for end in layout.connectable_ends()]
@@ -81,6 +82,10 @@ def check_session(session: Session) -> dict[str, Any]:
     neighbours: dict[int, set[int]] = {}
     for (a, _), (b, _) in layout.links.items():
         neighbours.setdefault(a, set()).add(b)
+    # Ends that meet exactly touch as a joint does, joined or not.
+    for (a, _), (b, _) in layout.matable_pairs():
+        neighbours.setdefault(a, set()).add(b)
+        neighbours.setdefault(b, set()).add(a)
     overlaps = []
     clouds = []
     # Small layouts test every pair. On larger layouts the shared deferred field
@@ -187,12 +192,15 @@ def trace_train(
     piece = layout.placements[index].piece
     if not 0 <= port < len(piece.ports) or port in piece.sealed:
         raise ValueError("pick an unsealed entry port for the train")
+    universe = drivable_universe(layout)
+    if index not in universe:  # a buffer cannot hold a train
+        raise ValueError("choose an inward port of drivable track")
     if type(max_steps) is not int or not 1 <= max_steps <= 10000:
         raise ValueError("train trace limit must be 1–10000 steps")
     initial = _initial_switches(layout, switch_states)
     if layout.joint_issues():
-        raise ValueError("Fix incompatible joints before testing the train")
-    universe = drivable_universe(layout)
+        raise ValueError("Test train needs track whose joints fit exactly; Check layout "
+                         "lists the others")
     common = {"revision": session.revision, "start": list(start),
               "initial_switch_states": initial, "drivable_count": len(universe),
               "terminal": None}
