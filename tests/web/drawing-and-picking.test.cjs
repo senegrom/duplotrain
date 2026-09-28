@@ -123,3 +123,66 @@ test("hovering within the same piece does not repaint after coalesced picking", 
   h.run("draw()"); flush();
   assert.equal(paints, 3); // Non-hover redraws are never suppressed.
 });
+
+test("viewport culling submits only visible track and includes edge padding", () => {
+  let fills=0,strokes=0;
+  const h=harness({events:true,overrides:{worldToScreen:(x,y)=>[x,y]}});
+  const placements=Array.from({length:1000},(_,i)=>track([[100+i*1000,100,0],[200+i*1000,100,0]]));
+  h.context.painted=placements;
+  h.context.record={beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){fills++;},stroke(){strokes++;}};
+  h.run("ctx=record; drawLayout({placements:painted},false)");
+  assert.equal(fills,1); assert.equal(strokes,1);
+  assert.equal(h.context.screenBoundsVisible(-100,-100,-1,-1,3),true);
+  assert.equal(h.context.screenBoundsVisible(-100,-100,-10,-10,3),false);
+  assert.equal(h.context.screenBoundsVisible(NaN,0,1,1),true);
+});
+
+test("base raster builds once a frame repeats, on one reused surface, within its pixel cap", () => {
+  const h=harness({events:true}); let direct=0,offscreen=0,blits=0,created=0;
+  const originalCreate=h.context.document.createElement;
+  h.context.document.createElement=tag=>tag==="canvas" ? (created++,{width:0,height:0,
+    getContext:()=>({setTransform(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},
+      fill(){offscreen++;},stroke(){}})}) : originalCreate(tag);
+  const target={drawImage(){blits++;},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){direct++;},stroke(){}};
+  h.context.target=target; h.context.layout={placements:[track([[0,0,0],[100,0,0]])]};
+  // A new view paints directly; its repeat builds the raster; later repeats only blit.
+  h.run("ctx=target; canvas.width=500; canvas.height=500; drawBaseTrack(layout); drawBaseTrack(layout); drawBaseTrack(layout)");
+  assert.deepEqual([direct,offscreen,blits,created],[1,1,2,1]);
+  // Pan and zoom frames and new geometry paint directly and allocate nothing.
+  h.run("for (let i=0;i<5;i++) { view.x++; drawBaseTrack(layout); }");
+  h.run("layout={placements:[...layout.placements]}; drawBaseTrack(layout)");
+  assert.deepEqual([direct,offscreen,blits,created],[7,1,2,1]);
+  assert.equal(h.run("baseRaster"),null);
+  // Once the view rests again, the same surface is re-rendered.
+  h.context.devicePixelRatio=2; h.run("drawBaseTrack(layout); drawBaseTrack(layout)");
+  assert.deepEqual([direct,offscreen,blits,created],[8,2,3,1]);
+  h.run("canvas.width=4000;canvas.height=3000;drawBaseTrack(layout);drawBaseTrack(layout)");
+  assert.equal(h.run("baseRaster"),null); assert.equal(h.run("rasterSurface"),null);
+  assert.deepEqual([direct,created],[10,1]);
+  assert.equal(h.run("ctx"),target);
+});
+
+test("base raster always restores the real canvas context if drawing throws", () => {
+  const h=harness({events:true});
+  const target={drawImage(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){}};
+  h.context.target=target;
+  h.context.document.createElement=()=>({getContext:()=>({setTransform(){},beginPath(){throw new Error("paint error");}})});
+  h.context.layout={placements:[track([[0,0,0],[100,0,0]])]};
+  h.run("ctx=target;canvas.width=500;canvas.height=500;drawBaseTrack(layout)");
+  assert.throws(()=>h.run("drawBaseTrack(layout)"),/paint error/);
+  assert.equal(h.run("ctx"),target); assert.equal(h.run("baseRaster"),null);
+});
+
+test("the cached raster is blitted 1:1 in device pixels at a fractional ratio", () => {
+  const h = harness({events: true}); const blits = [];
+  h.context.document.createElement = () => ({width: 0, height: 0, getContext: () => ({
+    setTransform() {}, clearRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, closePath() {},
+    fill() {}, stroke() {}})});
+  h.context.target = {drawImage: (_surface, ...box) => blits.push(box), beginPath() {},
+    moveTo() {}, lineTo() {}, closePath() {}, fill() {}, stroke() {}};
+  h.context.layout = {placements: [track([[0, 0, 0], [100, 0, 0]])]};
+  h.context.devicePixelRatio = 1.5;  // 333 CSS px: a 499-pixel store, 332.67 CSS px of it
+  h.run("ctx = target; canvas.clientWidth = canvas.clientHeight = 333;" +
+        "canvas.width = canvas.height = 499; drawBaseTrack(layout); drawBaseTrack(layout)");
+  assert.deepEqual(blits, [[0, 0, 499 / 1.5, 499 / 1.5]]);
+});

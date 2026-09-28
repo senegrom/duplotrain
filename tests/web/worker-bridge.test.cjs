@@ -119,6 +119,37 @@ test("the engine worker reports download progress while the runtime loads", asyn
   assert.match(messages[1].bootError, /stop after the runtime download/);
 });
 
+test("a lost engine download names its file and ends the boot at once", async () => {
+  for (const [failing, reason] of [["connect", "Failed to fetch"], ["body", "network error"]]) {
+    const messages = [];
+    const context = vm.createContext({
+      importScripts() {}, Response, ReadableStream, console, onmessage: null,
+      postMessage: message => messages.push(message),
+      fetch: async () => {
+        if (failing === "connect") throw new TypeError(reason);
+        return new Response(new ReadableStream({pull(stream) { stream.error(new TypeError(reason)); }}));
+      },
+      // Pyodide only logs a failed runtime download, and its start never settles.
+      loadPyodide: () => {
+        context.fetch("pyodide.asm.wasm").then(response => response.arrayBuffer()).catch(() => {});
+        return new Promise(() => {});
+      },
+    });
+    vm.runInContext(fs.readFileSync(path.join(root, "webapp/worker.js"), "utf8"), context);
+    for (let i = 0; i < 20 && !messages.length; i++) await new Promise(resolve => setImmediate(resolve));
+    assert.equal(messages.length, 1);
+    assert.equal(messages[0].bootError, `Could not load pyodide.asm.wasm: ${reason}`);
+  }
+});
+
+test("an engine script that never loads is named", async () => {
+  const h = harness();
+  const promise = h.window.duplotrainBoot({refresh: async () => {}, status() {}});
+  h.workers[0].onerror({preventDefault() {}});  // a failed script load carries no message
+  await promise;
+  assert.match(h.body.children[0].children[0].textContent, /Could not load worker\.js/);
+});
+
 test("a pending call gets two minutes of silence", async () => {
   const h = harness();
   const promise = h.window.duplotrainBoot({refresh: async () => {}, status() {}});

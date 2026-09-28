@@ -87,7 +87,8 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
         worker = current;
         current.onerror = event => {
           event.preventDefault();
-          if (worker === current) fail(new Error(event.message || "worker error"));
+          // An error without a message is the script itself failing to load.
+          if (worker === current) fail(new Error(event.message || "Could not load worker.js"));
         };
         current.onmessageerror = () => { if (worker === current) fail(new Error("invalid worker message")); };
         // Loading fails only after a minute without a progress report. The first

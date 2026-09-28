@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {harness} = require("./reliability-harness.cjs");
+const {harness, scene, track} = require("./reliability-harness.cjs");
 
 function editor(marks) {
   const state = {layout: {placements: [{
@@ -57,4 +57,18 @@ test("Remove away from markers still removes the selected piece", async () => {
   await e.run("removeAt(64, 0)");
   assert.equal(e.calls[0].path, "/api/remove");
   assert.equal(e.calls[0].body.placement, 0);
+});
+
+test("an armed stone or the Remove tool explains itself on a closed layout too", () => {
+  const closed = scene([track([[0, 0, 0], [100, 0, 0]])]);
+  closed.layout.exactly_closed = true;
+  closed.stones.catalog = {stone_direction: {name: "Direction stone"}};
+  const h = harness({state: closed});
+  h.run('selectTool({stone: "stone_direction"}); refreshStatus()');
+  assert.match(h.notices.at(-1).text, /Direction stone armed/);
+  h.run("selectTool({remove: true}); refreshStatus()");
+  assert.match(h.notices.at(-1).text, /Remove tool/);
+  // A closed layout has no end to attach an armed piece to.
+  h.run('selectTool({piece: {piece: "straight", pieceName: "Straight", label: "ahead"}}); refreshStatus()');
+  assert.match(h.notices.at(-1).text, /Connectors closed/);
 });

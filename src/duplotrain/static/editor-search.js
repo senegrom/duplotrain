@@ -20,7 +20,8 @@ function discardInteractiveJob() {
       (routeAnalysis && routeAnalysis.revision !== S?.revision)) clearInteractiveState();
 }
 function rectangleInput(text) {
-  const values = text.split(",").map(s => s.trim()).map(s => s === "" ? NaN : Number(s) * 10);
+  // The placeholder writes "−" (U+2212), as typeset text may.
+  const values = text.replaceAll("\u2212", "-").split(",").map(s => s.trim()).map(s => s === "" ? NaN : Number(s) * 10);
   if (values.length !== 4 || values.some(v => !Number.isFinite(v) || Math.abs(v) > 1e7) ||
       values[0] >= values[2] || values[1] >= values[3])
     throw new Error("Rectangles use xmin, ymin, xmax, ymax in cm, with positive area.");
@@ -137,7 +138,9 @@ async function publishSearch(sequence) {
 }
 async function driveSearchTicks(sequence) {
   let finalMessage = null, failed = false;
-  jobLoop = true; jobPauseRequested = false; refreshBusy(); renderJobControls(); refreshStatus();
+  // A job ends an unfinished end pick: taps wait while it runs, and publishing drops the pick.
+  jobLoop = true; jobPauseRequested = false; pickMode = null;
+  refreshBusy(); renderJobControls(); refreshStatus(); draw();
   try {
     while (sequence === jobSequence && interactiveJob?.status === "running") {
       if (jobPauseRequested) {
@@ -243,7 +246,8 @@ function showRouteAnalysis() {
 }
 async function driveRouteTicks(sequence) {
   let failure = null;
-  jobLoop = true; jobPauseRequested = false; refreshBusy(); refreshStatus(); renderJobControls();
+  jobLoop = true; jobPauseRequested = false; pickMode = null;
+  refreshBusy(); refreshStatus(); renderJobControls(); draw();
   try {
     while (sequence === jobSequence && routeAnalysis?.status === "running") {
       const response = await api(jobPauseRequested ? "/api/routes/pause" : "/api/routes/tick",

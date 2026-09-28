@@ -201,6 +201,23 @@ test("a wheel zooms by the distance scrolled, however it is split up", () => {
   same(zoom(...Array(10).fill([-100 * Math.log(2) / 10, 0, true])), 2);
 });
 
+test("a Safari trackpad pinch zooms by its gesture scale, a touch pinch by its pointers only", () => {
+  const e = editor(), before = e.run("view.scale");
+  const gesture = (type, scale) => e.el("canvas").fire(type,
+    {scale, clientX: 10, clientY: 10, preventDefault() {}});
+  gesture("gesturestart", 1); gesture("gesturechange", 1.5); gesture("gesturechange", 2);
+  assert.ok(Math.abs(e.run("view.scale") / before - 2) < 1e-9);
+  e.run("pointers.set(1, {x: 0, y: 0}); pointers.set(2, {x: 50, y: 50})");
+  gesture("gesturestart", 1); gesture("gesturechange", 1.5);
+  assert.ok(Math.abs(e.run("view.scale") / before - 2) < 1e-9);
+});
+
+test("Fit preview without a preview says what it needs", () => {
+  const e = editor();
+  e.el("fit-preview").fire("click");
+  assert.match(e.messages.at(-1), /Preview a suggestion first/);
+});
+
 test("fitting keeps to the zoom range, so zooming out never zooms in", () => {
   const e = editor();
   e.run("fitView([{lines: [[[0, 0], [20000, 0]]]}])");
@@ -215,4 +232,21 @@ test("a paint keeps the canvas store at its CSS size times the pixel ratio", () 
   e.context.devicePixelRatio = 1.5;  // another monitor: no element resizes
   e.run("paint()");
   assert.equal(e.run("canvas.width"), 750);
+});
+
+test("a canvas resize repaints at once, not a frame later", () => {
+  let observed;
+  const h = harness({events: true, overrides: {devicePixelRatio: 2,
+    ResizeObserver: class { constructor(callback) { observed = callback; } observe() {} },
+    window: {addEventListener() {}, ResizeObserver: true}}});
+  h.run("ctx = {setTransform() {}, clearRect() {}}; S = null; canvas.width = 0");
+  observed();
+  assert.equal(h.run("canvas.width"), 1000);
+});
+
+test("every paint starts from butt caps, whatever a highlight left behind", () => {
+  const e = editor();
+  e.context.devicePixelRatio = 1;
+  e.run('ctx = {setTransform() {}, clearRect() {}, lineCap: "round"}; S = null; paint()');
+  assert.equal(e.run("ctx.lineCap"), "butt");
 });

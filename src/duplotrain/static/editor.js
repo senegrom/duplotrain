@@ -424,6 +424,8 @@ function paint() {
     canvas.width = width; canvas.height = height;
   }
   ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  // Highlights leave round caps behind; a cached track sets none of its own.
+  ctx.lineCap = "butt";
   ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
   if (!S) return;
   // faint 128mm grid
@@ -555,8 +557,6 @@ function refreshStatus() {
            `Joint ${first.a.join(":")} ↔ ${first.b.join(":")}: ` +
            `${first.problems.join(", ")}; height difference ${first.height_mm.toPrecision(4)} mm, ` +
            `heading error ${first.heading_error_deg}°.`, "err");
-  } else if (S.layout.exactly_closed && n) {
-    status(`Connectors closed — use Check layout for overlaps and stock. ${n} pieces, ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`, "closed");
   } else if (pickMode) {
     status(pickMode.stage === "grow" ? "Pick the end to GROW from (click a red arrow)"
                                      : "Now pick the end to CLOSE onto");
@@ -565,6 +565,9 @@ function refreshStatus() {
   } else if (armedStone) {
     const info = S.stones.catalog[armedStone];
     status(`${info.name} armed — click a straight to clip it on (or off).`);
+  } else if (S.layout.exactly_closed && n) {
+    // A closed layout has no red arrow for an armed piece.
+    status(`Connectors closed — use Check layout for overlaps and stock. ${n} pieces, ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`, "closed");
   } else if (armed) {
     status(`${armed.pieceName} — ${armed.label} armed. ` +
            (n ? "Click a red arrow to attach." : "Click anywhere to place it."));
@@ -1045,6 +1048,18 @@ function bindEditorEvents() {
     const notch = Math.log(1.12), step = -pixels / 100 * (e.ctrlKey ? 1 : notch);
     zoomAt(Math.exp(Math.max(-notch, Math.min(notch, step))), p.x, p.y);
   }, {passive: false});
+  // Safari reports a trackpad pinch as gesture events with a running scale, not as
+  // ctrl+wheel. A touch pinch also sends them, but the pointers above zoom it.
+  let gestureScale = 1;
+  canvas.addEventListener("gesturestart", (e) => { e.preventDefault(); gestureScale = 1; });
+  canvas.addEventListener("gesturechange", (e) => {
+    e.preventDefault();
+    if (!pointers.size && e.scale > 0 && gestureScale > 0) {
+      const p = canvasPoint(e);
+      zoomAt(e.scale / gestureScale, p.x, p.y);
+    }
+    gestureScale = e.scale;
+  });
   el("zoom-in").addEventListener("click", () => zoomAt(1.25, canvas.clientWidth / 2, canvas.clientHeight / 2));
   el("zoom-out").addEventListener("click", () => zoomAt(1 / 1.25, canvas.clientWidth / 2, canvas.clientHeight / 2));
   el("fit").addEventListener("click", () => { fitView(); draw(); });
@@ -1279,7 +1294,7 @@ function renderNavigation() {
     });
   });
   S.open_ends.forEach(end => add(ends, JSON.stringify(end), `#${end[0] + 1} ${S.layout.placements[end[0]].name} — port ${end[1]}`));
-  for (const id of ["remove-selected", "test-train", "route-best"]) el(id).disabled = !S.layout.placements.length;
+  for (const id of ["remove-selected", "test-train", "route-best", "route-all"]) el(id).disabled = !S.layout.placements.length;
   el("use-end").disabled = !S.open_ends.length;
   renderSwitches();
   navigationRevision = S.revision;
@@ -1313,7 +1328,10 @@ function bindExtraEvents() {
   bindSearchEvents();
   on("redo", async () => { try { S = await api("/api/redo", {}); redraw(); } catch (error) { status(error.message, "err"); } });
   on("check-layout", checkLayout);
-  on("fit-preview", () => { const pl = previewPlacements(preview); if (pl) { fitView(pl); fitted = true; draw(); } });
+  on("fit-preview", () => {
+    const pl = previewPlacements(preview);
+    if (pl) { fitView(pl); fitted = true; draw(); } else status("Preview a suggestion first; Fit preview frames it.");
+  });
   on("use-end", async () => { try { await activateEnd(JSON.parse(el("end-select").value)); } catch (e) { status(e.message, "err"); } });
   on("place-first", async () => {
     if (!S || S.layout.placements.length || !armed) { status("Arm a piece on an empty layout first."); return; }

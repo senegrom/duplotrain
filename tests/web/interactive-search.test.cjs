@@ -41,6 +41,11 @@ test("preferences use centimetres in controls and millimetres in the validated A
   assert.throws(() => h.run("readSearchOptions()"), /32/);
 });
 
+test("room input reads the placeholder's minus sign", () => {
+  const h = app(); h.el("room-bounds").value = "\u2212200, \u2212200, 200, 200";
+  assert.deepEqual(clean(h.run("readSearchOptions()")).room, [-2000, -2000, 2000, 2000]);
+});
+
 test("excluded categories change next-search options, never inventory", async () => {
   const h = app(); h.context.S.palette = [
     {id: "custom-junction", name: "Junction", junction: true, category: "track"},
@@ -201,55 +206,6 @@ test("Pause stops a route analysis at its next checkpoint and offers Resume", as
   assert.equal(h.run("routeAnalysis.status"), "paused");
   assert.equal(h.el("route-pause").hidden, true);
   assert.equal(h.el("route-resume").hidden, false);
-});
-
-test("viewport culling submits only visible track and includes edge padding", () => {
-  let fills=0,strokes=0;
-  const h=harness({events:true,overrides:{worldToScreen:(x,y)=>[x,y]}});
-  const placements=Array.from({length:1000},(_,i)=>track([[100+i*1000,100,0],[200+i*1000,100,0]]));
-  h.context.painted=placements;
-  h.context.record={beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){fills++;},stroke(){strokes++;}};
-  h.run("ctx=record; drawLayout({placements:painted},false)");
-  assert.equal(fills,1); assert.equal(strokes,1);
-  assert.equal(h.context.screenBoundsVisible(-100,-100,-1,-1,3),true);
-  assert.equal(h.context.screenBoundsVisible(-100,-100,-10,-10,3),false);
-  assert.equal(h.context.screenBoundsVisible(NaN,0,1,1),true);
-});
-
-test("base raster builds once a frame repeats, on one reused surface, within its pixel cap", () => {
-  const h=harness({events:true}); let direct=0,offscreen=0,blits=0,created=0;
-  const originalCreate=h.context.document.createElement;
-  h.context.document.createElement=tag=>tag==="canvas" ? (created++,{width:0,height:0,
-    getContext:()=>({setTransform(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},
-      fill(){offscreen++;},stroke(){}})}) : originalCreate(tag);
-  const target={drawImage(){blits++;},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){direct++;},stroke(){}};
-  h.context.target=target; h.context.layout={placements:[track([[0,0,0],[100,0,0]])]};
-  // A new view paints directly; its repeat builds the raster; later repeats only blit.
-  h.run("ctx=target; canvas.width=500; canvas.height=500; drawBaseTrack(layout); drawBaseTrack(layout); drawBaseTrack(layout)");
-  assert.deepEqual([direct,offscreen,blits,created],[1,1,2,1]);
-  // Pan and zoom frames and new geometry paint directly and allocate nothing.
-  h.run("for (let i=0;i<5;i++) { view.x++; drawBaseTrack(layout); }");
-  h.run("layout={placements:[...layout.placements]}; drawBaseTrack(layout)");
-  assert.deepEqual([direct,offscreen,blits,created],[7,1,2,1]);
-  assert.equal(h.run("baseRaster"),null);
-  // Once the view rests again, the same surface is re-rendered.
-  h.context.devicePixelRatio=2; h.run("drawBaseTrack(layout); drawBaseTrack(layout)");
-  assert.deepEqual([direct,offscreen,blits,created],[8,2,3,1]);
-  h.run("canvas.width=4000;canvas.height=3000;drawBaseTrack(layout);drawBaseTrack(layout)");
-  assert.equal(h.run("baseRaster"),null); assert.equal(h.run("rasterSurface"),null);
-  assert.deepEqual([direct,created],[10,1]);
-  assert.equal(h.run("ctx"),target);
-});
-
-test("base raster always restores the real canvas context if drawing throws", () => {
-  const h=harness({events:true});
-  const target={drawImage(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){}};
-  h.context.target=target;
-  h.context.document.createElement=()=>({getContext:()=>({setTransform(){},beginPath(){throw new Error("paint error");}})});
-  h.context.layout={placements:[track([[0,0,0],[100,0,0]])]};
-  h.run("ctx=target;canvas.width=500;canvas.height=500;drawBaseTrack(layout)");
-  assert.throws(()=>h.run("drawBaseTrack(layout)"),/paint error/);
-  assert.equal(h.run("ctx"),target); assert.equal(h.run("baseRaster"),null);
 });
 
 test("paused preview uses its captured constraints rather than newer draft controls", () => {
@@ -531,11 +487,31 @@ test("Check layout rows still focus their pieces after a search publishes", asyn
   assert.equal(focused, 1);
 });
 
-test("Best settings for this start waits for a layout to start from", () => {
+test("route analysis waits for a layout to start from", () => {
   const h = app();
   h.run("S.layout.placements = []; S.open_ends = []; navigationRevision = null; renderNavigation()");
   assert.equal(h.el("route-best").disabled, true);
+  assert.equal(h.el("route-all").disabled, true);
 });
+
+for (const [name, code] of [["Find more", "interactiveJob = done; continueSearch()"],
+                            ["a route analysis", 'startRouteAnalysis("all")']]) {
+  test(`${name} ends an unfinished end pick`, async () => {
+    let h;
+    h = app({api: async path => {
+      if (path.endsWith("/continue")) return job({status: "results_ready", found: 16});
+      if (path.endsWith("/publish"))
+        return {...h.context.S, revision: 8, search_job: job({revision: 8, status: "results_ready", found: 16})};
+      if (path === "/api/routes/start") return route({status: "complete", complete: true});
+      throw new Error("Unexpected API: " + path);
+    }});
+    h.context.done = job({status: "results_ready", found: 8});
+    h.run('selectTool({pick: {stage: "grow", grow: null}})');
+    await h.run(code);
+    assert.equal(h.run("pickMode"), null);
+    assert.ok(!h.notices.some(notice => /Pick the end/.test(notice.text)));
+  });
+}
 
 test("a job the engine no longer holds withdraws its controls", async () => {
   const h = app({api: async () => { throw new Error("Search expired after 20 minutes of inactivity; start again"); }});
