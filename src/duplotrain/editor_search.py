@@ -31,6 +31,7 @@ from .solver import (
     _solution_overlaps,
     solve_steps,
 )
+from .symmetry import placement_key
 from .validation import MAX_LINKS, MAX_PLACEMENTS, MAX_SNAPSHOT_BYTES, check_layout_json
 
 MAX_RESULTS = 50
@@ -128,18 +129,18 @@ def fits_space(layout, options):
 def physical_key(layout, base):
     """Identity of the track *layout* adds to *base*, which it extends unchanged.
 
-    Connectors have no gender: a piece placed from its other end has another
-    frame and port order but lies in the same place. So a piece is its id with
-    the set of its world connector poses, and a link joins two such poses or a
-    connector of the base, named by index. The base's own links and stones are
-    common to every extension and left out.
+    Reversing a symmetric piece can change its frame and port numbering without
+    changing its shape. Conversely, equal connector poses can bound different
+    paths of an asymmetric piece. Use the solver's exact path/route/kind identity,
+    and keep links to the unchanged base distinguished by their original indices.
+    The base's own links and stones are common to every extension and left out.
     """
     placements, start = layout.placements, len(base)
 
     def end(placement, port):
         return (placement, port) if placement < start else placements[placement].port_pose(port)
 
-    pieces = Counter((p.piece.id, frozenset(map(p.port_pose, range(len(p.piece.ports)))))
+    pieces = Counter((p.piece.id, placement_key(p.piece, p.frame))
                      for p in placements[start:])
     links = frozenset(frozenset((end(*a), end(*b))) for a, b in layout.links.items()
                       if a not in base.links)

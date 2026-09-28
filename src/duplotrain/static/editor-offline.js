@@ -152,20 +152,32 @@ async function checkOfflineUpdate() {
 async function applyOfflineUpdate() {
   if (offlineWorking || jobLoop || apiBusy) { offlineNotice("Finish or pause the current operation before updating."); return; }
   if (!window.confirm("Reload the app with the verified offline version? Download a project first. In-memory undo and search progress will be reset.")) return;
-  offlineWorking = true;
+  // Own the existing API exclusion before the first await: pending imports and
+  // new edits/jobs must not run between update verification and reload. Background
+  // installation does not take this lock; portable downloads do not need it.
+  offlineWorking = apiBusy = true; refreshBusy();
+  const confirmedState = S;
+  const checkIdle = () => {
+    if (!apiBusy || jobLoop || S !== confirmedState)
+      throw new Error("The editor changed while applying the update; no reload performed. Try again.");
+  };
   try {
     const r = offlineRegistration || await findRegistration();
     if (!r) throw new Error("No offline version is installed");
-    if (!(await offlineMessage(r.waiting || r.active, "STATUS")).ready)
+    const worker = r.waiting || r.active, waiting = worker === r.waiting;
+    if (!(await offlineMessage(worker, "STATUS")).ready)
       throw new Error("Offline version is incomplete; reinstall online before reloading.");
-    if (r.waiting) {
-      const worker = r.waiting;
+    checkIdle();
+    if (waiting) {
+      if (r.waiting !== worker && r.active !== worker)
+        throw new Error("The offline update was replaced; check for an update again.");
       await offlineMessage(worker, "ACTIVATE");
       await untilState(worker, ["activated"], "Update did not activate; no reload performed", 15000);
     }
+    checkIdle();
     window.location.reload();
   } catch (error) { offlineNotice(sentence(error.message)); }
-  finally { offlineWorking = false; }
+  finally { offlineWorking = apiBusy = false; refreshBusy(); }
 }
 function bindOfflineEvents() {
   on("offline-install", installOffline); on("offline-check", checkOfflineUpdate); on("offline-update", applyOfflineUpdate);
