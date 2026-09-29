@@ -119,14 +119,16 @@ test("the engine worker reports download progress while the runtime loads", asyn
   assert.match(messages[1].bootError, /stop after the runtime download/);
 });
 
-test("a lost engine download names its file and ends the boot at once", async () => {
-  for (const [failing, reason] of [["connect", "Failed to fetch"], ["body", "network error"]]) {
+test("a lost or refused engine download names its file and ends the boot at once", async () => {
+  for (const [failing, reason] of [["connect", "Failed to fetch"], ["body", "network error"],
+                                   ["status", "HTTP 404"]]) {
     const messages = [];
     const context = vm.createContext({
       importScripts() {}, Response, ReadableStream, console, onmessage: null,
       postMessage: message => messages.push(message),
       fetch: async () => {
         if (failing === "connect") throw new TypeError(reason);
+        if (failing === "status") return new Response(null, {status: 404});
         return new Response(new ReadableStream({pull(stream) { stream.error(new TypeError(reason)); }}));
       },
       // Pyodide only logs a failed runtime download, and its start never settles.

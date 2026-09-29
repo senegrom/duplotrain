@@ -43,6 +43,12 @@ selected indices directly. When several pieces overlap under the pointer, a
 click or the Remove tool opens a chooser that owns its allowed targets and its
 selected target: confirmation checks the originating revision, the dialog
 identity and the selected option, and any other tool invalidates an old dialog.
+An armed piece shows red arrows only at the open ends it can join: the state
+names each bridge connector's kind and the kinds each palette variant joins, and
+an end the armed piece cannot take (a ramp's top for ordinary track) turns grey.
+Clicking an open end with no tool joins it to an end that meets it, or says what
+an open end is for; tool guidance comes before any joint warning, which returns
+once no tool is active.
 
 ## Drawing and picking
 
@@ -57,8 +63,9 @@ frames. Hover hit-testing runs at most once per frame at the latest pointer
 position, visits only the pieces whose bounds contain the pointer, and repaints
 only when the hovered piece changes; clicks pick immediately. A right click
 removes the stone or piece under the pointer, through the same chooser when
-pieces overlap. This is a sampled 2D view, not a solid renderer or a collision
-model.
+pieces overlap. Track is coloured by its height above the layout's lowest track,
+as rendered pictures measure it. This is a sampled 2D view, not a solid renderer
+or a collision model.
 
 Conservative viewport bounds skip off-screen track batches and markers without
 changing global paint order or picking. While the view or geometry keeps
@@ -91,9 +98,10 @@ reports the shortages.
 ## Check layout
 
 `/api/check` is a revision-checked, read-only report of open connectors and
-incompatible joints, sampled overlaps between non-neighbouring pieces under the
-solver's width, height and underpass rules, shortages of track and action
-stones against the owned counts, and pieces the catalogue marks provisional.
+incompatible joints (two ends that meet but cannot join among them), sampled
+overlaps between non-neighbouring pieces under the solver's width, height and
+underpass rules, shortages of track and action stones against the owned
+counts, and pieces the catalogue marks provisional.
 Each finding focuses and highlights its pieces. Layouts of 128 pieces or more
 shortlist candidate pairs through the collision field's bounds index and run
 the same pair tests on that superset. At most 200 overlapping pairs are
@@ -160,7 +168,8 @@ while answering a request, the overlay offers downloads of the last confirmed
 layout and session from this tab's own state, and a restart that creates a new
 worker and restores a copy of that snapshot; responses from an old worker
 generation are ignored, and a restart resets undo history and suggestions and
-says so. Startup fails after a minute without a loading progress report (five
+says so. Startup fails at once, naming the file, when a download fails or is
+refused, and otherwise after a minute without a loading progress report (five
 minutes before the first, while the runtime's main script loads in one piece);
 outstanding calls time out after two minutes without a response. Every request is short: the editor's searches
 and route analyses are interactive jobs that advance in brief ticks and pause

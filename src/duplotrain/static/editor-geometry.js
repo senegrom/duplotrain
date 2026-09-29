@@ -39,7 +39,8 @@ function drawLayout(layout, ghost) {
       });
       ctx.closePath();
     }
-    ctx.fillStyle = ghost ? "rgba(44,138,75,.35)" : elevColor(batch[0].z); ctx.fill();
+    ctx.fillStyle = ghost ? "rgba(44,138,75,.35)" : elevColor(batch[0].z - groundOf(layout.placements));
+    ctx.fill();
     if (!ghost) {
       ctx.beginPath();
       for (const segment of batch) for (const rail of segment.rails) {
@@ -136,14 +137,30 @@ function offsetLine(line, d) {
   return out;
 }
 
-function strokeSegment(a, b, width, color, cap = "round") {
+function strokeSegment(a, b, width, color) {
   const [ax, ay] = worldToScreen(a[0], a[1]), [bx, by] = worldToScreen(b[0], b[1]);
   if (!screenBoundsVisible(ax, ay, bx, by, width / 2 + 2)) return;
   ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
-  ctx.lineWidth = width; ctx.lineCap = cap; ctx.lineJoin = "round";
+  ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
   ctx.strokeStyle = color; ctx.stroke();
 }
+// A highlight along one piece's centre lines.
+function strokePiece(pl, width, color) {
+  for (const line of pl.lines) for (let i = 0; i + 1 < line.length; i++)
+    strokeSegment(line[i], line[i + 1], width, color);
+}
 const interpolate = (a, b, t) => [0, 1, 2].map(i => (a[i] || 0) + ((b[i] || 0) - (a[i] || 0)) * t);
+// Heights count from the lowest track, which stands on the floor, as the rendered
+// pictures count them: a loop begun up on a crest lies partly below zero.
+function groundOf(placements) {
+  const geometry = drawingGeometry(placements);
+  if (geometry.ground === undefined) {
+    let ground = Infinity;
+    for (const pl of placements) for (const line of pl.lines) for (const p of line) ground = Math.min(ground, p[2] || 0);
+    geometry.ground = Number.isFinite(ground) ? ground : 0;
+  }
+  return geometry.ground;
+}
 function drawingSegments(placements) {
   const geometry = drawingGeometry(placements);
   if (geometry.segments) return geometry.segments;

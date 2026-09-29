@@ -13,7 +13,7 @@ function editor() {
     inventory: {unlimited: false, owned: {straight: 8}, remaining: {straight: 7}},
     stones: {catalog: {stop: {name: "Stop stone", effect: "Stop", color: "red"}},
       remaining: {stop: 1}},
-    sets: [{code: "123", name: "Box", year: 2026, pieces: {straight: 8}}],
+    sets: [{code: "123", name: "Box", year: 2026, pieces: {straight: 8}, stones: {stop: 1}}],
     candidates: [],
   };
   const h = harness({state, overrides: {
@@ -88,6 +88,8 @@ test("retained listeners fire once and mutually exclusive tools update styling",
   await row.input.fire("change");
   assert.equal(e.calls.length, 1);
   assert.equal(e.calls[0].body.counts.straight, "17");
+  // A set's button names what it adds, stones included.
+  assert.equal(e.el("sets").children[0].title, "Box (2026): 8×straight, 1×Stop stone");
   await e.el("sets").children[0].fire("click");
   assert.equal(e.calls.length, 2);
   assert.equal(e.calls[1].body.code, "123");

@@ -78,7 +78,9 @@ async function openProject(data, revision = S && S.revision) {
   if (prefs.view) { view = {...prefs.view}; fitted = true; } else fitted = false;
   // The project is open even when this tab's own search fields are invalid;
   // the status then asks for them to be corrected before the next save.
-  redraw(); markProjectSaved(projectData()); status(`Opened project: ${next.project.name}`);
+  // A joint warning outlasts the opening message, as after an import.
+  redraw(); markProjectSaved(projectData());
+  if (!next.layout.joint_issues.length) status(`Opened project: ${next.project.name}`);
 }
 function readLocalProject(key, raw) {
   if (!projectPrefix(key) || typeof raw !== "string" || raw.length > 2 * 1024 * 1024)
@@ -146,6 +148,7 @@ function manageLocalProject(action) {
   try {
     if (!["rename", "delete"].includes(action)) throw new Error("Unknown backup action");
     const key = el("project-slots").value, row = projectRows.get(key);
+    if (!key) throw new Error("No local copy selected");
     if (!row || localStorage.getItem(key) !== row.raw) throw new Error("Selected backup changed; refresh the list first");
     if (!navigator.locks) throw new Error("Safe backup management unavailable; download or save a new copy instead");
     if (action === "rename" && !row.data) throw new Error("Cannot rename an unreadable backup; existing copy kept");

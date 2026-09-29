@@ -91,9 +91,10 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
           if (worker === current) fail(new Error(event.message || "Could not load worker.js"));
         };
         current.onmessageerror = () => { if (worker === current) fail(new Error("invalid worker message")); };
-        // Loading fails only after a minute without a progress report. The first
-        // report may take longer: the worker loads the runtime's main script in one
-        // blocking piece before it can report anything, so it gets five minutes.
+        // A download the worker cannot make fails loading at once (bootError);
+        // otherwise loading fails after a minute without a progress report. The
+        // first report may take longer: the worker loads the runtime's main script
+        // in one blocking piece before it can report anything, so it gets five minutes.
         const loading = (ms = 60000) => {
           clearTimeout(bootTimer);
           bootTimer = setTimeout(() => fail(new Error("engine loading stalled")), ms);

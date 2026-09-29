@@ -1051,7 +1051,10 @@ def exercise_geometry_optimisations(page):
         const sparsePixel = sample([flat], 12, 8), detailedPixel = sample([detailed], 12, 8);
         const ramp = track([[[-128, 0, 0], [128, 0, 120]]]);
         const level = track([[[-128, 0, 60], [128, 0, 60]]]);
-        const low = sample([ramp, level], -80, 8), lowReference = sample([level], -80, 8);
+        // Heights count from the lowest track: far off, a floor track keeps the
+        // reference's colours those of the scene.
+        const floor = track([[[4000, 4000, 0], [4128, 4000, 0]]]);
+        const low = sample([ramp, level], -80, 8), lowReference = sample([level, floor], -80, 8);
         const high = sample([ramp, level], 80, 8), highReference = sample([ramp], 80, 8);
         S = {...oldState, layout: {...oldState.layout, placements: [ramp, level]}};
         const pick = (x, y) => placementAt(...worldToScreen(x, y));

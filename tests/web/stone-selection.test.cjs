@@ -72,3 +72,22 @@ test("an armed stone or the Remove tool explains itself on a closed layout too",
   h.run('selectTool({piece: {piece: "straight", pieceName: "Straight", label: "ahead"}}); refreshStatus()');
   assert.match(h.notices.at(-1).text, /Connectors closed/);
 });
+
+test("an armed piece says which ends it joins, and a joint warning waits behind the tools", () => {
+  const ramp = track([[0, 0, 0], [320, 0, 57.6]], "Bridge ramp");
+  ramp.ports = [{port: 0, open: true, sealed: false, x: 0, y: 0, deg: 180, name: "low"},
+    {port: 1, open: true, sealed: false, x: 320, y: 0, deg: 0, name: "high", kind: "ramp_top"}];
+  const h = harness({state: scene([ramp])});
+  h.run('selectTool({piece: {piece: "span", pieceName: "Bridge arch", label: "climb", takes: ["ramp_top"]}})');
+  h.run("refreshStatus()");
+  assert.match(h.notices.at(-1).text, /Click a red arrow to attach/);
+  h.context.S.layout.placements[0].ports[1].open = false;  // the ramp's top is taken
+  h.run("refreshStatus()");
+  assert.match(h.notices.at(-1).text, /No open end takes it: it joins only a ramp's top\./);
+  h.context.S.layout.joint_issues = [{a: [0, 1], b: [1, 0], gap_mm: 0, height_mm: 0,
+    heading_error_deg: 0, problems: ["mismatched bridge joint"]}];
+  h.run("refreshStatus()");
+  assert.match(h.notices.at(-1).text, /Bridge arch — climb armed/);
+  h.run("selectTool(); refreshStatus()");
+  assert.match(h.notices.at(-1).text, /Joint #1 ↔ #2: mismatched bridge joint\.$/);
+});

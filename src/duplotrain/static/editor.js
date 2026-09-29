@@ -87,7 +87,7 @@ async function adoptConflictState(error) {
 // One API snapshot owner. The companion geometry, projects and train scripts
 // read this state; successful API operations publish their new snapshot here.
 let S = null;                 // last /api/state payload
-let armed = null;             // {piece, entry, label}
+let armed = null;             // {piece, entry, label, takes: kinds of open end it joins}
 let armedStone = null;        // stone id
 let preview = null;           // candidate layout ghost
 let pickMode = null;          // null | {stage: "grow"|"close", grow: [i,p]}
@@ -356,6 +356,11 @@ function elevColor(z) {
   return "rgb(185,190,196)";
 }
 
+// Kinds of connector (pieces.PORT_KINDS) as the status names them.
+const KIND_NAMES = {track: "ordinary track", ramp_top: "a ramp's top", arch_foot: "an arch's foot"};
+// Can the armed piece join this open end?
+const armedTakes = () => armed.takes || ["track"];
+const takesEnd = p => armedTakes().includes(p.kind || "track");
 function openEndScreenPos() {
   const out = [];
   if (!S) return out;
@@ -489,8 +494,10 @@ function paint() {
       } else {
         const picked = pickMode && pickMode.grow && pickMode.grow[0] === i && pickMode.grow[1] === p.port;
         const rad = -p.deg * Math.PI / 180;
-        ctx.strokeStyle = picked ? "#2f6fdb" : "#d0342c";
-        ctx.fillStyle = picked ? "#2f6fdb" : "#d0342c";
+        // Grey: the armed piece cannot join this end (a ramp's top, say).
+        const color = picked ? "#2f6fdb" : armed && !takesEnd(p) ? "#a7adb3" : "#d0342c";
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
         ctx.lineWidth = 2.5;
         const len = Math.max(16, 30 * view.scale);
         const ex = sx + Math.cos(rad) * len, ey = sy + Math.sin(rad) * len;
@@ -545,19 +552,7 @@ function refreshStatus() {
   const n = S.layout.placements.length;
   const opens = S.open_ends.length;
   const issues = S.layout.joint_issues || [];
-  if (issues.length) {
-    const first = issues[0];
-    const forced = issues.every(joint => joint.problems.length === 1 &&
-                                         joint.problems[0] === "planar gap");
-    const gap = issues.reduce((sum, joint) => sum + joint.gap_mm, 0);
-    status((S.layout.closed ? "Fully linked, but not exactly closed. " : `${opens} open end(s). `) +
-           (forced ? `Forced fit: ${gap.toPrecision(4)} mm total planar gap; physical fit not verified. `
-                   : "Incompatible joint geometry. ") +
-           `${issues.length} joint(s) need attention. ` +
-           `Joint ${first.a.join(":")} ↔ ${first.b.join(":")}: ` +
-           `${first.problems.join(", ")}; height difference ${first.height_mm.toPrecision(4)} mm, ` +
-           `heading error ${first.heading_error_deg}°.`, "err");
-  } else if (pickMode) {
+  if (pickMode) {
     status(pickMode.stage === "grow" ? "Pick the end to GROW from (click a red arrow)"
                                      : "Now pick the end to CLOSE onto");
   } else if (deleting) {
@@ -569,8 +564,25 @@ function refreshStatus() {
     // A closed layout has no red arrow for an armed piece.
     status(`Connectors closed — use Check layout for overlaps and stock. ${n} pieces, ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`, "closed");
   } else if (armed) {
+    const ends = S.layout.placements.flatMap(pl => pl.ports.filter(p => p.open && !p.sealed));
     status(`${armed.pieceName} — ${armed.label} armed. ` +
-           (n ? "Click a red arrow to attach." : "Click anywhere to place it."));
+           (!n ? "Click anywhere to place it." : ends.some(takesEnd) ? "Click a red arrow to attach."
+             : `No open end takes it: it joins only ${armedTakes().map(k => KIND_NAMES[k] ?? k).join(" or ")}.`));
+  } else if (issues.length) {
+    // After any tool's guidance: the warning stays in place until the joints change.
+    const first = issues[0];
+    const forced = issues.every(joint => joint.problems.length === 1 &&
+                                         joint.problems[0] === "planar gap");
+    const gap = issues.reduce((sum, joint) => sum + joint.gap_mm, 0);
+    const detail = [first.problems.join(", ")];
+    if (first.height_mm) detail.push(`height difference ${first.height_mm.toPrecision(4)} mm`);
+    if (first.heading_error_deg) detail.push(`heading error ${first.heading_error_deg}°`);
+    status((!S.layout.closed ? `${opens} open end(s). ` : forced
+              ? "Fully linked, but not exactly closed. " : "Fully linked, but some joints have problems. ") +
+           (forced ? `Forced fit: ${gap.toPrecision(4)} mm total planar gap; physical fit not verified. `
+                   : "Incompatible joints. ") +
+           `${issues.length} joint(s) need attention. ` +
+           `Joint #${first.a[0] + 1} ↔ #${first.b[0] + 1}: ${detail.join("; ")}.`, "err");
   } else {
     status(n ? `${n} pieces, ${opens} open end(s), ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`
              : "Empty floor. Arm a piece to begin.");
@@ -621,7 +633,8 @@ function renderPalette() {
         b.addEventListener("click", () => {
           const same = armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit;
           selectTool(same ? {} : {
-            piece: {piece: piece.id, pieceName: piece.name, entry: v.entry, exit: v.exit, label: v.label},
+            piece: {piece: piece.id, pieceName: piece.name, entry: v.entry, exit: v.exit, label: v.label,
+                    takes: v.takes || ["track"]},
           });
           renderPalette(); renderStones(); refreshStatus(); draw();
         });
@@ -663,8 +676,11 @@ function renderSets() {
   for (const s of (S.sets || [])) {
     const b = document.createElement("button");
     b.textContent = `+ ${s.code}`;
-    b.title = `${s.name} (${s.year}): ` +
-      Object.entries(s.pieces).map(([k, n]) => `${n}×${k}`).join(", ");
+    // The set adds its action stones too.
+    b.title = `${s.name} (${s.year}): ` + [
+      ...Object.entries(s.pieces).map(([pid, n]) => `${n}×${pid}`),
+      ...Object.entries(s.stones || {}).map(([sid, n]) => `${n}×${S.stones.catalog[sid]?.name ?? sid}`),
+    ].join(", ");
     b.addEventListener("click", async () => {
       try { S = await api("/api/add_set", { code: s.code }); redraw(); }
       catch (e) { status(e.message, "err"); }
@@ -856,12 +872,8 @@ async function activateAt(sx, sy) {
     } else if (armed && S.layout.placements.length === 0) {
       S = await api("/api/attach", {piece: armed.piece, entry: armed.entry, at: null});
       fitted = false; redraw();
-    } else if (armed && hit) {
-      await activateEnd(hit.end);
-    } else if (hit && S.matable.length) {
-      const mate = S.matable.find(([a, b]) =>
-        (a[0] === hit.end[0] && a[1] === hit.end[1]) || (b[0] === hit.end[0] && b[1] === hit.end[1]));
-      if (mate) { S = await api("/api/join", {a: mate[0], b: mate[1]}); redraw(); }
+    } else if (hit) {
+      await activateEnd(hit.end);  // attaches, joins its mate, or says what an end is for
     } else {
       const hits = placementsAt(sx, sy);
       if (hits.length > 1) showOverlapPicker(hits);
@@ -1192,23 +1204,19 @@ function drawHighlights() {
     for (const [id, pieces, color] of overlays) if (el(id).checked) {
       for (const index of pieces || []) {
         const pl = S.layout.placements[index];
-        if (pl) for (const line of pl.lines) for (let i = 0; i + 1 < line.length; i++)
-          strokeSegment(line[i], line[i + 1], 6, color);
+        if (pl) strokePiece(pl, 6, color);
       }
     }
   }
   for (const index of indices) {
     const pl = S.layout.placements[index];
-    if (!pl) continue;
-    for (const line of pl.lines) for (let i = 0; i + 1 < line.length; i++)
-      strokeSegment(line[i], line[i + 1], 3, "#2f6fdb");
+    if (pl) strokePiece(pl, 3, "#2f6fdb");
   }
   if (trainTrace?.revision === S.revision) {
     const step = trainTrace.steps[trainStep];
     const terminal = trainStep === trainTrace.steps.length ? trainTrace.terminal : null;
     const pl = S.layout.placements[terminal ? terminal.placement : step ? step[0] : trainTrace.start[0]];
-    if (pl) for (const line of pl.lines) for (let i = 0; i + 1 < line.length; i++)
-      strokeSegment(line[i], line[i + 1], 5, "#9a3c9c");
+    if (pl) strokePiece(pl, 5, "#9a3c9c");
   }
 }
 function focusPieces(indices) {
@@ -1230,7 +1238,8 @@ function showOverlapPicker(hits, remove = false) {
   const select = document.createElement("select"); select.setAttribute("aria-label", "Overlapping piece");
   hits.filter(h => choices.has(h.placement)).forEach(hit => {
     const option = document.createElement("option"); option.value = hit.placement;
-    option.textContent = `#${hit.placement + 1} ${S.layout.placements[hit.placement].name} · ${hit.z.toFixed(1)} mm`;
+    const height = hit.z - groundOf(S.layout.placements);
+    option.textContent = `#${hit.placement + 1} ${S.layout.placements[hit.placement].name} · ${height.toFixed(1)} mm`;
     select.append(option);
   });
   selectedPiece = dialog.target;
