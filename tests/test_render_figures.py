@@ -1,4 +1,4 @@
-"""Rendering to a file leaves pyplot's backend and figures as the caller had them."""
+"""Rendering: height labels, and pyplot's backend and figures left as the caller had them."""
 
 import pytest
 
@@ -52,3 +52,23 @@ def test_the_default_title_is_plain_text(tmp_path):
         {"segments": [{"type": "arc", "radius": 256, "degrees": 30}]}]})
     figure = render_layout(build_chain([(piece, 0, 1)] * 12), path=str(tmp_path / "ring.png"))
     assert figure.axes[0].get_title().startswith("12 arc$\\frac$  |")
+
+
+def test_heights_count_from_the_lowest_track_and_stand_clear_of_stones():
+    from matplotlib.figure import Figure
+
+    catalog = default_catalog()
+    ramp, span, straight = catalog["ramp"], catalog["span"], catalog["straight"]
+    # Down from a crest, the walk's own heights run below zero; up to one, the
+    # straight at the crest stands on bricks.
+    down = build_chain([(span, 1, 0), (ramp, 1, 0), (straight, 0, 1)])
+    up = build_chain([(ramp, 0, 1), (span, 0, 1), (straight, 0, 1)])
+    for layout, labels in ((down, ["+29mm", "+67mm"]), (up, ["+29mm", "+67mm", "+77mm"])):
+        ax = Figure().subplots()
+        render_layout(layout, ax=ax)
+        assert sorted(text.get_text() for text in ax.texts if text.get_text()) == labels
+    # The label of a piece carrying a stone moves below the stone.
+    ax = Figure().subplots()
+    render_layout(up.with_accessory(2, "stone_direction"), ax=ax)
+    offsets = {text.get_text(): tuple(text.xyann) for text in ax.texts if text.get_text()}
+    assert offsets["+77mm"] == (0, -12) and offsets["+29mm"] == (0, 0)

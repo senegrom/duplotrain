@@ -43,17 +43,21 @@ def test_pieces_json_lists_every_piece_with_its_port_count(runner, tmp_path):
         pid: len(piece.ports) for pid, piece in catalog.items()}
     assert (listed["straight"]["ports"], listed["switch"]["ports"],
             listed["crossing"]["ports"]) == (2, 3, 4)
+    assert listed["buffer"]["sealed_ports"] == [1] and listed["curve"]["sealed_ports"] == []
+    assert listed["span"]["port_kinds"] == ["arch_foot", "track"]
     # A --catalog file overrides a built-in piece by its id (the README example).
     mine = tmp_path / "my-measurements.json"
     mine.write_text(json.dumps({"pieces": [{
         "id": "ramp", "name": "Bridge ramp (my callipers)", "category": "bridge", "width": 64,
         "paths": [{"segments": [{"type": "ramp", "run": 320, "rise": 60}]}],
-        "port_names": ["low", "high"]}]}))
+        "port_names": ["low", "high"], "port_kinds": ["track", "ramp_top"]}]}))
     result = runner.invoke(main, ["pieces", "--json", "--catalog", str(mine)])
     overridden = {piece["id"]: piece for piece in json.loads(result.output)}
     assert list(overridden) == list(catalog)
     assert overridden["ramp"]["name"] == "Bridge ramp (my callipers)"
     assert overridden["ramp"]["ports"] == 2 and not overridden["ramp"]["provisional"]
+    # The override keeps the bridge joint only by naming it.
+    assert overridden["ramp"]["port_kinds"] == ["track", "ramp_top"]
 
 
 def captured_configs(monkeypatch):
@@ -115,6 +119,17 @@ def test_solve_saves_and_lists_loops_best_first(runner, monkeypatch, tmp_path):
     shown = [round(float(row.split("│")[2])) for row in result.output.splitlines()
              if row.count("│") > 3 and row.split("│")[1].strip().isdigit()]
     assert shown == [round(total) for total in totals]
+
+
+def test_solve_lists_loops_on_the_floor_before_loops_on_bricks(runner):
+    result = runner.invoke(main, ["solve", "--curve", "12", "--straight", "6", "--ramp", "2",
+                                  "--span", "2", "--max-results", "200"])
+    assert result.exit_code == 0, result.output
+    rows = [[cell.strip() for cell in row.split("│")] for row in result.output.splitlines()
+            if row.count("│") > 3 and row.split("│")[1].strip().isdigit()]
+    ranked = [(int(row[7]), -int(row[2])) for row in rows]
+    assert ranked[0][0] == 0 and ranked[-1][0] > 0
+    assert ranked == sorted(ranked)  # fewest pieces on bricks first, then the best score
 
 
 def test_malformed_catalog_fails_politely(runner, tmp_path):
@@ -197,6 +212,32 @@ def test_check_reports_each_pair_of_open_ends_and_their_gap(runner, tmp_path):
     assert "2 open end(s)" in result.output
     # The half circle's two ends face each other across its 512 mm diameter.
     assert "Open ends (0, 0) <-> (5, 1): gap 512 mm" in result.output
+
+
+def test_check_names_ends_that_meet_but_cannot_join(runner, tmp_path):
+    catalog = default_catalog()
+    ramp, straight = catalog["ramp"], catalog["straight"]
+    layout, _ = Layout().with_piece(ramp, ORIGIN)
+    layout, flat = layout.with_piece(straight, straight.frame_for(0, layout.pose_of((0, 1))))
+    path = tmp_path / "butted.json"
+    path.write_text(json.dumps(layout_to_dict(layout)))
+    result = runner.invoke(main, ["check", str(path)])
+    assert result.exit_code == 1
+    assert f"Open ends (0, 1) <-> ({flat}, 0) meet but cannot join" in result.output
+    # No near miss of 0 mm, and never a piece's own two ends.
+    assert "gap 0 mm" not in result.output and "(0, 0) <-> (0, 1)" not in result.output
+
+
+def test_solve_passes_its_piece_limit_and_names_it_when_the_search_runs_out(runner, monkeypatch):
+    configs = captured_configs(monkeypatch)
+    assert runner.invoke(main, ["solve", "--curve", "12", "--max-pieces", "20"]).exit_code == 0
+    assert configs[0].max_pieces == 20
+    monkeypatch.setattr(cli, "solve", lambda *args: SolveResult(
+        [], SolveStats(complete=False, stop_reason="node_limit")))
+    for args, hint in (([], True), (["--max-pieces", "24"], False)):
+        result = runner.invoke(main, ["solve", "--curve", "12", *args])
+        assert "a closure may still exist" in result.output
+        assert ("--max-pieces 24 finds loops" in result.output) == hint
 
 
 def test_cli_check_reports_the_complete_crossing_length(tmp_path):

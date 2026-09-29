@@ -9,8 +9,8 @@ weight can be overridden.  The components:
     it asks the joints to absorb.
 
 ``usage``
-    Fraction of the owned pieces actually on the floor.  A layout that leaves half the
-    box in the box is less satisfying.
+    Fraction of the owned pieces the layout uses.  A layout that leaves half the box in
+    the box is less satisfying.
 
 ``compactness``
     Track length relative to the bounding-box perimeter.  Long snaking layouts that
@@ -28,17 +28,21 @@ weight can be overridden.  The components:
     Open switch branches dangling off the loop.  Mild by default: a stub is untidy but
     also a place to park the second train.
 
-``stack_penalty``
-    Ordinary track raised above the layout's lowest track, which needs a stack of
-    DUPLO bricks under each piece.  A bridge carries itself; raised track is allowed,
-    but the loop standing on the floor ranks first.
+Apart from the score, ``raised`` counts the pieces that stand on stacks of DUPLO
+bricks: those a brick or more above the layout's lowest track, save an arch resting
+on a ramp that stands on the floor -- a bridge carries itself.  Raised track is
+allowed, but a loop needing fewer stacks ranks first, whatever its score
+(:attr:`ScoreBreakdown.rank`).
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from fractions import Fraction
 
+from .exact import Alg
+from .layout import Layout, _lowest
 from .solver import Solution
 
 __all__ = ["ScoreWeights", "ScoreBreakdown", "score_solution"]
@@ -53,7 +57,6 @@ class ScoreWeights:
     squareness: float = 10.0
     variety: float = 10.0
     stub_penalty: float = 3.0  # per dangling branch
-    stack_penalty: float = 2.0  # per ordinary piece raised on bricks
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +67,7 @@ class ScoreBreakdown:
     squareness: float
     variety: float
     stub_penalty: float
-    stack_penalty: float = 0.0
+    raised: int  # pieces standing on bricks; not part of the total
 
     @property
     def total(self) -> float:
@@ -75,8 +78,35 @@ class ScoreBreakdown:
             + self.squareness
             + self.variety
             - self.stub_penalty
-            - self.stack_penalty
         )
+
+    @property
+    def rank(self) -> tuple[int, float]:
+        """Sort key, best first: fewer pieces on bricks, then the higher total."""
+        return (self.raised, -self.total)
+
+
+#: One DUPLO brick: track lower than this above the floor needs nothing under it.
+_BRICK = Alg(Fraction(96, 5))
+
+
+def _raised_pieces(layout: Layout) -> int:
+    """How many of *layout*'s pieces stand on stacks of DUPLO bricks (see above)."""
+    lows = [_lowest(placement.port_pose(port).z for port in range(len(placement.piece.ports)))
+            for placement in layout]
+    floor = layout.floor()
+
+    def carried(index: int) -> bool:
+        # An arch whose foot rests on the top of a ramp standing on the floor.
+        for port, spec in enumerate(layout.placements[index].piece.ports):
+            mate = layout.links.get((index, port)) if spec.kind == "arch_foot" else None
+            if (mate is not None and lows[mate[0]] == floor
+                    and layout.placements[mate[0]].piece.ports[mate[1]].kind == "ramp_top"):
+                return True
+        return False
+
+    return sum((low - floor - _BRICK).sign() >= 0 and not carried(index)
+               for index, low in enumerate(lows))
 
 
 def score_solution(
@@ -112,15 +142,6 @@ def score_solution(
 
     stub_penalty = w.stub_penalty * solution.open_stubs
 
-    # A bridge part carries itself; flat or sloped ordinary track above the lowest
-    # track needs bricks under it.
-    lows = [(placement.piece.category, min(placement.port_pose(port).z
-                                           for port in range(len(placement.piece.ports))))
-            for placement in layout]
-    floor = min((low for _category, low in lows), default=0)
-    raised = sum(category != "bridge" and low != floor for category, low in lows)
-    stack_penalty = w.stack_penalty * raised
-
     return ScoreBreakdown(
         exactness=exactness,
         usage=usage,
@@ -128,5 +149,5 @@ def score_solution(
         squareness=squareness,
         variety=variety,
         stub_penalty=stub_penalty,
-        stack_penalty=stack_penalty,
+        raised=_raised_pieces(layout),
     )

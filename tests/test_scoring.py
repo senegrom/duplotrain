@@ -1,4 +1,4 @@
-"""Ranking loops for a box of pieces: exactness, usage, variety and open stubs."""
+"""Ranking loops for a box of pieces: exactness, usage, variety, open stubs and bricks."""
 
 from dataclasses import fields, replace
 
@@ -50,24 +50,37 @@ def test_scoring_subtracts_a_penalty_for_each_open_stub(catalog):
     tidy = score_solution(replace(stubbed, open_stubs=0), inventory)
     assert with_stub.stub_penalty == 3.0 and tidy.stub_penalty == 0.0
     assert with_stub.total == pytest.approx(tidy.total - 3.0)
-    parts = {f.name: getattr(with_stub, f.name) for f in fields(with_stub)}
-    assert with_stub.total == pytest.approx(
-        sum(parts.values()) - 2 * (parts["stub_penalty"] + parts["stack_penalty"]))
+    parts = {f.name: getattr(with_stub, f.name) for f in fields(with_stub) if f.name != "raised"}
+    assert with_stub.total == pytest.approx(sum(parts.values()) - 2 * parts["stub_penalty"])
 
 
-def test_each_piece_raised_on_bricks_costs_a_stack(catalog):
+def test_pieces_on_bricks_are_counted_apart_from_the_score(catalog):
     from duplotrain.layout import build_chain
-    from duplotrain.scoring import ScoreWeights
     from duplotrain.solver import Solution
 
-    ramp, span, straight = catalog["ramp"], catalog["span"], catalog["straight"]
+    ramp, span, straight, slope = (catalog[pid] for pid in ("ramp", "span", "straight", "slope"))
 
-    def penalty(chain):
+    def score(chain):
         layout = build_chain(chain)
         solution = Solution(layout, (), 0.0, True, len(layout.connectable_ends()), ())
-        return score_solution(solution, {"ramp": 1, "span": 1, "straight": 1}).stack_penalty
+        return score_solution(solution, {"ramp": 2, "span": 2, "straight": 1, "slope": 4})
 
-    # Bridge parts carry themselves; a straight at the crest stands on bricks.
-    assert penalty([(ramp, 0, 1), (span, 0, 1)]) == 0
-    assert penalty([(ramp, 0, 1), (span, 0, 1), (straight, 0, 1)]) == ScoreWeights().stack_penalty
-    assert penalty([(straight, 0, 1), (ramp, 0, 1), (span, 0, 1)]) == 0
+    def raised(chain):
+        return score(chain).raised
+
+    # A bridge standing on the floor carries itself; a straight at the crest
+    # stands on bricks, whichever way the chain was walked.
+    assert raised([(ramp, 0, 1), (span, 0, 1)]) == 0
+    assert raised([(ramp, 0, 1), (span, 0, 1), (straight, 0, 1)]) == 1
+    assert raised([(straight, 0, 1), (ramp, 0, 1), (span, 0, 1)]) == 0
+    assert raised([(span, 1, 0), (ramp, 1, 0), (straight, 0, 1)]) == 0
+    # A ramp climbing on from a crest stands on bricks, and so does its arch.
+    assert raised([(ramp, 0, 1), (span, 0, 1), (ramp, 0, 1), (span, 0, 1), (straight, 0, 1)]) == 3
+    # Less than a brick up, track rests on its joints: four slight slopes lift
+    # the straight after them past one brick.
+    assert raised([(slope, 0, 1), (straight, 0, 1)]) == 0
+    assert raised([(slope, 0, 1)] * 4 + [(straight, 0, 1)]) == 1
+    # Stacks rank a loop lower whatever its score, and never enter the score.
+    up = score([(ramp, 0, 1), (span, 0, 1), (straight, 0, 1)])
+    flat = score([(ramp, 0, 1), (span, 0, 1)])
+    assert up.rank > flat.rank and up.rank == (1, -up.total)

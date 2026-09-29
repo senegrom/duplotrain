@@ -59,8 +59,8 @@ and the LDraw part library:
 | `switch`         | 51943c01| left + right 30°/R256 branches off one stem (LDraw-exact); no straight route |
 | `crossing`       | 6376    | two 128 mm straight runs crossing at their midpoints, 60°  |
 | `level_crossing` | 6391    | one straight under a 160 × 160 mm road plate (16 mm end overhang — two of them refuse to mate) |
-| `ramp`           | 6392    | 320 mm run rising 57.6 mm (3 bricks); its top carries only an arch's foot |
-| `span`           | 6393    | 192 mm arch rising a further 19.2 mm to the 76.8 mm crest; its foot rests only on a ramp's top |
+| `ramp`           | 6392    | 320 mm run rising 57.6 mm (3 bricks)                       |
+| `span`           | 6393    | 192 mm arch rising a further 19.2 mm to the 76.8 mm crest  |
 | `buffer`         | 35967   | 64 mm track-end bumper; its far face is sealed and can never mate |
 | `slope`          | 35966   | 256 mm "slight slope" from 10875 (rise ~5.6 mm, unverified) |
 | `offramp`        | 4785    | 96 mm off-ramp to the floor from 10425; its floor side is sealed (provisional) |
@@ -72,9 +72,9 @@ the exception: an arch's foot overlaps a ramp's top instead, so a ramp's top car
 only an arch's foot and an arch's foot rests only on a ramp's top. An arch's crest takes
 the other arch, or a further ramp that climbs higher still. Ordinary track can stand on
 DUPLO bricks as well (a straight has three brick tubes under its middle, a curve two),
-so track raised on stacks may meet a crest or a ramp's foot; `duplotrain solve` ranks
-such loops below those standing on the floor, and a completion never builds under the
-lowest track it grows from.
+so track raised on stacks may meet a crest or a ramp's foot; `duplotrain solve` lists
+loops standing on the floor first, and a completion never builds under the floor its
+base stands on ([how the searches keep to both](docs/search-correctness.md#bridge-joints-and-the-floor)).
 
 These numbers come from the LDraw part files and BlueBrick's measured connection
 library, cross-checked against part weights, photographs and duplo-schienen.de's
@@ -94,9 +94,9 @@ changes:
 duplotrain solve --catalog my-measurements.json --curve 12 --ramp 2 --span 2 ...
 ```
 
-`port_kinds` names how each port joins: `track` (the default), `ramp_top` or
-`arch_foot`, which mate only with each other; an override of the ramp or the arch
-keeps the bridge joint only by naming them.
+`port_kinds` names how each port joins, one per port in port order: `track` (the
+default), `ramp_top` or `arch_foot`, which mate only with each other; an override of
+the ramp or the arch keeps the bridge joint only by naming them.
 
 Lengths may be plain numbers, exact fractions (`"384/5"`), field elements
 (`{"alg": [a, b, c, d]}` = `a + b√2 + c√3 + d√6`), or arc chords
@@ -137,7 +137,10 @@ duplotrain demo                                       # the classic oval
 ```
 
 `solve -o DIR` saves the top loops as `loop_01.json`, `loop_01.png` and so on,
-replacing the `loop_NN` files an earlier run left in `DIR`.
+replacing the `loop_NN` files an earlier run left in `DIR`. `--max-pieces N` looks
+only for loops of at most N pieces: in a large box (a bridge set, a switch and a
+track pack together) the search then finds loops quickly where the full-length
+search can run out of nodes first.
 
 `--set` knows the 2018 wave (10874 Steam Train, 10875 Cargo Train, 10872 Bridge &
 Tracks, 10882 Track pack) and the 2024 sets (10425 Tunnel, 10426 Bridge expansion)
@@ -146,8 +149,9 @@ set twice. Sets also contribute their **action stones** (below).
 
 `duplotrain check` audits the geometry of every recorded joint, not just whether the
 connectors have link records: it exits 1 for empty or open layouts, non-exact joints
-and incompatible headings, elevations or connector plates, and lists the five
-closest pairs of open ends. `--slop 5` accepts up to
+and incompatible headings, elevations, connector plates or bridge joints, and lists
+the five closest pairs of open ends that could join, and ends that meet but cannot.
+`--slop 5` accepts up to
 5 mm of **total** planar joint gap in a fully linked layout with a forced-fit warning;
 it never excuses elevation or heading errors and checks no collisions away from the
 joints. The editor recomputes joint warnings after import and reload, so an exported
@@ -227,14 +231,15 @@ result = solve({"curve": 18, "straight": 8}, pieces,
 ```
 
 It keeps every placed piece where it is, grows from one open end, and reports every
-way to reach the other — respecting collisions with the existing track, the floor under
-its lowest track and the bridge's joints, and re-entering its open switch branches when
-they help.
+way to reach the other — respecting collisions with the existing track, the floor it
+stands on and the bridge's joints, and re-entering its open switch branches when they
+help.
 
-`solve` prints a ranked table (exactness, box usage, compactness, squareness, variety,
-dangling-branch and brick-stack penalties — weights overridable in
-`duplotrain.scoring`) and writes a PNG + JSON per kept layout. Layout JSON stores
-frames as exact coefficients, so a reloaded layout still passes the exact closure test.
+`solve` prints a ranked table — loops standing on the floor first (a column counts
+the pieces on bricks), then by score: exactness, box usage, compactness, squareness,
+variety and a dangling-branch penalty, weights overridable in `duplotrain.scoring` —
+and writes a PNG + JSON per kept layout. Layout JSON stores frames as exact
+coefficients, so a reloaded layout still passes the exact closure test.
 
 Library:
 
@@ -395,8 +400,10 @@ a curve two — its left and right readings), trying homeward moves first so sma
 close promptly. It prunes, conservatively: headings that the remaining pieces cannot
 swing back to the anchor's, positions they cannot reach home from, placements that
 overlap existing track (respecting elevation, so a sufficiently high bridge
-legitimately crosses over), and joints where two overhanging road plates would claim
-the same floor. Switches drop *open stubs* which the walk may later re-enter exactly —
+legitimately crosses over), joints where two overhanging road plates would claim
+the same floor, and joints the bridge's parts cannot make, or in a completion track
+under the floor ([bridge joints and the floor](docs/search-correctness.md#bridge-joints-and-the-floor)).
+Switches drop *open stubs* which the walk may later re-enter exactly —
 figure-eights and re-joining branches emerge from that rule alone. Found loops are
 deduplicated by a canonical signature invariant under rotation, reversal **and
 reflection** — the mirror image is generated explicitly per piece from its geometry,

@@ -25,7 +25,7 @@ from . import __version__
 from .catalog import STONE_MOUNTS, default_catalog, load_catalog
 from .drive import DEFAULT_MAX_RUNS, ClassificationLimitError, DriveLimitError, classify
 from .explore import is_stem_tailed
-from .layout import layout_from_dict, layout_to_dict
+from .layout import _BRIDGE_JOINT, layout_from_dict, layout_to_dict
 from .render import render_layout
 from .scoring import score_solution
 from .sets import SETS, inventory_for_sets
@@ -112,6 +112,8 @@ def pieces(catalog_paths: tuple[str, ...], as_json: bool) -> None:
                 "name": p.name,
                 "category": p.category,
                 "ports": len(p.ports),
+                "port_kinds": [port.kind for port in p.ports],
+                "sealed_ports": sorted(p.sealed),
                 "part_numbers": list(p.part_numbers),
                 "provisional": p.provisional,
                 "notes": p.notes,
@@ -197,6 +199,9 @@ def sets_cmd() -> None:
 )
 @click.option("--min-pieces", type=click.IntRange(min=0), default=_MIN_PIECES,
               show_default=True)
+@click.option("--max-pieces", type=click.IntRange(min=1), default=None,
+              help="Look only for loops of at most this many pieces: in a large box, "
+                   "a limit such as 24 finds loops sooner.")
 @click.option("--max-results", type=click.IntRange(min=1), default=25, show_default=True)
 @click.option("--max-nodes", type=click.IntRange(min=1), default=2_000_000, show_default=True)
 @click.option("--use-all", is_flag=True,
@@ -229,6 +234,7 @@ def solve_cmd(
     catalog_paths: tuple[str, ...],
     slop: float,
     min_pieces: int,
+    max_pieces: int | None,
     max_results: int,
     max_nodes: int,
     use_all: bool,
@@ -292,6 +298,7 @@ def solve_cmd(
         config = SolverConfig(
             slop=slop,
             min_pieces=min_pieces,
+            max_pieces=max_pieces,
             max_results=max_results,
             max_nodes=max_nodes,
             use_all_pieces=use_all,
@@ -306,13 +313,9 @@ def solve_cmd(
         raise click.ClickException(str(exc)) from exc
     stats = result.stats
 
-    scored = sorted(
-        (
-            (score_solution(sol, inventory).total, sol)
-            for sol in result.solutions
-        ),
-        key=lambda pair: -pair[0],
-    )
+    # Loops standing on the floor first, then the nicest (scoring.ScoreBreakdown.rank).
+    scored = sorted(((score_solution(sol, inventory), sol) for sol in result.solutions),
+                    key=lambda pair: pair[0].rank)
     console.print(
         f"[bold]{len(scored)}[/bold] distinct loop(s) found "
         f"({stats.nodes:,} states searched in {stats.duration_s:.1f}s"
@@ -328,22 +331,28 @@ def solve_cmd(
         width, height = sol.layout.size()
         rows.append((score, sol, closure, f"{width / 10:.0f} x {height / 10:.0f}"))
     if rows:
-        table = Table(title="Loops, nicest first")
+        table = Table(title="Loops, on the floor first, then nicest")
         table.add_column("#", justify="right")
         table.add_column("score", justify="right")
         table.add_column("pieces")
         table.add_column("size (cm)", justify="right")
         table.add_column("closure")
         table.add_column("stubs", justify="right")
+        table.add_column("on bricks", justify="right")
         for rank, (score, sol, closure, size) in enumerate(rows, start=1):
             counts = " ".join(
                 f"{n}x{pid}" for pid, n in sorted(sol.layout.piece_counts.items())
             )
-            table.add_row(str(rank), f"{score:.0f}", Text(counts), size, closure,
-                          str(sol.open_stubs))
+            table.add_row(str(rank), f"{score.total:.0f}", Text(counts), size, closure,
+                          str(sol.open_stubs), str(score.raised))
         console.print(table)
+        if stats.stop_reason == "result_limit":
+            console.print(f"[dim]The search stopped at --max-results {max_results}; a higher "
+                          "limit may list better loops.[/dim]")
     elif not stats.complete:
-        console.print("No loop found within the search limits; a closure may still exist.")
+        console.print("No loop found within the search limits; a closure may still exist."
+                      + ("" if max_pieces else " In a large box, --max-pieces 24 finds loops "
+                         "sooner."))
     else:
         # Suggest only what this run did not try already.
         tips = ["without [bold]--use-all[/bold]"] if use_all else []
@@ -380,7 +389,7 @@ def solve_cmd(
         if render_layout is not None:
             _write_image(
                 render_layout, layout, f"{stem}.png",
-                title=f"#{rank}  score {score:.0f}  |  {closure}  |  {size} cm",
+                title=f"#{rank}  score {score.total:.0f}  |  {closure}  |  {size} cm",
             )
     console.print(f"Saved the top {min(top, len(scored))} to",
                   Text(str(out_dir), style="bold"))
@@ -449,6 +458,8 @@ def render(layout_file: str, catalog_paths: tuple[str, ...], out: str | None) ->
 
     catalog = _catalog(catalog_paths)
     layout = _load_layout(layout_file, catalog)
+    if not len(layout):
+        raise click.ClickException("nothing to render: the layout is empty")
     target = _image_target(out) if out else str(Path(layout_file).with_suffix(".png"))
     if Path(target).resolve() == Path(layout_file).resolve():
         raise click.UsageError("the picture would replace the layout file; name it with -o")
@@ -482,13 +493,20 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
         console.print("Joint geometry checked; collisions elsewhere are not checked.")
         return
     if layout.is_closed:
-        console.print("[yellow]Fully linked, but not exactly closed.[/yellow]")
+        forced = all(joint["problems"] == ["planar gap"] for joint in issues)
+        console.print("[yellow]Fully linked, but "
+                      + ("not exactly closed." if forced else "some joints have problems.")
+                      + "[/yellow]")
     elif not len(layout):
         console.print("[yellow]Empty layout; no closed track.[/yellow]")
     else:
         console.print(f"[yellow]{len(layout.connectable_ends())} open end(s).[/yellow]")
         for a, b, gap in layout.gaps(limit=5):
             console.print(f"  Open ends {a} <-> {b}: gap {gap:.6g} mm")
+        joinable = set(layout.matable_pairs())
+        for a, b in layout.meeting_pairs():
+            if (a, b) not in joinable:
+                console.print(f"  Open ends {a} <-> {b} meet but cannot join: {_BRIDGE_JOINT}")
     for joint in issues:
         a, b = tuple(joint["a"]), tuple(joint["b"])
         console.print(

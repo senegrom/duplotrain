@@ -278,16 +278,18 @@ def render_layout(
                     zorder=6,
                 )
 
-    # Elevation labels on raised bridge pieces, and on track raised on bricks.
-    for placement, lines3d in sampled:
+    # Elevation labels on raised bridge pieces and raised track, below any stone.
+    stoned = {entry[0] for entry in layout.accessories}
+    for index, (placement, lines3d) in enumerate(sampled):
         line = lines3d[0]
         mx, my, mz = line[len(line) // 2]
         raised = min(z for _x, _y, z in line) > 1.0
         if mz > 1.0 and (placement.piece.category == "bridge" or raised):
-            ax.text(
-                mx,
-                my,
+            ax.annotate(
                 f"+{mz:.0f}mm",
+                (mx, my),
+                xytext=(0, -12 if index in stoned else 0),
+                textcoords="offset points",
                 fontsize=7,
                 ha="center",
                 va="center",

@@ -80,7 +80,7 @@ def test_results_are_shown_before_earlier_results_are_replaced(runner, monkeypat
 
     monkeypatch.setattr(cli, "_clear_earlier_results", locked)
     result = runner.invoke(main, ["solve", "--curve", "12", "-o", str(tmp_path)])
-    assert result.exit_code == 1 and "Loops, nicest first" in result.output
+    assert result.exit_code == 1 and "Loops, on the floor first" in result.output
 
 
 def test_render_never_draws_over_its_own_layout_file(runner, tmp_path):
@@ -90,6 +90,14 @@ def test_render_never_draws_over_its_own_layout_file(runner, tmp_path):
     result = runner.invoke(main, ["render", str(source)])
     assert result.exit_code == 2 and "would replace the layout file" in result.output
     assert json.loads(source.read_text()) == layout_to_dict(layout)
+
+
+def test_render_refuses_an_empty_layout(runner, tmp_path):
+    empty = tmp_path / "empty.json"
+    empty.write_text(json.dumps(layout_to_dict(Layout())))
+    result = runner.invoke(main, ["render", str(empty), "-o", str(tmp_path / "empty.png")])
+    assert result.exit_code == 1 and "nothing to render" in result.output
+    assert not (tmp_path / "empty.png").exists()
 
 
 def test_a_layout_file_takes_at_most_2_mb(runner, tmp_path):
