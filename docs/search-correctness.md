@@ -16,24 +16,32 @@ the catalogue's geometry and underpass assumptions.
 
 ## Bridge joints and the floor
 
-A ramp's top carries only an arch's foot, and an arch's foot rests only on a ramp's
-top (`pieces.PORT_KINDS`). The loop and completion searches check that rule wherever
-the walk makes a joint: a placement's entry against the connector the walk stands
-on, a transit or a reversing closure into an open stub, and the closing joint onto
-the anchor, which in a fresh loop is the first piece's entry. A search with no such
-connector checks nothing. The reverse tables, the future-junction queries and the
-collision exemptions ignore connector kinds, which only enlarges what they allow.
+The bridge's joint ([the pieces](../README.md#the-pieces); `pieces.kinds_mate`) is
+checked by the loop and completion searches wherever the walk makes a joint: a
+placement's entry against the connector the walk stands on, a transit or a
+reversing closure into an open stub, and the closing joint onto the anchor, which in
+a fresh loop is the first piece's entry. A fresh teardrop's tail ends where the walk
+began, and never at an arch's foot, which would stand on nothing. A search with no
+such connector checks nothing, and a stock piece none of whose traversals anything
+on offer could join at both ends (ramps with no arch to take their tops) leaves the
+search alone, as a buffer does. The reverse tables, the future-junction queries and
+the collision exemptions ignore connector kinds, which only enlarges what they
+allow: two ends that meet touch as joined ones do, whether or not they could join.
 Network enumeration checks the rule at its joins and attachments; `Layout.attach`
-and `Layout.join` refuse such a joint, forced or not, so the editor's arc templates
-skip it; and `joint_issues` names one recorded in an imported layout.
+and `Layout.join` refuse such a joint, forced or not; the editor's arc templates try
+only the ramp and arch runs the joints allow; and `joint_issues` names one recorded
+in an imported layout, as Check layout does two ends that meet but cannot join.
 
-A completion also keeps its added track at or above the base's lowest connector,
-the floor: a candidate whose exit would go under it is never placed, and the arc
-templates drop such a closure. A fresh loop has no floor, only heights relative to
-one another, so the renderer measures them from its lowest track. Regressions check
-that the loops of the steam train and bridge sets join bridge parts only as the
-parts can, that a completion across a gap in floor track never runs under the
-floor, and that two buffers close a ramp and an arch one way only.
+A completion keeps its added track at or above the floor its base stands on
+(`Layout.floor`): the base's lowest connector, save an open arch foot, which rests
+on a ramp's top and so puts the floor a ramp's rise lower. A candidate whose exit
+would go under the floor is never placed, and the arc templates drop such a
+closure. A fresh loop has no floor, only heights relative to one another, so the
+renderer and the editor measure them from its lowest track. Regressions check that
+the loops of the steam train and bridge sets join bridge parts only as the parts
+can, that a completion across a gap in floor track never runs under the floor,
+that a layout begun with an arch closes over a ramp under it, and that two buffers
+close a ramp and an arch one way only.
 
 ## Centreline identity is independent of piece boundaries
 

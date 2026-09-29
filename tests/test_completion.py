@@ -240,3 +240,87 @@ def test_editor_can_apply_a_completion_without_new_inventory():
     assert session.layout.placements == base.placements
     assert session.layout.links[(1, 1)] == (0, 0)
     assert session.layout.links[(0, 1)] == (2, 0)
+
+
+def test_a_completion_never_runs_under_the_floor(catalog):
+    # A 1024 mm gap in floor track: a bridge climbs over it and straights fill it,
+    # but a bridge hung under the floor, its arches down from the floor track,
+    # is no layout.
+    base = build_chain([(catalog["straight"], 0, 1)])
+    base, far = base.with_piece(catalog["straight"], ORIGIN.then(1152, 0, 0, 0))
+    result = solve({"straight": 8, "ramp": 2, "span": 2}, catalog,
+                   SolverConfig(min_pieces=1, max_results=50), base=base,
+                   grow_from=(0, 1), close_onto=(far, 0))
+    lowest = [min(float(placement.port_pose(port).z) for placement in solution.layout
+                  for port in range(len(placement.piece.ports)))
+              for solution in result.solutions]
+    assert result.stats.complete and lowest and min(lowest) == 0.0
+    assert any("span" in solution.layout.piece_counts for solution in result.solutions)
+
+
+def test_an_open_arch_foot_stands_a_ramp_above_the_floor(catalog):
+    # An arch placed first: its foot rests on a ramp's top, never on the floor, so
+    # the ramp that carries it stands a ramp's rise lower, and the loop closes.
+    base = build_chain([(catalog["span"], 0, 1)] + [(catalog["curve"], 0, 1)] * 6)
+    assert base.floor() == 0 and float(base.floor(catalog.values())) == pytest.approx(-57.6)
+    for engine in ("field", "lattice"):
+        result = solve({"curve": 6, "ramp": 2, "span": 1}, catalog,
+                       SolverConfig(min_pieces=1, engine=engine), base=base,
+                       grow_from=(6, 1), close_onto=(0, 0))
+        assert result.stats.complete and len(result.solutions) == 1
+        layout = result.solutions[0].layout
+        assert layout.piece_counts == {"span": 2, "curve": 12, "ramp": 2}
+        assert layout.is_closed and not layout.joint_issues()
+
+
+def test_a_floor_off_the_height_lattice_holds_in_both_engines(catalog):
+    # An imported file with a loose straight a fortieth of a millimetre low: the
+    # lattice engine keeps that floor exactly as the field engine does.
+    from fractions import Fraction
+
+    from duplotrain.geometry import Pose
+
+    straight = catalog["straight"]
+    base = build_chain([(straight, 0, 1)])
+    base, far = base.with_piece(straight, ORIGIN.then(640, 0, 0, 0))
+    base, _loose = base.with_piece(straight, Pose.make(0, 2000, Fraction(-1, 40), 0))
+    for engine in ("field", "lattice"):
+        result = solve({"straight": 4, "slope": 2}, catalog,
+                       SolverConfig(min_pieces=1, engine=engine), base=base,
+                       grow_from=(0, 1), close_onto=(far, 0))
+        assert result.stats.engine == engine and len(result.solutions) == 2
+        assert min(float(p.port_pose(port).z) for s in result.solutions for p in s.layout
+                   for port in range(len(p.piece.ports))) == -0.025
+
+
+def test_a_ramps_top_does_not_pass_through_a_switch_it_meets(catalog):
+    ramp, switch = catalog["ramp"], catalog["switch"]
+    base, _ = Layout().with_piece(ramp, ORIGIN)
+    base, sw = base.with_piece(switch, switch.frame_for(0, base.pose_of((0, 1))))
+    result = solve({"curve": 12, "straight": 4}, catalog, SolverConfig(min_pieces=0),
+                   base=base, grow_from=(0, 1), close_onto=(sw, 2))
+    assert result.stats.complete and not result.solutions
+
+
+def test_a_half_built_bridge_closes_alike_from_either_end(catalog):
+    # Grown from the ramp's top or closed onto it: the same track.
+    from duplotrain.editor_search import physical_key
+
+    base = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
+    found = []
+    for grow, close in (((6, 1), (0, 0)), ((0, 0), (6, 1))):
+        result = solve({"curve": 6, "straight": 4, "ramp": 1, "span": 2}, catalog,
+                       SolverConfig(min_pieces=0, max_results=100), base=base,
+                       grow_from=grow, close_onto=close)
+        assert result.stats.complete
+        found.append({physical_key(s.layout, base) for s in result.solutions})
+    assert found[0] and found[0] == found[1]
+
+
+def test_ends_that_meet_but_cannot_join_say_why(catalog):
+    ramp, straight = catalog["ramp"], catalog["straight"]
+    base, _ = Layout().with_piece(ramp, ORIGIN)
+    base, end = base.with_piece(straight, straight.frame_for(0, base.pose_of((0, 1))))
+    with pytest.raises(ValueError, match="ramp and straight cannot join there"):
+        solve({"curve": 12}, catalog, SolverConfig(min_pieces=1), base=base,
+              grow_from=(0, 1), close_onto=(end, 0))

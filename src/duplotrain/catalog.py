@@ -10,7 +10,8 @@ facts:
 * switch (51943c01): a meld of a left and a right curve sharing one stem -- there is
   **no straight route** through a DUPLO switch
 * the connectors are genderless, so every end mates with every end and one physical
-  curve is both the left and the right curve
+  curve is both the left and the right curve -- save the bridge's overlap joint, where
+  a ramp's top takes only an arch's foot
 
 Because ``R = 2L`` exactly, one curve advances exactly one straight-length along the
 entry heading while shifting sideways by ``256 - 128*sqrt(3)`` mm.  That irrational
@@ -241,10 +242,10 @@ DEFAULT_CATALOG_SPECS: list[dict[str, Any]] = [
             "two arches meet mid-bridge. Modelled piecewise-linear. Its low end is a "
             "special overlap joint onto a ramp's top, needing 2-brick supports (no "
             "normal pin/socket), so it joins nothing else; the crest takes another "
-            "arch, or a further ramp to climb higher. UNDERPASS (user-verified "
-            "2026-08-04): a train passes beneath the arch near the crest -- provisional "
-            "pending real measurements of deck height, ramp rise and under-arch "
-            "clearance."
+            "arch, a further ramp to climb higher, or track raised on bricks. UNDERPASS "
+            "(user-verified 2026-08-04): a train passes beneath the arch near the "
+            "crest -- provisional pending real measurements of deck height, ramp rise "
+            "and under-arch clearance."
         ),
     },
 ]

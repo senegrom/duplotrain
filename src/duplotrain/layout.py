@@ -22,7 +22,7 @@ from typing import Any, Literal
 
 from ._congruence import curve_length
 from .catalog import ACCESSORIES, STONE_MOUNTS
-from .exact import Alg
+from .exact import ZERO, Alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .pieces import Path as TrackPath
 from .pieces import PieceType, _sample_paths, kinds_mate
@@ -35,6 +35,15 @@ End = tuple[int, int]
 
 #: Why two connectors whose kinds do not mate cannot join (see pieces.PORT_KINDS).
 _BRIDGE_JOINT = "a ramp's top takes only an arch's foot, and an arch's foot only a ramp's top"
+
+
+def _lowest(values: Iterable[Alg]) -> Alg | None:
+    """The least of exact *values*, compared exactly (None when there are none)."""
+    low = None
+    for value in values:
+        if low is None or (value - low).sign() < 0:
+            low = value
+    return low
 
 
 def _alg_to_json(value: Alg) -> list[str]:
@@ -258,6 +267,19 @@ class Layout:
         return kinds_mate(self.placements[a[0]].piece.ports[a[1]].kind,
                           self.placements[b[0]].piece.ports[b[1]].kind)
 
+    def _plates_clash(self, a: End, b: End) -> bool:
+        """Do both pieces overhang their connectors, so that their road plates overlap?"""
+        return (self.placements[a[0]].piece.end_overhang > 0
+                and self.placements[b[0]].piece.end_overhang > 0)
+
+    def _could_join(self, a: End, b: End) -> bool:
+        """Could open ends *a* and *b* join, were they to meet?
+
+        Never a piece's own two ends, two overhanging road plates, or bridge
+        connectors of kinds that do not mate.
+        """
+        return a[0] != b[0] and not self._plates_clash(a, b) and self._kinds_mate(a, b)
+
     def connectable_ends(self) -> list[End]:
         """Open ends something could actually plug into."""
         links = self.links
@@ -268,12 +290,14 @@ class Layout:
             if (i, p) not in links and p not in placement.piece.sealed
         ]
 
-    def matable_pairs(
+    def meeting_pairs(
         self, port_poses: Mapping[End, Pose] | None = None
     ) -> list[tuple[End, End]]:
         """Exactly coincident, oppositely facing open ends, in endpoint order.
 
-        Index each exact pose once instead of reconstructing it for every pair.
+        Their pieces touch as a joint's do, whether or not the connectors could
+        join -- except two overhanging road plates, which overlap. Index each exact
+        pose once instead of reconstructing it for every pair.
         ``port_poses`` lets serializers that already need every connector reuse those
         transforms instead of hashing/rebuilding them a second time.
         """
@@ -289,15 +313,44 @@ class Layout:
             (a, b)
             for a, pose in poses
             for b in by_pose.get(pose.reversed(), ())
-            if a < b and not (
-                self.placements[a[0]].piece.end_overhang > 0
-                and self.placements[b[0]].piece.end_overhang > 0
-            ) and self._kinds_mate(a, b)
+            if a < b and not self._plates_clash(a, b)
         ]
+
+    def matable_pairs(
+        self, port_poses: Mapping[End, Pose] | None = None
+    ) -> list[tuple[End, End]]:
+        """The :meth:`meeting_pairs` that could join: their connector kinds mate."""
+        return [(a, b) for a, b in self.meeting_pairs(port_poses) if self._kinds_mate(a, b)]
 
     def pose_of(self, end: End) -> Pose:
         i, p = end
         return self.placements[i].port_pose(p)
+
+    def floor(self, pieces: Iterable[PieceType] = ()) -> Alg:
+        """The height the layout stands on: its lowest connector, exactly.
+
+        An open arch foot is the exception: it rests on a ramp's top, never on the
+        floor, so the floor lies as low as the foot of whichever of *pieces* could
+        carry it. An empty layout stands at 0.
+        """
+        opens = set(self.connectable_ends())
+        reach: dict[str, Alg | None] = {}  # per kind, how far below it a mate reaches
+        heights = []
+        for index, placement in enumerate(self.placements):
+            for port, spec in enumerate(placement.piece.ports):
+                z = placement.port_pose(port).z
+                if spec.kind != "track" and (index, port) in opens:
+                    if spec.kind not in reach:
+                        reach[spec.kind] = _lowest(
+                            other.pose.z - mate.pose.z
+                            for piece in pieces for mate in piece.ports
+                            if kinds_mate(spec.kind, mate.kind) for other in piece.ports
+                        )
+                    if reach[spec.kind] is not None:
+                        z = z + reach[spec.kind]
+                heights.append(z)
+        low = _lowest(heights)
+        return ZERO if low is None else low
 
     @property
     def is_closed(self) -> bool:
@@ -339,8 +392,7 @@ class Layout:
                 problems.append("heading mismatch")
             if self.is_sealed(a) or self.is_sealed(b):
                 problems.append("sealed face")
-            if (self.placements[a[0]].piece.end_overhang > 0
-                    and self.placements[b[0]].piece.end_overhang > 0):
+            if self._plates_clash(a, b):
                 problems.append("overlapping connector plates")
             if not self._kinds_mate(a, b):
                 problems.append("mismatched bridge joint")
@@ -482,7 +534,7 @@ class Layout:
                 raise ValueError(f"end {end} is a sealed buffer face; it cannot mate")
         piece_a = self.placements[a[0]].piece
         piece_b = self.placements[b[0]].piece
-        if piece_a.end_overhang > 0 and piece_b.end_overhang > 0:
+        if self._plates_clash(a, b):
             raise ValueError(
                 f"{piece_a.id} and {piece_b.id} both overhang their connectors; "
                 "their plates would overlap, so they cannot join directly"
@@ -598,11 +650,12 @@ class Layout:
             cursor = nxt
 
     def gaps(self, limit: int | None = None) -> list[tuple[End, End, float]]:
-        """Pairs of connectable ends, closest first, with the planar gap in mm.
+        """Pairs of connectable ends that could join, closest first, with the planar gap in mm.
 
         Useful for reporting near-misses: a layout that is 4 mm from closing is a
         different kind of answer from one that is 400 mm away. A buffer's sealed
-        face mates with nothing and is never paired. Equal gaps keep end order.
+        face mates with nothing and is never paired, nor are ends that could never
+        join (a piece's own two, say). Equal gaps keep end order.
 
         Without *limit* every pair is listed. With it, only that many of the
         closest, found by a sweep along the wider axis that measures only pairs
@@ -612,7 +665,8 @@ class Layout:
         poses = [self.pose_of(end) for end in ends]  # once per end, not per pair
         if limit is None:
             out = [(ends[i], ends[j], poses[i].distance_to(poses[j]))
-                   for i in range(len(ends)) for j in range(i + 1, len(ends))]
+                   for i in range(len(ends)) for j in range(i + 1, len(ends))
+                   if self._could_join(ends[i], ends[j])]
             out.sort(key=lambda t: t[2])
             return out
         if limit < 1 or len(ends) < 2:
@@ -635,6 +689,8 @@ class Layout:
                     if abs(points[second][1 - along] - points[first][1 - along]) * shrink > bound:
                         continue
                 i, j = sorted((first, second))
+                if not self._could_join(ends[i], ends[j]):
+                    continue
                 candidate = (-poses[i].distance_to(poses[j]), -i, -j)
                 if len(kept) < limit:
                     heapq.heappush(kept, candidate)

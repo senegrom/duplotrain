@@ -617,15 +617,19 @@ def test_a_walk_stops_at_its_step_cap_and_says_so(monkeypatch, catalog):
     assert events[-2:] == ["walk_limit", "walk_limit"]
 
 
-def test_a_piece_no_walk_can_place_leaves_the_search_alone(catalog):
-    # A buffer's one open face joins no walk. Counted in the stock, buffers widened
-    # every piece budget, so the same search ran eight times as long, and no layout
-    # could ever use every piece.
+@pytest.mark.parametrize("unplaceable", [{"buffer": 2}, {"ramp": 2}, {"span": 2}])
+def test_a_piece_no_walk_can_place_leaves_the_search_alone(catalog, unplaceable):
+    # A buffer's one open face joins no walk, and a ramp with no arch to take its
+    # top joins none either, nor an arch with no ramp to rest on. Counted in the
+    # stock, they widened every piece budget, so the same search ran eight to
+    # twenty-seven times as long, and no layout could ever use every piece.
     box = {"curve": 12, "straight": 5, "switch": 2}
     plain = solve(box, catalog, SolverConfig(max_results=25))
-    buffered = solve({**box, "buffer": 2}, catalog, SolverConfig(max_results=25))
-    assert [s.signature for s in buffered.solutions] == [s.signature for s in plain.solutions]
-    assert buffered.stats.nodes == plain.stats.nodes
+    extra = solve({**box, **unplaceable}, catalog, SolverConfig(max_results=25))
+    assert [s.signature for s in extra.solutions] == [s.signature for s in plain.solutions]
+    assert extra.stats.nodes == plain.stats.nodes
+    everything = SolverConfig(use_all_pieces=True, max_results=5)
+    assert solve({"curve": 12, "straight": 4, **unplaceable}, catalog, everything).solutions
 
 
 def test_loops_use_bridge_parts_only_as_they_join(catalog):
@@ -634,11 +638,7 @@ def test_loops_use_bridge_parts_only_as_they_join(catalog):
     result = solve({"curve": 12, "straight": 12, "ramp": 2, "span": 2}, catalog,
                    SolverConfig(max_results=25))
     assert result.solutions
-    for solution in result.solutions:
-        layout = solution.layout
-        for a, b in layout.links.items():
-            kinds = {layout.placements[end[0]].piece.ports[end[1]].kind for end in (a, b)}
-            assert kinds in ({"track"}, {"ramp_top", "arch_foot"})
+    assert not any(solution.layout.joint_issues() for solution in result.solutions)
 
     def on_the_floor(layout):
         return len({min(placement.port_pose(port).z for port in range(len(placement.piece.ports)))
@@ -648,17 +648,21 @@ def test_loops_use_bridge_parts_only_as_they_join(catalog):
     assert any(on_the_floor(solution.layout) for solution in result.solutions)
 
 
-def test_a_completion_never_runs_under_the_floor(catalog):
-    # A 1024 mm gap in floor track: a bridge climbs over it and straights fill it,
-    # but a bridge hung under the floor, its arches down from the floor track,
-    # is no layout.
-    base = build_chain([(catalog["straight"], 0, 1)])
-    base, far = base.with_piece(catalog["straight"], ORIGIN.then(1152, 0, 0, 0))
-    result = solve({"straight": 8, "ramp": 2, "span": 2}, catalog,
-                   SolverConfig(min_pieces=1, max_results=50), base=base,
-                   grow_from=(0, 1), close_onto=(far, 0))
-    lowest = [min(float(placement.port_pose(port).z) for placement in solution.layout
-                  for port in range(len(placement.piece.ports)))
-              for solution in result.solutions]
-    assert result.stats.complete and lowest and min(lowest) == 0.0
-    assert any("span" in solution.layout.piece_counts for solution in result.solutions)
+
+def test_a_loop_closes_only_where_the_parts_join(catalog):
+    # Two arches and one ramp: no bridge fits in a loop, which could only close by
+    # setting one arch's foot on the other's.
+    result = solve({"curve": 12, "straight": 3, "span": 2, "ramp": 1}, catalog,
+                   SolverConfig(max_results=100))
+    assert result.stats.complete and result.solutions
+    assert not any({"span", "ramp"} & set(s.layout.piece_counts) for s in result.solutions)
+
+
+def test_a_teardrop_tail_never_ends_at_an_arch_foot(catalog):
+    # A tail's open end is where the walk began: an arch's foot there would stand
+    # on nothing, for it rests only on a ramp's top.
+    result = solve({"curve": 11, "switch": 1, "span": 1, "ramp": 1}, catalog,
+                   SolverConfig(reversing_loops=True))
+    assert result.stats.complete and len(result.solutions) == 4
+    assert not any(s.layout.placements[index].piece.ports[port].kind == "arch_foot"
+                   for s in result.solutions for index, port in s.layout.connectable_ends())

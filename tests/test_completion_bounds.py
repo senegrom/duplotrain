@@ -68,7 +68,8 @@ def test_elevated_mixed_inventory_retains_every_completion(engine):
     catalog = default_catalog()
     base = build_chain([(catalog["curve"], 0, 1)] * 8,
                        start=Pose.make(x=317, y=-90, z=41, heading=4))
-    inventory = {"curve": 4, "straight": 2, "ramp": 2}
+    # Ramps join the search only with arches to take their tops.
+    inventory = {"curve": 4, "straight": 2, "ramp": 2, "span": 2}
     cfg = SolverConfig(min_pieces=0, max_results=1000, max_nodes=100_000, engine=engine)
     reference = solve(inventory, catalog, replace(cfg, completion_lookahead=0), base=base)
     improved = solve(inventory, catalog, cfg, base=base)

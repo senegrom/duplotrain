@@ -532,15 +532,11 @@ def _derive_ports_and_routes(
 
     if names:
         if len(names) != len(ports):
-            raise ValueError(
-                f"piece declares {len(names)} port names but has {len(ports)} ports"
-            )
+            raise ValueError(f"{len(names)} port names for {len(ports)} ports")
         ports = [Port(name=n, pose=p.pose) for n, p in zip(names, ports, strict=True)]
     if kinds:
         if len(kinds) != len(ports):
-            raise ValueError(
-                f"piece declares {len(kinds)} port kinds but has {len(ports)} ports"
-            )
+            raise ValueError(f"{len(kinds)} port kinds for {len(ports)} ports")
         ports = [Port(p.name, p.pose, kind) for p, kind in zip(ports, kinds, strict=True)]
     return tuple(ports), tuple(routes)
 
@@ -590,7 +586,10 @@ def parse_piece(spec: dict[str, Any]) -> PieceType:
     if not paths:
         raise ValueError(f"piece {piece_id!r} has no paths")
 
-    ports, routes = _derive_ports_and_routes(paths, spec.get("port_names"), kinds)
+    try:
+        ports, routes = _derive_ports_and_routes(paths, spec.get("port_names"), kinds)
+    except ValueError as exc:
+        raise ValueError(f"piece {piece_id!r}: {exc}") from exc
     # Two connectors at one point mate each other: a piece joined to itself (a
     # full-turn path, say) would pass as a loop of one.
     spots = {(port.pose.x, port.pose.y, port.pose.z) for port in ports}

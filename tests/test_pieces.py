@@ -277,7 +277,8 @@ def test_a_chord_without_its_radius_is_bad_input():
     ({"port_names": ["a", 1]}, "list of texts"),
     ({"paths": [{"segments": [{"type": "straight", "run": {"alg": "1234"}}]}]},
      "four numbers"),
-    ({"port_kinds": ["track"]}, "1 port kinds but has 2 ports"),
+    ({"port_kinds": ["track"]}, "'odd': 1 port kinds for 2 ports"),
+    ({"port_names": ["a"]}, "'odd': 1 port names for 2 ports"),
     ({"port_kinds": ["track", "bridge"]}, "port_kinds must be a list of track"),
     ({"port_kinds": "track"}, "port_kinds must be a list"),
 ])
@@ -312,6 +313,11 @@ def test_port_kinds_name_how_each_end_joins():
     catalog = default_catalog()
     assert [port.kind for port in catalog["ramp"].ports] == ["track", "ramp_top"]
     assert [port.kind for port in catalog["span"].ports] == ["arch_foot", "track"]
+    # A straight has one move, its two readings alike; ends of different kinds
+    # make those readings different moves.
+    from duplotrain.solver import _moves_for
+
+    assert (len(_moves_for(parse_piece(spec))), len(_moves_for(piece))) == (1, 2)
 
 
 def test_catalogue_notes_may_run_over_several_lines():

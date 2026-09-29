@@ -159,7 +159,8 @@ def test_bridge_parts_join_only_as_the_parts_can(catalog):
     # A ramp's top carries only an arch's foot, and an arch's foot rests only on a
     # ramp's top: never on floor track, a crest or another ramp's foot.
     for chain in ([(straight, 0, 1), (ramp, 1, 0)], [(straight, 0, 1), (span, 0, 1)],
-                  [(ramp, 0, 1), (ramp, 0, 1)], [(ramp, 0, 1), (span, 0, 1), (span, 0, 1)]):
+                  [(ramp, 0, 1), (ramp, 0, 1)], [(ramp, 0, 1), (span, 0, 1), (span, 0, 1)],
+                  [(ramp, 0, 1), (ramp, 1, 0)], [(span, 1, 0), (span, 0, 1)]):
         with pytest.raises(ValueError, match="arch's foot"):
             build_chain(chain)
     # A further ramp after an arch climbs higher still; a crest also takes track
@@ -174,12 +175,44 @@ def test_a_ramps_top_and_track_that_meet_are_no_joint(catalog):
     layout, _ = Layout().with_piece(ramp, ORIGIN)
     layout, flat = layout.with_piece(straight, straight.frame_for(0, layout.pose_of((0, 1))))
     assert layout.pose_of((0, 1)).connects_to(layout.pose_of((flat, 0)))
-    assert ((0, 1), (flat, 0)) not in layout.matable_pairs()
+    # They touch as a joint's pieces do, but are no joint: nor a near miss to close.
+    assert layout.meeting_pairs() == [((0, 1), (flat, 0))] and not layout.matable_pairs()
+    near = layout.gaps()
+    assert [(a, b) for a, b, _gap in near] == [((0, 0), (flat, 0)), ((0, 0), (flat, 1))]
+    assert layout.gaps(limit=3) == near
     with pytest.raises(ValueError, match="arch's foot"):
         layout.join((0, 1), (flat, 0), force=True)  # no play in the connectors helps
     imported = Layout(layout.placements, {(0, 1): (flat, 0), (flat, 0): (0, 1)})
     assert [issue["problems"] for issue in imported.joint_issues()] == [
         ["mismatched bridge joint"]]
+
+
+def test_a_layout_stands_on_its_lowest_connector_or_under_an_open_arch_foot(catalog):
+    ramp, span, straight = catalog["ramp"], catalog["span"], catalog["straight"]
+    assert Layout().floor() == 0
+    down = build_chain([(span, 1, 0), (ramp, 1, 0), (straight, 0, 1)])
+    assert down.floor(catalog.values()) == Alg(Fraction(-384, 5))  # the straight, -76.8 mm
+    # An arch standing alone waits for a ramp: the floor lies a ramp's rise under
+    # its foot -- given a catalogue that has one.
+    arch = build_chain([(span, 0, 1), (straight, 0, 1)])
+    assert arch.floor() == 0
+    assert arch.floor(catalog.values()) == Alg(Fraction(-288, 5))
+    assert arch.floor([straight, span]) == 0
+    # A ramp's open top takes an arch rising from it: that sets no lower floor.
+    assert build_chain([(ramp, 0, 1)]).floor(catalog.values()) == 0
+
+
+def test_near_misses_pair_only_ends_that_could_join(catalog):
+    # A piece's own two ends are never a gap to close, nor two road plates.
+    straight, crossing = catalog["straight"], catalog["level_crossing"]
+    single = build_chain([(straight, 0, 1)])
+    assert single.gaps() == [] and single.gaps(limit=2) == []
+    plates, _ = Layout().with_piece(crossing, ORIGIN)
+    plates, second = plates.with_piece(crossing, ORIGIN.then(400, 0, 0, 0))
+    plates, third = plates.with_piece(straight, ORIGIN.then(0, 400, 0, 0))
+    pairs = {(a, b) for a, b, _gap in plates.gaps()}
+    assert pairs and all({a[0], b[0]} != {0, second} and a[0] != b[0] for a, b in pairs)
+    assert plates.gaps(limit=100) == plates.gaps()
 
 
 def test_attach_rejects_occupied_end(catalog):

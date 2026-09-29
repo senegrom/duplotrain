@@ -125,6 +125,34 @@ def _cached_moves(piece: PieceType) -> tuple[Move, ...]:
     return tuple(moves)
 
 
+def _placeable_stock(
+    inventory: Mapping[str, int], pieces: Mapping[str, PieceType], base: Layout | None
+) -> dict[str, int]:
+    """The pieces of *inventory* a walk can place.
+
+    A piece none of whose traversals could join something at both of its ends
+    never joins a walk: a buffer with its one open face, or ramps with no arch to
+    take their tops. Kept in the stock, it would widen every piece budget (the
+    search then drowned) and no layout could use every piece. What is on offer
+    is every connector of the pieces kept and the base's open ends.
+    """
+    counts = {pid: n for pid, n in inventory.items() if n > 0 and _cached_moves(pieces[pid])}
+    ends = ({base.placements[i].piece.ports[p].kind for i, p in base.connectable_ends()}
+            if base is not None else set())
+    while True:
+        offered = ends | {port.kind for pid in counts for port in pieces[pid].ports}
+        kept = {
+            pid: n for pid, n in counts.items()
+            if any(any(kinds_mate(kind, pieces[pid].ports[move.entry].kind) for kind in offered)
+                   and any(kinds_mate(pieces[pid].ports[move.exit].kind, kind)
+                           for kind in offered)
+                   for move in _cached_moves(pieces[pid]))
+        }
+        if kept == counts:
+            return counts
+        counts = kept
+
+
 def _completion_moves(
     pieces: Mapping[str, PieceType],
     stock: Mapping[str, int],
@@ -580,9 +608,17 @@ class _LatticeEngine:
         return pose[4]
 
     @staticmethod
-    def height_of(z: Alg) -> int | None:
-        """An exact elevation in this engine's height units, None off the lattice."""
-        return z_from_alg(z)
+    def height_of(z: Alg) -> int:
+        """The lowest lattice height not under *z*: exact, on the lattice or off it."""
+        if z.is_rational():
+            return math.ceil(z.a * SCALE)
+        scaled = z * SCALE
+        height = math.ceil(float(scaled))
+        while (scaled - height).sign() > 0:
+            height += 1
+        while (scaled - (height - 1)).sign() <= 0:
+            height -= 1
+        return height
 
     @staticmethod
     def below(pose: tuple, height: int) -> bool:
@@ -1909,16 +1945,13 @@ def solve_steps(
             if base.is_sealed(end):
                 raise ValueError(f"end {end} is a sealed buffer face; track cannot grow there")
         if base.pose_of(grow_from).connects_to(base.pose_of(close_onto)):
+            base.join(grow_from, close_onto)  # names why they cannot join, if so
             raise ValueError(
                 "those ends already mate exactly; join them with Layout.join instead"
             )
         base_pids = [p.piece.id for p in base.placements]
 
-    # A piece no traversal can place, such as a buffer with its one open face,
-    # never joins a walk: kept in the stock, it would widen every piece budget
-    # below (the search then drowned) and no layout could use every piece.
-    counts: dict[str, int] = {pid: n for pid, n in inventory.items()
-                              if n > 0 and _cached_moves(pieces[pid])}
+    counts = _placeable_stock(inventory, pieces, base)
     piece_ids = sorted(counts)
     piece_obj: dict[str, PieceType] = {pid: pieces[pid] for pid in piece_ids}
     if base is not None:
@@ -2034,13 +2067,12 @@ def solve_steps(
                 for port in range(len(placement.piece.ports))
             }
     stats.engine = eng.name
-    # Completion mode: the base's lowest connector stands on the floor, and added
+    # Completion mode: the base stands on the floor (Layout.floor), and added
     # track may not go under it. A fresh loop has no floor: only the heights of
     # its pieces relative to one another are fixed.
     floor = None
     if base is not None and any(move.dz for pid in piece_ids for move in moves_by_piece[pid]):
-        floor = eng.height_of(min((placement.port_pose(port).z for placement in base.placements
-                                   for port in range(len(placement.piece.ports))), key=float))
+        floor = eng.height_of(base.floor(pieces.values()))
     placement_samples = _placement_samples(eng, pieces, cfg.collision_spacing)
     # A fresh loop closes onto the origin face exactly as a completion closes onto
     # its target, so the same reverse tables prune walks that cannot return with
@@ -2487,11 +2519,14 @@ def solve_steps(
                     joint_gap = gap
                 # Closing into the first piece by a port routed to the one the walk
                 # left it by builds a plain loop, with a stub where it started: loop
-                # mode finds that loop anyway.
+                # mode finds that loop anyway. A fresh teardrop's tail ends where its
+                # first piece was entered, and an arch's foot cannot end a tail: it
+                # rests only on a ramp's top.
                 if cfg.reversing_loops and steps and eligible(used) and not (
-                        base is None and pidx == 0 and any(
+                        base is None and (pidx == 0 and any(
                             exit_port == port for exit_port, _route
-                            in piece_obj[placements[0][0]].transit(steps[0].exit))):
+                            in piece_obj[placements[0][0]].transit(steps[0].exit))
+                            or kinds_of[placements[0][0]][steps[0].entry] == "arch_foot")):
                     # Closing INTO the stub (rather than driving through) makes a
                     # reversing loop: the walk's end mates this branch, and the train
                     # thereafter shuttles out through the junction's other route.
