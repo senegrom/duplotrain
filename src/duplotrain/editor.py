@@ -19,8 +19,8 @@ from .catalog import ACCESSORIES, STONE_MOUNTS, default_catalog
 from .editor_tools import switch_choices
 from .geometry import ORIGIN, Pose, steps_to_degrees
 from .lattice import LatticePoint, from_alg_xy, z_from_alg
-from .layout import End, Layout, Placement, layout_from_dict, layout_to_dict
-from .pieces import PieceType
+from .layout import _BRIDGE_JOINT, End, Layout, Placement, layout_from_dict, layout_to_dict
+from .pieces import PORT_KINDS, PieceType, kinds_mate
 from .sets import SETS, inventory_for_sets
 from .solver import (
     Solution,
@@ -28,6 +28,7 @@ from .solver import (
     _lattice_rotations,
     _lattice_step,
     _moves_for,
+    _placeable_stock,
     _pose_to_lattice,
 )
 from .validation import MAX_INVENTORY_COUNT, MAX_SNAPSHOT_BYTES, check_layout_json
@@ -83,6 +84,12 @@ def _end(value: object, name: str) -> End:
 def _signed_degrees(dheading: int) -> int:
     degrees = steps_to_degrees(dheading)
     return degrees - 360 if degrees >= 180 else degrees
+
+
+def _takes(piece: PieceType, entry: int) -> dict[str, list[str]]:
+    """The kinds of open end a piece entered by *entry* joins, unless only ordinary track."""
+    takes = [kind for kind in PORT_KINDS if kinds_mate(kind, piece.ports[entry].kind)]
+    return {} if takes == ["track"] else {"takes": takes}
 
 
 @lru_cache(maxsize=2048)
@@ -342,6 +349,7 @@ class Session:
                     else port_poses[(index, port)]
                 )
                 x, y = pose.xy()
+                kind = placement.piece.ports[port].kind
                 ports.append(
                     {
                         "x": round(x, 2),
@@ -351,6 +359,7 @@ class Session:
                         "sealed": port in placement.piece.sealed,
                         "port": port,
                         "name": placement.piece.ports[port].name,
+                        **({} if kind == "track" else {"kind": kind}),
                     }
                 )
             main_line = lines[0]
@@ -455,7 +464,8 @@ class Session:
                     label = "turn left" if turn > 0 else "turn right"
                 else:
                     label = f"{entry_name}→{exit_name}"
-                variants.append({"entry": move.entry, "exit": move.exit, "label": label})
+                variants.append({"entry": move.entry, "exit": move.exit, "label": label,
+                                 **_takes(piece, move.entry)})
             if not variants:
                 # No drivable route (a buffer stop): still placeable by hand through
                 # each real connector -- attaching only needs an entry port.
@@ -464,7 +474,7 @@ class Session:
                 ]
                 for p in unsealed:
                     label = "cap the end" if len(unsealed) == 1 else f"via {piece.ports[p].name}"
-                    variants.append({"entry": p, "exit": p, "label": label})
+                    variants.append({"entry": p, "exit": p, "label": label, **_takes(piece, p)})
             palette.append(
                 {
                     "id": pid,
@@ -659,10 +669,10 @@ class Session:
         Yields the closures, and None as a heartbeat once per leveler pair.
         *auditor* returns the base's shared overlap auditor.
         Tries ``leveler + j straights + k same-sign curves + m straights + leveler``
-        chains (j, m <= 8, k <= 13; the 60 shortest leveler pairs whose climbs
-        cancel the height difference), where a leveler is a short run of
-        climbing pieces: a one-directional ramp/span sequence of up to four
-        pieces that the bridge's joints allow, or the full up-and-over bridge.
+        chains (j, m <= 8, k <= 13; the 60 shortest leveler pairs whose joints
+        the bridge allows and whose climbs cancel the height difference), where a
+        leveler is a short run of climbing pieces: a one-directional ramp/span
+        sequence of up to four pieces, or the full up-and-over bridge.
         This closes winding rings the
         search's toward-target ordering starves on -- ten curves looping to a
         neighbouring fork tip -- and their versions through bridges: finish the
@@ -675,9 +685,8 @@ class Session:
         remaining = self.remaining()
         base = self.layout
         n_base = len(base)
-        # The base's lowest connector stands on the floor: no template goes under it.
-        floor = min(float(placement.port_pose(port).z) for placement in base
-                    for port in range(len(placement.piece.ports)))
+        # No template goes under the floor the base stands on.
+        floor = float(base.floor(self.catalog.values()))
         curve, straight = self.catalog["curve"], self.catalog["straight"]
         ramp, span = self.catalog["ramp"], self.catalog["span"]
         deltas = {
@@ -718,17 +727,38 @@ class Session:
                     need[pid] = need.get(pid, 0) + 1
             return all(remaining.get(pid, 0) >= n for pid, n in need.items())
 
+        piece_of = {"ramp": ramp, "span": span}
+
+        def left_open(seq, kind):
+            # The connector kind a unit leaves open when entered from *kind*,
+            # or None when the bridge cannot make one of its joints.
+            for pid, side in seq:
+                if not kinds_mate(kind, piece_of[pid].ports[side].kind):
+                    return None
+                kind = piece_of[pid].ports[1 - side].kind
+            return kind
+
+        def joints_ok(pre, post):
+            # With plain track between the units or without, every joint must mate.
+            after = left_open(pre, base.placements[grow[0]].piece.ports[grow[1]].kind)
+            if after is None:
+                return False
+            closing = base.placements[close[0]].piece.ports[close[1]].kind
+            ends = [left_open(post, after)]
+            if kinds_mate(after, "track"):
+                ends.append(left_open(post, "track"))
+            return any(end is not None and kinds_mate(end, closing) for end in ends)
+
         target_dz = float(target.z) - float(base.pose_of(grow).z)
         pairs = [
             (pre, post)
             for pre, dz_pre in units
             for post, dz_post in units
             if abs(dz_pre + dz_post - target_dz) < 1e-6 and unit_ok(pre, post)
+            and joints_ok(pre, post)
         ]
         pairs.sort(key=lambda pp: len(pp[0]) + len(pp[1]))
         pairs = pairs[:60]
-
-        piece_of = {"ramp": ramp, "span": span}
 
         def apply_unit(pose, seq):
             # Rigid motions compose associatively, so stepping through a unit
@@ -857,13 +887,27 @@ class Session:
             return None
         lift = sum(
             max((abs(float(m.dz)) for m in _moves_for(self.catalog[pid])), default=0.0) * n
-            for pid, n in remaining.items()
+            for pid, n in _placeable_stock(remaining, self.catalog, self.layout).items()
         )
         if dz <= lift + 1e-6:
             return None
         return (f"impossible: those ends differ by {dz:.0f} mm in height and the "
                 f"remaining pieces can climb at most {lift:.0f} mm — the track up "
                 "there can never come back down")
+
+    def _joint_gap_reason(self, grow: End, close: End,
+                          remaining: Mapping[str, int]) -> str | None:
+        """Why no completion can start or finish at a bridge end, if nothing left takes it."""
+        layout = self.layout
+        offered = {port.kind for pid in _placeable_stock(remaining, self.catalog, layout)
+                   for port in self.catalog[pid].ports}
+        offered |= {layout.placements[i].piece.ports[p].kind
+                    for i, p in layout.connectable_ends() if (i, p) not in (grow, close)}
+        for i, p in (grow, close):
+            if not any(kinds_mate(layout.placements[i].piece.ports[p].kind, kind)
+                       for kind in offered):
+                return f"impossible: no piece left can join that end ({_BRIDGE_JOINT})"
+        return None
 
     def apply_candidate(self, index: int, revision: int | None = None) -> None:
         if self._candidate_revision != self.revision or (

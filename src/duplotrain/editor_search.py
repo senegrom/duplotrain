@@ -20,14 +20,13 @@ from typing import Any
 
 from .bridge_completion import _BRIDGE_ID, _bridge, _expand
 from .collision import DEFAULT_CLEARANCE
-from .exact import ZERO
 from .layout import Layout, layout_to_dict
 from .solver import (
     SearchLimits,
     Solution,
     SolverConfig,
-    _cached_moves,
     _OverlapAudit,
+    _placeable_stock,
     _solution_overlaps,
     solve_steps,
 )
@@ -228,16 +227,12 @@ class PairSearch:
 
     def __init__(self, base, catalog, stock, grow, close, depth, effort, slop, reversing,
                  options):
-        from .editor import Session
-
         self.base, self.catalog, self.stock = base, catalog, stock
         self.depth, self.effort = depth, effort
         self.grow, self.close_end = grow, close
         self.cursors: list[Cursor] = []
         self.active = 0
-        self.arc_session = Session(catalog=dict(catalog), history=[base], inventory={
-            pid: n + base.piece_counts.get(pid, 0) for pid, n in stock.items()
-        })
+        self.arc_session = None  # the arc templates' session, built when they run
         self.slop, self.reversing, self.options = slop, reversing, options
         # One overlap auditor of the base, built when first needed, serves the arc
         # templates and the bridge stage's expanded macros (new geometry).
@@ -254,6 +249,12 @@ class PairSearch:
         return self.audit
 
     def _templates(self):
+        if self.arc_session is None:
+            from .editor import Session
+
+            self.arc_session = Session(catalog=dict(self.catalog), history=[self.base],
+                                       inventory={pid: n + self.base.piece_counts.get(pid, 0)
+                                                  for pid, n in self.stock.items()})
         return self.arc_session._arc_events(self.grow, self.close_end, MAX_RESULTS,
                                             self.depth, auditor=self._auditor)
 
@@ -266,14 +267,15 @@ class PairSearch:
         plain = {pid: n for pid, n in stock.items() if pid in ("curve", "straight") and n}
         # The solver drops pieces no walk can place: with those alone beside plain
         # track, a plain stage would search the full stage's problem.
-        full = {pid: n for pid, n in stock.items() if n and _cached_moves(catalog[pid])}
+        full = _placeable_stock(stock, catalog, base)
         stages = []
         if plain and plain != full:
             stages.append(("plain track", plain, catalog, 25_000, 0, None))
         bridge = _bridge(catalog)
+        floor = base.floor(catalog.values())
         if (bridge is not None and stock.get("ramp", 0) >= 2
                 and stock.get("span", 0) >= 2
-                and base.pose_of(self.grow).z == ZERO and base.pose_of(self.close_end).z == ZERO):
+                and base.pose_of(self.grow).z == floor and base.pose_of(self.close_end).z == floor):
             macro, parts = bridge
             stages.append(("standard bridge", {**plain, _BRIDGE_ID: 1},
                            {**catalog, _BRIDGE_ID: macro}, 250_000, 3, parts))
@@ -300,11 +302,7 @@ class PairSearch:
                 def accept(sol, expand=expand):
                     if expand is None:
                         return valid_extension(base, sol, stock, self.depth, self.options)
-                    sol = expand(sol)
-                    if any(p.frame.z != ZERO for p in sol.layout.placements[len(base):]
-                           if p.piece.id in ("curve", "straight", "ramp")):
-                        return False
-                    return valid_extension(base, sol, stock, self.depth, self.options,
+                    return valid_extension(base, expand(sol), stock, self.depth, self.options,
                                            audit=self._auditor())
 
                 # The limits bound nodes, results and depth; max_nodes still sizes
@@ -416,7 +414,7 @@ def _meeting_ends_joined(layout):
         try:
             layout = layout.join(a, b)
         except ValueError:
-            pass  # coincident but catalogue-incompatible connectors stay apart
+            pass  # a third end at the same point: the first pair joined keeps it
     return layout
 
 
@@ -467,7 +465,9 @@ class SearchJob:
             grow, close = _end(grow, "grow"), _end(close, "close")
             if grow == close or grow not in opens or close not in opens:
                 raise ValueError("pick two distinct open ends")
-        if any(issue["problems"] != ["planar gap"] for issue in self.base.joint_issues()):
+        # Close all gaps would join every pair of meeting ends: they must be able to.
+        if any(issue["problems"] != ["planar gap"] for issue in self.base.joint_issues()) or (
+                self.all_gaps and self.base.matable_pairs() != self.base.meeting_pairs()):
             raise ValueError("Fix incompatible existing joints before starting this search")
         # A plan must be overlap-free as a whole, which no addition can make it.
         if self.all_gaps and _solution_overlaps(_meeting_ends_joined(self.base), 0,
@@ -501,6 +501,9 @@ class SearchJob:
         elif not reversing and (reason := session._height_gap_reason(grow, close, self.stock)):
             self.reason, self.status, self.complete = reason, "exhausted", True
             self.stage = "height check"
+        elif not reversing and (reason := session._joint_gap_reason(grow, close, self.stock)):
+            self.reason, self.status, self.complete = reason, "exhausted", True
+            self.stage = "joint check"
         else:
             self.pool = PairSearch(self.base, self.catalog, self.stock, grow, close,
                                    self.depth, self.effort, slop, reversing, self.options)

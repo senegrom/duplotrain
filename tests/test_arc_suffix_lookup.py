@@ -40,9 +40,10 @@ def test_arc_oracle_finds_winding_ring_closures():
 
 def test_arc_oracle_levels_through_ramps():
     """One end atop a half-built climb, the other at ground: no flat chain can
-    close this -- the oracle must descend through a ramp, then ring around."""
+    close this -- the oracle sets an arch on the ramp's top, rings round at the
+    crest and comes down over the second arch and ramp."""
     session = Session()
-    session.set_inventory({"curve": 12, "ramp": 2, "straight": 8})
+    session.set_inventory({"curve": 12, "ramp": 2, "span": 2, "straight": 8})
     session.attach("curve", 0, None)
     for _ in range(5):
         session.attach("curve", 0, (len(session.layout) - 1, 1))
@@ -54,9 +55,23 @@ def test_arc_oracle_levels_through_ramps():
     job = complete(session, grow, close, max_results=1)
     assert len(job.solutions) == 1
     assert job.nodes == 0
-    counts = dict(session.candidates[0].layout.piece_counts)
-    assert counts["ramp"] == 2  # the descending ramp was added
-    assert counts["curve"] == 12
+    assert dict(session.candidates[0].layout.piece_counts) == {"curve": 12, "ramp": 2,
+                                                              "span": 2}
+
+
+def test_arc_oracle_spends_its_pairs_on_joints_the_bridge_can_make():
+    # Two bridge sets beside a U of track: most ramp and arch runs cannot be built
+    # (a ramp's top takes only an arch's foot), and passing them over leaves room
+    # for the ring that carries two whole bridges on the floor.
+    catalog = default_catalog()
+    straight, curve = catalog["straight"], catalog["curve"]
+    base = build_chain([(straight, 1, 0)] + [(curve, 0, 1)] * 6 + [(straight, 0, 1)])
+    stock = Counter({"curve": 24, "straight": 8, "ramp": 4, "span": 4})
+    session = Session(history=[base], inventory=dict(stock + Counter(base.piece_counts)))
+    grow, close = base.connectable_ends()
+    found = arc_closures(session, grow, close, 50, 40)
+    added = [Counter(c.layout.piece_counts) - Counter(base.piece_counts) for c in found]
+    assert Counter({"ramp": 4, "span": 4, "curve": 6}) in added
 
 
 @pytest.mark.parametrize("heading", [0, 1, 5, 23])
@@ -88,6 +103,9 @@ def test_duplicate_straight_bridge_templates_do_not_fill_result_cards():
     assert found
     keys = [candidate.layout.placements[len(layout):] for candidate in found]
     assert len(keys) == len(set(keys))
+    # No bridge hangs under the floor track it spans.
+    assert all(min(float(placement.port_pose(port).z) for placement in candidate.layout
+                   for port in range(len(placement.piece.ports))) == 0 for candidate in found)
 
 
 def test_reported_gap_does_not_rebuild_every_suffix_for_every_prefix(monkeypatch):

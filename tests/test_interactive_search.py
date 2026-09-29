@@ -778,6 +778,33 @@ def test_ends_at_different_heights_explain_the_proof_instead_of_searching(catalo
     assert session._candidate_revision == session.revision and not session.candidates
 
 
+def test_a_bridge_end_nothing_left_can_take_explains_the_proof(catalog):
+    # A ramp's top takes only an arch's foot: with no arch left, that top and a
+    # raised straight at its height can never be joined. Nothing to search.
+    from fractions import Fraction
+
+    layout, _ = Layout().with_piece(catalog["ramp"], Pose.make())
+    layout, far = layout.with_piece(catalog["straight"],
+                                    Pose.make(x=1536, z=Fraction(288, 5), heading=12))
+    session = Session(history=[layout], inventory={"ramp": 3, "straight": 9, "curve": 24})
+    state = call(session, "start", grow=[0, 1], close=[far, 0])
+    assert state["status"] == "exhausted" and state["complete"] and state["searched"] == 0
+    assert state["stage"] == "joint check"
+    assert "no piece left can join that end" in state["reason"]
+
+
+def test_an_arch_placed_first_closes_over_a_ramp_under_it(catalog):
+    # The arch's foot rests on a ramp's top, never on the floor: the ramp that
+    # carries it stands lower, and the loop closes round at that floor.
+    from tests.editor_support import complete
+
+    base = build_chain([(catalog["span"], 0, 1)] + [(catalog["curve"], 0, 1)] * 6)
+    session = Session(history=[base], inventory={"span": 2, "curve": 12, "ramp": 2})
+    job = complete(session)
+    assert job.solutions and all(not s.layout.joint_issues() for s in job.solutions)
+    assert Counter(job.solutions[0].layout.piece_counts) == {"span": 2, "curve": 12, "ramp": 2}
+
+
 def test_closures_beyond_the_save_limits_are_no_proof_that_none_exist(catalog, monkeypatch):
     import duplotrain.editor_search as editor_search
 

@@ -55,6 +55,15 @@ def test_editor_page_serves(server):
     assert state["layout"]["placements"] == []
     curve = next(p for p in state["palette"] if p["id"] == "curve")
     assert {v["label"] for v in curve["variants"]} == {"turn left", "turn right"}
+    # Bridge parts name the only ends they join; ordinary track says nothing.
+    variants = {p["id"]: {v["label"]: v.get("takes") for v in p["variants"]}
+                for p in state["palette"] if p["id"] in ("curve", "ramp", "span")}
+    assert variants == {"curve": {"turn left": None, "turn right": None},
+                        "ramp": {"↑ climb 58mm": None, "↓ descend 58mm": ["arch_foot"]},
+                        "span": {"↑ climb 19mm": ["ramp_top"], "↓ descend 19mm": None}}
+    status, state = server("/api/attach", {"piece": "ramp", "entry": 0, "at": None})
+    assert [port.get("kind") for port in state["layout"]["placements"][0]["ports"]] == [
+        None, "ramp_top"]
 
 
 def test_attach_undo_clear(server):

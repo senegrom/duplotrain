@@ -44,6 +44,26 @@ def test_ends_that_meet_unjoined_are_no_overlap():
     assert not report["overlaps"] and len(report["open_ends"]) == 2
 
 
+def test_bridge_ends_that_meet_but_cannot_join_are_a_bad_joint_not_an_overlap():
+    # A straight butted against a ramp's top: the pieces only touch, but a ramp's
+    # top takes only an arch's foot. Close all gaps, which joins every pair of
+    # meeting ends, cannot start.
+    from duplotrain.editor import dispatch_session
+
+    c = default_catalog()
+    layout, _ = Layout().with_piece(c["ramp"], Pose.make())
+    straight = c["straight"]
+    layout, flat = layout.with_piece(straight, straight.frame_for(0, layout.pose_of((0, 1))))
+    session = Session(history=[layout])
+    report = check_session(session)
+    assert not report["overlaps"] and not report["connector_closed"]
+    assert [(j["a"], j["b"], j["problems"]) for j in report["joint_issues"]] == [
+        ([0, 1], [flat, 0], ["mismatched bridge joint"])]
+    with pytest.raises(ValueError, match="Fix incompatible existing joints"):
+        dispatch_session(session, "/api/search/start",
+                         {"revision": session.revision, "all_gaps": True})
+
+
 def test_diagnostics_reports_stone_shortages_even_in_sandbox():
     s = Session(unlimited=True, stones={})
     s.attach("straight", 0, None)

@@ -12,7 +12,7 @@ the general solver's, and every stage keeps to the bridge's joints and the floor
 
 The bridge macro uses the exact four ramp/span/span/ramp segments and their sampled
 height profile. It is enabled only for the standard bridge geometry, sufficient
-stock (two ramps and two spans), and two ground-level ends. Reserving three extra
+stock (two ramps and two spans), and two ends on the floor. Reserving three extra
 piece slots accounts for its four real components. Before publication, every macro
 is expanded into normal catalogue placements and checked for inventory, real-piece
 depth, exact joints among the new placements, and collisions against the actual
@@ -22,8 +22,8 @@ layouts.
 
 `search_effort` is an integer API parameter from 1 to 16, defaulting to 1. It scales
 the plain, bridge and full-inventory budgets of 25,000, 250,000 and 60,000 nodes. If
-curves and straights are already all the box a walk can place (a buffer or an
-off-ramp joins no walk), only the full-inventory search runs.
+curves and straights are already all the box a walk can place (a buffer, an
+off-ramp or a ramp with no arch joins no walk), only the full-inventory search runs.
 A job's `searched` count accumulates across stages instead of restarting, and
 **Search harder** resumes the same job with larger budgets
 ([search-jobs.md](search-jobs.md)).

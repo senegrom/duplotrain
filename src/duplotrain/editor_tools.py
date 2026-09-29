@@ -74,7 +74,8 @@ def check_session(session: Session) -> dict[str, Any]:
     At most 200 overlap pairs are returned. Reaching that limit is explicitly
     incomplete, never a collision-free verdict. Accepted layouts already have
     a 1500-piece bound. Direct neighbours, and pieces whose ends meet exactly,
-    use the solver's existing exemption.
+    touch as a joint does and are exempt; ends that meet but cannot join are a
+    mismatched bridge joint.
     """
     layout = session.layout
     opens = [list(end) for end in layout.connectable_ends()]
@@ -82,10 +83,12 @@ def check_session(session: Session) -> dict[str, Any]:
     neighbours: dict[int, set[int]] = {}
     for (a, _), (b, _) in layout.links.items():
         neighbours.setdefault(a, set()).add(b)
-    # Ends that meet exactly touch as a joint does, joined or not.
-    for (a, _), (b, _) in layout.matable_pairs():
-        neighbours.setdefault(a, set()).add(b)
-        neighbours.setdefault(b, set()).add(a)
+    for a, b in layout.meeting_pairs():
+        neighbours.setdefault(a[0], set()).add(b[0])
+        neighbours.setdefault(b[0], set()).add(a[0])
+        if not layout._kinds_mate(a, b):
+            joints.append({"a": list(a), "b": list(b), "gap_mm": 0.0, "height_mm": 0.0,
+                           "heading_error_deg": 0, "problems": ["mismatched bridge joint"]})
     overlaps = []
     clouds = []
     # Small layouts test every pair. On larger layouts the shared deferred field

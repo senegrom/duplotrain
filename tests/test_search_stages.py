@@ -51,9 +51,33 @@ def test_a_one_direction_stage_runs_before_the_next_stage_starts(gap):
     # its own limit before the bridge stage starts, and is never resumed after it.
     job, stages = run(gap, {"slop": 1}, nodes=30_000)
     try:
-        assert stages == ["templates", "plain track", "standard bridge"]
+        assert [stage for stage in stages if stage != "templates"] == [
+            "plain track", "standard bridge"]
     finally:
         job.close()
+
+
+@pytest.mark.parametrize("floor", [0, -76.8, 57.6])
+def test_the_bridge_stage_spans_a_gap_on_the_floor_at_any_height(floor):
+    # A layout loaded from a loop that began up on a crest stands lower than zero:
+    # its floor gap still gets the standard bridge. A gap up on bricks does not.
+    from fractions import Fraction
+
+    from duplotrain.exact import Alg
+    from duplotrain.geometry import Pose
+
+    catalog = default_catalog()
+    z = Alg(Fraction(floor).limit_denominator(5))
+    base = build_chain([(catalog["curve"], 0, 1)] * 6, start=Pose(Alg(0), Alg(0), z, 0))
+    if floor > 0:  # the floor lies under a ramp standing beside the gap
+        base, _ = base.with_piece(catalog["ramp"], Pose.make(x=-2000))
+    stock = {"curve": 12, "straight": 8, "ramp": 2, "span": 2}
+    pool = PairSearch(base, catalog, stock, (5, 1), (0, 0), 26, 1, 0, False,
+                      search_options(None, catalog))
+    try:
+        assert ("standard bridge" in {c.stage for c in pool.cursors}) == (floor <= 0)
+    finally:
+        pool.close()
 
 
 @pytest.mark.parametrize("slop, ends", [(0, {(5, 1), (0, 0)}), (1, {(5, 1)})])
