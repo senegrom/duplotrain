@@ -44,7 +44,7 @@ def all_wirings(n):
     yield from rec(ports, [], [])
 
 
-def is_connected(n, edges, caps):
+def is_connected(n, edges):
     adj = {k: set() for k in range(n)}
     for (k1, _a1), (k2, _a2) in edges:
         adj[k1].add(k2)
@@ -209,7 +209,7 @@ if __name__ == "__main__":
         perfect = []
         for edges, caps in all_wirings(n):
             total += 1
-            if not edges or not is_connected(n, edges, caps):
+            if not edges or not is_connected(n, edges):
                 continue
             connected += 1
             if classify_wiring(n, edges, caps):
@@ -227,6 +227,6 @@ if __name__ == "__main__":
         total = sum(
             1
             for edges, caps in core_wirings(n)
-            if edges and is_connected(n, edges, caps) and classify_wiring(n, edges, caps)
+            if edges and is_connected(n, edges) and classify_wiring(n, edges, caps)
         )
         print(f"cores n={n}: {total} PERFECT")

@@ -428,10 +428,38 @@ class PieceType:
             (exit_.heading + rotation) % HEADING_STEPS,
         )
 
+    @property
+    def minimum_z(self) -> Alg:
+        """Exact lowest centreline height over every path, in the local frame.
+
+        Built-in primitives are level or linear in height; their segment ends
+        include every extremum, even a dip hidden between level connectors.
+        The bounded cache is keyed by geometry, never by a catalogue identifier.
+        """
+        return _minimum_path_z(self.paths)
+
     def all_centrelines(self, spacing: float = 8.0) -> list[list[tuple[float, float, float]]]:
         # Cache immutable samples, never the caller's mutable outer/inner lists.
         # Geometry (not a catalogue id) is the key, so custom pieces cannot alias.
         return [list(line) for line in _sample_paths(self.paths, spacing)]
+
+
+@lru_cache(maxsize=128)
+def _minimum_path_z(paths: tuple[Path, ...]) -> Alg:
+    low = None
+    for path in paths:
+        z = path.start.z
+        if low is None or (z - low).sign() < 0:
+            low = z
+        for segment in path.segments:
+            if type(segment) not in (Straight, Arc, Ramp):
+                # Unknown primitives need an exact height envelope: guessing
+                # from their endpoints or samples would silently allow dips.
+                raise ValueError("minimum height is unknown for this segment type")
+            z = z + segment.delta()[2]
+            if (z - low).sign() < 0:
+                low = z
+    return alg(0) if low is None else low
 
 
 @lru_cache(maxsize=128)

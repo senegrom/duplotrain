@@ -177,7 +177,7 @@ class _LatticeArcGeometry:
         cached = self._run_steps.get((key, count))
         if cached is None:
             runs = self._runs.setdefault(key, [(0, 0, 0, 0, 0, 0)])
-            step = self.step(*key)
+            step = self.step(pid, entry, exit_port)
             while len(runs) <= count:
                 runs.append(step(runs[-1]))
             a, b, c, d, z, heading = runs[count]
@@ -432,7 +432,9 @@ class Session:
             out[pid] = _count(count)
         return out
 
-    def state(self, *, preview_format: str | None = None) -> dict[str, Any]:
+    def state(
+        self, *, preview_format: str | None = None, include_candidates: bool = True,
+    ) -> dict[str, Any]:
         """Return fresh state; compact previews are explicitly negotiated by clients."""
         if preview_format is not None and preview_format != PREVIEW_FORMAT:
             raise ValueError("unsupported preview format")
@@ -521,7 +523,7 @@ class Session:
             "snapshot": self.snapshot(),
             "candidates": [
                 self._candidate_json(i, s, preview_format=preview_format)
-                for i, s in enumerate(self.candidates)
+                for i, s in enumerate(self.candidates if include_candidates else ())
             ],
         }
 
@@ -686,7 +688,7 @@ class Session:
         base = self.layout
         n_base = len(base)
         # No template goes under the floor the base stands on.
-        floor = float(base.floor(self.catalog.values()))
+        floor = base.floor(self.catalog.values())
         curve, straight = self.catalog["curve"], self.catalog["straight"]
         ramp, span = self.catalog["ramp"], self.catalog["span"]
         deltas = {
@@ -840,9 +842,8 @@ class Session:
                                 closed = build(pre, j, k, entry, m, post)
                             except ValueError:
                                 continue
-                            if any(float(placement.port_pose(port).z) < floor - 1e-6
-                                   for placement in closed.placements[n_base:]
-                                   for port in range(len(placement.piece.ports))):
+                            if any((placement.frame.z + placement.piece.minimum_z - floor).sign() < 0
+                                   for placement in closed.placements[n_base:]):
                                 continue
                             if audit.overlaps(closed):
                                 continue

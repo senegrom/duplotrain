@@ -146,7 +146,7 @@ def physical_key(layout, base):
     return frozenset(pieces.items()), links
 
 
-def valid_extension(base, candidate, stock, max_pieces, options, *, audit=None):
+def valid_extension(base, candidate, stock, max_pieces, options, *, audit=None, floor=None):
     """Acceptance checks of one candidate over *base*.
 
     *base* already fits the room and keep-out limits: a job checks its layout
@@ -163,7 +163,10 @@ def valid_extension(base, candidate, stock, max_pieces, options, *, audit=None):
             or len(layout) - len(base) > max_pieces
             or any(n - base_counts.get(pid, 0) > stock.get(pid, 0)
                    for pid, n in layout.piece_counts.items())
-            or not fits_space(layout.placements[len(base):], options)):
+            or not fits_space(layout.placements[len(base):], options)
+            or (floor is not None and any(
+                (p.frame.z + p.piece.minimum_z - floor).sign() < 0
+                for p in layout.placements[len(base):]))):
         return False
     # Audit only the joints the candidate adds: the base's own, deliberate forced
     # fits among them, are not the candidate's claim.
@@ -229,6 +232,7 @@ class PairSearch:
     def __init__(self, base, catalog, stock, grow, close, depth, effort, slop, reversing,
                  options):
         self.base, self.catalog, self.stock = base, catalog, stock
+        self.floor = base.floor(catalog.values())
         self.depth, self.effort = depth, effort
         self.grow, self.close_end = grow, close
         self.cursors: list[Cursor] = []
@@ -302,9 +306,10 @@ class PairSearch:
 
                 def accept(sol, expand=expand):
                     if expand is None:
-                        return valid_extension(base, sol, stock, self.depth, self.options)
+                        return valid_extension(base, sol, stock, self.depth, self.options,
+                                               floor=self.floor)
                     return valid_extension(base, expand(sol), stock, self.depth, self.options,
-                                           audit=self._auditor())
+                                           audit=self._auditor(), floor=self.floor)
 
                 # The limits bound nodes, results and depth; max_nodes still sizes
                 # the reverse tables' base allowance.
@@ -321,7 +326,7 @@ class PairSearch:
             try:
                 candidate = next(self.arc)
                 if candidate is not None and valid_extension(
-                    self.base, candidate, self.stock, self.depth, self.options
+                    self.base, candidate, self.stock, self.depth, self.options, floor=self.floor
                 ):
                     return {"kind": "solution", "solution": candidate, "stage": "templates"}
                 return {"kind": "progress", "stage": "templates"}
@@ -755,6 +760,8 @@ def dispatch_search(session, path, body):
         raise ValueError("unknown candidate sort order")
     if type(body.get("harder", False)) is not bool:
         raise ValueError("harder must be a boolean")
+    if type(body.get("page_only", False)) is not bool:
+        raise ValueError("page_only must be a boolean")
     old = session._interactive_job
     if action == "start":
         job = SearchJob(session, body)  # validate before replacing prior search
@@ -791,7 +798,10 @@ def dispatch_search(session, path, body):
                 job.status = "running"
         elif action == "publish":
             job.publish(session)
-            return {**session.state(preview_format=body.get("preview_format")),
+            # Opt-in transport only: the engine still retains every exact layout.
+            # Legacy clients get the full collection; this editor needs one page.
+            return {**session.state(preview_format=body.get("preview_format"),
+                                    include_candidates=not body.get("page_only", False)),
                     "search_job": job.response(session, body)}
         elif action == "discard":
             job.close()

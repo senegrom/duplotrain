@@ -31,7 +31,7 @@ def proof():
 def perfect_wirings(proof, n):
     out = []
     for edges, caps in proof.all_wirings(n):
-        if not edges or not proof.is_connected(n, edges, caps):
+        if not edges or not proof.is_connected(n, edges):
             continue
         if proof.classify_wiring(n, edges, caps):
             out.append((edges, caps))
@@ -64,6 +64,6 @@ def test_lobe_free_cores_never_perfect(proof):
     core is perfect.  Exhausted to n=6 offline (24.1M wirings); n<=4 pinned."""
     for n in (2, 3, 4):
         for edges, caps in proof.core_wirings(n):
-            if not edges or not proof.is_connected(n, edges, caps):
+            if not edges or not proof.is_connected(n, edges):
                 continue
             assert not proof.classify_wiring(n, edges, caps), (edges, caps)

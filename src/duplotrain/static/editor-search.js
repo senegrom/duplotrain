@@ -123,7 +123,7 @@ async function publishSearch(sequence) {
   const chosenIndex = (interactiveJob.candidates || []).find(c =>
     `${c.revision}:${c.index}` === selectedCandidate)?.index;
   const next = await api("/api/search/publish", {job_id: interactiveJob.job_id,
-    revision: interactiveJob.revision, ...jobView()}, true);
+    revision: interactiveJob.revision, page_only: true, ...jobView()}, true);
   if (sequence !== jobSequence) return;
   const before = S.revision;
   S = next; interactiveJob = next.search_job;
