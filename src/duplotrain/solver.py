@@ -1884,7 +1884,7 @@ def solve_steps(
 ) -> Generator[dict, None, SolveResult]:
     """Find closed loops buildable from *inventory*.
 
-    Loop mode (default): search fresh loops from scratch.
+    Loop mode (default): search fresh loops from scratch, the shortest first.
 
     Completion mode (*base* given): keep every placed piece of *base* where it is and
     search for ways to connect its open end *grow_from* to its open end *close_onto*
@@ -1910,7 +1910,7 @@ def solve_steps(
         With mutable limits, progress/solution/limit checkpoints. Increase a
         budget and advance to continue, or close to release retained state.
         Piece-depth continuation applies to completion mode; fresh-loop mode
-        retains its configured full-depth traversal. The return value is a
+        deepens only to its configured depth. The return value is a
         SolveResult containing distinct solutions (loop mode: deduplicated up
         to rotation, reflection and starting point), each with a rebuilt
         :class:`~duplotrain.layout.Layout`, plus counters describing how the search went.
@@ -2691,10 +2691,18 @@ def solve_steps(
         depth_limit = min(depth_limit, cfg.max_pieces)
     try:
         if base is None:
-            # Loop mode enumerates everything reachable; one full-depth pass.
-            f_limit = depth_limit
-            stats.max_pieces_searched = f_limit
-            yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed, start_kind)
+            # Loop mode grows the same contour, shortest loops first: each pass finds
+            # every loop of up to f_limit pieces. One full-depth pass drowned in a
+            # broad box (a bridge set, a switch and a track pack found no loop in
+            # two million nodes); a search that must use every piece has one pass.
+            f_limit = (depth_limit if cfg.use_all_pieces
+                       else min(depth_limit, max(1, cfg.min_pieces)))
+            while True:
+                stats.max_pieces_searched = f_limit
+                if not (yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed,
+                                       start_kind)) or f_limit >= depth_limit:
+                    break
+                f_limit += 1
         else:
             # Completion mode runs IDA*: grow the pieces-needed contour until closures
             # appear.  Uninformed depth-first dies here whenever the inventory is broad

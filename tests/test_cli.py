@@ -228,16 +228,14 @@ def test_check_names_ends_that_meet_but_cannot_join(runner, tmp_path):
     assert "gap 0 mm" not in result.output and "(0, 0) <-> (0, 1)" not in result.output
 
 
-def test_solve_passes_its_piece_limit_and_names_it_when_the_search_runs_out(runner, monkeypatch):
+def test_solve_passes_its_piece_limit_and_says_when_the_search_runs_out(runner, monkeypatch):
     configs = captured_configs(monkeypatch)
     assert runner.invoke(main, ["solve", "--curve", "12", "--max-pieces", "20"]).exit_code == 0
     assert configs[0].max_pieces == 20
     monkeypatch.setattr(cli, "solve", lambda *args: SolveResult(
         [], SolveStats(complete=False, stop_reason="node_limit")))
-    for args, hint in (([], True), (["--max-pieces", "24"], False)):
-        result = runner.invoke(main, ["solve", "--curve", "12", *args])
-        assert "a closure may still exist" in result.output
-        assert ("--max-pieces 24 finds loops" in result.output) == hint
+    output = " ".join(runner.invoke(main, ["solve", "--curve", "12"]).output.split())
+    assert "a closure may still exist (a higher --max-nodes searches further)" in output
 
 
 def test_cli_check_reports_the_complete_crossing_length(tmp_path):

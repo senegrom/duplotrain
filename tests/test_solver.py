@@ -666,3 +666,20 @@ def test_a_teardrop_tail_never_ends_at_an_arch_foot(catalog):
     assert result.stats.complete and len(result.solutions) == 4
     assert not any(s.layout.placements[index].piece.ports[port].kind == "arch_foot"
                    for s in result.solutions for index, port in s.layout.connectable_ends())
+
+
+def test_loops_come_shortest_first(catalog):
+    # A broad box, a bridge set, a switch and a track pack: one pass at full length
+    # found no loop in two million nodes. Shortest first, loops come at once.
+    from duplotrain.sets import inventory_for_sets
+
+    box, _stones = inventory_for_sets(["10874", "10872", "10882"])
+    broad = solve(box, catalog, SolverConfig(max_results=25))
+    assert len(broad.solutions) == 25 and broad.stats.nodes < 10_000
+    assert max(s.piece_count for s in broad.solutions) <= 14
+    # A result limit keeps every shorter loop: 12 curves and 6 straights make seven
+    # loops of up to 16 pieces, and those are the first seven.
+    every = solve({"curve": 12, "straight": 6}, catalog, SolverConfig(max_results=1000))
+    first = solve({"curve": 12, "straight": 6}, catalog, SolverConfig(max_results=7))
+    assert {s.signature for s in first.solutions} == {
+        s.signature for s in every.solutions if s.piece_count <= 16}

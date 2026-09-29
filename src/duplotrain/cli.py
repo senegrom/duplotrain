@@ -200,8 +200,8 @@ def sets_cmd() -> None:
 @click.option("--min-pieces", type=click.IntRange(min=0), default=_MIN_PIECES,
               show_default=True)
 @click.option("--max-pieces", type=click.IntRange(min=1), default=None,
-              help="Look only for loops of at most this many pieces: in a large box, "
-                   "a limit such as 24 finds loops sooner.")
+              help="Look only for loops of at most this many pieces (the shortest are "
+                   "found first).")
 @click.option("--max-results", type=click.IntRange(min=1), default=25, show_default=True)
 @click.option("--max-nodes", type=click.IntRange(min=1), default=2_000_000, show_default=True)
 @click.option("--use-all", is_flag=True,
@@ -347,12 +347,11 @@ def solve_cmd(
                           str(sol.open_stubs), str(score.raised))
         console.print(table)
         if stats.stop_reason == "result_limit":
-            console.print(f"[dim]The search stopped at --max-results {max_results}; a higher "
-                          "limit may list better loops.[/dim]")
+            console.print(f"[dim]The search stopped at --max-results {max_results}, shortest "
+                          "loops first; raise it, or --min-pieces, for longer loops.[/dim]")
     elif not stats.complete:
-        console.print("No loop found within the search limits; a closure may still exist."
-                      + ("" if max_pieces else " In a large box, --max-pieces 24 finds loops "
-                         "sooner."))
+        console.print("No loop found within the search limits; a closure may still exist "
+                      "(a higher --max-nodes searches further).")
     else:
         # Suggest only what this run did not try already.
         tips = ["without [bold]--use-all[/bold]"] if use_all else []

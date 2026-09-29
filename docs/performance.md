@@ -175,9 +175,10 @@ reference searches without tables.
 | Reported bridge gap, finite stock, forward / reverse | 1,742 / 718 | 139 / 95 ms |
 | Reported bridge gap, unlimited stock, forward / reverse | 1,878 / 854 | |
 | Ordinary plain-track gap (oracle, then a short search) | 138 | 24 ms |
-| All loops of 12 curves and 6 straights | 1,915 | 0.07 s |
-| Reversing loops of 12 curves, 4 straights and 2 switches, 100 results | 793 | 57 ms |
-| Loops of at most 14 pieces from 16 curves, 8 straights, 2 switches and a crossing, 100 results | 350 | 27 ms |
+| All loops of 12 curves and 6 straights | 3,373 | 0.13 s |
+| The 100 shortest reversing loops of 12 curves, 4 straights and 2 switches | 4,219 | 0.25 s |
+| The 100 shortest loops of at most 14 pieces from 16 curves, 8 straights, 2 switches and a crossing | 2,948 | 0.17 s |
+| The 25 shortest loops of the steam train, bridge and track pack sets | 2,694 | 0.16 s |
 | 17-piece loop search with one switch, every piece required | 11,488 | 0.22 s |
 | Networks of 2 buffers, 3 straights and 3 curves up to 8 pieces, 109 classes | 770 | 0.61 s |
 | Check layout on a synthetic 1,499-piece layout | | 60 ms |

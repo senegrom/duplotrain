@@ -98,9 +98,9 @@ instance supplies mutable node, result and completion-depth bounds. It yields
 progress, accepted-solution and limit events. Raising a bound lets the caller
 resume the suspended DFS, including its inventory, collision backtracking and
 reverse tables. Closing an iterator releases its workspace. The synchronous
-`solve` drains this iterator. Fresh-loop enumeration always runs its configured
-depth in one pass; raising a piece bound on a continuation applies to
-completion mode.
+`solve` drains this iterator. Fresh-loop enumeration deepens, shortest loops
+first, only to its configured depth; raising a piece bound on a continuation
+applies to completion mode.
 
 Interactive single-pair jobs run the stages of
 [bridge-completion.md](bridge-completion.md) in order.

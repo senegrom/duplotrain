@@ -137,10 +137,10 @@ duplotrain demo                                       # the classic oval
 ```
 
 `solve -o DIR` saves the top loops as `loop_01.json`, `loop_01.png` and so on,
-replacing the `loop_NN` files an earlier run left in `DIR`. `--max-pieces N` looks
-only for loops of at most N pieces: in a large box (a bridge set, a switch and a
-track pack together) the search then finds loops quickly where the full-length
-search can run out of nodes first.
+replacing the `loop_NN` files an earlier run left in `DIR`. The search finds the
+shortest loops first, lengthening them a piece at a time from `--min-pieces` up to
+`--max-pieces` (by default the whole box), and ranks the first `--max-results` it
+finds.
 
 `--set` knows the 2018 wave (10874 Steam Train, 10875 Cargo Train, 10872 Bridge &
 Tracks, 10882 Track pack) and the 2024 sets (10425 Tunnel, 10426 Bridge expansion)
@@ -397,12 +397,15 @@ somewhere: a lobe, or a stone in a ring.
 Depth-first search that walks track outward from an anchored origin, over the
 geometrically distinct traversals of each piece type (a straight contributes one move,
 a curve two — its left and right readings), trying homeward moves first so small gaps
-close promptly. It prunes, conservatively: headings that the remaining pieces cannot
-swing back to the anchor's, positions they cannot reach home from, placements that
-overlap existing track (respecting elevation, so a sufficiently high bridge
-legitimately crosses over), joints where two overhanging road plates would claim
-the same floor, and joints the bridge's parts cannot make, or in a completion track
-under the floor ([bridge joints and the floor](docs/search-correctness.md#bridge-joints-and-the-floor)).
+close promptly. It runs in passes of growing length, each finding every loop or
+completion of up to that many pieces, so the shortest come first and a broad box
+cannot drown the search in long walks. It prunes, conservatively: headings that the
+remaining pieces cannot swing back to the anchor's, positions they cannot reach home
+from, placements that overlap existing track (respecting elevation, so a
+sufficiently high bridge legitimately crosses over), joints where two overhanging
+road plates would claim the same floor, and joints the bridge's parts cannot make,
+or in a completion track under the floor
+([bridge joints and the floor](docs/search-correctness.md#bridge-joints-and-the-floor)).
 Switches drop *open stubs* which the walk may later re-enter exactly —
 figure-eights and re-joining branches emerge from that rule alone. Found loops are
 deduplicated by a canonical signature invariant under rotation, reversal **and
