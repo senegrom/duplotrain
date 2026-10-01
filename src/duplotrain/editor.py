@@ -842,8 +842,10 @@ class Session:
                                 closed = build(pre, j, k, entry, m, post)
                             except ValueError:
                                 continue
-                            if any((placement.frame.z + placement.piece.minimum_z - floor).sign() < 0
-                                   for placement in closed.placements[n_base:]):
+                            if any(
+                                (p.frame.z + p.piece.minimum_z - floor).sign() < 0
+                                for p in closed.placements[n_base:]
+                            ):
                                 continue
                             if audit.overlaps(closed):
                                 continue

@@ -6,8 +6,14 @@ from pathlib import Path
 import pytest
 
 from duplotrain.catalog import default_catalog
-from duplotrain.drive import (_all_starts, _prepare_drive, _tongue_assignments,
-                               classify, drive, DriveLimitError)
+from duplotrain.drive import (
+    DriveLimitError,
+    _all_starts,
+    _prepare_drive,
+    _tongue_assignments,
+    classify,
+    drive,
+)
 from duplotrain.editor import PREVIEW_FORMAT, Session, dispatch_session
 from duplotrain.editor_routes import RouteJob
 from duplotrain.editor_search import SearchJob

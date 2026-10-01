@@ -141,9 +141,9 @@ def _prepare_drive(layout: Layout) -> _DriveContext:
     stones: dict[int, list[tuple[str, int | None]]] = {}
     for entry in layout.accessories:
         stones.setdefault(entry[0], []).append((entry[1], entry[2] if len(entry) > 2 else None))
-    return _DriveContext(layout, choices, tuple((index, min(options))
-                         for index, options in choices),
-                         MappingProxyType({index: tuple(values) for index, values in stones.items()}))
+    defaults = tuple((index, min(options)) for index, options in choices)
+    lookup = MappingProxyType({index: tuple(values) for index, values in stones.items()})
+    return _DriveContext(layout, choices, defaults, lookup)
 
 
 def drive(
