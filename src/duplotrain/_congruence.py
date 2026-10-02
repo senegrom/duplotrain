@@ -137,11 +137,11 @@ def _placement_primitives(placement) -> tuple:
     return cached
 
 
-def _union(layout: Layout) -> tuple[list, dict, set, list, set]:
+def _union(layout: Layout, *, with_features: bool = True) -> tuple[list, dict, set, list, set]:
     """Union exact primitives: lines, circle sectors, isolated points, opaque segments.
 
     Also returns the feature points (segment ends and sector boundaries) whose
-    average is the congruence origin.
+    average is the congruence origin. Length-only callers omit that preparation.
     """
     line_groups = defaultdict(list)
     circles = defaultdict(set)
@@ -158,8 +158,10 @@ def _union(layout: Layout) -> tuple[list, dict, set, list, set]:
             points_on[hi] = high_point
         for circle, sectors, sector_points in arcs:
             circles[circle].update(sectors)
-            boundaries[circle].update(sector_points)
-        isolated.update(points)
+            if with_features:
+                boundaries[circle].update(sector_points)
+        if with_features:
+            isolated.update(points)
         opaque.extend(segments)
 
     lines = []
@@ -180,7 +182,8 @@ def _union(layout: Layout) -> tuple[list, dict, set, list, set]:
             # cache holds; on the same line an equal value is the same point.
             a, b = points_on[lo], points_on[hi]
             lines.append((a, b))
-            features.update((a, b))
+            if with_features:
+                features.update((a, b))
         # Zero-length segments inside this union contribute no additional feature.
         isolated = {
             point for point in isolated
@@ -188,26 +191,27 @@ def _union(layout: Layout) -> tuple[list, dict, set, list, set]:
             or not any(_compare(lo, point[_axis]) <= 0 and _compare(point[_axis], hi) <= 0
                        for lo, hi in merged)
         }
-    for (centre, radius), sectors in circles.items():
-        sector_points = boundaries[centre, radius]
-        for sector in sectors:
-            features.add(sector_points[sector])
-            features.add(sector_points[sector + 1])
-        for point in tuple(isolated):
-            dx, dy = point[0] - centre[0], point[1] - centre[1]
-            if point[2] != centre[2] or dx * dx + dy * dy != radius * radius:
-                continue
+    if with_features:
+        for (centre, radius), sectors in circles.items():
+            sector_points = boundaries[centre, radius]
             for sector in sectors:
-                c, s = cos_sin(sector)
-                ec, es = cos_sin(sector + 1)
-                if _compare(c * dy - s * dx, Alg(0)) >= 0 and (
-                    _compare(dx * es - dy * ec, Alg(0)) >= 0
-                ):
-                    isolated.remove(point)
-                    break
-    features.update(isolated)
-    for start, end, _segment in opaque:
-        features.update((_xyz(start), _xyz(end)))
+                features.add(sector_points[sector])
+                features.add(sector_points[sector + 1])
+            for point in tuple(isolated):
+                dx, dy = point[0] - centre[0], point[1] - centre[1]
+                if point[2] != centre[2] or dx * dx + dy * dy != radius * radius:
+                    continue
+                for sector in sectors:
+                    c, s = cos_sin(sector)
+                    ec, es = cos_sin(sector + 1)
+                    if _compare(c * dy - s * dx, Alg(0)) >= 0 and (
+                        _compare(dx * es - dy * ec, Alg(0)) >= 0
+                    ):
+                        isolated.remove(point)
+                        break
+        features.update(isolated)
+        for start, end, _segment in opaque:
+            features.update((_xyz(start), _xyz(end)))
     return lines, circles, isolated, opaque, features
 
 
@@ -545,7 +549,7 @@ def curve_length(layout: Layout) -> float:
     cannot be unioned without a primitive description. A length needs no origin:
     the exact centroid of points with unrelated denominators can be enormous.
     """
-    lines, circles, _isolated, opaque, _features = _union(layout)
+    lines, circles, _isolated, opaque, _features = _union(layout, with_features=False)
     lengths = [math.sqrt(float(sum(((y - x) * (y - x) for x, y in zip(a, b, strict=True)),
                                   Alg(0)))) for a, b in lines]
     lengths.extend(float(radius) * math.radians(DEGREES_PER_STEP * len(sectors))
