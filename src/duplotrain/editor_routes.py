@@ -9,8 +9,8 @@ from .drive import (
     DriveLimitError,
     _all_starts,
     _cycle_both_directions,
+    _prepare_drive,
     _tongue_assignments,
-    _tongue_choices,
     drivable_universe,
     drive,
 )
@@ -43,12 +43,14 @@ class RouteJob:
             raise ValueError("route goal must be visited or cycle")
         self.max_runs = integer(body.get("max_runs", 20000), 1, 100000, "max_runs")
         self.max_steps = integer(body.get("max_steps", 10000), 1, 10000, "max_steps")
+        self.drive_context = _prepare_drive(self.layout)
         self.required = len(self.starts) * math.prod(
-            len(o) for _, o in _tongue_choices(self.layout))
+            len(o) for _, o in self.drive_context.choices)
         if not self.required:
             raise ValueError("No drivable starting positions")
         self.universe = drivable_universe(self.layout)
-        self.iterator = ((start, settings) for settings in _tongue_assignments(self.layout)
+        self.iterator = ((start, settings) for settings in _tongue_assignments(
+            self.layout, choices=self.drive_context.choices)
                          for start in self.starts)
         self.runs = self.steps = self.limited_runs = 0
         self.best = self.best_score = None
@@ -74,7 +76,7 @@ class RouteJob:
             self.runs += 1
             try:
                 report = drive(self.layout, start=start, switch_states=settings,
-                               max_steps=self.max_steps)
+                               max_steps=self.max_steps, _context=self.drive_context)
             except DriveLimitError:
                 self.limited_runs += 1
                 self.steps += self.max_steps
@@ -126,6 +128,7 @@ class RouteJob:
         iterator, self.iterator = self.iterator, None
         if iterator is not None:
             iterator.close()
+        self.drive_context = None
         self.status = "discarded"
 
 

@@ -59,6 +59,7 @@ WORKER_EXCLUDES = {
     "explore.py",
     "networks.py",
     "scoring.py",
+    "_congruence.py",  # desktop metrics; layout imports these helpers lazily
 }
 
 WORKER_INIT = b'''"""Minimal package marker for the Pyodide editor worker."""\n'''

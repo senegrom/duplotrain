@@ -20,7 +20,6 @@ from functools import lru_cache
 from types import MappingProxyType
 from typing import Any, Literal
 
-from ._congruence import curve_length
 from .catalog import ACCESSORIES, STONE_MOUNTS
 from .exact import ZERO, Alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, ORIGIN, Pose, cos_sin
@@ -448,6 +447,9 @@ class Layout:
         Count every junction route, but count shared line/arc sections only once.
         Unknown Segment subclasses contribute their declared length.
         """
+        # Desktop/library metric; the editor does not need congruence machinery.
+        from ._congruence import curve_length
+
         return curve_length(self)
 
     # -- construction ----------------------------------------------------------

@@ -394,7 +394,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
             "name": "half-circle.json", "mimeType": "application/json",
             "buffer": json.dumps(layout_to_dict(half_circle)).encode(),
         })
-        expect(page.locator("#status")).to_contain_text("6 pieces")
+        expect(page.locator("#status")).to_contain_text("imported 6 pieces.")
         for pid, count, remaining in (("curve", "12", "6/"), ("straight", "4", "4/")):
             control = page.locator(f'[data-piece-id="{pid}"] input')
             control.fill(count)
@@ -423,7 +423,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
             "name": "bridge-gap.json", "mimeType": "application/json",
             "buffer": json.dumps(layout_to_dict(bridge)).encode(),
         })
-        expect(page.locator("#status")).to_contain_text("7 pieces")
+        expect(page.locator("#status")).to_contain_text("imported 7 pieces.")
         page.locator("#slop").fill("1")
         page.locator("#solve").tap()
         candidate = page.locator(".cand").first
@@ -436,6 +436,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
         assert sorted(p["piece"] for p in export_layout()["placements"]) == (
             ["curve"] * 12 + ["ramp"] * 2 + ["span"] * 2)
 
+        # Wait for the completed import below: "16 pieces" also contains "6 pieces".
         # A longer tail exercises heading-conditioned bounds beyond the exact
         # tables' horizon and probe. Preview and apply must preserve the hand-built base in WASM.
         long_gap = build_chain([(catalog["straight"], 0, 1)] * 4
@@ -444,7 +445,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
             "name": "long-gap.json", "mimeType": "application/json",
             "buffer": json.dumps(layout_to_dict(long_gap)).encode(),
         })
-        expect(page.locator("#status")).to_contain_text("6 pieces")
+        expect(page.locator("#status")).to_contain_text("imported 6 pieces.")
         for pid, count, remaining in (("curve", "16", "14/"), ("straight", "12", "8/")):
             control = page.locator(f'[data-piece-id="{pid}"] input')
             control.fill(count)

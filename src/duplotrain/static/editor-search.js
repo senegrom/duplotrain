@@ -9,6 +9,15 @@ const nextJobTurn = () => new Promise(resolve => setTimeout(resolve, 0));
 function visibleCandidates() {
   return interactiveJob?.revision === S?.revision ? interactiveJob.candidates : S?.candidates || [];
 }
+function retainPublishedPage() {
+  // A job's streamed results are not applyable until publication. Keep only a
+  // page tied to the published revision; share its array, never copy geometry.
+  if (interactiveJob?.revision === S?.revision &&
+      S?.search_job?.job_id === interactiveJob.job_id && S.search_job.revision === S.revision) {
+    S.candidates = interactiveJob.candidates;
+    S.search_job = interactiveJob;
+  }
+}
 function clearInteractiveState() {
   jobSequence++; interactiveJob = routeAnalysis = null;
   jobPauseRequested = true; jobLoop = false; refreshBusy();
@@ -123,10 +132,11 @@ async function publishSearch(sequence) {
   const chosenIndex = (interactiveJob.candidates || []).find(c =>
     `${c.revision}:${c.index}` === selectedCandidate)?.index;
   const next = await api("/api/search/publish", {job_id: interactiveJob.job_id,
-    revision: interactiveJob.revision, ...jobView()}, true);
+    revision: interactiveJob.revision, page_only: true, ...jobView()}, true);
   if (sequence !== jobSequence) return;
   const before = S.revision;
   S = next; interactiveJob = next.search_job;
+  retainPublishedPage();
   // Publication changes candidate indices' revision, not the immutable problem
   // or its layout: picks, selectors and a train trace made on it stay valid.
   interactionRevision = S.revision;
@@ -194,7 +204,7 @@ async function startInteractiveSearch(grow, close, allGaps = false) {
     interactiveJob = response; routeAnalysis = null; searchPage = 0;
     selectedCandidate = null; preview = null;
     // The engine withdrew the previous suggestions; only this job's can follow.
-    S.candidates = [];
+    S.candidates = []; delete S.search_job;
     await driveSearchTicks(sequence);
   } catch (error) {
     // A refused start leaves the engine's previous job as it was.
@@ -221,6 +231,7 @@ async function searchPageTo(page) {
       revision: interactiveJob.revision, ...jobView(), page});
     if (!jobCurrent(sequence, response)) return;
     interactiveJob = response; searchPage = response.page;
+    retainPublishedPage();
     renderCandidates(); renderJobControls(); draw();
   } catch (error) { jobRequestFailed(error, sequence, () => { interactiveJob = null; }); }
 }
@@ -275,6 +286,7 @@ async function startRouteAnalysis(scope = "all") {
       ...(scope === "selected" ? {start: JSON.parse(el("train-start").value)} : {}),
       goal: el("route-goal").value || "visited", max_runs: Number(el("route-max-runs").value || 20000)});
     if (!jobCurrent(sequence, response)) return;
+    retainPublishedPage();
     interactiveJob = null; routeAnalysis = response;
     await driveRouteTicks(sequence);
   } catch (error) {
