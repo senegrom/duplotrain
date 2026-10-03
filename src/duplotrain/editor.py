@@ -354,6 +354,7 @@ class Session:
                     {
                         "x": round(x, 2),
                         "y": round(y, 2),
+                        "z": round(float(pose.z), 2),
                         "deg": pose.degrees,
                         "open": (index, port) not in layout.links,
                         "sealed": port in placement.piece.sealed,
@@ -371,6 +372,7 @@ class Session:
                     **drawing,
                     "ports": ports,
                     "mid": [mid[0], mid[1]],
+                    "mid_z": mid[2],
                     "stone_ok": placement.piece.id in STONE_MOUNTS,
                     "stone_marks": [
                         {"id": sid, "at": pos}

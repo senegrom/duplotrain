@@ -5,7 +5,7 @@ const {harness, scene, track} = require("./reliability-harness.cjs");
 
 function straight(z, vertical = false) {
   const line = vertical ? [[0,-64,z],[0,64,z]] : [[-64,0,z],[64,0,z]];
-  return {...track(line, `Straight at ${z}`), stone_ok: true, mid: [0,0,z],
+  return {...track(line, `Straight at ${z}`), stone_ok: true, mid: [0,0], mid_z: z,
     ports: line.map(([x,y,z], port) => ({x,y,z,port}))};
 }
 function setup(reverse = false, stones = false, extra = {}) {
@@ -112,8 +112,21 @@ for(const [x,at] of [[-70,0],[0,null],[70,1]]) {
 }
 
 test("legacy marker geometry without z remains finite",()=>{
-  const pl=straight(0);pl.mid=[0,0];for(const p of pl.ports)delete p.z;
+  const pl=straight(0);delete pl.mid_z;for(const p of pl.ports)delete p.z;
   pl.stone_marks=[{id:"stone_stop",at:0}];
   const h=harness({state:scene([pl]),overrides:{worldToScreen:(x,y)=>[x,y]}});
   assert.equal(h.run('stoneMarkPositions()[0].z'),0);
 });
+
+for (const height of [-96, 0, 153.6]) {
+  test(`face markers interpolate the real 2D-midpoint metadata at height ${height}`, () => {
+    const pl=straight(height); pl.ports[0].z=height-20; pl.ports[1].z=height+20;
+    pl.stone_marks=[{id:"stone_stop",at:0},{id:"stone_direction",at:1}];
+    const h=harness({state:scene([pl]),overrides:{worldToScreen:(x,y)=>[x,y]}});
+    const marks=h.run('stoneMarkPositions()');
+    assert.ok(Math.abs(marks[0].z - (height-16.4)) < 1e-10);
+    assert.ok(Math.abs(marks[1].z - (height+16.4)) < 1e-10);
+    assert.equal(h.run('stoneMountsAt(-64,0)[0].z'), height-20);
+    assert.equal(h.run('stoneMountsAt(0,0)[0].z'), height);
+  });
+}

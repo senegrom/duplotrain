@@ -390,8 +390,9 @@ function stoneMarkPositions() {
       const [sx, sy] = worldToScreen(wx, wy);
       const r = Math.max(6, 14 * view.scale);
       const oy = (k - ((pl.stone_marks.length - 1) / 2)) * r * 2.2;
+      const midZ = pl.mid_z ?? pl.mid[2] ?? 0;
       const z = mark.at !== null && mark.at !== undefined && pl.ports[mark.at]
-        ? (pl.ports[mark.at].z || 0) * 0.82 + (pl.mid[2] || 0) * 0.18 : pl.mid[2] || 0;
+        ? (pl.ports[mark.at].z || 0) * 0.82 + midZ * 0.18 : midZ;
       out.push({ placement: i, id: mark.id, at_port: mark.at ?? null, x: sx, y: sy + oy, r, z });
     });
   });
@@ -423,7 +424,7 @@ function stoneMountsAt(sx, sy) {
       if (d < 20 && (!best || d < best.d)) best = {placement, at_port: p.port, d, z: p.z || 0};
     });
     const [mx, my] = worldToScreen(pl.mid[0], pl.mid[1]), d = Math.hypot(mx - sx, my - sy);
-    if (d < 28 && (!best || d < best.d)) best = {placement, at_port: null, d, z: pl.mid[2] || 0};
+    if (d < 28 && (!best || d < best.d)) best = {placement, at_port: null, d, z: pl.mid_z ?? pl.mid[2] ?? 0};
     if (best) mounts.push({...best, hit: hits.get(placement) || {...best, painted: false}});
   });
   return mounts.sort((a, b) => compareHits(a.hit, b.hit));
