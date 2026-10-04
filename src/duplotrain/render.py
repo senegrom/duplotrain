@@ -17,7 +17,7 @@ import math
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from .catalog import ACCESSORIES
+from .catalog import ACCESSORIES, BRICK
 from .layout import Layout
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -278,12 +278,13 @@ def render_layout(
                     zorder=6,
                 )
 
-    # Elevation labels on raised bridge pieces and raised track, below any stone.
+    # Elevation labels on raised bridge pieces and on track raised on bricks (a slight
+    # slope's few millimetres rest on the joints), below any stone.
     stoned = {entry[0] for entry in layout.accessories}
     for index, (placement, lines3d) in enumerate(sampled):
         line = lines3d[0]
         mx, my, mz = line[len(line) // 2]
-        raised = min(z for _x, _y, z in line) > 1.0
+        raised = min(z for _x, _y, z in line) > float(BRICK) - 1e-6
         if mz > 1.0 and (placement.piece.category == "bridge" or raised):
             ax.annotate(
                 f"+{mz:.0f}mm",

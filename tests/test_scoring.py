@@ -49,9 +49,23 @@ def test_scoring_subtracts_a_penalty_for_each_open_stub(catalog):
     with_stub = score_solution(stubbed, inventory)
     tidy = score_solution(replace(stubbed, open_stubs=0), inventory)
     assert with_stub.stub_penalty == 3.0 and tidy.stub_penalty == 0.0
+    assert (with_stub.stubs, tidy.stubs) == (1, 0)
     assert with_stub.total == pytest.approx(tidy.total - 3.0)
-    parts = {f.name: getattr(with_stub, f.name) for f in fields(with_stub) if f.name != "raised"}
+    parts = {f.name: getattr(with_stub, f.name) for f in fields(with_stub)
+             if f.name not in ("raised", "stubs")}
     assert with_stub.total == pytest.approx(sum(parts.values()) - 2 * parts["stub_penalty"])
+
+
+def test_a_teardrop_tail_is_no_stub(catalog):
+    # A teardrop's tail ends open by design, where its stone clips on.
+    inventory = {"switch": 1, "curve": 12}
+    result = solve(inventory, catalog,
+                   SolverConfig(use_all_pieces=True, reversing_loops=True, max_results=100))
+    assert result.solutions and all(s.kind == "reversing" and s.open_stubs == 1
+                                    for s in result.solutions)
+    for teardrop in result.solutions:
+        score = score_solution(teardrop, inventory)
+        assert score.stubs == 0 and score.stub_penalty == 0.0
 
 
 def test_pieces_on_bricks_are_counted_apart_from_the_score(catalog):
@@ -80,6 +94,11 @@ def test_pieces_on_bricks_are_counted_apart_from_the_score(catalog):
     # the straight after them past one brick.
     assert raised([(slope, 0, 1), (straight, 0, 1)]) == 0
     assert raised([(slope, 0, 1)] * 4 + [(straight, 0, 1)]) == 1
+    # A bridge whose ramp rests on slight slopes carries itself too; past a brick,
+    # the ramp stands on bricks and so does its arch.
+    assert raised([(slope, 0, 1), (ramp, 0, 1), (span, 0, 1)]) == 0
+    assert raised([(span, 1, 0), (ramp, 1, 0), (slope, 1, 0)]) == 0
+    assert raised([(slope, 0, 1)] * 4 + [(ramp, 0, 1), (span, 0, 1)]) == 2
     # Stacks rank a loop lower whatever its score, and never enter the score.
     up = score([(ramp, 0, 1), (span, 0, 1), (straight, 0, 1)])
     flat = score([(ramp, 0, 1), (span, 0, 1)])

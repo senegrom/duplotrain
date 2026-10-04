@@ -25,12 +25,12 @@ weight can be overridden.  The components:
     fun than the plain ring.
 
 ``stub_penalty``
-    Open switch branches dangling off the loop.  Mild by default: a stub is untidy but
-    also a place to park the second train.
+    Open switch branches dangling off the loop (a teardrop's tail is no such branch).
+    Mild by default: a stub is untidy but also a place to park the second train.
 
 Apart from the score, ``raised`` counts the pieces that stand on stacks of DUPLO
 bricks: those a brick or more above the layout's lowest track, save an arch resting
-on a ramp that stands on the floor -- a bridge carries itself.  Raised track is
+on a ramp that is not itself raised -- a bridge carries itself.  Raised track is
 allowed, but a loop needing fewer stacks ranks first, whatever its score
 (:attr:`ScoreBreakdown.rank`).
 """
@@ -39,8 +39,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from fractions import Fraction
 
+from .catalog import BRICK
 from .exact import Alg
 from .layout import Layout, _lowest
 from .solver import Solution
@@ -68,6 +68,7 @@ class ScoreBreakdown:
     variety: float
     stub_penalty: float
     raised: int  # pieces standing on bricks; not part of the total
+    stubs: int  # open switch branches the stub penalty counts
 
     @property
     def total(self) -> float:
@@ -86,8 +87,7 @@ class ScoreBreakdown:
         return (self.raised, -self.total)
 
 
-#: One DUPLO brick: track lower than this above the floor needs nothing under it.
-_BRICK = Alg(Fraction(96, 5))
+_BRICK = Alg(BRICK)
 
 
 def _raised_pieces(layout: Layout) -> int:
@@ -96,17 +96,20 @@ def _raised_pieces(layout: Layout) -> int:
             for placement in layout]
     floor = layout.floor()
 
+    def raised(index: int) -> bool:
+        return (lows[index] - floor - _BRICK).sign() >= 0
+
     def carried(index: int) -> bool:
-        # An arch whose foot rests on the top of a ramp standing on the floor.
+        # An arch whose foot rests on the top of a ramp that is not raised itself
+        # (on the floor, or on slight slopes).
         for port, spec in enumerate(layout.placements[index].piece.ports):
             mate = layout.links.get((index, port)) if spec.kind == "arch_foot" else None
-            if (mate is not None and lows[mate[0]] == floor
+            if (mate is not None and not raised(mate[0])
                     and layout.placements[mate[0]].piece.ports[mate[1]].kind == "ramp_top"):
                 return True
         return False
 
-    return sum((low - floor - _BRICK).sign() >= 0 and not carried(index)
-               for index, low in enumerate(lows))
+    return sum(raised(index) and not carried(index) for index in range(len(lows)))
 
 
 def score_solution(
@@ -140,7 +143,9 @@ def score_solution(
     types_owned = sum(1 for n in inventory.values() if n > 0) or 1
     variety = w.variety * (len(layout.piece_counts) / types_owned)
 
-    stub_penalty = w.stub_penalty * solution.open_stubs
+    # A teardrop's tail ends open by design, where its stone clips on.
+    stubs = solution.open_stubs - (solution.kind == "reversing")
+    stub_penalty = w.stub_penalty * stubs
 
     return ScoreBreakdown(
         exactness=exactness,
@@ -150,4 +155,5 @@ def score_solution(
         variety=variety,
         stub_penalty=stub_penalty,
         raised=_raised_pieces(layout),
+        stubs=stubs,
     )

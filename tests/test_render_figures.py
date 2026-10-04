@@ -72,3 +72,36 @@ def test_heights_count_from_the_lowest_track_and_stand_clear_of_stones():
     render_layout(up.with_accessory(2, "stone_direction"), ax=ax)
     offsets = {text.get_text(): tuple(text.xyann) for text in ax.texts if text.get_text()}
     assert offsets["+77mm"] == (0, -12) and offsets["+29mm"] == (0, 0)
+
+
+def test_track_on_slight_slopes_is_labelled_once_it_stands_a_brick_high():
+    from matplotlib.figure import Figure
+
+    catalog = default_catalog()
+    slope, straight = catalog["slope"], catalog["straight"]
+    # A slight slope rises 5.6 mm: track less than a brick (19.2 mm) up rests on its
+    # joints and gets no label; four slopes up, it stands on bricks.
+    for slopes, labels in ((1, []), (3, []), (4, ["+22mm"])):
+        ax = Figure().subplots()
+        render_layout(build_chain([(slope, 0, 1)] * slopes + [(straight, 0, 1)]), ax=ax)
+        assert [text.get_text() for text in ax.texts if text.get_text()] == labels
+
+
+def test_track_is_labelled_from_a_whole_brick_up():
+    from fractions import Fraction
+
+    from matplotlib.figure import Figure
+
+    from duplotrain.geometry import ORIGIN, Pose
+    from duplotrain.layout import Layout
+
+    straight = default_catalog()["straight"]
+    brick = Fraction(96, 5)  # one DUPLO brick, 19.2 mm
+    # A straight a whole brick above the floor track stands on one brick; a tenth of
+    # a millimetre lower, it stands on none.
+    for rise, labels in ((brick, ["+19mm"]), (brick - Fraction(1, 10), [])):
+        layout, _ = Layout().with_piece(straight, ORIGIN)
+        layout, _ = layout.with_piece(straight, Pose.make(y=200, z=rise))
+        ax = Figure().subplots()
+        render_layout(layout, ax=ax)
+        assert [text.get_text() for text in ax.texts if text.get_text()] == labels

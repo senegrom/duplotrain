@@ -33,6 +33,7 @@ replace the built-ins.
 
 from __future__ import annotations
 
+from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,10 @@ RADIUS = 2 * STRAIGHT  # 256
 
 #: Nominal track piece width, mm (4 studs).
 WIDTH = 4 * STUD  # 64
+
+#: One DUPLO brick's height, mm: track less than this above the floor rests on its
+#: joints, track higher stands on a stack of bricks.
+BRICK = Fraction(96, 5)  # 19.2
 
 # The default catalogue, in exactly the schema accepted for user catalogue files.
 # A length may be a plain number or {"alg": [a, b, c, d]} = a + b*sqrt2 + c*sqrt3 + d*sqrt6.
