@@ -40,10 +40,19 @@ def test_twelve_curves_make_exactly_one_circle(catalog):
 
 
 def test_eleven_curves_make_nothing(catalog):
-    result = solve({"curve": 11}, catalog)
-    assert result.solutions == [] and result.stats.complete
-    # The turn and reach prunes should keep this cheap.
-    assert result.stats.nodes < 100_000
+    # An exact closed track turns a full circle at least in all (Fenchel's theorem).
+    # Eleven curves turn 330 degrees: no straights or crossings make them a loop,
+    # and the search knows so before it places a piece.
+    for box in ({"curve": 11}, {"curve": 11, "straight": 30, "crossing": 2}):
+        result = solve(box, catalog)
+        assert result.solutions == [] and result.stats.complete
+        assert result.stats.stop_reason == "exhausted"
+        assert result.stats.nodes == result.stats.max_pieces_searched == 0
+    # No loop of any length exists, so a piece limit cuts none off: that answer is
+    # complete too.
+    capped = solve({"curve": 11}, catalog, SolverConfig(max_pieces=6))
+    assert capped.solutions == [] and capped.stats.complete
+    assert capped.stats.stop_reason == "exhausted"
 
 
 def test_starter_oval_found_and_exact(catalog):
@@ -96,6 +105,60 @@ def test_slop_never_closes_a_loop_that_cannot_turn_full_circle(catalog):
             SolverConfig(slop=slop, use_all_pieces=True),
         )
         assert result.solutions == [] and result.stats.complete
+
+
+def test_only_an_exact_fresh_loop_must_turn_a_full_circle(catalog):
+    from duplotrain.catalog import DEFAULT_CATALOG_SPECS
+    from duplotrain.pieces import parse_pieces
+
+    # A teardrop's lobe meets its junction at an angle, which turns the rest: an arc
+    # of 300 degrees, a crossing and a straight make two, though no loop.
+    hooked = parse_pieces(list(DEFAULT_CATALOG_SPECS) + [
+        {"id": "arc300", "width": 64, "paths": [{"segments": [
+            {"type": "arc", "radius": {"alg": [0, 0, 64, 0]}, "degrees": -300}]}]}])
+    stock = {"straight": 1, "crossing": 1, "arc300": 1}
+    teardrops = solve(stock, hooked, SolverConfig(reversing_loops=True, min_pieces=2))
+    assert teardrops.stats.complete
+    assert [s.kind for s in teardrops.solutions] == ["reversing", "reversing"]
+    loops = solve(stock, hooked, SolverConfig(min_pieces=2))
+    assert not loops.solutions and loops.stats.complete and loops.stats.nodes == 0
+    # A forced fit's gap may stand in for any turn: four straights in a row close
+    # 512 mm apart inside a 600 mm slop.
+    forced = solve({"straight": 4}, catalog, SolverConfig(slop=600.0))
+    assert [(s.piece_count, s.gap) for s in forced.solutions] == [(4, 512.0)]
+    # A completion's base turns the rest: six curves close six more into a circle,
+    # so a limit of five pieces cuts that circle off.
+    base = build_chain([(catalog["curve"], 0, 1)] * 6)
+    completed = solve({"curve": 6}, catalog, SolverConfig(min_pieces=1), base=base)
+    assert [s.piece_count for s in completed.solutions] == [12]
+    cut = solve({"curve": 6}, catalog, SolverConfig(min_pieces=1, max_pieces=5), base=base)
+    assert not cut.solutions and not cut.stats.complete
+    assert cut.stats.stop_reason == "piece_limit"
+
+
+def test_a_closed_walk_turns_in_a_piece_by_its_arcs_once_a_pass(catalog):
+    from duplotrain.pieces import parse_piece
+
+    # Each pass takes one route through two ports: once through a switch, twice
+    # through a piece with two separate routes, such as a double-track curve.
+    turns = {pid: solver_module._circle_turn(piece) for pid, piece in catalog.items()}
+    assert None not in turns.values()  # no catalogue piece has a shape of unknown turn
+    assert (turns["curve"], turns["switch"], turns["crossing"], turns["slope"]) == (30, 30, 0, 0)
+    double = parse_piece({"id": "double_curve", "width": 64, "paths": [
+        {"segments": [{"type": "arc", "radius": 256, "degrees": 30}]},
+        {"start": {"x": 0, "y": 64, "heading_deg": 0},
+         "segments": [{"type": "arc", "radius": 192, "degrees": 30}]}]})
+    assert len(double.ports) == 4 and solver_module._circle_turn(double) == 60
+    # An arc turns by its size whichever way it bends: an S-bend by both its arcs,
+    # and twelve curves drawn turning right close a circle as the left-hand ones do.
+    s_bend = parse_piece({"id": "s_bend", "width": 64, "paths": [{"segments": [
+        {"type": "arc", "radius": 256, "degrees": 30},
+        {"type": "arc", "radius": 256, "degrees": -30}]}]})
+    assert solver_module._circle_turn(s_bend) == 60
+    right = parse_piece({"id": "right_curve", "width": 64, "paths": [
+        {"segments": [{"type": "arc", "radius": 256, "degrees": -30}]}]})
+    circle = solve({"right_curve": 12}, {"right_curve": right})
+    assert circle.stats.complete and [s.piece_count for s in circle.solutions] == [12]
 
 
 def test_chiral_loops_dedup_mirror_twins(catalog):
@@ -245,9 +308,21 @@ def test_base_junction_types_need_not_be_in_the_catalogue(catalog):
 
 
 def test_the_search_depth_cap_is_reported_not_a_crash(catalog, monkeypatch):
-    # Thousands of straights once recursed past Python's limit.
-    result = solve({"curve": 12, "straight": 2000}, catalog, SolverConfig(max_nodes=20_000))
-    assert result.solutions and result.stats.stop_reason == "node_limit"
+    # Each piece a walk places is a nested frame, and Python allows about a
+    # thousand: a search places _MAX_SEARCH_DEPTH pieces at most. A loop that
+    # long is found, in one pass at the cap.
+    box = {"curve": 12, "straight": 2000}
+    cap = solver_module._MAX_SEARCH_DEPTH
+    deepest = solve(box, catalog, SolverConfig(min_pieces=cap, max_results=1))
+    assert [s.piece_count for s in deepest.solutions] == [cap]
+    assert deepest.stats.max_pieces_searched == cap
+    # A longer loop, or one of all 2,012 pieces, is cut by the cap unsearched.
+    for config in (SolverConfig(min_pieces=1500, max_nodes=20_000),
+                   SolverConfig(use_all_pieces=True, max_nodes=20_000)):
+        cut = solve(box, catalog, config)
+        assert not cut.solutions and not cut.stats.complete
+        assert cut.stats.stop_reason == "piece_limit"
+        assert cut.stats.nodes == cut.stats.max_pieces_searched == 0
     monkeypatch.setattr(solver_module, "_MAX_SEARCH_DEPTH", 12)
     capped = solve({"curve": 12, "straight": 2}, catalog)
     assert [s.piece_count for s in capped.solutions] == [12]
@@ -267,6 +342,23 @@ def test_node_and_result_caps_report_incomplete():
     exhausted = solve({"straight": 1}, catalog)
     assert exhausted.stats.complete
     assert exhausted.stats.stop_reason == "exhausted"
+
+
+def test_piece_limits_no_loop_can_meet_run_no_pass(catalog):
+    # Fourteen pieces: a loop of thirteen or more under a bound of twelve, or one of
+    # every piece under a bound of thirteen, is cut by the piece limit unsearched.
+    box = {"curve": 12, "straight": 2}
+    for config in (SolverConfig(min_pieces=13, max_pieces=12),
+                   SolverConfig(use_all_pieces=True, max_pieces=13)):
+        cut = solve(box, catalog, config)
+        assert not cut.solutions and not cut.stats.complete
+        assert cut.stats.stop_reason == "piece_limit"
+        assert cut.stats.nodes == cut.stats.max_pieces_searched == 0
+    # No loop of more pieces than the box holds exists: that answer is complete.
+    longer = solve(box, catalog, SolverConfig(min_pieces=15))
+    assert not longer.solutions and longer.stats.complete
+    assert longer.stats.stop_reason == "exhausted"
+    assert longer.stats.nodes == longer.stats.max_pieces_searched == 0
 
 
 @pytest.mark.parametrize("engine", ["field", "lattice"])
@@ -635,8 +727,10 @@ def test_a_piece_no_walk_can_place_leaves_the_search_alone(catalog, unplaceable)
 def test_loops_use_bridge_parts_only_as_they_join(catalog):
     # The steam train and bridge sets: a ramp's top carries an arch's foot, and
     # arches meet at a crest, climb on with a further ramp or take raised track.
+    # Loops come shortest first. One carrying the whole bridge, as long as eight
+    # straights, needs eight straights back and the twelve curves: 24 pieces at least.
     result = solve({"curve": 12, "straight": 12, "ramp": 2, "span": 2}, catalog,
-                   SolverConfig(max_results=25))
+                   SolverConfig(min_pieces=24, max_results=25))
     assert result.solutions
     assert not any(solution.layout.joint_issues() for solution in result.solutions)
 
@@ -644,9 +738,9 @@ def test_loops_use_bridge_parts_only_as_they_join(catalog):
         return len({min(placement.port_pose(port).z for port in range(len(placement.piece.ports)))
                     for placement in layout if placement.piece.category != "bridge"}) == 1
 
-    # Some carry the whole bridge over track that all lies on the floor.
-    assert any(on_the_floor(solution.layout) for solution in result.solutions)
-
+    # Some carry the whole bridge, both arches, over track that all lies on the floor.
+    assert any(on_the_floor(solution.layout) and solution.layout.piece_counts.get("span") == 2
+               for solution in result.solutions)
 
 
 def test_a_loop_closes_only_where_the_parts_join(catalog):
@@ -666,6 +760,35 @@ def test_a_teardrop_tail_never_ends_at_an_arch_foot(catalog):
     assert result.stats.complete and len(result.solutions) == 4
     assert not any(s.layout.placements[index].piece.ports[port].kind == "arch_foot"
                    for s in result.solutions for index, port in s.layout.connectable_ends())
+    # So an arch with no ramp joins no teardrop at all: it is left out of the search.
+    teardrops = SolverConfig(reversing_loops=True)
+    assert (solve({"curve": 11, "switch": 1, "span": 1}, catalog, teardrops).stats.nodes
+            == solve({"curve": 11, "switch": 1}, catalog, teardrops).stats.nodes)
+
+
+def test_a_teardrop_tail_may_end_at_a_ramp_top(catalog):
+    # A tail's open end is where the walk began: a ramp may stand there with its
+    # top open, though no arch in the box could rest on it.
+    box = {"curve": 11, "switch": 1, "ramp": 1}
+    result = solve(box, catalog, SolverConfig(reversing_loops=True))
+    ramped = [s for s in result.solutions if "ramp" in s.layout.piece_counts]
+    assert result.stats.complete and ramped
+    for teardrop in ramped:
+        assert teardrop.kind == "reversing" and not teardrop.layout.joint_issues()
+        [(index, port)] = teardrop.layout.connectable_ends()
+        assert teardrop.layout.placements[index].piece.ports[port].kind == "ramp_top"
+    # So a teardrop can use every piece, the ramp at its tail.
+    everything = solve(box, catalog, SolverConfig(reversing_loops=True, use_all_pieces=True))
+    assert everything.solutions
+    assert all("ramp" in s.layout.piece_counts for s in everything.solutions)
+    # A loop has no open end for the ramp's top: it is left out of the search.
+    assert solve(box, catalog).stats.nodes == solve({"curve": 11, "switch": 1}, catalog).stats.nodes
+    # Nor has a completion, even one that may end in a teardrop: its walk begins at
+    # the base. Left out, the ramp keeps no completion from using every piece.
+    base = build_chain([(catalog["curve"], 0, 1)] * 8)
+    closing = SolverConfig(min_pieces=1, reversing_loops=True, use_all_pieces=True)
+    completed = solve({"curve": 4, "ramp": 1}, catalog, closing, base=base)
+    assert [s.piece_count for s in completed.solutions] == [12]
 
 
 def test_loops_come_shortest_first(catalog):
@@ -683,3 +806,45 @@ def test_loops_come_shortest_first(catalog):
     first = solve({"curve": 12, "straight": 6}, catalog, SolverConfig(max_results=7))
     assert {s.signature for s in first.solutions} == {
         s.signature for s in every.solutions if s.piece_count <= 16}
+    # The pass that fills the result limit is the last: the circle is the one loop
+    # of twelve pieces, and no pass of more pieces follows it.
+    circle = solve({"curve": 12, "straight": 6}, catalog, SolverConfig(max_results=1))
+    assert [s.piece_count for s in circle.solutions] == [12]
+    assert circle.stats.max_pieces_searched == 12
+
+
+def test_a_stepwise_loop_search_answers_to_its_own_result_limit(catalog):
+    from itertools import islice
+
+    # Its limits replace the config's: a configured limit of one result does not
+    # stop it lengthening past the circle to the oval.
+    steps = solver_module.solve_steps({"curve": 12, "straight": 2}, catalog,
+                                      SolverConfig(max_results=1),
+                                      limits=solver_module.SearchLimits(max_results=50))
+    events = list(islice(steps, 1000))
+    assert [e["solution"].piece_count for e in events if e["kind"] == "solution"] == [12, 14]
+
+
+@pytest.mark.parametrize("box, reversing, half_circle", [
+    ({"curve": 12, "straight": 4}, False, False),
+    ({"curve": 12, "switch": 1}, True, False),
+    ({"curve": 6, "straight": 4}, False, True),
+])
+def test_each_closure_counts_once_in_the_pass_of_its_length(catalog, box, reversing,
+                                                            half_circle):
+    # Every pass finds the shorter loops again, but counts only those of its own
+    # length: one search over every length counts what one pass per length does.
+    # A completion's pass is as long as the pieces it adds: six curves close half
+    # a circle, and two or four straights more make ovals.
+    options = {}
+    if half_circle:
+        options = dict(base=build_chain([(catalog["curve"], 0, 1)] * 6),
+                       grow_from=(5, 1), close_onto=(0, 0))
+    every = solve(box, catalog, SolverConfig(min_pieces=1, max_results=1000,
+                                              reversing_loops=reversing), **options)
+    passes = [solve(box, catalog, SolverConfig(min_pieces=n, max_pieces=n, max_results=1000,
+                                               reversing_loops=reversing), **options)
+              for n in range(1, sum(box.values()) + 1)]
+    assert every.stats.complete and every.solutions
+    assert every.stats.closures_found == sum(p.stats.closures_found for p in passes)
+    assert every.stats.closures_found >= len(every.solutions)

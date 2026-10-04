@@ -333,6 +333,7 @@ class Layout:
         floor, so the floor lies as low as the foot of whichever of *pieces* could
         carry it. An empty layout stands at 0.
         """
+        pieces = tuple(pieces)  # read once per kind of open end
         opens = set(self.connectable_ends())
         reach: dict[str, Alg | None] = {}  # per kind, how far below it a mate reaches
         heights = []

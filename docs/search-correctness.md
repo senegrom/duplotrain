@@ -24,9 +24,13 @@ a fresh loop is the first piece's entry. A fresh teardrop's tail ends where the 
 began, and never at an arch's foot, which would stand on nothing. A search with no
 such connector checks nothing, and a stock piece none of whose traversals anything
 on offer could join at both ends (ramps with no arch to take their tops) leaves the
-search alone, as a buffer does. The reverse tables, the future-junction queries and
-the collision exemptions ignore connector kinds, which only enlarges what they
-allow: two ends that meet touch as joined ones do, whether or not they could join.
+search alone, as a buffer does. On offer are the stock's connectors and, in a
+completion, its two ends and the open ports of junctions the walk may pass, never
+another open end of the base; a fresh teardrop's first piece needs a partner at its
+exit only, its entry being the tail's open tip. The reverse tables, the
+future-junction queries and the collision exemptions ignore connector kinds, which
+only enlarges what they allow: two ends that meet touch as joined ones do, whether
+or not they could join.
 Network enumeration checks the rule at its joins and attachments; `Layout.attach`
 and `Layout.join` refuse such a joint, forced or not; the editor's arc templates try
 only the ramp and arch runs the joints allow; and `joint_issues` names one recorded
@@ -233,6 +237,20 @@ traversed twice. Independent witnesses include forced joints and zero new pieces
 The mixed-inventory benchmarks in `tests/test_completion_slippage.py` also pin
 eight audited results below 25,000 nodes
 for exact, 1 mm and 5 mm searches.
+
+## A fresh loop must turn a full circle
+
+Exact joints match headings, so a closed loop's centreline, seen from above, is a
+closed curve without corners, and such a curve turns through at least a full circle
+in all (Fenchel's theorem), figure-eights included. A walk passes a piece at most
+once per pair of its connectors, each pass along one route, so a piece contributes
+at most its largest route turn (the sum of its arcs' angles) times half its
+connector count. When the box's pieces together fall short of 360 degrees, a fresh
+plain loop search runs no pass and reports a complete search that found nothing.
+Completions are left alone, since their base may do the turning, and so are
+searches with slop, whose forced fit leaves a gap, teardrops, which close into
+their switch's other branch at an angle, and boxes holding a path segment of a
+shape the bound does not know.
 
 ## Stock-aware reach and base routes
 

@@ -202,6 +202,16 @@ def test_a_layout_stands_on_its_lowest_connector_or_under_an_open_arch_foot(cata
     assert build_chain([(ramp, 0, 1)]).floor(catalog.values()) == 0
 
 
+def test_the_floor_takes_its_pieces_from_any_iterable(catalog):
+    # A ramp's open top and a lone arch's open foot each look among the pieces for
+    # a mate: pieces given as a generator serve both, as a list does.
+    ramp, span = catalog["ramp"], catalog["span"]
+    layout, _ = build_chain([(ramp, 0, 1)]).with_piece(span, Pose.make(x=1000))
+    under_the_foot = Alg(Fraction(-288, 5))  # a ramp's rise below the arch's foot
+    assert layout.floor(list(catalog.values())) == under_the_foot
+    assert layout.floor(piece for piece in catalog.values()) == under_the_foot
+
+
 def test_near_misses_pair_only_ends_that_could_join(catalog):
     # A piece's own two ends are never a gap to close, nor two road plates.
     straight, crossing = catalog["straight"], catalog["level_crossing"]

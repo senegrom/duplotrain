@@ -37,7 +37,7 @@ import math
 import time
 from bisect import bisect_left, bisect_right
 from collections import OrderedDict
-from collections.abc import Generator, Mapping, Sequence
+from collections.abc import Generator, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import lru_cache
@@ -47,7 +47,7 @@ from .exact import Alg
 from .geometry import HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .lattice import ROT_COS_SIN, SCALE, LatticePoint, LatticePose, from_alg_xy, z_from_alg
 from .layout import Layout, Placement
-from .pieces import PieceType, kinds_mate
+from .pieces import Arc, PieceType, Ramp, Straight, kinds_mate
 from .symmetry import placement_key, pose_key
 from .validation import check_inventory
 
@@ -125,8 +125,19 @@ def _cached_moves(piece: PieceType) -> tuple[Move, ...]:
     return tuple(moves)
 
 
+def _walk_ends(base: Layout, grow: tuple[int, int], close: tuple[int, int]) -> list:
+    """The open ends of *base* a completion from *grow* to *close* can join.
+
+    Its two ends, and the open ports of junctions it may pass through: nothing
+    else of the base ever meets the walk.
+    """
+    return [end for end in base.connectable_ends()
+            if end in (grow, close) or base.placements[end[0]].piece.is_junction]
+
+
 def _placeable_stock(
-    inventory: Mapping[str, int], pieces: Mapping[str, PieceType], base: Layout | None
+    inventory: Mapping[str, int], pieces: Mapping[str, PieceType], base: Layout | None,
+    ends: Iterable[tuple[int, int]] | None = None, *, open_tail: bool = False,
 ) -> dict[str, int]:
     """The pieces of *inventory* a walk can place.
 
@@ -134,23 +145,48 @@ def _placeable_stock(
     never joins a walk: a buffer with its one open face, or ramps with no arch to
     take their tops. Kept in the stock, it would widen every piece budget (the
     search then drowned) and no layout could use every piece. What is on offer
-    is every connector of the pieces kept and the base's open ends.
+    is every connector of the pieces kept and the base's *ends* (by default all
+    its open ends). A fresh teardrop's first piece needs a partner only at its
+    exit (*open_tail*): its entry is the tail's open tip, never an arch's foot.
     """
     counts = {pid: n for pid, n in inventory.items() if n > 0 and _cached_moves(pieces[pid])}
-    ends = ({base.placements[i].piece.ports[p].kind for i, p in base.connectable_ends()}
-            if base is not None else set())
+    fixed = (set() if base is None else
+             {base.placements[i].piece.ports[p].kind
+              for i, p in (base.connectable_ends() if ends is None else ends)})
+
+    def joins(kind: str, offered: set[str]) -> bool:
+        return any(kinds_mate(kind, other) for other in offered)
+
     while True:
-        offered = ends | {port.kind for pid in counts for port in pieces[pid].ports}
+        offered = fixed | {port.kind for pid in counts for port in pieces[pid].ports}
         kept = {
             pid: n for pid, n in counts.items()
-            if any(any(kinds_mate(kind, pieces[pid].ports[move.entry].kind) for kind in offered)
-                   and any(kinds_mate(pieces[pid].ports[move.exit].kind, kind)
-                           for kind in offered)
+            if any((joins(pieces[pid].ports[move.entry].kind, offered)
+                    or open_tail and pieces[pid].ports[move.entry].kind != "arch_foot")
+                   and joins(pieces[pid].ports[move.exit].kind, offered)
                    for move in _cached_moves(pieces[pid]))
         }
         if kept == counts:
             return counts
         counts = kept
+
+
+def _circle_turn(piece: PieceType) -> int | None:
+    """The most a closed walk can turn inside *piece*, in degrees (None: unknown shape).
+
+    Each pass follows one route through two of its ports, so a walk passes at
+    most len(ports) // 2 times, and a route turns by the sum of its arcs' degrees.
+    """
+    turns = [0]
+    for route in piece.routes:
+        turn = 0
+        for segment in piece.paths[route.path_index].segments:
+            if type(segment) is Arc:
+                turn += abs(segment.degrees)
+            elif type(segment) not in (Straight, Ramp):
+                return None
+        turns.append(turn)
+    return max(turns) * (len(piece.ports) // 2)
 
 
 def _completion_moves(
@@ -1951,7 +1987,10 @@ def solve_steps(
             )
         base_pids = [p.piece.id for p in base.placements]
 
-    counts = _placeable_stock(inventory, pieces, base)
+    counts = _placeable_stock(
+        inventory, pieces, base,
+        None if base is None else _walk_ends(base, grow_from, close_onto),
+        open_tail=base is None and cfg.reversing_loops)
     piece_ids = sorted(counts)
     piece_obj: dict[str, PieceType] = {pid: pieces[pid] for pid in piece_ids}
     if base is not None:
@@ -2164,7 +2203,7 @@ def solve_steps(
     pass_turns = sum(turn_of[pid] * n * _spare_passes(piece_obj[pid])
                      for pid, n in counts.items())
 
-    # Admissible per-piece bounds for the IDA* contour (loop mode's depth limit): one piece
+    # Admissible per-piece bounds for the IDA* contour (a loop pass's length): one piece
     # advances at most max_span_any millimetres and swings at most max_turn_any
     # heading steps, so pieces-needed >= max(dist/span, need/turn).
     max_span_any = max(span_of.values(), default=1.0) or 1.0
@@ -2343,7 +2382,8 @@ def solve_steps(
     audit: list = []  # one _OverlapAudit over the base, built on the first closure
 
     def emit(gap: float, reversing_target: tuple[int, int] | None = None) -> None:
-        stats.closures_found += 1
+        if len(placements) - len(base_pids) == f_limit:
+            stats.closures_found += 1  # a shorter closure, once: in the pass of its length
         signature = _canonical_signature(
             steps,
             canon_for,
@@ -2467,7 +2507,7 @@ def solve_steps(
             reach = _stock_span_budget(counts, stock_spans, slots)
             if home > reach + stub_reach + (cfg.slop - slack_used) + 1e-6:
                 return True
-        # IDA* contour (loop mode's depth limit): at least this many more pieces are needed.
+        # IDA* contour (a loop pass's length): at least this many more pieces are needed.
         # Transits through open stubs advance the walk without costing a piece, so
         # the admissible estimate must discount what the stubs could contribute
         # (mirroring the plain reach/turn prunes above).
@@ -2689,18 +2729,26 @@ def solve_steps(
     walk_cut = False
     if cfg.max_pieces is not None:
         depth_limit = min(depth_limit, cfg.max_pieces)
+    # An exact closed track turns a full circle at least in all (Fenchel's theorem):
+    # a fresh plain loop needs curves that can.
+    turns = {pid: _circle_turn(piece_obj[pid]) for pid in piece_ids}
+    no_circle = (base is None and not cfg.reversing_loops and not cfg.slop
+                 and None not in turns.values()
+                 and sum(turn * counts[pid] for pid, turn in turns.items()) < 360)
     try:
         if base is None:
             # Loop mode grows the same contour, shortest loops first: each pass finds
             # every loop of up to f_limit pieces. One full-depth pass drowned in a
             # broad box (a bridge set, a switch and a track pack found no loop in
             # two million nodes); a search that must use every piece has one pass.
-            f_limit = (depth_limit if cfg.use_all_pieces
-                       else min(depth_limit, max(1, cfg.min_pieces)))
-            while True:
+            # No pass runs where the limits or the turning admit no loop.
+            f_limit = total_pieces if cfg.use_all_pieces else max(1, cfg.min_pieces)
+            while f_limit <= depth_limit and not no_circle:
                 stats.max_pieces_searched = f_limit
                 if not (yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed,
-                                       start_kind)) or f_limit >= depth_limit:
+                                       start_kind)):
+                    break
+                if limits is None and len(solutions) >= cfg.max_results:
                     break
                 f_limit += 1
         else:
@@ -2750,7 +2798,7 @@ def solve_steps(
         stats.stop_reason = "node_limit"
     elif limits is None and len(solutions) >= cfg.max_results:
         stats.stop_reason = "result_limit"
-    elif depth_limit < total_pieces or walk_cut:
+    elif (depth_limit < total_pieces or walk_cut) and not no_circle:
         stats.stop_reason = "piece_limit"
     else:
         stats.complete = True

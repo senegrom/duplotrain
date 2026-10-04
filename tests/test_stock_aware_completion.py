@@ -36,6 +36,32 @@ def test_scarce_bridge_is_not_reusable_after_it_is_spent():
     assert solver._stock_span_budget(counts, spans, 3) == 384
 
 
+def test_the_stock_filter_offers_only_ends_the_completion_can_meet():
+    # A completion meets the base only at its own two ends and at the open ports of
+    # junctions it may pass through. A span, which rests only on a ramp's top, finds
+    # no partner in the top of a remote bridge ramp.
+    catalog = default_catalog()
+    base = build_chain([(catalog["curve"], 0, 1)] * 8)
+    base, ramp = base.with_piece(catalog["ramp"], Pose.make(x=10000))
+    base, switch = base.with_piece(catalog["switch"], Pose.make(x=-10000))
+    grow, close = (7, 1), (0, 0)
+    ends = solver._walk_ends(base, grow, close)
+    assert (ramp, 1) in base.connectable_ends()
+    assert sorted(ends) == [close, grow, (switch, 0), (switch, 1), (switch, 2)]
+    stock = {"curve": 4, "span": 2}
+    assert solver._placeable_stock(stock, catalog, base) == stock  # every open end
+    assert solver._placeable_stock(stock, catalog, base, ends) == {"curve": 4}
+    # Left out, the spans neither widen the search nor keep it from using every piece.
+    options = dict(base=base, grow_from=grow, close_onto=close)
+    config = SolverConfig(min_pieces=0, max_results=100)
+    plain = solver.solve({"curve": 4}, catalog, config, **options)
+    extra = solver.solve(stock, catalog, config, **options)
+    assert extra.solutions == plain.solutions and extra.stats.nodes == plain.stats.nodes
+    everything = solver.solve(stock, catalog, SolverConfig(min_pieces=0, use_all_pieces=True),
+                              **options)
+    assert [s.piece_count for s in everything.solutions] == [len(base) + 4]
+
+
 def test_base_only_nonjunctions_are_not_fictitious_spare_moves():
     catalog = default_catalog()
     base = build_chain([(catalog["ramp"], 0, 1), (catalog["span"], 0, 1)])

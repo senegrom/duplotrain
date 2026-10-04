@@ -302,6 +302,29 @@ def test_a_ramps_top_does_not_pass_through_a_switch_it_meets(catalog):
     assert result.stats.complete and not result.solutions
 
 
+def test_plain_track_cannot_close_onto_a_ramps_top(catalog):
+    from fractions import Fraction
+
+    from duplotrain.geometry import Pose
+
+    # A ramp's top carries only an arch's foot. A straight raised to its height
+    # faces it from 1024 mm away: eight straights close that gap onto raised track
+    # ending where the top is, but none can join the top itself.
+    straight, rise = catalog["straight"], Fraction(288, 5)
+    ramp, _ = Layout().with_piece(catalog["ramp"], ORIGIN)
+    raised, _ = Layout().with_piece(straight, Pose.make(x=192, z=rise))
+    assert ramp.pose_of((0, 1)) == raised.pose_of((0, 1))  # 320 mm along, 57.6 mm up
+    for engine in ("lattice", "field"):
+        added = []
+        for start in (ramp, raised):
+            base, far = start.with_piece(straight, Pose.make(x=1344, z=rise))
+            result = solve({"straight": 12}, catalog, SolverConfig(min_pieces=1, engine=engine),
+                           base=base, grow_from=(far, 0), close_onto=(0, 1))
+            assert result.stats.complete
+            added.append([len(s.layout) - len(base) for s in result.solutions])
+        assert added == [[], [8]]
+
+
 def test_a_half_built_bridge_closes_alike_from_either_end(catalog):
     # Grown from the ramp's top or closed onto it: the same track.
     from duplotrain.editor_search import physical_key
