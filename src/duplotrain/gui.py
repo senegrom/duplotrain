@@ -308,7 +308,7 @@ def run(port: int = 8137, open_browser: bool = True) -> None:
     session = Session()
     server = make_server(session, port)
     url = f"http://127.0.0.1:{server.server_port}/"
-    print(f"duplotrain editor at {url}  (Ctrl+C to stop)")
+    print(f"duplotrain editor at {url}  (Ctrl+C to stop)", flush=True)
     if open_browser:
         webbrowser.open(url)
     try:

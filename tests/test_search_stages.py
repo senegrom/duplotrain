@@ -166,6 +166,20 @@ def test_a_reversing_search_names_its_first_stage_from_the_start(gap):
         job.close()
 
 
+def test_the_arc_templates_build_their_session_when_they_first_run():
+    # Setting a search up builds nothing it may never use: the templates' session
+    # comes with the first step, which asks for the first template.
+    catalog = default_catalog()
+    pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog, {"curve": 6},
+                      (5, 1), (0, 0), 26, 1, 0, False, search_options(None, catalog))
+    try:
+        assert pool.arc_session is None
+        assert pool.step()["stage"] == "templates"
+        assert pool.arc_session is not None
+    finally:
+        pool.close()
+
+
 @pytest.mark.parametrize("slop", [0, 5])
 def test_interactive_quota_preserves_first_stage_and_publishes_job_counters(slop):
     catalog = default_catalog()
@@ -274,10 +288,21 @@ def test_search_harder_lifts_a_directions_result_limit(monkeypatch):
 def test_pieces_no_walk_can_place_add_no_stage():
     # Buffers beside plain track: the solver drops them, so a plain stage would
     # search the full stage's problem again.
+    from duplotrain.geometry import Pose
+
     catalog = default_catalog()
     half = build_chain([(catalog["curve"], 0, 1)] * 6)
     session = Session(history=[half], inventory={"curve": 20, "buffer": 2})
     job = SearchJob(session, {})
+    try:
+        assert {cursor.stage for cursor in job.pool.cursors} == {"full inventory"}
+    finally:
+        job.close()
+    # Spare arches too, when the one ramp stands apart from the gap: no walk
+    # between the gap's two ends meets that ramp's top, where an arch's foot rests.
+    apart, _ = half.with_piece(catalog["ramp"], Pose.make(x=-2000))
+    session = Session(history=[apart], inventory={"curve": 20, "ramp": 1, "span": 2})
+    job = SearchJob(session, {"grow": [5, 1], "close": [0, 0]})
     try:
         assert {cursor.stage for cursor in job.pool.cursors} == {"full inventory"}
     finally:

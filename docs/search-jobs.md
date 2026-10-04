@@ -11,9 +11,10 @@ the layout.
 **Close the loop** starts with eight alternatives. **Find more** raises that
 allowance to 16, 32 and then 50 distinct layouts, retaining the current search's
 suspended traversal. Alternatives are told apart by the track as built: each
-added piece with the positions and directions of its connectors. The same pieces
-found from the other end of the gap have other frames and placement order but
-count once. **Search harder** raises both the node
+added piece's exact shape where it stands, its connectors, paths and routes, so
+an asymmetric piece fitted to the same connectors the other way round makes
+another alternative. The same pieces found from the other end of the gap have
+other frames and placement order but count once. **Search harder** raises both the node
 allowance and the maximum added-piece count, up to 16 times the initial stage
 budget and 128 added pieces. Its result allowance also increases. Pagination
 builds eight candidate cards at a time; sorting never changes the underlying
@@ -71,9 +72,12 @@ non-reversing joins; the slop and reversing settings belong to **Close the
 loop**. It chooses a constrained end, tries possible mates and alternative
 completions, debits the shared remaining stock, and backtracks when a choice
 prevents a later gap from closing. Already matching, compatible ends are
-joined without adding pieces. Track that already overlaps itself, apart from
-such meeting ends, is refused before the search starts, since no plan could then
-be overlap-free as a whole. Forced fits already in the track stay as they are.
+joined without adding pieces; ends that meet but cannot join (a straight against
+a ramp's top) are refused before the search starts, naming their pieces. Track
+that already overlaps itself, apart from ends that meet, is refused too, since
+no plan could then be overlap-free as a whole. An open bridge end that no piece
+left and no end meeting it could join makes every plan impossible, and the job
+says so at once. Forced fits already in the track stay as they are.
 Each pair's addition is checked when that pair is solved: its pieces for overlaps
 against all the track before them, and its new joints, the unchanged base, the
 stock left and the remaining added-piece allowance. Only a complete plan reducing

@@ -184,16 +184,17 @@ def test_restore_checks_final_snapshot_once_and_rejection_is_atomic(monkeypatch)
     check = session._check_snapshot
     calls = []
 
-    def counted(data):
-        calls.append(data)
-        check(data)
+    def counted(data, **options):
+        calls.append(options)
+        check(data, **options)
 
     monkeypatch.setattr(session, "_check_snapshot", counted)
     session.restore(snapshot)
-    assert len(calls) == 1
+    # A restored layout is a new one: its check is not skipped.
+    assert calls == [{"layout_checked": False}]
     before = unchanged(session)
 
-    def reject(_snapshot):
+    def reject(_snapshot, **_options):
         raise ValueError("too large")
 
     monkeypatch.setattr(session, "_check_snapshot", reject)

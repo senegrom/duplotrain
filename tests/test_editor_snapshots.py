@@ -13,6 +13,7 @@ from duplotrain.catalog import ACCESSORIES, default_catalog
 from duplotrain.geometry import Pose
 from duplotrain.gui import Session, dispatch_session
 from duplotrain.layout import Layout, Placement, layout_from_dict, layout_to_dict
+from duplotrain.sets import SETS
 from duplotrain.solver import Solution
 from duplotrain.validation import MAX_ACCESSORIES, MAX_PLACEMENTS
 from tests.editor_support import unchanged
@@ -96,6 +97,27 @@ def test_save_size_budget_is_checked_before_any_session_change(monkeypatch, acti
             snapshot["inventory"]["straight"] = 10000
             session.restore(snapshot)
     assert unchanged(session) == before
+
+
+def test_an_edit_that_keeps_the_layout_does_not_check_it_again(monkeypatch):
+    # The layout passed the import check when it was committed: an edit of the
+    # counts or the sandbox checks only the save size, an edit of the layout both.
+    session = Session()
+    session.attach("straight", 0, None)
+    checked, check = [], editor.check_layout_json
+
+    def counted(data):
+        checked.append(data)
+        return check(data)
+
+    monkeypatch.setattr(editor, "check_layout_json", counted)
+    revision = session.revision
+    session.set_inventory({"straight": 17, "stone_stop": 3})
+    session.set_unlimited(True)
+    session.add_set(next(iter(SETS)))
+    assert session.revision == revision + 3 and not checked
+    session.attach("straight", 0, (0, 1))
+    assert checked == [session.snapshot()["layout"]]
 
 
 def stone_limit(session, _monkeypatch):

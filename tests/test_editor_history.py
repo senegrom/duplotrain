@@ -18,6 +18,7 @@ def content_state(session):
 
 @pytest.mark.parametrize("action", [
     lambda s: s.set_inventory({"straight": 17}),
+    lambda s: s.set_inventory({"crossing": 0}),
     lambda s: s.set_inventory({"stone_stop": 17}),
     lambda s: s.set_unlimited(True),
     lambda s: s.add_set(next(iter(SETS))),
@@ -90,11 +91,14 @@ def test_nonempty_clear_is_still_one_undoable_change():
 
 
 def test_noop_or_rejected_edit_keeps_redo_but_new_edit_clears_it():
-    s = Session()
+    s = Session(stones={})
     s.set_inventory({"straight": 17})
     s.undo()
     before = unchanged(s)
     s.set_inventory({"straight": s.inventory["straight"]})
+    # The panel shows 0 for a piece or stone the box never listed: 0 is no change.
+    assert "offramp" not in s.inventory
+    s.set_inventory({"offramp": 0, "stone_stop": 0})
     s.set_unlimited(s.unlimited)
     with pytest.raises(ValueError):
         s.set_inventory({"straight": -1})

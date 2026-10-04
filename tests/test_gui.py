@@ -61,9 +61,22 @@ def test_editor_page_serves(server):
     assert variants == {"curve": {"turn left": None, "turn right": None},
                         "ramp": {"↑ climb 58mm": None, "↓ descend 58mm": ["arch_foot"]},
                         "span": {"↑ climb 19mm": ["ramp_top"], "↓ descend 19mm": None}}
+    # What a drawing does not show, named only where it holds: a road plate
+    # overhangs its joints (two cannot meet), and a piece with no route between
+    # two unsealed connectors holds no train.
+    def traits(item):
+        return {key: item[key] for key in ("plate", "drivable") if key in item}
+
+    assert {p["id"]: traits(p) for p in state["palette"] if traits(p)} == {
+        "level_crossing": {"plate": True}, "buffer": {"drivable": False},
+        "offramp": {"drivable": False}}
     status, state = server("/api/attach", {"piece": "ramp", "entry": 0, "at": None})
     assert [port.get("kind") for port in state["layout"]["placements"][0]["ports"]] == [
         None, "ramp_top"]
+    server("/api/attach", {"piece": "level_crossing", "entry": 0, "at": [0, 0]})
+    status, state = server("/api/attach", {"piece": "buffer", "entry": 0, "at": [1, 1]})
+    assert [traits(p) for p in state["layout"]["placements"]] == [
+        {}, {"plate": True}, {"drivable": False}]
 
 
 def test_attach_undo_clear(server):

@@ -16,11 +16,12 @@ import time
 import uuid
 from collections import Counter
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from typing import Any
 
 from .bridge_completion import _BRIDGE_ID, _bridge, _expand
 from .collision import DEFAULT_CLEARANCE
-from .layout import Layout, layout_to_dict
+from .layout import _BRIDGE_JOINT, Layout, layout_to_dict
 from .solver import (
     SearchLimits,
     Solution,
@@ -28,6 +29,7 @@ from .solver import (
     _OverlapAudit,
     _placeable_stock,
     _solution_overlaps,
+    _walk_ends,
     solve_steps,
 )
 from .symmetry import placement_key
@@ -139,11 +141,16 @@ def physical_key(layout, base):
     def end(placement, port):
         return (placement, port) if placement < start else placements[placement].port_pose(port)
 
-    pieces = Counter((p.piece.id, placement_key(p.piece, p.frame))
-                     for p in placements[start:])
+    pieces = Counter(map(_piece_identity, placements[start:]))
     links = frozenset(frozenset((end(*a), end(*b))) for a, b in layout.links.items()
                       if a not in base.links)
     return frozenset(pieces.items()), links
+
+
+@lru_cache(maxsize=4096)
+def _piece_identity(placement):
+    """One added piece's identity: candidates of one search share their placements."""
+    return placement.piece.id, placement_key(placement.piece, placement.frame)
 
 
 def valid_extension(base, candidate, stock, max_pieces, options, *, audit=None):
@@ -250,14 +257,15 @@ class PairSearch:
         return self.audit
 
     def _templates(self):
+        # A generator, so that the session is built when the first template is asked for.
         if self.arc_session is None:
             from .editor import Session
 
             self.arc_session = Session(catalog=dict(self.catalog), history=[self.base],
                                        inventory={pid: n + self.base.piece_counts.get(pid, 0)
                                                   for pid, n in self.stock.items()})
-        return self.arc_session._arc_events(self.grow, self.close_end, MAX_RESULTS,
-                                            self.depth, auditor=self._auditor)
+        yield from self.arc_session._arc_events(self.grow, self.close_end, MAX_RESULTS,
+                                                self.depth, auditor=self._auditor)
 
     @property
     def nodes(self):
@@ -268,7 +276,7 @@ class PairSearch:
         plain = {pid: n for pid, n in stock.items() if pid in ("curve", "straight") and n}
         # The solver drops pieces no walk can place: with those alone beside plain
         # track, a plain stage would search the full stage's problem.
-        full = _placeable_stock(stock, catalog, base)
+        full = _placeable_stock(stock, catalog, base, _walk_ends(base, self.grow, self.close_end))
         stages = []
         if plain and plain != full:
             stages.append(("plain track", plain, catalog, 25_000, 0, None))
@@ -466,10 +474,13 @@ class SearchJob:
             grow, close = _end(grow, "grow"), _end(close, "close")
             if grow == close or grow not in opens or close not in opens:
                 raise ValueError("pick two distinct open ends")
-        # Close all gaps would join every pair of meeting ends: they must be able to.
-        if any(issue["problems"] != ["planar gap"] for issue in self.base.joint_issues()) or (
-                self.all_gaps and self.base.matable_pairs() != self.base.meeting_pairs()):
+        if any(issue["problems"] != ["planar gap"] for issue in self.base.joint_issues()):
             raise ValueError("Fix incompatible existing joints before starting this search")
+        # Close all gaps would join every pair of meeting ends: they must be able to.
+        for a, b in (self.base.meeting_pairs() if self.all_gaps else ()):
+            if not self.base._kinds_mate(a, b):
+                raise ValueError(f"Pieces #{a[0] + 1} and #{b[0] + 1} meet but cannot join "
+                                 f"({_BRIDGE_JOINT}); move one before closing all gaps")
         # A plan must be overlap-free as a whole, which no addition can make it.
         if self.all_gaps and _solution_overlaps(_meeting_ends_joined(self.base), 0,
                                                 DEFAULT_CLEARANCE, 8.0):
@@ -491,20 +502,23 @@ class SearchJob:
         self.complete = False
         self.multi_nodes = 0
         self.multi_cap = 335_000 * self.effort
-        self.pool = None
-        if self.all_gaps:
+        self.pool = self.multi = None  # a refusal or a direct join starts no search
+        if self.all_gaps and (reason := session._joint_gap_reason(opens, self.stock)):
+            self.reason, self.status, self.complete = reason, "exhausted", True
+            self.stage = "joint check"
+        elif self.all_gaps:
             self.stage = f"close all: {len(opens)} open ends left"
             self.multi = self._all_gaps(self.base, self.stock, self.depth)
         elif self.base.pose_of(grow).connects_to(self.base.pose_of(close)):
             closed = self.base.join(grow, close)
             self._accept(Solution(closed, (), 0, True, len(closed.connectable_ends()), ("join",)))
             self.status, self.stage = "direct_join", "direct join"
+        elif not reversing and (reason := session._joint_gap_reason((grow, close), self.stock)):
+            self.reason, self.status, self.complete = reason, "exhausted", True
+            self.stage = "joint check"
         elif not reversing and (reason := session._height_gap_reason(grow, close, self.stock)):
             self.reason, self.status, self.complete = reason, "exhausted", True
             self.stage = "height check"
-        elif not reversing and (reason := session._joint_gap_reason(grow, close, self.stock)):
-            self.reason, self.status, self.complete = reason, "exhausted", True
-            self.stage = "joint check"
         else:
             self.pool = PairSearch(self.base, self.catalog, self.stock, grow, close,
                                    self.depth, self.effort, slop, reversing, self.options)
@@ -653,8 +667,8 @@ class SearchJob:
     def more(self, *, harder=False):
         if not harder and self.status in ("limited", "bounded_complete", "exhausted"):
             return  # a larger result quota does not lift an exhausted work/depth limit
-        if self.pool is None and not self.all_gaps:
-            return  # a direct join or a height refusal has no search to continue
+        if self.pool is None and (not self.all_gaps or self.complete):
+            return  # a direct join or an impossibility proof has no search to continue
         if len(self.solutions) >= MAX_RESULTS:
             self.status = "result_cap"
             return
@@ -720,8 +734,9 @@ class SearchJob:
                 # something left to search: not every direction exhausted or cut short.
                 "can_harden": (len(self.solutions) < MAX_RESULTS
                                and (self.depth, self.effort) != _harder(self.depth, self.effort)
-                               and (self.all_gaps or (self.pool is not None and not all(
-                                   c.exhausted or c.cut for c in self.pool.cursors)))),
+                               and (self.all_gaps and not self.complete
+                                    or (self.pool is not None and not all(
+                                        c.exhausted or c.cut for c in self.pool.cursors)))),
                 "resumable": len(self.solutions) < MAX_RESULTS and self.status not in (
                     "exhausted", "bounded_complete", "direct_join", "limited")}
 
@@ -738,7 +753,7 @@ class SearchJob:
     def close(self):
         if self.pool:
             self.pool.close()
-        if self.all_gaps:
+        if self.multi is not None:
             self.multi.close()
         self.status = "discarded"
         self.solutions.clear()

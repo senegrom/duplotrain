@@ -86,6 +86,18 @@ def _signed_degrees(dheading: int) -> int:
     return degrees - 360 if degrees >= 180 else degrees
 
 
+def _traits(piece: PieceType) -> dict[str, bool]:
+    """What the front end must know of a piece beyond its geometry, when unusual.
+
+    A road plate overhangs its connectors (two cannot meet), and a piece with no
+    route between two real connectors, a buffer, cannot hold a train.
+    """
+    drivable = any(route.port_a not in piece.sealed and route.port_b not in piece.sealed
+                   for route in piece.routes)
+    return {**({"plate": True} if piece.end_overhang > 0 else {}),
+            **({} if drivable else {"drivable": False})}
+
+
 def _takes(piece: PieceType, entry: int) -> dict[str, list[str]]:
     """The kinds of open end a piece entered by *entry* joins, unless only ordinary track."""
     takes = [kind for kind in PORT_KINDS if kinds_mate(kind, piece.ports[entry].kind)]
@@ -277,11 +289,11 @@ class Session:
 
     def _invalidate(self) -> None:
         job, self._interactive_job = self._interactive_job, None
-        if job is not None:
-            job.close()
         self.revision += 1
         self.candidates = []
         self._candidate_revision = None
+        if job is not None:
+            job.close()  # last: the session has moved on, whatever closing the job does
 
     def set_unlimited(self, on: bool) -> None:
         if type(on) is not bool:
@@ -290,9 +302,13 @@ class Session:
             self._commit(self.layout, unlimited=on, label="sandbox change")
 
     @staticmethod
-    def _check_snapshot(snapshot: dict[str, Any]) -> None:
-        """An accepted edit must be readable by our own import/recovery parser."""
-        check_layout_json(snapshot["layout"])
+    def _check_snapshot(snapshot: dict[str, Any], *, layout_checked: bool = False) -> None:
+        """An accepted edit must be readable by our own import/recovery parser.
+
+        *layout_checked*: the layout is the current one, which passed when committed.
+        """
+        if not layout_checked:
+            check_layout_json(snapshot["layout"])
         # ASCII escaping and default whitespace bound the smaller browser JSON
         # representation too; reserve space for its versioned save envelope.
         if len(json.dumps(snapshot, ensure_ascii=True).encode("utf-8")) > MAX_SNAPSHOT_BYTES:
@@ -307,7 +323,8 @@ class Session:
         stones = dict(self.stones if stones is None else stones)
         unlimited = self.unlimited if unlimited is None else unlimited
         self._check_snapshot({**self.snapshot(layout=layout), "inventory": inventory,
-                              "stones": stones, "unlimited": unlimited})
+                              "stones": stones, "unlimited": unlimited},
+                             layout_checked=layout is self.layout)
         # Validation is complete before any history, ownership or revision changes.
         self._sync_history()
         self.history.append(layout)
@@ -370,6 +387,7 @@ class Session:
                     "name": placement.piece.name,
                     **drawing,
                     "ports": ports,
+                    **_traits(placement.piece),
                     "mid": [mid[0], mid[1]],
                     "stone_ok": placement.piece.id in STONE_MOUNTS,
                     "stone_marks": [
@@ -483,6 +501,7 @@ class Session:
                     "junction": piece.is_junction,
                     "provisional": piece.provisional,
                     "variants": variants,
+                    **_traits(piece),
                 }
             )
         mates = [[list(a), list(b)] for a, b in layout.matable_pairs(port_poses)]
@@ -620,7 +639,11 @@ class Session:
         inventory, stones = dict(self.inventory), dict(self.stones)
         for pid, n in validated.items():
             (inventory if pid in self.catalog else stones)[pid] = n
-        if inventory != self.inventory or stones != self.stones:
+        def counted(owned):
+            return {pid: n for pid, n in owned.items() if n}
+
+        if (counted(inventory) != counted(self.inventory)
+                or counted(stones) != counted(self.stones)):
             self._commit(self.layout, inventory=inventory, stones=stones,
                          label="inventory change")
 
@@ -895,17 +918,23 @@ class Session:
                 f"remaining pieces can climb at most {lift:.0f} mm — the track up "
                 "there can never come back down")
 
-    def _joint_gap_reason(self, grow: End, close: End,
-                          remaining: Mapping[str, int]) -> str | None:
-        """Why no completion can start or finish at a bridge end, if nothing left takes it."""
+    def _joint_gap_reason(self, ends, remaining: Mapping[str, int]) -> str | None:
+        """Why no completion can join one of *ends*, a bridge end nothing left takes, if so.
+
+        Ordinary track is the search's to report. A bridge end needs a piece left
+        whose connector mates it, or an end that meets it.
+        """
         layout = self.layout
         offered = {port.kind for pid in _placeable_stock(remaining, self.catalog, layout)
                    for port in self.catalog[pid].ports}
-        offered |= {layout.placements[i].piece.ports[p].kind
-                    for i, p in layout.connectable_ends() if (i, p) not in (grow, close)}
-        for i, p in (grow, close):
-            if not any(kinds_mate(layout.placements[i].piece.ports[p].kind, kind)
-                       for kind in offered):
+        meeting = layout.meeting_pairs()
+        for end in ends:
+            kind = layout.placements[end[0]].piece.ports[end[1]].kind
+            if kind == "track":
+                continue
+            met = {layout.placements[i].piece.ports[p].kind
+                   for pair in meeting if end in pair for i, p in pair if (i, p) != end}
+            if not any(kinds_mate(kind, other) for other in offered | met):
                 return f"impossible: no piece left can join that end ({_BRIDGE_JOINT})"
         return None
 

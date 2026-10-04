@@ -234,6 +234,36 @@ def test_failed_tick_releases_job_and_preserves_confirmed_content(catalog, monke
     assert unchanged(session) == before
 
 
+def test_an_edit_moves_the_session_on_before_it_releases_the_search(catalog, monkeypatch):
+    # Whatever releasing the search does, the edit is committed at a new revision:
+    # neither a request made before it nor a suggestion published for the layout
+    # it changed can still apply.
+    session = Session(history=[half(catalog)], inventory={"curve": 12})
+    call(session, "start", max_results=1)
+    job = session._interactive_job
+    settle(job)
+    assert call(session, "publish")["candidates"]
+    revision, release = session.revision, job.close
+
+    def fail():
+        raise RuntimeError("release error")
+
+    monkeypatch.setattr(job, "close", fail)
+    try:
+        with pytest.raises(RuntimeError, match="release error"):
+            session.attach("curve", 0, [5, 1])
+        assert session.revision == revision + 1
+        assert len(session.history) == 2 and len(session.layout) == 7
+        assert session._interactive_job is None
+        assert not session.candidates and session._candidate_revision is None
+        with pytest.raises(RevisionConflictError):
+            dispatch_session(session, "/api/undo", {"revision": revision})
+        with pytest.raises(ValueError, match="stale"):
+            session.apply_candidate(0, revision=session.revision)
+    finally:
+        release()
+
+
 def test_expiry_releases_only_retained_search(catalog):
     session = Session(history=[half(catalog)])
     call(session, "start")
@@ -760,10 +790,14 @@ def test_interactive_forced_fit_preserves_exactness_and_joint_budget(catalog, sl
     # A further ramp after an arch climbs higher still: a sky-high end.
     (["ramp", "span", "ramp", "span"],
      {"ramp": 2, "span": 2, "curve": 12, "straight": 8}, 154),
+    # Spare ramps lift nothing: a ramp's top takes only an arch's foot, and no
+    # arch is left.
+    (["straight", "ramp", "span"],
+     {"straight": 3, "ramp": 3, "span": 1, "curve": 12}, 77),
 ])
 def test_ends_at_different_heights_explain_the_proof_instead_of_searching(catalog, chain,
                                                                           inventory, rise):
-    # No ramp is left to come down: nothing to search.
+    # No ramp left can come down: nothing to search.
     up = build_chain([(catalog[pid], 0, 1) for pid in chain])
     session = Session(history=[up], inventory=inventory)
     state = call(session, "start")
@@ -778,19 +812,94 @@ def test_ends_at_different_heights_explain_the_proof_instead_of_searching(catalo
     assert session._candidate_revision == session.revision and not session.candidates
 
 
-def test_a_bridge_end_nothing_left_can_take_explains_the_proof(catalog):
+@pytest.mark.parametrize("case", ["level", "arch-elsewhere", "on-the-floor"])
+def test_a_bridge_end_nothing_left_can_take_explains_the_proof(catalog, case):
     # A ramp's top takes only an arch's foot: with no arch left, that top and a
-    # raised straight at its height can never be joined. Nothing to search.
+    # straight can never be joined. Nothing to search. An arch standing elsewhere
+    # is no help: a search adds pieces, it never moves one. A straight on the
+    # floor is out of reach in height as well (the spare ramps need arches too):
+    # the missing arch is the reason given all the same.
     from fractions import Fraction
 
     layout, _ = Layout().with_piece(catalog["ramp"], Pose.make())
-    layout, far = layout.with_piece(catalog["straight"],
-                                    Pose.make(x=1536, z=Fraction(288, 5), heading=12))
-    session = Session(history=[layout], inventory={"ramp": 3, "straight": 9, "curve": 24})
+    layout, far = layout.with_piece(catalog["straight"], Pose.make(
+        x=1536, z=0 if case == "on-the-floor" else Fraction(288, 5), heading=12))
+    if case == "arch-elsewhere":
+        layout, _ = layout.with_piece(catalog["span"], Pose.make(x=-3000, y=2000))
+    session = Session(history=[layout],
+                      inventory={**layout.piece_counts, "ramp": 3, "straight": 9, "curve": 24})
+    if case == "on-the-floor":  # the height check alone would refuse too
+        assert session._height_gap_reason((0, 1), (far, 0), session.remaining())
     state = call(session, "start", grow=[0, 1], close=[far, 0])
     assert state["status"] == "exhausted" and state["complete"] and state["searched"] == 0
     assert state["stage"] == "joint check"
     assert "no piece left can join that end" in state["reason"]
+
+
+def test_ordinary_track_ends_are_left_to_the_search_when_no_piece_is_left(catalog):
+    # Every curve owned is in the half circle. An ordinary end takes any track, so
+    # no joint is to blame: the search itself runs out, and proves no closure.
+    session = Session(history=[half(catalog)], inventory={"curve": 6})
+    state = call(session, "start")
+    assert state["status"] == "running" and state["reason"] is None
+    job = session._interactive_job
+    settle(job)
+    assert job.status == "exhausted" and job.complete and job.reason is None
+    assert not job.solutions
+
+
+@pytest.mark.parametrize("arch_elsewhere", [False, True], ids=["ramp-alone", "arch-elsewhere"])
+def test_close_all_gaps_explains_a_bridge_end_nothing_left_can_take(catalog, arch_elsewhere):
+    # Every bridge part owned is placed, and a ramp's top takes only an arch's
+    # foot. An arch standing elsewhere cannot be moved onto it: no plan can join
+    # that top, so there is nothing to search, nor to search harder.
+    layout, _ = Layout().with_piece(catalog["ramp"], Pose.make())
+    if arch_elsewhere:
+        layout, _ = layout.with_piece(catalog["span"], Pose.make(x=-3000, y=2000))
+    session = Session(history=[layout],
+                      inventory={**layout.piece_counts, "curve": 24, "straight": 8})
+    state = call(session, "start", all_gaps=True)
+    assert state["status"] == "exhausted" and state["complete"] and state["searched"] == 0
+    assert state["stage"] == "joint check"
+    assert "no piece left can join that end" in state["reason"]
+    assert not state["can_harden"] and not state["resumable"]
+    for harder in (False, True):
+        state = call(session, "continue", harder=harder)
+        assert state["status"] == "exhausted" and state["max_pieces"] == 26
+
+
+def test_a_refused_close_all_gaps_search_is_released_like_any_other(catalog):
+    # Nothing left can join the ramp's top: the joint check refuses at once and no
+    # plan search starts. The refusal is released all the same: discarded,
+    # replaced by a new search, or by an edit, which then commits.
+    layout, _ = Layout().with_piece(catalog["ramp"], Pose.make())
+    session = Session(history=[layout],
+                      inventory={**layout.piece_counts, "curve": 24, "straight": 8})
+    assert call(session, "start", all_gaps=True)["stage"] == "joint check"
+    assert call(session, "discard")["discarded"] and session._interactive_job is None
+    call(session, "start", all_gaps=True)
+    replaced = session._interactive_job
+    call(session, "start", all_gaps=True)
+    job, revision = session._interactive_job, session.revision
+    assert replaced.stage == job.stage == "joint check" and replaced.status == "discarded"
+    session.attach("curve", 0, [0, 0])
+    assert job.status == "discarded" and session._interactive_job is None
+    assert session.revision == revision + 1 and len(session.layout) == len(layout) + 1
+
+
+def test_close_all_gaps_takes_an_arch_resting_unjoined_on_a_ramp_top(catalog):
+    # Its foot meets the ramp's top: Close all gaps joins meeting ends as they
+    # are, so that top needs no arch from the box.
+    span = catalog["span"]
+    layout, _ = Layout().with_piece(catalog["ramp"], Pose.make())
+    layout, _ = layout.with_piece(span, span.frame_for(0, layout.pose_of((0, 1))))
+    session = Session(history=[layout],
+                      inventory={**layout.piece_counts, "curve": 24, "straight": 8})
+    job = SearchJob(session, {"all_gaps": True, "max_pieces": 4})
+    try:
+        assert job.status == "running" and job.stage == "close all: 4 open ends left"
+    finally:
+        job.close()
 
 
 def test_an_arch_placed_first_closes_over_a_ramp_under_it(catalog):
@@ -800,9 +909,11 @@ def test_an_arch_placed_first_closes_over_a_ramp_under_it(catalog):
 
     base = build_chain([(catalog["span"], 0, 1)] + [(catalog["curve"], 0, 1)] * 6)
     session = Session(history=[base], inventory={"span": 2, "curve": 12, "ramp": 2})
-    job = complete(session)
+    job = complete(session, (6, 1), (0, 0), max_results=1)
     assert job.solutions and all(not s.layout.joint_issues() for s in job.solutions)
     assert Counter(job.solutions[0].layout.piece_counts) == {"span": 2, "curve": 12, "ramp": 2}
+    # The arc templates measure from that floor too: they close it before any search.
+    assert job.stage == "templates" and job.nodes == 0
 
 
 def test_closures_beyond_the_save_limits_are_no_proof_that_none_exist(catalog, monkeypatch):

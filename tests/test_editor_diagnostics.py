@@ -59,7 +59,7 @@ def test_bridge_ends_that_meet_but_cannot_join_are_a_bad_joint_not_an_overlap():
     assert not report["overlaps"] and not report["connector_closed"]
     assert [(j["a"], j["b"], j["problems"]) for j in report["joint_issues"]] == [
         ([0, 1], [flat, 0], ["mismatched bridge joint"])]
-    with pytest.raises(ValueError, match="Fix incompatible existing joints"):
+    with pytest.raises(ValueError, match=r"Pieces #1 and #2 meet but cannot join .*; move one"):
         dispatch_session(session, "/api/search/start",
                          {"revision": session.revision, "all_gaps": True})
 

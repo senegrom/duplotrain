@@ -1,5 +1,10 @@
 # Bridge-aware editor completion
 
+Without reversing loops, two proofs can end a pair search before any stage, the
+job naming them as its stage: the joint check, for a bridge end that no piece left
+and no end meeting it could join, and then the height check, for ends further
+apart in height than the pieces left could climb.
+
 The editor searches in this order: the arc templates (skipped when reversing loops
 are allowed), ordinary curves and straights, one complete standard bridge plus
 ordinary track, and finally the full remaining inventory. The bridge stage is a
