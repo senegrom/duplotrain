@@ -140,7 +140,10 @@ duplotrain demo                                       # the classic oval
 replacing the `loop_NN` files an earlier run left in `DIR`. The search finds the
 shortest loops first, lengthening them a piece at a time from `--min-pieces` up to
 `--max-pieces` (by default the whole box), and ranks the first `--max-results` it
-finds.
+finds. With reversing loops on (below), and a switch and a straight for the stone in
+the box, it then looks for as many teardrops, as far as the loops went, with the
+states the loops left: a teardrop is longer than the shortest loops, which would
+otherwise take every place.
 
 `--set` knows the 2018 wave (10874 Steam Train, 10875 Cargo Train, 10872 Bridge &
 Tracks, 10882 Track pack) and the 2024 sets (10425 Tunnel, 10426 Bridge expansion)
@@ -150,7 +153,9 @@ set twice. Sets also contribute their **action stones** (below).
 `duplotrain check` audits the geometry of every recorded joint, not just whether the
 connectors have link records: it exits 1 for empty or open layouts, non-exact joints
 and incompatible headings, elevations, connector plates or bridge joints, and lists
-the five closest pairs of open ends that could join, and ends that meet but cannot.
+the five closest pairs of open ends that could join, ends that meet but cannot, and
+open ends no other open end could join. Like every command, it exits 2 for a file it
+cannot read.
 `--slop 5` accepts up to
 5 mm of **total** planar joint gap in a fully linked layout with a forced-fit warning;
 it never excuses elevation or heading errors and checks no collisions away from the

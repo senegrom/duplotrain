@@ -23,7 +23,7 @@ def test_invalid_json_counts_are_rejected_before_merging(tmp_path, monkeypatch, 
     path = tmp_path / "box.json"
     path.write_text(json.dumps({"curve": count}))
     result = CliRunner().invoke(cli.main, ["solve", "--curve", "20", "--inventory", str(path)])
-    assert result.exit_code != 0
+    assert result.exit_code == 2
     assert "bad inventory file" in result.output and "non-negative integer" in result.output
     assert "Traceback" not in result.output
 
@@ -33,7 +33,7 @@ def test_inventory_document_must_be_a_known_id_mapping(tmp_path, data):
     path = tmp_path / "box.json"
     path.write_text(json.dumps(data))
     result = CliRunner().invoke(cli.main, ["solve", "--inventory", str(path)])
-    assert result.exit_code != 0 and "bad inventory file" in result.output
+    assert result.exit_code == 2 and "bad inventory file" in result.output
     if isinstance(data, dict):
         assert "unknown piece" in result.output
     assert "Traceback" not in result.output
@@ -70,10 +70,10 @@ def test_valid_flags_sets_and_json_counts_are_still_additive(tmp_path, monkeypat
 def test_inventory_read_errors_are_reported_politely(tmp_path):
     big = tmp_path / "big.json"
     big.write_bytes(b" " * (2 * 1024 * 1024 + 1))
-    for path, code, message in ((tmp_path, 2, "is a directory"),
-                                (big, 1, "larger than 2 MB")):
+    # An inventory solve cannot read is bad input, like a bad option: exit 2.
+    for path, message in ((tmp_path, "is a directory"), (big, "larger than 2 MB")):
         result = CliRunner().invoke(cli.main, ["solve", "--inventory", str(path)])
-        assert result.exit_code == code and message in result.output
+        assert result.exit_code == 2 and message in result.output
         assert "Traceback" not in result.output
 
 

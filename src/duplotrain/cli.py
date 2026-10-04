@@ -39,6 +39,12 @@ console = Console()
 #: shapes (JSONDecodeError is a ValueError), unreadable files, absurd nesting.
 _BAD_FILE = (ValueError, TypeError, KeyError, OSError, RecursionError)
 
+
+class _BadInput(click.ClickException):
+    """A file the command cannot read: exit 2, apart from check's verdict (1)."""
+
+    exit_code = 2
+
 #: The files ``solve -o`` writes, one pair per saved loop.
 _SAVED_NAME = re.compile(r"loop_\d{2,}\.(?:json|png)")
 #: The smallest loop ``solve`` looks for unless told otherwise.
@@ -61,7 +67,7 @@ def _catalog(paths: tuple[str, ...]):
     try:
         return load_catalog(*paths) if paths else default_catalog()
     except _BAD_FILE as exc:
-        raise click.ClickException(f"bad catalogue file: {exc}") from exc
+        raise _BadInput(f"bad catalogue file: {exc}") from exc
 
 
 def _image_target(out: str) -> str:
@@ -198,12 +204,17 @@ def sets_cmd() -> None:
     help="Total closing gap (mm) the joints may absorb; 0 = exact loops only.",
 )
 @click.option("--min-pieces", type=click.IntRange(min=0), default=_MIN_PIECES,
-              show_default=True)
+              show_default=True,
+              help="Shortest loop to look for: the search starts there and lengthens a "
+                   "piece at a time.")
 @click.option("--max-pieces", type=click.IntRange(min=1), default=None,
               help="Look only for loops of at most this many pieces (the shortest are "
                    "found first).")
-@click.option("--max-results", type=click.IntRange(min=1), default=25, show_default=True)
-@click.option("--max-nodes", type=click.IntRange(min=1), default=2_000_000, show_default=True)
+@click.option("--max-results", type=click.IntRange(min=1), default=25, show_default=True,
+              help="How many loops to find and rank, the shortest first; with reversing "
+                   "loops, as many teardrops again, looked for as far as the loops went.")
+@click.option("--max-nodes", type=click.IntRange(min=1), default=2_000_000, show_default=True,
+              help="The search's budget, in states searched.")
 @click.option("--use-all", is_flag=True,
               help="Only layouts using every owned piece a loop can take (no buffer or "
                    "off-ramp).")
@@ -264,7 +275,7 @@ def solve_cmd(
             for k, v in raw_counts.items():
                 inventory[k] = inventory.get(k, 0) + v
         except _BAD_FILE as exc:
-            raise click.ClickException(f"bad inventory file: {exc}") from exc
+            raise _BadInput(f"bad inventory file: {exc}") from exc
     if not any(inventory.values()):
         raise click.UsageError(
             "Tell me what you own, e.g.:  duplotrain solve --curve 12 --straight 4 "
@@ -275,6 +286,8 @@ def solve_cmd(
     except ValueError as exc:
         raise click.ClickException(f"the counts added together: {exc}") from exc
 
+    if max_pieces is not None and min_pieces > max_pieces:
+        raise click.UsageError("--min-pieces is above --max-pieces: no loop fits between them")
     if reversing is None:
         reversing = stones.get("stone_direction", 0) > 0
         if reversing:
@@ -288,38 +301,57 @@ def solve_cmd(
     def turns_back(sol) -> bool:
         # A branch-tailed teardrop takes the train into its lobe for good, and one
         # without a straight on its tail has nowhere for the stone.
-        if sol.kind != "reversing" or (is_stem_tailed(sol, catalog)
-                                       and _tail_mount(sol) is not None):
+        if sol.kind != "reversing":
+            return False
+        if is_stem_tailed(sol, catalog) and _tail_mount(sol) is not None:
             return True
         set_aside.add(sol.signature)
         return False
 
+    def config(**options) -> SolverConfig:
+        return SolverConfig(**{"slop": slop, "min_pieces": min_pieces, "max_pieces": max_pieces,
+                               "max_results": max_results, "max_nodes": max_nodes,
+                               "use_all_pieces": use_all, **options})
+
     try:
-        config = SolverConfig(
-            slop=slop,
-            min_pieces=min_pieces,
-            max_pieces=max_pieces,
-            max_results=max_results,
-            max_nodes=max_nodes,
-            use_all_pieces=use_all,
-            reversing_loops=reversing,
-            solution_filter=turns_back if reversing else None,
-        )
+        loops = config()
         # Before the search: an unusable directory must not cost a whole search.
         out_dir = _output_dir(out) if out is not None else None
         with console.status("searching for loops..."):
-            result = solve(inventory, catalog, config)
+            result = solve(inventory, catalog, loops)
+            stats, solutions, teardrops = result.stats, list(result.solutions), None
+            # A teardrop is longer than the shortest loops, which would take every
+            # place: teardrops get places of their own, looked for as far as the
+            # loops went, with the nodes the loops left. One needs a junction a train
+            # can leave two ways (a switch, not a crossing) to close into, and a
+            # straight on its tail for the stone.
+            owned = {pid for pid, n in inventory.items() if n > 0}
+            can_reverse = bool(reversing and STONE_MOUNTS & owned and any(
+                len(catalog[pid].transit(port)) > 1
+                for pid in owned for port in range(len(catalog[pid].ports))))
+            if can_reverse and stats.stop_reason != "node_limit":
+                # Under --use-all every layout is as long as its stock: no cap there.
+                teardrops = solve(inventory, catalog, config(
+                    max_pieces=(stats.max_pieces_searched
+                                if stats.stop_reason == "result_limit" and not use_all
+                                else max_pieces),
+                    max_nodes=max(1, max_nodes - stats.nodes), reversing_loops=True,
+                    solution_filter=turns_back))
+                solutions += teardrops.solutions
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
-    stats = result.stats
 
     # Loops standing on the floor first, then the nicest (scoring.ScoreBreakdown.rank).
-    scored = sorted(((score_solution(sol, inventory), sol) for sol in result.solutions),
+    scored = sorted(((score_solution(sol, inventory), sol) for sol in solutions),
                     key=lambda pair: pair[0].rank)
+    searches = [stats] + ([teardrops.stats] if teardrops is not None else [])
+    # The search that stopped short, if any: the loops', else the teardrops'.
+    cut = next((s for s in searches if not s.complete), None)
     console.print(
         f"[bold]{len(scored)}[/bold] distinct loop(s) found "
-        f"({stats.nodes:,} states searched in {stats.duration_s:.1f}s"
-        + (f", [yellow]stopped: {stats.stop_reason}[/yellow]" if not stats.complete else "")
+        f"({sum(s.nodes for s in searches):,} states searched in "
+        f"{sum(s.duration_s for s in searches):.1f}s"
+        + (f", [yellow]stopped: {cut.stop_reason}[/yellow]" if cut is not None else "")
         + ")"
     )
     # One closure label and size per loop, for the table and the pictures alike.
@@ -344,14 +376,31 @@ def solve_cmd(
                 f"{n}x{pid}" for pid, n in sorted(sol.layout.piece_counts.items())
             )
             table.add_row(str(rank), f"{score.total:.0f}", Text(counts), size, closure,
-                          str(sol.open_stubs), str(score.raised))
+                          str(score.stubs), str(score.raised))
         console.print(table)
         if stats.stop_reason == "result_limit":
-            console.print(f"[dim]The search stopped at --max-results {max_results}, shortest "
-                          "loops first; raise it, or --min-pieces, for longer loops.[/dim]")
-    elif not stats.complete:
-        console.print("No loop found within the search limits; a closure may still exist "
-                      "(a higher --max-nodes searches further).")
+            console.print(
+                f"[dim]The search stopped at --max-results {max_results}"
+                + ("; raise it for more.[/dim]" if use_all else
+                   ", shortest first; raise it, or --min-pieces, for longer loops"
+                   + (" and teardrops" if teardrops is not None else "") + ".[/dim]"))
+        elif teardrops is not None and teardrops.stats.stop_reason == "result_limit":
+            console.print(f"[dim]The search stopped at --max-results {max_results} teardrops, "
+                          "shortest first; raise it for more.[/dim]")
+        if teardrops is not None and teardrops.stats.stop_reason == "node_limit":
+            console.print("[dim]The search for teardrops ran out of --max-nodes.[/dim]")
+        elif can_reverse and teardrops is None:
+            console.print("[dim]No teardrops were looked for: the loops used up "
+                          "--max-nodes.[/dim]")
+    elif cut is not None:
+        hint = {
+            "node_limit": "a higher --max-nodes searches further",
+            "piece_limit": (f"loops of more than --max-pieces {max_pieces} were not searched"
+                            if max_pieces is not None else
+                            "loops that long are beyond the search's depth"),
+        }.get(cut.stop_reason)
+        console.print("No loop found within the search limits; a closure may still exist"
+                      + (f" ({hint})." if hint else "."))
     else:
         # Suggest only what this run did not try already.
         tips = ["without [bold]--use-all[/bold]"] if use_all else []
@@ -444,7 +493,7 @@ def _load_layout(layout_file: str, catalog):
     try:
         return layout_from_dict(read_json_file(layout_file), catalog)
     except _BAD_FILE as exc:
-        raise click.ClickException(f"bad layout file: {exc}") from exc
+        raise _BadInput(f"bad layout file: {exc}") from exc
 
 
 @main.command()
@@ -491,21 +540,26 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
         console.print("[green]Fully closed: every connector is exactly mated.[/green]")
         console.print("Joint geometry checked; collisions elsewhere are not checked.")
         return
+    planar_only = all(joint["problems"] == ["planar gap"] for joint in issues)
     if layout.is_closed:
-        forced = all(joint["problems"] == ["planar gap"] for joint in issues)
         console.print("[yellow]Fully linked, but "
-                      + ("not exactly closed." if forced else "some joints have problems.")
+                      + ("not exactly closed." if planar_only else "some joints have problems.")
                       + "[/yellow]")
     elif not len(layout):
         console.print("[yellow]Empty layout; no closed track.[/yellow]")
     else:
-        console.print(f"[yellow]{len(layout.connectable_ends())} open end(s).[/yellow]")
+        ends = layout.connectable_ends()
+        console.print(f"[yellow]{len(ends)} open end(s).[/yellow]")
         for a, b, gap in layout.gaps(limit=5):
             console.print(f"  Open ends {a} <-> {b}: gap {gap:.6g} mm")
-        joinable = set(layout.matable_pairs())
         for a, b in layout.meeting_pairs():
-            if (a, b) not in joinable:
+            if not layout._kinds_mate(a, b):
                 console.print(f"  Open ends {a} <-> {b} meet but cannot join: {_BRIDGE_JOINT}")
+        for end in ends:
+            if not any(layout._could_join(end, other) for other in ends):
+                piece = layout.placements[end[0]].piece
+                console.print(f"  Open end {end}: {piece.id} '{piece.ports[end[1]].name}', "
+                              "with no other end to join")
     for joint in issues:
         a, b = tuple(joint["a"]), tuple(joint["b"])
         console.print(
@@ -516,7 +570,6 @@ def check(layout_file: str, catalog_paths: tuple[str, ...], slop: float) -> None
         )
     if issues:
         total_gap = sum(joint["gap_mm"] for joint in issues)
-        planar_only = all(joint["problems"] == ["planar gap"] for joint in issues)
         if planar_only:
             console.print(f"Forced fit: total planar gap {total_gap:.6g} mm.")
             if layout.is_closed and slop > 0 and total_gap <= slop:

@@ -104,7 +104,8 @@ def test_a_layout_file_takes_at_most_2_mb(runner, tmp_path):
     big = tmp_path / "big.json"
     big.write_bytes(b" " * (2 * 1024 * 1024 + 1))
     result = runner.invoke(main, ["check", str(big)])
-    assert result.exit_code == 1 and "larger than 2 MB" in result.output
+    # A file check cannot read is no verdict on a layout (exit 1): exit 2.
+    assert result.exit_code == 2 and "larger than 2 MB" in result.output
 
 
 def test_an_empty_output_name_is_refused_not_ignored(runner):
@@ -166,6 +167,18 @@ def test_check_reports_open_ends_behind_many_buffer_faces(runner, tmp_path):
 def test_solve_rejects_out_of_range_options_like_the_other_commands(runner, option, value):
     result = runner.invoke(main, ["solve", "--curve", "12", option, value])
     assert result.exit_code == 2 and option in result.output
+
+
+def test_solve_refuses_a_min_pieces_above_max_pieces_before_searching(runner, monkeypatch):
+    # Equal bounds leave loops of exactly that many pieces: the circle.
+    result = runner.invoke(main, ["solve", "--curve", "12", "--min-pieces", "12",
+                                  "--max-pieces", "12"])
+    assert result.exit_code == 0 and "1 distinct loop(s) found" in result.output
+    # No loop fits between the two bounds: a usage error, not an empty search.
+    monkeypatch.setattr("duplotrain.cli.solve", lambda *args: pytest.fail("searched first"))
+    result = runner.invoke(main, ["solve", "--curve", "12", "--min-pieces", "13",
+                                  "--max-pieces", "12"])
+    assert result.exit_code == 2 and "--min-pieces is above --max-pieces" in result.output
 
 
 def test_an_output_directory_that_cannot_be_written_is_refused_before_the_search(
