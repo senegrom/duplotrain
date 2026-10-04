@@ -28,6 +28,25 @@ test("stale endpoint is rejected even before the next redraw", async () => {
   assert.match(h.notices.at(-1).text, /again/);
 });
 
+test("an open end clicked with no tool joins the end it meets; one meeting nothing asks for a piece", async () => {
+  // Two straights whose ends meet unlinked, as where a loop comes round to its start.
+  const first = track([[0, 0, 0], [128, 0, 0]], "First"), last = track([[128, 0, 0], [256, 0, 0]], "Last");
+  first.ports = [{port: 0, open: true, sealed: false, x: 0, y: 0, deg: 180, name: "a"},
+    {port: 1, open: true, sealed: false, x: 128, y: 0, deg: 0, name: "b"}];
+  last.ports = [{port: 0, open: true, sealed: false, x: 128, y: 0, deg: 180, name: "a"},
+    {port: 1, open: true, sealed: false, x: 256, y: 0, deg: 0, name: "b"}];
+  const s = scene([first, last]);
+  s.open_ends = [[0, 0], [0, 1], [1, 0], [1, 1]]; s.matable = [[[0, 1], [1, 0]]];
+  const h = harness({state: s, events: true, overrides: {redraw() {}}});
+  h.run("view = {x: 128, y: 0, scale: 1}");
+  for (const x of [128, 256]) {
+    const [sx, sy] = h.run(`worldToScreen(${x}, 0)`);
+    await h.run(`activateAt(${sx}, ${sy})`);
+  }
+  assert.deepEqual(json(h.calls), [{path: "/api/join", body: {a: [0, 1], b: [1, 0]}}]);
+  assert.match(h.notices.at(-1).text, /^Arm a piece/);
+});
+
 test("ambiguous removal waits for explicit choice and refuses stale confirmation", async () => {
   const h = harness({state: scene([track([[0, 0, 0], [100, 0, 0]], "Top"),
     track([[0, 0, 0], [100, 0, 0]], "Bottom")]), overrides: {redraw() {}}});
@@ -76,6 +95,23 @@ test("only the overlap dialog target is highlighted while confirming removal", (
   h.context.showOverlapPicker([{placement: 0, z: 100}, {placement: 1, z: 0}], true);
   h.run("drawHighlights()");
   assert.deepEqual(json(strokes), [[[-100, 0, 100], [100, 0, 100]]]);
+});
+
+test("the overlap chooser gives each piece's height above the lowest track", async () => {
+  // Begun up on a bridge's crest, a layout lies partly below zero; its lowest track still
+  // stands on the floor, 0.0 mm up, whether or not it is one of the pieces clicked. Each
+  // piece of tracks() is lowered as given; the click falls where Top and Bottom cross.
+  const chooser = async lowered => {
+    const crest = tracks().map((t, i) => ({...t,
+      lines: t.lines.map(line => line.map(([x, y, z]) => [x, y, z - lowered[i]]))}));
+    const h = harness({state: scene(crest), events: true});
+    const [x, y] = h.run("worldToScreen(0, 0)");
+    await h.run(`activateAt(${x}, ${y})`);
+    return h.el("overlap-picker").children[1].children.map(option => option.textContent);
+  };
+  assert.deepEqual(await chooser([76.8, 76.8, 76.8]), ["#1 Top · 100.0 mm", "#2 Bottom · 0.0 mm"]);
+  // With the distant piece a crest lower still, it is on the floor and the crossing a crest up.
+  assert.deepEqual(await chooser([76.8, 76.8, 153.6]), ["#1 Top · 176.8 mm", "#2 Bottom · 76.8 mm"]);
 });
 
 test("diagnostic reports use literal text and their highlights expire by revision", async () => {

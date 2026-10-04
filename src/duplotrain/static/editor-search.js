@@ -4,7 +4,10 @@
 let interactiveJob = null, routeAnalysis = null, jobSequence = 0;
 let jobPauseRequested = false, jobLoop = false, searchPage = 0;
 let exclusions = new Set(), exclusionKey = null;
-const nextJobTurn = () => new Promise(resolve => setTimeout(resolve, 0));
+// Between ticks, a turn of the browser's event loop. A hidden tab clamps timers to
+// one a second, and the engine's reply has returned to the event loop already.
+const nextJobTurn = () => document.hidden ? Promise.resolve()
+  : new Promise(resolve => setTimeout(resolve, 0));
 
 function visibleCandidates() {
   return interactiveJob?.revision === S?.revision ? interactiveJob.candidates : S?.candidates || [];
@@ -215,14 +218,16 @@ async function continueSearch(harder = false, resume = false) {
 }
 async function searchPageTo(page) {
   if (!interactiveJob || jobLoop || apiBusy) return;
-  const sequence = jobSequence;
+  const sequence = jobSequence, {sort} = jobView();
   try {
     const response = await api("/api/search/page", {job_id: interactiveJob.job_id,
       revision: interactiveJob.revision, ...jobView(), page});
     if (!jobCurrent(sequence, response)) return;
     interactiveJob = response; searchPage = response.page;
     renderCandidates(); renderJobControls(); draw();
-  } catch (error) { jobRequestFailed(error, sequence, () => { interactiveJob = null; }); }
+  } catch (error) { jobRequestFailed(error, sequence, () => { interactiveJob = null; }); return; }
+  // The Rank select changed while the request ran, and that change was dropped.
+  if (jobView().sort !== sort) await searchPageTo(0);
 }
 function requestJobPause() {
   jobPauseRequested = true;

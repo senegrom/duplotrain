@@ -74,6 +74,175 @@ test("right-click removes the piece under the pointer; a touch long-press does n
   assert.equal(prevented, 2);  // the browser's own menu never opens over the track
 });
 
+test("a click anywhere on an open end's arrow takes that end, the nearest arrow first", async () => {
+  // Two straights face each other across a 75 mm gap, and a third, off to the west, ends
+  // facing north. Zoomed in, each red arrow reaches 48 px from its connector's dot: its
+  // head is as much the end's target as the dot. Zoomed out, the arrows shrink to 16 px,
+  // and their targets with them.
+  const right = track([[75, 0, 0], [203, 0, 0]], "Right");
+  right.ports = [{port: 0, open: true, sealed: false, x: 75, y: 0, deg: 180, name: "a"},
+    {port: 1, open: false, sealed: false, x: 203, y: 0, deg: 0, name: "b"}];
+  const left = track([[-128, 0, 0], [0, 0, 0]], "Left");
+  left.ports = [{port: 0, open: false, sealed: false, x: -128, y: 0, deg: 180, name: "a"},
+    {port: 1, open: true, sealed: false, x: 0, y: 0, deg: 0, name: "b"}];
+  const north = track([[-250, -128, 0], [-250, 0, 0]], "North");
+  north.ports = [{port: 0, open: false, sealed: false, x: -250, y: -128, deg: 270, name: "a"},
+    {port: 1, open: true, sealed: false, x: -250, y: 0, deg: 90, name: "b"}];
+  const state = scene([right, left, north], 5);
+  state.open_ends = [[0, 0], [1, 1], [2, 1]];
+  const h = harness({state, events: true, overrides: {redraw() {}}});
+  h.run("view = {x: 0, y: 0, scale: 1.6}; canvas.clientWidth = 1000; canvas.clientHeight = 500");
+  h.run('selectTool({piece: {piece: "straight", pieceName: "Straight rail", entry: 0, exit: 1, label: "ahead"}})');
+  // The left straight's dot; the right one's is 120 px on, its arrow pointing back.
+  const [x, y] = h.run("worldToScreen(0, 0)");
+  // On the left arrow's head, 44 px out; between the two heads, nearer each in turn;
+  // and 25 px beside the left arrow's head, out of reach of both.
+  for (const [dx, dy] of [[44, 0], [55, 0], [66, 0], [44, 25]]) await h.run(`activateAt(${x + dx}, ${y + dy})`);
+  // North is up the screen, though screen y counts downward: on that arrow's head.
+  const [nx, ny] = h.run("worldToScreen(-250, 0)");
+  await h.run(`activateAt(${nx}, ${ny - 44})`);
+  // Zoomed out: on its head, 14 px up; and 40 px up, 24 px beyond the head.
+  h.run("view.scale = 0.4");
+  const [zx, zy] = h.run("worldToScreen(-250, 0)");
+  for (const up of [14, 40]) await h.run(`activateAt(${zx}, ${zy - up})`);
+  assert.deepEqual(json(h.calls), [
+    {path: "/api/attach", body: {piece: "straight", entry: 0, at: [1, 1]}},
+    {path: "/api/attach", body: {piece: "straight", entry: 0, at: [1, 1]}},
+    {path: "/api/attach", body: {piece: "straight", entry: 0, at: [0, 0]}},
+    {path: "/api/attach", body: {piece: "straight", entry: 0, at: [2, 1]}},
+    {path: "/api/attach", body: {piece: "straight", entry: 0, at: [2, 1]}}]);
+});
+
+// Two straights face each other across a gap of `gap` mm, as where a loop has nearly come
+// round: the left one ends at the origin pointing east, the right one starts beyond the gap
+// pointing west. With no gap, the two ends meet at one point.
+function facingEnds(gap, overrides = {}) {
+  const left = track([[-128, 0, 0], [0, 0, 0]], "Left");
+  left.ports = [{port: 0, open: false, sealed: false, x: -128, y: 0, deg: 180, name: "a"},
+    {port: 1, open: true, sealed: false, x: 0, y: 0, deg: 0, name: "b"}];
+  const right = track([[gap, 0, 0], [gap + 128, 0, 0]], "Right");
+  right.ports = [{port: 0, open: true, sealed: false, x: gap, y: 0, deg: 180, name: "a"},
+    {port: 1, open: false, sealed: false, x: gap + 128, y: 0, deg: 0, name: "b"}];
+  const state = scene([left, right], 5);
+  state.open_ends = [[0, 1], [1, 0]];
+  if (!gap) state.matable = [[[0, 1], [1, 0]]];
+  const h = harness({state, events: true, overrides: {redraw() {}, ...overrides}});
+  h.run("canvas.clientWidth = 1000; canvas.clientHeight = 500");
+  return h;
+}
+
+// Zoomed to `scale`, the ends of facingEnds(20), each with where to click it: on its dot,
+// and 6 px behind it, just off the dot over its own piece (west of the left end's dot,
+// east of the right end's).
+function facingClicks(h, scale) {
+  h.run(`view = {x: 0, y: 0, scale: ${scale}}`);
+  const [lx, ly] = h.run("worldToScreen(0, 0)"), [rx, ry] = h.run("worldToScreen(20, 0)");
+  return [[[0, 1], lx, ly], [[0, 1], lx - 6, ly], [[1, 0], rx, ry], [[1, 0], rx + 6, ry]];
+}
+
+test("a click on an open end's dot, or just behind it, takes that end though a facing arrow runs over it", async () => {
+  // 20 mm apart, the ends are closer than an arrow is long: zoomed in, 32 px apart with
+  // 48 px arrows; zoomed out, 8 px apart with 16 px arrows. Each arrow runs over the other
+  // end's dot, yet the dot clicked names its own end, and the armed piece attaches there.
+  const h = facingEnds(20);
+  h.run('selectTool({piece: {piece: "straight", pieceName: "Straight rail", entry: 0, exit: 1, label: "ahead"}})');
+  const ends = [];
+  for (const scale of [1.6, 0.4]) {
+    const clicks = facingClicks(h, scale), [left, right] = h.run("openEndScreenPos()");
+    assert.ok(left.tipX > right.x && right.tipX < left.x);  // each arrow runs over the other dot
+    for (const [end, x, y] of clicks) {
+      await h.run(`activateAt(${x}, ${y})`);
+      ends.push(end);
+    }
+  }
+  assert.deepEqual(json(h.calls), ends.map(at => ({path: "/api/attach", body: {piece: "straight", entry: 0, at}})));
+});
+
+test("a dot names its end within 22 px; past every dot's reach, the nearest arrow takes the click", async () => {
+  // 21 px behind its dot, a click is the end's own, though the facing arrow lies nearer.
+  // 23 px behind, out of both dots' reach, the nearest arrow decides: the facing one, its
+  // head 7 px off zoomed in and 15 px zoomed out.
+  const h = facingEnds(20);
+  h.run('selectTool({piece: {piece: "straight", pieceName: "Straight rail", entry: 0, exit: 1, label: "ahead"}})');
+  const ends = [];
+  for (const scale of [1.6, 0.4]) {
+    const [[left, lx, ly], , [right, rx, ry]] = facingClicks(h, scale);
+    for (const [end, x, y] of [[left, lx - 21, ly], [right, rx + 21, ry],
+      [right, lx - 23, ly], [left, rx + 23, ry]]) {
+      await h.run(`activateAt(${x}, ${y})`);
+      ends.push(end);
+    }
+  }
+  // The nearest arrow, not the nearest dot. Zoomed in, a straight takes the right one's
+  // place: its end stands 60 px on from the left end and 30 px up, its arrow slanting back
+  // across the left arrow. A click 44 px out on the left arrow takes the left end, though
+  // the slanting arrow passes 10 px off and its dot, 34 px off, is nearer than the left's.
+  const slant = track([[37.5, 18.75, 0], [128, 109.25, 0]], "Slant");
+  slant.ports = [{port: 0, open: true, sealed: false, x: 37.5, y: 18.75, deg: 225, name: "a"},
+    {port: 1, open: false, sealed: false, x: 128, y: 109.25, deg: 45, name: "b"}];
+  h.context.S.layout.placements[1] = slant;
+  h.run("view = {x: 0, y: 0, scale: 1.6}");
+  const [x, y] = h.run("worldToScreen(0, 0)");
+  await h.run(`activateAt(${x + 44}, ${y})`);
+  ends.push([0, 1]);
+  assert.deepEqual(json(h.calls), ends.map(at => ({path: "/api/attach", body: {piece: "straight", entry: 0, at}})));
+});
+
+test("Close the loop picks the end whose dot is clicked, and at a dot two ends share, the arrow's", async () => {
+  // Grown from on its dot or just behind it, each facing end is the one meant, and a close
+  // pick there on the other end closes onto it, never onto the end grown from.
+  const searches = [];
+  const h = facingEnds(20, {startInteractiveSearch: async (grow, close) => { searches.push(json([grow, close])); }});
+  const grown = [], pairs = [];
+  for (const scale of [1.6, 0.4]) {
+    const [left, leftBehind, right, rightBehind] = facingClicks(h, scale);
+    for (const [[grow, gx, gy], [close, cx, cy]] of
+      [[left, right], [leftBehind, rightBehind], [right, left], [rightBehind, leftBehind]]) {
+      h.run('selectTool({pick: {stage: "grow", grow: null}})');
+      await h.run(`activateAt(${gx}, ${gy})`);
+      grown.push(json(h.run("pickMode.grow")));
+      await h.run(`activateAt(${cx}, ${cy})`);
+      pairs.push([grow, close]);
+    }
+  }
+  assert.deepEqual(grown, pairs.map(([grow]) => grow));
+  assert.deepEqual(searches, pairs);
+  // Two ends that meet share one dot: 10 px out along either arrow, as near the dot for
+  // both, the arrow clicked names the end to grow from.
+  const met = facingEnds(0), byArrow = [];
+  for (const scale of [1.6, 0.4]) {
+    met.run(`view = {x: 0, y: 0, scale: ${scale}}`);
+    const [x, y] = met.run("worldToScreen(0, 0)");
+    for (const dx of [10, -10]) {
+      met.run('selectTool({pick: {stage: "grow", grow: null}})');
+      await met.run(`activateAt(${x + dx}, ${y})`);
+      byArrow.push(json(met.run("pickMode.grow")));
+    }
+  }
+  assert.deepEqual(byArrow, [[0, 1], [1, 0], [0, 1], [1, 0]]);
+});
+
+test("an end that meets its mate joins it on a click, though a piece is armed", async () => {
+  // Two straights meet end to end unjoined, as a loop's last piece lands on its first:
+  // a piece attached there would overlap the mate. The far end, meeting nothing, still
+  // takes the armed piece.
+  const first = track([[0, 0, 0], [128, 0, 0]], "First");
+  first.ports = [{port: 0, open: false, sealed: false, x: 0, y: 0, deg: 180, name: "a"},
+    {port: 1, open: true, sealed: false, x: 128, y: 0, deg: 0, name: "b"}];
+  const last = track([[128, 0, 0], [256, 0, 0]], "Last");
+  last.ports = [{port: 0, open: true, sealed: false, x: 128, y: 0, deg: 180, name: "a"},
+    {port: 1, open: true, sealed: false, x: 256, y: 0, deg: 0, name: "b"}];
+  const state = scene([first, last], 5);
+  state.open_ends = [[0, 1], [1, 0], [1, 1]];
+  state.matable = [[[0, 1], [1, 0]]];
+  const h = harness({state, overrides: {worldToScreen: (x, y) => [x, y], redraw() {}}});
+  h.run('selectTool({piece: {piece: "straight", pieceName: "Straight rail", entry: 0, exit: 1, label: "ahead"}})');
+  await h.run("activateAt(128, 0)");
+  await h.run("activateAt(256, 0)");
+  assert.deepEqual(json(h.calls), [{path: "/api/join", body: {a: [0, 1], b: [1, 0]}},
+    {path: "/api/attach", body: {piece: "straight", entry: 0, at: [1, 1]}}]);
+});
+
 test("cached world-space rails survive view changes, redraws coalesce into one frame", () => {
   let paints = 0;
   const h = harness({state: scene([track([[0, 0, 0], [100, 0, 0]])]), schedule: true,

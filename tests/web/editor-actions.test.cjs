@@ -250,3 +250,74 @@ test("every paint starts from butt caps, whatever a highlight left behind", () =
   e.run('ctx = {setTransform() {}, clearRect() {}, lineCap: "round"}; S = null; paint()');
   assert.equal(e.run("ctx.lineCap"), "butt");
 });
+
+// Paint on a canvas that notes each call, with the fill and stroke colours in force.
+function paintCalls(h) {
+  const calls = [], recorder = {};
+  for (const name of ["setTransform", "clearRect", "beginPath", "moveTo", "lineTo", "closePath",
+                      "fill", "stroke", "arc", "fillText"])
+    recorder[name] = (...args) => calls.push([name, recorder.fillStyle, recorder.strokeStyle, ...args]);
+  h.context.recorder = recorder;
+  h.run("ctx = recorder; paint()");
+  return calls;
+}
+
+test("an armed bridge arch greys the arrows of the ends it cannot join, whichever way it is armed", () => {
+  const {scene, track} = require("./reliability-harness.cjs");
+  // A bridge ramp alone. Climbing, the arch's foot stands only on a ramp's top;
+  // descending, the arch joins by its other end, which is ordinary track.
+  const ramp = track([[0, 0, 0], [320, 0, 57.6]], "Bridge ramp (lower part)");
+  ramp.ports = [{port: 0, open: true, sealed: false, x: 0, y: 0, deg: 180, name: "low"},
+    {port: 1, open: true, sealed: false, x: 320, y: 0, deg: 0, name: "high", kind: "ramp_top"}];
+  const state = scene([ramp]);
+  state.open_ends = [[0, 0], [0, 1]];
+  state.palette = [{id: "span", name: "Bridge arch (upper part)", variants: [
+    {entry: 0, exit: 1, label: "↑ climb 19mm", takes: ["ramp_top"]},
+    {entry: 1, exit: 0, label: "↓ descend 19mm"}]}];
+  state.inventory.owned.span = state.inventory.remaining.span = 1;
+  const h = harness({state, events: true, overrides: {devicePixelRatio: 1}});
+  h.run("view = {x: 160, y: 0, scale: 1}; renderPalette()");
+  const [climb, descend] = h.run("paletteRows[0].buttons").map(row => row.button);
+  // The colour of the dot each open end's arrow starts from: the ramp's foot, then its top.
+  const arrows = () => {
+    const dots = new Map(paintCalls(h).filter(([name]) => name === "arc")
+      .map(([, fill, , x, y]) => [`${x},${y}`, fill]));
+    return [[0, 0], [320, 0]].map(([x, y]) => dots.get(h.run(`worldToScreen(${x}, ${y})`).join(",")));
+  };
+  assert.deepEqual(arrows(), ["#d0342c", "#d0342c"]);  // nothing armed: every open end is red
+  climb.click();
+  assert.deepEqual(arrows(), ["#a7adb3", "#d0342c"]);
+  descend.click();
+  assert.deepEqual(arrows(), ["#d0342c", "#a7adb3"]);
+});
+
+test("track colours count height from the lowest track: a layout raised or lowered as a whole paints alike", () => {
+  const {scene, track} = require("./reliability-harness.cjs");
+  // A straight on a bridge's crest crosses one on the floor, a crest (76.8 mm) below. Begun
+  // up on the crest, at the engine's height zero, the layout lies partly below zero; however
+  // high it was begun, its lowest track stands on the floor.
+  const painted = dz => paintCalls(harness({state: scene([track([[-64, 0, dz], [64, 0, dz]], "Straight rail"),
+    track([[0, -64, dz - 76.8], [0, 64, dz - 76.8]], "Straight rail")]),
+    events: true, overrides: {devicePixelRatio: 1}}));
+  const begun = painted(0);
+  // Painted from the floor up: the floor's grey, then a crest's amber.
+  assert.deepEqual(begun.filter(([name]) => name === "fill").map(([, fill]) => fill),
+    ["rgb(185,190,196)", "rgb(214,164,76)"]);
+  for (const dz of [76.8, -76.8]) assert.deepEqual(painted(dz), begun);
+});
+
+test("a joint warning gives the height difference and heading error of the joint that is off", () => {
+  const {scene, track} = require("./reliability-harness.cjs");
+  // A bridge ramp's top linked to a straight on the floor, turned one 15° step: the
+  // warning says by how much the joint is off, so it can be found and fixed.
+  const state = scene([track([[0, 0, 0], [320, 0, 57.6]], "Bridge ramp (lower part)"),
+    track([[320, 0, 0], [443.64, 33.13, 0]], "Straight rail")]);
+  state.open_ends = [[0, 0], [1, 1]];
+  state.layout.joint_issues = [{a: [0, 1], b: [1, 0], gap_mm: 0, height_mm: 57.6, heading_error_deg: 15,
+    problems: ["elevation mismatch", "heading mismatch", "mismatched bridge joint"]}];
+  const h = harness({state});
+  h.run("refreshStatus()");
+  assert.deepEqual(h.notices.at(-1), {kind: "err", text: "2 open end(s). Incompatible joints. " +
+    "1 joint(s) need attention. Joint #1 ↔ #2: elevation mismatch, heading mismatch, " +
+    "mismatched bridge joint; height difference 57.60 mm; heading error 15°."});
+});

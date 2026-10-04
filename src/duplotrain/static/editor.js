@@ -87,7 +87,7 @@ async function adoptConflictState(error) {
 // One API snapshot owner. The companion geometry, projects and train scripts
 // read this state; successful API operations publish their new snapshot here.
 let S = null;                 // last /api/state payload
-let armed = null;             // {piece, entry, label, takes: kinds of open end it joins}
+let armed = null;             // {piece, entry, label, takes: kinds of open end it joins, plate}
 let armedStone = null;        // stone id
 let preview = null;           // candidate layout ghost
 let pickMode = null;          // null | {stage: "grow"|"close", grow: [i,p]}
@@ -358,9 +358,15 @@ function elevColor(z) {
 
 // Kinds of connector (pieces.PORT_KINDS) as the status names them.
 const KIND_NAMES = {track: "ordinary track", ramp_top: "a ramp's top", arch_foot: "an arch's foot"};
-// Can the armed piece join this open end?
+// Can the armed piece join this open end of placement pl? Its connector kinds must
+// mate, and two road plates cannot meet.
 const armedTakes = () => armed.takes || ["track"];
-const takesEnd = p => armedTakes().includes(p.kind || "track");
+const kindTaken = p => armedTakes().includes(p.kind || "track");
+const takesEnd = (p, pl) => kindTaken(p) && !(armed.plate && pl.plate);
+// Does open end (i, port) meet a mate (S.matable)? A click there joins the two.
+const meetsMate = (i, port) => S.matable.some(pair => pair.some(e => e[0] === i && e[1] === port));
+// An open end's arrow runs from its dot outward, longer as the view zooms in.
+const arrowLength = () => Math.max(16, 30 * view.scale);
 function openEndScreenPos() {
   const out = [];
   if (!S) return out;
@@ -368,10 +374,18 @@ function openEndScreenPos() {
     for (const p of pl.ports) {
       if (!p.open || p.sealed) continue;
       const [sx, sy] = worldToScreen(p.x, p.y);
-      out.push({ end: [i, p.port], x: sx, y: sy, deg: p.deg, name: p.name });
+      const rad = -p.deg * Math.PI / 180, len = arrowLength();
+      out.push({ end: [i, p.port], x: sx, y: sy, tipX: sx + Math.cos(rad) * len,
+                 tipY: sy + Math.sin(rad) * len, deg: p.deg, name: p.name });
     }
   });
   return out;
+}
+// Distance from (px, py) to the segment from (ax, ay) to (bx, by), in screen pixels.
+function segmentDistance(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(px - ax - t * dx, py - ay - t * dy);
 }
 
 function stoneMarkPositions() {
@@ -494,12 +508,14 @@ function paint() {
       } else {
         const picked = pickMode && pickMode.grow && pickMode.grow[0] === i && pickMode.grow[1] === p.port;
         const rad = -p.deg * Math.PI / 180;
-        // Grey: the armed piece cannot join this end (a ramp's top, say).
-        const color = picked ? "#2f6fdb" : armed && !takesEnd(p) ? "#a7adb3" : "#d0342c";
+        // Grey: the armed piece cannot join this end (a ramp's top, say), nor
+        // does the end meet a mate it would join.
+        const color = picked ? "#2f6fdb"
+          : armed && !takesEnd(p, pl) && !meetsMate(i, p.port) ? "#a7adb3" : "#d0342c";
         ctx.strokeStyle = color;
         ctx.fillStyle = color;
         ctx.lineWidth = 2.5;
-        const len = Math.max(16, 30 * view.scale);
+        const len = arrowLength();
         const ex = sx + Math.cos(rad) * len, ey = sy + Math.sin(rad) * len;
         ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
         ctx.beginPath();
@@ -564,10 +580,16 @@ function refreshStatus() {
     // A closed layout has no red arrow for an armed piece.
     status(`Connectors closed — use Check layout for overlaps and stock. ${n} pieces, ${S.layout.size_cm[0]} × ${S.layout.size_cm[1]} cm`, "closed");
   } else if (armed) {
-    const ends = S.layout.placements.flatMap(pl => pl.ports.filter(p => p.open && !p.sealed));
+    // An end that meets a mate joins it on a click; the others take the armed piece.
+    const ends = S.layout.placements.flatMap((pl, i) =>
+      pl.ports.filter(p => p.open && !p.sealed && !meetsMate(i, p.port)).map(p => [p, pl]));
+    const joins = S.matable.length ? " Ends that meet join on a click." : "";
     status(`${armed.pieceName} — ${armed.label} armed. ` +
-           (!n ? "Click anywhere to place it." : ends.some(takesEnd) ? "Click a red arrow to attach."
-             : `No open end takes it: it joins only ${armedTakes().map(k => KIND_NAMES[k] ?? k).join(" or ")}.`));
+           (!n ? "Click anywhere to place it."
+             : ends.some(([p, pl]) => takesEnd(p, pl)) ? "Click a red arrow to attach." + joins
+             : !ends.length && joins ? "Every open end meets another: click one to join them."
+             : ends.some(([p]) => kindTaken(p)) ? "No open end takes it: two road plates cannot meet." + joins
+             : `No open end takes it: it joins only ${armedTakes().map(k => KIND_NAMES[k] ?? k).join(" or ")}.` + joins));
   } else if (issues.length) {
     // After any tool's guidance: the warning stays in place until the joints change.
     const first = issues[0];
@@ -634,7 +656,7 @@ function renderPalette() {
           const same = armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit;
           selectTool(same ? {} : {
             piece: {piece: piece.id, pieceName: piece.name, entry: v.entry, exit: v.exit, label: v.label,
-                    takes: v.takes || ["track"]},
+                    takes: v.takes || ["track"], plate: !!piece.plate},
           });
           renderPalette(); renderStones(); refreshStatus(); draw();
         });
@@ -856,8 +878,13 @@ async function activateAt(sx, sy) {
     status("The layout changed. Select the endpoints again.", "err");
     return;
   }
-  const hit = openEndScreenPos().map(p => ({...p, distance: Math.hypot(p.x - sx, p.y - sy)}))
-    .filter(p => p.distance < 22).sort((a, b) => a.distance - b.distance)[0];
+  // A dot within reach names its end; elsewhere the nearest arrow does. Facing
+  // ends closer than an arrow run their arrows over each other's dots, and two
+  // ends that meet share one dot: there the arrows tell them apart.
+  const ends = openEndScreenPos().map(p => ({...p, dot: Math.hypot(p.x - sx, p.y - sy),
+    distance: segmentDistance(sx, sy, p.x, p.y, p.tipX, p.tipY)}));
+  const hit = ends.filter(p => p.dot < 22).sort((a, b) => a.dot - b.dot || a.distance - b.distance)[0]
+    ?? ends.filter(p => p.distance < 22).sort((a, b) => a.distance - b.distance)[0];
   try {
     if (pickMode) {
       if (hit) await activateEnd(hit.end);
@@ -885,7 +912,8 @@ async function removeAt(sx, sy) {
   if (!S || apiBusy || jobLoop) return;
   closeOverlapPicker(); clearHover();
   try {
-    const mark = stoneMarkPositions().find(m => Math.hypot(m.x - sx, m.y - sy) < Math.max(16, m.r + 4));
+    const mark = stoneMarkPositions().map(m => ({...m, d: Math.hypot(m.x - sx, m.y - sy)}))
+      .filter(m => m.d < Math.max(16, m.r + 4)).sort((a, b) => a.d - b.d)[0];
     if (mark) {
       S = await api("/api/stone", {
         placement: mark.placement, id: mark.id, at_port: mark.at_port, remove: true,
@@ -1281,12 +1309,13 @@ async function activateEnd(end) {
       status("Choose a different open end to close onto.", "err"); return;
     }
     await startInteractiveSearch(pickMode.grow, end);
-  } else if (armed) {
-    S = await api("/api/attach", {piece: armed.piece, entry: armed.entry, at: end}); redraw();
   } else {
+    // An end that meets a mate joins it: a piece attached there would overlap the mate.
     const mate = S.matable.find(pair => pair.some(e => e[0] === end[0] && e[1] === end[1]));
     if (mate) { S = await api("/api/join", {a: mate[0], b: mate[1]}); redraw(); }
-    else status("Arm a piece or choose Close the loop first.");
+    else if (armed) {
+      S = await api("/api/attach", {piece: armed.piece, entry: armed.entry, at: end}); redraw();
+    } else status("Arm a piece or choose Close the loop first.");
   }
 }
 function renderNavigation() {
@@ -1299,11 +1328,12 @@ function renderNavigation() {
   S.layout.placements.forEach((pl, i) => {
     add(pieces, i, `#${i + 1} ${pl.name}`);
     pl.ports.forEach(p => {
-      if (!p.sealed) add(starts, JSON.stringify([i, p.port]), `#${i + 1} ${pl.name} — enter ${p.name}`);
+      if (!p.sealed && pl.drivable !== false) add(starts, JSON.stringify([i, p.port]), `#${i + 1} ${pl.name} — enter ${p.name}`);
     });
   });
   S.open_ends.forEach(end => add(ends, JSON.stringify(end), `#${end[0] + 1} ${S.layout.placements[end[0]].name} — port ${end[1]}`));
-  for (const id of ["remove-selected", "test-train", "route-best", "route-all"]) el(id).disabled = !S.layout.placements.length;
+  for (const id of ["remove-selected", "route-all"]) el(id).disabled = !S.layout.placements.length;
+  for (const id of ["test-train", "route-best"]) el(id).disabled = !starts.children.length;
   el("use-end").disabled = !S.open_ends.length;
   renderSwitches();
   navigationRevision = S.revision;

@@ -44,11 +44,15 @@ click or the Remove tool opens a chooser that owns its allowed targets and its
 selected target: confirmation checks the originating revision, the dialog
 identity and the selected option, and any other tool invalidates an old dialog.
 An armed piece shows red arrows only at the open ends it can join: the state
-names each bridge connector's kind and the kinds each palette variant joins, and
-an end the armed piece cannot take (a ramp's top for ordinary track) turns grey.
-Clicking an open end with no tool joins it to an end that meets it, or says what
-an open end is for; tool guidance comes before any joint warning, which returns
-once no tool is active.
+names each bridge connector's kind, the kinds each palette variant joins and the
+pieces with a road plate, two of which cannot meet, and an end the armed piece
+cannot take (a ramp's top for ordinary track, another road plate for a road
+plate) turns grey. An open end's whole arrow is its target; where arrows run over
+other ends' dots, a dot within reach names its own end.
+Clicking an open end that meets another joins the two, a piece armed or not (a
+piece attached there would overlap its mate); with no tool, any other open end
+says what an open end is for. Tool guidance comes before any joint warning, which
+returns once no tool is active.
 
 ## Drawing and picking
 
@@ -183,7 +187,8 @@ with their limits and what a ranking or a bounded search does not prove.
 
 ## Test train
 
-`/api/drive` runs the drive model from one selected inward start with the
+`/api/drive` runs the drive model from one selected inward start, offered only
+on pieces that can hold a train (not on a buffer), with the
 chosen initial switch positions (`train_switches` in the state lists the
 choices, `switch_states` in the request selects them) for at most 10,000
 steps; a run that needs more makes no verdict, coverage or terminal claim. The report gives the outcome, the traversals, the repeating cycle, the

@@ -3,7 +3,7 @@
 // changed-since-save indicator, and managing backup copies under Web Locks.
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {harness, scene} = require("./reliability-harness.cjs");
+const {harness, scene, track} = require("./reliability-harness.cjs");
 const json = v => JSON.parse(JSON.stringify(v));
 
 test("project save contains full inventory, stones and preferences without changing layout export", () => {
@@ -53,6 +53,21 @@ test("a project file opens against the revision shown when it was chosen", async
   finish('{"format": "duplotrain-project/1"}'); await reading;
   assert.deepEqual(opens, [{path: "/api/project/open", revision: 1}]);
   assert.match(h.notices.at(-1).text, /Project not opened: Your action was not applied/);
+});
+
+test("opening a project with a joint problem keeps the joint warning in view", async () => {
+  // As after an import: the warning names the joint to fix, which an opening message would hide.
+  // Here a bridge ramp's top is linked to a straight on the floor, turned one 15° step.
+  const opened = {...scene([track([[0, 0, 0], [320, 0, 57.6]], "Bridge ramp (lower part)"),
+    track([[320, 0, 0], [443.64, 33.13, 0]], "Straight rail")], 2), project: {name: "Bridge", preferences: {}}};
+  opened.open_ends = [[0, 0], [1, 1]];
+  opened.layout.joint_issues = [{a: [0, 1], b: [1, 0], gap_mm: 0, height_mm: 57.6, heading_error_deg: 15,
+    problems: ["elevation mismatch", "heading mismatch", "mismatched bridge joint"]}];
+  const h = harness({events: true, overrides: {api: async () => opened}});
+  await h.context.openProject({});
+  assert.equal(h.context.S.revision, 2); assert.equal(h.el("project-name").value, "Bridge");
+  assert.match(h.notices.at(-1).text, /Joint #1 ↔ #2: elevation mismatch, heading mismatch, mismatched bridge joint;/);
+  assert.equal(h.notices.at(-1).kind, "err");
 });
 
 test("project changed indicator tracks content, view and settings, not revision or autosave", async () => {
@@ -140,4 +155,12 @@ test("unsafe backup management is refused when Web Locks are unavailable", async
   const h=harness({events:true,overrides:{navigator:{}}});stored(h,"old",{});h.run("renderProjects()");
   await h.el("delete-local").click();assert.equal(h.saved.size,1);
   assert.match(h.notices.at(-1).text,/Safe backup management unavailable/);
+});
+
+for (const action of ["rename", "delete"]) test(`backup ${action} with no local copy in the list says none is selected`, async () => {
+  // An empty list selects nothing: there is no copy to act on, rather than one that changed.
+  const h = harness({events: true}); h.run("renderProjects()");
+  await h.el(action + "-local").click();
+  assert.equal(h.el("project-manage").hidden, true);
+  assert.deepEqual(h.notices.at(-1), {text: "No local copy selected", kind: "err"});
 });

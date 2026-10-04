@@ -398,3 +398,18 @@ test("boot answers with its immutable document build without starting or install
   listener({data:{type:"DUPLOTRAIN_CLIENT_BUILD"},ports:[]});
   assert.equal(replies.length,1);
 });
+
+test("engine downloads lost together end the boot with one report, naming the first",async()=>{
+  // Pyodide fetches its runtime files side by side: when the connection drops, each of
+  // them fails, and the page hears once that the engine cannot start.
+  const messages=[],context=vm.createContext({importScripts(){},Response,ReadableStream,console,onmessage:null,
+    postMessage:message=>messages.push(message),fetch:async()=>{throw new TypeError("Failed to fetch");},
+    // Pyodide only logs a failed download, and its start never settles.
+    loadPyodide:()=>{
+      for(const file of ["pyodide.asm.wasm","python_stdlib.zip"])context.fetch(file).catch(()=>{});
+      return new Promise(()=>{});
+    }});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,"../../webapp/worker.js"),"utf8"),context);
+  await settle();
+  assert.deepEqual(clean(messages),[{bootError:"Could not load pyodide.asm.wasm: Failed to fetch"}]);
+});

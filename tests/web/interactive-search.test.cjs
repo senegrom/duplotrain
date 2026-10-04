@@ -274,6 +274,33 @@ test("the busy state holds through a whole search instead of flickering per tick
   assert.equal(body.classes.has("busy"), false);
 });
 
+test("a hidden tab runs a job's ticks back to back, a visible one yields a timer turn between them", async () => {
+  // A hidden tab clamps timers to one a second, and each engine reply has returned to
+  // the event loop already: there a timer between ticks would only slow the job down.
+  // Here the tab goes to the background after the search's first turn.
+  for (const [hidden, turns] of [[false, 4], [true, 1]]) {
+    let ticks = 0, timers = 0, h;
+    h = app({setTimeout: fn => { timers++; fn(); return 1; }, api: async path => {
+      if (path === "/api/search/start") return job();
+      if (path === "/api/search/tick") {
+        h.context.document.hidden = hidden && ticks > 0;  // from the second tick on
+        return ++ticks < 3 ? job({searched: 32 * ticks}) :
+          job({status: "results_ready", found: 1, candidates: [candidate(0)]});
+      }
+      if (path === "/api/search/publish") return {...h.context.S, revision: 8,
+        search_job: job({status: "results_ready", revision: 8, found: 1})};
+      if (path === "/api/routes/start") return route({revision: 8});
+      if (path === "/api/routes/tick") return ++ticks < 6 ? route({revision: 8, runs: ticks}) :
+        route({revision: 8, status: "complete", complete: true});
+      throw new Error("Unexpected API: " + path);
+    }});
+    await h.run("startInteractiveSearch(null, null)");
+    await h.run('startRouteAnalysis("all")');
+    assert.deepEqual([ticks, timers], [6, turns], hidden ? "hidden tab" : "visible tab");
+    assert.equal(h.run("routeAnalysis.status"), "complete");
+  }
+});
+
 test("Close all gaps asks for exact, non-reversing joins whatever the pair settings say", async () => {
   const bodies = [];
   const h = app({api: async (path, body) => { bodies.push(clean(body)); throw new Error("stop"); }});
@@ -301,6 +328,30 @@ test("a ranking chosen while a search runs applies from its next tick, on the fi
   await h.run("continueSearch(false, true)");
   assert.deepEqual(calls.map(c => [c.path.split("/").pop(), c.body.page, c.body.sort]),
     [["resume", 1, "discovery"], ["tick", 1, "discovery"], ["tick", 0, "pieces"], ["publish", 0, "pieces"]]);
+});
+
+test("a ranking chosen while a page of cards is fetched is asked for once it arrives, from the first page", async () => {
+  // The busy editor drops a change of the Rank select made while a page request runs;
+  // the cards must still follow the select, and a new ranking starts on its first page.
+  const state = scene([], 7); state.open_ends = [[0, 0], [5, 1]];
+  const asked = []; let answer;
+  const h = harness({state, events: true, omit: ["api"], overrides: {redraw() {}}});
+  h.context.window.duplotrainApi = (_path, body) => {
+    asked.push([body.page, body.sort]);
+    const reply = job({status: "results_ready", found: 24, page: body.page,
+      candidates: [candidate(body.sort === "pieces" ? 5 : 16)]});
+    return asked.length > 1 ? reply : new Promise(resolve => { answer = () => resolve(reply); });
+  };
+  h.context.shown = job({status: "results_ready", found: 24, page: 1, candidates: [candidate(8)]});
+  h.run("interactiveJob = shown; searchPage = 1; renderJobControls()");
+  h.el("candidate-next").click();  // to the third page of three
+  const rank = h.el("candidate-sort");
+  rank.value = "pieces"; rank.fire("change");  // while that page is fetched
+  assert.deepEqual(asked, [[2, "discovery"]]);
+  answer(); await turn();
+  assert.deepEqual(asked, [[2, "discovery"], [0, "pieces"]]);
+  assert.equal(h.run("searchPage"), 0);
+  assert.equal(h.run("candidateRows[0].candidate.index"), 5);
 });
 
 test("between its ticks a running search refuses other actions and keeps the engine", async () => {

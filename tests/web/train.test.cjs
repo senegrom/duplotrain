@@ -1,6 +1,7 @@
 "use strict";
-// Test train: playing a trace, its terminal event, coverage overlays and initial
-// switch choices, none of which outlives the revision or settings it was made for.
+// Test train: the starts it offers, playing a trace, its terminal event, coverage
+// overlays and initial switch choices, none of which outlives the revision or
+// settings it was made for.
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {harness, scene, track} = require("./reliability-harness.cjs");
@@ -83,4 +84,50 @@ test("switch controls send explicit choices and reject responses from old select
   select.value = 1; select.listeners.change();
   finish({revision: 1, steps: []}); await request;
   assert.equal(h.run("trainTrace"), null);
+});
+
+test("Test train offers no start on a buffer stop or an off-ramp, though each stays a piece to pick", () => {
+  // A straight between the two. Each has one real connector and no route through it:
+  // no train stands on it.
+  const buffer = track([[0, 0, 0], [64, 0, 0]], "Buffer stop (rail end)");
+  buffer.drivable = false;
+  buffer.ports = [{port: 0, open: false, sealed: false, x: 0, y: 0, deg: 180, name: "a"},
+    {port: 1, open: true, sealed: true, x: 64, y: 0, deg: 0, name: "end"}];
+  const straight = track([[0, 0, 0], [-128, 0, 0]], "Straight rail");
+  straight.ports = [{port: 0, open: false, sealed: false, x: 0, y: 0, deg: 0, name: "a"},
+    {port: 1, open: false, sealed: false, x: -128, y: 0, deg: 180, name: "b"}];
+  const offramp = track([[-128, 0, 0], [-224, 0, 0]], "Off-ramp to the floor");
+  offramp.drivable = false;
+  offramp.ports = [{port: 0, open: false, sealed: false, x: -128, y: 0, deg: 0, name: "a"},
+    {port: 1, open: true, sealed: true, x: -224, y: 0, deg: 180, name: "floor"}];
+  const h = harness({state: scene([buffer, straight, offramp])});
+  h.run("renderNavigation()");
+  assert.deepEqual(h.el("train-start").children.map(option => [option.value, option.textContent]),
+    [["[1,0]", "#2 Straight rail — enter a"], ["[1,1]", "#2 Straight rail — enter b"]]);
+  assert.equal(h.el("train-start").value, "[1,0]");  // Test train starts on the straight
+  assert.deepEqual(h.el("piece-select").children.map(option => option.textContent),
+    ["#1 Buffer stop (rail end)", "#2 Straight rail", "#3 Off-ramp to the floor"]);
+});
+
+test("Test train and Best settings for this start wait for a piece a train can start on", () => {
+  // A buffer stop alone has no route through it, so neither has a start to run from;
+  // the analysis of all starts still has track to look at.
+  const buffer = track([[0, 0, 0], [64, 0, 0]], "Buffer stop (rail end)");
+  buffer.drivable = false;
+  buffer.ports = [{port: 0, open: true, sealed: false, x: 0, y: 0, deg: 180, name: "a"},
+    {port: 1, open: true, sealed: true, x: 64, y: 0, deg: 0, name: "end"}];
+  const h = harness({state: scene([buffer])});
+  const disabled = () => ["test-train", "route-best", "route-all"].map(id => h.el(id).disabled);
+  h.run("renderNavigation()");
+  assert.equal(h.el("train-start").children.length, 0);
+  assert.deepEqual(disabled(), [true, true, false]);
+  // A straight joined to the buffer stop offers a train its two starts.
+  const straight = track([[0, 0, 0], [-128, 0, 0]], "Straight rail");
+  straight.ports = [{port: 0, open: false, sealed: false, x: 0, y: 0, deg: 0, name: "a"},
+    {port: 1, open: true, sealed: false, x: -128, y: 0, deg: 180, name: "b"}];
+  buffer.ports[0].open = false;
+  h.context.S = scene([buffer, straight], 2);
+  h.run("renderNavigation()");
+  assert.equal(h.el("train-start").children.length, 2);
+  assert.deepEqual(disabled(), [false, false, false]);
 });
