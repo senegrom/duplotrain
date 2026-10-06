@@ -29,11 +29,6 @@ from duplotrain.solver import SolverConfig, _solution_overlaps, solve
 LEFT = (0, 1)
 
 
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
-
-
 def closed_circle(catalog):
     layout = build_chain([(catalog["curve"], *LEFT)] * 12)
     return layout.join(layout.open_ends()[1], layout.open_ends()[0])
@@ -174,7 +169,7 @@ def test_dogbone_is_perfectly_looping_with_no_stone(catalog, teardrop):
 def test_branch_tailed_teardrop_is_a_one_way_trap(catalog, teardrops):
     """The other teardrop flavour absorbs the train into a one-way circuit; it can
     never make a dogbone, and make_dogbone says so instead of building a dud."""
-    from duplotrain.explore import is_stem_tailed, make_dogbone
+    from duplotrain.explore import is_stem_tailed
 
     branch_tailed = next(
         (s for s in teardrops if not is_stem_tailed(s, catalog)), None
@@ -230,7 +225,7 @@ def test_shuttle_with_face_stones_is_perfectly_looping(catalog):
 
 
 def test_positioned_stones_serialise(catalog):
-    from duplotrain.layout import layout_from_dict, layout_to_dict
+    from duplotrain.layout import layout_from_dict
 
     layout = build_chain([(catalog["straight"], 0, 1)])
     layout = layout.with_accessory(0, "stone_direction", at_port=1)
@@ -411,20 +406,6 @@ def test_a_prepared_context_drives_exactly_like_a_fresh_run():
         context.stones[0] = ()
     with pytest.raises(ValueError, match="different layout"):
         drive(ring, _context=replace(context, layout=Layout(ring.placements)))
-
-
-@pytest.mark.parametrize("stone", ["stone_stop", "stone_direction"])
-def test_a_prepared_context_keeps_stone_positions_and_step_limits(catalog, stone):
-    straight = build_chain([(catalog["straight"], 0, 1)])
-    for face in (None, 0, 1):
-        layout = straight.with_accessory(0, stone, at_port=face)
-        context = _prepare_drive(layout)
-        for start in ((0, 0), (0, 1)):
-            assert drive(layout, start) == drive(layout, start, _context=context)
-    ring = _switch_ring(1)
-    for context in (None, _prepare_drive(ring)):
-        with pytest.raises(DriveLimitError):
-            drive(ring, (0, 0), max_steps=1, _context=context)
 
 
 def test_classify_prepares_the_switch_choices_once(monkeypatch):

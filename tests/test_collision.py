@@ -3,13 +3,8 @@
 from duplotrain.collision import CollisionField
 
 
-def straight_line(y: float, z: float = 0.0, x0: float = 0.0, x1: float = 128.0, step: float = 8.0):
-    points = []
-    x = x0
-    while x <= x1:
-        points.append((x, y, z))
-        x += step
-    return points
+def straight_line(y: float, z: float = 0.0):
+    return [(float(x), y, z) for x in range(0, 129, 8)]
 
 
 def test_wide_piece_collision_is_position_independent():

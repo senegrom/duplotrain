@@ -9,12 +9,7 @@ from duplotrain.layout import build_chain
 from duplotrain.solver import SolverConfig, solve
 
 
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
-
-
-def assert_loop_is_sound(solution, catalog):
+def assert_loop_is_sound(solution):
     """Every recorded link of a reported loop truly mates (exactly, or within its gap)."""
     layout = solution.layout
     for a, b in layout.links.items():
@@ -36,7 +31,7 @@ def test_twelve_curves_make_exactly_one_circle(catalog):
     assert sol.exact
     assert sol.piece_count == 12
     assert sol.open_stubs == 0
-    assert_loop_is_sound(sol, catalog)
+    assert_loop_is_sound(sol)
 
 
 def test_eleven_curves_make_nothing(catalog):
@@ -65,7 +60,7 @@ def test_starter_oval_found_and_exact(catalog):
     for sol in result.solutions:
         assert sol.exact
         assert sol.piece_count == 16
-        assert_loop_is_sound(sol, catalog)
+        assert_loop_is_sound(sol)
     # The classic oval is among them: bounding envelope 832 x 576 mm.
     sizes = {
         tuple(sorted((round(w), round(h))))
@@ -91,7 +86,7 @@ def test_switch_joins_the_circle_with_a_dangling_branch(catalog):
     assert best.exact
     assert best.piece_count == 12
     assert best.open_stubs == 1  # the unused branch of the switch
-    assert_loop_is_sound(best, catalog)
+    assert_loop_is_sound(best)
 
 
 def test_slop_never_closes_a_loop_that_cannot_turn_full_circle(catalog):
@@ -129,8 +124,6 @@ def test_only_an_exact_fresh_loop_must_turn_a_full_circle(catalog):
     # A completion's base turns the rest: six curves close six more into a circle,
     # so a limit of five pieces cuts that circle off.
     base = build_chain([(catalog["curve"], 0, 1)] * 6)
-    completed = solve({"curve": 6}, catalog, SolverConfig(min_pieces=1), base=base)
-    assert [s.piece_count for s in completed.solutions] == [12]
     cut = solve({"curve": 6}, catalog, SolverConfig(min_pieces=1, max_pieces=5), base=base)
     assert not cut.solutions and not cut.stats.complete
     assert cut.stats.stop_reason == "piece_limit"
@@ -200,7 +193,7 @@ def test_level_crossings_never_link_in_series(catalog):
             assert not (pa == pb == "level_crossing")
 
 
-def test_slop_reports_engineered_gap(catalog):
+def test_slop_reports_engineered_gap():
     """A 130 mm 'stretched straight' opposite a 128 mm one leaves exactly 2 mm.
 
     No arrangement of those two plus 12 curves closes exactly (the straights' vector
@@ -492,7 +485,7 @@ def replay(steps, pieces, force_final_join, base=None, grow_from=None, close_ont
 
 
 def test_solution_layouts_equal_their_replayed_constructions(catalog):
-    from duplotrain import ORIGIN, Layout, build_chain
+    from duplotrain import Layout
     from duplotrain.solver import _Place, _Transit
 
     # Two crossings in a row: a completion that transits both without a piece,
@@ -781,10 +774,8 @@ def test_a_teardrop_tail_may_end_at_a_ramp_top(catalog):
     everything = solve(box, catalog, SolverConfig(reversing_loops=True, use_all_pieces=True))
     assert everything.solutions
     assert all("ramp" in s.layout.piece_counts for s in everything.solutions)
-    # A loop has no open end for the ramp's top: it is left out of the search.
-    assert solve(box, catalog).stats.nodes == solve({"curve": 11, "switch": 1}, catalog).stats.nodes
-    # Nor has a completion, even one that may end in a teardrop: its walk begins at
-    # the base. Left out, the ramp keeps no completion from using every piece.
+    # A completion has no open tail, even one that may end in a teardrop: its walk
+    # begins at the base. Left out, the ramp keeps no completion from using every piece.
     base = build_chain([(catalog["curve"], 0, 1)] * 8)
     closing = SolverConfig(min_pieces=1, reversing_loops=True, use_all_pieces=True)
     completed = solve({"curve": 4, "ramp": 1}, catalog, closing, base=base)

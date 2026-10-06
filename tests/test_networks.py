@@ -13,11 +13,6 @@ from duplotrain.symmetry import placement_key
 from tests.test_congruence import long_straight_catalog
 
 
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
-
-
 def test_shuttle_is_the_only_buffered_bar(catalog):
     result = enumerate_networks(
         {"straight": 3, "buffer": 2},
@@ -105,7 +100,6 @@ def test_star_of_three_arms_is_never_perfect(catalog):
 
 
 def test_lattice_frames_convert_back_to_exact_layout_poses(catalog):
-    from duplotrain import build_chain
     from duplotrain.geometry import ORIGIN
     from duplotrain.solver import _compile_lattice, _flat, _moves_for, _pose_to_lattice
 

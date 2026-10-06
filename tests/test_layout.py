@@ -19,11 +19,6 @@ from duplotrain.validation import check_layout_json
 from tests.test_congruence import built, track, transform
 
 
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
-
-
 def chain_end(layout: Layout) -> tuple:
     """(pose of the last piece's open exit)."""
     open_ends = layout.open_ends()
@@ -143,10 +138,6 @@ def test_mating_hints_never_offer_overlapping_road_plates(catalog):
 
 
 def test_bridge_dimensions_are_exact(catalog):
-    from fractions import Fraction
-
-    from duplotrain.exact import Alg
-
     ramp, span = catalog["ramp"], catalog["span"]
     assert ramp.exit_delta(0, 1)[2] == Alg(Fraction(288, 5))  # 57.6 mm
     assert span.exit_delta(0, 1)[2] == Alg(Fraction(96, 5))  # 19.2 mm
@@ -521,9 +512,6 @@ def test_unknown_segment_uses_declared_length_not_its_endpoint_distance():
 def test_the_closest_gaps_come_first_without_measuring_every_pair(monkeypatch, catalog, columns):
     # A grid of loose crossings, or a single column of them, plus buffers whose
     # sealed faces must never be paired. Equal gaps keep end order.
-    from duplotrain.geometry import Pose
-    from duplotrain.layout import Placement
-
     placements = [
         Placement(catalog["crossing"], Pose.make(400 * (i % columns), 400 * (i // columns)))
         for i in range(100)

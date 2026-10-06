@@ -164,9 +164,7 @@ def test_composed_arc_runs_preserve_finite_stock_order(straights):
 def test_lattice_oracle_geometry_matches_the_exact_geometry():
     from fractions import Fraction
 
-    import duplotrain.editor as editor
-    from duplotrain import Layout, Pose, build_chain
-    from duplotrain.editor import Session, _ExactArcGeometry, _LatticeArcGeometry
+    from duplotrain.editor import _ExactArcGeometry, _LatticeArcGeometry
 
     catalog = default_catalog()
     bases = [

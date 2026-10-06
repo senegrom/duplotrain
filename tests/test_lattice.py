@@ -8,7 +8,6 @@ an answer.
 
 import pytest
 
-from duplotrain.catalog import default_catalog
 from duplotrain.exact import Alg
 from duplotrain.geometry import ORIGIN, Pose, degrees_to_steps
 from duplotrain.lattice import (
@@ -28,12 +27,6 @@ from duplotrain.solver import (
     _pose_to_lattice,
     solve,
 )
-
-
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
-
 
 # -- ring arithmetic ---------------------------------------------------------------
 
@@ -168,7 +161,7 @@ def test_conformance_completion(catalog):
     )
 
 
-def test_conformance_forced_fits(catalog):
+def test_conformance_forced_fits():
     from duplotrain.catalog import DEFAULT_CATALOG_SPECS
     from duplotrain.pieces import parse_pieces
 
@@ -211,7 +204,7 @@ def test_auto_engine_picks_lattice_for_builtins(catalog):
     assert result.stats.engine == "lattice"
 
 
-def test_auto_engine_falls_back_for_off_lattice_pieces(catalog):
+def test_auto_engine_falls_back_for_off_lattice_pieces():
     from duplotrain.catalog import DEFAULT_CATALOG_SPECS
     from duplotrain.pieces import parse_pieces
 
@@ -234,7 +227,7 @@ def test_auto_engine_falls_back_for_off_lattice_pieces(catalog):
 
 
 def test_equal_lattice_frames_convert_to_one_exact_pose():
-    from duplotrain.solver import _flat, _LatticeEngine, _pose_to_lattice
+    from duplotrain.solver import _LatticeEngine
 
     frame = (2560, -40, 80, 0, 200, 5)
     pose = _LatticeEngine.to_pose(frame)

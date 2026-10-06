@@ -4,15 +4,9 @@ from dataclasses import fields, replace
 
 import pytest
 
-from duplotrain.catalog import default_catalog
 from duplotrain.scoring import score_solution
 from duplotrain.solver import SolverConfig, solve
 from tests.test_solver import stretched_catalog
-
-
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
 
 
 def test_scoring_prefers_exact_and_fuller_layouts(catalog):

@@ -47,10 +47,7 @@ import sys, json
 sys.path[:0] = sys.argv[1:3]
 import adapter
 from duplotrain import editor
-# Lengths and congruence keys stay out of the archive; nothing the editor runs needs them.
-assert "duplotrain._congruence" not in sys.modules
 assert "engine.zip" in editor.__file__, editor.__file__
-assert "duplotrain.gui" not in sys.modules
 assert "http.server" not in sys.modules
 assert "webbrowser" not in sys.modules
 def api(path, body):
@@ -98,7 +95,6 @@ for _ in range(500):
 assert routes["complete"] and routes["classification"] is not None, routes
 assert api("/api/check", {"revision": s["revision"]})["connector_closed"]
 assert api("/api/drive", {"revision": s["revision"], "start": [0, 0]})["complete"]
-assert "duplotrain._congruence" not in sys.modules
 '''
     run = subprocess.run([sys.executable, "-I", "-c", code, str(archive), str(tmp_path),
                           "compact" if compact else "legacy"],

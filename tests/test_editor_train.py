@@ -15,11 +15,6 @@ from duplotrain.layout import Layout, Placement, build_chain, layout_from_dict
 from tests.editor_support import load_adapter, post, running_server, unchanged
 
 
-def content_state(session):
-    return (session.snapshot(), session.revision, list(session.history),
-            list(session._history_state), list(session._future), list(session.candidates))
-
-
 @pytest.mark.parametrize("start", [[-1, 0], [999, 0], [0, 999], [False, 0], None])
 def test_train_rejects_invalid_start_without_mutation(start):
     s = Session()
@@ -75,7 +70,7 @@ def test_terminal_event_does_not_add_a_traversal(piece, stone, at_port, expected
     if stone:
         layout = layout.with_accessory(index, "stone_stop", at_port=at_port)
     session = Session(history=[layout])
-    before = content_state(session)
+    before = unchanged(session)
     result = trace_train(session, [0, 0])
     assert len(result["steps"]) == expected_steps
     assert result["terminal"] == {"placement": 1, "entry": 0, "at_port": event_port,
@@ -85,7 +80,7 @@ def test_terminal_event_does_not_add_a_traversal(piece, stone, at_port, expected
     assert result["drivable_count"] == (1 if piece == "buffer" else 2)
     assert result["visited_drivable"] == ([0] if piece == "buffer" else [0, 1])
     assert result["unvisited"] == []
-    assert content_state(session) == before
+    assert unchanged(session) == before
 
 
 def test_immediate_stop_has_terminal_but_zero_traversals():
@@ -102,7 +97,7 @@ def test_endless_and_limited_runs_never_invent_a_terminal_event():
     c = default_catalog()
     layout = build_chain([(c["curve"], 0, 1)] * 12).join((0, 0), (11, 1))
     session = Session(history=[layout])
-    before = content_state(session)
+    before = unchanged(session)
     complete = trace_train(session, [0, 0])
     assert complete["outcome"] == "endless" and complete["covers"]
     assert complete["terminal"] is None
@@ -114,7 +109,7 @@ def test_endless_and_limited_runs_never_invent_a_terminal_event():
     assert limited["terminal"] is None
     assert limited["unvisited"] is None
     assert limited["cycle_pieces"] == []
-    assert content_state(session) == before
+    assert unchanged(session) == before
     with pytest.raises(DriveLimitError):
         drive(layout, max_steps=3)
 
@@ -142,7 +137,7 @@ def test_reported_layout_coverage_is_separate_from_cycle(fixture, total):
 def test_explicit_initial_switches_reach_drive_model_without_mutating_layout(transport):
     s = Session()
     s.attach("switch", 0, None)
-    before = content_state(s)
+    before = unchanged(s)
     choices = s.state()["train_switches"]
     assert choices[0]["placement"] == 0
     ports = [o["port"] for o in choices[0]["options"]]
@@ -158,7 +153,7 @@ def test_explicit_initial_switches_reach_drive_model_without_mutating_layout(tra
             assert status == 200
     assert result["steps"] == [[0, 0, 2]]
     assert result["terminal"]["at_port"] == 2
-    assert content_state(s) == before
+    assert unchanged(s) == before
     assert trace_train(s, [0, 0])["steps"] == [[0, 0, 1]]
 
 
@@ -169,10 +164,10 @@ def test_explicit_initial_switches_reach_drive_model_without_mutating_layout(tra
 def test_invalid_switch_choices_are_rejected_before_any_change(states):
     s = Session()
     s.attach("switch", 0, None)
-    before = content_state(s)
+    before = unchanged(s)
     with pytest.raises(ValueError):
         trace_train(s, [0, 0], switch_states=states)
-    assert content_state(s) == before
+    assert unchanged(s) == before
 
 
 def test_explicit_defaults_preserve_existing_route_cycle_and_coverage():

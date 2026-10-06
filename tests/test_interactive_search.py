@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from duplotrain import build_chain, default_catalog
+from duplotrain import build_chain
 from duplotrain.editor import PREVIEW_FORMAT, RevisionConflictError, Session, dispatch_session
 from duplotrain.editor_search import (
     MAX_JOB_SECONDS,
@@ -35,11 +35,6 @@ from tests.editor_support import layout_key, load_adapter, post, running_server,
 
 
 @pytest.fixture
-def catalog():
-    return default_catalog()
-
-
-@pytest.fixture
 def gap(catalog):
     path = Path(__file__).parent / "fixtures/bridge-gap.json"
     return layout_from_dict(json.loads(path.read_text()), catalog)
@@ -49,8 +44,8 @@ def half(catalog):
     return build_chain([(catalog["curve"], 0, 1)] * 6)
 
 
-def settle(job, limit=20000):
-    for _ in range(limit):
+def settle(job):
+    for _ in range(20000):
         if job.status != "running":
             return
         job.tick()

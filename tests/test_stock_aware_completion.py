@@ -10,7 +10,7 @@ from duplotrain import Layout, Pose, SolverConfig, build_chain, default_catalog
 
 
 def unfiltered_moves(pieces, stock, base, grow_from, close_onto):
-    """The previous relaxation: every base type was reusable, even when occupied."""
+    """A relaxation that reuses every base type, even an occupied one."""
     return {pid: solver._moves_for(piece) for pid, piece in pieces.items()}
 
 

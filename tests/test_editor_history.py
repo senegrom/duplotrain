@@ -11,11 +11,6 @@ from tests.editor_support import load_adapter, post, running_server, unchanged
 from tests.test_editor_revisions import half_circle_session
 
 
-def content_state(session):
-    return (session.snapshot(), session.revision, list(session.history),
-            list(session._history_state), list(session._future), list(session.candidates))
-
-
 @pytest.mark.parametrize("action", [
     lambda s: s.set_inventory({"straight": 17}),
     lambda s: s.set_inventory({"crossing": 0}),
@@ -61,7 +56,7 @@ def test_empty_clear_preserves_redo_revision_and_history(transport):
     session.attach("straight", 0, None)
     placed = session.snapshot()
     session.undo()
-    before = content_state(session)
+    before = unchanged(session)
     body = {"revision": session.revision}
     if transport == "direct":
         result = dispatch_session(session, "/api/clear", body)
@@ -72,7 +67,7 @@ def test_empty_clear_preserves_redo_revision_and_history(transport):
             status, result = post(server, "/api/clear", body)
             assert status == 200
     assert result["can_redo"]
-    assert content_state(session) == before
+    assert unchanged(session) == before
     session.redo()
     assert session.snapshot() == placed
 

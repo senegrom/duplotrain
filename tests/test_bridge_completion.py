@@ -29,13 +29,13 @@ def owned(base):
     return {pid: base.piece_counts.get(pid, 0) + SPARE.get(pid, 0) for pid in default_catalog()}
 
 
-def assert_extension(base, completed, remaining=None, max_pieces=26):
+def assert_extension(base, completed, remaining=None):
     assert completed.placements[:len(base)] == base.placements
     assert all(completed.links[a] == b for a, b in base.links.items())
     assert completed.accessories == base.accessories
     assert completed.is_closed and not completed.joint_issues()
     assert not _solution_overlaps(completed, 0, 120.0, 8.0)
-    assert len(completed) - len(base) <= max_pieces
+    assert len(completed) - len(base) <= 26
     assert all(p.frame.z == ORIGIN.z for p in completed if p.piece.id != "span")
     if remaining is not None:
         assert all(n - base.piece_counts.get(pid, 0) <= remaining.get(pid, 0)
@@ -44,8 +44,8 @@ def assert_extension(base, completed, remaining=None, max_pieces=26):
     assert layout_from_dict(layout_to_dict(completed), default_catalog()) == completed
 
 
-def pair_search(base, catalog, stock, grow, close, depth=26, effort=1):
-    return PairSearch(base, catalog, stock, grow, close, depth, effort, 0, False,
+def pair_search(base, catalog, stock, grow, close, depth=26):
+    return PairSearch(base, catalog, stock, grow, close, depth, 1, 0, False,
                       search_options(None, catalog))
 
 

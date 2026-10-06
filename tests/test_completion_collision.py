@@ -16,18 +16,13 @@ from tests.editor_support import complete, layout_key
 from tests.test_completion import crossing_completion
 
 
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
-
-
-def strict_overlap_pairs(layout, spacing=8.0):
+def strict_overlap_pairs(layout):
     """Independent all-pairs audit: linked neighbours exempt, everything else must
     keep centreline clearance (same rules the engine's CollisionField enforces,
     including the arch-underpass exemption)."""
     clouds = []
     for placement in layout:
-        pts = [p for line in placement.centrelines(spacing) for p in line]
+        pts = [p for line in placement.centrelines(8.0) for p in line]
         clouds.append((pts, placement.piece.width / 2.0, placement.piece.underpass))
     linked = {tuple(sorted((a[0], b[0]))) for a, b in layout.links.items()}
     bad = []
@@ -198,7 +193,6 @@ def bridge_with_ground_track(catalog, cross_x):
 def test_ground_track_passes_under_the_high_bridge(catalog):
     """The user's observations: a train fits beneath the mid-arch, beneath the
     spans generally, and grazing under the ramp's highest portion is fine."""
-    from duplotrain.solver import _solution_overlaps
 
     for cross_x in (512.0, 384.0, 304.0):  # crest, span low half, ramp top
         layout = bridge_with_ground_track(catalog, cross_x=cross_x)
@@ -207,8 +201,6 @@ def test_ground_track_passes_under_the_high_bridge(catalog):
 
 
 def test_ground_track_never_passes_under_the_lower_ramp(catalog):
-    from duplotrain.solver import _solution_overlaps
-
     for cross_x in (60.0, 160.0):  # ramp foot and mid-ramp stay solid
         layout = bridge_with_ground_track(catalog, cross_x=cross_x)
         assert strict_overlap_pairs(layout) != [], cross_x
@@ -216,8 +208,8 @@ def test_ground_track_never_passes_under_the_lower_ramp(catalog):
 
 
 def test_shared_overlap_audit_matches_the_standalone_audit_and_restores_its_field():
-    from duplotrain import Layout, build_chain, default_catalog, solve
-    from duplotrain.solver import SolverConfig, _OverlapAudit, _solution_overlaps
+    from duplotrain import build_chain
+    from duplotrain.solver import _OverlapAudit
 
     catalog = default_catalog()
     base = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
@@ -250,10 +242,9 @@ def test_shared_overlap_audit_matches_the_standalone_audit_and_restores_its_fiel
 
 
 def test_shared_overlap_audit_accepts_equal_copies_of_the_base_and_shorter_layouts():
-    from duplotrain import Layout, build_chain, default_catalog
-    from duplotrain.geometry import Pose
+    from duplotrain import build_chain
     from duplotrain.layout import Placement
-    from duplotrain.solver import _OverlapAudit, _solution_overlaps
+    from duplotrain.solver import _OverlapAudit
 
     catalog = default_catalog()
     base = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
@@ -278,9 +269,8 @@ def test_shared_overlap_audit_keeps_a_prefix_only_with_the_same_links():
     carry the same link sets, and every verdict must equal the standalone audit's."""
     import random
 
-    from duplotrain import Layout, SolverConfig, default_catalog, solve
     from duplotrain.layout import Placement
-    from duplotrain.solver import _OverlapAudit, _solution_overlaps
+    from duplotrain.solver import _OverlapAudit
 
     catalog = default_catalog()
     result = solve({"curve": 12, "straight": 4, "switch": 2}, catalog,

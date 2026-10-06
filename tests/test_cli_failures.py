@@ -113,7 +113,7 @@ def test_an_empty_output_name_is_refused_not_ignored(runner):
     assert result.exit_code == 2 and "-o needs a directory name" in result.output
 
 
-def test_a_format_that_needs_latex_is_reported_politely(tmp_path):
+def test_a_format_that_needs_latex_is_reported_politely():
     import click
 
     from duplotrain import cli

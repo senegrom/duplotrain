@@ -2,16 +2,10 @@
 
 import pytest
 
-from duplotrain.catalog import ACCESSORIES, default_catalog
+from duplotrain.catalog import ACCESSORIES
 from duplotrain.layout import build_chain, layout_from_dict, layout_to_dict
 from duplotrain.sets import SETS, inventory_for_sets
 from duplotrain.solver import SolverConfig, solve
-
-
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
-
 
 # -- sets ------------------------------------------------------------------------
 
@@ -30,7 +24,7 @@ def test_sets_combine():
     assert stones == {"stone_stop": 1}
 
 
-def test_owning_a_set_twice(catalog):
+def test_owning_a_set_twice():
     pieces, _ = inventory_for_sets(["10874", "10874"])
     assert pieces == {"curve": 24, "straight": 8}
 

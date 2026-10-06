@@ -143,18 +143,15 @@ def test_solve_saves_and_lists_loops_best_first(runner, monkeypatch, tmp_path):
     totals = [score[json.dumps(json.loads(path.read_text()))] for path in saved]
     assert totals == sorted(totals, reverse=True) and totals[0] > totals[-1]
     # The table lists them in the same order, numbered from the best.
-    shown = [round(float(row.split("│")[2])) for row in result.output.splitlines()
-             if row.count("│") > 3 and row.split("│")[1].strip().isdigit()]
+    shown = [round(float(row[1])) for row in table_rows(result.output)]
     assert shown == [round(total) for total in totals]
 
 
 def test_solve_lists_loops_on_the_floor_before_loops_on_bricks(runner):
-    result = runner.invoke(main, ["solve", "--curve", "12", "--straight", "6", "--ramp", "2",
+    result = runner.invoke(main, ["solve", "--curve", "12", "--straight", "2", "--ramp", "2",
                                   "--span", "2", "--max-results", "200"])
     assert result.exit_code == 0, result.output
-    rows = [[cell.strip() for cell in row.split("│")] for row in result.output.splitlines()
-            if row.count("│") > 3 and row.split("│")[1].strip().isdigit()]
-    ranked = [(int(row[7]), -int(row[2])) for row in rows]
+    ranked = [(int(row[6]), -int(row[1])) for row in table_rows(result.output)]
     assert ranked[0][0] == 0 and ranked[-1][0] > 0
     assert ranked == sorted(ranked)  # fewest pieces on bricks first, then the best score
 
@@ -190,8 +187,6 @@ def test_solve_check_render_round_trip(runner, tmp_path):
 
 
 def test_cli_continues_json_export_without_matplotlib(monkeypatch, tmp_path):
-    import duplotrain.cli as cli
-
     real_import = cli.importlib.import_module
 
     def without_matplotlib(name, *args, **kwargs):

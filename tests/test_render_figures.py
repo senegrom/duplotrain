@@ -219,8 +219,6 @@ def test_a_failed_save_leaves_no_figure_behind(layout, tmp_path):
 def test_the_default_title_is_plain_text(tmp_path):
     # Dollar signs in a piece id are no mathematics: read as math, this one failed
     # the save.
-    from duplotrain.pieces import parse_piece
-
     piece = parse_piece({"id": "arc$\\frac$", "paths": [
         {"segments": [{"type": "arc", "radius": 256, "degrees": 30}]}]})
     figure = render_layout(build_chain([(piece, 0, 1)] * 12), path=str(tmp_path / "ring.png"))
@@ -265,8 +263,7 @@ def test_track_is_labelled_from_a_whole_brick_up():
 
     from matplotlib.figure import Figure
 
-    from duplotrain.geometry import ORIGIN, Pose
-    from duplotrain.layout import Layout
+    from duplotrain.geometry import ORIGIN
 
     straight = default_catalog()["straight"]
     brick = Fraction(96, 5)  # one DUPLO brick, 19.2 mm

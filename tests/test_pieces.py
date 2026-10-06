@@ -14,11 +14,6 @@ from duplotrain.pieces import Arc, parse_length, parse_piece
 CURVE_KICK = Alg(256, 0, -128, 0)
 
 
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
-
-
 def test_parse_length_forms():
     assert parse_length(128) == Alg(128)
     assert parse_length(152.5) == Alg(Fraction(305, 2))
@@ -108,7 +103,6 @@ def test_span_keeps_rising_to_the_crest(catalog):
 
 def test_a_user_catalogue_overrides_a_built_in_piece_by_id(tmp_path, catalog):
     """The README's own "custom catalogue" example: re-measured bridge ramps."""
-    import json
 
     from duplotrain.catalog import load_catalog
 

@@ -96,17 +96,9 @@ def test_endpoint_pairs_validate_each_index_and_shape(endpoint, path, field, bod
     ("slop", True), ("slop", False), ("slop", "0"), ("slop", None),
     ("slop", -0.1), ("slop", float("inf")), ("slop", float("nan")),
     ("reversing", "false"), ("reversing", 0), ("reversing", 1), ("reversing", None),
+    ("max_results", 0), ("max_results", 51), ("max_pieces", 0), ("max_pieces", 129),
 ])
-def test_search_options_reject_wrong_types_without_losing_candidates(endpoint, field, value):
-    _, reject = endpoint
-    reject("/api/search/start", {"grow": [1, 1], "close": [0, 0], "max_pieces": 1, field: value})
-
-
-@pytest.mark.parametrize("field,value", [
-    ("max_results", 0), ("max_results", 51),
-    ("max_pieces", 0), ("max_pieces", 129),
-])
-def test_search_integer_bounds_remain_enforced(endpoint, field, value):
+def test_search_options_reject_wrong_values_without_losing_candidates(endpoint, field, value):
     _, reject = endpoint
     reject("/api/search/start", {"grow": [1, 1], "close": [0, 0], "max_pieces": 1, field: value})
 

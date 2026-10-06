@@ -16,11 +16,6 @@ from tests.editor_support import complete
 LEFT = (0, 1)
 
 
-@pytest.fixture(scope="module")
-def catalog():
-    return default_catalog()
-
-
 @pytest.fixture()
 def half_circle(catalog):
     return build_chain([(catalog["curve"], *LEFT)] * 6)
@@ -373,8 +368,6 @@ def test_a_ramps_top_does_not_pass_through_a_switch_it_meets(catalog):
 
 
 def test_plain_track_cannot_close_onto_a_ramps_top(catalog):
-    from fractions import Fraction
-
     from duplotrain.geometry import Pose
 
     # A ramp's top carries only an arch's foot. A straight raised to its height
