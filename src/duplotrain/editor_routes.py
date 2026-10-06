@@ -14,7 +14,7 @@ from .drive import (
     drivable_universe,
     drive,
 )
-from .editor_search import MAX_JOB_SECONDS, integer
+from .editor_search import integer, job_action
 
 
 class RouteJob:
@@ -144,27 +144,11 @@ def dispatch_routes(session, path, body):
         if (not isinstance(job, RouteJob) or body.get("job_id") != job.id
                 or session.revision != job.revision):
             raise ValueError("This train analysis is no longer active")
-        if time.monotonic() - job.last_touch > MAX_JOB_SECONDS:
-            job.close()
-            session._interactive_job = None
-            raise ValueError("Train analysis expired; start again")
-        if action == "tick":
-            try:
-                job.tick()
-            except Exception:
-                job.close()
-                session._interactive_job = None
-                raise
-        elif action == "pause":
-            if job.status == "running":
-                job.status = "paused"
-        elif action == "resume":
-            if job.status == "paused":
-                job.status = "running"
+        if job_action(session, job, action, "Train analysis expired; start again"):
+            pass  # tick, pause or resume
         elif action == "discard":
             job.close()
             session._interactive_job = None
         else:
             raise ValueError("unknown train analysis action")
-    job.last_touch = time.monotonic()
     return job.response()

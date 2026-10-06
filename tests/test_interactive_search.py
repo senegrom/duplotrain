@@ -168,6 +168,9 @@ def test_publication_pause_resume_and_apply_are_revision_bound_and_undoable(cata
     assert (job.nodes, len(job.solutions)) == (paused_nodes, paused_solutions)
     call(session, "resume")
     settle(job)
+    stopped = job.status
+    for action in ("pause", "resume"):  # a stopped search neither pauses nor resumes
+        assert call(session, action)["status"] == stopped
     old_revision = session.revision
     result = call(session, "publish")
     assert session.revision == old_revision + 1
@@ -266,10 +269,27 @@ def test_expiry_releases_only_retained_search(catalog):
     call(session, "start")
     old, before = session._interactive_job, session.snapshot()
     old.last_touch -= MAX_JOB_SECONDS + 1
-    with pytest.raises(ValueError, match="expired"):
+    with pytest.raises(ValueError, match="Search expired after 20 minutes of inactivity"):
         call(session, "page")
     assert session._interactive_job is None and old.status == "discarded"
     assert session.snapshot() == before
+
+
+@pytest.mark.parametrize("kind,actions", [
+    ("search", ["pause", "resume", "tick", "page", "continue", "pause"]),
+    ("routes", ["pause", "resume", "tick", "pause"]),
+])
+def test_every_request_keeps_its_job_alive(catalog, kind, actions):
+    # Each request comes three quarters of the inactivity window after the last.
+    session = Session(history=[half(catalog)])
+    body = {"revision": session.revision}
+    body["job_id"] = dispatch_session(session, f"/api/{kind}/start", body)["job_id"]
+    job = session._interactive_job
+    for action in actions:
+        job.last_touch -= MAX_JOB_SECONDS * 3 / 4
+        dispatch_session(session, f"/api/{kind}/{action}", body)
+    assert session._interactive_job is job
+    job.close()
 
 
 @pytest.mark.parametrize("gone", ["train analysis", "expiry", "failed tick"])

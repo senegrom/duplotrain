@@ -791,6 +791,36 @@ def published_page(session, body):
             "candidates": shown}
 
 
+def job_action(session, job, action, expired):
+    """The steps every interactive job shares; whether *action* was one of them.
+
+    A job idle for MAX_JOB_SECONDS is released and the request fails with the
+    message *expired*; any other request keeps the job alive. A failed tick
+    releases the job too.
+    """
+    if time.monotonic() - job.last_touch > MAX_JOB_SECONDS:
+        job.close()
+        session._interactive_job = None
+        raise ValueError(expired)
+    job.last_touch = time.monotonic()
+    if action == "tick":
+        try:
+            job.tick()
+        except Exception:
+            job.close()
+            session._interactive_job = None
+            raise
+    elif action == "pause":
+        if job.status == "running":
+            job.status = "paused"
+    elif action == "resume":
+        if job.status == "paused":
+            job.status = "running"
+    else:
+        return False
+    return True
+
+
 def dispatch_search(session, path, body):
     """Caller has validated the request revision and holds the session lock."""
     action = path.removeprefix("/api/search/")
@@ -820,26 +850,11 @@ def dispatch_search(session, path, body):
                 return published_page(session, body)
             raise ValueError("This search is no longer active; start a new search")
         job = old
-        if time.monotonic() - job.last_touch > MAX_JOB_SECONDS:
-            job.close()
-            session._interactive_job = None
-            raise ValueError("Search expired after 20 minutes of inactivity; start again")
-        job.last_touch = time.monotonic()
-        if action == "tick":
-            try:
-                job.tick()
-            except Exception:
-                job.close()
-                session._interactive_job = None
-                raise
+        if job_action(session, job, action,
+                      "Search expired after 20 minutes of inactivity; start again"):
+            pass  # tick, pause or resume
         elif action == "continue":
             job.more(harder=body.get("harder", False))
-        elif action == "pause":
-            if job.status == "running":
-                job.status = "paused"
-        elif action == "resume":
-            if job.status == "paused":
-                job.status = "running"
         elif action == "publish":
             job.publish(session)
             # page_only leaves out the full list: the editor shows one page, and the

@@ -191,7 +191,7 @@ def test_idle_route_analysis_expires_and_releases_iterator(completed):
     job = RouteJob(s, {})
     s._interactive_job = job
     job.last_touch -= MAX_JOB_SECONDS + 1
-    with pytest.raises(ValueError, match="expired"):
+    with pytest.raises(ValueError, match="Train analysis expired; start again"):
         dispatch_session(s, "/api/routes/tick", {"revision": s.revision, "job_id": job.id})
     assert s._interactive_job is None and job.status == "discarded"
 
