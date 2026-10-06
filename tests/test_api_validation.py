@@ -48,7 +48,7 @@ def endpoint(request):
             assert unchanged(session) == before
             assert session.candidates is candidates
             # A rejected request must not stale an already-published valid candidate.
-            session.apply_candidate(0, session.revision)
+            session.apply_candidate(0)
             assert session.layout.links[(0, 1)] == (1, 0)
 
         yield session, reject

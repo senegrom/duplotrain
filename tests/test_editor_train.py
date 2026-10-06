@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import duplotrain.editor_tools as editor_tools
 from duplotrain.catalog import default_catalog
 from duplotrain.drive import DriveLimitError, drive
 from duplotrain.editor import Session, dispatch_session
@@ -48,14 +49,6 @@ def test_train_tools_name_a_forced_fit_a_joint_that_does_not_fit_exactly():
         dispatch_session(s, "/api/routes/start", {"revision": s.revision})
 
 
-@pytest.mark.parametrize("limit", [0, 10001, True, 1.5, "4"])
-def test_train_budget_validation(limit):
-    s = Session()
-    s.attach("straight", 0, None)
-    with pytest.raises(ValueError):
-        trace_train(s, [0, 0], limit)
-
-
 @pytest.mark.parametrize("piece,stone,at_port,expected_steps,reason,event_port", [
     ("straight", True, None, 1, "stop_stone", None),
     ("straight", True, 1, 1, "stop_stone", 1),
@@ -92,7 +85,7 @@ def test_immediate_stop_has_terminal_but_zero_traversals():
     assert result["visited_drivable"] == [0]
 
 
-def test_endless_and_limited_runs_never_invent_a_terminal_event():
+def test_endless_and_limited_runs_never_invent_a_terminal_event(monkeypatch):
     c = default_catalog()
     layout = build_chain([(c["curve"], 0, 1)] * 12).join((0, 0), (11, 1))
     session = Session(history=[layout])
@@ -103,8 +96,9 @@ def test_endless_and_limited_runs_never_invent_a_terminal_event():
     assert complete["cycle_start"] == 0 and complete["period"] == 12
     assert complete["cycle_pieces"] == list(range(12))
     # One start and a step budget: past it there is no verdict and no claim.
-    limited = trace_train(session, [0, 0], 3)
-    assert limited["outcome"] == "limit" and not limited["complete"]
+    monkeypatch.setattr(editor_tools, "TRAIN_STEPS", 3)
+    limited = trace_train(session, [0, 0])
+    assert limited["outcome"] == "limit" and limited["limit"] == 3 and not limited["complete"]
     assert limited["terminal"] is None
     assert limited["unvisited"] is None
     assert limited["cycle_pieces"] == []

@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from duplotrain import build_chain
-from duplotrain.editor import PREVIEW_FORMAT, RevisionConflictError, Session, dispatch_session
+from duplotrain.editor import RevisionConflictError, Session, dispatch_session
 from duplotrain.editor_search import (
     MAX_JOB_SECONDS,
     MAX_RESULTS,
@@ -56,8 +56,7 @@ def call(session, action, **body):
     if action != "start" and "job_id" not in body and session._interactive_job is not None:
         body["job_id"] = session._interactive_job.id
     return dispatch_session(session, "/api/search/" + action,
-                            {"revision": session.revision,
-                             "preview_format": PREVIEW_FORMAT, **body})
+                            {"revision": session.revision, **body})
 
 
 def physical(layout, start):
@@ -180,7 +179,7 @@ def test_publication_pause_resume_and_apply_are_revision_bound_and_undoable(cata
     assert result["search_job"]["candidates"]
     with pytest.raises(RevisionConflictError):
         call(session, "tick", revision=old_revision)
-    session.apply_candidate(0, revision=session.revision)
+    session.apply_candidate(0)
     assert session._interactive_job is None and job.status == "discarded"
     assert session.layout.is_closed
     session.undo()
@@ -201,7 +200,7 @@ def test_wrong_job_identity_never_reuses_new_problem(catalog, action):
 
 
 @pytest.mark.parametrize("body", [
-    {"max_results": 51}, {"max_pieces": True}, {"search_effort": 0}, {"slop": float("nan")},
+    {"max_results": 51}, {"max_pieces": True}, {"slop": float("nan")},
     {"all_gaps": "yes"}, {"options": {"exclude": ["does-not-exist"]}},
     {"options": {"room": [0, 0, 0, 1]}}, {"options": {"sort": "shortest-guaranteed"}},
     {"page": -1}, {"sort": "bad"}, {"harder": "yes"},
@@ -242,7 +241,7 @@ def test_an_edit_moves_the_session_on_before_it_releases_the_search(catalog, mon
     call(session, "start", max_results=1)
     job = session._interactive_job
     settle(job)
-    assert call(session, "publish")["candidates"]
+    assert call(session, "publish")["search_job"]["candidates"]
     revision, release = session.revision, job.close
 
     def fail():
@@ -259,7 +258,7 @@ def test_an_edit_moves_the_session_on_before_it_releases_the_search(catalog, mon
         with pytest.raises(RevisionConflictError):
             dispatch_session(session, "/api/undo", {"revision": revision})
         with pytest.raises(ValueError, match="stale"):
-            session.apply_candidate(0, revision=session.revision)
+            session.apply_candidate(0)
     finally:
         release()
 
@@ -305,7 +304,7 @@ def test_published_suggestions_stay_paged_and_ranked_after_their_search_is_gone(
     call(session, "start", max_results=16, options={"exclude": ["span"]})
     job = session._interactive_job
     settle(job)
-    published = call(session, "publish", page_only=True)
+    published = call(session, "publish")
     assert published["candidates"] == [] and published["search_job"]["found"] == 16
     shown = {(goal, page): call(session, "page", sort=goal, page=page)
              for goal in SORTS for page in (0, 1)}
@@ -335,7 +334,7 @@ def test_published_suggestions_stay_paged_and_ranked_after_their_search_is_gone(
     assert unchanged(session) == before
     later = reply["candidates"][-1]["index"]  # the last card of the second page
     chosen = session.candidates[later].layout
-    session.apply_candidate(later, session.revision)
+    session.apply_candidate(later)
     assert session.layout == chosen
     with pytest.raises(ValueError, match="no longer active"):
         call(session, "page", job_id=job.id)  # the edit withdrew them
@@ -346,13 +345,13 @@ def test_a_new_search_or_another_job_id_never_pages_published_suggestions(catalo
     call(session, "start", max_results=8)
     first = session._interactive_job
     settle(first)
-    call(session, "publish", page_only=True)
+    call(session, "publish")
     call(session, "start", max_results=8)  # withdraws what the first search published
     with pytest.raises(ValueError, match="no longer active"):
         call(session, "page", job_id=first.id)
     second = session._interactive_job
     settle(second)
-    call(session, "publish", page_only=True)
+    call(session, "publish")
     # While a search is active, only its own ID pages it.
     with pytest.raises(ValueError, match="no longer active"):
         call(session, "page", job_id=first.id)
@@ -368,7 +367,7 @@ def test_abandoned_search_is_collectable_without_cyclic_gc(gap):
         job = session._interactive_job
         settle(job)
         refs = [weakref.ref(job), weakref.ref(job.pool), weakref.ref(job.pool.arc_session)]
-        call(session, "discard")
+        session.set_unlimited(False)  # an edit releases the job
         del job
         assert all(ref() is None for ref in refs)
     finally:
@@ -435,7 +434,7 @@ def test_two_gap_repair_debits_stock_and_is_one_atomic_plan(catalog):
     assert_plan(base, job.solutions[0], session.remaining())
     assert session.snapshot() == before and len(session.history) == history
     call(session, "publish")
-    session.apply_candidate(0, revision=session.revision)
+    session.apply_candidate(0)
     assert len(session.history) == history + 1
     session.undo()
     assert session.snapshot() == before
@@ -493,11 +492,11 @@ def test_close_all_gaps_gives_each_pair_the_jobs_search_effort(catalog, monkeypa
     session = Session(history=[ring], inventory={"curve": 12})
     session.remove_piece(7)
     session.remove_piece(2)
-    job = SearchJob(session, {"all_gaps": True, "max_pieces": 2, "search_effort": 2})
+    job = SearchJob(session, {"all_gaps": True, "max_pieces": 2})
     settle(job)
     job.more(harder=True)
     settle(job)
-    assert efforts[0] == 2 and efforts[-1] == 4 and job.effort == 4
+    assert efforts[0] == 1 and efforts[-1] == 2 and job.effort == 2
     job.close()
 
 
@@ -549,11 +548,11 @@ def test_a_new_search_withdraws_the_suggestions_the_last_one_published(catalog):
     settle(job)
     assert job.response(session, {})["candidates"][0]["revision"] == revision
     with pytest.raises(ValueError, match="stale"):
-        session.apply_candidate(0, revision=revision)
+        session.apply_candidate(0)
     assert not session.state()["candidates"]
     call(session, "publish")
     chosen = job.solutions[0].layout
-    session.apply_candidate(0, revision=session.revision)
+    session.apply_candidate(0)
     assert session.layout == chosen
 
 
@@ -958,14 +957,12 @@ def test_close_all_gaps_explains_a_bridge_end_nothing_left_can_take(catalog, arc
 
 def test_a_refused_close_all_gaps_search_is_released_like_any_other(catalog):
     # Nothing left can join the ramp's top: the joint check refuses at once and no
-    # plan search starts. The refusal is released all the same: discarded,
-    # replaced by a new search, or by an edit, which then commits.
+    # plan search starts. The refusal is released all the same: replaced by a
+    # new search, or by an edit, which then commits.
     layout, _ = Layout().with_piece(catalog["ramp"], Pose.make())
     session = Session(history=[layout],
                       inventory={**layout.piece_counts, "curve": 24, "straight": 8})
     assert call(session, "start", all_gaps=True)["stage"] == "joint check"
-    assert call(session, "discard")["discarded"] and session._interactive_job is None
-    call(session, "start", all_gaps=True)
     replaced = session._interactive_job
     call(session, "start", all_gaps=True)
     job, revision = session._interactive_job, session.revision
@@ -1028,7 +1025,7 @@ def test_no_suggestion_runs_a_piece_under_the_floor(catalog, rise, all_gaps):
         assert len(job.solutions) == int(rise > 0) and session.snapshot() == before
         if job.solutions:
             job.publish(session)
-            session.apply_candidate(0, session.revision)
+            session.apply_candidate(0)
             assert session.layout.is_closed and not session.layout.joint_issues()
             session.undo()
             assert session.snapshot() == before
@@ -1098,7 +1095,8 @@ def test_a_walk_cut_short_is_settled_when_the_other_direction_runs_out(catalog, 
 def test_search_harder_is_not_offered_at_its_ceiling(catalog):
     # The engine alone decides, the 128-piece and effort-16 ceiling included.
     session = Session(history=[half(catalog)], inventory={"curve": 12})
-    job = SearchJob(session, {"max_pieces": 128, "search_effort": 16})
+    job = SearchJob(session, {"max_pieces": 128})
+    job.effort = 16
     try:
         job.status = "limited"
         assert not job.response(session, {})["can_harden"]

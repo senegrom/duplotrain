@@ -66,7 +66,7 @@ def test_placement_limit_cannot_be_crossed_by_editing_or_candidates():
     session._candidate_revision = session.revision
     before = unchanged(session)
     with pytest.raises(ValueError, match="placements must be a list"):
-        session.apply_candidate(0, session.revision)
+        session.apply_candidate(0)
     assert unchanged(session) == before
 
 

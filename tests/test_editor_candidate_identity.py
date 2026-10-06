@@ -66,7 +66,7 @@ def test_editor_keeps_both_asymmetric_closures_and_applies_each(grow, close, can
         # The two outer ends intentionally remain open: this closes the selected gap.
         assert grow not in layout.connectable_ends() and close not in layout.connectable_ends()
         job.publish(session)
-        session.apply_candidate(candidate_index, revision=session.revision)
+        session.apply_candidate(candidate_index)
         assert layout_to_dict(session.layout) == layout_to_dict(layout)
         session.undo()
         assert session.snapshot() == before

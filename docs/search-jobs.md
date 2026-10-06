@@ -150,8 +150,8 @@ change the session under the job or take the engine from its next tick. Request 
 job IDs, revisions and client generations prevent results from an old problem
 from being applied to new content. Jobs expire after 20 minutes without a
 request, checked on the next access, and are released on content changes or
-explicit discard. The 50-result limit and bounded depth do not constitute a
-fixed-byte memory ceiling.
+when another job starts. The 50-result limit and bounded depth do not
+constitute a fixed-byte memory ceiling.
 
 ## Finding and checking train routes
 
@@ -185,11 +185,10 @@ witnesses remain per-run settings, not persistent layout geometry.
 ## Shared API
 
 Interactive completion uses `/api/search/start`, then `tick`, `page`,
-`pause`, `resume`, `continue`, `publish` and `discard`; subsequent requests carry
+`pause`, `resume`, `continue` and `publish`; subsequent requests carry
 the job ID and current revision. Every job reply names the ranking (`sort`) its
-page was built with. `publish` with `page_only: true` returns the state without
-the candidate list (`candidates` is empty; the page is in `search_job`); without
-it every candidate is listed. When the job is gone but its suggestions are still
-published (see Completion controls), `page` answers with `status: "published"`,
-`found`, `page`, `sort` and `candidates`. Train analysis
-uses `/api/routes/start`, `tick`, `pause`, `resume` and `discard`.
+page was built with. `publish` returns the state without the candidate list
+(`candidates` is empty; the page is in `search_job`). When the job is gone but
+its suggestions are still published (see Completion controls), `page` answers
+with `status: "published"`, `found`, `page`, `sort` and `candidates`. Train
+analysis uses `/api/routes/start`, `tick`, `pause` and `resume`.

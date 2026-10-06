@@ -16,7 +16,7 @@ from importlib import resources
 from time import monotonic
 from typing import Any
 
-from .editor import RevisionConflictError, UnknownRouteError
+from .editor import RevisionConflictError
 from .editor import Session as Session
 from .editor import dispatch_session as dispatch_session
 from .validation import MAX_JSON_BYTES, check_json_depth
@@ -247,11 +247,6 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
                 path = self.path.split("?", 1)[0]
                 asset = resources.files("duplotrain").joinpath("static" + path)
                 self._send(200, asset.read_bytes(), content_type)
-            elif self.path in ("/api/state", "/api/export"):
-                # A client slow to read must not hold the session lock.
-                with session.lock:
-                    result = dispatch_session(session, self.path, {})
-                self._json(200, result)
             else:
                 # A GET carrying a body (a mutation attempt) must be drained like
                 # any other rejected request, or the close resets the connection
@@ -271,12 +266,9 @@ def _handler_for(session: Session) -> type[BaseHTTPRequestHandler]:
             except RevisionConflictError as exc:
                 # The comparison above happened under the same lock as edits.
                 # Return current state, but never replay the rejected mutation.
-                # dispatch_session validated the body and its preview format first.
                 with session.lock:
-                    current = session.state(preview_format=body.get("preview_format"))
+                    current = session.state()
                 self._json(409, {"error": str(exc), "code": "stale_revision", "state": current})
-            except UnknownRouteError as exc:
-                self._json(404, {"error": str(exc)})
             except TimeoutError:
                 self._reject(408, "request body timed out")
             except (

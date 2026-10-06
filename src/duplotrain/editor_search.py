@@ -476,7 +476,7 @@ class SearchJob:
         for pid in self.options["exclude"]:
             self.stock[pid] = 0
         self.depth = integer(body.get("max_pieces", 26), 1, 128, "max_pieces")
-        self.effort = integer(body.get("search_effort", 1), 1, 16, "search effort")
+        self.effort = 1  # Search harder raises it
         self.target = integer(body.get("max_results", 8), 1, MAX_RESULTS, "max_results")
         slop, reversing = body.get("slop", 0), body.get("reversing", False)
         if type(slop) not in (int, float) or not math.isfinite(slop) or not 0 <= slop <= 1e9:
@@ -724,11 +724,8 @@ class SearchJob:
         page = integer(body.get("page", 0), 0, 6, "page")
         shown = []
         for index, candidate in self.ordered()[page * 8:(page + 1) * 8]:
-            item = session._candidate_json(index, candidate,
-                                           preview_format=body.get("preview_format"))
-            item["revision"] = self.revision
-            if "base_revision" in item["preview"]:  # a compact preview
-                item["preview"]["base_revision"] = self.revision
+            item = session._candidate_json(index, candidate)
+            item["revision"] = item["preview"]["base_revision"] = self.revision
             shown.append(item)
         return {"job_id": self.id, "revision": self.revision, "status": self.status,
                 "stage": self.stage, "searched": self.nodes, "found": len(self.solutions),
@@ -780,8 +777,7 @@ def published_page(session, body):
     page = integer(body.get("page", 0), 0, 6, "page")
     ranked = _ranked(session.candidates, goal, [], session.layout, session.remaining(),
                      session.catalog)
-    shown = [session._candidate_json(index, candidate,
-                                     preview_format=body.get("preview_format"))
+    shown = [session._candidate_json(index, candidate)
              for index, candidate in ranked[page * 8:(page + 1) * 8]]
     return {"revision": session.revision, "status": "published",
             "found": len(session.candidates), "page": page, "sort": goal,
@@ -827,8 +823,6 @@ def dispatch_search(session, path, body):
         raise ValueError("unknown candidate sort order")
     if type(body.get("harder", False)) is not bool:
         raise ValueError("harder must be a boolean")
-    if type(body.get("page_only", False)) is not bool:
-        raise ValueError("page_only must be a boolean")
     old = session._interactive_job
     if action == "start":
         job = SearchJob(session, body)  # validate before replacing prior search
@@ -854,15 +848,10 @@ def dispatch_search(session, path, body):
             job.more(harder=body.get("harder", False))
         elif action == "publish":
             job.publish(session)
-            # page_only leaves out the full list: the editor shows one page, and the
-            # engine still holds every exact layout. Other clients get every candidate.
-            return {**session.state(preview_format=body.get("preview_format"),
-                                    include_candidates=not body.get("page_only", False)),
+            # The state leaves out the full list: the editor shows the job's page, and
+            # the engine still holds every exact layout.
+            return {**session.state(include_candidates=False),
                     "search_job": job.response(session, body)}
-        elif action == "discard":
-            job.close()
-            session._interactive_job = None
-            return {"discarded": True, "revision": session.revision}
         elif action != "page":
             raise ValueError("unknown search job action")
     return job.response(session, body)

@@ -11,7 +11,7 @@ import pytest
 
 from duplotrain.catalog import default_catalog
 from duplotrain.collision import DEFAULT_CLEARANCE, CollisionField, bounds_of
-from duplotrain.editor import PREVIEW_FORMAT, Session, _drawing_lines, _drawing_size
+from duplotrain.editor import Session, _drawing_lines, _drawing_size
 from duplotrain.editor_tools import check_session
 from duplotrain.geometry import Pose
 from duplotrain.layout import Layout, Placement, build_chain
@@ -166,9 +166,9 @@ def test_size_cache_is_geometry_only_and_state_fields_stay_live():
     layout = build_chain([(cat["straight"], 0, 1)] * 2)
     assert _drawing_size(layout.placements) == layout.size()
     session = Session(history=[layout])
-    original = session.state(preview_format=PREVIEW_FORMAT)
+    original = session.state()
     session.set_inventory({"straight": 81})
-    current = session.state(preview_format=PREVIEW_FORMAT)
+    current = session.state()
     assert original["layout"] == current["layout"]
     assert current["inventory"]["owned"]["straight"] == 81
     assert current["revision"] != original["revision"]
@@ -214,16 +214,14 @@ def test_worker_json_is_compact_but_keeps_strings_and_ascii_escaping(path, body)
     assert raw.isascii()
 
 
-def test_http_json_is_compact_and_the_export_schema_is_unchanged():
+def test_http_json_is_compact():
     with running_server(Session()) as server:
-        for path in ("/api/state", "/api/export", "/missing"):
+        for method, path in (("POST", "/api/state"), ("GET", "/missing")):
             connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=3)
             try:
-                connection.request("GET", path)
+                connection.request(method, path, "{}", {"Content-Type": "application/json"})
                 response = connection.getresponse()
                 raw = response.read().decode()
                 assert raw == json.dumps(json.loads(raw), separators=(",", ":"))
-                if path == "/api/export":
-                    assert json.loads(raw)["format"] == "duplotrain-layout/1"
             finally:
                 connection.close()

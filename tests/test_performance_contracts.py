@@ -182,7 +182,7 @@ def test_state_and_candidate_return_values_cannot_poison_later_responses(monkeyp
     assert session._candidate_json(0, session.candidates[0]) == candidate
     assert calls == [session.layout]  # repeated immutable geometry reuses it
     candidate["size_cm"][0] = -1
-    assert candidate["preview"]["size_cm"][0] != -1
+    assert session._candidate_json(0, session.candidates[0])["size_cm"][0] != -1
 
 
 def test_shared_exact_values_are_immutable_and_still_copyable():

@@ -7,8 +7,6 @@ import sys
 import zipfile
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).parents[1]
 spec = importlib.util.spec_from_file_location("worker_build", ROOT / "webapp/build.py")
 build = importlib.util.module_from_spec(spec)
@@ -37,8 +35,7 @@ def test_worker_zip_is_deterministic_and_excludes_only_desktop_files():
     assert all((src / name).is_file() for name in excluded)
 
 
-@pytest.mark.parametrize("compact", [False, True])
-def test_isolated_worker_zip_runs_all_editor_operations(tmp_path, compact):
+def test_isolated_worker_zip_runs_all_editor_operations(tmp_path):
     archive = tmp_path / "engine.zip"
     archive.write_bytes(build.build_source_zip())
     (tmp_path / "adapter.py").write_bytes((ROOT / "webapp/adapter.py").read_bytes())
@@ -51,8 +48,6 @@ assert "engine.zip" in editor.__file__, editor.__file__
 assert "http.server" not in sys.modules
 assert "webbrowser" not in sys.modules
 def api(path, body):
-    if sys.argv[3] == "compact":
-        body = {**body, "preview_format": "duplotrain-preview/1"}
     result = json.loads(adapter.dispatch(path, json.dumps(body)))
     assert "__error" not in result, result
     return result
@@ -69,13 +64,11 @@ for _ in range(500):
     job = api("/api/search/tick", body)
 assert job["found"] == 1, job
 s = api("/api/search/publish", body)
-assert (s["candidates"][0]["preview"].get("format") == "duplotrain-preview/1") == (
-    sys.argv[3] == "compact"
-)
+assert s["search_job"]["candidates"][0]["preview"]["format"] == "duplotrain-preview/1"
 s = api("/api/apply", {"index": 0, "revision": s["revision"]})
 assert s["layout"]["exactly_closed"]
 snapshot = s["snapshot"]
-exported = api("/api/export", {})
+exported = snapshot["layout"]
 s = api("/api/clear", {"revision": s["revision"]})
 s = api("/api/import", {"data": exported, "revision": s["revision"]})
 assert s["layout"]["exactly_closed"]
@@ -96,7 +89,6 @@ assert routes["complete"] and routes["classification"] is not None, routes
 assert api("/api/check", {"revision": s["revision"]})["connector_closed"]
 assert api("/api/drive", {"revision": s["revision"], "start": [0, 0]})["complete"]
 '''
-    run = subprocess.run([sys.executable, "-I", "-c", code, str(archive), str(tmp_path),
-                          "compact" if compact else "legacy"],
+    run = subprocess.run([sys.executable, "-I", "-c", code, str(archive), str(tmp_path)],
                          cwd=tmp_path, capture_output=True, text=True, timeout=30)
     assert run.returncode == 0, run.stderr

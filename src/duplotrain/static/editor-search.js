@@ -12,7 +12,7 @@ const nextJobTurn = () => document.hidden ? Promise.resolve()
 function visibleCandidates() {
   return interactiveJob?.revision === S?.revision ? interactiveJob.candidates : S?.candidates || [];
 }
-// Publication sends the page shown, not every suggestion (page_only). That page
+// Publication sends the page shown, not every suggestion. That page
 // stays the session's when the job is gone; only a page of the published
 // revision is kept, and its array is shared, never copied.
 function retainPublishedPage() {
@@ -152,7 +152,7 @@ async function publishSearch(sequence) {
   const chosenIndex = (interactiveJob.candidates || []).find(c =>
     `${c.revision}:${c.index}` === selectedCandidate)?.index;
   const next = await api("/api/search/publish", {job_id: interactiveJob.job_id,
-    revision: interactiveJob.revision, page_only: true, ...jobView()}, true);
+    revision: interactiveJob.revision, ...jobView()}, true);
   if (sequence !== jobSequence) return;
   const before = S.revision;
   S = next; interactiveJob = next.search_job;

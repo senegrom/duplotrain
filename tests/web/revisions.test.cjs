@@ -31,7 +31,7 @@ test("every edit captures its viewed revision for HTTP and worker transports", a
     };
     for (const name of paths) await e.run(`api("/api/${name}", {placement: 1})`);
     assert.equal(e.calls.length, paths.length);
-    for (const {options} of e.calls) assert.deepEqual(JSON.parse(options.body), {revision: 7, placement: 1, preview_format: "duplotrain-preview/1"});
+    for (const {options} of e.calls) assert.deepEqual(JSON.parse(options.body), {revision: 7, placement: 1});
     assert.equal(e.classes.size, 0);
   }
 });
@@ -39,14 +39,14 @@ test("every edit captures its viewed revision for HTTP and worker transports", a
 test("candidate revision is not silently replaced by the latest viewed revision", async () => {
   const e = editor();
   await e.run('api("/api/apply", {index: 0, revision: 3})');
-  assert.deepEqual(JSON.parse(e.calls[0].options.body), {revision: 3, index: 0, preview_format: "duplotrain-preview/1"});
+  assert.deepEqual(JSON.parse(e.calls[0].options.body), {revision: 3, index: 0});
 });
 
 test("the read-only state request does not require or inject an edit revision", async () => {
   const e = editor();
-  await e.run('api("/api/state")');
+  await e.run('api("/api/state", {})');
   assert.equal(e.calls[0].options.method, "POST");
-  assert.deepEqual(JSON.parse(e.calls[0].options.body), {preview_format: "duplotrain-preview/1"});
+  assert.deepEqual(JSON.parse(e.calls[0].options.body), {});
 });
 
 for (const transport of ["http", "worker"]) {
@@ -82,9 +82,9 @@ test("every edit also names the engine instance it acted on", async () => {
     fetch: async (url, options) => { calls.push(JSON.parse(options.body)); return {ok: true, json: async () => ({revision: 8})}; },
   }});
   await h.run('api("/api/remove", {placement: 1})');
-  await h.run('api("/api/state")');
-  assert.deepEqual(calls[0], {revision: 7, instance: "a1", placement: 1, preview_format: "duplotrain-preview/1"});
-  assert.deepEqual(calls[1], {preview_format: "duplotrain-preview/1"});
+  await h.run('api("/api/state", {})');
+  assert.deepEqual(calls[0], {revision: 7, instance: "a1", placement: 1});
+  assert.deepEqual(calls[1], {});
 });
 
 function restartedEngine(restore) {
@@ -111,8 +111,7 @@ test("a restarted engine receives this tab's confirmed session instead of emptyi
   e.h.run('pickMode = {stage: "grow"}; selectedCandidate = "5:0";');
   await assert.rejects(e.h.run('api("/api/remove", {placement: 0})'), /session was restored/);
   assert.deepEqual(e.calls.map(c => c.url), ["/api/remove", "/api/restore"]);
-  assert.deepEqual(e.calls[1].body, {data: e.confirmed, revision: 0, instance: "new",
-    preview_format: "duplotrain-preview/1"});
+  assert.deepEqual(e.calls[1].body, {data: e.confirmed, revision: 0, instance: "new"});
   assert.equal(e.h.run("S.instance"), "new");
   assert.deepEqual(e.h.run("S.snapshot"), e.confirmed);
   assert.equal(e.h.run("pickMode"), null);

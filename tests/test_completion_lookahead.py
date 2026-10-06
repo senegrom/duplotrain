@@ -114,7 +114,7 @@ def test_editor_can_apply_a_completion_from_the_improved_search():
     assert len(job.solutions) == 3 and job.complete
     assert job.nodes < 500
     assert session.revision == before_revision + 1
-    session.apply_candidate(0, revision=session.revision)
+    session.apply_candidate(0)
     assert session.layout.is_closed and not session.layout.joint_issues()
     assert session.layout.placements[:len(base)] == base.placements
 

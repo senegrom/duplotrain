@@ -19,6 +19,8 @@ if TYPE_CHECKING:
     from .layout import Layout
 
 PROJECT_FORMAT = "duplotrain-project/1"
+#: One train run's step budget, in Test train and in every route-analysis run.
+TRAIN_STEPS = 10_000
 
 
 def _number(value: object, low: float, high: float, name: str) -> float:
@@ -87,8 +89,7 @@ def check_session(session: Session) -> dict[str, Any]:
         neighbours.setdefault(a[0], set()).add(b[0])
         neighbours.setdefault(b[0], set()).add(a[0])
         if not layout._kinds_mate(a, b):
-            joints.append({"a": list(a), "b": list(b), "gap_mm": 0.0, "height_mm": 0.0,
-                           "heading_error_deg": 0, "problems": ["mismatched bridge joint"]})
+            joints.append({"a": list(a), "b": list(b), "problems": ["mismatched bridge joint"]})
     overlaps = []
     clouds = []
     # Small layouts test every pair. On larger layouts the shared deferred field
@@ -135,8 +136,8 @@ def check_session(session: Session) -> dict[str, Any]:
                 indices = ([i for i, p in enumerate(layout) if p.piece.id == pid]
                            if pid in session.catalog else
                            sorted({entry[0] for entry in layout.accessories if entry[1] == pid}))
-                missing.append({"piece": pid, "name": name, "used": count,
-                                "owned": have, "missing": count - have, "placements": indices})
+                missing.append({"name": name, "used": count, "owned": have,
+                                "missing": count - have, "placements": indices})
     provisional = [i for i, p in enumerate(layout) if p.piece.provisional]
     return {"revision": session.revision, "open_ends": opens, "joint_issues": joints,
             "connector_closed": layout.is_closed and not joints,
@@ -181,7 +182,7 @@ def _initial_switches(layout: Layout, settings: object) -> dict[int, int]:
 
 
 def trace_train(
-    session: Session, start: object, max_steps: object = 10000, *, switch_states: object = None,
+    session: Session, start: object, *, switch_states: object = None,
 ) -> dict[str, Any]:
     """One selected inward start and initial switches, never a universal claim."""
     from .editor import _end
@@ -197,8 +198,6 @@ def trace_train(
     universe = drivable_universe(layout)
     if index not in universe:  # a buffer cannot hold a train
         raise ValueError("choose an inward port of drivable track")
-    if type(max_steps) is not int or not 1 <= max_steps <= 10000:
-        raise ValueError("train trace limit must be 1–10000 steps")
     initial = _initial_switches(layout, switch_states)
     if layout.joint_issues():
         raise ValueError("Test train needs track whose joints fit exactly; Check layout "
@@ -206,10 +205,10 @@ def trace_train(
     common = {"revision": session.revision, "start": list(start),
               "drivable_count": len(universe), "terminal": None}
     try:
-        report = drive(layout, start=start, switch_states=initial, max_steps=max_steps)
+        report = drive(layout, start=start, switch_states=initial, max_steps=TRAIN_STEPS)
     except DriveLimitError:
         # No partial/unvisited coverage or terminal-position claim at the limit.
-        return {**common, "outcome": "limit", "steps": [], "limit": max_steps,
+        return {**common, "outcome": "limit", "steps": [], "limit": TRAIN_STEPS,
                 "complete": False, "visited_drivable": [],
                 "unvisited": None, "cycle_pieces": [], "cycle_start": None, "period": None}
     cycle = (report.steps[report.cycle_start:] if report.cycle_start is not None else ())

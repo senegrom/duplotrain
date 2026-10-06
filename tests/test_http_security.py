@@ -88,7 +88,7 @@ def test_simple_or_missing_content_type_cannot_clear(local_editor, media_type, b
     "localhost.attacker.invalid:{port}", "attacker@127.0.0.1:{port}",
     "127.0.0.1:{port}/", "[::1]:{port}",
 ])
-@pytest.mark.parametrize("method,path", [("GET", "/api/state"), ("POST", "/api/clear")])
+@pytest.mark.parametrize("method,path", [("GET", "/"), ("POST", "/api/clear")])
 def test_dns_rebinding_and_invalid_hosts_are_rejected(local_editor, host, method, path):
     _, port = local_editor
     headers = [("Content-Type", "application/json")]
@@ -187,8 +187,8 @@ def test_cors_preflight_never_grants_access(local_editor):
 
 def test_response_headers_prevent_embedding_and_sniffing(local_editor):
     _, port = local_editor
-    for path in ("/", "/api/state"):
-        status, headers, _ = request(port, method="GET", path=path)
+    for method, path in (("GET", "/"), ("POST", "/api/state")):
+        status, headers, _ = request(port, method=method, path=path)
         assert status == 200
         assert headers["X-Content-Type-Options"] == "nosniff"
         assert headers["X-Frame-Options"] == "DENY"
@@ -246,7 +246,6 @@ def test_a_refused_body_is_drained_before_the_refusal_is_sent(monkeypatch):
 
 @pytest.mark.parametrize("head, body, expected", [
     pytest.param("GET / HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 200, id="page"),
-    pytest.param("GET /api/state HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 200, id="state"),
     # A GET promising a body is a mutation attempt: its refusal is read all the same.
     pytest.param("GET /api/clear HTTP/1.1\r\nContent-Length: 2\r\n", b"{}", 404,
                  id="get-mutation"),
@@ -286,7 +285,7 @@ def test_a_late_body_never_costs_the_client_its_response(local_editor, head, bod
 def test_the_graceful_close_is_bounded_when_the_client_never_closes(local_editor):
     _, port = local_editor
     with socket.create_connection(("127.0.0.1", port), timeout=3) as sock:
-        sock.sendall(f"GET /api/state HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n".encode())
+        sock.sendall(f"GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n".encode())
         response = http.client.HTTPResponse(sock, method="GET")
         response.begin()
         assert response.status == 200 and response.read()

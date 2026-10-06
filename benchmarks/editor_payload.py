@@ -31,15 +31,13 @@ def main():
     job.publish(session)
     print(json.dumps({"base": len(base), "candidates": len(job.solutions),
                       "search_nodes": job.nodes}))
-    for label, preview_format in (("legacy", None), ("compact", PREVIEW_FORMAT)):
-        timings = []
-        for _ in range(args.repeats):
-            started = perf_counter()
-            data = json.dumps(session.state(preview_format=preview_format),
-                              separators=(",", ":")).encode()
-            timings.append(perf_counter() - started)
-        print(json.dumps({"contract": label, "bytes": len(data),
-                          "median_ms": round(1000 * median(timings), 3)}))
+    timings = []
+    for _ in range(args.repeats):
+        started = perf_counter()
+        data = json.dumps(session.state(), separators=(",", ":")).encode()
+        timings.append(perf_counter() - started)
+    print(json.dumps({"contract": PREVIEW_FORMAT, "bytes": len(data),
+                      "median_ms": round(1000 * median(timings), 3)}))
 
 
 if __name__ == "__main__":

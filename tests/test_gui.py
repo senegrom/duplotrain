@@ -21,17 +21,16 @@ def client(base):
 
     def call(path, body=None):
         nonlocal revision
+        if body is None:
+            body = {}
         if isinstance(body, dict):
             body = {"revision": revision, **body}
-        if body is None:
-            req = urllib.request.Request(base + path)
-        else:
-            req = urllib.request.Request(
-                base + path,
-                data=json.dumps(body).encode(),
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
+        req = urllib.request.Request(
+            base + path,
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
         try:
             with urllib.request.urlopen(req) as res:
                 data = json.loads(res.read())
@@ -122,7 +121,7 @@ def test_solve_and_apply_close_the_loop(server):
     status, state = server("/api/search/publish", {"job_id": job["job_id"]})
     assert status == 200
     assert state["search_job"]["found"] >= 1
-    exact = [c for c in state["candidates"] if c["exact"]]
+    exact = [c for c in state["search_job"]["candidates"] if c["exact"]]
     assert exact
     assert exact[0]["added"] == {"curve": 6}
 
@@ -146,9 +145,9 @@ def test_manual_join_when_ends_mate(server):
 
 
 def test_export_round_trips(server):
+    # Export JSON saves the state's exact layout; import reads it back.
     _, state = server("/api/attach", {"piece": "curve", "entry": 0, "at": None})
-    status, exported = server("/api/export")
-    assert status == 200
+    exported = state["snapshot"]["layout"]
     assert exported["format"].startswith("duplotrain-layout/")
     status, state = server("/api/clear", {})
     status, state = server("/api/import", {"data": exported})
@@ -218,7 +217,7 @@ def test_buffer_is_placeable_from_the_palette(server):
         {"piece": "buffer", "entry": variant["entry"], "at": state["open_ends"][-1]},
     )
     assert status == 200
-    assert state["layout"]["placements"][1]["piece"] == "buffer"
+    assert state["snapshot"]["layout"]["placements"][1]["piece"] == "buffer"
 
 
 def test_remove_piece_reindexes(server):
@@ -236,7 +235,8 @@ def test_remove_piece_reindexes(server):
     status, state = server("/api/remove", {"placement": 1})
     assert status == 200
     assert len(state["layout"]["placements"]) == 2
-    assert [p["piece"] for p in state["layout"]["placements"]] == ["straight", "curve"]
+    assert [p["piece"] for p in state["snapshot"]["layout"]["placements"]] == [
+        "straight", "curve"]
     assert [mark["id"] for mark in state["layout"]["placements"][0]["stone_marks"]] == [
         "stone_stop"]
     assert len(state["open_ends"]) == 4  # two loose chains now
@@ -282,7 +282,7 @@ def test_unlimited_sandbox_mode(server):
 @pytest.mark.parametrize("coefficient", ["1e999999999", "1/0"])
 def test_invalid_numeric_import_returns_json_and_preserves_state(server, coefficient):
     _, before = server("/api/attach", {"piece": "straight", "entry": 0, "at": None})
-    _, data = server("/api/export")
+    data = json.loads(json.dumps(before["snapshot"]["layout"]))
     data["placements"][0]["frame"]["x"][0] = coefficient
     status, error = server("/api/import", {"data": data})
     assert status == 409

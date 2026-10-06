@@ -11,7 +11,7 @@ from duplotrain import build_chain, default_catalog
 from duplotrain.bridge_completion import _BRIDGE_ID, _bridge, _expand
 from duplotrain.editor_search import PairSearch, SearchJob, physical_key, search_options
 from duplotrain.geometry import ORIGIN
-from duplotrain.gui import Session, dispatch_session
+from duplotrain.gui import Session
 from duplotrain.layout import layout_from_dict, layout_to_dict
 from duplotrain.solver import Solution, _solution_overlaps
 from tests.editor_support import complete
@@ -68,7 +68,7 @@ def test_editor_finds_a_standard_bridge_without_being_given_the_witness(unlimite
     for candidate in session.candidates:
         assert candidate.signature[0] == "standard_bridge" and len(candidate.layout) == 83
         assert_extension(base, candidate.layout, remaining)
-    session.apply_candidate(0, revision=session.revision)
+    session.apply_candidate(0)
     assert_extension(base, session.layout, remaining)
     session.undo()
     assert session.layout == base
@@ -163,29 +163,19 @@ def test_macro_stage_counts_real_pieces_and_stock_and_reaudits(monkeypatch):
         pool.close()
 
 
-@pytest.mark.parametrize("bad", [True, False, 0, 17, -1, 1.5, "2", None])
-def test_invalid_search_effort_does_not_mutate_the_session(bad):
-    session = Session()
-    before = session.snapshot(), session.revision
-    with pytest.raises(ValueError, match="search effort"):
-        dispatch_session(session, "/api/search/start", {"revision": 0, "search_effort": bad})
-    assert (session.snapshot(), session.revision) == before
-    assert session._interactive_job is None
-
-
-def test_search_effort_scales_all_three_stages():
+def test_search_harder_scales_all_three_stages():
     catalog = default_catalog()
     base = build_chain([(catalog["straight"], 0, 1)])
-    for effort in (1, 2, 16):
-        session = Session(history=[base], unlimited=True)
-        job = SearchJob(session, {"search_effort": effort})
-        try:
+    job = SearchJob(Session(history=[base], unlimited=True), {})
+    try:
+        for effort in (1, 2, 4, 8, 16):
             assert {c.stage: c.cap for c in job.pool.cursors} == {
                 "plain track": 25_000 * effort, "standard bridge": 250_000 * effort,
                 "full inventory": 60_000 * effort}
             assert job.effort == effort
-        finally:
-            job.close()
+            job.more(harder=True)
+    finally:
+        job.close()
 
 
 def test_a_rejected_bridge_expansion_does_not_stop_the_stage(monkeypatch):

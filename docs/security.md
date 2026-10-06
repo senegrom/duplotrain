@@ -68,7 +68,7 @@ Every mutating API route (including the search jobs and restore) requires an
 integer `revision` copied from the state the client actually displayed. The HTTP
 server checks it under the same session lock as the mutation. Missing, malformed or
 stale revisions receive HTTP 409 with `code: "stale_revision"` and the current
-`state`, without changing the session. Read-only state/export requests do not
+`state`, without changing the session. The read-only state request does not
 require a revision. Non-browser JSON clients must follow this contract too.
 
 Revisions restart at 0 in every engine process or worker, so the state also

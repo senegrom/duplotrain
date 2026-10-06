@@ -15,6 +15,7 @@ from .drive import (
     drive,
 )
 from .editor_search import integer, job_action
+from .editor_tools import TRAIN_STEPS
 
 
 class RouteJob:
@@ -42,7 +43,6 @@ class RouteJob:
         if self.goal not in ("visited", "cycle"):
             raise ValueError("route goal must be visited or cycle")
         self.max_runs = integer(body.get("max_runs", 20000), 1, 100000, "max_runs")
-        self.max_steps = integer(body.get("max_steps", 10000), 1, 10000, "max_steps")
         self.drive_context = _prepare_drive(self.layout)
         self.required = len(self.starts) * math.prod(
             len(o) for _, o in self.drive_context.choices)
@@ -75,10 +75,10 @@ class RouteJob:
             self.runs += 1
             try:
                 report = drive(self.layout, start=start, switch_states=settings,
-                               max_steps=self.max_steps, _context=self.drive_context)
+                               max_steps=TRAIN_STEPS, _context=self.drive_context)
             except DriveLimitError:
                 self.limited_runs += 1
-                self.steps += self.max_steps
+                self.steps += TRAIN_STEPS
                 if time.perf_counter() >= deadline:
                     return
                 continue
@@ -89,7 +89,7 @@ class RouteJob:
             score = ((cycle, visited) if self.goal == "cycle" else (visited, cycle))
             score += (report.outcome == "endless", -len(report.steps))
             witness = {"start": list(start), "switch_states": dict(settings),
-                       "visited": visited, "cycle_visited": cycle, "outcome": report.outcome}
+                       "visited": visited, "cycle_visited": cycle}
             if self.best is None or score > self.best_score:
                 self.best, self.best_score = witness, score
             if report.outcome == "endless":
@@ -110,8 +110,7 @@ class RouteJob:
         # Universal booleans appear only after EVERY requested run returned a verdict.
         classification = None
         if self.complete:
-            classification = {"locally_looping": self.locally,
-                              "looping": self.locally and self.looping,
+            classification = {"looping": self.locally and self.looping,
                               "completely_looping": self.locally and self.completely,
                               "perfectly_looping": self.locally and self.perfectly}
         return {"job_id": self.id, "revision": self.revision, "status": self.status,
@@ -144,11 +143,6 @@ def dispatch_routes(session, path, body):
         if (not isinstance(job, RouteJob) or body.get("job_id") != job.id
                 or session.revision != job.revision):
             raise ValueError("This train analysis is no longer active")
-        if job_action(session, job, action, "Train analysis expired; start again"):
-            pass  # tick, pause or resume
-        elif action == "discard":
-            job.close()
-            session._interactive_job = None
-        else:
+        if not job_action(session, job, action, "Train analysis expired; start again"):
             raise ValueError("unknown train analysis action")
     return job.response()

@@ -63,7 +63,8 @@ def test_two_tabs_cannot_delete_a_reindexed_piece(local_session):
     assert status == 409
     assert result["code"] == "stale_revision"
     assert result["state"]["revision"] == session.revision
-    assert [p["piece"] for p in result["state"]["layout"]["placements"]] == ["curve", "switch"]
+    pieces = result["state"]["snapshot"]["layout"]["placements"]
+    assert [p["piece"] for p in pieces] == ["curve", "switch"]
     assert unchanged(session) == before
     # Only a fresh, explicit action can now remove the curve at its new index.
     assert post(server, "/api/remove", {"placement": 0, "revision": session.revision})[0] == 200
@@ -147,8 +148,8 @@ def test_repeated_search_invalidates_the_previous_candidate_indices():
     complete(session, max_results=1)
     assert session.revision > old_revision
     before = unchanged(session)
-    with pytest.raises(ValueError, match="stale"):
-        session.apply_candidate(0, old_revision)
+    with pytest.raises(RevisionConflictError):
+        dispatch_session(session, "/api/apply", {"index": 0, "revision": old_revision})
     assert unchanged(session) == before
 
 
@@ -165,7 +166,7 @@ def test_inventory_changes_invalidate_candidates(change):
     assert not session.candidates
     assert session.revision > revision
     with pytest.raises(ValueError, match="stale"):
-        session.apply_candidate(0, revision)
+        session.apply_candidate(0)
 
 
 def test_old_candidate_revision_cannot_select_a_new_candidate():
@@ -173,8 +174,8 @@ def test_old_candidate_revision_cannot_select_a_new_candidate():
     old_revision = session.revision
     session.set_inventory({"curve": 13})
     complete(session, max_results=3)
-    with pytest.raises(ValueError, match="stale"):
-        session.apply_candidate(0, old_revision)
+    with pytest.raises(RevisionConflictError):
+        dispatch_session(session, "/api/apply", {"index": 0, "revision": old_revision})
 
 
 def test_candidate_application_rechecks_inventory_even_without_setter():

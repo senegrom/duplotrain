@@ -15,7 +15,7 @@ from time import perf_counter
 
 from duplotrain import build_chain, default_catalog
 from duplotrain.collision import CollisionField
-from duplotrain.editor import PREVIEW_FORMAT, Session
+from duplotrain.editor import Session
 from duplotrain.editor_search import SearchJob
 from duplotrain.editor_tools import check_session
 from duplotrain.geometry import Pose
@@ -78,7 +78,7 @@ def main():
     for name, session in sessions:
         report, check_ms = timed(lambda session=session: check_session(session), args.repeats)
         body, state_ms = timed(
-            lambda session=session: encoded(session.state(preview_format=PREVIEW_FORMAT)),
+            lambda session=session: encoded(session.state()),
             args.repeats,
         )
         pair_checks, original = 0, CollisionField.near

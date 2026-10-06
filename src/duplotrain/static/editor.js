@@ -26,9 +26,6 @@ async function api(path, body, fromJob = false) {
   apiBusy = true;
   refreshBusy();
   try {
-    // Legacy API clients still receive full previews. This editor opts into the
-    // versioned drawing-only contract; state reads use the existing read-only POST.
-    body = {...body, preview_format: "duplotrain-preview/1"};
     if (path !== "/api/state") {
       // Capture the state and engine the user acted on; never fill in a newer
       // revision after an await. Preserve an explicit candidate revision as well.
@@ -56,7 +53,7 @@ async function adoptConflictState(error) {
     const newer = newerCheckpoint();
     try {
       S = await send("/api/restore", {data: newer?.snapshot || S.snapshot, revision: 0,
-                                      instance: current.instance, preview_format: "duplotrain-preview/1"});
+                                      instance: current.instance});
       // This tab now continues the session another tab saved: its save is this
       // tab's baseline, not a competing writer that should pause autosave.
       if (newer) { savedCheckpoint = newer.raw; lastSavedSnapshot = JSON.stringify(newer.snapshot); }
@@ -861,7 +858,7 @@ function redraw() {
 }
 
 async function refresh() {
-  S = await api("/api/state");
+  S = await api("/api/state", {});
   if (!recoveryAttempted) {
     recoveryAttempted = true;
     await initializeRecovery();

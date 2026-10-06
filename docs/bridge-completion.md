@@ -25,13 +25,12 @@ link graph. Action stones and all existing placements and links are retained, so
 base with a deliberate forced fit keeps its candidates. No macro appears in saved
 layouts.
 
-`search_effort` is an integer API parameter from 1 to 16, defaulting to 1. It scales
-the plain, bridge and full-inventory budgets of 25,000, 250,000 and 60,000 nodes. If
-curves and straights are already all the box a walk can place (a buffer, an
-off-ramp or a ramp with no arch joins no walk), only the full-inventory search runs.
-A job's `searched` count accumulates across stages instead of restarting, and
-**Search harder** resumes the same job with larger budgets
-([search-jobs.md](search-jobs.md)).
+A search starts with plain, bridge and full-inventory budgets of 25,000, 250,000
+and 60,000 nodes. If curves and straights are already all the box a walk can place
+(a buffer, an off-ramp or a ramp with no arch joins no walk), only the
+full-inventory search runs. A job's `searched` count accumulates across stages
+instead of restarting, and **Search harder** resumes the same job with larger
+budgets ([search-jobs.md](search-jobs.md)).
 
 ## Regression case
 

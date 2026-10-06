@@ -70,5 +70,5 @@ def test_diagnostics_reports_stone_shortages_even_in_sandbox():
     s.toggle_stone(0, "stone_stop")
     report = check_session(s)
     assert report["sandbox"]
-    assert report["missing"][0]["piece"] == "stone_stop"
+    assert report["missing"][0]["name"] == "Stop stone"
     assert report["missing"][0]["missing"] == 1

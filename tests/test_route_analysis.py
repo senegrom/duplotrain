@@ -43,8 +43,7 @@ def test_actual_bridge_best_route_and_exhaustive_model_coverage(completed, scope
         assert result["best"]["visited"] == 57
         assert result["best"]["cycle_visited"] == 26
         assert result["classification"] == {
-            "locally_looping": True, "looping": True,
-            "completely_looping": False, "perfectly_looping": False,
+            "looping": True, "completely_looping": False, "perfectly_looping": False,
         }
         best = result["best"]
         replay = drive(completed, start=tuple(best["start"]), switch_states=best["switch_states"])
@@ -76,8 +75,11 @@ def test_run_cap_is_partial_never_universal(completed):
     job.close()
 
 
-def test_step_limited_runs_produce_no_terminal_or_coverage_claim(completed):
-    job = RouteJob(Session(history=[completed]), {"max_runs": 2, "max_steps": 1})
+def test_step_limited_runs_produce_no_terminal_or_coverage_claim(completed, monkeypatch):
+    import duplotrain.editor_routes as routes
+
+    monkeypatch.setattr(routes, "TRAIN_STEPS", 1)
+    job = RouteJob(Session(history=[completed]), {"max_runs": 2})
     result = finished(job)
     assert result["step_limited_runs"] == 2
     assert result["best"] is None and result["counterexample"] is None
@@ -95,7 +97,7 @@ def test_runs_share_one_ten_million_step_allowance(completed, monkeypatch):
         raise DriveLimitError(f"{kwargs['max_steps']} steps without a verdict")
 
     monkeypatch.setattr(routes, "drive", limited)
-    job = RouteJob(Session(history=[completed]), {"max_runs": 100000, "max_steps": 10000})
+    job = RouteJob(Session(history=[completed]), {"max_runs": 100000})
     result = finished(job)
     assert result["required_runs"] == "11008" and job.max_runs == 100000
     assert result["runs"] == result["step_limited_runs"] == 1000
@@ -113,7 +115,7 @@ def test_an_open_end_produces_a_loadable_counterexample():
     assert result["complete"] and not result["classification"]["looping"]
     witness = result["counterexample"]
     assert drive(layout, start=tuple(witness["start"]),
-                 switch_states=witness["switch_states"]).outcome == witness["outcome"]
+                 switch_states=witness["switch_states"]).outcome != "endless"
     job.close()
 
 
@@ -130,9 +132,9 @@ def test_the_counterexample_breaks_the_weakest_property_that_fails():
     result = finished(job)
     assert not result["classification"]["looping"]
     witness = result["counterexample"]
-    assert witness["outcome"] != "endless"
-    assert (tuple(witness["start"]), witness["switch_states"],
-            witness["outcome"]) == classify(layout).counterexample
+    start, settings, outcome = classify(layout).counterexample
+    assert (tuple(witness["start"]), witness["switch_states"]) == (start, settings)
+    assert outcome != "endless"
     job.close()
 
 
@@ -156,8 +158,7 @@ def test_a_route_job_prepares_its_switch_choices_once_and_releases_them(monkeypa
 
 @pytest.mark.parametrize("bad", [{"max_runs": 0}, {"max_runs": 100001}, {"max_runs": True},
     {"scope": "whatever"}, {"scope": "selected", "start": [10000, 0]},
-    {"scope": "selected", "start": [0, 99]}, {"goal": "all guaranteed"},
-    {"max_steps": 10001}, {"max_steps": 1.5}])
+    {"scope": "selected", "start": [0, 99]}, {"goal": "all guaranteed"}])
 def test_invalid_analysis_cannot_replace_existing_search(completed, bad):
     s = Session(history=[completed])
     body = {"revision": s.revision}
@@ -196,7 +197,7 @@ def test_idle_route_analysis_expires_and_releases_iterator(completed):
     assert s._interactive_job is None and job.status == "discarded"
 
 
-def test_route_job_does_not_leak_after_discard_without_cyclic_gc(completed):
+def test_a_released_route_job_does_not_leak_without_cyclic_gc(completed):
     enabled = gc.isenabled()
     gc.disable()
     try:
@@ -205,7 +206,7 @@ def test_route_job_does_not_leak_after_discard_without_cyclic_gc(completed):
         ref = weakref.ref(s._interactive_job)
         body = {"revision": s.revision, "job_id": response["job_id"]}
         dispatch_session(s, "/api/routes/tick", body)
-        dispatch_session(s, "/api/routes/discard", body)
+        s.set_unlimited(True)  # an edit releases the job
         assert ref() is None
     finally:
         if enabled:

@@ -116,9 +116,7 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
         loading(300000);
       });
       if (snapshot) {
-        const state = await window.duplotrainApi("/api/restore", {
-          data: snapshot, revision: 0, preview_format: "duplotrain-preview/1",
-        });
+        const state = await window.duplotrainApi("/api/restore", {data: snapshot, revision: 0});
         await options.restored(state);
       } else await options.refresh();
       // The editor tolerates a failed startup restore; a worker that died during

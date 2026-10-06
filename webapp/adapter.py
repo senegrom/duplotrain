@@ -19,9 +19,7 @@ def dispatch(path: str, body_json: str | None) -> str:
         result = dispatch_session(session, path, body)
         return json.dumps(result, separators=(",", ":"))
     except RevisionConflictError as exc:
-        # dispatch_session validated the body and its preview format first.
-        state = session.state(preview_format=body.get("preview_format"))
-        return json.dumps({"__error": str(exc), "code": "stale_revision", "state": state},
-                          separators=(",", ":"))
+        return json.dumps({"__error": str(exc), "code": "stale_revision",
+                           "state": session.state()}, separators=(",", ":"))
     except (ValueError, KeyError, TypeError, IndexError, OverflowError, RecursionError) as exc:
         return json.dumps({"__error": str(exc)}, separators=(",", ":"))

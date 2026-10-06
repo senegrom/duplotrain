@@ -618,10 +618,10 @@ test("a search's reason is shown beside the alternatives it did find", () => {
 
 // An engine with sixteen suggestions behind the editor's own api(), answering as
 // the real one does: every page names its ranking ("pieces" reverses discovery
-// order), publication honours page_only, and once the search is gone (a train
-// analysis replaced it, or a tick failed) a page request is answered from what
-// the search published. `hold` keeps one route's answer back until release(), which
-// answers it, or refuses it with `refuse`.
+// order), publication leaves the full list out of the state, and once the search
+// is gone (a train analysis replaced it, or a tick failed) a page request is
+// answered from what the search published. `hold` keeps one route's answer back
+// until release(), which answers it, or refuses it with `refuse`.
 function engine(hold = null, {failTick = false, refuse = false} = {}) {
   const calls = [];
   let gone = false, held = null, published = false;
@@ -642,7 +642,7 @@ function engine(hold = null, {failTick = false, refuse = false} = {}) {
     if (path === "/api/search/publish") {
       published = true;
       return {...h.context.S, revision: 8,
-        candidates: body.page_only ? [] : order("discovery").map(i => candidate(i, 8)),
+        candidates: [],
         search_job: job({revision: 8, status: "results_ready", ...page(body, 8)})};
     }
     if (path === "/api/search/page") return gone ? {revision: 8, status: "published", ...page(body, 8)} :
@@ -658,7 +658,7 @@ function engine(hold = null, {failTick = false, refuse = false} = {}) {
     throw new Error("Unexpected API: " + path);
   };
   h.context.window.duplotrainApi = (path, body) => {
-    calls.push([path.replace("/api/", ""), body.page, body.sort, body.page_only, body.index, body.revision]);
+    calls.push([path.replace("/api/", ""), body.page, body.sort, body.index, body.revision]);
     // A held request is answered, or refused, when the test releases it.
     if (path === hold) return new Promise((resolve, reject) => {
       held = () => refuse ? reject(Object.assign(new Error("refused"), {refused: true}))
@@ -673,7 +673,7 @@ const shown = h => h.run("visibleCandidates().map(c => c.index).join()");
 test("publication asks for one page and keeps it as the session's suggestions", async () => {
   const {h, calls} = engine();
   await h.run("startInteractiveSearch(null, null)");
-  assert.deepEqual(calls.find(c => c[0] === "search/publish").slice(0, 4), ["search/publish", 0, "discovery", true]);
+  assert.deepEqual(calls.find(c => c[0] === "search/publish").slice(0, 3), ["search/publish", 0, "discovery"]);
   assert.equal(h.context.S.candidates.length, 8);  // the reply had none: the page is kept instead
   assert.equal(h.run("S.candidates === interactiveJob.candidates && S.search_job === interactiveJob"), true);
   await h.run("searchPageTo(1)");
@@ -714,7 +714,7 @@ for (const [name, end] of [["a train analysis replaced the search", 'startRouteA
     assert.equal(shown(h), "15,14,13,12,11,10,9,8");
     // The stable index applies, at the published revision.
     const row = h.run("candidateRows[2]"); await row.show.click(); await row.apply.click();
-    assert.deepEqual(calls.at(-1).slice(0, 1).concat(calls.at(-1).slice(4)), ["apply", 13, 8]);
+    assert.deepEqual(calls.at(-1).slice(0, 1).concat(calls.at(-1).slice(3)), ["apply", 13, 8]);
   });
 }
 

@@ -7,7 +7,7 @@ import pytest
 import duplotrain.editor_search as editor_search
 from benchmarks.completion import cases
 from duplotrain.catalog import default_catalog
-from duplotrain.editor import PREVIEW_FORMAT, Session, dispatch_session
+from duplotrain.editor import Session, dispatch_session
 from duplotrain.editor_search import PairSearch, SearchJob, search_options
 from duplotrain.layout import build_chain, layout_from_dict
 from duplotrain.solver import _solution_overlaps
@@ -216,15 +216,16 @@ def test_interactive_quota_preserves_first_stage_and_publishes_job_counters(slop
             assert len(issues) == (2 if slop else 0)
             assert sum(j["gap_mm"] for j in issues) == pytest.approx(2 * slop)
         published = dispatch_session(session, "/api/search/publish", {
-            "revision": session.revision, "job_id": job.id, "preview_format": PREVIEW_FORMAT,
+            "revision": session.revision, "job_id": job.id,
         })
         # Plain track (75 nodes), then the ordinary bridge stage, which reversing
         # does not skip (102), then the full inventory (20).
         assert published["search_job"]["searched"] == job.nodes == 197
-        assert published["search_job"]["found"] == len(published["candidates"]) == 8
+        candidates = session.state()["candidates"]
+        assert published["search_job"]["found"] == len(candidates) == 8
         assert published["snapshot"] == before
         assert len(session.history) == 1
-        assert all(c["revision"] == published["revision"] for c in published["candidates"])
+        assert all(c["revision"] == published["revision"] for c in candidates)
     finally:
         job.close()
 

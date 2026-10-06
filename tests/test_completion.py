@@ -230,7 +230,7 @@ def test_editor_can_apply_a_completion_without_new_inventory():
     session = Session(catalog=catalog, history=[base], inventory={})
     job = complete(session, grow, close, max_results=10)
     assert len(job.solutions) == 1 and job.complete
-    session.apply_candidate(0, revision=session.revision)
+    session.apply_candidate(0)
     assert session.layout.placements == base.placements
     assert session.layout.links[(1, 1)] == (0, 0)
     assert session.layout.links[(0, 1)] == (2, 0)

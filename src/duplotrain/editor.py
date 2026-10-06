@@ -52,7 +52,7 @@ DEFAULT_STONES = {sid: 1 for sid in ACCESSORIES}
 #: enough to never run out in practice, small enough to keep every sum finite.
 UNLIMITED_COUNT = 999
 
-# An opt-in presentation contract; saved layouts and full previews do not change.
+# Every candidate preview's drawing-only contract; saved layouts do not change.
 PREVIEW_FORMAT = "duplotrain-preview/1"
 
 
@@ -349,20 +349,14 @@ class Session:
             "lines": [[list(point) for point in line] for line in _drawing_lines(placement)],
         }
 
-    def _layout_json(
-        self, layout: Layout, port_poses: Mapping[End, Pose] | None = None
-    ) -> dict[str, Any]:
+    def _layout_json(self, layout: Layout, port_poses: Mapping[End, Pose]) -> dict[str, Any]:
         placements = []
         for index, placement in enumerate(layout):
             drawing = self._drawing_json(placement)
             lines = drawing["lines"]
             ports = []
             for port in range(len(placement.piece.ports)):
-                pose = (
-                    placement.port_pose(port)
-                    if port_poses is None
-                    else port_poses[(index, port)]
-                )
+                pose = port_poses[(index, port)]
                 x, y = pose.xy()
                 kind = placement.piece.ports[port].kind
                 ports.append(
@@ -381,7 +375,6 @@ class Session:
             mid = main_line[len(main_line) // 2]
             placements.append(
                 {
-                    "piece": placement.piece.id,
                     "name": placement.piece.name,
                     **drawing,
                     "ports": ports,
@@ -448,16 +441,12 @@ class Session:
             out[pid] = _count(count)
         return out
 
-    def state(
-        self, *, preview_format: str | None = None, include_candidates: bool = True,
-    ) -> dict[str, Any]:
-        """Return fresh state; compact previews are explicitly negotiated by clients.
+    def state(self, *, include_candidates: bool = True) -> dict[str, Any]:
+        """Return fresh state, every candidate with a compact preview.
 
-        Without *include_candidates* the suggestions are left out, as a page_only
-        publication leaves them: the session still holds every exact layout.
+        Without *include_candidates* the suggestions are left out, as a publication
+        leaves them: the session still holds every exact layout.
         """
-        if preview_format is not None and preview_format != PREVIEW_FORMAT:
-            raise ValueError("unsupported preview format")
         layout = self.layout
         port_poses = {
             (index, port): placement.port_pose(port)
@@ -543,30 +532,24 @@ class Session:
             "instance": self.instance,
             "snapshot": self.snapshot(),
             "candidates": [
-                self._candidate_json(i, s, preview_format=preview_format)
+                self._candidate_json(i, s)
                 for i, s in enumerate(self.candidates if include_candidates else ())
             ],
         }
 
-    def _candidate_json(
-        self, index: int, sol: Solution, *, preview_format: str | None = None
-    ) -> dict[str, Any]:
-        if preview_format == PREVIEW_FORMAT:
-            base = self.layout.placements
-            # Only share an identical geometry prefix. A future solver that moves
-            # existing track falls back to drawing the whole candidate, not a lie.
-            shared = len(base) if sol.layout.placements[:len(base)] == base else 0
-            preview = {
-                "format": PREVIEW_FORMAT,
-                "base_revision": self._candidate_revision,
-                "base_count": shared,
-                "placements": [self._drawing_json(p) for p in sol.layout.placements[shared:]],
-            }
-            width, height = _drawing_size(sol.layout.placements)
-            size_cm = [round(width / 10, 1), round(height / 10, 1)]
-        else:
-            preview = self._layout_json(sol.layout)
-            size_cm = list(preview["size_cm"])
+    def _candidate_json(self, index: int, sol: Solution) -> dict[str, Any]:
+        base = self.layout.placements
+        # Only share an identical geometry prefix. A future solver that moves
+        # existing track falls back to drawing the whole candidate, not a lie.
+        shared = len(base) if sol.layout.placements[:len(base)] == base else 0
+        preview = {
+            "format": PREVIEW_FORMAT,
+            "base_revision": self._candidate_revision,
+            "base_count": shared,
+            "placements": [self._drawing_json(p) for p in sol.layout.placements[shared:]],
+        }
+        width, height = _drawing_size(sol.layout.placements)
+        size_cm = [round(width / 10, 1), round(height / 10, 1)]
         added: dict[str, int] = dict(sol.layout.piece_counts)
         for pid, n in self.layout.piece_counts.items():
             added[pid] = added.get(pid, 0) - n
@@ -943,10 +926,8 @@ class Session:
                 return f"impossible: no piece left can join that end ({_BRIDGE_JOINT})"
         return None
 
-    def apply_candidate(self, index: int, revision: int | None = None) -> None:
-        if self._candidate_revision != self.revision or (
-            revision is not None and revision != self.revision
-        ):
+    def apply_candidate(self, index: int) -> None:
+        if self._candidate_revision != self.revision:
             raise ValueError("candidate is stale (solve again)")
         index = _index(index, "index")
         if not 0 <= index < len(self.candidates):
@@ -964,10 +945,6 @@ class Session:
 # --------------------------------------------------------------------------------------
 
 
-class UnknownRouteError(ValueError):
-    """The editor API does not expose this route."""
-
-
 class RevisionConflictError(ValueError):
     """The client is attempting to edit a state it has not seen."""
 
@@ -978,8 +955,8 @@ MUTATING_ROUTES = frozenset({
     "/api/apply", "/api/import", "/api/restore", "/api/redo",
     "/api/project/open",
     *("/api/search/" + action for action in (
-        "start", "tick", "page", "continue", "pause", "resume", "publish", "discard")),
-    *("/api/routes/" + action for action in ("start", "tick", "pause", "resume", "discard")),
+        "start", "tick", "page", "continue", "pause", "resume", "publish")),
+    *("/api/routes/" + action for action in ("start", "tick", "pause", "resume")),
 })
 
 
@@ -987,15 +964,10 @@ def dispatch_session(session: Session, path: str, body: object) -> dict[str, Any
     """Shared HTTP/Pyodide API. Call with the session lock on threaded hosts."""
     if not isinstance(body, dict):
         raise ValueError("request body must be a JSON object")
-    preview_format = body.get("preview_format")
-    if preview_format is not None and preview_format != PREVIEW_FORMAT:
-        raise ValueError("unsupported preview format")
     if path == "/api/state":
-        return session.state(preview_format=preview_format)
-    if path == "/api/export":
-        return layout_to_dict(session.layout)
+        return session.state()
     if path not in MUTATING_ROUTES and path not in ("/api/check", "/api/drive"):
-        raise UnknownRouteError(f"no route {path}")
+        raise ValueError(f"no route {path}")
     revision = body.get("revision")
     # The editor also names the engine instance it saw; older API clients may omit it.
     if (type(revision) is not int or revision != session.revision
@@ -1036,7 +1008,7 @@ def dispatch_session(session: Session, path: str, body: object) -> dict[str, Any
             body.get("at_port"), remove_only=body.get("remove", False),
         )
     elif path == "/api/apply":
-        session.apply_candidate(body["index"], body.get("revision"))
+        session.apply_candidate(body["index"])
     elif path == "/api/import":
         session._push(layout_from_dict(body.get("data"), session.catalog), "import layout")
     elif path == "/api/restore":
@@ -1046,7 +1018,7 @@ def dispatch_session(session: Session, path: str, body: object) -> dict[str, Any
 
         project = validate_project(body.get("data"), session.catalog)
         session.restore(project["session"])
-        return {**session.state(preview_format=preview_format),
+        return {**session.state(),
                 "project": {"name": project["name"], "preferences": project["preferences"]}}
     elif path == "/api/check":
         from .editor_tools import check_session
@@ -1055,8 +1027,7 @@ def dispatch_session(session: Session, path: str, body: object) -> dict[str, Any
     elif path == "/api/drive":
         from .editor_tools import trace_train
 
-        return trace_train(session, body.get("start"), body.get("max_steps", 10000),
-                           switch_states=body.get("switch_states"))
+        return trace_train(session, body.get("start"), switch_states=body.get("switch_states"))
     else:
-        raise UnknownRouteError(f"no route {path}")
-    return session.state(preview_format=preview_format)
+        raise ValueError(f"no route {path}")
+    return session.state()

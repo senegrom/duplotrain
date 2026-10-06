@@ -601,12 +601,13 @@ def test_stale_tab_refreshes_without_replaying_a_delete(editor):
         other.evaluate("async () => { S = await api('/api/remove', {placement: 0}); redraw(); }")
         # This tab still displays the curve at index 1. Its old index must not
         # remove the switch now occupying index 1 on the shared server.
-        assert page.evaluate("S.layout.placements[1].piece") == "curve"
+        assert page.evaluate("S.snapshot.layout.placements[1].piece") == "curve"
         page.locator("#delete-tool").tap()
         tap_world(page, *page.evaluate("S.layout.placements[1].mid"))
         wait_count(page, 2)
         assert [p.piece.id for p in session.layout] == ["curve", "switch"]
-        assert page.evaluate("S.layout.placements.map(p => p.piece)") == ["curve", "switch"]
+        assert page.evaluate("S.snapshot.layout.placements.map(p => p.piece)") == [
+            "curve", "switch"]
         assert page.evaluate("S.revision") == session.revision
         assert page.evaluate("deleting") is False
         assert "not applied" in page.locator("#status").inner_text()
@@ -674,7 +675,7 @@ def test_delayed_import_cannot_overwrite_newer_work(editor, intervening):
         place_straight(page)
     page.evaluate("window.importReads[0]()")
     page.wait_for_function("!apiBusy")
-    assert page.evaluate("S.layout.placements.map(p => p.piece)") == ["straight"]
+    assert page.evaluate("S.snapshot.layout.placements.map(p => p.piece)") == ["straight"]
     assert [p.piece.id for p in session.layout] == ["straight"]
     if intervening == "edit":
         assert "not applied" in page.locator("#status").inner_text()
@@ -961,7 +962,7 @@ def test_endpoint_selection_clears_after_import_and_keyboard_attach(editor):
         "name": "replacement.json", "mimeType": "application/json",
         "buffer": json.dumps(layout_to_dict(curve)).encode(),
     })
-    page.wait_for_function("S.layout.placements[0].piece === 'curve' && !apiBusy")
+    page.wait_for_function("S.snapshot.layout.placements[0].piece === 'curve' && !apiBusy")
     assert page.evaluate("pickMode") is None
     panel = page.locator("details").filter(has=page.locator("#end-select"))
     panel.locator(":scope > summary").tap()
