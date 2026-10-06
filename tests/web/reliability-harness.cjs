@@ -26,13 +26,12 @@ function harness({state = scene(), events = false, schedule = false, overrides =
   class Element {
     constructor(tag = "div") {
       created++;
-      this.tag = tag; this.tagName = tag; this.children = []; this.listeners = {}; this.registered = {};
+      this.tag = tag; this.children = []; this.listeners = {}; this.registered = {};
       this.dataset = {}; this.style = {};
       this.attributes = {}; this._value = ""; this.textContent = ""; this.disabled = false; this.hidden = false;
       this.checked = false;
       const classes = this.classes = new Set();
       this.classList = {
-        add: name => classes.add(name), remove: name => classes.delete(name),
         toggle(name, on) { if (on ?? !classes.has(name)) classes.add(name); else classes.delete(name); },
         contains: name => classes.has(name),
       };
@@ -50,7 +49,6 @@ function harness({state = scene(), events = false, schedule = false, overrides =
     fire(event, data = {target: this}) { return this.listeners[event]?.(data); }
     click() { if (!this.disabled) return this.fire("click"); }
     focus() { context.document.activeElement = this; }
-    closest() { return null; }
     getBoundingClientRect() { return {left: 0, top: 0}; }
   }
   const el = id => {
@@ -84,4 +82,15 @@ function harness({state = scene(), events = false, schedule = false, overrides =
     created: () => created};
 }
 
-module.exports = {harness, scene, track};
+// Paint on a canvas that notes each call, with the fill and stroke colours in force.
+function paintCalls(h) {
+  const calls = [], recorder = {};
+  for (const name of ["setTransform", "clearRect", "beginPath", "moveTo", "lineTo", "closePath",
+                      "fill", "stroke", "arc", "fillText"])
+    recorder[name] = (...args) => calls.push([name, recorder.fillStyle, recorder.strokeStyle, ...args]);
+  h.context.recorder = recorder;
+  h.run("ctx = recorder; paint()");
+  return calls;
+}
+
+module.exports = {harness, scene, track, paintCalls};

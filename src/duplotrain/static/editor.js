@@ -345,7 +345,6 @@ const ELEV_STOPS = [
 function elevColor(z) {
   const s = ELEV_STOPS;
   if (z <= s[0][0]) return `rgb(${s[0][1].join(",")})`;
-  if (z >= s[s.length - 1][0]) return `rgb(${s[s.length - 1][1].join(",")})`;
   for (let i = 1; i < s.length; i++) {
     if (z <= s[i][0]) {
       const t = (z - s[i - 1][0]) / (s[i][0] - s[i - 1][0]);
@@ -353,7 +352,7 @@ function elevColor(z) {
       return `rgb(${c.join(",")})`;
     }
   }
-  return "rgb(185,190,196)";
+  return `rgb(${s[s.length - 1][1].join(",")})`;
 }
 
 // Kinds of connector (pieces.PORT_KINDS) as the status names them.
@@ -375,8 +374,7 @@ function openEndScreenPos() {
       if (!p.open || p.sealed) continue;
       const [sx, sy] = worldToScreen(p.x, p.y);
       const rad = -p.deg * Math.PI / 180, len = arrowLength();
-      out.push({ end: [i, p.port], x: sx, y: sy, tipX: sx + Math.cos(rad) * len,
-                 tipY: sy + Math.sin(rad) * len, deg: p.deg, name: p.name });
+      out.push({ end: [i, p.port], x: sx, y: sy, tipX: sx + Math.cos(rad) * len, tipY: sy + Math.sin(rad) * len });
     }
   });
   return out;
@@ -402,7 +400,7 @@ function stoneMarkPositions() {
   S.layout.placements.forEach((pl, i) => {
     (pl.stone_marks || []).forEach((mark, k) => {
       let wx = pl.mid[0], wy = pl.mid[1];
-      if (mark.at !== null && mark.at !== undefined && pl.ports[mark.at]) {
+      if (mark.at !== null && pl.ports[mark.at]) {
         const port = pl.ports[mark.at];
         wx = port.x * 0.82 + pl.mid[0] * 0.18;
         wy = port.y * 0.82 + pl.mid[1] * 0.18;
@@ -410,7 +408,7 @@ function stoneMarkPositions() {
       const [sx, sy] = worldToScreen(wx, wy);
       const r = Math.max(6, 14 * view.scale);
       const oy = (k - ((pl.stone_marks.length - 1) / 2)) * r * 2.2;
-      out.push({ placement: i, id: mark.id, at_port: mark.at ?? null, x: sx, y: sy + oy, r,
+      out.push({ placement: i, id: mark.id, at_port: mark.at, x: sx, y: sy + oy, r,
         z: stoneHeight(pl) });
     });
   });
@@ -690,7 +688,7 @@ function renderPalette() {
           const same = armed && armed.piece === piece.id && armed.entry === v.entry && armed.exit === v.exit;
           selectTool(same ? {} : {
             piece: {piece: piece.id, pieceName: piece.name, entry: v.entry, exit: v.exit, label: v.label,
-                    takes: v.takes || ["track"], plate: !!piece.plate},
+                    takes: v.takes, plate: !!piece.plate},
           });
           renderPalette(); renderStones(); refreshStatus(); draw();
         });
@@ -1172,12 +1170,12 @@ function initializeEditor() {
   bindOfflineEvents();
   paint();
   if (window.duplotrainBoot) {
-    window.duplotrainBoot({ refresh, status,
+    window.duplotrainBoot({ refresh,
       checkpoint: () => S && S.snapshot,
       downloadLayout: () => S && downloadJSON(S.snapshot.layout, "layout-recovered.json"),
       downloadSession: () => S && downloadJSON(S.snapshot, "session-recovered.json"),
       restored: (state) => { S = state; clearTransient(); redraw(); },
-      readyStatus: (message) => {
+      status: (message) => {
       if (!S.layout.joint_issues.length) status(message);
     }});
   } else {
@@ -1232,7 +1230,7 @@ function closeOverlapPicker() {
 function clearTransient() {
   clearInteractiveState();
   pickMode = null; selectedCandidate = null; hoveredCandidate = null; preview = null;
-  selectedPiece = null; clearHover(); highlightedPieces = []; closeOverlapPicker();
+  selectedPiece = null; clearHover(); highlightedPieces = [];
   invalidateTrain(); initialSwitches = {};
   navigationRevision = diagnosticsRevision = null;
   for (const id of ["diagnostics", "train-report"]) el(id).textContent = "";
@@ -1298,7 +1296,7 @@ function showOverlapPicker(hits, remove = false, stone = null) {
   const choices = new Map(options.map((hit, i) => [stone ? i : hit.placement, hit]));
   if (!choices.size) return;
   const [choice, first] = choices.entries().next().value;
-  const dialog = {revision, choices, choice, target: first.placement}; activeOverlap = dialog;
+  const dialog = {choice, target: first.placement}; activeOverlap = dialog;
   box.replaceChildren(); box.hidden = false;
   const title = document.createElement("strong");
   title.textContent = stone ? (remove ? "Choose the stone to remove" : "Choose where to place the stone")
@@ -1327,7 +1325,7 @@ function showOverlapPicker(hits, remove = false, stone = null) {
   confirm.addEventListener("click", async () => {
     const hit = choices.get(dialog.choice), target = dialog.target;
     if (activeOverlap !== dialog || S?.revision !== revision || S.instance !== instance || apiBusy || jobLoop ||
-        !hit || hit.placement !== target || !S.layout.placements[target] || Number(select.value) !== dialog.choice) return;
+        !S.layout.placements[target] || Number(select.value) !== dialog.choice) return;
     selectedPiece = target;
     if (stone || remove) {
       try {

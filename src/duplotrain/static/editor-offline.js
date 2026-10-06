@@ -118,8 +118,6 @@ async function installOffline() {
   if (offlineWorking) return;
   offlineWorking = true;
   try {
-    if (!window.duplotrainBuild || !navigator.serviceWorker || !globalThis.isSecureContext)
-      throw new Error("Offline installation needs the browser-engine app on HTTPS or localhost.");
     offlineNotice("Downloading and verifying the complete application…");
     const r = await navigator.serviceWorker.register("./service-worker.js", {scope: "./", updateViaCache: "none"});
     offlineRegistration = r; watchOfflineUpdates(r);

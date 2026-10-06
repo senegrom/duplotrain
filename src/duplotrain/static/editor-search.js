@@ -164,7 +164,7 @@ async function publishSearch(sequence) {
   if (trainTrace?.revision === before) trainTrace.revision = S.revision;
   if (diagnosticsRevision === before) diagnosticsRevision = S.revision;
   selectedCandidate = chosenIndex === undefined ? null : `${S.revision}:${chosenIndex}`;
-  redraw(); renderJobControls();
+  redraw();
 }
 async function driveSearchTicks(sequence) {
   let finalMessage = null, failed = false;

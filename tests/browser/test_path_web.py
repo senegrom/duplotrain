@@ -96,9 +96,7 @@ def exercise_interactive_features(page):
     page.locator("#importfile").set_input_files(str(fixtures / "bridge-completed.json"))
     expect(page.locator("#status")).to_contain_text("83 pieces")
     for label in ("Test train", "Find and analyse train routes"):
-        summary = page.locator("summary", has_text=re.compile("^" + re.escape(label) + "$"))
-        if summary.locator("..").get_attribute("open") is None:
-            summary.click()
+        editor_tests.open_section(page, label)
     page.locator("#train-start").select_option("[0,0]")
     page.locator("#route-best").click()
     expect(page.locator("#route-report")).to_contain_text("64 / 64 runs", timeout=90000)
@@ -244,7 +242,7 @@ def _exercise_offline_reload(page, stop_server):
     """Reload the real worker after its resource server has physically stopped."""
     from playwright.sync_api import expect
 
-    _open_offline_panel(page)
+    editor_tests.open_section(page, "Version and offline access")
     page.locator("#offline-install").click()
     # Fail promptly with the UI's actual reason rather than waiting three minutes
     # after a rejected registration or integrity check.
@@ -291,12 +289,6 @@ def _exercise_offline_reload(page, stop_server):
     finally:
         if emulate_offline:
             page.context.set_offline(False)
-
-
-def _open_offline_panel(page):
-    summary = page.locator("summary", has_text="Version and offline access")
-    if summary.locator("..").get_attribute("open") is None:
-        summary.click()
 
 
 def test_built_app_reloads_offline(browser):
@@ -378,13 +370,10 @@ def test_a_tab_left_open_across_three_updates_restarts_its_engine_offline(browse
         old_tab.on("pageerror", lambda error: errors.append(str(error)))
         old_tab.goto(url)
         expect(old_tab.locator("#status")).to_contain_text("Engine ready", timeout=90000)
-        old_tab.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
-        bounds = old_tab.locator("#canvas").bounding_box()
-        old_tab.touchscreen.tap(bounds["x"] + bounds["width"] / 2,
-                                bounds["y"] + bounds["height"] / 2)
+        editor_tests.place_straight(old_tab)
         expect(old_tab.locator("#undo")).to_be_enabled()
         confirmed = old_tab.evaluate("S.snapshot")
-        _open_offline_panel(old_tab)
+        editor_tests.open_section(old_tab, "Version and offline access")
         old_tab.locator("#offline-install").click()
         expect(old_tab.locator("#offline-status")).to_contain_text("Offline ready",
                                                                   timeout=180000)
@@ -401,7 +390,7 @@ def test_a_tab_left_open_across_three_updates_restarts_its_engine_offline(browse
         for index, build in ((1, "ab000002"), (2, "ab000003"), (3, "ab000004")):
             current[0] = index
             expect(new_tab.locator("#status")).to_contain_text("Engine ready", timeout=90000)
-            _open_offline_panel(new_tab)
+            editor_tests.open_section(new_tab, "Version and offline access")
             new_tab.locator("#offline-check").click()
             expect(new_tab.locator("#offline-update")).to_be_visible(timeout=180000)
             with new_tab.expect_navigation(timeout=90000):

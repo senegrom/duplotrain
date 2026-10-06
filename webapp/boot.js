@@ -125,7 +125,7 @@ if (typeof navigator !== "undefined" && navigator.serviceWorker) {
       // it has already put up the recovery overlay, which must stay.
       if (!ready) return;
       overlay.remove();
-      (options.readyStatus || options.status)(snapshot ?
+      options.status(snapshot ?
         "Engine restarted; last confirmed session restored. Previous undo history and suggestions were reset." :
         "Engine ready — runs in your browser · build __BUILD__");
     } catch (error) { fail(error); }

@@ -46,6 +46,15 @@ def wait_count(page, count):
     expect(page.locator("#piece-select option")).to_have_count(count)
 
 
+def open_section(page, label):
+    """Open the sidebar section titled *label* unless it is open already."""
+    import re
+
+    summary = page.locator("summary", has_text=re.compile("^" + re.escape(label) + "$"))
+    if summary.locator("..").get_attribute("open") is None:
+        summary.click()
+
+
 def place_straight(page):
     page.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
     bounds = page.locator("#canvas").bounding_box()
@@ -69,9 +78,7 @@ def test_clear_undo_and_mobile_controls(editor):
     assert page.evaluate("view.scale") > old_scale
     page.locator("#fit").tap()
     page.locator("#delete-tool").tap()
-    point = page.evaluate("worldToScreen(...S.layout.placements[0].mid)")
-    bounds = page.locator("#canvas").bounding_box()
-    page.touchscreen.tap(bounds["x"] + point[0], bounds["y"] + point[1])
+    tap_world(page, *page.evaluate("S.layout.placements[0].mid"))
     wait_count(page, 0)
     assert not errors
 
@@ -357,10 +364,7 @@ def test_built_pyodide_app_boots_and_recovers(browser, tmp_path):
     try:
         page.goto(f"https://127.0.0.1:{server.server_port}/")
         expect(page.locator("#status")).to_contain_text("Engine ready", timeout=90000)
-        page.locator('[data-piece-id="straight"]').get_by_role("button", name="ahead").tap()
-        bounds = page.locator("#canvas").bounding_box()
-        page.touchscreen.tap(bounds["x"] + bounds["width"] / 2,
-                             bounds["y"] + bounds["height"] / 2)
+        place_straight(page)
         expect(page.locator("#undo")).to_be_enabled()
         owned = page.locator('[data-piece-id="straight"] input')
         owned.fill("17")
@@ -599,9 +603,7 @@ def test_stale_tab_refreshes_without_replaying_a_delete(editor):
         # remove the switch now occupying index 1 on the shared server.
         assert page.evaluate("S.layout.placements[1].piece") == "curve"
         page.locator("#delete-tool").tap()
-        point = page.evaluate("worldToScreen(...S.layout.placements[1].mid)")
-        bounds = page.locator("#canvas").bounding_box()
-        page.touchscreen.tap(bounds["x"] + point[0], bounds["y"] + point[1])
+        tap_world(page, *page.evaluate("S.layout.placements[1].mid"))
         wait_count(page, 2)
         assert [p.piece.id for p in session.layout] == ["curve", "switch"]
         assert page.evaluate("S.layout.placements.map(p => p.piece)") == ["curve", "switch"]
@@ -791,8 +793,6 @@ def test_reported_bridge_search_preview_apply_and_undo(editor):
 
 
 def test_published_pages_outlive_a_train_analysis_and_apply_exactly(editor):
-    import re
-
     from playwright.sync_api import expect
 
     from duplotrain.editor_search import published_page
@@ -814,9 +814,7 @@ def test_published_pages_outlive_a_train_analysis_and_apply_exactly(editor):
     expect(page.locator("#candidate-page")).to_have_text("Page 2 / 2")
     for label in ("Test train", "Find and analyse train routes",
                   "Search goals and floor constraints"):
-        summary = page.locator("summary", has_text=re.compile("^" + re.escape(label) + "$"))
-        if summary.locator("..").get_attribute("open") is None:
-            summary.tap()
+        open_section(page, label)
     page.locator("#route-all").tap()
     expect(page.locator("#route-report")).to_contain_text("12 / 12 runs", timeout=30000)
     # The analysis replaced the search, not the pages it published.

@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {harness} = require("./reliability-harness.cjs");
+const {harness, scene, track, paintCalls} = require("./reliability-harness.cjs");
 
 function state(revision, piece = "straight", unlimited = false) {
   const layout = {format: "duplotrain-layout/1", placements: [{piece}], links: [], accessories: []};
@@ -148,7 +148,6 @@ test("sandbox checkbox returns to the viewed value after a network failure", asy
 });
 
 test("a search re-enables redo when the server kept the redo stack", async () => {
-  const {scene, track} = require("./reliability-harness.cjs");
   const before = {...scene([track([[0, 0, 0], [100, 0, 0]])], 5), can_undo: true, can_redo: true,
     open_ends: [[0, 0], [0, 1]]};
   const done = {job_id: "job", revision: 5, status: "exhausted", stage: "full inventory", searched: 12,
@@ -163,7 +162,6 @@ test("a search re-enables redo when the server kept the redo stack", async () =>
 });
 
 test("opening a project records it as opened even with invalid local search fields", async () => {
-  const {scene, track} = require("./reliability-harness.cjs");
   const opened = {...scene([track([[0, 0, 0], [100, 0, 0]])], 4),
     project: {name: "Recovered session", preferences: {}}};
   const h = harness({state: scene([], 3), overrides: {api: async () => opened}});
@@ -251,19 +249,7 @@ test("every paint starts from butt caps, whatever a highlight left behind", () =
   assert.equal(e.run("ctx.lineCap"), "butt");
 });
 
-// Paint on a canvas that notes each call, with the fill and stroke colours in force.
-function paintCalls(h) {
-  const calls = [], recorder = {};
-  for (const name of ["setTransform", "clearRect", "beginPath", "moveTo", "lineTo", "closePath",
-                      "fill", "stroke", "arc", "fillText"])
-    recorder[name] = (...args) => calls.push([name, recorder.fillStyle, recorder.strokeStyle, ...args]);
-  h.context.recorder = recorder;
-  h.run("ctx = recorder; paint()");
-  return calls;
-}
-
 test("an armed bridge arch greys the arrows of the ends it cannot join, whichever way it is armed", () => {
-  const {scene, track} = require("./reliability-harness.cjs");
   // A bridge ramp alone. Climbing, the arch's foot stands only on a ramp's top;
   // descending, the arch joins by its other end, which is ordinary track.
   const ramp = track([[0, 0, 0], [320, 0, 57.6]], "Bridge ramp (lower part)");
@@ -292,7 +278,6 @@ test("an armed bridge arch greys the arrows of the ends it cannot join, whicheve
 });
 
 test("track colours count height from the lowest track: a layout raised or lowered as a whole paints alike", () => {
-  const {scene, track} = require("./reliability-harness.cjs");
   // A straight on a bridge's crest crosses one on the floor, a crest (76.8 mm) below. Begun
   // up on the crest, at the engine's height zero, the layout lies partly below zero; however
   // high it was begun, its lowest track stands on the floor.
@@ -307,7 +292,6 @@ test("track colours count height from the lowest track: a layout raised or lower
 });
 
 test("a joint warning gives the height difference and heading error of the joint that is off", () => {
-  const {scene, track} = require("./reliability-harness.cjs");
   // A bridge ramp's top linked to a straight on the floor, turned one 15° step: the
   // warning says by how much the joint is off, so it can be found and fixed.
   const state = scene([track([[0, 0, 0], [320, 0, 57.6]], "Bridge ramp (lower part)"),

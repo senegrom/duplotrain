@@ -7,25 +7,13 @@ const scripts = ["editor.js", "editor-geometry.js", "editor-projects.js", "edito
 const sources = scripts.map(name => [name,
   fs.readFileSync(path.join(__dirname, "../../src/duplotrain/static", name), "utf8")]);
 const stateNames = new Set(["S", "armed", "armedStone", "preview", "pickMode", "view", "fitted",
-  "deleting", "selectedCandidate", "jobLoop", "recoveryAttempted", "autosaveReady", "apiBusy"]);
+  "selectedCandidate", "autosaveReady"]);
 
 function loadEditor(context, {events = false} = {}) {
   const overrides = {...context};
-  const elements = new Map();
-  const element = id => {
-    if (!elements.has(id)) elements.set(id, {
-      addEventListener() {}, setAttribute() {}, classList: {toggle() {}, add() {}, remove() {}},
-      dataset: {}, style: {},
-    });
-    return elements.get(id);
-  };
   context.location ??= {pathname: "/"};
-  context.window ??= {};
-  context.window.addEventListener ??= () => {};
   context.document ??= {};
   context.document.addEventListener ??= () => {};
-  context.document.getElementById ??= overrides.el || element;
-  context.navigator ??= {};
   for (const [filename, source] of sources) vm.runInContext(source, context, {filename});
   for (const [name, value] of Object.entries(overrides)) {
     if (stateNames.has(name)) {

@@ -131,14 +131,16 @@ test("a lost or refused engine download names its file and ends the boot at once
         if (failing === "status") return new Response(null, {status: 404});
         return new Response(new ReadableStream({pull(stream) { stream.error(new TypeError(reason)); }}));
       },
-      // Pyodide only logs a failed runtime download, and its start never settles.
+      // Pyodide fetches its runtime files side by side, only logs a failed one,
+      // and its start never settles: the page hears once, of the first.
       loadPyodide: () => {
-        context.fetch("pyodide.asm.wasm").then(response => response.arrayBuffer()).catch(() => {});
+        for (const file of ["pyodide.asm.wasm", "python_stdlib.zip"])
+          context.fetch(file).then(response => response.arrayBuffer()).catch(() => {});
         return new Promise(() => {});
       },
     });
     vm.runInContext(fs.readFileSync(path.join(root, "webapp/worker.js"), "utf8"), context);
-    for (let i = 0; i < 20 && !messages.length; i++) await new Promise(resolve => setImmediate(resolve));
+    for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve));
     assert.equal(messages.length, 1);
     assert.equal(messages[0].bootError, `Could not load pyodide.asm.wasm: ${reason}`);
   }

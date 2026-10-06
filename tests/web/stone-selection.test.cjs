@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {harness, scene, track} = require("./reliability-harness.cjs");
+const {harness, scene, track, paintCalls} = require("./reliability-harness.cjs");
 
 function editor(marks, {events = false} = {}) {
   const state = {layout: {placements: [{
@@ -26,13 +26,6 @@ for (const at of [null, 0, 1]) {
     assert.deepEqual(e.notices, []);
   });
 }
-
-test("Legacy midpoint markers without at send explicit null", async () => {
-  const e = editor([{id: "stone_lights"}]);
-  await e.run("const marker = stoneMarkPositions()[0]; removeAt(marker.x, marker.y)");
-  assert.equal(e.calls[0].body.at_port, null);
-  assert.equal(e.calls[0].body.remove, true);
-});
 
 test("Remove and a right click take the stone mark nearest the pointer, not the first in reach", async () => {
   // Zoomed out, the marks of two stones on one piece stand closer together than a
@@ -130,18 +123,13 @@ function crossingScene() {
   return state;
 }
 
-// Paint on a canvas that notes the colour of each dot drawn, by its place on screen:
-// the foot of an open end's arrow, or a joint. With `every`, each place lists the colours
-// of all its dots in the order painted, as where two ends meet at one dot.
+// The colour of each dot painted, by its place on screen: the foot of an open end's
+// arrow, or a joint. With `every`, each place lists the colours of all its dots in the
+// order painted, as where two ends meet at one dot.
 function dotColours(h, {every = false} = {}) {
-  const dots = {}, none = () => {};
-  h.context.recorder = {setTransform: none, clearRect: none, beginPath: none, moveTo: none,
-    lineTo: none, closePath: none, fill: none, stroke: none, fillText: none,
-    arc(x, y) {
-      const at = `${x},${y}`;
-      dots[at] = every ? [...(dots[at] ?? []), this.fillStyle] : this.fillStyle;
-    }};
-  h.run("ctx = recorder; paint()");
+  const dots = {};
+  for (const [, fill, , x, y] of paintCalls(h).filter(([name]) => name === "arc"))
+    dots[`${x},${y}`] = every ? [...(dots[`${x},${y}`] ?? []), fill] : fill;
   return dots;
 }
 
@@ -283,14 +271,8 @@ function stacked(reverse = false, stones = false) {
 }
 const chooser = h => h.el("overlap-picker").children;
 // The fill colours of the stone marks in the order painted.
-function stoneFills(h) {
-  const fills = [], none = () => {};
-  let arc = false;
-  h.context.recorder = new Proxy({arc() { arc = true; }, beginPath() { arc = false; },
-    fill() { if (arc) fills.push(this.fillStyle); }}, {get: (t, p) => p in t ? t[p] : none});
-  h.run("ctx = recorder; paint()");
-  return fills.filter(fill => fill === "#c4281c" || fill === "#237841");
-}
+const stoneFills = h => paintCalls(h).map(([name, fill]) => name === "fill" && fill)
+  .filter(fill => fill === "#c4281c" || fill === "#237841");
 
 for (const reverse of [false, true]) {
   test(`stones paint in the height order of their track, placed ${reverse ? "raised" : "ground"} first`, () => {

@@ -86,13 +86,6 @@ test("failed offline installation keeps the editor and portable download route",
   assert.match(h.el("offline-status").textContent, /Portable project downloads/);
 });
 
-test("busy search prevents update confirmation, activation and reload", async () => {
-  const h = client({waiting: true}); h.run("offlineRegistration = registration; jobLoop = true");
-  await h.run("applyOfflineUpdate()");
-  assert.deepEqual(h.messages, []);
-  assert.deepEqual(h.counts(), {reloads: 0, registrations: 0, confirmations: 0});
-});
-
 test("another active offline build without a waiting update offers no update to apply", async () => {
   // Reloading would open the active build, which may be older than this page.
   const h = client({existing: true, activeBuild: "other-build"}); h.run("bindOfflineEvents()");
@@ -114,7 +107,7 @@ test("an applied update reloads only once the waiting version has activated", as
   assert.equal(h.counts().reloads, 1);
 });
 
-for (const flag of ["apiBusy", "offlineWorking"]) {
+for (const flag of ["jobLoop", "apiBusy", "offlineWorking"]) {
   test(`${flag} prevents update confirmation, activation and reload`, async () => {
     const h = client({waiting: true}); h.run(`offlineRegistration = registration; ${flag} = true`);
     await h.run("applyOfflineUpdate()");
@@ -249,9 +242,10 @@ test("an update superseded before it activates stops the apply at once", async (
 
 test("offline installation outside a secure context registers nothing", async () => {
   const h = client(); h.context.isSecureContext = false;
-  await h.run("installOffline()");
+  h.run("bindOfflineEvents()");
+  assert.equal(h.el("offline-install").disabled, true);
+  await h.el("offline-install").click();
   assert.equal(h.counts().registrations, 0);
-  assert.match(h.el("offline-status").textContent, /HTTPS or localhost/);
 });
 
 test("startup ignores an offline registration made for another scope", async () => {

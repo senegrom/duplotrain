@@ -48,7 +48,7 @@ async function testTrain() {
     if (sequence === trainConfigSequence || error.code === "stale_revision") status(error.message, "err");
   }
 }
-function traceLength(trace = trainTrace) { return trace ? trace.steps.length + (trace.terminal ? 1 : 0) : 0; }
+function traceLength() { return trainTrace ? trainTrace.steps.length + (trainTrace.terminal ? 1 : 0) : 0; }
 function showTrainStep() {
   if (!trainTrace || trainTrace.revision !== S?.revision) { stopTrain(); return; }
   const t = trainTrace, step = t.steps[trainStep];
@@ -61,8 +61,8 @@ function showTrainStep() {
     (step ? ` Step ${trainStep + 1}/${t.steps.length}: #${step[0] + 1}, port ${step[1]} → ${step[2]}.` : "") +
     (terminal ? ` Final event: #${terminal.placement + 1}, entered port ${terminal.entry}, ` +
       `${terminal.at_port === null ? "midpoint" : `at port ${terminal.at_port}`} — ${reason[terminal.reason] || terminal.reason}.` : "");
-  const available = traceLength(t) > 0;
-  el("train-step").disabled = !available || (t.cycle_start === null && trainStep + 1 >= traceLength(t));
+  const available = traceLength() > 0;
+  el("train-step").disabled = !available || (t.cycle_start === null && trainStep + 1 >= traceLength());
   el("train-play").disabled = !available;
   el("train-unvisited").disabled = !t.complete || !t.unvisited?.length;
   el("train-cycle").disabled = !t.complete || !t.cycle_pieces?.length;

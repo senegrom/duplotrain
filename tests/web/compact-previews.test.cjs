@@ -29,11 +29,6 @@ test("compact ghosts compose shared base and additions without mutating either",
   assert.equal(preview.placements.length, 1);
 });
 
-test("legacy previews remain displayable", () => {
-  const full = {placements: [...base, extra]};
-  assert.equal(editor().previewPlacements(full, state), full.placements);
-});
-
 test("geometry fallback displays only the complete candidate drawing", () => {
   const fallback = {...preview, base_count: 0, placements: [extra]};
   assert.deepEqual(plain(editor().previewPlacements(fallback, state)), [extra]);
@@ -69,7 +64,8 @@ test("independent candidates share base geometry but not each other's additions"
 test("fit preview includes extension geometry rather than only the current base", async () => {
   let fitted;
   const h = harness({events: true, overrides: {fitView: p => { fitted = p; }}});
-  h.context.preview = {placements: [track([[1000, 0, 0], [1200, 0, 0]])]};
+  h.context.preview = {format: "duplotrain-preview/1", base_revision: 1, base_count: 0,
+    placements: [track([[1000, 0, 0], [1200, 0, 0]])]};
   await h.el("fit-preview").click(); assert.equal(fitted[0].lines[0][0][0], 1000);
 });
 
