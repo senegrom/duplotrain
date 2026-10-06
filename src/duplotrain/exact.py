@@ -18,8 +18,8 @@ that is a multiple of 15 degrees (15, 30, 45, 60, 90, ..., though not 22.5).  Th
 leaves room for crossings at 45 or 90 degrees and any future piece on a 15-degree grid
 without giving up exactness.
 
-:class:`Alg` is the field element.  Equality is exact, so ``pose == HOME`` is a real
-answer rather than a judgement call.
+:class:`Alg` is the field element.  Equality is exact, so ``cursor == anchor`` is a
+real answer rather than a judgement call.
 """
 
 from __future__ import annotations

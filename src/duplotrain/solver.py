@@ -37,7 +37,7 @@ import math
 import time
 from bisect import bisect_left, bisect_right
 from collections import OrderedDict
-from collections.abc import Generator, Iterable, Mapping, Sequence
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import lru_cache
@@ -309,21 +309,11 @@ def _mirror_traversals(piece: PieceType) -> dict[tuple[int, int], tuple[int, int
 def _cached_mirror_traversals(
     piece: PieceType,
 ) -> tuple[tuple[tuple[int, int], tuple[int, int] | None], ...]:
-    by_key: dict[tuple, tuple[int, int]] = {}
-    traversals: list[tuple[int, int]] = []
-    for entry in range(len(piece.ports)):
-        for exit_port, _route in piece.transit(entry):
-            key = _traversal_key(piece, entry, exit_port)
-            by_key.setdefault(key, (entry, exit_port))
-            traversals.append((entry, exit_port))
-
     canon = _canonical_traversals(piece)
-    mirror: dict[tuple[int, int], tuple[int, int] | None] = {}
-    for entry, exit_port in traversals:
-        mirrored_key = _traversal_key(piece, entry, exit_port, mirror=True)
-        partner = by_key.get(mirrored_key)
-        mirror[(entry, exit_port)] = canon[partner] if partner is not None else None
-    return tuple(mirror.items())
+    # Each class of equivalent traversals, by the geometry its representative places.
+    representative = {_traversal_key(piece, *rep): rep for rep in dict.fromkeys(canon.values())}
+    return tuple((traversal, representative.get(_traversal_key(piece, *traversal, mirror=True)))
+                 for traversal in canon)
 
 
 @lru_cache(maxsize=128)
@@ -419,11 +409,7 @@ class _FieldEngine:
             ]
             for pid, moves in moves_by_piece.items()
         }
-        self._frames0 = {
-            (pid, entry): pieces[pid].frame_for(entry, ORIGIN)
-            for pid, moves in moves_by_piece.items()
-            for entry in {m.entry for m in moves}
-        }
+        self._frames0: dict[tuple[str, int], Pose] = {}  # filled by frame()
 
     @staticmethod
     def _make_apply(dx: Alg, dy: Alg, dz: Alg, dheading: int):
@@ -610,24 +596,18 @@ class _LatticeEngine:
         anchor: LatticePose,
         start_cursor: LatticePose,
         moves: Mapping[str, list[tuple]],
-        frames0: Mapping[tuple[str, int], tuple],
-        port_locals: Mapping[tuple[str, int], tuple],
+        frames0: Mapping[tuple[str, int], Callable[[tuple], tuple]],
+        port_locals: Mapping[tuple[str, int], Callable[[tuple], tuple]],
     ) -> None:
         self.anchor = _flat(anchor)
         self._mate = self.reverse(self.anchor)  # the pose that closes onto the anchor
         self.start_cursor = _flat(start_cursor)
         self.moves = moves
-        self._frames0 = frames0  # (pid, entry) -> (rotated deltas x12, dz, turn)
-        self._port_locals = port_locals
+        self._frames0 = frames0  # (pid, entry) -> step from a cursor to the piece's frame
+        self._port_locals = port_locals  # (pid, port) -> step from a frame to the port
         ax, ay = _flat_xy(self.anchor)
         theta = math.radians(self.anchor[5] * 30)
         self._approach = (ax - 128.0 * math.cos(theta), ay - 128.0 * math.sin(theta))
-
-    @staticmethod
-    def _advance(cursor: tuple, rotated: tuple, dz: int, turn: int) -> tuple:
-        a, b, c, d, z, h = cursor
-        da, db, dc, dd = rotated[h]
-        return (a + da, b + db, c + dc, d + dd, z + dz, (h + turn) % 12)
 
     to_pose = staticmethod(_lattice_pose)
 
@@ -672,8 +652,7 @@ class _LatticeEngine:
                 anchor[4] + cursor[4] - target[4], (cursor[5] + turn) % 12)
 
     def frame(self, pid: str, entry: int, cursor: tuple) -> tuple:
-        rotated, dz, turn = self._frames0[(pid, entry)]
-        return self._advance(cursor, rotated, dz, turn)
+        return self._frames0[(pid, entry)](cursor)
 
     def frame_floats(self, frame: tuple) -> tuple[int, float, float, float, float, float]:
         fx, fy = _flat_xy(frame)
@@ -681,8 +660,7 @@ class _LatticeEngine:
         return (frame[5], fx, fy, frame[4] / 20.0, c, s)
 
     def port_world(self, pid: str, port: int, frame: tuple) -> tuple:
-        rotated, dz, turn = self._port_locals[(pid, port)]
-        return self._advance(frame, rotated, dz, turn)
+        return self._port_locals[(pid, port)](frame)
 
     def closes(self, cursor: tuple) -> bool:
         return cursor == self.anchor
@@ -803,18 +781,18 @@ def _compile_lattice(
         return None
 
     moves: dict[str, list[tuple]] = {}
-    frames0: dict[tuple[str, int], tuple] = {}
-    port_locals: dict[tuple[str, int], tuple] = {}
+    frames0: dict[tuple[str, int], Callable[[tuple], tuple]] = {}
+    port_locals: dict[tuple[str, int], Callable[[tuple], tuple]] = {}
 
-    def as_delta(pose: LatticePose) -> tuple:
-        return (_lattice_rotations(pose.p), pose.z, pose.heading)
+    def as_step(pose: LatticePose):
+        return _lattice_step(_lattice_rotations(pose.p), pose.z, pose.heading)
 
     for pid, piece in pieces.items():
         for port_index, port in enumerate(piece.ports):
             local = _pose_to_lattice(port.pose)
             if local is None:
                 return None
-            port_locals[(pid, port_index)] = as_delta(local)
+            port_locals[(pid, port_index)] = as_step(local)
         # Frames for every unsealed entry: the network enumerator attaches pieces
         # (a buffer, say) that contribute no traversal moves at all.
         for entry in range(len(piece.ports)):
@@ -823,7 +801,7 @@ def _compile_lattice(
             f0 = _pose_to_lattice(piece.frame_for(entry, ORIGIN))
             if f0 is None:
                 return None
-            frames0[(pid, entry)] = as_delta(f0)
+            frames0[(pid, entry)] = as_step(f0)
 
     for pid, piece_moves in moves_by_piece.items():
         compiled = []
@@ -1101,10 +1079,8 @@ class _CompletionReachability:
     predecessor. Ignoring placement constraints makes this an overapproximation:
     absence proves impossibility, while membership still needs the full DFS audit.
 
-    Never use a partly built layer. Preprocessing is paid for progressively: a
-    small base allowance, more for every DFS node spent, a hard cap. A depth not
-    yet affordable stays permissive and is asked again later, so short searches
-    never pay for deep tables while long ones earn them.
+    Never use a partly built layer: a depth the table budget cannot yet afford
+    stays permissive and is asked again later.
 
     The same layers bound the loop a walk must drive before it can pass through
     a junction it places itself: ``transit_floor`` proves how many traversals such
@@ -1776,10 +1752,9 @@ class SolverConfig:
     engine: str = "auto"
     #: Exact reverse reachability for this many final placements of a loop or a
     #: completion, supplemented by longer linear bounds. Zero disables both; they share
-    #: a preprocessing allowance of min(4096, max_nodes // 8) expansions plus 24
-    #: per DFS node spent, capped at 262,144, so only long searches pay for deep
-    #: tables. Slop fits use physical distance enclosures with the remaining
-    #: total gap budget.
+    #: a preprocessing allowance, sized by max_nodes, that grows with the DFS nodes a
+    #: search spends (_completion_budget). Slop fits use physical distance
+    #: enclosures with the remaining total gap budget.
     completion_lookahead: int = 10
     #: Optional extra acceptance audit, applied BEFORE the result limit. Rejected
     #: candidates do not consume result slots. Used to validate expanded bridge
@@ -2231,7 +2206,7 @@ def solve_steps(
         return used >= cfg.min_pieces and (not cfg.use_all_pieces or used == total_pieces)
 
     # These queries describe a future junction's own geometry, independent of the
-    # growing path. Cap the per-search cache now that bounds can check longer tails.
+    # growing path: one search shares their answers, at most 4,096 (see tail_possible).
     future_closure: dict[tuple, bool] = {}
 
     def tail_context(cursor, used: int, slack: float | None):
@@ -2241,7 +2216,7 @@ def solve_steps(
         stubs_of: dict[int, list] = {}  # placement -> its open (port, pose)s
         for index, port, pose in stubs:
             stubs_of.setdefault(index, []).append((port, pose))
-        slots = min(total_pieces, depth_limit, f_limit) - used
+        slots = f_limit - used
         owned = []  # (placement, piece id, transit count, ports with a partner)
         loose = slots
         for index, open_ports in stubs_of.items():
@@ -2284,7 +2259,7 @@ def solve_steps(
     def tail_budget(context, used: int) -> tuple:
         """The allowances every query with this many pieces used shares."""
         transits, transit_turns, _targets, _future_targets, max_turn, future_items = context
-        slots = min(total_pieces, depth_limit, f_limit) - used
+        slots = f_limit - used
         capacity = future = max_free_turn = future_turns = 0
         for pid, free, count in future_items:
             # Placing this junction and looping back to it must fit the remaining
@@ -2513,7 +2488,7 @@ def solve_steps(
         if need > remaining_turn + stub_turns:
             return True
         if simple_stock:
-            slots = min(total_pieces, depth_limit, f_limit) - used
+            slots = f_limit - used
             reach = _stock_span_budget(counts, stock_spans, slots)
             if home > reach + stub_reach + (cfg.slop - slack_used) + 1e-6:
                 return True
@@ -2615,7 +2590,7 @@ def solve_steps(
                         return False
 
         # -- place a new piece -----------------------------------------------------
-        if used >= min(depth_limit, f_limit):
+        if used >= f_limit:
             return True
         if len(steps) >= _MAX_WALK_STEPS:
             walk_cut = True
@@ -2653,7 +2628,7 @@ def solve_steps(
         # child before exact tail queries, collision work, or another DFS node.
         child_reach = None
         if simple_stock and not stubs and not cfg.reversing_loops:
-            slots = min(total_pieces, depth_limit, f_limit) - used - 1
+            slots = f_limit - used - 1
             child_reach = {
                 pid: _stock_span_budget(counts, stock_spans, slots, consumed=pid)
                 for pid in piece_ids if counts[pid]
@@ -2747,53 +2722,39 @@ def solve_steps(
                  and None not in turns.values()
                  and sum(turn * counts[pid] for pid, turn in turns.items()) < 360)
     try:
+        # Both modes run IDA*: grow the pieces-needed contour, shortest closures
+        # first; each pass finds every closure of up to f_limit pieces. Uninformed
+        # depth-first dies whenever the inventory is broad (it exhausts gigantic
+        # fruitless subtrees before ever backtracking), while each admissible
+        # contour stays small; plain iterative deepening without the heuristic is
+        # equally hopeless. A loop that must use every piece has one pass, and no
+        # pass runs where the limits or the turning admit no loop. A completion
+        # may only join/transit preplaced junctions: it still has a nonempty step
+        # trace, but uses no inventory and needs contour zero.
         if base is None:
-            # Loop mode grows the same contour, shortest loops first: each pass finds
-            # every loop of up to f_limit pieces. One full-depth pass drowned in a
-            # broad box (a bridge set, a switch and a track pack found no loop in
-            # two million nodes); a search that must use every piece has one pass.
-            # No pass runs where the limits or the turning admit no loop.
             f_limit = total_pieces if cfg.use_all_pieces else max(1, cfg.min_pieces)
-            while f_limit <= depth_limit and not no_circle:
-                stats.max_pieces_searched = f_limit
-                if not (yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed,
-                                       start_kind)):
-                    break
-                if limits is None and len(solutions) >= cfg.max_results:
-                    break
-                f_limit += 1
         else:
-            # Completion mode runs IDA*: grow the pieces-needed contour until closures
-            # appear.  Uninformed depth-first dies here whenever the inventory is broad
-            # (it exhausts gigantic fruitless subtrees before ever backtracking), while
-            # each admissible contour stays small and finds the SHORTEST completions
-            # first.  Plain iterative deepening without the heuristic is equally
-            # hopeless -- the contour bound is what tames the tree.
-            # A completion may only join/transit preplaced junctions. It still has
-            # a nonempty step trace, but uses no inventory and needs contour zero.
-            first_limit = 0 if cfg.min_pieces == 0 else 1
-            f_limit = first_limit
-            while True:
-                if limits is not None:
-                    # A raised piece bound still stays within the recursion cap.
+            f_limit = 0 if cfg.min_pieces == 0 else 1
+        while not no_circle:
+            if limits is not None and base is not None:
+                # A raised piece bound still stays within the recursion cap.
+                depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH, limits.max_pieces)
+                while f_limit > depth_limit and depth_limit < total_pieces:
+                    yield {"kind": "piece_limit", "nodes": stats.nodes, "depth": depth_limit}
                     depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH, limits.max_pieces)
-                    while f_limit > depth_limit and depth_limit < total_pieces:
-                        yield {"kind": "piece_limit", "nodes": stats.nodes,
-                               "depth": depth_limit}
-                        depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH, limits.max_pieces)
-                if f_limit > depth_limit:
-                    break
-                stats.max_pieces_searched = f_limit
-                if not (yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed,
-                                       start_kind)):
-                    break
-                if limits is None and (len(solutions) >= cfg.max_results or stats.aborted):
-                    break
-                f_limit += 1
-            while walk_cut and limits is not None:
-                # No bound a caller can raise lifts the walk's cap: report it on every
-                # resume, never finishing as if the search had been exhausted.
-                yield {"kind": "walk_limit", "nodes": stats.nodes, "depth": depth_limit}
+            if f_limit > depth_limit:
+                break
+            stats.max_pieces_searched = f_limit
+            if not (yield from dfs(eng.start_cursor, 0, 0.0, start_prev, not one_handed,
+                                   start_kind)):
+                break
+            if limits is None and len(solutions) >= cfg.max_results:
+                break
+            f_limit += 1
+        while walk_cut and limits is not None and base is not None:
+            # No bound a caller can raise lifts the walk's cap: report it on every
+            # resume, never finishing as if the search had been exhausted.
+            yield {"kind": "walk_limit", "nodes": stats.nodes, "depth": depth_limit}
     finally:
         # The recursive function owns a cell pointing to itself. Break that
         # cycle once the stack has unwound, so collision fields, geometry and

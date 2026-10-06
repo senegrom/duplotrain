@@ -26,7 +26,6 @@ auto-select this fast engine and fall back to the general field otherwise.
 from __future__ import annotations
 
 import math
-from fractions import Fraction
 
 from .exact import Alg
 
@@ -104,13 +103,6 @@ class LatticePose:
         return f"LatticePose({x:.3f}, {y:.3f}, z={self.z / SCALE:.3f}, {self.heading * 30}deg)"
 
 
-def _scaled_int(value: Fraction) -> int | None:
-    scaled = value * SCALE
-    if scaled.denominator != 1:
-        return None
-    return int(scaled)
-
-
 def from_alg_xy(x: Alg, y: Alg) -> LatticePoint | None:
     """Express exact field coordinates as a lattice point, or None if off-lattice.
 
@@ -136,4 +128,5 @@ def z_from_alg(z: Alg) -> int | None:
     """Elevation as a scaled integer, or None if it doesn't fit."""
     if not z.is_rational():
         return None
-    return _scaled_int(z.a)
+    scaled = z.a * SCALE
+    return int(scaled) if scaled.denominator == 1 else None

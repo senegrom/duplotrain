@@ -367,10 +367,8 @@ def enumerate_networks(
             frame = eng.frame(pid, entry, eng.start_cursor)
             placements.append((pid, frame))
             base_pts, offset, bounds = samples_for(pid, frame)
-            field._add_prepared(
-                0, field._prepare(base_pts, offset=offset), piece.width / 2.0,
-                underpass=piece.underpass, bounds=bounds,
-            )
+            field.add_deferred(0, base_pts, offset, piece.width / 2.0, bounds,
+                               underpass=piece.underpass)
             counts[pid] -= 1
             for port in range(len(piece.ports)):
                 if port in piece.sealed:

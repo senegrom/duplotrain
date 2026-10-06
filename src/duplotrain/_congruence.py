@@ -452,11 +452,6 @@ def _canonical_frame(curve: _Curve) -> tuple[tuple, _Curve]:
                             (Alg(0), Alg(0), Alg(0)))
 
 
-def _spacing(spacing: float) -> None:
-    if not math.isfinite(spacing) or spacing <= 0:
-        raise ValueError("spacing must be finite and positive")
-
-
 def _sample(
     curve: _Curve, spacing: float, *, mirror_opaque: bool = False
 ) -> list[tuple[float, float, float]]:
@@ -511,7 +506,8 @@ def curve_key(layout: Layout, spacing: float, decimals: int) -> tuple:
     minimum exact primitive descriptor supplies bit-identical sampling inputs.
     The returned key is still approximate; it is not an exact congruence proof.
     """
-    _spacing(spacing)
+    if not math.isfinite(spacing) or spacing <= 0:
+        raise ValueError("spacing must be finite and positive")
     curve = _normalise(layout)
 
     def rounded(frame: _Curve, mirror: bool = False) -> tuple:
