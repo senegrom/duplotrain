@@ -1,5 +1,6 @@
 """Complete requested model spaces versus honestly bounded route analysis."""
 import gc
+import importlib
 import json
 import weakref
 from dataclasses import asdict, replace
@@ -133,6 +134,24 @@ def test_the_counterexample_breaks_the_weakest_property_that_fails():
     assert (tuple(witness["start"]), witness["switch_states"],
             witness["outcome"]) == classify(layout).counterexample
     job.close()
+
+
+def test_a_route_job_prepares_its_switch_choices_once_and_releases_them(monkeypatch):
+    module = importlib.import_module("duplotrain.drive")
+    calls, original = [], module._tongue_choices
+    monkeypatch.setattr(module, "_tongue_choices",
+                        lambda layout: calls.append(layout) or original(layout))
+    c = default_catalog()
+    ring = build_chain([(c["switch"], 0, 1)] + [(c["curve"], 0, 1)] * 11)
+    ends = ring.connectable_ends()
+    layout = ring.join(*next((a, b) for a in ends for b in ends
+                             if a < b and ring.pose_of(a).connects_to(ring.pose_of(b))))
+    job = RouteJob(Session(history=[layout]), {})
+    result = finished(job)
+    assert result["complete"] and result["runs"] == job.required > 1
+    assert len(calls) == 1
+    job.close()
+    assert job.drive_context is None
 
 
 @pytest.mark.parametrize("bad", [{"max_runs": 0}, {"max_runs": 100001}, {"max_runs": True},

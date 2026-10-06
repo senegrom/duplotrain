@@ -4,6 +4,7 @@ import importlib
 import os
 import subprocess
 import sys
+from dataclasses import replace
 from itertools import islice
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from duplotrain.catalog import default_catalog
 from duplotrain.drive import (
     ClassificationLimitError,
     DriveLimitError,
+    _all_starts,
+    _prepare_drive,
     _tongue_assignments,
     classify,
     drive,
@@ -379,6 +382,58 @@ def test_drive_memory_does_not_grow_with_steps_times_switches():
     assert report.outcome == "endless" and len(report.steps) > 400
     # One tongue tuple per change, not one per step (a copy per step took 6 MiB).
     assert peak < 2 * 2**20
+
+
+# -- one prepared context per analysis -----------------------------------------------
+
+
+def test_a_prepared_context_drives_exactly_like_a_fresh_run():
+    # Switches with dangling branches and a direction stone: trailing moves re-aim
+    # tongues, runs derail, bounce and loop. One context shared by many runs must
+    # leave every run exactly as a fresh drive() makes it.
+    ring = _switch_ring(1)
+    context = _prepare_drive(ring)
+    before = repr(context)
+    starts = _all_starts(ring)
+    for settings in islice(_tongue_assignments(ring, choices=context.choices), 3):
+        original = dict(settings)
+        for start in starts[::5]:
+            expected = drive(ring, start, settings)
+            actual = drive(ring, start, settings, _context=context)
+            assert repr(actual) == repr(expected) and settings == original
+            actual.final_switch_states.clear()
+            assert drive(ring, start, settings, _context=context) == expected
+    # Default tongues come from the context too: no run's trailing moves leak into it.
+    for start in starts[::5]:
+        assert repr(drive(ring, start, _context=context)) == repr(drive(ring, start))
+    assert repr(context) == before
+    with pytest.raises(TypeError):
+        context.stones[0] = ()
+    with pytest.raises(ValueError, match="different layout"):
+        drive(ring, _context=replace(context, layout=Layout(ring.placements)))
+
+
+@pytest.mark.parametrize("stone", ["stone_stop", "stone_direction"])
+def test_a_prepared_context_keeps_stone_positions_and_step_limits(catalog, stone):
+    straight = build_chain([(catalog["straight"], 0, 1)])
+    for face in (None, 0, 1):
+        layout = straight.with_accessory(0, stone, at_port=face)
+        context = _prepare_drive(layout)
+        for start in ((0, 0), (0, 1)):
+            assert drive(layout, start) == drive(layout, start, _context=context)
+    ring = _switch_ring(1)
+    for context in (None, _prepare_drive(ring)):
+        with pytest.raises(DriveLimitError):
+            drive(ring, (0, 0), max_steps=1, _context=context)
+
+
+def test_classify_prepares_the_switch_choices_once(monkeypatch):
+    module = importlib.import_module("duplotrain.drive")
+    calls, original = [], module._tongue_choices
+    monkeypatch.setattr(module, "_tongue_choices",
+                        lambda layout: calls.append(layout) or original(layout))
+    verdict = classify(switches(2))
+    assert verdict.runs == 24 and len(calls) == 1
 
 
 # -- stones on the return pass -------------------------------------------------------

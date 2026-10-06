@@ -30,6 +30,7 @@ import math
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from itertools import product
+from types import MappingProxyType
 
 from .layout import End, Layout
 
@@ -121,11 +122,35 @@ def drivable_universe(layout: Layout) -> frozenset[int]:
     return frozenset(universe)
 
 
+@dataclass(frozen=True, slots=True)
+class _DriveContext:
+    """Read-only preparation owned by one analysis of an unchanged layout.
+
+    No global cache and no mutable run state: drive copies the default tongues
+    and creates fresh traversal/cycle containers for every start.
+    """
+
+    layout: Layout
+    choices: tuple[tuple[int, tuple[int, ...]], ...]
+    defaults: tuple[tuple[int, int], ...]
+    stones: Mapping[int, tuple[tuple[str, int | None], ...]]
+
+
+def _prepare_drive(layout: Layout) -> _DriveContext:
+    choices = tuple((index, tuple(options)) for index, options in _tongue_choices(layout))
+    stones: dict[int, list[tuple[str, int | None]]] = {}
+    for entry in layout.accessories:
+        stones.setdefault(entry[0], []).append((entry[1], entry[2] if len(entry) > 2 else None))
+    defaults = tuple((index, min(options)) for index, options in choices)
+    lookup = MappingProxyType({index: tuple(values) for index, values in stones.items()})
+    return _DriveContext(layout, choices, defaults, lookup)
+
+
 def drive(
     layout: Layout,
     start: End | None = None,
     switch_states: Mapping[int, int] | None = None,
-    *, max_steps: int = MAX_STEPS,
+    *, max_steps: int = MAX_STEPS, _context: _DriveContext | None = None,
 ) -> DriveReport:
     """Simulate a train from *start* until it stops, derails, or provably loops.
 
@@ -154,17 +179,13 @@ def drive(
     if layout.is_sealed(start):
         raise ValueError("a train cannot enter through a sealed buffer face")
 
-    # As a builder leaves them: every tongue aimed at its lowest-numbered branch.
-    states = {index: min(options) for index, options in _tongue_choices(layout)}
+    context = _prepare_drive(layout) if _context is None else _context
+    if context.layout is not layout:
+        raise ValueError("drive context belongs to a different layout")
+    states = dict(context.defaults)
     if switch_states:
         states.update({int(k): int(v) for k, v in switch_states.items()})
-
-    # One pass over the stones, in their order: this runs once per drive() call,
-    # and classify or a route analysis drive the same layout thousands of times.
-    stones_by_placement: dict[int, list[tuple[str, int | None]]] = {}
-    for entry in layout.accessories:
-        stones_by_placement.setdefault(entry[0], []).append(
-            (entry[1], entry[2] if len(entry) > 2 else None))
+    stones_by_placement = context.stones
 
     placement, entered = start
     steps: list[tuple[int, int, int]] = []
@@ -324,9 +345,10 @@ def _tongue_choices(layout: Layout) -> list[tuple[int, list[int]]]:
     return choices
 
 
-def _tongue_assignments(layout: Layout) -> Iterator[dict[int, int]]:
+def _tongue_assignments(layout: Layout, *, choices=None) -> Iterator[dict[int, int]]:
     """Yield each tongue setting, retaining only one assignment at a time."""
-    choices = _tongue_choices(layout)
+    if choices is None:
+        choices = _tongue_choices(layout)
     indices = [index for index, _ in choices]
     for setting in product(*(options for _, options in choices)):
         yield dict(zip(indices, setting, strict=True))
@@ -385,15 +407,16 @@ def classify(
     if max_runs is not None and (type(max_runs) is not int or max_runs < 1):
         raise ValueError("max_runs must be a positive integer or None")
     starts = _all_starts(layout)
+    context = _prepare_drive(layout)
     required_runs = len(starts) * math.prod(
-        len(options) for _, options in _tongue_choices(layout)
+        len(options) for _, options in context.choices
     )
     if max_runs is not None and required_runs > max_runs:
         raise ClassificationLimitError(
             f"classification needs {required_runs:,} runs, exceeding max_runs={max_runs:,}; "
             "increase max_runs to classify this layout"
         )
-    assignments = _tongue_assignments(layout)
+    assignments = _tongue_assignments(layout, choices=context.choices)
     everything = drivable_universe(layout)
 
     locally = False
@@ -406,7 +429,7 @@ def classify(
 
     for assignment in assignments:
         for start in starts:
-            report = drive(layout, start=start, switch_states=assignment)
+            report = drive(layout, start=start, switch_states=assignment, _context=context)
             runs += 1
             if report.outcome == "endless":
                 locally = True
