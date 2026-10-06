@@ -24,7 +24,7 @@ async function offlineStatus() {
   const cache = await caches.open(CACHE);
   if (!(await cache.match(MARKER))) return {build: BUILD, ready: false};
   for (const asset of ASSETS) if (!(await cache.match(absolute(asset.url)))) return {build: BUILD, ready: false};
-  return {build: BUILD, ready: true, assets: ASSETS.length};
+  return {build: BUILD, ready: true};
 }
 // One verified asset. The download fails once no bytes arrive for a minute,
 // however long a slow but steady link needs for the largest runtime file.
@@ -189,10 +189,10 @@ self.addEventListener("message", event => {
     try {
       if (event.data.type === "ACTIVATE") {
         if (!(await offlineStatus()).ready) throw new Error("New offline version is incomplete");
-        await self.skipWaiting(); reply.postMessage({build: BUILD, activated: true});
+        await self.skipWaiting(); reply.postMessage({activated: true});
       } else reply.postMessage(event.data.type === "INSTALL" ? await installVersion() : await offlineStatus());
     } catch (error) {
-      reply.postMessage({error: error?.message || String(error), build: BUILD, ready: false});
+      reply.postMessage({error: error?.message || String(error)});
     }
     finally { clearInterval(beat); }
   })());

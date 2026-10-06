@@ -115,16 +115,13 @@ function selectTool({piece = null, stone = null, pick = null, remove = false} = 
 // One editor answers at ".../" and at ".../index.html": storage is keyed by the
 // directory, so both spellings share one autosave and one list of local copies.
 const APP_PATH = location.pathname.replace(/\/index\.html$/, "/");
-// Use a new key so a still-open tab running the old, unconditional writer cannot
-// overwrite new checkpoints. The previous format's keys are read for migration only.
 const STORAGE_KEY = "duplotrain-session/2:" + APP_PATH;
 // Keys once named the exact path, so the index.html spelling kept its own autosave.
 const INDEX_STORAGE_KEY = STORAGE_KEY + "index.html";
-const LEGACY_STORAGE_KEYS = [APP_PATH, APP_PATH + "index.html"].map(path => "duplotrain-session/1:" + path);
 const CHECKPOINT_FORMAT = "duplotrain-checkpoint/1";
 let savedCheckpoint = null;       // exact revision this tab read or last committed
 let lastSavedSnapshot = null;     // ignore redraws and other non-mutating actions
-let keptCheckpoint = null;        // {key, raw, legacy}: a stored session this tab could not restore
+let keptCheckpoint = null;        // {key, raw}: a stored session this tab could not restore
 
 function saveNotice(message, error = false) {
   const notice = document.getElementById("save-status");
@@ -138,15 +135,14 @@ function pauseAutosave() {
              "export JSON to keep this tab's work before reloading.", true);
 }
 
-function decodeCheckpoint(raw, legacy = false) {
+function decodeCheckpoint(raw) {
   if (raw.length > 2 * 1024 * 1024) throw new Error("saved session is too large");
   const record = JSON.parse(raw);
-  if (!legacy && (!record || record.format !== CHECKPOINT_FORMAT ||
-                  typeof record.revision !== "string" || !record.revision ||
-                  record.revision.length > 128)) {
+  if (!record || record.format !== CHECKPOINT_FORMAT || typeof record.revision !== "string" ||
+      !record.revision || record.revision.length > 128) {
     throw new Error("unrecognised checkpoint format");
   }
-  const snapshot = legacy ? record : record.snapshot;
+  const snapshot = record.snapshot;
   if (!snapshot || snapshot.format !== "duplotrain-session/1") {
     throw new Error("unrecognised session format");
   }
@@ -183,15 +179,10 @@ async function adoptIndexSpelling() {
 }
 
 // Where to recover from when this key holds nothing: an index.html autosave that
-// could not be moved, else the previous format's.
+// could not be moved.
 function migrationSource() {
   const raw = localStorage.getItem(INDEX_STORAGE_KEY);
-  if (raw !== null) return {key: INDEX_STORAGE_KEY, raw, legacy: false};
-  for (const key of LEGACY_STORAGE_KEYS) {
-    const legacy = localStorage.getItem(key);
-    if (legacy !== null) return {key, raw: legacy, legacy: true};
-  }
-  return null;
+  return raw === null ? null : {key: INDEX_STORAGE_KEY, raw};
 }
 
 async function initializeRecovery() {
@@ -200,10 +191,10 @@ async function initializeRecovery() {
   try {
     try { await adoptIndexSpelling(); } catch (_error) { /* left in place; read below */ }
     savedCheckpoint = localStorage.getItem(STORAGE_KEY);
-    source = savedCheckpoint !== null ? {key: STORAGE_KEY, raw: savedCheckpoint, legacy: false} : migrationSource();
+    source = savedCheckpoint !== null ? {key: STORAGE_KEY, raw: savedCheckpoint} : migrationSource();
     if (source !== null) {
       let snapshot;
-      try { snapshot = decodeCheckpoint(source.raw, source.legacy); }
+      try { snapshot = decodeCheckpoint(source.raw); }
       catch (error) { unreadable = true; throw error; }
       lastSavedSnapshot = JSON.stringify(snapshot);
       // A running local server is authoritative; restore only a fresh engine.
@@ -238,7 +229,7 @@ async function initializeRecovery() {
 function downloadKeptCheckpoint() {
   if (!keptCheckpoint) return;
   let session = null;
-  try { session = decodeCheckpoint(keptCheckpoint.raw, keptCheckpoint.legacy); } catch (_error) { /* raw */ }
+  try { session = decodeCheckpoint(keptCheckpoint.raw); } catch (_error) { /* raw */ }
   if (session) downloadJSON(session, "session-kept.json");
   else downloadText(keptCheckpoint.raw, "session-kept.txt");
 }

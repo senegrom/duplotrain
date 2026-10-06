@@ -8,7 +8,7 @@ const candidate = (index, revision = 7) => ({index, revision,
   exact: true, gap: 0, kind: "loop", added: {curve: 6}, size_cm: [50, 50], open_stubs: 0,
   preview: {format: "duplotrain-preview/1", base_count: 0, base_revision: revision, placements: []}});
 const job = (extra = {}) => ({job_id: "job-A", revision: 7, status: "running", stage: "plain track",
-  searched: 32, found: 0, page: 0, candidates: [], complete: false,
+  searched: 32, found: 0, page: 0, sort: "discovery", candidates: [], complete: false,
   max_pieces: 26, resumable: true, can_harden: true, ...extra});
 const route = (extra = {}) => ({job_id: "route-A", revision: 7, status: "running", scope: "all",
   runs: 1, required_runs: "4", step_limited_runs: 0, total_drivable: 3, best: null,
@@ -320,7 +320,7 @@ test("a ranking chosen while a search runs applies from its next tick, on the fi
       return ticks < 2 ? job({found: 16}) : job({status: "results_ready", found: 16});
     }
     if (path.endsWith("/publish")) return {...h.context.S, revision: 8,
-      search_job: job({revision: 8, status: "results_ready", found: 16})};
+      search_job: job({revision: 8, status: "results_ready", found: 16, sort: body.sort})};
     throw new Error("Unexpected API: " + path);
   }});
   h.context.paused = job({status: "paused", found: 16, page: 1});

@@ -140,18 +140,17 @@ and it keeps autosaving from there.
 Checkpoints carry unique revisions and Web Locks serialise writes across tabs: a
 tab that sees another writer pauses its autosave and asks you to export before
 reloading, and redrawing or closing a stale tab never rewrites a newer
-checkpoint. Saves from older editor versions migrate read-only into a new
-storage key, isolated from tabs still running the old editor. Without safe
-locking or storage the editor warns you to export instead, and a storage or
-recovery error is shown without overwriting an unreadable checkpoint. A saved
-session this editor cannot read, or its engine refuses, keeps autosave off until
-you act on it, since a newer editor may read it: its notice offers a download (a
-session file that Open project reads, or the raw text of one that cannot be
-read) and a discard, which asks for confirmation, deletes it only if no other
-tab has replaced it since, and turns autosave back on for this tab's session. A
-restore that fails for another reason, such as a lost connection, keeps the
-session without offering to discard it. Autosave is device- and browser-local,
-not a backup: export JSON or save a project for a portable copy.
+checkpoint. Without safe locking or storage the editor warns you to export
+instead, and a storage or recovery error is shown without overwriting an
+unreadable checkpoint. A saved session this editor cannot read, or its engine
+refuses, keeps autosave off until you act on it, since a newer editor may read
+it: its notice offers a download (a session file that Open project reads, or the
+raw text of one that cannot be read) and a discard, which asks for confirmation,
+deletes it only if no other tab has replaced it since, and turns autosave back on
+for this tab's session. A restore that fails for another reason, such as a lost
+connection, keeps the session without offering to discard it. Autosave is
+device- and browser-local, not a backup: export JSON or save a project for a
+portable copy.
 
 ## Projects and local copies
 

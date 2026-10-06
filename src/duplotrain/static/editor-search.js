@@ -30,7 +30,7 @@ const publishedPages = () =>
 function followRanking() {
   const pages = interactiveJob?.revision === S?.revision ? interactiveJob : publishedPages();
   if (!pages) return;
-  if (pages.sort && pages.sort !== jobView().sort) return searchPageTo(0);
+  if (pages.sort !== jobView().sort) return searchPageTo(0);
   searchPage = pages.page;  // a ranking changed and changed back: the page shown stays
 }
 function clearInteractiveState() {

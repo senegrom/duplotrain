@@ -6,7 +6,6 @@ const {randomUUID} = require("node:crypto");
 const {loadEditor} = require("./editor-harness.cjs");
 
 const KEY = "duplotrain-session/2:/";
-const LEGACY = "duplotrain-session/1:/";
 
 function snapshot(count = 0) {
   return {format: "duplotrain-session/1", layout: {placements: Array(count).fill({piece: "straight"})},
@@ -137,21 +136,10 @@ test("clearing storage is a conflict, not permission to recreate a stale save", 
   assert.equal(store.storage.getItem(KEY), null);
 });
 
-test("legacy migration isolates new saves from tabs still running the old writer", async () => {
-  const store = shared();
-  store.storage.setItem(LEGACY, JSON.stringify(snapshot(2)));
-  const a = tab(store); await a.init(); await a.save();
-  assert.equal(saved(store).snapshot.layout.placements.length, 2);
-  store.storage.setItem(LEGACY, JSON.stringify(snapshot(1)));
-  const b = tab(store); await b.init(); await b.save();
-  assert.equal(b.context.S.snapshot.layout.placements.length, 2);
-});
-
-test("bad new checkpoints are preserved, never replaced by legacy or edited work", async () => {
+test("bad new checkpoints are preserved, never replaced by edited work", async () => {
   for (const raw of ["not json", "null", '{}', JSON.stringify({format: "future-format"})]) {
     const store = shared();
     store.storage.setItem(KEY, raw);
-    store.storage.setItem(LEGACY, JSON.stringify(snapshot(2)));
     const a = tab(store); await a.init(); a.edit(3); await a.save();
     assert.equal(store.storage.getItem(KEY), raw);
     assert.match(a.notice.textContent, /Existing save kept/);
