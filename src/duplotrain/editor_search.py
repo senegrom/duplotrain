@@ -432,6 +432,34 @@ def _harder(depth, effort):
     return min(128, depth * 2), min(16, effort * 2)
 
 
+def _cost(goal, sol, base, stock, catalog):
+    """*goal*'s cost of candidate *sol* over *base*; the lower ranks first."""
+    base_counts = base.piece_counts
+    added = {pid: n - base_counts.get(pid, 0) for pid, n in sol.layout.piece_counts.items()}
+    if goal == "pieces":
+        return sum(added.values())
+    if goal == "footprint":
+        w, h = sol.layout.size()
+        return w * h
+    if goal == "scarce":
+        return sum(n / max(1, stock.get(pid, 0)) for pid, n in added.items())
+    if goal == "junctions":
+        return sum(n for pid, n in added.items() if catalog[pid].is_junction)
+    if goal == "bridges":
+        return sum(n for pid, n in added.items() if catalog[pid].category == "bridge")
+    return 0
+
+
+def _ranked(solutions, goal, costs, base, stock, catalog):
+    """Exact candidates first, then *goal*'s cost, then the order found.
+
+    *costs* holds the costs already computed, one per solution index.
+    """
+    costs.extend(_cost(goal, sol, base, stock, catalog) for sol in solutions[len(costs):])
+    return sorted(enumerate(solutions),
+                  key=lambda item: (not item[1].exact, costs[item[0]], item[0]))
+
+
 class SearchJob:
     def __init__(self, session, body):
         from .editor import _end
@@ -687,29 +715,11 @@ class SearchJob:
         self.target = min(MAX_RESULTS, max(self.target * 2, len(self.solutions) + 8))
         self.status = "running"
 
-    def _cost(self, goal, sol):
-        base_counts = self.base.piece_counts
-        added = {pid: n - base_counts.get(pid, 0) for pid, n in sol.layout.piece_counts.items()}
-        if goal == "pieces":
-            return sum(added.values())
-        if goal == "footprint":
-            w, h = sol.layout.size()
-            return w * h
-        if goal == "scarce":
-            return sum(n / max(1, self.stock.get(pid, 0)) for pid, n in added.items())
-        if goal == "junctions":
-            return sum(n for pid, n in added.items() if self.catalog[pid].is_junction)
-        if goal == "bridges":
-            return sum(n for pid, n in added.items() if self.catalog[pid].category == "bridge")
-        return 0
-
     def ordered(self):
         # Solutions are only ever appended: each cost is computed once per goal.
         goal = self.options["sort"]
-        costs = self.costs.setdefault(goal, [])
-        costs.extend(self._cost(goal, sol) for sol in self.solutions[len(costs):])
-        return sorted(enumerate(self.solutions),
-                      key=lambda item: (not item[1].exact, costs[item[0]], item[0]))
+        return _ranked(self.solutions, goal, self.costs.setdefault(goal, []),
+                       self.base, self.stock, self.catalog)
 
     def response(self, session, body):
         if "sort" in body:  # validated by dispatch_search
@@ -725,7 +735,7 @@ class SearchJob:
             shown.append(item)
         return {"job_id": self.id, "revision": self.revision, "status": self.status,
                 "stage": self.stage, "searched": self.nodes, "found": len(self.solutions),
-                "page": page, "candidates": shown,
+                "page": page, "sort": self.options["sort"], "candidates": shown,
                 "complete": self.complete, "reason": self.reason,
                 "options": {"room": list(self.options["room"]) if self.options["room"] else None,
                             "keep_out": [list(r) for r in self.options["keep_out"]]},
@@ -761,6 +771,26 @@ class SearchJob:
         self.costs.clear()
 
 
+def published_page(session, body):
+    """A page of the suggestions a search published, ranked as the search ranks them.
+
+    They outlive the search, which a train analysis replaces and inactivity
+    expires, until the next edit or search. The session's layout and remaining
+    stock are the search's base and stock; the stock differs only in excluded
+    pieces, which no suggestion adds, so every cost is the search's.
+    """
+    goal = body.get("sort", "discovery")
+    page = integer(body.get("page", 0), 0, 6, "page")
+    ranked = _ranked(session.candidates, goal, [], session.layout, session.remaining(),
+                     session.catalog)
+    shown = [session._candidate_json(index, candidate,
+                                     preview_format=body.get("preview_format"))
+             for index, candidate in ranked[page * 8:(page + 1) * 8]]
+    return {"revision": session.revision, "status": "published",
+            "found": len(session.candidates), "page": page, "sort": goal,
+            "candidates": shown}
+
+
 def dispatch_search(session, path, body):
     """Caller has validated the request revision and holds the session lock."""
     action = path.removeprefix("/api/search/")
@@ -770,6 +800,8 @@ def dispatch_search(session, path, body):
         raise ValueError("unknown candidate sort order")
     if type(body.get("harder", False)) is not bool:
         raise ValueError("harder must be a boolean")
+    if type(body.get("page_only", False)) is not bool:
+        raise ValueError("page_only must be a boolean")
     old = session._interactive_job
     if action == "start":
         job = SearchJob(session, body)  # validate before replacing prior search
@@ -780,8 +812,12 @@ def dispatch_search(session, path, body):
         # suggestions do: withdraw those, so an index names only this job's.
         session.candidates, session._candidate_revision = [], None
     else:
-        if (not isinstance(old, SearchJob) or body.get("job_id") != old.id
-                or old.revision != session.revision):
+        active = isinstance(old, SearchJob) and old.revision == session.revision
+        if not active or body.get("job_id") != old.id:
+            # The search is gone; what it published stays until the next edit.
+            if action == "page" and not active and (
+                    session._candidate_revision == session.revision):
+                return published_page(session, body)
             raise ValueError("This search is no longer active; start a new search")
         job = old
         if time.monotonic() - job.last_touch > MAX_JOB_SECONDS:
@@ -806,7 +842,10 @@ def dispatch_search(session, path, body):
                 job.status = "running"
         elif action == "publish":
             job.publish(session)
-            return {**session.state(preview_format=body.get("preview_format")),
+            # page_only leaves out the full list: the editor shows one page, and the
+            # engine still holds every exact layout. Other clients get every candidate.
+            return {**session.state(preview_format=body.get("preview_format"),
+                                    include_candidates=not body.get("page_only", False)),
                     "search_job": job.response(session, body)}
         elif action == "discard":
             job.close()

@@ -14,9 +14,11 @@ from duplotrain.editor import PREVIEW_FORMAT, RevisionConflictError, Session, di
 from duplotrain.editor_search import (
     MAX_JOB_SECONDS,
     MAX_RESULTS,
+    SORTS,
     PairSearch,
     SearchJob,
     fits_space,
+    published_page,
     search_options,
 )
 from duplotrain.geometry import Pose
@@ -273,6 +275,73 @@ def test_expiry_releases_only_retained_search(catalog):
         call(session, "page")
     assert session._interactive_job is None and old.status == "discarded"
     assert session.snapshot() == before
+
+
+@pytest.mark.parametrize("gone", ["train analysis", "expiry", "failed tick"])
+def test_published_suggestions_stay_paged_and_ranked_after_their_search_is_gone(catalog,
+                                                                                 monkeypatch,
+                                                                                 gone):
+    # A train analysis replaces the search, inactivity expires it and a failed tick
+    # ends it; what it published stays with the session until the next edit. Every
+    # ranking pages it as the search did, and a later page's index applies its
+    # exact layout.
+    session = Session(history=[half(catalog)],
+                      inventory={"curve": 14, "straight": 6, "switch": 2, "ramp": 2})
+    call(session, "start", max_results=16, options={"exclude": ["span"]})
+    job = session._interactive_job
+    settle(job)
+    published = call(session, "publish", page_only=True)
+    assert published["candidates"] == [] and published["search_job"]["found"] == 16
+    shown = {(goal, page): call(session, "page", sort=goal, page=page)
+             for goal in SORTS for page in (0, 1)}
+    before = unchanged(session)
+    if gone == "train analysis":
+        dispatch_session(session, "/api/routes/start", {"revision": session.revision})
+    elif gone == "expiry":
+        job.last_touch -= MAX_JOB_SECONDS + 1
+        with pytest.raises(ValueError, match="expired"):
+            call(session, "page")
+    else:
+        call(session, "continue")  # Find more, whose next tick fails
+
+        def fail():
+            raise RuntimeError("worker failed")
+
+        monkeypatch.setattr(job, "tick", fail)
+        with pytest.raises(RuntimeError, match="worker failed"):
+            call(session, "tick")
+    assert job.status == "discarded" and not job.solutions
+    for (goal, page), pages in shown.items():
+        reply = call(session, "page", job_id=job.id, sort=goal, page=page)
+        assert pages["sort"] == reply["sort"] == goal
+        assert reply["status"] == "published" and reply["found"] == 16
+        assert reply["revision"] == session.revision and reply["page"] == page
+        assert reply["candidates"] == pages["candidates"]
+    assert unchanged(session) == before
+    later = reply["candidates"][-1]["index"]  # the last card of the second page
+    chosen = session.candidates[later].layout
+    session.apply_candidate(later, session.revision)
+    assert session.layout == chosen
+    with pytest.raises(ValueError, match="no longer active"):
+        call(session, "page", job_id=job.id)  # the edit withdrew them
+
+
+def test_a_new_search_or_another_job_id_never_pages_published_suggestions(catalog):
+    session = Session(history=[half(catalog)], inventory={"curve": 14, "straight": 6})
+    call(session, "start", max_results=8)
+    first = session._interactive_job
+    settle(first)
+    call(session, "publish", page_only=True)
+    call(session, "start", max_results=8)  # withdraws what the first search published
+    with pytest.raises(ValueError, match="no longer active"):
+        call(session, "page", job_id=first.id)
+    second = session._interactive_job
+    settle(second)
+    call(session, "publish", page_only=True)
+    # While a search is active, only its own ID pages it.
+    with pytest.raises(ValueError, match="no longer active"):
+        call(session, "page", job_id=first.id)
+    assert call(session, "page", job_id=second.id)["job_id"] == second.id
 
 
 def test_abandoned_search_is_collectable_without_cyclic_gc(gap):
@@ -602,9 +671,13 @@ def test_each_sort_ranks_exact_candidates_by_its_own_cost_then_discovery(catalog
         ]
         assert [index for index, _ in job.ordered()] == [1, 2, 3, 4, 0]  # discovery
         response = job.response(session, {"sort": goal})
-        assert job.options["sort"] == goal
+        assert job.options["sort"] == goal == response["sort"]
         assert [item["index"] for item in response["candidates"]] == order
         assert [index for index, _ in job.ordered()] == order
+        # Published, they rank alike from the session's own layout and stock.
+        session.candidates, session._candidate_revision = list(job.solutions), session.revision
+        published = published_page(session, {"sort": goal})
+        assert [item["index"] for item in published["candidates"]] == order
     finally:
         job.close()
 

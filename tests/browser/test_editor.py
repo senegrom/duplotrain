@@ -789,6 +789,59 @@ def test_reported_bridge_search_preview_apply_and_undo(editor):
     assert not errors
 
 
+def test_published_pages_outlive_a_train_analysis_and_apply_exactly(editor):
+    import re
+
+    from playwright.sync_api import expect
+
+    from duplotrain.editor_search import published_page
+
+    page, session, url, errors = editor
+    session.inventory = {"curve": 14, "straight": 6, "switch": 2, "ramp": 2}
+    session.history = [build_chain([(session.catalog["curve"], 0, 1)] * 6)]
+    load(page, url)
+    original = session.snapshot()
+    page.locator("#reversing").uncheck()
+    page.locator("#solve").tap()
+    expect(page.locator("#status")).to_contain_text("8 alternative(s) found", timeout=30000)
+    page.locator("#find-more").tap()
+    expect(page.locator("#status")).to_contain_text("16 alternative(s) found", timeout=30000)
+    # Publication sent the shown page alone; the engine keeps all sixteen.
+    assert page.evaluate("S.candidates === interactiveJob.candidates && S.candidates.length") == 8
+    assert len(session.candidates) == 16
+    page.locator("#candidate-next").tap()
+    expect(page.locator("#candidate-page")).to_have_text("Page 2 / 2")
+    for label in ("Test train", "Find and analyse train routes",
+                  "Search goals and floor constraints"):
+        summary = page.locator("summary", has_text=re.compile("^" + re.escape(label) + "$"))
+        if summary.locator("..").get_attribute("open") is None:
+            summary.tap()
+    page.locator("#route-all").tap()
+    expect(page.locator("#route-report")).to_contain_text("12 / 12 runs", timeout=30000)
+    # The analysis replaced the search, not the pages it published.
+    assert page.evaluate("interactiveJob") is None
+    expect(page.locator("#candidate-page")).to_have_text("Page 2 / 2")
+    expect(page.locator(".cand").first).to_have_attribute("data-candidate-index", "8")
+    page.locator("#candidate-prev").tap()
+    expect(page.locator("#candidate-page")).to_have_text("Page 1 / 2")
+    expect(page.locator(".cand").first).to_have_attribute("data-candidate-index", "0")
+    with session.lock:  # the server thread answers the page's requests
+        ranked = [c["index"] for c in published_page(session, {"sort": "footprint"})["candidates"]]
+    assert ranked[1] != 1  # the ranking moves the second card
+    page.locator("#candidate-sort").select_option("footprint")
+    second = page.locator(".cand").nth(1)
+    expect(second).to_have_attribute("data-candidate-index", str(ranked[1]))
+    chosen = session.candidates[ranked[1]].layout
+    second.get_by_role("button", name="Preview", exact=True).tap()
+    second.get_by_role("button", name="Apply").tap()
+    wait_count(page, len(chosen))
+    assert session.layout == chosen
+    page.locator("#undo").tap()
+    wait_count(page, 6)
+    assert session.snapshot() == original
+    assert not errors
+
+
 def exercise_project_history_and_tools(page):
     """Run identical new UI flows on the HTTP host and the real WASM worker."""
     import json

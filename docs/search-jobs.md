@@ -26,7 +26,12 @@ destroying its worker or undo history, and publishes the accepted suggestions.
 while the search is running is not directly applicable: the engine must first
 publish its candidate revision. Starting a new search withdraws the suggestions
 published before it. Applying a suggestion is one normal, undoable edit and
-releases the old job.
+releases the old job. Publication sends the page shown, not every suggestion;
+the engine keeps them all until the next edit or search. Once the search is
+gone, because a train analysis replaced it, it expired or a tick failed, the
+engine still pages and ranks them as the search did, so the cards, their pages
+and the ranking stay; Find more, Resume and Search harder then need a new
+search.
 
 Ranking choices are discovery order, added-piece count, footprint area, scarce
 stock consumption, new junctions and new bridge parts. Exact candidates rank
@@ -36,7 +41,11 @@ by the corresponding available count, with a denominator of at least one.
 Footprint ranking uses the existing sampled layout dimensions; it is not a
 substitute for the width-inclusive room check below. Every request of a search
 carries the chosen ranking, so a ranking chosen while the search runs applies
-from its next checkpoint, starting at the first page.
+from its next checkpoint, starting at the first page. One chosen during the
+search's final publication, Check layout, Test train or a train analysis is
+asked for once that ends, again from the first page; one chosen while Find
+more, Resume or Search harder starts applies from the first page as well. One
+chosen during any other request applies from the next page asked for.
 
 Per-piece exclusion checkboxes, and the junction/bridge shortcuts, affect the
 next new search's available pieces, not owned inventory or existing track.
@@ -177,5 +186,10 @@ witnesses remain per-run settings, not persistent layout geometry.
 
 Interactive completion uses `/api/search/start`, then `tick`, `page`,
 `pause`, `resume`, `continue`, `publish` and `discard`; subsequent requests carry
-the job ID and current revision. Train analysis uses `/api/routes/start`, `tick`,
-`pause`, `resume` and `discard`.
+the job ID and current revision. Every job reply names the ranking (`sort`) its
+page was built with. `publish` with `page_only: true` returns the state without
+the candidate list (`candidates` is empty; the page is in `search_job`); without
+it every candidate is listed. When the job is gone but its suggestions are still
+published (see Completion controls), `page` answers with `status: "published"`,
+`found`, `page`, `sort` and `candidates`. Train analysis
+uses `/api/routes/start`, `tick`, `pause`, `resume` and `discard`.

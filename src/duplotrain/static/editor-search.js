@@ -12,6 +12,27 @@ const nextJobTurn = () => document.hidden ? Promise.resolve()
 function visibleCandidates() {
   return interactiveJob?.revision === S?.revision ? interactiveJob.candidates : S?.candidates || [];
 }
+// Publication sends the page shown, not every suggestion (page_only). That page
+// stays the session's when the job is gone; only a page of the published
+// revision is kept, and its array is shared, never copied.
+function retainPublishedPage() {
+  if (interactiveJob?.revision === S?.revision &&
+      S?.search_job?.job_id === interactiveJob.job_id && S.search_job.revision === S.revision) {
+    S.candidates = interactiveJob.candidates;
+    S.search_job = interactiveJob;
+  }
+}
+// Once the job is gone, the engine still pages and ranks what it published.
+const publishedPages = () =>
+  !interactiveJob && S?.search_job?.revision === S?.revision ? S.search_job : null;
+// The cards follow the Rank select: a ranking chosen while another request
+// ran, such as a search's final publication, is asked for once it is done.
+function followRanking() {
+  const pages = interactiveJob?.revision === S?.revision ? interactiveJob : publishedPages();
+  if (!pages) return;
+  if (pages.sort && pages.sort !== jobView().sort) return searchPageTo(0);
+  searchPage = pages.page;  // a ranking changed and changed back: the page shown stays
+}
 function clearInteractiveState() {
   jobSequence++; interactiveJob = routeAnalysis = null;
   jobPauseRequested = true; jobLoop = false; refreshBusy();
@@ -82,21 +103,26 @@ function renderJobControls() {
     const target = el(id); target.hidden = !visible; target.disabled = disabled;
   };
   const job = interactiveJob, active = !!job && job.revision === S?.revision;
+  const pages = active ? job : publishedPages();
   show("find-more", active && job.resumable, jobLoop);
   show("resume-search", active && job.status === "paused", jobLoop);
+  if (pages) {
+    const total = Math.max(1, Math.ceil(pages.found / 8));
+    el("candidate-page").textContent = `Page ${pages.page + 1} / ${total}`;
+    show("candidate-prev", total > 1, jobLoop || pages.page === 0);
+    show("candidate-next", total > 1, jobLoop || pages.page + 1 >= total);
+  } else {
+    for (const id of ["candidate-prev", "candidate-next"]) show(id, false);
+    el("candidate-page").textContent = "";
+  }
   if (active) {
     show("expand-search", job.can_harden, jobLoop);
-    const total = Math.max(1, Math.ceil(job.found / 8));
-    el("candidate-page").textContent = `Page ${job.page + 1} / ${total}`;
-    show("candidate-prev", total > 1, jobLoop || job.page === 0);
-    show("candidate-next", total > 1, jobLoop || job.page + 1 >= total);
     el("search-report").textContent =
       `${job.stage}: ${job.searched.toLocaleString()} search nodes; ${job.found} distinct alternative(s). ` +
       `${job.status.replaceAll("_", " ")}. Sorted best among found only; no global optimum guaranteed. ` +
       "Constraints shown belong to this search; changed controls apply to a new search.";
   } else {
-    for (const id of ["candidate-prev", "candidate-next", "expand-search"]) show(id, false);
-    el("candidate-page").textContent = "";
+    show("expand-search", false);
     el("search-report").textContent = "";
   }
   if (S) show("close-all", true, jobLoop || (S.open_ends?.length ?? 0) < 2);
@@ -126,10 +152,11 @@ async function publishSearch(sequence) {
   const chosenIndex = (interactiveJob.candidates || []).find(c =>
     `${c.revision}:${c.index}` === selectedCandidate)?.index;
   const next = await api("/api/search/publish", {job_id: interactiveJob.job_id,
-    revision: interactiveJob.revision, ...jobView()}, true);
+    revision: interactiveJob.revision, page_only: true, ...jobView()}, true);
   if (sequence !== jobSequence) return;
   const before = S.revision;
   S = next; interactiveJob = next.search_job;
+  retainPublishedPage();
   // Publication changes candidate indices' revision, not the immutable problem
   // or its layout: picks, selectors and a train trace made on it stay valid.
   interactionRevision = S.revision;
@@ -181,6 +208,7 @@ async function driveSearchTicks(sequence) {
       if (finalMessage) status(finalMessage, failed ? "err" : "");
     }
   }
+  if (sequence === jobSequence) await followRanking();
 }
 async function startInteractiveSearch(grow, close, allGaps = false) {
   if (!S || jobLoop || apiBusy) return;
@@ -197,7 +225,7 @@ async function startInteractiveSearch(grow, close, allGaps = false) {
     interactiveJob = response; routeAnalysis = null; searchPage = 0;
     selectedCandidate = null; preview = null;
     // The engine withdrew the previous suggestions; only this job's can follow.
-    S.candidates = [];
+    S.candidates = []; delete S.search_job;
     await driveSearchTicks(sequence);
   } catch (error) {
     // A refused start leaves the engine's previous job as it was.
@@ -206,26 +234,38 @@ async function startInteractiveSearch(grow, close, allGaps = false) {
 }
 async function continueSearch(harder = false, resume = false) {
   if (!interactiveJob || jobLoop || apiBusy || interactiveJob.revision !== S?.revision) return;
-  const sequence = ++jobSequence;
+  const sequence = ++jobSequence, {sort} = jobView();
   try {
     const response = await api(resume ? "/api/search/resume" : "/api/search/continue",
       {job_id: interactiveJob.job_id, revision: interactiveJob.revision, harder, ...jobView()});
     if (!jobCurrent(sequence, response)) return;
     interactiveJob = response;
+    // A ranking chosen while the request ran applies from the first page.
+    if (jobView().sort !== sort) searchPage = 0;
     el("max-pieces").value = response.max_pieces;
     await driveSearchTicks(sequence);
   } catch (error) { jobRequestFailed(error, sequence, () => { interactiveJob = null; }); }
 }
 async function searchPageTo(page) {
-  if (!interactiveJob || jobLoop || apiBusy) return;
+  const pages = interactiveJob || publishedPages();
+  if (!pages || jobLoop || apiBusy) return;
   const sequence = jobSequence, {sort} = jobView();
   try {
-    const response = await api("/api/search/page", {job_id: interactiveJob.job_id,
-      revision: interactiveJob.revision, ...jobView(), page});
+    const response = await api("/api/search/page", {job_id: pages.job_id,
+      revision: pages.revision, ...jobView(), page});
     if (!jobCurrent(sequence, response)) return;
-    interactiveJob = response; searchPage = response.page;
+    searchPage = response.page;
+    // A job the engine no longer holds is answered from what it published.
+    if (response.status === "published") {
+      interactiveJob = null; S.search_job = response; S.candidates = response.candidates;
+    } else { interactiveJob = response; retainPublishedPage(); }
     renderCandidates(); renderJobControls(); draw();
-  } catch (error) { jobRequestFailed(error, sequence, () => { interactiveJob = null; }); return; }
+  } catch (error) {
+    jobRequestFailed(error, sequence, () => {
+      if (interactiveJob) interactiveJob = null; else delete S.search_job;
+    });
+    return;
+  }
   // The Rank select changed while the request ran, and that change was dropped.
   if (jobView().sort !== sort) await searchPageTo(0);
 }
@@ -271,6 +311,7 @@ async function driveRouteTicks(sequence) {
     jobLoop = false; refreshBusy(); renderJobControls(); refreshStatus();
     if (failure) status(failure, "err");
   } }
+  if (sequence === jobSequence) await followRanking();
 }
 async function startRouteAnalysis(scope = "all") {
   if (!S || jobLoop || apiBusy) return;
@@ -280,6 +321,7 @@ async function startRouteAnalysis(scope = "all") {
       ...(scope === "selected" ? {start: JSON.parse(el("train-start").value)} : {}),
       goal: el("route-goal").value || "visited", max_runs: Number(el("route-max-runs").value || 20000)});
     if (!jobCurrent(sequence, response)) return;
+    retainPublishedPage();
     interactiveJob = null; routeAnalysis = response;
     await driveRouteTicks(sequence);
   } catch (error) {
@@ -307,7 +349,9 @@ function bindSearchEvents() {
   on("candidate-next", () => searchPageTo(searchPage + 1));
   el("candidate-sort").addEventListener("change", () => {
     updateProjectStatus();
-    // A running search re-ranks at its next checkpoint, from the first page.
+    // A running search re-ranks at its next checkpoint, from the first page. A change
+    // made while a search, a route analysis, Test train or Check layout runs is asked
+    // for when it ends (followRanking); one made during any other request is dropped.
     if (jobLoop) searchPage = 0; else searchPageTo(0);
   });
   for (const id of ["room-bounds", "keep-out"]) el(id).addEventListener("input", updateProjectStatus);

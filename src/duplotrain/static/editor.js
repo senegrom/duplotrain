@@ -1360,6 +1360,7 @@ async function checkLayout() {
     report.missing.forEach(m => row(`${m.name}: ${m.missing} missing (${m.used} used, ${m.owned} owned)`, m.placements));
     row(`Provisional geometry: ${report.provisional.length} piece(s)`, report.provisional);
     row(report.model_note);
+    await followRanking();
   } catch (error) { status(error.message, "err"); }
 }
 

@@ -615,3 +615,230 @@ test("a search's reason is shown beside the alternatives it did find", () => {
   h.context.done = job({status: "exhausted", found: 3, reason, resumable: false, can_harden: false});
   assert.match(h.run("searchOutcome(done)"), /3 alternative\(s\) found.*too large to save/);
 });
+
+// An engine with sixteen suggestions behind the editor's own api(), answering as
+// the real one does: every page names its ranking ("pieces" reverses discovery
+// order), publication honours page_only, and once the search is gone (a train
+// analysis replaced it, or a tick failed) a page request is answered from what
+// the search published. `hold` keeps one route's answer back until release(), which
+// answers it, or refuses it with `refuse`.
+function engine(hold = null, {failTick = false, refuse = false} = {}) {
+  const calls = [];
+  let gone = false, held = null, published = false;
+  const state = scene([], 7); state.open_ends = [[0, 0], [5, 1]];
+  const h = harness({state, events: true, omit: ["api"],
+    overrides: {redraw() {}, setTimeout: fn => { fn(); return 1; }}});
+  const order = sort => [...Array(16).keys()].sort((a, b) => sort === "pieces" ? b - a : a - b);
+  const page = (body, revision) => ({found: 16, page: body.page ?? 0, sort: body.sort,
+    candidates: order(body.sort).slice((body.page ?? 0) * 8, (body.page ?? 0) * 8 + 8)
+      .map(i => candidate(i, revision))});
+  const answer = (path, body) => {
+    if (path === "/api/search/start") return job({sort: "discovery"});
+    if (path === "/api/search/continue") return job({revision: 8, found: 16, page: body.page, sort: body.sort});
+    if (path === "/api/search/tick") {
+      if (failTick && published) { gone = true; throw new Error("Worker failed"); }
+      return job({revision: h.context.S.revision, status: "results_ready", ...page(body, h.context.S.revision)});
+    }
+    if (path === "/api/search/publish") {
+      published = true;
+      return {...h.context.S, revision: 8,
+        candidates: body.page_only ? [] : order("discovery").map(i => candidate(i, 8)),
+        search_job: job({revision: 8, status: "results_ready", ...page(body, 8)})};
+    }
+    if (path === "/api/search/page") return gone ? {revision: 8, status: "published", ...page(body, 8)} :
+      job({revision: 8, status: "results_ready", ...page(body, 8)});
+    if (path === "/api/routes/start") { gone = true; return route({revision: 8}); }
+    if (path === "/api/routes/tick") return route({revision: 8, status: "complete", complete: true});
+    if (path === "/api/check") return {revision: 8, connector_closed: false, open_ends: [], joint_issues: [],
+      overlaps: [], overlap_check_complete: true, missing: [], provisional: [], model_note: "m"};
+    if (path === "/api/drive") return {revision: 8, steps: [], terminal: null, cycle_start: null, period: null,
+      outcome: "dead end", reversals: 0, visited_drivable: [], drivable_count: 1, complete: true,
+      unvisited: [], cycle_pieces: []};
+    if (path === "/api/apply") return {...scene([], 9), open_ends: []};
+    throw new Error("Unexpected API: " + path);
+  };
+  h.context.window.duplotrainApi = (path, body) => {
+    calls.push([path.replace("/api/", ""), body.page, body.sort, body.page_only, body.index, body.revision]);
+    // A held request is answered, or refused, when the test releases it.
+    if (path === hold) return new Promise((resolve, reject) => {
+      held = () => refuse ? reject(Object.assign(new Error("refused"), {refused: true}))
+        : resolve(answer(path, body));
+    });
+    try { return Promise.resolve(answer(path, body)); } catch (error) { return Promise.reject(error); }
+  };
+  return {h, calls, release: () => held()};
+}
+const shown = h => h.run("visibleCandidates().map(c => c.index).join()");
+
+test("publication asks for one page and keeps it as the session's suggestions", async () => {
+  const {h, calls} = engine();
+  await h.run("startInteractiveSearch(null, null)");
+  assert.deepEqual(calls.find(c => c[0] === "search/publish").slice(0, 4), ["search/publish", 0, "discovery", true]);
+  assert.equal(h.context.S.candidates.length, 8);  // the reply had none: the page is kept instead
+  assert.equal(h.run("S.candidates === interactiveJob.candidates && S.search_job === interactiveJob"), true);
+  await h.run("searchPageTo(1)");
+  assert.equal(h.run("S.candidates === interactiveJob.candidates"), true);
+  assert.equal(shown(h), "8,9,10,11,12,13,14,15");
+});
+
+test("an obsolete publication cannot replace a newer editor session", async () => {
+  let release;
+  const h = app({api: () => new Promise(resolve => { release = resolve; })});
+  h.context.done = job({status: "results_ready", found: 8});
+  h.run("interactiveJob = done; jobSequence = 3");
+  const publishing = h.run("publishSearch(3)");
+  h.run("jobSequence = 4; S = {...S, revision: 12, candidates: []}");
+  release({...h.context.S, revision: 8, candidates: [], search_job: job({revision: 8})});
+  await publishing;
+  assert.equal(h.context.S.revision, 12);
+});
+
+for (const [name, end] of [["a train analysis replaced the search", 'startRouteAnalysis("all")'],
+                           ["a Find more tick failed", "continueSearch()"]]) {
+  test(`published pages stay reachable and rankable once ${name}`, async () => {
+    const {h, calls} = engine(null, {failTick: name.includes("tick")});
+    await h.run("startInteractiveSearch(null, null)");
+    await h.run("searchPageTo(1)");
+    await h.run(end);
+    assert.equal(h.run("interactiveJob"), null);
+    assert.equal(shown(h), "8,9,10,11,12,13,14,15");
+    assert.equal(h.el("candidate-page").textContent, "Page 2 / 2");
+    assert.equal(h.el("candidate-prev").hidden, false);
+    assert.equal(h.el("find-more").hidden, true);
+    await h.el("candidate-prev").click();
+    assert.deepEqual(calls.at(-1).slice(0, 3), ["search/page", 0, "discovery"]);
+    assert.equal(shown(h), "0,1,2,3,4,5,6,7");
+    assert.equal(h.el("candidate-page").textContent, "Page 1 / 2");
+    h.el("candidate-sort").value = "pieces"; h.el("candidate-sort").fire("change"); await turn();
+    assert.deepEqual(calls.at(-1).slice(0, 3), ["search/page", 0, "pieces"]);
+    assert.equal(shown(h), "15,14,13,12,11,10,9,8");
+    // The stable index applies, at the published revision.
+    const row = h.run("candidateRows[2]"); await row.show.click(); await row.apply.click();
+    assert.deepEqual(calls.at(-1).slice(0, 1).concat(calls.at(-1).slice(4)), ["apply", 13, 8]);
+  });
+}
+
+for (const change of ["interactiveJob.revision = 99", 'S.search_job.job_id = "other"',
+                      "S.search_job.revision = 99", "delete S.search_job"]) {
+  test(`an unpublished or stale page never replaces the kept one: ${change}`, async () => {
+    const {h} = engine();
+    await h.run("startInteractiveSearch(null, null)");
+    h.run(`window.kept = S.candidates; interactiveJob = {...interactiveJob, candidates: [{index: 9}]};
+      ${change}; retainPublishedPage()`);
+    assert.equal(h.run("S.candidates === window.kept"), true);
+  });
+}
+
+test("a new search withdraws the published pager with the suggestions", async () => {
+  const {h} = engine();
+  await h.run("startInteractiveSearch(null, null)");
+  assert.equal(h.el("candidate-page").textContent, "Page 1 / 2");
+  h.context.window.duplotrainApi = async path => {
+    if (path === "/api/search/start") return job({revision: 8, sort: "discovery"});
+    return new Promise(() => {});  // the new search's first tick never answers
+  };
+  h.run("startInteractiveSearch(null, null)"); await turn();
+  assert.equal(h.context.S.search_job, undefined);
+  assert.deepEqual(clean(h.context.S.candidates), []);
+  assert.equal(h.run("publishedPages()"), null);
+});
+
+test("a failed request for a published page withdraws that pager, not the cards", async () => {
+  const {h} = engine();
+  await h.run("startInteractiveSearch(null, null)");
+  await h.run('startRouteAnalysis("all")');
+  h.context.window.duplotrainApi = async () => {
+    throw new Error("This search is no longer active; start a new search");
+  };
+  await h.el("candidate-next").click();
+  assert.equal(h.el("candidate-next").hidden, true);
+  assert.equal(shown(h), "0,1,2,3,4,5,6,7");
+  assert.match(h.notices.at(-1).text, /no longer active/);
+});
+
+for (const [name, run, hold, expected] of [
+  ["the final publication", "startInteractiveSearch(null, null)", "/api/search/publish",
+   [["search/publish", 0, "discovery"], ["search/page", 0, "pieces"]]],
+  ["Check layout", "checkLayout()", "/api/check", [["check", undefined, undefined], ["search/page", 0, "pieces"]]],
+  ["Test train", 'el("train-start").value = "[0,0]"; testTrain()', "/api/drive",
+   [["drive", undefined, undefined], ["search/page", 0, "pieces"]]],
+  ["a train analysis", 'startRouteAnalysis("all")', "/api/routes/tick",
+   [["routes/start", undefined, undefined], ["routes/tick", undefined, undefined], ["search/page", 0, "pieces"]]],
+]) {
+  test(`a ranking chosen during ${name} is asked for once it is done`, async () => {
+    const {h, calls, release} = engine(hold);
+    if (hold !== "/api/search/publish") {
+      await h.run("startInteractiveSearch(null, null)");
+      await h.run("searchPageTo(1)");
+    }
+    const before = calls.length;
+    const action = h.run(run);
+    await turn();
+    h.el("candidate-sort").value = "pieces"; h.el("candidate-sort").fire("change");
+    release(); await action; await turn();
+    const tail = calls.slice(before).map(c => c.slice(0, 3)).filter(c => c[0] !== "search/start" && c[0] !== "search/tick");
+    assert.deepEqual(tail, expected);
+    assert.equal(shown(h), "15,14,13,12,11,10,9,8");
+    assert.equal(h.el("candidate-page").textContent, "Page 1 / 2");
+  });
+}
+
+test("a ranking chosen while Find more is asked for starts its search on the first page", async () => {
+  const {h, calls, release} = engine("/api/search/continue");
+  await h.run("startInteractiveSearch(null, null)");
+  await h.run("searchPageTo(1)");
+  const before = calls.length;
+  const more = h.run("continueSearch()");
+  h.el("candidate-sort").value = "pieces"; h.el("candidate-sort").fire("change");
+  release(); await more; await turn();
+  assert.deepEqual(calls.slice(before).map(c => c.slice(0, 3)),
+    [["search/continue", 1, "discovery"], ["search/tick", 0, "pieces"], ["search/publish", 0, "pieces"]]);
+  assert.equal(shown(h), "15,14,13,12,11,10,9,8");
+});
+
+test("an unchanged ranking asks for nothing more after the publication or Check layout", async () => {
+  const {h, calls} = engine();
+  await h.run("startInteractiveSearch(null, null)");
+  await h.run("checkLayout()");
+  assert.deepEqual(calls.map(c => c[0]), ["search/start", "search/tick", "search/publish", "check"]);
+});
+
+test("a ranking changed and changed back during Check layout keeps the page shown", async () => {
+  const {h, calls, release} = engine("/api/check");
+  await h.run("startInteractiveSearch(null, null)");
+  await h.run("searchPageTo(1)");
+  const before = calls.length;
+  const check = h.run("checkLayout()"); await turn();
+  for (const sort of ["pieces", "discovery"]) { h.el("candidate-sort").value = sort; h.el("candidate-sort").fire("change"); }
+  release(); await check; await turn();
+  assert.deepEqual(calls.slice(before).map(c => c[0]), ["check"]);
+  assert.equal(h.el("candidate-page").textContent, "Page 2 / 2");
+  assert.equal(h.run("searchPage"), 1);  // Prev and Next step from the page shown
+});
+
+test("a ranking changed and changed back during Find more's final publication keeps the page shown", async () => {
+  const {h, calls, release} = engine("/api/search/publish");
+  const first = h.run("startInteractiveSearch(null, null)"); await turn(); release(); await first;
+  await h.run("searchPageTo(1)");
+  const before = calls.length;
+  const more = h.run("continueSearch()"); await turn();
+  for (const sort of ["pieces", "discovery"]) { h.el("candidate-sort").value = sort; h.el("candidate-sort").fire("change"); }
+  release(); await more; await turn();
+  assert.deepEqual(calls.slice(before).map(c => c.slice(0, 3)),
+    [["search/continue", 1, "discovery"], ["search/tick", 1, "discovery"], ["search/publish", 1, "discovery"]]);
+  assert.equal(h.el("candidate-page").textContent, "Page 2 / 2");
+  assert.equal(h.run("searchPage"), 1);  // Prev and Next step from the page shown
+});
+
+test("a ranking changed and changed back during a refused edit keeps the page shown", async () => {
+  // No follow-up asks for a ranking after an ordinary request: the page shown stays.
+  const {h, release} = engine("/api/inventory", {refuse: true});
+  await h.run("startInteractiveSearch(null, null)");
+  await h.run("searchPageTo(1)");
+  h.el("probe-count").value = "-1";
+  const submit = h.run('submitInventory("straight", el("probe-count"), false)'); await turn();
+  for (const sort of ["pieces", "discovery"]) { h.el("candidate-sort").value = sort; h.el("candidate-sort").fire("change"); }
+  release(); await submit; await turn();
+  assert.equal(h.el("candidate-page").textContent, "Page 2 / 2");
+  assert.equal(h.run("searchPage"), 1);  // Prev and Next step from the page shown
+});

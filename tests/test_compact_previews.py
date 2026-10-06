@@ -174,6 +174,84 @@ def test_search_job_previews_follow_the_negotiated_contract(transport):
             assert all(("format" in c["preview"]) == negotiated for c in candidates)
 
 
+@pytest.mark.parametrize("page_only", [False, True])
+def test_page_only_publication_builds_one_page_and_keeps_every_exact_candidate(monkeypatch,
+                                                                               page_only):
+    path = Path(__file__).parent / "fixtures/bridge-gap.json"
+    base = layout_from_dict(json.loads(path.read_text()), default_catalog())
+    session = Session(history=[base], unlimited=True)
+    before = session.snapshot()
+    job = dispatch_session(session, "/api/search/start", {"revision": 0, "max_results": 16})
+    while job["status"] == "running":
+        job = dispatch_session(session, "/api/search/tick",
+                               {"revision": 0, "job_id": job["job_id"]})
+    built, build = [], session._candidate_json
+
+    def record(index, *args, **kwargs):
+        built.append(index)
+        return build(index, *args, **kwargs)
+
+    monkeypatch.setattr(session, "_candidate_json", record)
+    response = dispatch_session(session, "/api/search/publish", {
+        "job_id": job["job_id"], "revision": 0, "preview_format": PREVIEW_FORMAT,
+        "page_only": page_only, "page": 1, "sort": "pieces",
+    })
+    # The requested page alone, where a full reply builds every candidate too.
+    assert len(built) == (8 if page_only else 24)
+    assert len(response["candidates"]) == (0 if page_only else 16)
+    shown = response["search_job"]["candidates"]
+    assert len(shown) == 8 and len(session.candidates) == 16
+    assert session.snapshot() == before
+    assert all(c["revision"] == c["preview"]["base_revision"] == session.revision
+               for c in shown)
+    # A later page's index, not its place on the screen, selects the exact layout.
+    index = shown[-1]["index"]
+    chosen = session.candidates[index].layout
+    session.apply_candidate(index, session.revision)
+    assert session.layout == chosen
+    session.undo()
+    assert session.snapshot() == before
+
+
+@pytest.mark.parametrize("value", [None, 1, "true", []])
+def test_a_bad_page_only_value_publishes_nothing(value):
+    session = Session(history=[build_chain([(default_catalog()["curve"], 0, 1)] * 6)],
+                      inventory={"curve": 12})
+    job = dispatch_session(session, "/api/search/start", {"revision": 0})
+    before = unchanged(session)
+    with pytest.raises(ValueError, match="page_only"):
+        dispatch_session(session, "/api/search/publish",
+                         {"revision": 0, "job_id": job["job_id"], "page_only": value})
+    assert unchanged(session) == before
+    assert session._interactive_job.id == job["job_id"]
+
+
+@pytest.mark.parametrize("transport", ["worker", "http"])
+def test_page_only_publication_answers_alike_over_the_worker_and_http(transport):
+    session = Session(history=[build_chain([(default_catalog()["curve"], 0, 1)] * 6)],
+                      inventory={"curve": 12})
+    adapter = load_adapter(session)
+    with running_server(session) as server:
+        def request(path, body):
+            body = {"revision": session.revision, "preview_format": PREVIEW_FORMAT, **body}
+            if transport == "worker":
+                reply = json.loads(adapter.dispatch(path, json.dumps(body)))
+                assert "__error" not in reply
+                return reply
+            status, reply = post(server, path, body)
+            assert status == 200
+            return reply
+
+        job = request("/api/search/start", {"max_results": 2})
+        while job["status"] == "running":
+            job = request("/api/search/tick", {"job_id": job["job_id"]})
+        published = request("/api/search/publish", {"job_id": job["job_id"], "page_only": True})
+        assert published["candidates"] == []
+        assert published["search_job"]["candidates"] == request(
+            "/api/state", {})["candidates"] == session.state(
+            preview_format=PREVIEW_FORMAT)["candidates"]
+
+
 @pytest.mark.parametrize("transport", ["worker", "http"])
 def test_a_stale_request_answers_in_the_negotiated_preview_contract(transport):
     session = candidate_session()

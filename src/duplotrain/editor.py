@@ -450,8 +450,14 @@ class Session:
             out[pid] = _count(count)
         return out
 
-    def state(self, *, preview_format: str | None = None) -> dict[str, Any]:
-        """Return fresh state; compact previews are explicitly negotiated by clients."""
+    def state(
+        self, *, preview_format: str | None = None, include_candidates: bool = True,
+    ) -> dict[str, Any]:
+        """Return fresh state; compact previews are explicitly negotiated by clients.
+
+        Without *include_candidates* the suggestions are left out, as a page_only
+        publication leaves them: the session still holds every exact layout.
+        """
         if preview_format is not None and preview_format != PREVIEW_FORMAT:
             raise ValueError("unsupported preview format")
         layout = self.layout
@@ -540,7 +546,7 @@ class Session:
             "snapshot": self.snapshot(),
             "candidates": [
                 self._candidate_json(i, s, preview_format=preview_format)
-                for i, s in enumerate(self.candidates)
+                for i, s in enumerate(self.candidates if include_candidates else ())
             ],
         }
 

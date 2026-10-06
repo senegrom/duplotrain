@@ -43,6 +43,7 @@ async function testTrain() {
     const trace = await api("/api/drive", {start, switch_states: {...initialSwitches}});
     if (sequence !== trainConfigSequence || trace.revision !== S.revision) return;
     trainTrace = trace; trainStep = -1; showTrainStep(); draw();
+    await followRanking();
   } catch (error) {
     if (sequence === trainConfigSequence || error.code === "stale_revision") status(error.message, "err");
   }
