@@ -148,9 +148,8 @@ k up to the lookahead horizon
 ([performance.md](performance.md#reverse-reachability-tables)). Both arithmetic
 engines use exact values. Separating the projections
 avoids multiplying states for bridge routes: each may admit a different route,
-which enlarges the allowed set. The move pool includes routes through preplaced
-pieces, even when none remain in inventory. Stock counts, connector kinds,
-placement frames and collisions are also ignored. Absence from either complete
+which enlarges the allowed set. Stock counts, connector kinds, placement frames
+and collisions are also ignored. Absence from either complete
 projection proves a tail impossible; membership still requires actual coupled 3D
 geometry, inventory, exact joints and the final actual-link overlap check.
 
@@ -306,8 +305,7 @@ the sum of those joint gaps. The bound therefore uses `slop - slack_used`, once
 for the entire tail, including the final joint. Rigid retargeting preserves that
 budget for existing and future reversing targets. Both geometry and future-target
 cache keys include the remaining budget, preventing an answer for one allowance
-from being reused for another. The indexes are cleared together with the query
-cache when a search finishes, raises or is closed.
+from being reused for another.
 
 `tests/test_completion_slippage.py` compares complete ordered solutions against
 lookahead-disabled searches on both engines, including 3-4-5 mm offset endpoints,
@@ -333,8 +331,8 @@ its child visits compute their own values after consuming stock and ports. The
 parent's values remain valid when backtracking restores its state.
 
 The tables' LRU cache ([performance.md](performance.md#reverse-reachability-tables))
-belongs to one search, which empties it when it returns, raises or is closed;
-this avoids retaining its poses through the recursive DFS closure cycle.
+and the slippage indexes belong to one search, which empties both when it returns,
+raises or is closed, so the recursive DFS closure cycle retains none of their entries.
 Tests compare complete results and all search counters against
 an uncached evaluator, retain permissive fallback after eviction, separate
 catalogues, and check callback-error cleanup.
@@ -484,7 +482,7 @@ they arrived with, and the smallest identity names the same frame for every
 member of the orbit. Ties can only occur between frames with identical
 geometry, which sample to the same points. The chosen frame is materialised
 with its exact transform, so the sampled key is exactly the one that frame
-produces. Opaque custom segments keep the sampled-orbit fallback.
+produces.
 
 ## Forward probes are exact
 

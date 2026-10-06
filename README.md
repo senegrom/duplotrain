@@ -49,8 +49,10 @@ how many millimetres the joints must absorb. It never mislabels them as exact.
 Geometry for the modern light-grey system (2018+, sets 10874 / 10875 / 10882), sourced
 from measured surveys ([Cailliau](https://www.cailliau.org/en/Alphabetical/L/Lego/Duplo/Train/Rails/Dimensions/),
 [duplo-schienen.de](http://www.duplo-schienen.de/lego-duplo-schienen-geometrische-regeln.html),
-[onemetre.net](https://www.onemetre.net/OtherTopics/Duplo/Track%20dims/DuploTrack.htm))
-and the LDraw part library:
+[onemetre.net](https://www.onemetre.net/OtherTopics/Duplo/Track%20dims/DuploTrack.htm)),
+the LDraw part files and BlueBrick's measured connection library, cross-checked against
+part weights and photographs (BrickLink's stud dimensions for track parts are wrong and
+are not used):
 
 | id               | part    | geometry                                                  |
 | ---------------- | ------- | --------------------------------------------------------- |
@@ -72,14 +74,10 @@ the exception: an arch's foot overlaps a ramp's top instead, so a ramp's top car
 only an arch's foot and an arch's foot rests only on a ramp's top. An arch's crest takes
 the other arch, or a further ramp that climbs higher still. Ordinary track can stand on
 DUPLO bricks as well (a straight has three brick tubes under its middle, a curve two),
-so track raised on stacks may meet a crest or a ramp's foot; `duplotrain solve` lists
-loops standing on the floor first, and a completion never sets track under the floor
-its base stands on ([how the searches keep to both](docs/search-correctness.md#bridge-joints-and-the-floor)).
+so track raised on stacks may meet a crest or a ramp's foot; a completion never sets
+track under the floor its base stands on ([how the searches keep to both](docs/search-correctness.md#bridge-joints-and-the-floor)).
 
-These numbers come from the LDraw part files and BlueBrick's measured connection
-library, cross-checked against part weights, photographs and duplo-schienen.de's
-combination rules; BrickLink's stud dimensions for track parts are wrong and are not
-used. The one soft spot is the bridge's vertical split — derived from brick-integer
+The one soft spot is the bridge's vertical split — derived from brick-integer
 constraints and part heights rather than a published figure. Override any piece — or add entirely new ones — with a JSON catalogue, no code
 changes:
 

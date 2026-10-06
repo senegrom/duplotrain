@@ -1,8 +1,7 @@
 """The built-in piece catalogue, and loading of user-supplied ones.
 
-Numbers here come from measured sources (Cailliau's dimension survey, the LDraw part
-library, duplo-schienen.de's geometry rules, BrickLink listings) and refer to the
-modern light-grey track generation (2018+, sets 10874/10875/10882).  The load-bearing
+The numbers refer to the modern light-grey track generation (2018+, sets
+10874/10875/10882); README.md ("The pieces") names their sources.  The load-bearing
 facts:
 
 * straight (6377): connection pitch exactly **128 mm** (8 DUPLO studs)
@@ -20,15 +19,11 @@ truly close (ovals, S-bends, 90-degree lattice layouts) then test closed with no
 epsilon, and layouts that only *look* closed (the classic "Regel 3" builds, which are
 4.59 mm short) are honestly reported as forced fits.
 
-The crossing, switch and bridge plan geometry were settled by parsing the LDraw part
-files and BlueBrick's measured connection library (cross-calibrated against each
-other and against part weights and photographs).  The bridge's *vertical* split
-(57.6 mm ramp + 19.2 mm arch to a 76.8 mm crest) is derived from brick-integer
-constraints and part bounding heights rather than a published figure -- the most
-likely number to move if someone puts callipers on the real part -- so the bridge
-parts, the slight slope and the off-ramp stay flagged ``provisional``.
-Override any piece by loading a user catalogue on top -- same JSON schema, matching ids
-replace the built-ins.
+The bridge's *vertical* split (57.6 mm ramp + 19.2 mm arch to a 76.8 mm crest) is
+derived from brick-integer constraints and part bounding heights rather than a
+published figure -- the most likely number to move if someone puts callipers on the
+real part -- so the bridge parts, the slight slope and the off-ramp stay flagged
+``provisional``.
 """
 
 from __future__ import annotations

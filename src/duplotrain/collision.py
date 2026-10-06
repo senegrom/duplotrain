@@ -5,12 +5,11 @@ when any two of their sample points come closer than the sum of their half-width
 (minus a small margin so that exactly-touching parallel tracks stay legal -- sidings
 laid side by side are a feature, not a collision).
 
-Height is respected two ways.  Points whose elevations differ by at least
-``clearance`` pass over each other freely -- a blanket rule no current piece can
-reach. Separately, pieces flagged ``underpass`` let track run beneath wherever their
-deck stands at least ``UNDERPASS_MIN`` higher. The current catalogue flags both spans and ramps:
-the spans and the highest portions of the ramps can clear track, while the lower
-ramp sections stay solid. These thresholds are provisional.
+Height is respected two ways.  Points whose elevations differ by at least ``clearance``
+pass over each other freely.  Separately, pieces flagged ``underpass`` let track run
+beneath wherever their deck stands at least ``UNDERPASS_MIN`` higher. The current
+catalogue flags both spans and ramps: the spans and the highest portions of the ramps
+can clear track, while the lower ramp sections stay solid. These thresholds are provisional.
 
 Directly-linked placements are exempt from mutual checking: neighbouring pieces meet at
 their shared joint by construction, and that contact is not an overlap.  The one thing
@@ -33,9 +32,8 @@ __all__ = ["CollisionField", "TOUCH_MARGIN", "DEFAULT_CLEARANCE", "UNDERPASS_MIN
 #: apart) do not count as overlapping.
 TOUCH_MARGIN = 2.0
 
-#: Vertical separation (mm) at which one track clears another regardless of piece
-#: type. No in-system elevation reaches it; lower clearances require the
-#: ``underpass`` flag and the height-specific rule below.
+#: Vertical separation (mm) at which one track clears another regardless of piece type;
+#: lower clearances require the ``underpass`` flag and the height-specific rule below.
 DEFAULT_CLEARANCE = 120.0
 
 #: An ``underpass`` piece (the bridge arch, and the ramps near their high ends)
