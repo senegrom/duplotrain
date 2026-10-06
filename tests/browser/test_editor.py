@@ -1007,6 +1007,84 @@ def test_overlap_chooser_and_elevation_picking(editor):
     assert not errors
 
 
+def stacked_straights(session, reverse, stones=False):
+    """A ground straight and one 153.6 mm above it, crossing at their midpoints."""
+    from fractions import Fraction
+
+    from duplotrain.exact import Alg
+    from duplotrain.geometry import Pose
+    from duplotrain.layout import Placement
+
+    straight = session.catalog["straight"]
+    pieces = [Placement(straight, Pose(Alg(-64), Alg(0), Alg(0), 0)),
+              Placement(straight, Pose(Alg(0), Alg(-64), Alg(Fraction(768, 5)), 6))]
+    lower, upper = (1, 0) if reverse else (0, 1)
+    layout = Layout(pieces[::-1] if reverse else pieces)
+    if stones:
+        layout = layout.with_accessory(lower, "stone_stop").with_accessory(upper, "stone_direction")
+    session.history = [layout]
+    session.unlimited = True
+    return lower, upper
+
+
+def tap_world(page, x=0, y=0):
+    point = page.evaluate("([x, y]) => worldToScreen(x, y)", [x, y])
+    page.locator("#canvas").scroll_into_view_if_needed()
+    bounds = page.locator("#canvas").bounding_box()
+    page.touchscreen.tap(bounds["x"] + point[0], bounds["y"] + point[1])
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_stone_over_track_at_two_heights_asks_where_raised_first(editor, reverse):
+    import re
+
+    from playwright.sync_api import expect
+
+    page, session, url, errors = editor
+    _lower, upper = stacked_straights(session, reverse)
+    load(page, url)
+    initial = session.snapshot()
+    page.locator("#stones button").filter(has_text=re.compile("^Stop")).tap()
+    tap_world(page)
+    picker = page.locator("#overlap-picker")
+    expect(picker).to_be_visible()
+    expect(picker.locator("select option")).to_have_count(2)
+    assert page.evaluate("selectedPiece") == upper
+    assert not session.layout.accessories
+    picker.get_by_role("button", name="Place selected stone", exact=True).tap()
+    page.wait_for_function("S.snapshot.layout.accessories.length === 1 && !apiBusy")
+    assert session.layout.accessories[0][:2] == (upper, "stone_stop")
+    page.locator("#undo").tap()
+    page.wait_for_function("S.snapshot.layout.accessories.length === 0 && !apiBusy")
+    assert session.snapshot() == initial
+    assert not errors
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_stacked_stones_paint_raised_on_top_and_remove_the_one_chosen(editor, reverse):
+    from playwright.sync_api import expect
+
+    page, session, url, errors = editor
+    lower, upper = stacked_straights(session, reverse, stones=True)
+    load(page, url)
+    initial = session.snapshot()
+    assert page.evaluate("stoneMarkPositions().at(-1).placement") == upper  # painted last
+    page.locator("#delete-tool").tap()
+    tap_world(page)
+    picker = page.locator("#overlap-picker")
+    expect(picker).to_be_visible()
+    assert page.evaluate("selectedPiece") == upper
+    picker.locator("select").select_option(index=1)
+    assert page.evaluate("selectedPiece") == lower
+    picker.get_by_role("button", name="Remove selected stone", exact=True).tap()
+    page.wait_for_function("S.snapshot.layout.accessories.length === 1 && !apiBusy")
+    assert session.layout.accessories[0][:2] == (upper, "stone_direction")
+    page.locator("#undo").tap()
+    page.wait_for_function("S.snapshot.layout.accessories.length === 2 && !apiBusy")
+    assert session.snapshot() == initial
+    assert not errors
+
+
 def exercise_train_finishing(page):
     """Terminal playback and explicit coverage/settings on both real hosts."""
     import json

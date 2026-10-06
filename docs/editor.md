@@ -43,8 +43,11 @@ which disarms it. Old placement indices are never
 reused for a newly imported piece, and the keyboard selectors act on the
 selected indices directly. When several pieces overlap under the pointer, a
 click or the Remove tool opens a chooser that owns its allowed targets and its
-selected target: confirmation checks the originating revision, the dialog
-identity and the selected option, and any other tool invalidates an old dialog.
+selected target: confirmation checks the originating revision and engine, the
+dialog identity and the selected option, does nothing while a request or job
+runs, and any other tool invalidates an old dialog. Stones use the same chooser
+where they lie over each other at different heights; each option names the
+stone's piece, height and face or midpoint.
 An armed piece shows red arrows only at the open ends it can join: the state
 names each bridge connector's kind, the kinds each palette variant joins and the
 pieces with a road plate, two of which cannot meet, and an end the armed piece
@@ -69,9 +72,16 @@ frames. Hover hit-testing runs at most once per frame at the latest pointer
 position, visits only the pieces whose bounds contain the pointer, and repaints
 only when the hovered piece changes; clicks pick immediately. A right click
 removes the stone or piece under the pointer, through the same chooser when
-pieces overlap. Track is coloured by its height above the layout's lowest track,
-as rendered pictures measure it. This is a sampled 2D view, not a solid renderer
-or a collision model.
+pieces overlap. Stone marks paint over the track, and over each other in the
+order of their track's height. An armed stone goes to the nearest connector face
+or midpoint of a straight within reach, and a right click or the Remove tool
+takes the nearest stone mark. Where straights at different heights are within
+reach, those painted under the pointer, if any, set the height, and the nearest
+face or midpoint at that height takes the stone; where those are at different
+heights, or stone marks at different heights are painted over each other, the
+chooser lists them, topmost first. Track is coloured by its height above the
+layout's lowest track, as rendered pictures measure it. This is a sampled 2D
+view, not a solid renderer or a collision model.
 
 Conservative viewport bounds skip off-screen track batches and markers without
 changing global paint order or picking. While the view or geometry keeps

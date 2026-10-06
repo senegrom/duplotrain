@@ -256,3 +256,229 @@ test("an armed piece's status counts ends that meet as joins, not as places to a
   h.context.S.matable = [];
   assert.equal(arm(straight), "Straight rail — ahead armed. No open end takes it: it joins only ordinary track.");
 });
+
+// Stones at two heights. A straight at height z through the origin, along x or y.
+function level(z, vertical = false) {
+  const line = vertical ? [[0, -64, z], [0, 64, z]] : [[-64, 0, z], [64, 0, z]];
+  return {...track(line, `Straight at ${z}`), stone_ok: true, mid: [0, 0],
+    ports: line.map(([x, y], port) => ({x, y, port}))};
+}
+// A ground straight and one 153.6 mm above it crossing at their midpoints, in either
+// order, with a Stop stone on the ground one and a Direction stone on the raised one.
+function stacked(reverse = false, stones = false) {
+  const bottom = level(0), top = level(153.6, true);
+  if (stones) {
+    bottom.stone_marks = [{id: "stone_stop", at: null}];
+    top.stone_marks = [{id: "stone_direction", at: null}];
+  }
+  const placements = reverse ? [top, bottom] : [bottom, top];
+  const state = scene(placements); state.instance = "test-engine";
+  state.stones.catalog = {stone_stop: {name: "Stop stone", color: "#c4281c"},
+    stone_direction: {name: "Direction stone", color: "#237841"}};
+  const h = harness({state, overrides: {devicePixelRatio: 1, worldToScreen: (x, y) => [x, y], redraw() {}}});
+  h.run("canvas = {clientWidth: 500, clientHeight: 500}");
+  h.upper = placements.indexOf(top);
+  h.lower = placements.indexOf(bottom);
+  return h;
+}
+const chooser = h => h.el("overlap-picker").children;
+// The fill colours of the stone marks in the order painted.
+function stoneFills(h) {
+  const fills = [], none = () => {};
+  let arc = false;
+  h.context.recorder = new Proxy({arc() { arc = true; }, beginPath() { arc = false; },
+    fill() { if (arc) fills.push(this.fillStyle); }}, {get: (t, p) => p in t ? t[p] : none});
+  h.run("ctx = recorder; paint()");
+  return fills.filter(fill => fill === "#c4281c" || fill === "#237841");
+}
+
+for (const reverse of [false, true]) {
+  test(`stones paint in the height order of their track, placed ${reverse ? "raised" : "ground"} first`, () => {
+    // The raised stone covers the ground one whichever straight was laid first.
+    assert.deepEqual(stoneFills(stacked(reverse, true)), ["#c4281c", "#237841"]);
+  });
+
+  test(`an armed stone over track at two heights asks where, raised first (placed ${reverse ? "raised" : "ground"} first)`, async () => {
+    const h = stacked(reverse);
+    h.run('selectTool({stone: "stone_stop"})');
+    await h.run("activateAt(0, 0)");
+    assert.equal(h.calls.length, 0);
+    assert.equal(h.run("selectedPiece"), h.upper);
+    assert.match(chooser(h)[1].children[0].textContent, /153\.6 mm · Stop stone · midpoint$/);
+    await chooser(h)[2].click();
+    assert.deepEqual(h.calls.map(c => [c.path, c.body.placement, c.body.id, c.body.at_port, c.body.remove]),
+      [["/api/stone", h.upper, "stone_stop", null, false]]);
+  });
+
+  test(`a stone removed over stones at two heights asks which, the one painted on top first (placed ${reverse ? "raised" : "ground"} first)`, async () => {
+    const h = stacked(reverse, true);
+    assert.equal(h.run("stoneMarkPositions().at(-1).id"), "stone_direction");
+    await h.run("removeAt(0, 0)");
+    assert.equal(h.calls.length, 0);
+    assert.equal(h.run("selectedPiece"), h.upper);
+    await chooser(h)[2].click();
+    assert.deepEqual(h.calls.map(c => [c.body.placement, c.body.id, c.body.at_port, c.body.remove]),
+      [[h.upper, "stone_direction", null, true]]);
+  });
+}
+
+test("the stone chooser can take the lower track though the selection moves", async () => {
+  const h = stacked(false, true);
+  await h.run("removeAt(0, 0)");
+  const [, select, confirm] = chooser(h);
+  select.value = "1"; select.fire("change");
+  h.run("selectedPiece = 1");
+  await confirm.click();
+  assert.deepEqual([h.calls[0].body.placement, h.calls[0].body.id], [0, "stone_stop"]);
+});
+
+for (const change of ["revision", "engine", "tool", "cancel", "replace", "selection", "job", "invalid"]) {
+  test(`a stone chooser does nothing after ${change}`, async () => {
+    const h = stacked(false, true);
+    await h.run("removeAt(0, 0)");
+    const [, select, confirm, cancel] = chooser(h);
+    if (change === "revision") h.run("S.revision++");
+    if (change === "engine") h.run('S.instance = "new-engine"');
+    if (change === "tool") h.run("selectTool()");
+    if (change === "cancel") cancel.click();
+    if (change === "replace") await h.run("removeAt(0, 0)");
+    if (change === "selection") h.run("focusPieces([0])");
+    if (change === "job") h.run("jobLoop = true");
+    if (change === "invalid") { select.value = "999"; select.fire("change"); }
+    await confirm.click();
+    assert.equal(h.calls.length, 0);
+  });
+}
+
+for (const change of ["revision", "engine"]) {
+  test(`a stale stone chooser keeps its target after ${change}`, async () => {
+    const h = stacked(false, true);
+    await h.run("removeAt(0, 0)");
+    const [, select] = chooser(h);
+    h.run(change === "revision" ? "S.revision++" : 'S.instance = "new-engine"');
+    select.value = "1"; select.fire("change");
+    assert.equal(h.run("selectedPiece"), h.upper);
+  });
+}
+
+test("stacked face stones keep their own faces and identities in the chooser", async () => {
+  // Zoomed far out, face stones at two heights fall on one spot.
+  const low = level(0), high = level(153.6);
+  low.stone_marks = [{id: "stone_stop", at: 0}];
+  high.stone_marks = [{id: "stone_direction", at: 1}];
+  for (const pl of [low, high]) { pl.ports[0].x = -1; pl.ports[1].x = 1; }
+  const h = harness({state: scene([low, high]), overrides: {worldToScreen: (x, y) => [x, y], redraw() {}}});
+  h.run("view.scale = 0.1");
+  await h.run("removeAt(0, 0)");
+  const [, select, confirm] = chooser(h);
+  assert.equal(select.children.length, 2);
+  select.value = "1"; select.fire("change");
+  await confirm.click();
+  assert.deepEqual(h.calls.map(c => [c.body.placement, c.body.id, c.body.at_port]), [[0, "stone_stop", 0]]);
+});
+
+test("stones at one height keep the nearest rule, even painted over each other", async () => {
+  // Two level straights crossing at one height, a stone on each at the crossing: the
+  // direction mark lies 3 px east of the stop mark, over it.
+  const a = level(0), b = level(0, true);
+  a.stone_marks = [{id: "stone_stop", at: null}];
+  b.stone_marks = [{id: "stone_direction", at: null}];
+  b.mid = [3, 0];
+  const h = harness({state: scene([a, b]), overrides: {worldToScreen: (x, y) => [x, y], redraw() {}}});
+  await h.run("removeAt(2, 0)");
+  await h.run("removeAt(1, 0)");
+  assert.equal(h.el("overlap-picker").hidden, true);
+  assert.deepEqual(h.calls.map(c => c.body.id), ["stone_direction", "stone_stop"]);
+});
+
+test("off the overlap the stone or track under the pointer is taken directly", async () => {
+  // The ground mark sits 20 px east of the raised one. A click inside one mark only
+  // means that one, though the other lies within its 18 px reach.
+  const h = stacked(false, true);
+  h.context.S.layout.placements[0].mid = [20, 0];
+  await h.run("removeAt(17, 0)");
+  await h.run("removeAt(3, 0)");
+  assert.equal(h.el("overlap-picker").hidden, true);
+  assert.deepEqual(h.calls.map(c => [c.body.placement, c.body.id]), [[0, "stone_stop"], [1, "stone_direction"]]);
+  // Both midpoints lie within reach of a click 24 px up the raised straight, or 24 px
+  // along the ground one, off the other's track: the straight under the pointer takes it.
+  const place = stacked(false);
+  place.run('selectTool({stone: "stone_stop"})');
+  await place.run("activateAt(0, 24)");
+  await place.run("activateAt(24, 0)");
+  assert.equal(place.el("overlap-picker").hidden, true);
+  assert.deepEqual(place.calls.map(c => [c.body.placement, c.body.at_port]), [[1, null], [0, null]]);
+});
+
+test("places at one height keep the nearest rule, whichever straight is under the pointer", async () => {
+  // Level straights meet at the origin; 10 px onto the second one both joint faces lie
+  // 10 px away, and the tie goes to the first straight's face, the lower index.
+  const a = {...level(0), mid: [-64, 0], lines: [[[-128, 0, 0], [0, 0, 0]]],
+    ports: [{x: -128, y: 0, port: 0}, {x: 0, y: 0, port: 1}]};
+  const b = {...level(0), mid: [64, 0], lines: [[[0, 0, 0], [128, 0, 0]]],
+    ports: [{x: 0, y: 0, port: 0}, {x: 128, y: 0, port: 1}]};
+  const h = harness({state: scene([a, b]), overrides: {worldToScreen: (x, y) => [x, y], redraw() {}}});
+  assert.equal(h.run("placementAt(10, 0)"), 1);
+  h.run('selectTool({stone: "stone_stop"})');
+  await h.run("activateAt(10, 0)");
+  assert.deepEqual(h.calls.map(c => [c.body.placement, c.body.at_port]), [[0, 1]]);
+});
+
+test("a joint of raised straights keeps the nearest rule though a ground place is in reach", async () => {
+  // Two straights 76.8 mm up meet at the origin; a ground straight runs north 25 px
+  // east of the joint, its midpoint 27 px away: in reach, its track not under the pointer.
+  const raised = (x0, x1) => ({...track([[x0, 0, 76.8], [x1, 0, 76.8]]), stone_ok: true,
+    mid: [(x0 + x1) / 2, 0], ports: [{x: x0, y: 0, port: 0}, {x: x1, y: 0, port: 1}]});
+  const ground = {...track([[25, -64, 0], [25, 64, 0]]), stone_ok: true, mid: [25, 10],
+    ports: [{x: 25, y: -64, port: 0}, {x: 25, y: 64, port: 1}]};
+  const h = harness({state: scene([raised(-128, 0), raised(0, 128), ground]),
+    overrides: {worldToScreen: (x, y) => [x, y], redraw() {}}});
+  h.run('selectTool({stone: "stone_stop"})');
+  await h.run("activateAt(0, 0)");
+  assert.equal(h.el("overlap-picker").hidden, true);
+  assert.deepEqual(h.calls.map(c => [c.body.placement, c.body.at_port]), [[0, 1]]);
+});
+
+for (const z of [0, 153.6]) {
+  test(`a joint at ${z} mm keeps the nearest rule though a place at the other height is in reach`, async () => {
+    // Zoomed out, two straights at one height meet at the origin, and a straight at the
+    // other height lies flush beside the second one: its first face is 17 px from a tap
+    // 6 px onto the second straight, in reach, its track not under the pointer. Both
+    // joint faces are 6 px away, and the tie goes to the first straight's face, as it
+    // does with no other height near.
+    const level = (x0, y0, x1, y1, z) => ({...track([[x0, y0, z], [x1, y1, z]]), width: 64,
+      stone_ok: true, mid: [(x0 + x1) / 2, (y0 + y1) / 2],
+      ports: [{x: x0, y: y0, port: 0}, {x: x1, y: y1, port: 1}]});
+    const joint = [level(-128, 0, 0, 0, z), level(0, 0, 128, 0, z)];
+    for (const placements of [joint, [...joint, level(0, 16, 128, 16, z ? 0 : 153.6)]]) {
+      const h = harness({state: scene(placements), overrides: {worldToScreen: (x, y) => [x, y], redraw() {}}});
+      h.run("view.scale = 0.25");
+      h.run('selectTool({stone: "stone_stop"})');
+      await h.run("activateAt(6, 0)");
+      assert.equal(h.el("overlap-picker").hidden, true);
+      assert.deepEqual(h.calls.map(c => [c.body.placement, c.body.at_port]), [[0, 1]]);
+    }
+  });
+}
+
+for (const [x, at] of [[-70, 0], [0, null], [70, 1]]) {
+  test(`a lone straight still takes the face or midpoint clicked at x=${x}`, async () => {
+    const state = scene([level(0)]);
+    state.stones.catalog = {stone_stop: {name: "Stop stone"}};
+    const h = harness({state, overrides: {worldToScreen: (x, y) => [x, y], redraw() {}}});
+    h.run('selectTool({stone: "stone_stop"})');
+    await h.context.activateAt(x, 0);
+    assert.deepEqual(h.calls.map(c => [c.body.placement, c.body.at_port]), [[0, at]]);
+  });
+}
+
+test("a stone stands at its straight's height, read from the drawn centreline", () => {
+  const pl = level(76.8);
+  pl.stone_marks = [{id: "stone_stop", at: 0}, {id: "stone_direction", at: null}];
+  const h = harness({state: scene([pl]), overrides: {worldToScreen: (x, y) => [x, y]}});
+  const heights = code => Array.from(h.run(code));
+  assert.deepEqual(heights("stoneMarkPositions().map(m => m.z)"), [76.8, 76.8]);
+  assert.deepEqual(heights("[stoneMountsAt(-64, 0)[0].z, stoneMountsAt(0, 0)[0].z]"), [76.8, 76.8]);
+  delete pl.lines;  // nothing drawn to read a height from
+  assert.deepEqual(heights("stoneMarkPositions().map(m => m.z)"), [0, 0]);
+});

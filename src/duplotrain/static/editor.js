@@ -388,6 +388,13 @@ function segmentDistance(px, py, ax, ay, bx, by) {
   return Math.hypot(px - ax - t * dx, py - ay - t * dy);
 }
 
+// Stones clip onto level straights: a stone stands at its straight's height, read
+// where the state's 2D midpoint is taken, from the drawn centreline.
+function stoneHeight(pl) {
+  const line = pl.lines?.[0];
+  return line?.[line.length >> 1]?.[2] ?? 0;
+}
+
 function stoneMarkPositions() {
   // Screen positions of every stone mark: the draw loop and hit tests share them.
   const out = [];
@@ -403,33 +410,60 @@ function stoneMarkPositions() {
       const [sx, sy] = worldToScreen(wx, wy);
       const r = Math.max(6, 14 * view.scale);
       const oy = (k - ((pl.stone_marks.length - 1) / 2)) * r * 2.2;
-      out.push({ placement: i, id: mark.id, at_port: mark.at ?? null, x: sx, y: sy + oy, r });
+      out.push({ placement: i, id: mark.id, at_port: mark.at ?? null, x: sx, y: sy + oy, r,
+        z: stoneHeight(pl) });
     });
   });
-  return out;
+  // Marks paint over all track, and over each other in the track's height order;
+  // equal heights keep placement and within-piece order.
+  return out.sort((a, b) => a.z - b.z || a.placement - b.placement);
+}
+
+// The stone marks a click means: the nearest within reach, or, where marks at
+// different heights are painted over each other under the pointer, all of those,
+// topmost first.
+function stoneMarksAt(sx, sy) {
+  const near = stoneMarkPositions().map(m => ({...m, d: Math.hypot(m.x - sx, m.y - sy)}))
+    .filter(m => m.d < Math.max(16, m.r + 4));
+  const stacked = near.filter(m => m.d < m.r).reverse();
+  if (new Set(stacked.map(m => m.z)).size > 1) return stacked;
+  return near.sort((a, b) => a.d - b.d).slice(0, 1);
 }
 
 function placementAt(sx, sy) {
   return placementsAt(sx, sy)[0]?.placement ?? null;
 }
 
-function stoneMountAt(sx, sy) {
-  if (!S) return null;
-  let best = null;
-  S.layout.placements.forEach((pl, i) => {
+// Where a click puts an armed stone: the nearest connector face (the stone then acts
+// only on trains running into it -- the reversing-terminator trick at a buffer) or
+// midpoint of a piece that takes stones. When such places at different heights are
+// in reach, a piece among them painted under the pointer sets the height, as in track
+// picking, and the nearest place at that height takes the stone; where such pieces at
+// different heights are painted there, each one's nearest place, topmost first.
+function stoneMountsAt(sx, sy) {
+  if (!S) return [];
+  const mounts = [];
+  S.layout.placements.forEach((pl, placement) => {
     if (!pl.stone_ok) return;
-    // Near a connector face: position the stone AT that face (it then only acts on
-    // trains running into it -- the reversing-terminator trick at a buffer).
-    pl.ports.forEach((p) => {
-      const [px, py] = worldToScreen(p.x, p.y);
-      const d = Math.hypot(px - sx, py - sy);
-      if (d < 20 && (!best || d < best.d)) best = { placement: i, at_port: p.port, d };
+    let best = null;
+    const z = stoneHeight(pl);
+    pl.ports.forEach(p => {
+      const [px, py] = worldToScreen(p.x, p.y), d = Math.hypot(px - sx, py - sy);
+      if (d < 20 && (!best || d < best.d)) best = {placement, at_port: p.port, d, z};
     });
-    const [mx, my] = worldToScreen(pl.mid[0], pl.mid[1]);
-    const d = Math.hypot(mx - sx, my - sy);
-    if (d < 28 && (!best || d < best.d)) best = { placement: i, at_port: null, d };
+    const [mx, my] = worldToScreen(pl.mid[0], pl.mid[1]), d = Math.hypot(mx - sx, my - sy);
+    if (d < 28 && (!best || d < best.d)) best = {placement, at_port: null, d, z};
+    if (best) mounts.push(best);
   });
-  return best;
+  const nearest = list => list.sort((a, b) => a.d - b.d).slice(0, 1);
+  if (new Set(mounts.map(m => m.z)).size > 1) {
+    const painted = new Map(placementsAt(sx, sy).filter(h => h.painted).map(h => [h.placement, h]));
+    const under = mounts.filter(m => painted.has(m.placement));
+    if (new Set(under.map(m => m.z)).size > 1)
+      return under.sort((a, b) => compareHits(painted.get(a.placement), painted.get(b.placement)));
+    if (under.length) return nearest(mounts.filter(m => m.z === under[0].z));
+  }
+  return nearest(mounts);
 }
 
 function paint() {
@@ -891,7 +925,8 @@ async function activateAt(sx, sy) {
     } else if (deleting) {
       await removeAt(sx, sy);
     } else if (armedStone) {
-      const mount = stoneMountAt(sx, sy);
+      const mounts = stoneMountsAt(sx, sy), mount = mounts[0];
+      if (mounts.length > 1) { showOverlapPicker(mounts, false, {id: armedStone}); return; }
       if (mount) {
         S = await api("/api/stone", {placement: mount.placement, id: armedStone, at_port: mount.at_port});
         redraw();
@@ -912,8 +947,8 @@ async function removeAt(sx, sy) {
   if (!S || apiBusy || jobLoop) return;
   closeOverlapPicker(); clearHover();
   try {
-    const mark = stoneMarkPositions().map(m => ({...m, d: Math.hypot(m.x - sx, m.y - sy)}))
-      .filter(m => m.d < Math.max(16, m.r + 4)).sort((a, b) => a.d - b.d)[0];
+    const marks = stoneMarksAt(sx, sy), mark = marks[0];
+    if (marks.length > 1) { showOverlapPicker(marks, true, {}); return; }
     if (mark) {
       S = await api("/api/stone", {
         placement: mark.placement, id: mark.id, at_port: mark.at_port, remove: true,
@@ -1253,38 +1288,54 @@ function focusPieces(indices) {
   if (highlightedPieces.length) { fitView(highlightedPieces.map(i => S.layout.placements[i])); fitted = true; }
   draw();
 }
-function showOverlapPicker(hits, remove = false) {
+function showOverlapPicker(hits, remove = false, stone = null) {
   closeOverlapPicker(); clearHover();
   if (!S || !hits.length) return;
-  const box = el("overlap-picker"), revision = S.revision;
-  const choices = new Set(hits.map(h => h.placement).filter(i => Number.isInteger(i) && S.layout.placements[i]));
+  const box = el("overlap-picker"), revision = S.revision, instance = S.instance;
+  const options = hits.filter(h => Number.isInteger(h.placement) && S.layout.placements[h.placement]);
+  // A piece has one choice; stones on the same piece can have different faces
+  // and identities. Keep the choice independent of global selection controls.
+  const choices = new Map(options.map((hit, i) => [stone ? i : hit.placement, hit]));
   if (!choices.size) return;
-  const dialog = {revision, choices, target: [...choices][0]}; activeOverlap = dialog;
+  const [choice, first] = choices.entries().next().value;
+  const dialog = {revision, choices, choice, target: first.placement}; activeOverlap = dialog;
   box.replaceChildren(); box.hidden = false;
   const title = document.createElement("strong");
-  title.textContent = remove ? "Choose the piece to remove" : "Overlapping pieces";
-  const select = document.createElement("select"); select.setAttribute("aria-label", "Overlapping piece");
-  hits.filter(h => choices.has(h.placement)).forEach(hit => {
-    const option = document.createElement("option"); option.value = hit.placement;
+  title.textContent = stone ? (remove ? "Choose the stone to remove" : "Choose where to place the stone")
+    : remove ? "Choose the piece to remove" : "Overlapping pieces";
+  const select = document.createElement("select");
+  select.setAttribute("aria-label", stone ? "Overlapping stone target" : "Overlapping piece");
+  for (const [key, hit] of choices) {
+    const option = document.createElement("option"); option.value = key;
     const height = hit.z - groundOf(S.layout.placements);
-    option.textContent = `#${hit.placement + 1} ${S.layout.placements[hit.placement].name} · ${height.toFixed(1)} mm`;
+    const stoneName = stone ? S.stones.catalog[stone.id || hit.id]?.name || "Stone" : "";
+    const mount = hit.at_port == null ? "midpoint" : `port ${hit.at_port}`;
+    option.textContent = `#${hit.placement + 1} ${S.layout.placements[hit.placement].name} · ${height.toFixed(1)} mm` +
+      (stone ? ` · ${stoneName} · ${mount}` : "");
     select.append(option);
-  });
+  }
+  select.value = String(choice);
   selectedPiece = dialog.target;
   select.addEventListener("change", () => {
-    const target = Number(select.value);
-    if (activeOverlap !== dialog || S?.revision !== revision || !choices.has(target)) return;
-    dialog.target = target; selectedPiece = target; draw();
+    const key = Number(select.value), hit = choices.get(key);
+    if (activeOverlap !== dialog || S?.revision !== revision || S.instance !== instance || !hit) return;
+    dialog.choice = key; dialog.target = hit.placement; selectedPiece = hit.placement; draw();
   });
-  const confirm = document.createElement("button"); confirm.textContent = remove ? "Remove highlighted piece" : "Select highlighted piece";
+  const confirm = document.createElement("button");
+  confirm.textContent = stone ? (remove ? "Remove selected stone" : "Place selected stone")
+    : remove ? "Remove highlighted piece" : "Select highlighted piece";
   confirm.addEventListener("click", async () => {
-    const target = dialog.target;
-    if (activeOverlap !== dialog || S?.revision !== revision || apiBusy ||
-        !choices.has(target) || !S.layout.placements[target] || Number(select.value) !== target) return;
+    const hit = choices.get(dialog.choice), target = dialog.target;
+    if (activeOverlap !== dialog || S?.revision !== revision || S.instance !== instance || apiBusy || jobLoop ||
+        !hit || hit.placement !== target || !S.layout.placements[target] || Number(select.value) !== dialog.choice) return;
     selectedPiece = target;
-    if (remove) {
-      try { S = await api("/api/remove", {placement: target, revision}); redraw(); }
-      catch (error) { status(error.message, "err"); return; }
+    if (stone || remove) {
+      try {
+        S = await api(stone ? "/api/stone" : "/api/remove", stone
+          ? {placement: target, id: stone.id || hit.id, at_port: hit.at_port, remove, revision}
+          : {placement: target, revision});
+        redraw();
+      } catch (error) { status(error.message, "err"); return; }
     }
     if (activeOverlap === dialog) closeOverlapPicker();
     draw();
