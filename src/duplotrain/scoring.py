@@ -42,7 +42,7 @@ from dataclasses import dataclass
 
 from .catalog import BRICK
 from .exact import Alg
-from .layout import Layout, _lowest
+from .layout import Layout
 from .solver import Solution
 
 __all__ = ["ScoreWeights", "ScoreBreakdown", "score_solution"]
@@ -92,8 +92,7 @@ _BRICK = Alg(BRICK)
 
 def _raised_pieces(layout: Layout) -> int:
     """How many of *layout*'s pieces stand on stacks of DUPLO bricks (see above)."""
-    lows = [_lowest(placement.port_pose(port).z for port in range(len(placement.piece.ports)))
-            for placement in layout]
+    lows = [placement.frame.z + placement.piece.minimum_z for placement in layout]
     floor = layout.floor()
 
     def raised(index: int) -> bool:

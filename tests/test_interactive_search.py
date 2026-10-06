@@ -916,6 +916,38 @@ def test_an_arch_placed_first_closes_over_a_ramp_under_it(catalog):
     assert job.stage == "templates" and job.nodes == 0
 
 
+@pytest.mark.parametrize("all_gaps", [False, True])
+@pytest.mark.parametrize("rise", [-40, 40])
+def test_no_suggestion_runs_a_piece_under_the_floor(catalog, rise, all_gaps):
+    # A custom piece whose track dips (or humps) 40 mm between its level ends: no
+    # stage suggests the dip under the floor; the hump applies and undoes cleanly.
+    from duplotrain.pieces import parse_piece
+
+    catalog = {**catalog, "probe": parse_piece({"id": "probe", "width": 40, "paths": [
+        {"segments": [{"type": "ramp", "run": 128, "rise": rise},
+                      {"type": "ramp", "run": 128, "rise": -rise}]}]})}
+    base = Layout([Placement(catalog["straight"], Pose.make(-128, 0, 0)),
+                   Placement(catalog["straight"], Pose.make(256, 0, 0))])
+    for end in [(0, 0), (1, 1)]:  # buffers leave the gap the only open ends
+        base, _ = base.attach(catalog["buffer"], 0, end)
+    session = Session(catalog=catalog, history=[base],
+                      inventory={**base.piece_counts, "probe": 1})
+    before = session.snapshot()
+    job = SearchJob(session, {"grow": [0, 1], "close": [1, 0], "max_pieces": 1,
+                              "all_gaps": all_gaps})
+    try:
+        settle(job)
+        assert len(job.solutions) == int(rise > 0) and session.snapshot() == before
+        if job.solutions:
+            job.publish(session)
+            session.apply_candidate(0, session.revision)
+            assert session.layout.is_closed and not session.layout.joint_issues()
+            session.undo()
+            assert session.snapshot() == before
+    finally:
+        job.close()
+
+
 def test_closures_beyond_the_save_limits_are_no_proof_that_none_exist(catalog, monkeypatch):
     import duplotrain.editor_search as editor_search
 

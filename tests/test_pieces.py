@@ -181,6 +181,63 @@ def test_unknown_segment_type_rejected():
         )
 
 
+def test_a_pieces_lowest_point_takes_in_every_path(catalog):
+    # Every built-in piece is level or climbs evenly: its lowest point is a port.
+    for piece in catalog.values():
+        assert piece.minimum_z == min(port.pose.z for port in piece.ports)
+    # A custom piece may dip between level ends, or carry a lower route.
+    dip = parse_piece({"id": "dip", "paths": [{"segments": [
+        {"type": "ramp", "run": 128, "rise": "-1/7"},
+        {"type": "ramp", "run": 128, "rise": "1/7"}]}]})
+    assert dip.minimum_z == Alg(Fraction(-1, 7))
+    lower = parse_piece({"id": "lower", "paths": [
+        {"segments": [{"type": "straight", "run": 256}]},
+        {"start": {"y": 200, "z": -40}, "segments": [{"type": "straight", "run": 256}]}]})
+    assert lower.minimum_z == -40
+
+
+def test_an_unknown_segment_is_bounded_by_its_own_samples():
+    # A Segment subclass built in Python has no exact height profile: its own
+    # samples stand in, as they do for its collisions and drawing.
+    from dataclasses import dataclass
+
+    from duplotrain.exact import alg
+    from duplotrain.pieces import Path, PieceType, Port, Route, Segment
+
+    @dataclass(frozen=True)
+    class Sag(Segment):
+        def delta(self):
+            return alg(128), alg(0), alg(0)
+
+        def length(self):
+            return 128.0
+
+        def sample(self, spacing):
+            # Level ends, 16 mm down at the middle.
+            return [(x, 0.0, -16.0 * (1 - abs(64 - x) / 64), 0.0) for x in range(1, 129)]
+
+    @dataclass(frozen=True)
+    class Descent(Segment):
+        def delta(self):
+            return alg(256), alg(0), alg(Fraction(-288, 5))
+
+        def length(self):
+            return 262.4
+
+        def sample(self, spacing):
+            # Down 57.6 mm evenly: the last sample, float(-57.6), lies a hair under the end.
+            return [(x, 0.0, -57.6 * x / 256, 0.0) for x in range(1, 257)]
+
+    def piece(segment):
+        path = Path(ORIGIN, (segment,))
+        return PieceType("p", "p", "track", (path,),
+                         (Port("a", ORIGIN.reversed()), Port("b", path.end())), (Route(0, 1, 0),))
+
+    assert piece(Sag()).minimum_z == -16
+    # Float noise at an exact end is no dip: track ending on the floor stays on it.
+    assert piece(Descent()).minimum_z == Alg(Fraction(-288, 5))
+
+
 @pytest.mark.parametrize("spec", [
     {"id": "x", "paths": "abc"},
     {"id": "x", "paths": [{"segments": [5]}]},

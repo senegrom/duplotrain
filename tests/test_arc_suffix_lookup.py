@@ -108,6 +108,26 @@ def test_duplicate_straight_bridge_templates_do_not_fill_result_cards():
                    for port in range(len(placement.piece.ports))) == 0 for candidate in found)
 
 
+@pytest.mark.parametrize("rise", [-40, 40])
+def test_no_template_runs_a_piece_under_the_floor(rise):
+    # A catalogue straight whose track dips (or humps) 40 mm between its level
+    # ends: a template closes the gap with it only where it stays above the floor.
+    from duplotrain.pieces import parse_piece
+
+    catalog = default_catalog()
+    curve = catalog["curve"]
+    catalog["straight"] = parse_piece({"id": "straight", "width": 64, "paths": [{"segments": [
+        {"type": "ramp", "run": 64, "rise": rise}, {"type": "ramp", "run": 64, "rise": -rise}]}]})
+    # Six curves, a 256 mm gap, five curves: a curve and two straights close it.
+    first = build_chain([(curve, 0, 1)] * 6)
+    second = build_chain([(curve, 0, 1)] * 5, start=first.pose_of((5, 1)).then(256, 0, 0, 0))
+    base = Layout(first.placements + second.placements, {**first.links, **{
+        (i + 6, p): (j + 6, q) for (i, p), (j, q) in second.links.items()}})
+    session = Session(catalog=catalog, history=[base], inventory={"curve": 12, "straight": 2})
+    found = arc_closures(session, (10, 1), (0, 0), 50, 6)
+    assert [s.signature for s in found] == [("arc", (), 0, 1, 0, 2, ())] * (rise > 0)
+
+
 def test_reported_gap_does_not_rebuild_every_suffix_for_every_prefix(monkeypatch):
     data = json.loads((Path(__file__).parent / "fixtures/bridge-gap.json").read_text())
     layout = layout_from_dict(data, default_catalog())

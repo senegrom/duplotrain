@@ -1,5 +1,7 @@
 """Completion mode: close a partially built layout using spare pieces."""
 
+from fractions import Fraction
+
 import pytest
 
 from duplotrain.catalog import default_catalog
@@ -276,8 +278,6 @@ def test_an_open_arch_foot_stands_a_ramp_above_the_floor(catalog):
 def test_a_floor_off_the_height_lattice_holds_in_both_engines(catalog):
     # An imported file with a loose straight a fortieth of a millimetre low: the
     # lattice engine keeps that floor exactly as the field engine does.
-    from fractions import Fraction
-
     from duplotrain.geometry import Pose
 
     straight = catalog["straight"]
@@ -291,6 +291,76 @@ def test_a_floor_off_the_height_lattice_holds_in_both_engines(catalog):
         assert result.stats.engine == engine and len(result.solutions) == 2
         assert min(float(p.port_pose(port).z) for s in result.solutions for p in s.layout
                    for port in range(len(p.piece.ports))) == -0.025
+
+
+def dipping(rise, piece_id="probe"):
+    """A custom 256 mm piece with level ends whose track dips (or humps) by *rise*."""
+    return parse_piece({"id": piece_id, "width": 40, "paths": [{"segments": [
+        {"type": "ramp", "run": 128, "rise": str(rise)},
+        {"type": "ramp", "run": 128, "rise": str(-rise)}]}]})
+
+
+def floor_gap(probe, height=0):
+    """A 256 mm gap between two straights at *height*; a straight elsewhere on the floor."""
+    from duplotrain.geometry import Pose
+
+    catalog = {**default_catalog(), "probe": probe}
+    base = Layout([Placement(catalog["straight"], Pose.make(-128, 0, height)),
+                   Placement(catalog["straight"], Pose.make(256, 0, height)),
+                   Placement(catalog["straight"], Pose.make(0, 1000, 0))])
+    return catalog, base
+
+
+@pytest.mark.parametrize("engine", ["lattice", "field"])
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("height", [0, 80])
+@pytest.mark.parametrize("rise", [-40, Fraction(-1, 10**12), Fraction(-1, 7), 40])
+def test_no_track_of_an_added_piece_runs_under_the_floor(engine, reverse, height, rise):
+    # Its ends are level, but the whole piece counts: a dip under the floor, however
+    # slight or off the height lattice, is never placed; raised high enough, it is.
+    catalog, base = floor_gap(dipping(rise), height)
+    ends = [(0, 1), (1, 0)][::-1 if reverse else 1]
+    result = solve({"probe": 1}, catalog,
+                   SolverConfig(min_pieces=1, max_pieces=1, max_nodes=10_000, engine=engine),
+                   base=base, grow_from=ends[0], close_onto=ends[1])
+    assert result.stats.complete and len(result.solutions) == int(height + min(rise, 0) >= 0)
+    for solution in result.solutions:
+        assert not solution.layout.joint_issues()
+        assert (solution.layout.placements[-1].frame.z + catalog["probe"].minimum_z).sign() >= 0
+
+
+@pytest.mark.parametrize("engine", ["lattice", "field"])
+def test_an_unused_lower_route_stays_above_the_floor_too(engine):
+    # Entered by its upper route, the piece would set its lower one 40 mm under the
+    # floor; entered by the lower route, it stands 40 mm higher, and fits.
+    probe = parse_piece({"id": "probe", "width": 40, "paths": [
+        {"segments": [{"type": "straight", "run": 256}]},
+        {"start": {"y": 200, "z": -40}, "segments": [{"type": "straight", "run": 256}]}]})
+    catalog, base = floor_gap(probe)
+    result = solve({"probe": 1}, catalog,
+                   SolverConfig(min_pieces=1, max_pieces=1, max_nodes=10_000, engine=engine),
+                   base=base, grow_from=(0, 1), close_onto=(1, 0))
+    assert len(result.solutions) == 2
+    assert all(solution.steps[0].entry in (2, 3) for solution in result.solutions)
+
+
+@pytest.mark.parametrize("engine", ["lattice", "field"])
+@pytest.mark.parametrize("rise", [-40, -50])
+def test_a_base_dipping_already_stands_on_its_dip(engine, rise):
+    # The base holds a piece dipping 40 mm: it stands on that dip, so another as
+    # deep fits beside it, and a deeper one does not.
+    from duplotrain.geometry import Pose
+
+    base_dip = dipping(-40, "dip")
+    catalog = {**default_catalog(), "dip": base_dip, "probe": dipping(rise)}
+    base = Layout([Placement(catalog["straight"], Pose.make(-128, 0, 0)),
+                   Placement(base_dip, Pose.make(0, 0, 0)),
+                   Placement(catalog["straight"], Pose.make(512, 0, 0))]).join((0, 1), (1, 0))
+    assert base.floor(catalog.values()) == -40
+    result = solve({"probe": 1}, catalog,
+                   SolverConfig(min_pieces=1, max_pieces=1, max_nodes=10_000, engine=engine),
+                   base=base, grow_from=(1, 1), close_onto=(2, 0))
+    assert len(result.solutions) == int(rise == -40)
 
 
 def test_a_ramps_top_does_not_pass_through_a_switch_it_meets(catalog):

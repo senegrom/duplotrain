@@ -187,7 +187,7 @@ def test_a_ramps_top_and_track_that_meet_are_no_joint(catalog):
         ["mismatched bridge joint"]]
 
 
-def test_a_layout_stands_on_its_lowest_connector_or_under_an_open_arch_foot(catalog):
+def test_a_layout_stands_on_its_lowest_track_or_under_an_open_arch_foot(catalog):
     ramp, span, straight = catalog["ramp"], catalog["span"], catalog["straight"]
     assert Layout().floor() == 0
     down = build_chain([(span, 1, 0), (ramp, 1, 0), (straight, 0, 1)])
@@ -200,6 +200,16 @@ def test_a_layout_stands_on_its_lowest_connector_or_under_an_open_arch_foot(cata
     assert arch.floor([straight, span]) == 0
     # A ramp's open top takes an arch rising from it: that sets no lower floor.
     assert build_chain([(ramp, 0, 1)]).floor(catalog.values()) == 0
+    # Every path counts, not only the connectors: a piece dipping 40 mm between
+    # its level ends stands the layout on its dip, and a ramp that dips 20 mm
+    # before it climbs to an arch's foot stands that much lower under the foot.
+    dip = parse_piece({"id": "dip", "paths": [{"segments": [
+        {"type": "ramp", "run": 128, "rise": -40}, {"type": "ramp", "run": 128, "rise": 40}]}]})
+    assert build_chain([(straight, 0, 1), (dip, 0, 1)]).floor() == -40
+    sagging = parse_piece({"id": "ramp", "port_kinds": ["track", "ramp_top"], "paths": [
+        {"segments": [{"type": "ramp", "run": 100, "rise": -20},
+                      {"type": "ramp", "run": 220, "rise": "388/5"}]}]})
+    assert arch.floor([straight, span, sagging]) == Alg(Fraction(-388, 5))
 
 
 def test_the_floor_takes_its_pieces_from_any_iterable(catalog):

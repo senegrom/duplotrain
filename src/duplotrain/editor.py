@@ -709,7 +709,7 @@ class Session:
         base = self.layout
         n_base = len(base)
         # No template goes under the floor the base stands on.
-        floor = float(base.floor(self.catalog.values()))
+        floor = base.floor(self.catalog.values())
         curve, straight = self.catalog["curve"], self.catalog["straight"]
         ramp, span = self.catalog["ramp"], self.catalog["span"]
         deltas = {
@@ -863,9 +863,10 @@ class Session:
                                 closed = build(pre, j, k, entry, m, post)
                             except ValueError:
                                 continue
-                            if any(float(placement.port_pose(port).z) < floor - 1e-6
-                                   for placement in closed.placements[n_base:]
-                                   for port in range(len(placement.piece.ports))):
+                            if any(
+                                (p.frame.z + p.piece.minimum_z - floor).sign() < 0
+                                for p in closed.placements[n_base:]
+                            ):
                                 continue
                             if audit.overlaps(closed):
                                 continue

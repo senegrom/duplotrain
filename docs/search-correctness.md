@@ -36,16 +36,23 @@ and `Layout.join` refuse such a joint, forced or not; the editor's arc templates
 only the ramp and arch runs the joints allow; and `joint_issues` names one recorded
 in an imported layout, as Check layout does two ends that meet but cannot join.
 
-A completion keeps its added track at or above the floor its base stands on
-(`Layout.floor`): the base's lowest connector, save an open arch foot, which rests
-on a ramp's top and so puts the floor a ramp's rise lower. A candidate whose exit
-would go under the floor is never placed, and the arc templates drop such a
+A completion keeps every piece it adds, all of its track and not only its
+connectors, at or above the floor its base stands on (`Layout.floor`): the base's
+lowest track, save an open arch foot, which rests on a ramp's top and so puts the
+floor as low as the lowest track of a ramp under it. A piece's lowest point
+(`PieceType.minimum_z`) is exact for straights, arcs and ramps, whose heights run
+level or evenly from end to end; an unknown `Segment` subclass is measured at its
+own samples, as its collisions and drawing are, where they dip more than float
+noise (1e-6 mm) under its exact ends. A candidate that would set any of its track
+under the floor -- a custom piece dipping between its ends, or carrying a lower
+route it does not take -- is never placed, and the arc templates drop such a
 closure. A fresh loop has no floor, only heights relative to one another, so the
 renderer and the editor measure them from its lowest track. Regressions check that
 the loops of the steam train and bridge sets join bridge parts only as the parts
-can, that a completion across a gap in floor track never runs under the floor,
-that a layout begun with an arch closes over a ramp under it, and that two buffers
-close a ramp and an arch one way only.
+can, that a completion across a gap in floor track never runs under the floor, nor
+sets a custom piece's dip or lower route under it, that a layout begun with an arch
+closes over a ramp under it, and that two buffers close a ramp and an arch one way
+only.
 
 ## Centreline identity is independent of piece boundaries
 

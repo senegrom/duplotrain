@@ -73,8 +73,8 @@ only an arch's foot and an arch's foot rests only on a ramp's top. An arch's cre
 the other arch, or a further ramp that climbs higher still. Ordinary track can stand on
 DUPLO bricks as well (a straight has three brick tubes under its middle, a curve two),
 so track raised on stacks may meet a crest or a ramp's foot; `duplotrain solve` lists
-loops standing on the floor first, and a completion never sets a connector under the
-floor its base stands on ([how the searches keep to both](docs/search-correctness.md#bridge-joints-and-the-floor)).
+loops standing on the floor first, and a completion never sets track under the floor
+its base stands on ([how the searches keep to both](docs/search-correctness.md#bridge-joints-and-the-floor)).
 
 These numbers come from the LDraw part files and BlueBrick's measured connection
 library, cross-checked against part weights, photographs and duplo-schienen.de's

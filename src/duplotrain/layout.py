@@ -327,29 +327,31 @@ class Layout:
         return self.placements[i].port_pose(p)
 
     def floor(self, pieces: Iterable[PieceType] = ()) -> Alg:
-        """The height the layout stands on: its lowest connector, exactly.
+        """The height the layout stands on: its lowest track (exact for straights, arcs
+        and ramps; other segments as :attr:`PieceType.minimum_z` measures them).
 
+        Every path of every piece counts (:attr:`PieceType.minimum_z`), not only
+        its connectors: a piece may dip between its ends or carry a lower route.
         An open arch foot is the exception: it rests on a ramp's top, never on the
-        floor, so the floor lies as low as the foot of whichever of *pieces* could
-        carry it. An empty layout stands at 0.
+        floor, so the floor lies as low as the lowest track of whichever of
+        *pieces* could carry it. An empty layout stands at 0.
         """
         pieces = tuple(pieces)  # read once per kind of open end
-        opens = set(self.connectable_ends())
         reach: dict[str, Alg | None] = {}  # per kind, how far below it a mate reaches
-        heights = []
-        for index, placement in enumerate(self.placements):
-            for port, spec in enumerate(placement.piece.ports):
-                z = placement.port_pose(port).z
-                if spec.kind != "track" and (index, port) in opens:
-                    if spec.kind not in reach:
-                        reach[spec.kind] = _lowest(
-                            other.pose.z - mate.pose.z
-                            for piece in pieces for mate in piece.ports
-                            if kinds_mate(spec.kind, mate.kind) for other in piece.ports
-                        )
-                    if reach[spec.kind] is not None:
-                        z = z + reach[spec.kind]
-                heights.append(z)
+        heights = [placement.frame.z + placement.piece.minimum_z for placement in self.placements]
+        for index, port in self.connectable_ends():
+            placement = self.placements[index]
+            spec = placement.piece.ports[port]
+            if spec.kind == "track":
+                continue
+            if spec.kind not in reach:
+                reach[spec.kind] = _lowest(
+                    piece.minimum_z - mate.pose.z
+                    for piece in pieces for mate in piece.ports
+                    if kinds_mate(spec.kind, mate.kind)
+                )
+            if reach[spec.kind] is not None:
+                heights.append(placement.frame.z + spec.pose.z + reach[spec.kind])
         low = _lowest(heights)
         return ZERO if low is None else low
 

@@ -103,3 +103,17 @@ def test_pieces_on_bricks_are_counted_apart_from_the_score(catalog):
     up = score([(ramp, 0, 1), (span, 0, 1), (straight, 0, 1)])
     flat = score([(ramp, 0, 1), (span, 0, 1)])
     assert up.rank > flat.rank and up.rank == (1, -up.total)
+
+
+def test_a_piece_dipping_between_its_ends_stands_the_layout_on_its_dip(catalog):
+    from duplotrain.layout import build_chain
+    from duplotrain.pieces import parse_piece
+    from duplotrain.solver import Solution
+
+    dip = parse_piece({"id": "dip", "paths": [{"segments": [
+        {"type": "ramp", "run": 128, "rise": -40}, {"type": "ramp", "run": 128, "rise": 40}]}]})
+    straight = catalog["straight"]
+    layout = build_chain([(straight, 0, 1), (dip, 0, 1), (straight, 0, 1)])
+    solution = Solution(layout, (), 0.0, True, len(layout.connectable_ends()), ())
+    # The dip rests on the floor; the straights at its ends stand 40 mm up, on bricks.
+    assert score_solution(solution, {"straight": 2, "dip": 1}).raised == 2

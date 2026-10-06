@@ -2109,9 +2109,19 @@ def solve_steps(
     # Completion mode: the base stands on the floor (Layout.floor), and added
     # track may not go under it. A fresh loop has no floor: only the heights of
     # its pieces relative to one another are fixed.
-    floor = None
-    if base is not None and any(move.dz for pid in piece_ids for move in moves_by_piece[pid]):
-        floor = eng.height_of(base.floor(pieces.values()))
+    entry_floors = {}
+    if base is not None:
+        # A net-level move may still dip, or carry a lower, unused path. Compare
+        # the cursor with floor + entry height - the whole piece's minimum.
+        # Convert the complete threshold at once: rounding the two heights
+        # separately would be unsound for off-lattice interior ramp vertices.
+        offsets = {pid: tuple(port.pose.z - pieces[pid].minimum_z
+                              for port in pieces[pid].ports) for pid in piece_ids}
+        offsets = {pid: values for pid, values in offsets.items() if any(values)}
+        if offsets:
+            floor = base.floor(pieces.values())
+            entry_floors = {pid: tuple(eng.height_of(floor + z) for z in values)
+                            for pid, values in offsets.items()}
     placement_samples = _placement_samples(eng, pieces, cfg.collision_spacing)
     # A fresh loop closes onto the origin face exactly as a completion closes onto
     # its target, so the same reverse tables prune walks that cannot return with
@@ -2622,14 +2632,15 @@ def solve_steps(
             if cursor_overhangs and overhang_of[pid] > 0:
                 continue  # the joint would stack two overhanging plates
             rank = piece_rank[pid]
+            floors = entry_floors.get(pid)
             for entry, exit_port, apply_move in eng.moves[pid]:
                 if not handed and chirality[(pid, entry, exit_port)] < 0:
                     continue
                 if kind is not None and not kinds_mate(kind, kinds_of[pid][entry]):
                     continue  # say, an arch's foot on anything but a ramp's top
+                if floors is not None and eng.below(cursor, floors[entry]):
+                    continue  # no path of the placed piece may go under the floor
                 child = apply_move(cursor)
-                if floor is not None and eng.below(child, floor):
-                    continue  # track under the floor the base stands on
                 candidates.append(
                     (candidate_score(child, stub_refs), rank, pid, entry, exit_port, child)
                 )

@@ -428,10 +428,47 @@ class PieceType:
             (exit_.heading + rotation) % HEADING_STEPS,
         )
 
+    @property
+    def minimum_z(self) -> Alg:
+        """The lowest centreline height over every path, in the local frame.
+
+        Straights, arcs and ramps are level or linear in height, so their segment
+        ends hold every extremum, exactly -- a dip hidden between level connectors
+        too. An unknown Segment subclass has no exact height profile: its own
+        samples stand in, as they do for its collisions and drawing, where they dip
+        more than float noise under its exact ends.
+        The bounded cache is keyed by geometry, never by a catalogue identifier.
+        """
+        return _minimum_path_z(self.paths)
+
     def all_centrelines(self, spacing: float = 8.0) -> list[list[tuple[float, float, float]]]:
         # Cache immutable samples, never the caller's mutable outer/inner lists.
         # Geometry (not a catalogue id) is the key, so custom pieces cannot alias.
         return [list(line) for line in _sample_paths(self.paths, spacing)]
+
+
+@lru_cache(maxsize=128)
+def _minimum_path_z(paths: tuple[Path, ...]) -> Alg:
+    heights = []
+    for path in paths:
+        z = path.start.z
+        heights.append(z)
+        for segment in path.segments:
+            dz = segment.delta()[2]
+            if type(segment) not in (Straight, Arc, Ramp):
+                # Float samples carry rounding noise: one counts only where it lies
+                # clearly under both exact ends, so track ending on the floor stays on it.
+                ends = min(0.0, float(dz))
+                dip = min((lz for _x, _y, lz, _h in segment.sample(1.0)), default=ends)
+                if dip < ends - 1e-6:
+                    heights.append(z + Fraction(dip))
+            z = z + dz
+            heights.append(z)
+    low = None
+    for z in heights:
+        if low is None or (z - low).sign() < 0:
+            low = z
+    return alg(0) if low is None else low
 
 
 @lru_cache(maxsize=128)
