@@ -3,7 +3,9 @@
 The drawing is deliberately toy-like: a grey ballast band per piece, two rails, sleeper
 ticks, and dots at the joints.  Raised and climbing track is tinted by its height above
 the layout's lowest track, and bridge pieces and track raised on bricks have their
-elevation printed on them.  Output format follows the
+elevation printed on them.  Where track passes over track, the track that is higher
+there is drawn on top: climbing track is ordered one sleeper spacing at a time, not by
+its piece's mean height.  Output format follows the
 file extension (``.png``, ``.svg``, ``.pdf``); pass no path to get the figure back
 for further fiddling.
 
@@ -14,7 +16,8 @@ it (it is an optional dependency, installed via ``duplotrain[render]``).
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from bisect import bisect_left
+from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING
 
 from .catalog import ACCESSORIES, BRICK
@@ -26,7 +29,6 @@ if TYPE_CHECKING:  # pragma: no cover
 
 __all__ = ["render_layout"]
 
-BALLAST = "#b9bec4"
 BALLAST_EDGE = "#8d949c"
 RAIL = "#6d7278"
 SLEEPER = "#9aa0a7"
@@ -95,11 +97,81 @@ def _offset(
     ]
 
 
-def _band(line: Sequence[tuple[float, float]], half_width: float) -> list[tuple[float, float]]:
-    """Closed polygon covering the line swept to +/- half_width."""
-    left = _offset(line, half_width)
-    right = _offset(line, -half_width)
-    return left + right[::-1]
+_Point = tuple[float, float]
+_Chunk = tuple[float, list[tuple[float, list[_Point]]], list[list[_Point]] | None,
+               list[list[_Point]], list[list[_Point]]]
+
+
+def _mean_height(line3d: Sequence[tuple[float, float, float]], start: int, end: int) -> float:
+    """Mean height of the samples *start* to *end* (inclusive) of a path."""
+    return sum(point[2] for point in line3d[start:end + 1]) / (end - start + 1)
+
+
+def _track_chunks(
+    lines3d: Sequence[Sequence[tuple[float, float, float]]], half_width: float
+) -> Iterator[_Chunk]:
+    """The drawing pieces of one placement's paths, each with the height that orders it.
+
+    Yields ``(height, decks, edges, rails, sleepers)``, the decks as ``(tint height,
+    polygon)`` pairs.  A flat path stays whole, its deck outlined as one polygon
+    (``edges`` is None).  A climbing path is cut at the sample points nearest midway
+    between its sleepers: each piece is ordered by its own mean height, so a crossing
+    follows the height of the track where it crosses, and carries one sleeper, clear of
+    the decks beside it.  Its deck is tinted three sample chords at a time.  Offsets and
+    sleeper positions come from the whole path, so the cuts add neither end lines nor
+    sleepers.
+    """
+    for line3d in lines3d:
+        line = [(x, y) for x, y, _z in line3d]
+        left, right = _offset(line, half_width), _offset(line, -half_width)
+        rails = [_offset(line, side) for side in (GAUGE / 2.0, -GAUGE / 2.0)]
+        distances = [0.0]
+        for (x0, y0), (x1, y1) in zip(line, line[1:], strict=False):
+            distances.append(distances[-1] + math.hypot(x1 - x0, y1 - y0))
+        total = distances[-1]
+        sleepers: dict[int, list[list[_Point]]] = {}
+        count = max(2, int(total // 30))
+        for i in range(count):
+            target = (i + 0.5) / count * total
+            segment = max(0, bisect_left(distances, target) - 1)
+            if segment + 1 >= len(line):
+                continue
+            length = distances[segment + 1] - distances[segment]
+            if not length:
+                continue
+            (x0, y0), (x1, y1) = line[segment], line[segment + 1]
+            u = (target - distances[segment]) / length
+            cx, cy = x0 + u * (x1 - x0), y0 + u * (y1 - y0)
+            nx, ny = -(y1 - y0) / length, (x1 - x0) / length
+            w = half_width * 0.82
+            sleepers.setdefault(segment, []).append(
+                [(cx - nx * w, cy - ny * w), (cx + nx * w, cy + ny * w)])
+        last = len(line) - 1
+        flat = all(point[2] == line3d[0][2] for point in line3d)
+        cuts = [0]
+        for k in range(1, 1 if flat else count):
+            target = k / count * total
+            j = bisect_left(distances, target)
+            if j > 0 and target - distances[j - 1] < distances[j] - target:
+                j -= 1
+            if cuts[-1] < j < last:
+                cuts.append(j)
+        cuts.append(last)
+        for start, end in zip(cuts, cuts[1:], strict=False):
+            rail_parts = [rail[start:end + 1] for rail in rails]
+            ties = [sleeper for i in range(start, end) for sleeper in sleepers.get(i, ())]
+            if flat:
+                yield line3d[0][2], [(line3d[0][2], left + right[::-1])], None, rail_parts, ties
+                continue
+            tints = [(s, min(s + 3, end)) for s in range(start, end, 3)]
+            decks = [(_mean_height(line3d, s, e), left[s:e + 1] + right[s:e + 1][::-1])
+                     for s, e in tints]
+            edges = [left[start:end + 1], right[start:end + 1]]
+            if start == 0:
+                edges.append([left[0], right[0]])
+            if end == last:
+                edges.append([left[-1], right[-1]])
+            yield _mean_height(line3d, start, end), decks, edges, rail_parts, ties
 
 
 def render_layout(
@@ -137,94 +209,52 @@ def render_layout(
     sampled = [(placement, [[(x, y, z - ground) for x, y, z in line] for line in lines])
                for placement, lines in sampled]
 
-    # Ballast bands first, then rails and sleepers on top, so overlaps look right.
-    features: list[tuple[float, list[list[tuple[float, float, float]]], float]] = []
-    for placement, lines3d in sampled:
-        mean_z = sum(z for line in lines3d for _x, _y, z in line) / max(
-            1, sum(len(line) for line in lines3d)
-        )
-        features.append((mean_z, lines3d, placement.piece.width / 2.0))
+    # Each height paints in its own band, decks first, then edges, sleepers and rails,
+    # so a deck covers everything of the track below it and nothing of the track above
+    # (a band per piece, at its mean height, would draw a ground rail over a ramp's high
+    # end).  Each band is a few collections, not an artist per piece of track.
+    from matplotlib.collections import LineCollection, PolyCollection
 
-    for mean_z, lines3d, half_width in sorted(features, key=lambda f: f[0]):
-        lines = [[(x, y) for x, y, _ in line] for line in lines3d]
-        # One zorder band per piece: an elevated deck (ballast ~1.8) must paint over a
-        # ground piece's rails (~1.5), not thread between another piece's layers.
-        band = 1 + mean_z / 100.0
-        for line3d, line in zip(lines3d, lines, strict=True):
-            climbs = max(z for _x, _y, z in line3d) - min(z for _x, _y, z in line3d)
-            if climbs > 1.0 or line3d[0][2] > 1.0:
-                # Elevation gradient: short chunks, each tinted by its own height.
-                step = 3
-                for s in range(0, len(line) - 1, step):
-                    chunk = line[s : s + step + 1]
-                    heights = [p[2] for p in line3d[s : s + step + 1]]
-                    chunk_z = sum(heights) / len(heights)
-                    poly = _band(chunk, half_width)
-                    ax.fill(
-                        [p[0] for p in poly],
-                        [p[1] for p in poly],
-                        facecolor=elevation_color(chunk_z),
-                        edgecolor="none",
-                        zorder=band,
-                    )
-                outline = _band(line, half_width)
-                ax.fill(
-                    [p[0] for p in outline],
-                    [p[1] for p in outline],
-                    facecolor="none",
-                    edgecolor=BALLAST_EDGE,
-                    linewidth=0.8,
-                    zorder=band + 0.01,
-                )
+    bands: dict[float, tuple[list, list, list, list, list]] = {}
+    for placement, lines3d in sampled:
+        for height, decks, edges, rails, ties in _track_chunks(
+            lines3d, placement.piece.width / 2.0
+        ):
+            outlined, bare, outlines, sleepers, tracks = bands.setdefault(
+                height, ([], [], [], [], []))
+            if edges is None:
+                outlined.extend(polygon for _tint, polygon in decks)
             else:
-                poly = _band(line, half_width)
-                ax.fill(
-                    [p[0] for p in poly],
-                    [p[1] for p in poly],
-                    facecolor=BALLAST,
-                    edgecolor=BALLAST_EDGE,
-                    linewidth=0.8,
-                    zorder=band,
-                )
-        for line in lines:
-            z = band + 0.5
-            # Sleepers.
-            total = sum(
-                math.hypot(bx - ax_, by - ay)
-                for (ax_, ay), (bx, by) in zip(line, line[1:], strict=False)
-            )
-            n_sleepers = max(2, int(total // 30))
-            for i in range(n_sleepers):
-                t = (i + 0.5) / n_sleepers
-                target = t * total
-                run = 0.0
-                for (x0, y0), (x1, y1) in zip(line, line[1:], strict=False):
-                    seg = math.hypot(x1 - x0, y1 - y0)
-                    if run + seg >= target and seg > 0:
-                        u = (target - run) / seg
-                        cx, cy = x0 + u * (x1 - x0), y0 + u * (y1 - y0)
-                        nx, ny = -(y1 - y0) / seg, (x1 - x0) / seg
-                        w = half_width * 0.82
-                        ax.plot(
-                            [cx - nx * w, cx + nx * w],
-                            [cy - ny * w, cy + ny * w],
-                            color=SLEEPER,
-                            linewidth=2.2,
-                            solid_capstyle="butt",
-                            zorder=z,
-                        )
-                        break
-                    run += seg
-            # Rails.
-            for side in (GAUGE / 2.0, -GAUGE / 2.0):
-                rail = _offset(line, side)
-                ax.plot(
-                    [p[0] for p in rail],
-                    [p[1] for p in rail],
-                    color=RAIL,
-                    linewidth=1.6,
-                    zorder=z + 0.001,
-                )
+                bare.extend(decks)
+                outlines.extend(edges)
+            sleepers.extend(ties)
+            tracks.extend(rails)
+    step = min(1.0, 4.0 / max(1, len(bands)))
+    for index, height in enumerate(sorted(bands)):
+        band = 1 + index * step
+        outlined, bare, outlines, sleepers, tracks = bands[height]
+        # A flat path's deck is one outlined, antialiased patch.  The pieces of a
+        # climbing path are aliased, so no seam shows where they meet, and edged by
+        # lines whose projecting caps carry them, like the rails, across the cuts.
+        if outlined:
+            ax.add_collection(PolyCollection(
+                outlined, facecolors=elevation_color(height), edgecolors=BALLAST_EDGE,
+                linewidths=0.8, joinstyle="miter", zorder=band))
+        if bare:
+            ax.add_collection(PolyCollection(
+                [polygon for _tint, polygon in bare],
+                facecolors=[elevation_color(tint) for tint, _polygon in bare],
+                edgecolors="none", antialiaseds=False, zorder=band))
+        for segments, colour, width, cap, offset in (
+            (outlines, BALLAST_EDGE, 0.8, "projecting", 0.01),
+            (sleepers, SLEEPER, 2.2, "butt", 0.5),
+            (tracks, RAIL, 1.6, "projecting", 0.501),
+        ):
+            if segments:
+                ax.add_collection(LineCollection(
+                    segments, colors=colour, linewidths=width, capstyle=cap,
+                    zorder=band + step * offset))
+    ax.autoscale_view()
 
     # Action stones clipped onto pieces (mid-piece, or pulled toward a port face).
     for k, entry in enumerate(layout.accessories):
