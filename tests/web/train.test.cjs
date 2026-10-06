@@ -11,7 +11,7 @@ const tracks = () => [track([[-100, 0, 100], [100, 0, 100]], "Top"),
 
 test("train trace steps, pauses and expires without claiming all starting states", async () => {
   const trace = {revision: 1, outcome: "endless", start: [0, 0], steps: [[0, 0, 1], [1, 0, 1]],
-    cycle_start: 0, period: 2, reversals: 0, visited: [0, 1], visited_drivable: [0, 1], drivable_count: 2,
+    cycle_start: 0, period: 2, reversals: 0, visited_drivable: [0, 1], drivable_count: 2,
     complete: true};
   const h = harness({events: true, overrides: {api: async () => trace}});
   h.el("train-start").value = "[0,0]";
@@ -27,7 +27,7 @@ for (const immediate of [true, false]) test(`train ${immediate ? "immediate" : "
   const strokes = [];
   const trace = {revision: 1, outcome: "stopped", start: [0, 0],
     steps: immediate ? [] : [[0, 0, 1]], terminal: {placement: 1, entry: 0, at_port: null, reason: "stop_stone"},
-    cycle_start: null, period: null, reversals: 0, visited: [0, 1], visited_drivable: [0, 1],
+    cycle_start: null, period: null, reversals: 0, visited_drivable: [0, 1],
     drivable_count: 3, unvisited: [2], cycle_pieces: [], complete: true};
   const h = harness({state: scene(tracks()), events: true,
     overrides: {api: async () => trace, strokeSegment: (a, b) => strokes.push([a, b])}});
@@ -58,7 +58,7 @@ test("step limit disables playback and coverage rather than highlighting suppose
 test("coverage overlays distinguish unvisited and cycle pieces and expire with new settings", async () => {
   const strokes = [];
   const trace = {revision: 1, outcome: "endless", start: [0, 0], steps: [[0,0,1],[1,0,1]],
-    cycle_start: 1, period: 1, reversals: 0, visited: [0,1], visited_drivable: [0,1],
+    cycle_start: 1, period: 1, reversals: 0, visited_drivable: [0,1],
     drivable_count: 3, unvisited: [2], cycle_pieces: [1], terminal: null, complete: true};
   const h = harness({state: scene(tracks()), events: true,
     overrides: {api: async () => trace, strokeSegment: (a, b, w, color) => strokes.push({a, b, color})}});

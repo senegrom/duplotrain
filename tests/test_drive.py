@@ -74,7 +74,7 @@ def test_circle_drives_forever_one_way(catalog):
     report = drive(closed_circle(catalog))
     assert report.outcome == "endless"
     assert report.period == 12
-    assert report.covers(closed_circle(catalog))
+    assert report.visited == set(range(12))
     assert report.reversals == 0
 
 
@@ -396,8 +396,6 @@ def test_a_prepared_context_drives_exactly_like_a_fresh_run():
             expected = drive(ring, start, settings)
             actual = drive(ring, start, settings, _context=context)
             assert repr(actual) == repr(expected) and settings == original
-            actual.final_switch_states.clear()
-            assert drive(ring, start, settings, _context=context) == expected
     # Default tongues come from the context too: no run's trailing moves leak into it.
     for start in starts[::5]:
         assert repr(drive(ring, start, _context=context)) == repr(drive(ring, start))

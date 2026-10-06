@@ -1135,7 +1135,8 @@ def exercise_train_finishing(page):
     expect(page.locator("#train-step")).to_be_disabled()
     page.locator("#test-train").tap()
     expect(page.locator("#train-report")).to_contain_text("Selected initial switches")
-    assert page.evaluate("trainTrace.initial_switch_states['3']") == 2
+    # The train now leaves switch #4 (by default stem to port 1) through port 2.
+    assert page.evaluate("trainTrace.steps.find(step => step[0] === 3)") == [3, 0, 2]
 
 
 def test_clear_empty_keeps_redo_in_the_editor(editor):

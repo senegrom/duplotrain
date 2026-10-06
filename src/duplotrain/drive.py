@@ -91,7 +91,6 @@ class DriveReport:
     cycle_start: int | None  # index into steps where the endless cycle begins
     reversals: int
     visited: frozenset[int]
-    final_switch_states: Mapping[int, int]
     terminal: DriveTerminal | None = None
 
     @property
@@ -99,15 +98,6 @@ class DriveReport:
         if self.cycle_start is None:
             return None
         return len(self.steps) - self.cycle_start
-
-    def covers(self, layout: Layout) -> bool:
-        """Did the run visit every drivable piece?
-
-        Coverage ranges over track a train can actually traverse: a buffer stop's
-        only route runs into its sealed face, so it can terminate a run but never be
-        driven through, and it doesn't count against coverage.
-        """
-        return self.visited >= drivable_universe(layout)
 
 
 def drivable_universe(layout: Layout) -> frozenset[int]:
@@ -204,7 +194,6 @@ def drive(
             cycle_start=None,
             reversals=reversals,
             visited=frozenset(p for p, _e, _x in steps) | {here},
-            final_switch_states=dict(states),
             terminal=DriveTerminal(here, entered, at_port, reason),
         )
 
@@ -217,7 +206,6 @@ def drive(
                 cycle_start=seen[key],
                 reversals=reversals,
                 visited=frozenset(p for p, _e, _x in steps),
-                final_switch_states=dict(states),
             )
         if len(steps) >= max_steps:
             # A cycle closing exactly at the budget is still recognised above.

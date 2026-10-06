@@ -313,18 +313,14 @@ def default_catalog() -> dict[str, PieceType]:
     return dict(_default_catalog_items())
 
 
-def load_catalog(*paths: str | Path, include_default: bool = True) -> dict[str, PieceType]:
+def load_catalog(*paths: str | Path) -> dict[str, PieceType]:
     """Load piece catalogues, later files overriding earlier ids.
 
-    Each file is JSON: either a list of piece specs or ``{"pieces": [...]}``.  With
-    *include_default* the built-in catalogue is the base layer, so a user file can both
-    add new pieces and override a built-in one (e.g. correct a provisional dimension)
-    by reusing its id.
+    Each file is JSON: either a list of piece specs or ``{"pieces": [...]}``.  The
+    built-in catalogue is the base layer, so a user file can both add new pieces and
+    override a built-in one (e.g. correct a provisional dimension) by reusing its id.
     """
-    specs: dict[str, dict[str, Any]] = {}
-    if include_default:
-        for spec in DEFAULT_CATALOG_SPECS:
-            specs[spec["id"]] = spec
+    specs: dict[str, dict[str, Any]] = {spec["id"]: spec for spec in DEFAULT_CATALOG_SPECS}
     for path in paths:
         data = read_json_file(path)
         if isinstance(data, dict):

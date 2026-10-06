@@ -70,7 +70,7 @@ def test_internal_cycle_does_not_claim_to_cover_other_pieces():
     layout = straight_with([("direction", 0), ("direction", 1)])
     layout, _ = layout.attach(default_catalog()["straight"], 0, (0, 1))
     report = drive(layout, start=(0, 0))
-    assert report.outcome == "endless" and not report.covers(layout)
+    assert report.outcome == "endless" and report.visited == {0}
     assert not classify(layout).completely_looping
 
 

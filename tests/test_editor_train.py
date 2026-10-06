@@ -76,7 +76,6 @@ def test_terminal_event_does_not_add_a_traversal(piece, stone, at_port, expected
     assert result["terminal"] == {"placement": 1, "entry": 0, "at_port": event_port,
                                   "reason": reason}
     assert result["cycle_start"] is None and result["period"] is None
-    assert result["visited"] == [0, 1]
     assert result["drivable_count"] == (1 if piece == "buffer" else 2)
     assert result["visited_drivable"] == ([0] if piece == "buffer" else [0, 1])
     assert result["unvisited"] == []
@@ -99,7 +98,7 @@ def test_endless_and_limited_runs_never_invent_a_terminal_event():
     session = Session(history=[layout])
     before = unchanged(session)
     complete = trace_train(session, [0, 0])
-    assert complete["outcome"] == "endless" and complete["covers"]
+    assert complete["outcome"] == "endless" and complete["unvisited"] == []
     assert complete["terminal"] is None
     assert complete["cycle_start"] == 0 and complete["period"] == 12
     assert complete["cycle_pieces"] == list(range(12))
@@ -128,8 +127,8 @@ def test_reported_layout_coverage_is_separate_from_cycle(fixture, total):
     assert len(result["cycle_pieces"]) == 26
     assert result["period"] == 26 and result["cycle_start"] == 47
     assert len(result["steps"]) == 73
-    assert set(result["cycle_pieces"]) <= set(result["visited"])
-    assert set(result["unvisited"]).isdisjoint(result["visited"])
+    assert set(result["cycle_pieces"]) <= set(result["visited_drivable"])
+    assert set(result["unvisited"]).isdisjoint(result["visited_drivable"])
     assert result["terminal"] is None
 
 
@@ -180,5 +179,4 @@ def test_explicit_defaults_preserve_existing_route_cycle_and_coverage():
                                               for x in s.state()["train_switches"]})
     assert trace["steps"] == [list(x) for x in direct.steps]
     assert trace["period"] == direct.period
-    assert trace["visited"] == sorted(direct.visited)
-    assert trace["final_switch_states"] == direct.final_switch_states
+    assert trace["visited_drivable"] == sorted(direct.visited)

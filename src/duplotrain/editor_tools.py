@@ -154,13 +154,13 @@ def switch_choices(layout: Layout) -> list[dict[str, Any]]:
 
 
 def _initial_switches(layout: Layout, settings: object) -> dict[int, int]:
-    choices = {c["placement"]: c for c in switch_choices(layout)}
-    states = {i: c["default"] for i, c in choices.items()}
+    """The validated choices; drive() aims every other tongue at its default."""
     if settings is None:
-        return states
+        return {}
     if not isinstance(settings, dict):
         raise ValueError("initial switch choices must be an object")
-    seen = set()
+    choices = {c["placement"]: c for c in switch_choices(layout)}
+    states = {}
     for key, port in settings.items():
         # JSON object keys are strings; reject bools, floats and noncanonical
         # spellings rather than coercing them to another piece's switch.
@@ -172,11 +172,10 @@ def _initial_switches(layout: Layout, settings: object) -> dict[int, int]:
                 raise ValueError("invalid switch placement")
         else:
             raise ValueError("invalid switch placement")
-        if index not in choices or index in seen:
+        if index not in choices or index in states:
             raise ValueError("pick a valid switch placement once")
         if type(port) is not int or port not in {p["port"] for p in choices[index]["options"]}:
             raise ValueError("pick a valid switch exit port")
-        seen.add(index)
         states[index] = port
     return states
 
@@ -205,22 +204,19 @@ def trace_train(
         raise ValueError("Test train needs track whose joints fit exactly; Check layout "
                          "lists the others")
     common = {"revision": session.revision, "start": list(start),
-              "initial_switch_states": initial, "drivable_count": len(universe),
-              "terminal": None}
+              "drivable_count": len(universe), "terminal": None}
     try:
         report = drive(layout, start=start, switch_states=initial, max_steps=max_steps)
     except DriveLimitError:
         # No partial/unvisited coverage or terminal-position claim at the limit.
         return {**common, "outcome": "limit", "steps": [], "limit": max_steps,
-                "complete": False, "visited": [], "visited_drivable": [],
+                "complete": False, "visited_drivable": [],
                 "unvisited": None, "cycle_pieces": [], "cycle_start": None, "period": None}
     cycle = (report.steps[report.cycle_start:] if report.cycle_start is not None else ())
-    return {**common, "outcome": report.outcome,
+    return {**common, "outcome": report.outcome, "complete": True,
             "steps": [list(step) for step in report.steps], "cycle_start": report.cycle_start,
             "period": report.period, "reversals": report.reversals,
-            "visited": sorted(report.visited), "covers": report.visited >= universe,
             "visited_drivable": sorted(report.visited & universe),
             "unvisited": sorted(universe - report.visited),
             "cycle_pieces": sorted({step[0] for step in cycle}),
-            "terminal": asdict(report.terminal) if report.terminal is not None else None,
-            "final_switch_states": dict(report.final_switch_states), "complete": True}
+            "terminal": asdict(report.terminal) if report.terminal is not None else None}
