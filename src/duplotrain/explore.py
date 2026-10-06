@@ -26,7 +26,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 from typing import TYPE_CHECKING
 
-from ._congruence import curve_key
+from ._congruence import congruence_key
 from .catalog import STONE_MOUNTS
 from .drive import LoopClassification, classify
 from .layout import Layout
@@ -85,19 +85,6 @@ class PerfectResult(list[tuple[Layout, LoopClassification]]):
         if not self.stats.complete:
             raise IncompleteSearchError(self)
         return self
-
-
-def congruence_key(layout: Layout, spacing: float = 8.0, decimals: int = 1) -> tuple:
-    """A key equal for layouts whose track curves are congruent in space.
-
-    Collinear line intervals and fixed lattice arc sectors are unioned before
-    sampling, so splitting a rail into shorter pieces or segments does not alter
-    the key. The exact normalized geometry supplies the translation origin;
-    rounded samples form a set, never a multiplicity-weighted cloud. An exact
-    canonical frame over the 24 rotations and reflection is chosen BEFORE any
-    float conversion, keeping decimal rounding ties invariant under rigid motion.
-    """
-    return curve_key(layout, spacing, decimals)
 
 
 def find_perfect_loops(

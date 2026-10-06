@@ -498,13 +498,19 @@ _KEY_CACHE: dict[tuple, tuple] = {}
 _KEY_CACHE_LIMIT = 4096
 
 
-def curve_key(layout: Layout, spacing: float, decimals: int) -> tuple:
-    """Choose an exact canonical frame, then sample and round just once.
+def congruence_key(layout: Layout, spacing: float = 8.0, decimals: int = 1) -> tuple:
+    """A key equal for layouts whose track curves are congruent in space.
 
-    Rotating already-rounded or floating samples changes half-way rounding cases.
-    Each exact orbit is identical under all 24 rotations and reflection, so its
-    minimum exact primitive descriptor supplies bit-identical sampling inputs.
-    The returned key is still approximate; it is not an exact congruence proof.
+    Collinear line intervals and fixed lattice arc sectors are unioned before
+    sampling, so splitting a rail into shorter pieces or segments does not alter
+    the key. The exact normalized geometry supplies the translation origin;
+    rounded samples form a set, never a multiplicity-weighted cloud. An exact
+    canonical frame over the 24 rotations and reflection is chosen BEFORE any
+    float conversion: rotating already-rounded or floating samples would change
+    half-way rounding cases. Each exact orbit is identical under all 24 rotations
+    and reflection, so its minimum exact primitive descriptor supplies
+    bit-identical sampling inputs. The key is still approximate, not an exact
+    congruence proof.
     """
     if not math.isfinite(spacing) or spacing <= 0:
         raise ValueError("spacing must be finite and positive")
