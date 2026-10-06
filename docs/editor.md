@@ -13,8 +13,10 @@ single DOMContentLoaded initialiser are part of the tested contract, and the
 local host serves them from an explicit allowlist. The static build injects
 the worker bootstrap, stamps the bundle with the content of every engine and
 editor source, and leaves the CLI, the HTTP host, rendering, exhaustive
-enumeration and scoring out of the worker archive. Local hosting
-security and the revision protocol are described in [security.md](security.md).
+enumeration, scoring and the track-length and congruence-key geometry out of
+the worker archive; `Layout.track_length` imports that geometry on demand in the
+desktop package, and the editor never calls it. Local hosting security and the
+revision protocol are described in [security.md](security.md).
 
 ## History
 

@@ -87,9 +87,9 @@ routes. Intersections at isolated points remove no length; parallel tracks at
 different elevations remain distinct. Multi-turn arcs trace their circle once.
 For unknown `Segment` subclasses, the declared `length()` is used; overlapping
 arbitrary custom shapes cannot be unioned without a primitive description. A
-length needs no translation origin, so it never computes the exact centroid the
-congruence key averages, whose denominator can grow with every distinct one in
-the layout.
+length needs no translation origin, so it neither collects the feature points
+nor computes the exact centroid the congruence key averages, whose denominator
+can grow with every distinct one in the layout.
 
 The returned value is a floating-point geometric length in millimetres, not the
 length of a particular train itinerary. CLI length reports and the compactness

@@ -3,6 +3,7 @@
 import copy
 import math
 import pickle
+import random
 from dataclasses import replace
 from fractions import Fraction
 
@@ -10,7 +11,7 @@ import pytest
 
 from duplotrain.catalog import default_catalog
 from duplotrain.exact import Alg
-from duplotrain.geometry import ORIGIN, Pose
+from duplotrain.geometry import DEGREES_PER_STEP, ORIGIN, Pose
 from duplotrain.gui import Session
 from duplotrain.layout import Layout, Placement, build_chain, layout_from_dict, layout_to_dict
 from duplotrain.pieces import Arc, Straight, parse_piece
@@ -405,16 +406,44 @@ def test_pose_index_computes_each_endpoint_once(monkeypatch):
     ]
 
 
-def test_track_length_needs_no_congruence_origin(monkeypatch, catalog):
+def test_track_length_needs_no_congruence_origin_or_features(monkeypatch, catalog):
     # The exact average of points with unrelated denominators can run to tens of
-    # thousands of digits, and a length never needs that origin.
-    import math
-
+    # thousands of digits, and a length needs neither that origin nor the feature
+    # points it averages.
     import duplotrain._congruence as congruence
 
+    union, calls = congruence._union, []
+
+    def observed(layout, *, with_features=True):
+        calls.append(with_features)
+        return union(layout, with_features=with_features)
+
     monkeypatch.setattr(congruence, "_normalise", lambda layout: pytest.fail("origin computed"))
+    monkeypatch.setattr(congruence, "_union", observed)
     circle = build_chain([(catalog["curve"], 0, 1)] * 12)
     assert circle.track_length() == pytest.approx(2 * math.pi * 256)
+    assert calls == [False]
+
+
+@pytest.mark.parametrize("seed", range(12))
+def test_length_only_union_keeps_every_line_arc_and_segment(seed, catalog):
+    import duplotrain._congruence as congruence
+
+    rng = random.Random(seed)
+    choices = [catalog[k] for k in ("straight", "curve", "switch", "ramp", "span")]
+    pieces = [Placement(rng.choice(choices), Pose(
+        Alg(rng.randrange(-3, 4) * 128), Alg(rng.randrange(-3, 4) * 128),
+        Alg(rng.randrange(3) * 64), rng.randrange(24))) for _ in range(12)]
+    layout = Layout(pieces + pieces[::2])  # exact duplicates must be unioned
+    lines, circles, _isolated, opaque, _features = congruence._union(layout)
+    assert congruence._union(layout, with_features=False) == (
+        lines, circles, set(), opaque, set())
+    lengths = [math.sqrt(float(sum(((y - x) * (y - x) for x, y in zip(a, b, strict=True)),
+                                   Alg(0)))) for a, b in lines]
+    lengths += [float(radius) * math.radians(DEGREES_PER_STEP * len(sectors))
+                for (_centre, radius), sectors in circles.items()]
+    lengths += [segment.length() for _start, _end, segment in opaque]
+    assert layout.track_length() == math.fsum(lengths)
 
 
 @pytest.mark.parametrize("pid", list(default_catalog()))
