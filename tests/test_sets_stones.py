@@ -48,7 +48,7 @@ def test_all_set_pieces_exist_in_catalog(catalog):
 def test_buffer_seals_its_far_end(catalog):
     buffer = catalog["buffer"]
     layout = build_chain([(catalog["straight"], 0, 1)])
-    layout, idx = layout.attach(buffer, 0, layout.open_ends()[-1])
+    layout, idx = layout.attach(buffer, 0, layout.connectable_ends()[-1])
     sealed_end = (idx, 1)
     assert layout.is_sealed(sealed_end)
     assert sealed_end not in layout.connectable_ends()
@@ -77,10 +77,10 @@ def test_stones_serialise_with_the_layout(catalog):
     rebuilt = layout_from_dict(layout_to_dict(layout), catalog)
     assert rebuilt == layout
     assert rebuilt.stone_entries_on(1) == [("stone_stop", None)]
-    removed = rebuilt.without_accessory(0, "stone_direction")
+    removed = rebuilt.without_accessory(0, "stone_direction", at_port=None)
     assert removed.stone_entries_on(0) == []
     with pytest.raises(ValueError, match="no 'stone_direction'"):
-        removed.without_accessory(0, "stone_direction")
+        removed.without_accessory(0, "stone_direction", at_port=None)
 
 
 # -- reversing loops ---------------------------------------------------------------

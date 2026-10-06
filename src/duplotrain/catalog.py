@@ -36,8 +36,6 @@ from typing import Any
 from .pieces import PieceType, parse_pieces
 from .validation import read_json_file
 
-__all__ = ["DEFAULT_CATALOG_SPECS", "default_catalog", "load_catalog"]
-
 #: One DUPLO stud pitch, mm.
 STUD = 16
 

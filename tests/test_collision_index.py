@@ -165,7 +165,7 @@ def test_randomized_push_pop_ignore_and_query_matches_linear_scan(seed):
     rng = random.Random(seed)
     a, b = fill(CollisionField()), fill(LinearField())
     for step in range(250):
-        if len(a) > 160 and rng.random() < 0.3:
+        if len(a._clouds) > 160 and rng.random() < 0.3:
             a.pop()
             b.pop()
         else:
@@ -183,7 +183,7 @@ def test_randomized_push_pop_ignore_and_query_matches_linear_scan(seed):
                   rng.choice([0.0, 42.0, 120.0, 200.0]))]
         compare(a, b, query, half=rng.choice([16, 32, 80]), ignore=ignore,
                 underpass=rng.choice([False, True]))
-    while len(a):
+    while a._clouds:
         a.pop()
     assert not a._grid and not a._bounds_grid and not a._wide_clouds
 

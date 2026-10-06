@@ -4,6 +4,7 @@ import pytest
 
 import duplotrain.solver as solver_module
 from duplotrain.catalog import default_catalog
+from duplotrain.drive import drive
 from duplotrain.geometry import ORIGIN
 from duplotrain.layout import build_chain
 from duplotrain.solver import SolverConfig, solve
@@ -243,9 +244,9 @@ def test_results_walk_round_in_piece_count_steps(catalog):
     assert result.solutions
     for sol in result.solutions:
         assert sol.layout.is_closed or sol.open_stubs > 0
-        # Walking the loop from the first piece returns in piece_count steps.
-        steps = list(sol.layout.walk(start=(0, 0)))
-        assert len(steps) == sol.piece_count
+        # A train set off on the first piece comes round in piece_count steps.
+        report = drive(sol.layout, start=(0, 0))
+        assert report.cycle_start == 0 and report.period == sol.piece_count
 
 
 @pytest.mark.parametrize("ends", [((5, 1), (-6, 0)), ((-1, 1), (0, 0)), ((5, -1), (0, 0)),
@@ -271,8 +272,7 @@ def test_rejected_candidates_do_not_exhaust_the_result_limit(catalog, engine):
     result = solve({"curve": 6, "straight": 4}, catalog, SolverConfig(
         min_pieces=0, max_results=1, engine=engine, solution_filter=accept), base=base)
     assert result.solutions and len(result.solutions[0].layout) == 16
-    assert result.stats.dropped_filter > 0
-    assert 12 in seen and 16 in seen
+    assert 12 in seen and 16 in seen  # the filter refused the shorter loop
     assert result.solutions[0].layout.is_closed
     assert not solver_module._solution_overlaps(result.solutions[0].layout, 0, 120, 8)
 
@@ -728,7 +728,8 @@ def test_loops_use_bridge_parts_only_as_they_join(catalog):
     assert not any(solution.layout.joint_issues() for solution in result.solutions)
 
     def on_the_floor(layout):
-        return len({min(placement.port_pose(port).z for port in range(len(placement.piece.ports)))
+        return len({min((placement.port_pose(port).z for port in range(len(placement.piece.ports))),
+                        key=float)
                     for placement in layout if placement.piece.category != "bridge"}) == 1
 
     # Some carry the whole bridge, both arches, over track that all lies on the floor.
@@ -814,28 +815,3 @@ def test_a_stepwise_loop_search_answers_to_its_own_result_limit(catalog):
                                       limits=solver_module.SearchLimits(max_results=50))
     events = list(islice(steps, 1000))
     assert [e["solution"].piece_count for e in events if e["kind"] == "solution"] == [12, 14]
-
-
-@pytest.mark.parametrize("box, reversing, half_circle", [
-    ({"curve": 12, "straight": 4}, False, False),
-    ({"curve": 12, "switch": 1}, True, False),
-    ({"curve": 6, "straight": 4}, False, True),
-])
-def test_each_closure_counts_once_in_the_pass_of_its_length(catalog, box, reversing,
-                                                            half_circle):
-    # Every pass finds the shorter loops again, but counts only those of its own
-    # length: one search over every length counts what one pass per length does.
-    # A completion's pass is as long as the pieces it adds: six curves close half
-    # a circle, and two or four straights more make ovals.
-    options = {}
-    if half_circle:
-        options = dict(base=build_chain([(catalog["curve"], 0, 1)] * 6),
-                       grow_from=(5, 1), close_onto=(0, 0))
-    every = solve(box, catalog, SolverConfig(min_pieces=1, max_results=1000,
-                                              reversing_loops=reversing), **options)
-    passes = [solve(box, catalog, SolverConfig(min_pieces=n, max_pieces=n, max_results=1000,
-                                               reversing_loops=reversing), **options)
-              for n in range(1, sum(box.values()) + 1)]
-    assert every.stats.complete and every.solutions
-    assert every.stats.closures_found == sum(p.stats.closures_found for p in passes)
-    assert every.stats.closures_found >= len(every.solutions)

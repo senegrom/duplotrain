@@ -139,7 +139,7 @@ def test_small_physical_gap_with_large_cancelling_coefficients_is_not_pruned(eng
     offset = Alg(3650401, 0, -2107560)
     assert abs(float(offset)) < 1e-3
     base, left = Layout().with_piece(catalog["straight"], ORIGIN)
-    base, right = base.with_piece(catalog["straight"], Pose(256 + offset, 0, 0, 0))
+    base, right = base.with_piece(catalog["straight"], Pose(offset + 256, 0, 0, 0))
     cfg = SolverConfig(min_pieces=1, slop=1e-3, engine=engine)
     options = dict(base=base, grow_from=(left, 1), close_onto=(right, 0))
     reference = solve({"straight": 1}, catalog, replace(cfg, completion_lookahead=0), **options)

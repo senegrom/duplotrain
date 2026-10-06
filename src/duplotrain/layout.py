@@ -18,7 +18,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
 from types import MappingProxyType
-from typing import Any, Literal
+from typing import Any
 
 from .catalog import ACCESSORIES, STONE_MOUNTS
 from .exact import ZERO, Alg
@@ -26,8 +26,6 @@ from .geometry import DEGREES_PER_STEP, HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .pieces import Path as TrackPath
 from .pieces import PieceType, _lowest, _sample_paths, kinds_mate
 from .validation import check_layout_json, rational_coefficient
-
-__all__ = ["Placement", "End", "Layout", "layout_to_dict", "layout_from_dict"]
 
 #: A specific connector on a specific placed piece.
 End = tuple[int, int]
@@ -214,11 +212,6 @@ class Layout:
         object.__setattr__(self, "links", MappingProxyType(dict(self.links or {})))
         object.__setattr__(self, "accessories", tuple(tuple(a) for a in self.accessories))
 
-    def __reduce__(self):
-        # mappingproxy itself cannot be pickled/deep-copied. Reconstruct through
-        # the constructor so restored layouts retain the same immutable boundary.
-        return type(self), (self.placements, dict(self.links), self.accessories)
-
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Layout):
             return NotImplemented
@@ -235,18 +228,6 @@ class Layout:
 
     def __iter__(self) -> Iterator[Placement]:
         return iter(self.placements)
-
-    def ends(self) -> list[End]:
-        """Every connector on every piece."""
-        return [
-            (i, p)
-            for i, placement in enumerate(self.placements)
-            for p in range(len(placement.piece.ports))
-        ]
-
-    def open_ends(self) -> list[End]:
-        """Connectors that nothing is plugged into (including sealed dead faces)."""
-        return [end for end in self.ends() if end not in self.links]
 
     def is_sealed(self, end: End) -> bool:
         """True when *end* is a dead face (a buffer's bumper) that can never mate."""
@@ -578,29 +559,25 @@ class Layout:
         )
 
     def without_accessory(
-        self, placement: int, accessory_id: str, *,
-        at_port: int | None | Literal["any"] = "any",
+        self, placement: int, accessory_id: str, *, at_port: int | None,
     ) -> Layout:
         """Remove one matching stone, preserving other stones of the same colour.
 
-        Omit ``at_port`` to remove the last stone of that colour, wherever it
-        sits. Explicit ``None``
-        selects the midpoint; an integer selects that connector face only.
+        ``at_port`` None selects the midpoint; an integer selects that connector
+        face only.
         """
-        if at_port != "any":
-            if not 0 <= placement < len(self.placements):
-                raise ValueError(f"no placement {placement}")
-            if at_port is not None and (
-                type(at_port) is not int
-                or not 0 <= at_port < len(self.placements[placement].piece.ports)
-            ):
-                raise ValueError(f"placement {placement} has no port {at_port}")
+        if not 0 <= placement < len(self.placements):
+            raise ValueError(f"no placement {placement}")
+        if at_port is not None and (
+            type(at_port) is not int
+            or not 0 <= at_port < len(self.placements[placement].piece.ports)
+        ):
+            raise ValueError(f"placement {placement} has no port {at_port}")
         accessories = list(self.accessories)
         for i in range(len(accessories) - 1, -1, -1):
             entry = accessories[i]
             position = entry[2] if len(entry) > 2 else None
-            if (entry[0] == placement and entry[1] == accessory_id
-                    and (at_port == "any" or position == at_port)):
+            if entry[0] == placement and entry[1] == accessory_id and position == at_port:
                 accessories.pop(i)
                 break
         else:
@@ -614,34 +591,6 @@ class Layout:
             for entry in self.accessories
             if entry[0] == placement
         ]
-
-    # -- traversal -------------------------------------------------------------
-
-    def walk(self, start: End | None = None) -> Iterator[tuple[int, int, int]]:
-        """Follow the track from *start*, yielding ``(placement, entry, exit)`` triples.
-
-        At a junction the main route is taken.  Stops on reaching an open end or
-        returning to where it began.
-        """
-        if not self.placements:
-            return
-        if start is None:
-            open_ends = self.open_ends()
-            start = open_ends[0] if open_ends else (0, 0)
-        seen: set[End] = set()
-        cursor = start
-        while cursor is not None and cursor not in seen:
-            seen.add(cursor)
-            index, port = cursor
-            options = self.placements[index].piece.transit(port)
-            if not options:
-                return
-            exit_port, _route = options[0]
-            yield (index, port, exit_port)
-            nxt = self.links.get((index, exit_port))
-            if nxt is None:
-                return
-            cursor = nxt
 
     def gaps(self, limit: int | None = None) -> list[tuple[End, End, float]]:
         """Pairs of connectable ends that could join, closest first, with the planar gap in mm.

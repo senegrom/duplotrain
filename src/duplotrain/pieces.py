@@ -34,21 +34,6 @@ from .exact import Alg, alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, Pose, cos_sin, degrees_to_steps
 from .validation import MAX_ID_LENGTH
 
-__all__ = [
-    "Segment",
-    "Straight",
-    "Arc",
-    "Ramp",
-    "Path",
-    "Port",
-    "Route",
-    "PieceType",
-    "parse_length",
-    "parse_piece",
-    "parse_pieces",
-]
-
-
 #: Catalogue numbers: an integer ratio, or a decimal whose exponent stays small.
 _INTEGER = re.compile(r"[+-]?\d+")
 _DECIMAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE]([+-]?\d+))?")

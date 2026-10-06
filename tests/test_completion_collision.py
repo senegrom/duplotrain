@@ -214,7 +214,7 @@ def test_shared_overlap_audit_matches_the_standalone_audit_and_restores_its_fiel
     catalog = default_catalog()
     base = build_chain([(catalog["curve"], 0, 1)] * 6 + [(catalog["ramp"], 0, 1)])
     audit = _OverlapAudit(base, 120.0, 8.0)
-    assert len(audit.field) == len(base)
+    assert len(audit.field._clouds) == len(base)
     result = solve({"curve": 6, "straight": 4, "ramp": 1, "span": 2}, catalog,
                    SolverConfig(min_pieces=0, max_results=8), base=base)
     candidates = [s.layout for s in result.solutions]
@@ -230,7 +230,8 @@ def test_shared_overlap_audit_matches_the_standalone_audit_and_restores_its_fiel
         n_base = len(base) if layout.placements[:len(base)] == base.placements else 0
         expected = _solution_overlaps(layout, n_base, 120.0, 8.0)
         assert audit.overlaps(layout) is expected
-        assert len(audit.field) == len(base) + len(audit.pushed)  # the field is the kept prefix
+        # The field is the kept prefix.
+        assert len(audit.field._clouds) == len(base) + len(audit.pushed)
         verdicts.add(expected)
     assert verdicts == {True, False}
     # A layout over another base is audited standalone, and the loop-mode
@@ -238,7 +239,7 @@ def test_shared_overlap_audit_matches_the_standalone_audit_and_restores_its_fiel
     empty = _OverlapAudit(None, 120.0, 8.0)
     for layout in candidates:
         assert empty.overlaps(layout) is _solution_overlaps(layout, 0, 120.0, 8.0)
-        assert len(empty.field) == len(empty.pushed)
+        assert len(empty.field._clouds) == len(empty.pushed)
 
 
 def test_shared_overlap_audit_accepts_equal_copies_of_the_base_and_shorter_layouts():
@@ -260,7 +261,7 @@ def test_shared_overlap_audit_accepts_equal_copies_of_the_base_and_shorter_layou
     for layout in (Layout(copies + (extra,), dict(base.links)), onto_base,
                    Layout(copies[:3], {}), Layout(), base):
         assert audit.overlaps(layout) is _solution_overlaps(layout, len(base), 120.0, 8.0)
-        assert len(audit.field) == len(base) + len(audit.pushed)
+        assert len(audit.field._clouds) == len(base) + len(audit.pushed)
 
 
 def test_shared_overlap_audit_keeps_a_prefix_only_with_the_same_links():
@@ -293,7 +294,7 @@ def test_shared_overlap_audit_keeps_a_prefix_only_with_the_same_links():
             before = list(audit.pushed)
             expected = _solution_overlaps(layout, 0, 120.0, 8.0)
             assert audit.overlaps(layout) is expected
-            assert len(audit.field) == len(audit.pushed)
+            assert len(audit.field._clouds) == len(audit.pushed)
             # Every kept entry is the same object, checked under the same links.
             shared = sum(1 for a, b in zip(before, audit.pushed, strict=False) if a is b)
             kept += shared

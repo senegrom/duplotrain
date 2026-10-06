@@ -44,8 +44,6 @@ from .catalog import BRICK
 from .layout import Layout
 from .solver import Solution
 
-__all__ = ["ScoreWeights", "ScoreBreakdown", "score_solution"]
-
 
 @dataclass(frozen=True, slots=True)
 class ScoreWeights:

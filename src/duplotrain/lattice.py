@@ -29,15 +29,6 @@ import math
 
 from .exact import Alg
 
-__all__ = [
-    "SCALE",
-    "LatticePoint",
-    "LatticePose",
-    "from_alg_xy",
-    "z_from_alg",
-    "ROT_COS_SIN",
-]
-
 #: Twentieths of a millimetre: covers the catalogue's fifths (bridge rises) and the
 #: halves that 30-degree trigonometry introduces.
 SCALE = 20
@@ -46,9 +37,6 @@ SCALE = 20
 ROT_COS_SIN = tuple(
     (math.cos(math.radians(30 * k)), math.sin(math.radians(30 * k))) for k in range(12)
 )
-
-# Basis reals: zeta^0..zeta^3 = 1, (sqrt3+i)/2, (1+i*sqrt3)/2, i
-_SQRT3 = math.sqrt(3.0)
 
 
 class LatticePoint:
@@ -72,16 +60,6 @@ class LatticePoint:
     def key(self) -> tuple[int, int, int, int]:
         return (self.a, self.b, self.c, self.d)
 
-    def xy(self) -> tuple[float, float]:
-        """Floating-point millimetres."""
-        x = self.a + (self.b * _SQRT3 + self.c) / 2.0
-        y = self.d + (self.c * _SQRT3 + self.b) / 2.0
-        return (x / SCALE, y / SCALE)
-
-    def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        x, y = self.xy()
-        return f"LatticePoint({x:.3f}, {y:.3f})"
-
 
 class LatticePose:
     """Pose on the fast lattice: xy in ``Z[zeta]``, integer z, heading in 30-degree steps.
@@ -97,10 +75,6 @@ class LatticePose:
         self.p = p
         self.z = z
         self.heading = heading % 12
-
-    def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        x, y = self.p.xy()
-        return f"LatticePose({x:.3f}, {y:.3f}, z={self.z / SCALE:.3f}, {self.heading * 30}deg)"
 
 
 def from_alg_xy(x: Alg, y: Alg) -> LatticePoint | None:

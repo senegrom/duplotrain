@@ -28,7 +28,6 @@ i.e. up to rotation, translation and reflection of the embedded track.
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
@@ -53,8 +52,6 @@ from .solver import (
 from .symmetry import placement_key
 from .validation import check_inventory
 
-__all__ = ["NetworkConfig", "NetworkStats", "NetworkResult", "enumerate_networks"]
-
 
 @dataclass(frozen=True, slots=True)
 class NetworkConfig:
@@ -63,8 +60,6 @@ class NetworkConfig:
     max_results: int = 200
     max_nodes: int = 2_000_000
     use_all_pieces: bool = False
-    clearance: float = DEFAULT_CLEARANCE
-    collision_spacing: float = 8.0
     #: Exact reverse reachability for this many final placements, as
     #: ``SolverConfig.completion_lookahead``; zero disables the pruning.
     lookahead: int = 10
@@ -76,7 +71,6 @@ class NetworkConfig:
         SolverConfig(
             min_pieces=self.min_pieces, max_pieces=self.max_pieces,
             max_results=self.max_results, max_nodes=self.max_nodes,
-            clearance=self.clearance, collision_spacing=self.collision_spacing,
             completion_lookahead=self.lookahead,
         )
 
@@ -85,9 +79,7 @@ class NetworkConfig:
 class NetworkStats:
     nodes: int = 0
     pruned_reachability: int = 0  # subtrees whose open ends can no longer all mate
-    duration_s: float = 0.0
     aborted: bool = False
-    engine: str = ""
     #: Entire inventory exhausted, not merely the configured piece bound.
     complete: bool = False
     stop_reason: str = "not_started"
@@ -150,9 +142,7 @@ def enumerate_networks(
     eng = _compile_lattice(ORIGIN, ORIGIN, piece_obj, moves_by_piece)
     if eng is None:
         eng = _FieldEngine(ORIGIN, ORIGIN, piece_obj, moves_by_piece)
-    stats = NetworkStats(
-        engine=eng.name, max_pieces_searched=min(total, max_pieces)
-    )
+    stats = NetworkStats(max_pieces_searched=min(total, max_pieces))
 
     # Reverse reachability, anchored at the origin like the loop solver's: a
     # query asks whether one pose can reach another within so many traversals
@@ -220,14 +210,13 @@ def enumerate_networks(
         )
 
     # The field bins a candidate's samples once some placement's bounds come within reach.
-    samples_for = _placement_samples(eng, pieces, cfg.collision_spacing)
+    samples_for = _placement_samples(eng, pieces, 8.0)
 
     placements: list[tuple[str, object]] = []  # (pid, engine frame)
-    field = CollisionField(clearance=cfg.clearance)
+    field = CollisionField()
     links: dict[tuple[int, int], tuple[int, int]] = {}
     open_ends: dict[tuple[int, int], object] = {}  # end -> engine pose
     found: dict[tuple, Layout] = {}
-    started = time.perf_counter()
 
     def potential_neighbours(port_poses: Mapping[int, object], target: End) -> set[int]:
         """Owners that could become directly linked to the new, fixed placement.
@@ -257,7 +246,7 @@ def enumerate_networks(
         key = congruence_key(layout)
         if key in found:
             return
-        if _solution_overlaps(layout, 0, cfg.clearance, cfg.collision_spacing):
+        if _solution_overlaps(layout, 0, DEFAULT_CLEARANCE, 8.0):
             return
         if accept is not None and not accept(layout):
             return  # Do not reserve the curve key for an ineligible realization.
@@ -400,5 +389,4 @@ def enumerate_networks(
     else:
         stats.complete = True
         stats.stop_reason = "exhausted"
-    stats.duration_s = time.perf_counter() - started
     return NetworkResult(layouts=list(found.values()), stats=stats)

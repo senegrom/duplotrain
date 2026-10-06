@@ -21,6 +21,7 @@ from duplotrain.layout import build_chain
 from duplotrain.solver import (
     SolverConfig,
     _flat,
+    _flat_xy,
     _lattice_pose,
     _lattice_rotations,
     _lattice_step,
@@ -33,10 +34,10 @@ from duplotrain.solver import (
 
 def test_rotation_matches_floats():
     p = LatticePoint(7 * SCALE, 3, -5, 2)
-    x0, y0 = p.xy()
+    x0, y0 = _flat_xy((*p.key(), 0, 0))
     for steps in range(12):
         c, s = ROT_COS_SIN[steps]
-        rx, ry = p.rotated(steps).xy()
+        rx, ry = _flat_xy((*p.rotated(steps).key(), 0, 0))
         assert rx == pytest.approx(c * x0 - s * y0, abs=1e-9)
         assert ry == pytest.approx(s * x0 + c * y0, abs=1e-9)
 
@@ -54,7 +55,7 @@ def test_conversion_round_trips_catalogue_geometry(catalog):
             pose = port.pose
             lat = _pose_to_lattice(pose)
             assert lat is not None, f"{piece.id} port off-lattice"
-            x, y = lat.p.xy()
+            x, y = _flat_xy(_flat(lat))
             px, py = pose.xy()
             assert x == pytest.approx(px, abs=1e-9)
             assert y == pytest.approx(py, abs=1e-9)

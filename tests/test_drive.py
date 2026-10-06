@@ -31,7 +31,7 @@ LEFT = (0, 1)
 
 def closed_circle(catalog):
     layout = build_chain([(catalog["curve"], *LEFT)] * 12)
-    return layout.join(layout.open_ends()[1], layout.open_ends()[0])
+    return layout.join(layout.connectable_ends()[1], layout.connectable_ends()[0])
 
 
 def closed_oval(catalog):
@@ -42,7 +42,7 @@ def closed_oval(catalog):
         + [(catalog["curve"], *LEFT)] * 6
     )
     layout = build_chain(pieces)
-    return layout.join(layout.open_ends()[1], layout.open_ends()[0])
+    return layout.join(layout.connectable_ends()[1], layout.connectable_ends()[0])
 
 
 @pytest.fixture(scope="module")
@@ -71,7 +71,7 @@ def teardrop(catalog, teardrops):
 
 
 def test_circle_drives_forever_one_way(catalog):
-    report = drive(closed_circle(catalog))
+    report = drive(closed_circle(catalog), (0, 0))
     assert report.outcome == "endless"
     assert report.period == 12
     assert report.visited == set(range(12))
@@ -105,7 +105,7 @@ def test_switch_state_forced_by_trailing_move(catalog, teardrop):
 def test_wrong_tongue_derails_at_a_dangling_stub(catalog):
     """A circle with a switch is safe trailing, fatal facing the open branch."""
     layout = build_chain([(catalog["switch"], 0, 1)] + [(catalog["curve"], *LEFT)] * 11)
-    layout = layout.join(layout.open_ends()[-1], (0, 0))
+    layout = layout.join(layout.connectable_ends()[-1], (0, 0))
     switch = 0
     # Trailing around (entering the switch via its left branch): always endless.
     assert drive(layout, start=(0, 1)).outcome == "endless"
@@ -120,7 +120,7 @@ def test_stop_stone_parks_every_run(catalog):
     layout = closed_oval(catalog).with_accessory(0, "stone_stop")
     verdict = classify(layout)
     assert not verdict.locally_looping
-    assert drive(layout).outcome == "stopped"
+    assert drive(layout, (0, 0)).outcome == "stopped"
 
 
 # -- the looping ladder --------------------------------------------------------------
@@ -142,7 +142,7 @@ def test_oval_with_direction_stone_is_perfectly_looping(catalog):
 
 def test_circle_with_stub_is_only_locally_looping(catalog):
     layout = build_chain([(catalog["switch"], 0, 1)] + [(catalog["curve"], *LEFT)] * 11)
-    layout = layout.join(layout.open_ends()[-1], (0, 0))
+    layout = layout.join(layout.connectable_ends()[-1], (0, 0))
     verdict = classify(layout)
     assert verdict.locally_looping
     assert not verdict.looping  # facing the stub with the wrong tongue derails
@@ -159,7 +159,7 @@ def test_teardrop_with_stone_is_only_locally_looping(catalog, teardrop):
 
 
 def test_dogbone_is_perfectly_looping_with_no_stone(catalog, teardrop):
-    dogbone = make_dogbone(teardrop, catalog, bar_straights=2)
+    dogbone = make_dogbone(teardrop, catalog)
     assert dogbone.is_closed
     assert not dogbone.accessories
     verdict = classify(dogbone)
@@ -211,7 +211,7 @@ def test_direction_stone_at_buffer_face_makes_a_safe_terminator(catalog, teardro
 def test_shuttle_with_face_stones_is_perfectly_looping(catalog):
     """[buffer][stone@face ... straights ... stone@face][buffer]: pure ping-pong."""
     chain = build_chain([(catalog["straight"], 0, 1)] * 3)
-    layout, b1 = chain.attach(catalog["buffer"], 0, chain.open_ends()[0])
+    layout, b1 = chain.attach(catalog["buffer"], 0, chain.connectable_ends()[0])
     layout, b2 = layout.attach(catalog["buffer"], 0, (2, 1))
     layout = layout.with_accessory(0, "stone_direction", at_port=0)  # at buffer 1's face
     layout = layout.with_accessory(2, "stone_direction", at_port=1)  # at buffer 2's face
@@ -245,7 +245,7 @@ def test_congruence_ignores_placement_pose(catalog):
     b = build_chain(
         [(catalog["curve"], *LEFT)] * 12, start=Pose.make(500, -321, 0, 5)
     )
-    b = b.join(b.open_ends()[1], b.open_ends()[0])
+    b = b.join(b.connectable_ends()[1], b.connectable_ends()[0])
     assert congruence_key(a) == congruence_key(b)
     assert congruence_key(a) != congruence_key(closed_oval(catalog))
 
@@ -261,7 +261,7 @@ def test_congruence_identifies_same_curve_different_pieces(catalog):
     )
     with_crossing = build_chain(pieces)
     with_crossing = with_crossing.join(
-        with_crossing.open_ends()[1], with_crossing.open_ends()[0]
+        with_crossing.connectable_ends()[1], with_crossing.connectable_ends()[0]
     )
     assert congruence_key(with_straight) == congruence_key(with_crossing)
 
@@ -317,7 +317,7 @@ def test_a_train_never_starts_through_a_sealed_face_or_on_no_track(catalog):
         drive(bar, start=(1, 1))
     assert drive(bar, start=(0, 0)).outcome == "buffered"
     with pytest.raises(ValueError, match="nothing to drive on"):
-        drive(Layout())
+        drive(Layout(), (0, 0))
 
 
 def test_the_counterexample_breaks_the_first_failed_property(catalog):
@@ -357,10 +357,10 @@ def test_a_half_never_driven_is_not_swept_both_ways(catalog):
 
 def test_an_endless_run_found_exactly_at_the_step_budget_is_a_verdict(catalog):
     circle = build_chain([(catalog["curve"], 0, 1)] * 12).join((0, 0), (11, 1))
-    report = drive(circle, max_steps=12)
+    report = drive(circle, (0, 0), max_steps=12)
     assert report.outcome == "endless" and len(report.steps) == 12
     with pytest.raises(DriveLimitError, match="11-step budget"):
-        drive(circle, max_steps=11)
+        drive(circle, (0, 0), max_steps=11)
 
 
 def test_drive_memory_does_not_grow_with_steps_times_switches():
@@ -403,7 +403,7 @@ def test_a_prepared_context_drives_exactly_like_a_fresh_run():
     with pytest.raises(TypeError):
         context.stones[0] = ()
     with pytest.raises(ValueError, match="different layout"):
-        drive(ring, _context=replace(context, layout=Layout(ring.placements)))
+        drive(ring, (0, 0), _context=replace(context, layout=Layout(ring.placements)))
 
 
 def test_classify_prepares_the_switch_choices_once(monkeypatch):
@@ -580,11 +580,9 @@ def test_a_teardrop_closing_into_its_base_switch_is_told_apart_too():
     assert dogbone.is_closed and classify(dogbone).perfectly_looping
 
 
-def test_the_package_exports_what_classify_returns_and_raises():
+def test_the_package_exports_what_classify_raises():
     import duplotrain
 
-    verdict = classify(build_chain([(default_catalog()["curve"], 0, 1)] * 12))
-    assert isinstance(verdict, duplotrain.LoopClassification)
     assert duplotrain.DriveLimitError is DriveLimitError
     assert duplotrain.ClassificationLimitError is ClassificationLimitError
 

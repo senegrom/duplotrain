@@ -1117,11 +1117,11 @@ def test_a_later_stop_drops_a_walk_reason_the_harder_search_settled(catalog, mon
     def search(inventory, pieces, config, *, base, grow_from, close_onto, limits):
         if grow_from == (5, 1):
             while True:
-                yield {"kind": "walk_limit", "nodes": 1, "depth": 1}
+                yield {"kind": "walk_limit", "nodes": 1}
         nodes = 0
         while nodes < 100_000:  # beyond the 60,000-node stage cap at effort 1
             nodes = limits.max_nodes
-            yield {"kind": "node_limit", "nodes": nodes, "depth": 1}
+            yield {"kind": "node_limit", "nodes": nodes}
 
     monkeypatch.setattr(editor_search, "solve_steps", search)
     # Five spare curves cannot close the half circle: the arc templates find nothing,

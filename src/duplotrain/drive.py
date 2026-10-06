@@ -34,11 +34,6 @@ from types import MappingProxyType
 
 from .layout import End, Layout
 
-__all__ = [
-    "ClassificationLimitError", "DriveLimitError", "DriveReport", "DriveTerminal", "drive",
-    "LoopClassification", "classify", "drivable_universe",
-]
-
 #: Stones that affect motion.
 STOP_STONE = "stone_stop"
 DIRECTION_STONE = "stone_direction"
@@ -138,7 +133,7 @@ def _prepare_drive(layout: Layout) -> _DriveContext:
 
 def drive(
     layout: Layout,
-    start: End | None = None,
+    start: End,
     switch_states: Mapping[int, int] | None = None,
     *, max_steps: int = MAX_STEPS, _context: _DriveContext | None = None,
 ) -> DriveReport:
@@ -147,8 +142,7 @@ def drive(
     Args:
         layout: the build, including any clipped-on action stones.
         start: ``(placement, port)`` the train ENTERS its first piece through --
-            i.e. it travels from that connector into the piece.  Defaults to the
-            first piece's first port.
+            i.e. it travels from that connector into the piece.
         switch_states: initial tongue positions, ``placement -> exit port``; defaults
             to every tongue aimed at its lowest-numbered branch.
         max_steps: bounded run length; raises DriveLimitError rather than making
@@ -158,8 +152,6 @@ def drive(
         raise ValueError("max_steps must be an integer from 1 to MAX_STEPS")
     if not layout.placements:
         raise ValueError("nothing to drive on")
-    if start is None:
-        start = (0, layout.placements[0].piece.routes[0].port_a)
     if (not isinstance(start, tuple) or len(start) != 2
             or any(type(value) is not int for value in start)
             or not 0 <= start[0] < len(layout.placements)

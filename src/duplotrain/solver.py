@@ -51,9 +51,6 @@ from .pieces import Arc, PieceType, Ramp, Straight, kinds_mate
 from .symmetry import placement_key, pose_key
 from .validation import check_inventory
 
-__all__ = ["Move", "SolverConfig", "Solution", "SolveStats", "SolveResult",
-           "SearchLimits", "solve", "solve_steps"]
-
 
 @dataclass(frozen=True, slots=True)
 class Move:
@@ -1737,8 +1734,6 @@ class SolverConfig:
     max_results: int = 100
     max_nodes: int = 2_000_000
     use_all_pieces: bool = False
-    clearance: float = DEFAULT_CLEARANCE
-    collision_spacing: float = 8.0
     #: Also accept layouts that close into an open junction stub instead of the
     #: anchor -- a teardrop whose walk ends against its own switch's other branch.
     #: On a stem-tailed one the train keeps exiting through the stem toward the open
@@ -1764,12 +1759,8 @@ class SolverConfig:
     def __post_init__(self) -> None:
         if self.solution_filter is not None and not callable(self.solution_filter):
             raise ValueError("solution_filter must be callable or None")
-        for name in ("slop", "clearance", "collision_spacing"):
-            value = getattr(self, name)
-            if not math.isfinite(value) or value < 0:
-                raise ValueError(f"{name} must be finite and non-negative")
-        if self.collision_spacing == 0:
-            raise ValueError("collision_spacing must be positive")
+        if not math.isfinite(self.slop) or self.slop < 0:
+            raise ValueError("slop must be finite and non-negative")
         for name, minimum in (("min_pieces", 0), ("max_results", 1), ("max_nodes", 1)):
             value = getattr(self, name)
             if type(value) is not int or value < minimum:
@@ -1785,7 +1776,6 @@ class SolverConfig:
 @dataclass
 class SolveStats:
     nodes: int = 0
-    closures_found: int = 0  # before deduplication
     pruned_collision: int = 0
     pruned_completion: int = 0
     completion_states: int = 0  # planar states in the largest complete reverse layer
@@ -1796,7 +1786,6 @@ class SolveStats:
     #: future joint exempted during search may not be realized in the final trace;
     #: these overlapping candidates are counted here, never returned.
     dropped_overlap: int = 0
-    dropped_filter: int = 0  # candidates rejected by the optional acceptance audit
     #: True only after exhausting the entire inventory, not a capped search.
     complete: bool = False
     stop_reason: str = "not_started"
@@ -2023,7 +2012,7 @@ def solve_steps(
     total_pieces = sum(counts.values())
 
     stats = SolveStats()
-    field = CollisionField(clearance=cfg.clearance)
+    field = CollisionField()
     solutions: dict[tuple, Solution] = {}
     started = time.perf_counter()
 
@@ -2097,7 +2086,7 @@ def solve_steps(
             floor = base.floor(pieces.values())
             entry_floors = {pid: tuple(eng.height_of(floor + z) for z in values)
                             for pid, values in offsets.items()}
-    placement_samples = _placement_samples(eng, pieces, cfg.collision_spacing)
+    placement_samples = _placement_samples(eng, pieces, 8.0)
     # A fresh loop closes onto the origin face exactly as a completion closes onto
     # its target, so the same reverse tables prune walks that cannot return with
     # the traversals left in either mode.
@@ -2167,7 +2156,7 @@ def solve_steps(
             placements.append((placement.piece.id, None))  # base frames never re-used
             field.add(
                 index,
-                placement.centreline_points(cfg.collision_spacing),
+                placement.centreline_points(8.0),
                 placement.piece.width / 2.0,
                 underpass=placement.piece.underpass,
             )
@@ -2367,8 +2356,6 @@ def solve_steps(
     audit: list = []  # one _OverlapAudit over the base, built on the first closure
 
     def emit(gap: float, reversing_target: tuple[int, int] | None = None) -> None:
-        if len(placements) - len(base_pids) == f_limit:
-            stats.closures_found += 1  # a shorter closure, once: in the pass of its length
         signature = _canonical_signature(
             steps,
             canon_for,
@@ -2383,7 +2370,7 @@ def solve_steps(
             return
         layout = assemble(reversing_target)
         if not audit:
-            audit.append(_OverlapAudit(base, cfg.clearance, cfg.collision_spacing))
+            audit.append(_OverlapAudit(base, DEFAULT_CLEARANCE, 8.0))
         if audit[0].overlaps(layout):
             stats.dropped_overlap += 1
             return
@@ -2397,7 +2384,6 @@ def solve_steps(
             kind="loop" if reversing_target is None else "reversing",
         )
         if cfg.solution_filter is not None and not cfg.solution_filter(candidate):
-            stats.dropped_filter += 1
             return
         solutions[signature] = candidate
         if limits is not None:
@@ -2420,9 +2406,9 @@ def solve_steps(
             while len(solutions) >= limits.max_results or stats.nodes >= limits.max_nodes:
                 reason = ("result_limit" if len(solutions) >= limits.max_results
                           else "node_limit")
-                yield {"kind": reason, "nodes": stats.nodes, "depth": f_limit}
+                yield {"kind": reason, "nodes": stats.nodes}
             if stats.nodes % limits.quantum == 0:
-                yield {"kind": "progress", "nodes": stats.nodes, "depth": f_limit}
+                yield {"kind": "progress", "nodes": stats.nodes}
         elif len(solutions) >= cfg.max_results:
             return False
         stats.nodes += 1
@@ -2740,7 +2726,7 @@ def solve_steps(
                 # A raised piece bound still stays within the recursion cap.
                 depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH, limits.max_pieces)
                 while f_limit > depth_limit and depth_limit < total_pieces:
-                    yield {"kind": "piece_limit", "nodes": stats.nodes, "depth": depth_limit}
+                    yield {"kind": "piece_limit", "nodes": stats.nodes}
                     depth_limit = min(total_pieces, _MAX_SEARCH_DEPTH, limits.max_pieces)
             if f_limit > depth_limit:
                 break
@@ -2754,7 +2740,7 @@ def solve_steps(
         while walk_cut and limits is not None and base is not None:
             # No bound a caller can raise lifts the walk's cap: report it on every
             # resume, never finishing as if the search had been exhausted.
-            yield {"kind": "walk_limit", "nodes": stats.nodes, "depth": depth_limit}
+            yield {"kind": "walk_limit", "nodes": stats.nodes}
     finally:
         # The recursive function owns a cell pointing to itself. Break that
         # cycle once the stack has unwound, so collision fields, geometry and

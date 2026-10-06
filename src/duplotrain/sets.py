@@ -13,8 +13,6 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 
-__all__ = ["TrainSet", "SETS", "inventory_for_sets"]
-
 
 @dataclass(frozen=True, slots=True)
 class TrainSet:

@@ -178,7 +178,7 @@ def test_unknown_segment_type_rejected():
 def test_a_pieces_lowest_point_takes_in_every_path(catalog):
     # Every built-in piece is level or climbs evenly: its lowest point is a port.
     for piece in catalog.values():
-        assert piece.minimum_z == min(port.pose.z for port in piece.ports)
+        assert piece.minimum_z == min((port.pose.z for port in piece.ports), key=float)
     # A custom piece may dip between level ends, or carry a lower route.
     dip = parse_piece({"id": "dip", "paths": [{"segments": [
         {"type": "ramp", "run": 128, "rise": "-1/7"},

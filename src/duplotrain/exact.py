@@ -30,8 +30,6 @@ from fractions import Fraction
 from functools import lru_cache
 from typing import Union
 
-__all__ = ["Alg", "ZERO", "ONE", "SQRT2", "SQRT3", "SQRT6", "alg", "AlgLike"]
-
 # What can be coerced into an Alg.
 AlgLike = Union["Alg", int, Fraction]
 
@@ -116,8 +114,6 @@ class Alg:
             return o
         return Alg(self.a + o.a, self.b + o.b, self.c + o.c, self.d + o.d)
 
-    __radd__ = __add__
-
     def __neg__(self) -> Alg:
         if not self:
             return self
@@ -130,9 +126,6 @@ class Alg:
         if not self:
             return -o
         return Alg(self.a - o.a, self.b - o.b, self.c - o.c, self.d - o.d)
-
-    def __rsub__(self, other: AlgLike) -> Alg:
-        return Alg.coerce(other).__sub__(self)
 
     def __mul__(self, other: AlgLike) -> Alg:
         o = Alg.coerce(other)
@@ -204,9 +197,6 @@ class Alg:
             return Alg(self.a * inv, self.b * inv, self.c * inv, self.d * inv)
         return self * o.inverse()
 
-    def __rtruediv__(self, other: AlgLike) -> Alg:
-        return Alg.coerce(other) * self.inverse()
-
     # -- comparison ------------------------------------------------------------
 
     def __eq__(self, other: object) -> bool:
@@ -233,7 +223,7 @@ class Alg:
         return bool(self.a or self.b or self.c or self.d)
 
     def sign(self) -> int:
-        """-1, 0 or 1, exactly: the comparisons below use floats, this does not.
+        """-1, 0 or 1, exactly.
 
         Rational bounds on the three radicals are refined until they separate the
         value from zero, which every nonzero field element eventually allows.
@@ -254,22 +244,6 @@ class Alg:
             if high < 0:
                 return -1
             bits *= 2
-
-    def __lt__(self, other: AlgLike) -> bool:
-        # Ordering compares float images, for callers sorting values; decisions
-        # use sign(). All four operators derive from the same float comparison so
-        # that distinct values with identical float images compare as consistently
-        # unordered rather than each claiming to exceed the other.
-        return float(self) < float(Alg.coerce(other))
-
-    def __le__(self, other: AlgLike) -> bool:
-        return self == other or self < other
-
-    def __gt__(self, other: AlgLike) -> bool:
-        return float(self) > float(Alg.coerce(other))
-
-    def __ge__(self, other: AlgLike) -> bool:
-        return self == other or self > other
 
     # -- conversion ------------------------------------------------------------
 
@@ -300,9 +274,6 @@ class Alg:
             if coeff:
                 parts.append(f"{coeff}{symbol}")
         return f"Alg({' + '.join(parts) if parts else '0'})"
-
-    def __str__(self) -> str:
-        return f"{float(self):.6g}"
 
 
 def alg(value: AlgLike) -> Alg:

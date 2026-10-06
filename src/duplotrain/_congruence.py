@@ -29,9 +29,8 @@ _Point = tuple[Alg, Alg, Alg]
 
 
 def _compare(a: Alg, b: Alg) -> int:
-    """Exact ordering (Alg.__lt__ deliberately uses floats elsewhere): a rounded
-    comparison must not bridge gaps between collinear runs or erase an extremely
-    short segment."""
+    """Exact ordering: a rounded comparison must not bridge gaps between collinear
+    runs or erase an extremely short segment."""
     return (a - b).sign()
 
 

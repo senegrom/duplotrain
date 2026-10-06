@@ -110,7 +110,7 @@ def test_endless_and_limited_runs_never_invent_a_terminal_event():
     assert limited["cycle_pieces"] == []
     assert unchanged(session) == before
     with pytest.raises(DriveLimitError):
-        drive(layout, max_steps=3)
+        drive(layout, (0, 0), max_steps=3)
 
 
 @pytest.mark.parametrize("fixture,total", [("bridge-gap.json", 59), ("bridge-completed.json", 83)])

@@ -88,7 +88,7 @@ def test_an_exact_stage_alternates_doubling_turns_within_one_shared_cap(monkeypa
     def never_settles(inventory, pieces, config, *, base, grow_from, close_onto, limits):
         while True:
             turns.append((grow_from, limits.max_nodes))
-            yield {"kind": "node_limit", "nodes": limits.max_nodes, "depth": 1}
+            yield {"kind": "node_limit", "nodes": limits.max_nodes}
 
     monkeypatch.setattr(editor_search, "solve_steps", never_settles)
     pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog,
@@ -124,8 +124,8 @@ def test_the_last_direction_of_a_stage_runs_before_the_next_stage_starts(monkeyp
         while True:
             turns.append(stage)
             if stage == "plain" and grow_from == (5, 1):
-                yield {"kind": "walk_limit", "nodes": 10, "depth": 1}
-            yield {"kind": "node_limit", "nodes": limits.max_nodes, "depth": 1}
+                yield {"kind": "walk_limit", "nodes": 10}
+            yield {"kind": "node_limit", "nodes": limits.max_nodes}
 
     monkeypatch.setattr(editor_search, "solve_steps", one_end_cut)
     pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog,
@@ -150,7 +150,6 @@ def test_piece_depth_limit_is_not_a_proof_of_impossibility():
     job = complete(session, (0, 1), (1, 0), max_results=3)
     assert not job.solutions
     assert job.status == "limited" and not job.complete
-    assert max(c.depth for c in job.pool.cursors) == 26  # the search reached the bound
     deeper = complete(session, (0, 1), (1, 0), max_results=3, max_pieces=64)
     assert len(deeper.solutions) == 1
     assert deeper.status == "exhausted" and deeper.complete
@@ -238,8 +237,8 @@ def test_the_full_inventory_running_out_of_search_settles_every_stage(monkeypatc
     def plain_capped(inventory, pieces, config, *, base, grow_from, close_onto, limits):
         if set(inventory) <= {"curve", "straight"}:
             while True:
-                yield {"kind": "node_limit", "nodes": limits.max_nodes, "depth": 1}
-        yield {"kind": "progress", "nodes": 5, "depth": 1}
+                yield {"kind": "node_limit", "nodes": limits.max_nodes}
+        yield {"kind": "progress", "nodes": 5}
 
     monkeypatch.setattr(editor_search, "solve_steps", plain_capped)
     pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog,
@@ -263,11 +262,11 @@ def test_search_harder_lifts_a_directions_result_limit(monkeypatch):
         count = 0
         while True:
             if count >= limits.max_results:
-                yield {"kind": "result_limit", "nodes": count, "depth": 1}
+                yield {"kind": "result_limit", "nodes": count}
             else:
                 count += 1
                 found.append(grow_from)
-                yield {"kind": "solution", "solution": None, "nodes": count, "depth": 1}
+                yield {"kind": "solution", "solution": None, "nodes": count}
 
     monkeypatch.setattr(editor_search, "solve_steps", repeats)
     pool = PairSearch(build_chain([(catalog["curve"], 0, 1)] * 6), catalog,

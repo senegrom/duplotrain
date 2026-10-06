@@ -23,16 +23,6 @@ from fractions import Fraction
 
 from .exact import Alg, AlgLike, alg
 
-__all__ = [
-    "HEADING_STEPS",
-    "DEGREES_PER_STEP",
-    "steps_to_degrees",
-    "degrees_to_steps",
-    "cos_sin",
-    "Pose",
-    "ORIGIN",
-]
-
 #: Number of distinct headings on the lattice.  24 steps of 15 degrees covers every
 #: angle DUPLO track uses (30-degree curves, 90-degree crossings) with room for 45- and
 #: 15-degree pieces, and all of them stay exact in ``Q(sqrt2, sqrt3)``.
@@ -106,7 +96,6 @@ def cos_sin(steps: int) -> tuple[Alg, Alg]:
 def _rotate_xy(x: Alg, y: Alg, steps: int) -> tuple[Alg, Alg]:
     """Rotate exactly; quarter turns only exchange or negate coordinates."""
     heading = steps % HEADING_STEPS
-    c, s = _ROTATIONS[heading]  # Also preserve the table's integer-index validation.
     if heading == 0:
         return x, y
     if heading == 6:
@@ -115,6 +104,7 @@ def _rotate_xy(x: Alg, y: Alg, steps: int) -> tuple[Alg, Alg]:
         return -x, -y
     if heading == 18:
         return y, -x
+    c, s = _ROTATIONS[heading]
     return c * x - s * y, s * x + c * y
 
 
@@ -170,20 +160,6 @@ class Pose:
     def reversed(self) -> Pose:
         """The same point, facing the opposite way."""
         return Pose(self.x, self.y, self.z, self.heading + HEADING_STEPS // 2)
-
-    def rotated_about_origin(self, steps: int) -> Pose:
-        """Rotate the whole pose about the world origin."""
-        rx, ry = _rotate_xy(self.x, self.y, steps)
-        return Pose(
-            rx,
-            ry,
-            self.z,
-            self.heading + steps,
-        )
-
-    def mirrored(self) -> Pose:
-        """Reflect across the world x axis (y -> -y), which flips handedness."""
-        return Pose(self.x, -self.y, self.z, -self.heading)
 
     @property
     def degrees(self) -> int:

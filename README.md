@@ -348,9 +348,9 @@ identical straight that can carry a required stone.
 **Check whether the search finished.** `solve()` and `enumerate_networks()` expose
 `stats.complete`, `stats.stop_reason`, and `stats.max_pieces_searched`. Both
 `find_perfect_*()` helpers return a `PerfectResult`: it supports list operations
-(indexing, iteration, `len`, comparison with `[]`), and also exposes `.layouts` and
-`.stats`. A successful classification proves the returned candidate's
-behaviour; it does not mean the search found every candidate.
+(indexing, iteration, `len`, comparison with `[]`), and also exposes `.stats`. A
+successful classification proves the returned candidate's behaviour; it does not
+mean the search found every candidate.
 
 ```python
 from duplotrain import (
@@ -362,7 +362,7 @@ result = find_perfect_networks(
     default_catalog(), {"stone_direction": 2},
     NetworkConfig(max_pieces=5, max_results=100),
 )
-print(len(result.layouts), result.stats.complete, result.stats.stop_reason)
+print(len(result), result.stats.complete, result.stats.stop_reason)
 # An optional level crossing does not hide the all-straight perfect shuttle.
 
 try:
@@ -434,7 +434,7 @@ disables) sets the exact horizon; `stats.pruned_completion` and the other
 and budgets, and [its benchmarks](docs/performance.md#measuring) the measurements.
 
 Elevation is modelled (ramps carry `z`; closure requires returning to the anchor's
-height). Blanket collision clearance defaults to 120 mm; underpass-enabled pieces
+height). Blanket collision clearance is 120 mm; underpass-enabled pieces
 add a separate, provisional clearance rule near the bridge crest. Both search
 engines apply the same rule (see `duplotrain.collision` and the catalogue notes).
 

@@ -53,8 +53,7 @@ def test_reversing_completion_keeps_both_distinct_anchored_witnesses(engine):
     found = {congruence_key(solution.layout) for solution in result.solutions}
     missing = sum(congruence_key(witness) not in found for witness in witnesses)
     assert missing == 0, (
-        f"{engine}: {result.stats.closures_found} closures found, but "
-        f"{len(result.solutions)} returned; {missing} exact, collision-free, "
+        f"{engine}: {len(result.solutions)} returned; {missing} exact, collision-free, "
         "non-congruent anchored witness was incorrectly deduplicated"
     )
 

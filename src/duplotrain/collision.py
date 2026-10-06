@@ -25,8 +25,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-__all__ = ["CollisionField", "TOUCH_MARGIN", "DEFAULT_CLEARANCE", "UNDERPASS_MIN"]
-
 #: Overlap allowance, mm: two tracks' centreline samples clash only when closer than
 #: the sum of their half widths less this margin, so flush parallel tracks (a width
 #: apart) do not count as overlapping.
@@ -465,6 +463,3 @@ class CollisionField:
                 bucket[:] = [c for c in bucket if c.placement != placement]
             if not bucket:
                 del grid[key]
-
-    def __len__(self) -> int:
-        return len(self._clouds)

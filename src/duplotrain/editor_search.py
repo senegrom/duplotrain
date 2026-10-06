@@ -192,7 +192,6 @@ class Cursor:
     budget: int  # the stage's node budget at search effort 1
     overhead: int = 0
     nodes: int = 0
-    depth: int = 0
     blocked: bool = False
     exhausted: bool = False
     cut: bool = False  # a walk too long for the recursion limit: no bound lifts it
@@ -206,10 +205,8 @@ class Cursor:
             self.exhausted = True
             if done.value is not None:
                 self.nodes = done.value.stats.nodes
-                self.depth = done.value.stats.max_pieces_searched
             return {"kind": "exhausted"}
         self.nodes = event.get("nodes", self.nodes)
-        self.depth = event.get("depth", self.depth)
         if event["kind"] == "node_limit":
             if self.limits.max_nodes < self.cap:
                 self.limits.max_nodes = min(self.cap, max(self.nodes + 1, self.nodes * 2))

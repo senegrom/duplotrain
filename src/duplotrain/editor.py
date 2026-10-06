@@ -33,8 +33,6 @@ from .solver import (
 )
 from .validation import MAX_INVENTORY_COUNT, MAX_SNAPSHOT_BYTES, check_layout_json
 
-__all__ = ["Session", "dispatch_session", "RevisionConflictError", "UnknownRouteError"]
-
 #: A friendly default box so the editor is playable before anyone edits counts.
 DEFAULT_INVENTORY = {
     "straight": 8,

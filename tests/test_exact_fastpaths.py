@@ -9,7 +9,7 @@ import pytest
 
 from duplotrain import SolverConfig, build_chain, default_catalog, solve
 from duplotrain.exact import Alg
-from duplotrain.geometry import Pose, cos_sin
+from duplotrain.geometry import Pose, _rotate_xy, cos_sin
 from duplotrain.layout import _port_pose, _rotated_local_pose
 
 
@@ -24,13 +24,12 @@ def full_product(x, y):
 
 def test_scalar_arithmetic_entry_points_keep_exact_coercion():
     # Alg-by-Alg products are compared in test_sparse_and_dense_products_are_exact
-    # below; here the scalar entry points, including reflected subtraction.
+    # below; here the scalar entry points.
     x = Alg(1, 2, 3, 4)
     for scalar in (0, 1, -3, Fraction(7, 13), 152.4):
         y = Alg(scalar)
         assert (x * scalar).coeffs() == full_product(x, y)
         assert (scalar * x).coeffs() == full_product(y, x)
-        assert scalar - x == y - x
 
 
 def generic_add(x, y):
@@ -86,9 +85,7 @@ def test_identity_fastpaths_keep_scalar_coercion_and_immutability(scalar):
     value = Alg(Fraction(3, 7), -2, Fraction(5, 11), 4)
     before = copy.deepcopy(value)
     for actual, expected in ((value + scalar, generic_add(value, scalar)),
-                             (scalar + value, generic_add(value, scalar)),
                              (value - scalar, generic_sub(value, scalar)),
-                             (scalar - value, generic_sub(Alg(scalar), value)),
                              (value * scalar, generic_mul(value, scalar)),
                              (scalar * value, generic_mul(value, scalar))):
         assert actual.coeffs() == expected.coeffs()
@@ -110,8 +107,9 @@ def test_every_heading_matches_full_rotation_and_composition(heading):
             for turn in (-48, -7, 0, 6, 12, 18, 25, 72):
                 rx, ry = generic_rotation(x, y, turn)
                 expected = Pose(rx, ry, pose.z, heading + turn)
-                assert pose.rotated_about_origin(turn) == expected
-                assert hash(pose.rotated_about_origin(turn)) == hash(expected)
+                actual = Pose(*_rotate_xy(x, y, turn), pose.z, heading + turn)
+                assert actual == expected
+                assert hash(actual) == hash(expected)
             dx, dy = y, -x
             rx, ry = generic_rotation(dx, dy, heading)
             actual = pose.then(dx, dy, Fraction(-96, 5), -29)
@@ -129,16 +127,9 @@ def test_quarter_turns_do_not_multiply_field_elements(heading, monkeypatch):
     pose = Pose.make(Alg(1, 2, 3, 4), Alg(-5, 6, -7, 8), 41, heading)
     expected_xy = generic_rotation(pose.x, pose.y, heading)
     monkeypatch.setattr(Alg, "__mul__", unexpected)
-    assert pose.rotated_about_origin(heading).xy() == tuple(map(float, expected_xy))
+    assert tuple(map(float, _rotate_xy(pose.x, pose.y, heading))) == tuple(
+        map(float, expected_xy))
     pose.then(Alg(1, 2, 3, 4), Alg(-5, 6, -7, 8), 0, 2)
-
-
-@pytest.mark.parametrize("steps", [0.0, 6.0, 12.0, 18.0, 1.5, "6", None])
-def test_rotation_still_rejects_non_integer_steps(steps):
-    # The old table lookup rejected even whole floats; shortcut branches must
-    # not accidentally accept them just because 6.0 == 6.
-    with pytest.raises(TypeError):
-        Pose.make().rotated_about_origin(steps)
 
 
 @pytest.mark.parametrize("engine", ["lattice", "field"])
@@ -159,7 +150,6 @@ def test_complete_search_results_and_counters_match_full_arithmetic(
     optimized = solve(stock, catalog, config, base=base)
     assert optimized.stats.complete and optimized.solutions
     monkeypatch.setattr(Alg, "__add__", generic_add)
-    monkeypatch.setattr(Alg, "__radd__", generic_add)
     monkeypatch.setattr(Alg, "__sub__", generic_sub)
     monkeypatch.setattr(Alg, "__neg__", generic_neg)
     monkeypatch.setattr(Alg, "__mul__", generic_mul)

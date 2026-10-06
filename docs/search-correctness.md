@@ -344,7 +344,7 @@ angles as exact multiples of 30, before any integer conversion. For example, 30.
 degrees is rejected rather than changed into a 30-degree curve, and 30.0000000001
 rather than snapped to 30. Integral float/string inputs are normalized to integers
 while retaining signed sweeps. Layout construction copies and freezes the link graph,
-placements and accessory collections; copying and pickling retain that boundary.
+placements and accessory collections.
 Editor responses copy nested accessory metadata, so modifying a response cannot
 change the catalogue or other sessions. These boundaries are covered in
 `tests/test_pieces.py`, `tests/test_layout.py` and `tests/test_editor_snapshots.py`.
@@ -385,10 +385,9 @@ matches type and position together. The Remove tool also sends `remove: true`,
 so a missing marker is an error rather than a request to add a new stone. Invalid
 positions/removal modes leave the session and revision untouched.
 
-Library callers can use `Layout.without_accessory(..., at_port=None)` or an
-integer for exact-position removal. Omitting the keyword removes the last stone
-of that colour. Removing one marker preserves other positions, counts,
-serialization round trips and undo.
+Library callers pass `Layout.without_accessory(..., at_port=None)` or an
+integer for exact-position removal. Removing one marker preserves other
+positions, counts, serialization round trips and undo.
 
 These contracts are exercised by `tests/test_drive.py`,
 `tests/test_stone_encounters.py`, `tests/test_stone_positions.py` and

@@ -77,13 +77,6 @@ def test_reversed_and_connects_to():
     assert not a.connects_to(lifted)
 
 
-def test_mirror_and_rotation():
-    p = Pose.make(3, 4, 0, degrees_to_steps(30))
-    assert p.mirrored() == Pose.make(3, -4, 0, degrees_to_steps(-30))
-    q = p.rotated_about_origin(degrees_to_steps(90))
-    assert q == Pose.make(-4, 3, 0, degrees_to_steps(120))
-
-
 def test_pose_is_hashable_and_exact():
     p1 = ORIGIN.then(128, 0, 0, 2).then(128, 0, 0, -2)
     p2 = ORIGIN.then(256, 0, 0, 0)

@@ -83,7 +83,7 @@ def test_completion_around_a_switch_leaves_its_branch_open(catalog):
     sol = result.solutions[0]
     assert sol.exact
     assert len(sol.layout) == 12
-    assert sol.layout.open_ends() == [(0, 2)]  # only the right branch dangles
+    assert sol.layout.connectable_ends() == [(0, 2)]  # only the right branch dangles
 
 
 def test_completion_rejects_already_mating_ends(catalog):
@@ -94,7 +94,7 @@ def test_completion_rejects_already_mating_ends(catalog):
 
 def test_completion_needs_two_open_ends(catalog):
     layout = build_chain([(catalog["curve"], *LEFT)] * 12)
-    closed = layout.join(layout.open_ends()[1], layout.open_ends()[0])
+    closed = layout.join(layout.connectable_ends()[1], layout.connectable_ends()[0])
     with pytest.raises(ValueError, match="two distinct open ends"):
         solve({"curve": 1}, catalog, SolverConfig(min_pieces=1), base=closed)
 
@@ -158,9 +158,6 @@ def preplaced_crossing_gap():
     witness = base.join(grow, (cross, 0)).join((cross, 1), close)
     assert not witness.joint_issues()
     assert not _solution_overlaps(witness, 0, 120.0, 8.0)
-    assert list(witness.walk(start=(left, 0))) == [
-        (left, 0, 1), (cross, 0, 1), (right, 0, 1),
-    ]
     return catalog, base, grow, close
 
 

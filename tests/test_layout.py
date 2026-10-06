@@ -1,8 +1,6 @@
 """Layout assembly, the classic identities, and serialisation."""
 
-import copy
 import math
-import pickle
 import random
 from dataclasses import replace
 from fractions import Fraction
@@ -21,7 +19,7 @@ from tests.test_congruence import built, track, transform
 
 def chain_end(layout: Layout) -> tuple:
     """(pose of the last piece's open exit)."""
-    open_ends = layout.open_ends()
+    open_ends = layout.connectable_ends()
     # build_chain leaves exactly the first entry and last exit open.
     return layout.pose_of(open_ends[-1])
 
@@ -35,7 +33,7 @@ def test_twelve_curves_close_a_circle(catalog):
     layout = build_chain([(curve, *LEFT)] * 12)
     end = chain_end(layout)
     assert end == ORIGIN  # back at the anchor, exactly
-    closed = layout.join(layout.open_ends()[1], layout.open_ends()[0])
+    closed = layout.join(layout.connectable_ends()[1], layout.connectable_ends()[0])
     assert closed.is_closed
     # Outer diameter of the circle: centreline square of 512 plus one track width.
     width, height = closed.size()
@@ -54,7 +52,7 @@ def test_classic_starter_oval_closes_exactly(catalog):
     )
     layout = build_chain(pieces)
     assert chain_end(layout) == ORIGIN
-    closed = layout.join(layout.open_ends()[1], layout.open_ends()[0])
+    closed = layout.join(layout.connectable_ends()[1], layout.connectable_ends()[0])
     assert closed.is_closed
     width, height = closed.size()
     # 832 x 576 mm outer envelope, from the research dossier's arithmetic.
@@ -121,9 +119,9 @@ def test_overhanging_plates_refuse_to_mate(catalog):
     lc = catalog["level_crossing"]
     layout = build_chain([(lc, 0, 1)])
     with pytest.raises(ValueError, match="overlap"):
-        layout.attach(lc, 0, layout.open_ends()[-1])
+        layout.attach(lc, 0, layout.connectable_ends()[-1])
     # A plain straight on the same end is fine.
-    layout.attach(catalog["straight"], 0, layout.open_ends()[-1])
+    layout.attach(catalog["straight"], 0, layout.connectable_ends()[-1])
 
 
 def test_mating_hints_never_offer_overlapping_road_plates(catalog):
@@ -237,7 +235,7 @@ def test_attach_rejects_occupied_end(catalog):
 def test_join_rejects_non_meeting_ends(catalog):
     curve = catalog["curve"]
     layout = build_chain([(curve, *LEFT), (curve, *LEFT)])
-    a, b = layout.open_ends()
+    a, b = layout.connectable_ends()
     with pytest.raises(ValueError, match="do not meet"):
         layout.join(a, b)
     forced = layout.join(a, b, force=True)
@@ -265,16 +263,6 @@ def test_layout_copies_and_freezes_constructor_collections():
         layout.links[(0, 1)] = (1, 1)
 
 
-@pytest.mark.parametrize("restore", [copy.copy, copy.deepcopy,
-                                     lambda obj: pickle.loads(pickle.dumps(obj))])
-def test_immutable_layout_still_supports_copy_and_pickle(restore):
-    chain = build_chain([(default_catalog()["straight"], 0, 1)] * 2)
-    restored = restore(chain)
-    assert restored == chain
-    with pytest.raises(TypeError):
-        restored.links[(0, 1)] = (1, 1)
-
-
 def test_serialisation_round_trip_is_exact(catalog):
     curve, straight = catalog["curve"], catalog["straight"]
     layout = build_chain([(curve, *LEFT)] * 3 + [(straight, 0, 1)])
@@ -282,7 +270,8 @@ def test_serialisation_round_trip_is_exact(catalog):
     rebuilt = layout_from_dict(data, catalog)
     assert rebuilt == layout
     # Exactness survives JSON: the reloaded end pose still compares equal.
-    assert rebuilt.pose_of(rebuilt.open_ends()[-1]) == layout.pose_of(layout.open_ends()[-1])
+    end = layout.connectable_ends()[-1]
+    assert rebuilt.pose_of(end) == layout.pose_of(end)
 
 
 @pytest.mark.parametrize("links", [
@@ -341,15 +330,6 @@ def test_coefficient_arity_and_format_version_are_checked():
     data["placements"][0]["frame"]["x"] = ["0"] * 3
     with pytest.raises(ValueError, match="exactly 4"):
         check_layout_json(data)
-
-
-def test_walk_traverses_the_loop(catalog):
-    curve = catalog["curve"]
-    layout = build_chain([(curve, *LEFT)] * 12)
-    layout = layout.join(layout.open_ends()[1], layout.open_ends()[0])
-    steps = list(layout.walk(start=(0, 0)))
-    assert len(steps) == 12
-    assert [i for i, _, _ in steps] == list(range(12))
 
 
 def straights(count):

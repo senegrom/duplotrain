@@ -8,7 +8,19 @@ from duplotrain import Layout, Placement, Pose, build_chain, default_catalog, pa
 from duplotrain._congruence import _compare
 from duplotrain.exact import Alg
 from duplotrain.explore import congruence_key
+from duplotrain.geometry import cos_sin
 from duplotrain.pieces import Arc, Straight
+
+
+def mirrored(pose):
+    """Reflect across the world x axis (y -> -y), which flips handedness."""
+    return Pose(pose.x, -pose.y, pose.z, -pose.heading)
+
+
+def rotated(pose, steps):
+    """Rotate the whole pose about the world origin."""
+    c, s = cos_sin(steps)
+    return Pose(c * pose.x - s * pose.y, s * pose.x + c * pose.y, pose.z, pose.heading + steps)
 
 
 def track(segments, *, start=None):
@@ -39,14 +51,14 @@ def transform(layout, heading, mirror, dx=431):
             # Reflect the local paths as well as the placement frame: changing
             # only the frame is not a reflection of a handed curve.
             paths = tuple(replace(
-                path, start=path.start.mirrored(),
+                path, start=mirrored(path.start),
                 segments=tuple(replace(seg, degrees=-seg.degrees) if type(seg) is Arc else seg
                                for seg in path.segments),
             ) for path in piece.paths)
-            ports = tuple(replace(port, pose=port.pose.mirrored()) for port in piece.ports)
+            ports = tuple(replace(port, pose=mirrored(port.pose)) for port in piece.ports)
             piece = replace(piece, paths=paths, ports=ports)
-            frame = frame.mirrored()
-        frame = frame.rotated_about_origin(heading)
+            frame = mirrored(frame)
+        frame = rotated(frame, heading)
         frame = Pose.make(frame.x + dx, frame.y - 781, frame.z + 19, frame.heading)
         placements.append(Placement(piece, frame))
     return Layout(tuple(placements), dict(layout.links), layout.accessories)

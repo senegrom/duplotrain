@@ -118,7 +118,7 @@ def test_previously_capped_broad_search_finds_audited_solutions(case):
     for solution in result.solutions:
         assert solution.exact and not solution.layout.joint_issues()
         assert solution.layout.placements[:len(base)] == base.placements
-        assert not _solution_overlaps(solution.layout, len(base), cfg.clearance, 8)
+        assert not _solution_overlaps(solution.layout, len(base), 120.0, 8)
         assert all(n <= inventory.get(pid, 0) + base.piece_counts.get(pid, 0)
                    for pid, n in solution.layout.piece_counts.items())
 

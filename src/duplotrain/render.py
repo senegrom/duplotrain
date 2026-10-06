@@ -27,8 +27,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
-__all__ = ["render_layout"]
-
 BALLAST_EDGE = "#8d949c"
 RAIL = "#6d7278"
 SLEEPER = "#9aa0a7"
@@ -179,25 +177,20 @@ def render_layout(
     path: str | None = None,
     title: str | None = None,
     ax: Axes | None = None,
-    dpi: int = 150,
 ) -> Figure:
     """Draw *layout*; save to *path* if given, and return the figure.
 
     The *title*, by default the piece counts and size, is drawn as plain text.
 
-    A figure made only to be saved is a standalone :class:`~matplotlib.figure.Figure`:
+    Without *ax* the figure is a standalone :class:`~matplotlib.figure.Figure`:
     pyplot's backend and open figures stay as they were. A caller's *ax* keeps its
     figure open.
     """
-    if ax is None and path is not None:
+    if ax is None:
         from matplotlib.figure import Figure
 
         fig = Figure(figsize=(9, 9))
         ax = fig.subplots()
-    elif ax is None:
-        import matplotlib.pyplot as plt
-
-        fig, ax = plt.subplots(figsize=(9, 9))
     else:
         fig = ax.figure
 
@@ -343,5 +336,5 @@ def render_layout(
     ax.set_facecolor("#f4f2ee")
 
     if path is not None:
-        fig.savefig(path, dpi=dpi, bbox_inches="tight")
+        fig.savefig(path, dpi=150, bbox_inches="tight")
     return fig

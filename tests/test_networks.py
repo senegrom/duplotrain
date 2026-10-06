@@ -10,7 +10,7 @@ from duplotrain.explore import congruence_key, find_perfect_networks
 from duplotrain.networks import NetworkConfig, enumerate_networks
 from duplotrain.solver import _solution_overlaps
 from duplotrain.symmetry import placement_key
-from tests.test_congruence import long_straight_catalog
+from tests.test_congruence import long_straight_catalog, rotated
 
 
 def test_shuttle_is_the_only_buffered_bar(catalog):
@@ -354,7 +354,7 @@ def _exact_piece_key(layout):
                 f = placement.frame
                 centred = Pose(f.x - centre[0], f.y - centre[1], f.z - centre[2], f.heading)
                 items.append((placement.piece.id, placement_key(
-                    placement.piece, centred.rotated_about_origin(heading), mirror)))
+                    placement.piece, rotated(centred, heading), mirror)))
             candidates.append(tuple(sorted(items)))
     return min(candidates)
 

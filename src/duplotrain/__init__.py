@@ -10,16 +10,8 @@ Quick taste::
     render_layout(best.layout, "oval.png")
 """
 
-from .catalog import ACCESSORIES, default_catalog, load_catalog
-from .drive import (
-    ClassificationLimitError,
-    DriveLimitError,
-    DriveReport,
-    LoopClassification,
-    classify,
-    drive,
-)
-from .exact import Alg
+from .catalog import default_catalog
+from .drive import ClassificationLimitError, DriveLimitError, classify, drive
 from .explore import (
     IncompleteSearchError,
     PerfectResult,
@@ -33,26 +25,17 @@ from .explore import (
 from .geometry import ORIGIN, Pose
 from .layout import Layout, Placement, build_chain, layout_from_dict, layout_to_dict
 from .networks import NetworkConfig, enumerate_networks
-from .pieces import PieceType, parse_piece, parse_pieces
+from .pieces import parse_piece
 from .render import render_layout
-from .scoring import ScoreWeights, score_solution
-from .sets import SETS, inventory_for_sets
-from .solver import Solution, SolverConfig, SolveResult, solve
+from .solver import SolverConfig, solve
 
 __version__ = "0.1.0"
 
 __all__ = [
-    "Alg",
     "Pose",
     "ORIGIN",
-    "PieceType",
     "parse_piece",
-    "parse_pieces",
     "default_catalog",
-    "load_catalog",
-    "ACCESSORIES",
-    "SETS",
-    "inventory_for_sets",
     "Layout",
     "Placement",
     "build_chain",
@@ -60,14 +43,8 @@ __all__ = [
     "layout_from_dict",
     "solve",
     "SolverConfig",
-    "SolveResult",
-    "Solution",
-    "ScoreWeights",
-    "score_solution",
     "drive",
     "classify",
-    "DriveReport",
-    "LoopClassification",
     "ClassificationLimitError",
     "DriveLimitError",
     "congruence_key",

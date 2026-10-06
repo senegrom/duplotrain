@@ -36,10 +36,8 @@ def test_remove_exact_position_and_undo_preserve_other_markers(position):
     assert session.layout == before and session.stones_remaining()["stone_lights"] == 0
 
 
-def test_library_omitted_position_keeps_legacy_last_of_colour_removal():
+def test_library_removal_takes_the_selected_position():
     layout = positioned_session().layout
-    removed = layout.without_accessory(0, "stone_lights")
-    assert removed.stone_entries_on(0) == [("stone_lights", None), ("stone_lights", 0)]
     assert layout.without_accessory(0, "stone_lights", at_port=None).stone_entries_on(0) == [
         ("stone_lights", 0), ("stone_lights", 1),
     ]

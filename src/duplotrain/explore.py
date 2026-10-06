@@ -36,17 +36,6 @@ from .solver import Solution, SolverConfig, SolveStats, _Place, solve
 if TYPE_CHECKING:
     from .networks import NetworkConfig, NetworkStats
 
-__all__ = [
-    "PerfectResult",
-    "IncompleteSearchError",
-    "congruence_key",
-    "find_perfect_loops",
-    "find_perfect_networks",
-    "is_stem_tailed",
-    "pick_stem_tailed",
-    "make_dogbone",
-]
-
 
 class IncompleteSearchError(RuntimeError):
     """A requested exhaustive search hit a bound; ``result`` retains partial work."""
@@ -54,10 +43,6 @@ class IncompleteSearchError(RuntimeError):
     def __init__(self, result: PerfectResult) -> None:
         self.result = result
         super().__init__(f"search incomplete: {result.stats.stop_reason}")
-
-    def __reduce__(self):
-        # Rebuilt from the result, not the message (pickling, copying).
-        return type(self), (self.result,)
 
 
 class PerfectResult(list[tuple[Layout, LoopClassification]]):
@@ -74,11 +59,6 @@ class PerfectResult(list[tuple[Layout, LoopClassification]]):
     ) -> None:
         super().__init__(layouts)
         self.stats = stats
-
-    @property
-    def layouts(self) -> list[tuple[Layout, LoopClassification]]:
-        """The same list, for callers using the explicit result-envelope API."""
-        return self
 
     def require_complete(self) -> PerfectResult:
         """Return this result, or raise with the partial result still attached."""
@@ -277,14 +257,10 @@ def find_perfect_networks(
     return perfect.require_complete() if require_complete else perfect
 
 
-def make_dogbone(
-    teardrop: Solution,
-    pieces: Mapping[str, PieceType],
-    bar_straights: int = 2,
-) -> Layout:
+def make_dogbone(teardrop: Solution, pieces: Mapping[str, PieceType]) -> Layout:
     """Grow a solver-found teardrop into a dogbone: the stone-free perfect layout.
 
-    The teardrop's open tail gets a straight bar, a second switch, and a copy of
+    The teardrop's open tail gets a bar of two straights, a second switch, and a copy of
     the lobe replayed from the teardrop's own step recipe; the final joint closes the
     walk into the new switch's other branch.  Every connector ends up mated, so the
     result has no ends to fall off and needs no direction stone: the lobes
@@ -309,7 +285,7 @@ def make_dogbone(
         raise ValueError("the teardrop should have exactly its tail open")
 
     cursor = opens[0]
-    for _ in range(bar_straights):
+    for _ in range(2):
         layout, index = layout.attach(pieces["straight"], 0, cursor)
         cursor = (index, 1)
 

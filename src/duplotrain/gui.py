@@ -21,8 +21,6 @@ from .editor import Session as Session
 from .editor import dispatch_session as dispatch_session
 from .validation import MAX_JSON_BYTES, check_json_depth
 
-__all__ = ["Session", "make_server", "run"]
-
 # Only these packaged assets are HTTP routes; never resolve arbitrary request
 # paths against the filesystem. Keep icon URLs shared with the static build.
 _EDITOR_ASSETS = {

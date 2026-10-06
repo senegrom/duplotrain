@@ -112,8 +112,7 @@ def test_sealed_buffer_faces_are_not_open_connectors(tmp_path):
     layout = build_chain([(catalog["straight"], 0, 1)])
     for end in layout.connectable_ends():
         layout, _ = layout.attach(catalog["buffer"], 0, end)
-    assert layout.is_closed
-    assert len(layout.open_ends()) == 2  # bumpers, not real open connectors
+    assert layout.is_closed  # the bumper faces are not open connectors
     result = check_layout(tmp_path, layout)
     assert result.exit_code == 0
     assert "exactly mated" in result.output

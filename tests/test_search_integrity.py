@@ -1,6 +1,5 @@
 """Search regressions: eligibility before dedup, exact symmetries and honest limits."""
 
-import pickle
 from dataclasses import replace
 
 import pytest
@@ -115,11 +114,9 @@ def test_both_searches_reject_unknown_ids_even_with_zero_count(search):
     {"min_pieces": -1}, {"min_pieces": True}, {"max_pieces": 0},
     {"max_pieces": None}, {"max_pieces": 1.5}, {"max_pieces": True},
     {"max_results": 0}, {"max_results": True}, {"max_nodes": 0},
-    {"max_nodes": 1.5}, {"clearance": -1}, {"clearance": float("inf")},
-    {"collision_spacing": 0}, {"collision_spacing": -1},
-    {"collision_spacing": float("nan")},
+    {"max_nodes": 1.5},
 ])
-def test_network_configuration_validates_resource_and_sampling_bounds(kwargs):
+def test_network_configuration_validates_resource_bounds(kwargs):
     with pytest.raises(ValueError):
         NetworkConfig(**kwargs)
 
@@ -169,8 +166,7 @@ def test_perfection_wrappers_retain_stats_and_can_require_exhaustion(family, lim
             )
     result = search()
     assert isinstance(result, PerfectResult)
-    assert result.layouts is result
-    assert list(result) == result  # existing list-style clients still work
+    assert list(result) == result
     assert result.stats.stop_reason == reason
     if reason == "exhausted":
         assert result.stats.complete
@@ -181,8 +177,6 @@ def test_perfection_wrappers_retain_stats_and_can_require_exhaustion(family, lim
         with pytest.raises(IncompleteSearchError) as error:
             result.require_complete()
         assert error.value.result is result
-        again = pickle.loads(pickle.dumps(error.value))  # as from a worker process
-        assert str(again) == str(error.value) and again.result.stats == result.stats
         with pytest.raises(IncompleteSearchError, match=reason):
             search(require_complete=True)
 
