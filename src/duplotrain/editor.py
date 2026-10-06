@@ -475,8 +475,8 @@ class Session:
                 turn = _signed_degrees(move.dheading)
                 rise = float(move.dz)
                 if len(piece.ports) == 2 and turn == 0 and abs(rise) > 0.5:
-                    # Climbing pieces MUST distinguish direction: two identical
-                    # "ahead" buttons once left a user's bridge hanging mid-air.
+                    # A climbing piece names its direction: two "ahead" buttons would
+                    # not tell the climb from the descent.
                     label = (
                         f"↑ climb {rise:.0f}mm"
                         if rise > 0

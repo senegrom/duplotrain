@@ -345,10 +345,8 @@ def _tongue_choices(layout: Layout) -> list[tuple[int, list[int]]]:
     return choices
 
 
-def _tongue_assignments(layout: Layout, *, choices=None) -> Iterator[dict[int, int]]:
+def _tongue_assignments(choices) -> Iterator[dict[int, int]]:
     """Yield each tongue setting, retaining only one assignment at a time."""
-    if choices is None:
-        choices = _tongue_choices(layout)
     indices = [index for index, _ in choices]
     for setting in product(*(options for _, options in choices)):
         yield dict(zip(indices, setting, strict=True))
@@ -416,7 +414,7 @@ def classify(
             f"classification needs {required_runs:,} runs, exceeding max_runs={max_runs:,}; "
             "increase max_runs to classify this layout"
         )
-    assignments = _tongue_assignments(layout, choices=context.choices)
+    assignments = _tongue_assignments(context.choices)
     everything = drivable_universe(layout)
 
     locally = False

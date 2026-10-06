@@ -447,6 +447,15 @@ class PieceType:
         return [list(line) for line in _sample_paths(self.paths, spacing)]
 
 
+def _lowest(values: Iterable[Alg]) -> Alg | None:
+    """The least of exact *values*, compared exactly (None when there are none)."""
+    low = None
+    for value in values:
+        if low is None or (value - low).sign() < 0:
+            low = value
+    return low
+
+
 @lru_cache(maxsize=128)
 def _minimum_path_z(paths: tuple[Path, ...]) -> Alg:
     heights = []
@@ -464,11 +473,7 @@ def _minimum_path_z(paths: tuple[Path, ...]) -> Alg:
                     heights.append(z + Fraction(dip))
             z = z + dz
             heights.append(z)
-    low = None
-    for z in heights:
-        if low is None or (z - low).sign() < 0:
-            low = z
-    return alg(0) if low is None else low
+    return _lowest(heights)
 
 
 @lru_cache(maxsize=128)

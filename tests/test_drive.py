@@ -395,7 +395,7 @@ def test_a_prepared_context_drives_exactly_like_a_fresh_run():
     context = _prepare_drive(ring)
     before = repr(context)
     starts = _all_starts(ring)
-    for settings in islice(_tongue_assignments(ring, choices=context.choices), 3):
+    for settings in islice(_tongue_assignments(context.choices), 3):
         original = dict(settings)
         for start in starts[::5]:
             expected = drive(ring, start, settings)
@@ -491,7 +491,7 @@ def switches(count):
 
 
 def test_tongue_assignments_can_yield_a_small_prefix_of_a_large_product():
-    assignments = list(islice(_tongue_assignments(switches(24)), 3))
+    assignments = list(islice(_tongue_assignments(_prepare_drive(switches(24)).choices), 3))
     assert len(assignments) == 3
     assert all(len(a) == 24 for a in assignments)
     assert len({tuple(a.items()) for a in assignments}) == 3

@@ -50,8 +50,7 @@ class RouteJob:
             raise ValueError("No drivable starting positions")
         self.universe = drivable_universe(self.layout)
         self.iterator = ((start, settings) for settings in _tongue_assignments(
-            self.layout, choices=self.drive_context.choices)
-                         for start in self.starts)
+            self.drive_context.choices) for start in self.starts)
         self.runs = self.steps = self.limited_runs = 0
         self.best = self.best_score = None
         # The first run breaking each universal property, as drive.classify

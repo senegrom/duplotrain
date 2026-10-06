@@ -41,7 +41,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from .catalog import BRICK
-from .exact import Alg
 from .layout import Layout
 from .solver import Solution
 
@@ -87,16 +86,13 @@ class ScoreBreakdown:
         return (self.raised, -self.total)
 
 
-_BRICK = Alg(BRICK)
-
-
 def _raised_pieces(layout: Layout) -> int:
     """How many of *layout*'s pieces stand on stacks of DUPLO bricks (see above)."""
     lows = [placement.frame.z + placement.piece.minimum_z for placement in layout]
-    floor = layout.floor()
+    brick_top = layout.floor() + BRICK  # the top of one brick standing on the floor
 
     def raised(index: int) -> bool:
-        return (lows[index] - floor - _BRICK).sign() >= 0
+        return (lows[index] - brick_top).sign() >= 0
 
     def carried(index: int) -> bool:
         # An arch whose foot rests on the top of a ramp that is not raised itself

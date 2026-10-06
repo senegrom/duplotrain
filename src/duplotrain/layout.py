@@ -24,7 +24,7 @@ from .catalog import ACCESSORIES, STONE_MOUNTS
 from .exact import ZERO, Alg
 from .geometry import DEGREES_PER_STEP, HEADING_STEPS, ORIGIN, Pose, cos_sin
 from .pieces import Path as TrackPath
-from .pieces import PieceType, _sample_paths, kinds_mate
+from .pieces import PieceType, _lowest, _sample_paths, kinds_mate
 from .validation import check_layout_json, rational_coefficient
 
 __all__ = ["Placement", "End", "Layout", "layout_to_dict", "layout_from_dict"]
@@ -34,15 +34,6 @@ End = tuple[int, int]
 
 #: Why two connectors whose kinds do not mate cannot join (see pieces.PORT_KINDS).
 _BRIDGE_JOINT = "a ramp's top takes only an arch's foot, and an arch's foot only a ramp's top"
-
-
-def _lowest(values: Iterable[Alg]) -> Alg | None:
-    """The least of exact *values*, compared exactly (None when there are none)."""
-    low = None
-    for value in values:
-        if low is None or (value - low).sign() < 0:
-            low = value
-    return low
 
 
 def _alg_to_json(value: Alg) -> list[str]:
@@ -326,11 +317,9 @@ class Layout:
         return self.placements[i].port_pose(p)
 
     def floor(self, pieces: Iterable[PieceType] = ()) -> Alg:
-        """The height the layout stands on: its lowest track (exact for straights, arcs
-        and ramps; other segments as :attr:`PieceType.minimum_z` measures them).
+        """The height the layout stands on: its lowest track, every path of every piece
+        (:attr:`PieceType.minimum_z`), not only their connectors.
 
-        Every path of every piece counts (:attr:`PieceType.minimum_z`), not only
-        its connectors: a piece may dip between its ends or carry a lower route.
         An open arch foot is the exception: it rests on a ramp's top, never on the
         floor, so the floor lies as low as the lowest track of whichever of
         *pieces* could carry it. An empty layout stands at 0.
@@ -756,7 +745,7 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
             _alg_from_json(frame_spec["x"]),
             _alg_from_json(frame_spec["y"]),
             _alg_from_json(frame_spec["z"]),
-            int(frame_spec["heading"]),
+            frame_spec["heading"],
         )
         placements.append(Placement(pieces[piece_id], frame))
 
@@ -776,12 +765,7 @@ def layout_from_dict(data: Mapping[str, Any], pieces: Mapping[str, PieceType]) -
             raise ValueError(f"end ({ai}, {ap}) or ({bi}, {bp}) is linked twice")
         links[(ai, ap)] = (bi, bp)
         links[(bi, bp)] = (ai, ap)
-    accessories = tuple(
-        (int(entry[0]), str(entry[1]))
-        if len(entry) < 3
-        else (int(entry[0]), str(entry[1]), int(entry[2]))
-        for entry in data.get("accessories", [])
-    )
+    accessories = data.get("accessories", [])
     for entry in accessories:
         check_end(entry[0], entry[2] if len(entry) > 2 else 0)
         # The same rules as the editor's stone tool: a file from elsewhere must
